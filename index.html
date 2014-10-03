@@ -8,7 +8,7 @@
     <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen">
     <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
 
-    <title>Drakvuf by tklengyel</title>
+    <title>DRAKVUF Dynamic Malware Analysis</title>
   </head>
 
   <body>
@@ -16,10 +16,9 @@
     <header>
       <div class="container">
         <h1>Drakvuf</h1>
-        <h2>DRAKVUF Dynamic Malware Analysis System</h2>
+        <h2>DRAKVUF Dynamic Malware Analysis</h2>
 
         <section id="downloads">
-          <a href="https://github.com/tklengyel/drakvuf/zipball/master" class="btn">Download as .zip</a>
           <a href="https://github.com/tklengyel/drakvuf/tarball/master" class="btn">Download as .tar.gz</a>
           <a href="https://github.com/tklengyel/drakvuf" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
         </section>
@@ -29,39 +28,265 @@
     <div class="container">
       <section id="main_content">
         <h3>
-<a name="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages"><span class="octicon octicon-link"></span></a>Welcome to GitHub Pages.</h3>
+<a name="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages"><span class="octicon octicon-link"></span></a>Introduction</h3>
 
-<p>This automatic page generator is the easiest way to create beautiful pages for all of your projects. Author your page content here using GitHub Flavored Markdown, select a template crafted by a designer, and publish. After your page is generated, you can check out the new branch:</p>
+<p>DRAKVUF is an agentless dynamic malware analysis system built on Xen, LibVMI, Volatility and Rekall. It allows for in-depth execution tracing of malware samples, extracting deleted files from memory and more.</p>
 
-<pre><code>$ cd your_repo_root/repo_name
-$ git fetch origin
-$ git checkout gh-pages
+<h3>
+<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Hardware requirements</h3>
+<p>For DRAKVUF to work you will need an Intel CPU with virtualization support and with Extended Page Tables (EPT). DRAKVUF is not going to work on any other CPUs or without EPT. It is recommended to have at least 8GB RAM but you may be able get by with less.</p>
+
+<h3>
+<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Supported guests</h3>
+<p>DRAKVUF currently supports Windows 7 VMs, both 32 and 64-bit versions.</p>
+
+<h3>
+<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Installation guide</h3>
+
+The following packages are normally required to build Xen and DRAKVUF on Debian based Linux distros.
+
+<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute libcurl3 libcurl4-openssl-dev bzip2 module-init-tools pciutils-dev build-essential make gcc libc6-dev zlib1g-dev python python-dev python-twisted libncurses5-dev patch libvncserver-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev bison flex libglib2.0-dev autoconf automake libtool libjansson-dev libfuse-dev
 </code></pre>
 
-<p>If you're using the GitHub for Mac, simply sync your repository and you'll see the new branch.</p>
+You can also install Xen from your repository but the recommended way is to build it from source.
 
-<h3>
-<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Designer Templates</h3>
+<pre><code>wget http://bits.xensource.com/oss-xen/release/4.4.1/xen-4.4.1.tar.gz
+tar xzvf xen-4.4.1.tar.gz
+cd ./xen-4.4.1
+./configure
+make -j4 dist-xen
+make -j4 dist-tools
+</code></pre>
 
-<p>We've crafted some handsome templates for you to use. Go ahead and continue to layouts to browse through them. You can easily go back to edit your page before publishing. After publishing your page, you can revisit the page generator and switch to another theme. Your Page content will be preserved if it remained markdown format.</p>
+To install Xen with dom0 getting 4GB RAM assigned and two dedicated CPU cores (tune it as preferred):
 
-<h3>
-<a name="rather-drive-stick" class="anchor" href="#rather-drive-stick"><span class="octicon octicon-link"></span></a>Rather Drive Stick?</h3>
+<pre><code>sudo su
+make -j4 install-xen
+make -j4 install-tools
+echo "GRUB_CMDLINE_XEN_DEFAULT=\"dom0_mem=4096M,max:4096M dom0_max_vcpus=2 dom0_vcpus_pin=true\"" >> /etc/default/grub
+update-grub
+echo "none /proc/xen xenfs defaults,nofail 0 0" >> /etc/fstab
+echo "xen-evtchn" >> /etc/modules
+echo "xen-privcmd" >> /etc/modules
+update-rc.d xencommons defaults 19 18
+update-rc.d xendomains defaults 21 20
+update-rc.d xen-watchdog defaults 22 23
+reboot
+</code></pre>
 
-<p>If you prefer to not use the automatic generator, push a branch named <code>gh-pages</code> to your repository to create a page manually. In addition to supporting regular HTML content, GitHub Pages support Jekyll, a simple, blog aware static site generator written by our own Tom Preston-Werner. Jekyll makes it easy to create site-wide headers and footers without having to copy them across every page. It also offers intelligent blog support and other advanced templating features.</p>
+<p>Also make sure you are running a relatively recent kernel (anything above 3.8 should just work).</p>
 
-<h3>
-<a name="authors-and-contributors" class="anchor" href="#authors-and-contributors"><span class="octicon octicon-link"></span></a>Authors and Contributors</h3>
+<pre><code>uname -r</code></pre>
 
-<p>You can <a href="https://github.com/blog/821" class="user-mention">@mention</a> a GitHub username to generate a link to their profile. The resulting <code>&lt;a&gt;</code> element will link to the contributor's GitHub Profile. For example: In 2007, Chris Wanstrath (<a href="https://github.com/defunkt" class="user-mention">@defunkt</a>), PJ Hyett (<a href="https://github.com/pjhyett" class="user-mention">@pjhyett</a>), and Tom Preston-Werner (<a href="https://github.com/mojombo" class="user-mention">@mojombo</a>) founded GitHub.</p>
+Once you are booted into Xen, verify that everything works as such:
+<pre><code>sudo xen-detect</code></pre>
 
-<h3>
-<a name="support-or-contact" class="anchor" href="#support-or-contact"><span class="octicon octicon-link"></span></a>Support or Contact</h3>
+The output should be: Running in PV context on Xen v4.4.
 
-<p>Having trouble with Pages? Check out the documentation at <a href="http://help.github.com/pages">http://help.github.com/pages</a> or contact <a href="mailto:support@github.com">support@github.com</a> and we’ll help you sort it out.</p>
+<pre><code>xl list</code></pre>
+
+The output should be something similar:
+<pre><code>Name                                        ID   Mem VCPUs	State	Time(s)
+Domain-0                                     0  4096     2     r-----     614.0
+</code></pre>
+
+Setup an LVM Volume Group to hold your VMs disks, then create a volume:
+
+<pre><code>lvcreate -L20G -n windows7-sp1 vg</code></pre>
+
+Install Windows 7 from your ISO using the following template (tune it as needed):
+<pre><code>arch = 'x86_64'
+name = "windows7-sp1"
+maxmem = 3000
+memory = 3000
+vcpus = 1
+maxcpus = 1
+builder = "hvm"
+boot = "cd"
+hap = 1
+acpi = 1
+shadow_memory = 32
+on_poweroff = "destroy"
+on_reboot = "restart"
+on_crash = "preserve"
+vnc=1
+vnclisten="0.0.0.0"
+vif = ['type=ioemu,model=e1000,bridge=xenbr0,mac=00:06:5B:BA:7C:01']
+disk = [
+    'phy:/dev/vg/windows7-sp1,xvda,w', 
+    'file:/path/to/your/windows7.iso,hdc:cdrom,r'
+]
+</pre></code>
+
+Download LibVMI and prepare to build it:
+
+<pre><code>git clone https://github.com/bdpayne/libvmi
+cd libvmi
+./autogen.sh
+./configure --enable-xen --enable-xen-events
+</code></pre>
+
+Make sure the output is like the following:
+<pre><code>Feature      | Option                    | Reason
+-------------|---------------------------|----------------------------
+Xen Support  | --enable-xen=yes          | yes
+Xen Events   | --enable-xen-events=yes   | yes
+KVM Support  | --enable-kvm=no           | kernel module is not loaded
+File Support | --enable-file=yes         | yes
+Shm-snapshot | --enable-shm-snapshot=no  | no
+-------------|---------------------------|----------------------------
+
+Tools        | Option                    | Reason
+-------------|---------------------------|----------------------------
+VMIFS        | --enable-vmifs=yes        | yes
+
+Extra features
+----------------------------------------------------------------------
+Support of Rekall profiles: yes
+</code></pre>
+
+Build and install LibVMI:
+<pre><code>make -j4
+sudo make install
+cd tools/pyvmi
+python setup.py build
+sudo python setup.py install
+cd ..
+</code></pre>
+
+Download Volatility:
+
+<pre><code>git clone https://github.com/volatilityfoundation/volatility
+cd volatility
+cp ../libvmi/tools/pyvmi/pyvmiaddressspace.py volatility/plugins/addresspace
+python setup.py build
+sudo python setup.py install
+cd ..
+</code></pre>
+
+Download Rekall and install it:
+
+<pre><code>git clone https://github.com/google/rekall
+cd rekall
+python setup.py build
+sudo python setup.py install
+cd ..
+</code></pre>
+
+Now we will create the Rekall profile for the Windows domain. First, we need to get the debug information for the Windows kernel via the LibVMI win-guid tool. For example, in the following my domain is named windows7-sp1-x86:
+
+<pre><code>$ xl list
+Name                                        ID   Mem VCPUs	State	Time(s)
+Domain-0                                     0  4024     4     r-----     848.8
+windows7-sp1-x86                             7  3000     1     -b----      94.7
+$ win-guid name windows7-sp1-x86
+Windows Kernel found @ 0x2604000
+	Version: 32-bit Windows 7
+	PE GUID: 4ce78a09412000
+	PDB GUID: 684da42a30cc450f81c535b4d18944b12
+	Kernel filename: ntkrpamp.pdb
+	Multi-processor with PAE (version 5.0 and higher)
+	Signature: 17744.
+	Machine: 332.
+	# of sections: 22.
+	# of symbols: 0.
+	Timestamp: 1290242569.
+	Characteristics: 290.
+	Optional header size: 224.
+	Optional header type: 0x10b
+	Section 1: .text
+	Section 2: _PAGELK
+	Section 3: POOLMI
+	Section 4: POOLCODE
+	Section 5: .data
+	Section 6: ALMOSTRO
+	Section 7: SPINLOCK
+	Section 8: PAGE
+	Section 9: PAGELK
+	Section 10: PAGEKD
+	Section 11: PAGEVRFY
+	Section 12: PAGEHDLS
+	Section 13: PAGEBGFX
+	Section 14: PAGEVRFB
+	Section 15: .edata
+	Section 16: PAGEDATA
+	Section 17: PAGEKDD
+	Section 18: PAGEVRFC
+	Section 19: PAGEVRFD
+	Section 20: INIT
+	Section 21: .rsrc
+	Section 22: .reloc
+</code></pre>
+
+The important fields are:
+<pre><code>PDB GUID: 684da42a30cc450f81c535b4d18944b12
+Kernel filename: ntkrpamp.pdb
+</code></pre>
+
+Now generate the Rekall profile:
+<pre><code>cd /tmp
+rekall fetch_pdb -F ntkrpamp.pdb --guid 684da42a30cc450f81c535b4d18944b12
+rekall parse_pdb -F ntkrpamp.pdb > windows7-sp1.rekall.json
+sudo mv windows7-sp1.rekall.json /root
+</code></pre>
+
+With this profile ready we can create the LibVMI config:
+<pre><code>sudo su
+printf "windows7-sp1 { \n\
+    ostype = \"Windows\"; \n\
+    sysmap = \"/root/windows7-sp1.rekall.json\"; \n\
+}" > /etc/libvmi.conf
+</code></pre>
+
+Test if LibVMI is working by running process-list:
+<pre><code>process-list windows7-sp1</code></pre>
+
+Output should be something similar:
+<pre><code>Process listing for VM windows7-sp1-x86 (id=7)
+[    4] System (struct addr:84aba980)
+[  220] smss.exe (struct addr:85a44020)
+[  300] csrss.exe (struct addr:85f67a68)
+[  336] wininit.exe (struct addr:8601e030)
+[  348] csrss.exe (struct addr:84ba4030)
+[  384] winlogon.exe (struct addr:85966d40)
+[  444] services.exe (struct addr:8614c030)
+[  460] lsass.exe (struct addr:86171030)
+[  468] lsm.exe (struct addr:8617b4f8)
+[  564] svchost.exe (struct addr:861d9bc8)
+[  628] svchost.exe (struct addr:863fb8a8)
+[  816] sppsvc.exe (struct addr:86426838)
+[  856] svchost.exe (struct addr:854abd40)
+[  880] svchost.exe (struct addr:854c5030)
+[  916] svchost.exe (struct addr:854d7a70)
+[ 1240] svchost.exe (struct addr:8614cb80)
+[ 1280] svchost.exe (struct addr:854f7d40)
+[ 1608] spoolsv.exe (struct addr:85578660)
+[ 1636] svchost.exe (struct addr:85554af0)
+[  792] SearchIndexer. (struct addr:8562ac08)
+[ 1128] taskhost.exe (struct addr:858d9d40)
+[ 1524] dwm.exe (struct addr:857f3a60)
+[ 1728] explorer.exe (struct addr:858d9180)
+[ 1720] regsvr32.exe (struct addr:8605f398)
+[  248] svchost.exe (struct addr:863ed030)
+[ 1024] svchost.exe (struct addr:86420390)
+[  256] WmiPrvSE.exe (struct addr:854014a0)
+</code></pre>
+
+Now we are ready to build and install DRAKVUF:
+<pre><code>git clone https://github.com/tklengyel/drakvuf
+cd drakvuf
+autoreconf -vi
+./configure
+make -j4
+</code></pre>
+
+To simply trace the execution of the system:
+<pre><code>./src/drakvuf -d &lt;rekall profile&gt; &lt;domid&gt;</code></pre>
+
+For example:
+<pre><code>./src/drakvuf -d /root/windows7-sp1.rekall.json 7</code></pre>
+
       </section>
-    </div>
-
-    
+    </div>    
   </body>
 </html>
