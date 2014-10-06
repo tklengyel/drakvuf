@@ -49,12 +49,6 @@
  * particularly including the GPL Section 3 requirements of providing      *
  * source code and allowing free redistribution of the work as a whole.    *
  *                                                                         *
- * As another special exception to the GPL terms, the author grants        *
- * permission to link the code of this program with any version of the     *
- * OpenSSL library which is distributed under a license identical to that  *
- * listed in the included docs/licenses/OpenSSL.txt file, and distribute   *
- * linked combinations including the two.                                  *
- *                                                                         *
  * Any redistribution of Covered Software, including any derived works,    *
  * must obey and carry forward all of the terms of this license, including *
  * obeying all GPL rules and restrictions.  For example, source code of    *
@@ -454,3 +448,4 @@ proprietary programs. If your program is a subroutine library, you may
 consider it more useful to permit linking proprietary applications with the
 library. If this is what you want to do, use the GNU Library General Public
 License instead of this License.
+
