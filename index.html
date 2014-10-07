@@ -41,9 +41,15 @@
 <p>DRAKVUF currently supports Windows 7 VMs, both 32 and 64-bit versions.</p>
 
 <h3>
+<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Demos</h3>
+<p>This demo shows the process injection component of DRAKVUF that can start arbitrary executables within the guest, without the aid of any in-guest helper. In the demo we hijack the execution of the standard Windows Task Manager to initiate the execution of our tasks.</p>
+
+<p><center><iframe width="560" height="315" src="http://www.youtube.com/embed/0Dk5RehrA-Q" frameborder="0" allowfullscreen></iframe></center></p>
+
+<h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Installation guide</h3>
 
-The following packages are normally required to build Xen and DRAKVUF on Debian based Linux distros.
+The following packages are normally required to build Xen and DRAKVUF on Debian based Linux distros. The system has been mainly tested on Debian Wheezy and Debian Jessie.
 
 <pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute libcurl3 libcurl4-openssl-dev bzip2 module-init-tools pciutils-dev build-essential make gcc libc6-dev libc6-dev-i386 zlib1g-dev python python-dev python-twisted libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev libglib2.0-dev autoconf automake libtool libjansson-dev libfuse-dev
 </code></pre>
