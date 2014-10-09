@@ -73,6 +73,7 @@ To install Xen with dom0 getting 4GB RAM assigned and two dedicated CPU cores (t
 make -j4 install-xen
 make -j4 install-tools
 echo "GRUB_CMDLINE_XEN_DEFAULT=\"dom0_mem=4096M,max:4096M dom0_max_vcpus=2 dom0_vcpus_pin=true\"" >> /etc/default/grub
+echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
 update-grub
 echo "none /proc/xen xenfs defaults,nofail 0 0" >> /etc/fstab
 echo "xen-evtchn" >> /etc/modules
@@ -157,6 +158,7 @@ Support of Rekall profiles: yes
 Build and install LibVMI:
 <pre><code>make
 sudo make install
+echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
 cd tools/pyvmi
 python setup.py build
 sudo python setup.py install
