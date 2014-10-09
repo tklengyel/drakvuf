@@ -54,7 +54,7 @@
 
 The following packages are normally required to build Xen and DRAKVUF on Debian based Linux distros. The system has been mainly tested on Debian Wheezy and Debian Jessie.
 
-<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute libcurl3 libcurl4-openssl-dev bzip2 module-init-tools pciutils-dev build-essential make gcc libc6-dev libc6-dev-i386 zlib1g-dev python python-dev python-twisted libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev libglib2.0-dev autoconf automake libtool libjansson-dev libfuse-dev
+<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute libcurl3 libcurl4-openssl-dev bzip2 module-init-tools pciutils-dev build-essential make gcc libc6-dev libc6-dev-i386 zlib1g-dev python python-dev python-twisted libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev libglib2.0-dev autoconf automake libtool check libjansson-dev libfuse-dev
 </code></pre>
 
 You can also install Xen from your repository but the recommended way is to build it from source.
@@ -155,7 +155,7 @@ Support of Rekall profiles: yes
 </code></pre>
 
 Build and install LibVMI:
-<pre><code>make -j4
+<pre><code>make
 sudo make install
 cd tools/pyvmi
 python setup.py build
@@ -286,7 +286,7 @@ Now we are ready to build and install DRAKVUF:
 cd drakvuf
 autoreconf -vi
 ./configure
-make -j4
+make
 </code></pre>
 
 To simply trace the execution of the system:
