@@ -233,7 +233,7 @@ else
         AC_ERROR([** Volatility vol.py was not found in your PATH!])
 fi
 
-AC_CHECK_HEADERS([libxl_utils.h], [], [AC_ERROR([Standard Xenlight (libxl) headers not found!])])
+AC_CHECK_HEADERS([libxl_utils.h], [], [AC_ERROR([Xenlight (libxl) headers are not usable])])
 AC_CHECK_LIB(xenlight, libxl_name_to_domid, [], [AC_ERROR([Xenlight does not have required features!])])
 
 #AC_CHECK_HEADER([xenstore.h])

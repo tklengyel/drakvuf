@@ -1,0 +1,43 @@
+language: c
+compiler:
+- gcc
+- clang
+
+before_install:
+  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib
+  - sudo add-apt-repository "deb mirror://mirrors.ubuntu.com/mirrors.txt trusty main restricted universe multiverse" -y
+  - sudo apt-get update -qq
+  - sudo apt-get install -y bison flex check libjansson-dev libxen-dev uuid-dev libfuse-dev
+  - git clone https://github.com/bdpayne/libvmi
+  - cd libvmi
+  - ./autogen.sh
+  - ./configure --enable-xen --enable-xen-events
+  - make
+  - sudo make install
+  - cd tools/pyvmi
+  - python setup.py build
+  - sudo python setup.py install
+  - cd ../../..
+  - git clone https://github.com/volatilityfoundation/volatility
+  - cd volatility
+  - python setup.py build
+  - sudo python setup.py install
+  - cd ..
+
+script: "./autogen.sh; ./configure; make clean; make"
+
+env:
+  global:
+   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "ZkXc5huudqMN0PXeloNfnuwaq4PQ6BDmU1Ov/ONDOtnwxkm4hxHrbbPwZ9O7/DprAor9p7X7jhx6sf3fsMB+ib0ARffQPB0JQNPPEWjbgUhTLL//y0W64efuwSrRLfaHXbcm6OJT1pjeyXWOKOMPrM7GBOnnRRscpDNtjqriPAs="
+
+addons:
+  coverity_scan:
+    project:
+      name: "tklengyel/drakvuf"
+      description: "Build submitted via Travis CI"
+    notification_email: tamas.k.lengyel@gmail.com
+    build_command_prepend: "./autogen.sh; ./configure; make clean"
+    build_command:   "make"
+    branch_pattern: staging
