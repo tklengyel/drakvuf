@@ -230,8 +230,8 @@ void grab_file_by_handle(honeymon_clone_t *clone, vmi_event_t *event, reg_t cr3,
         vmi_read(vmi, &ctx, str.contents, length);
 
         unicode_string_t str2 = { .contents = NULL };
-        vmi_convert_str_encoding(&str, &str2, "UTF-8");
-        if (str2.contents) {
+        status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
+        if (rc == VMI_SUCCESS) {
             printf("\tExtracting file: %s\n", str2.contents);
 
             volatility_extract_file(clone, file);

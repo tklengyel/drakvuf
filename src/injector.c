@@ -1,4 +1,4 @@
-/*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
+ /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
  * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
@@ -355,7 +355,7 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
         struct startup_info_64 si;
         memset(&si, 0, sizeof(struct startup_info_64));
         struct process_information_64 pi;
-        memset(&si, 0, sizeof(struct process_information_64));
+        memset(&pi, 0, sizeof(struct process_information_64));
 
         addr -= sizeof(struct process_information_64);
         injector->process_info = addr;
@@ -507,7 +507,7 @@ void cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
             if (PM2BIT(injector->pm) == BIT32) {
                 if(!injector->mm_enabled) {
                     vmi_pid_t pid = vmi_dtb_to_pid(vmi, event->reg_event.value);
-                    addr_t waitfor = waitfor = sym2va(vmi, pid, "kernel32.dll", "WaitForMultipleObjects");
+                    addr_t waitfor = sym2va(vmi, pid, "kernel32.dll", "WaitForMultipleObjects");
                     //printf("PID %u waitfor 0x%lx\n", pid, waitfor);
 
                     if (!waitfor) {

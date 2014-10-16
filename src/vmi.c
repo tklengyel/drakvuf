@@ -237,9 +237,9 @@ void trap_guard(vmi_instance_t vmi, vmi_event_t *event) {
         addr_t *key = NULL;
         struct memevent *s = NULL;
         ghashtable_foreach(containers, i, key, s) {
-            printf("Write memaccess @ 0x%lx. Page %lu. Symbol: %s!%s\n", pa,
+            /*printf("Write memaccess @ 0x%lx. Page %lu. Symbol: %s!%s\n", pa,
                     event->mem_event.gfn, s->symbol.config->name,
-                    s->symbol.symbol->name);
+                    s->symbol.symbol->name);*/
             if (s && s->sID == SYMBOLWRAP) {
                 if (pa > s->pa - 7 && pa <= s->pa) {
                     printf("** Mem event removing trap 0x%lx -> %s!%s\n", s->pa,

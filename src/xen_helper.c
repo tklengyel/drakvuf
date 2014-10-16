@@ -165,6 +165,7 @@ int get_dom_info(xen_interface_t *xen, const char *input, uint32_t *domID,
         libxl_name_to_domid(xen->xl_ctx, input, &_domID);
         if (!_domID || _domID == INVALID_DOMID) {
             printf("Domain is not running, failed to get domID from name!\n");
+            free(_name);
             return -1;
         } else {
             //printf("Got domID from name: %u\n", _domID);
@@ -234,9 +235,10 @@ xen_domconfig_raw_t* xen_domconfig_raw_by_id(xen_interface_t *xen,
     config->config_data = NULL;
 
     if (libxl_userdata_retrieve(xen->xl_ctx, domID, "xl",
-
-    &(config->config_data), &(config->config_length))) {
+	    &(config->config_data), &(config->config_length)))
+    {
         printf("Unable to get config file\n");
+        free(config);
         return NULL;
     }
 

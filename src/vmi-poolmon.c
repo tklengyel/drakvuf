@@ -152,7 +152,7 @@ void objcreate(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3) {
 
     vmi_read_8(vmi, &ctx, &index);
 
-    if (index <= WIN7_TYPEINDEX_LAST) {
+    if (index < WIN7_TYPEINDEX_LAST) {
         printf("\tObject: %s\n", win7_typeindex[index]);
     } else {
         printf("\tUnknown object type index: %u\n", index);
