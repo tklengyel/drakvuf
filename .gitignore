@@ -3,6 +3,7 @@
 *.ko
 *.obj
 *.elf
+*.Po
 
 # Libraries
 *.lib
@@ -26,3 +27,17 @@
 configure
 Makefile
 Makefile.in
+autom4te.cache/*
+src/.deps
+compile
+aclocal.m4
+config.*
+depcomp
+install-sh
+missing
+stamp-h1
+
+# drakvuf binaries
+drakvuf
+injector
+xen_domconfig
