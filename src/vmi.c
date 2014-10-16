@@ -543,7 +543,7 @@ void inject_traps(honeymon_clone_t *clone) {
     do {
 
         vmi_pid_t pid;
-        vmi_read_32_va(vmi, current_process + offsets[EPROCESS_PID], 0, &pid);
+        vmi_read_32_va(vmi, current_process + offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
 
         char *procname = vmi_read_str_va(vmi, current_process + offsets[EPROCESS_PNAME], 0);
 
