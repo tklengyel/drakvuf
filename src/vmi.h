@@ -166,6 +166,7 @@ enum offset {
     KTRAP_FRAME_RIP,
 
     OBJECT_HEADER_TYPEINDEX,
+    OBJECT_HEADER_BODY,
 
     UNICODE_STRING_LENGTH,
     UNICODE_STRING_BUFFER,
@@ -207,6 +208,7 @@ static const char *offset_names[OFFSET_MAX][2] = {
     [KTRAP_FRAME_EIP] = {"_KTRAP_FRAME", "Eip" },
     [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
     [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
+    [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
     [UNICODE_STRING_LENGTH] = {"_UNICODE_STRING", "Length" },
     [UNICODE_STRING_BUFFER] = {"_UNICODE_STRING", "Buffer" },
     [POOL_HEADER_BLOCKSIZE] = {"_POOL_HEADER", "BlockSize" },
@@ -219,7 +221,7 @@ size_t offsets[OFFSET_MAX];
 enum size {
     FILE_OBJECT,
     //OBJECT_ATTRIBUTES,
-    OBJECT_HEADER,
+    //OBJECT_HEADER,
     POOL_HEADER,
 
     SIZE_LIST_MAX
@@ -228,7 +230,7 @@ enum size {
 static const char *size_names[SIZE_LIST_MAX] = {
         [FILE_OBJECT] = "_FILE_OBJECT",
         //[OBJECT_ATTRIBUTES] = "_OBJECT_ATTRIBUTES", // May be useful TODO
-        [OBJECT_HEADER] = "_OBJECT_HEADER",
+        //[OBJECT_HEADER] = "_OBJECT_HEADER",
         [POOL_HEADER] = "_POOL_HEADER",
 };
 

@@ -115,7 +115,7 @@
 #include "vmi.h"
 #include "win-handles.h"
 
-#define VOL_DUMPFILES "%s %s -l vmi://domid/%u --profile=%s -Q %lu -D /tmp -n dumpfiles 2>&1"
+#define VOL_DUMPFILES "%s %s -l vmi://domid/%u --profile=%s -Q 0x%lx -D /tmp -n dumpfiles 2>&1"
 #define PROFILE32 "Win7SP1x86"
 #define PROFILE64 "Win7SP1x64"
 
@@ -199,16 +199,18 @@ void grab_file_by_handle(honeymon_clone_t *clone, vmi_event_t *event, reg_t cr3,
         .addr = obj + offsets[OBJECT_HEADER_TYPEINDEX],
         .dtb = cr3
     };
-    vmi_read_8(vmi, &ctx, &type_index);
-
-    //printf("Handle: 0x%lx. Obj @ 0x%lx. Type: %s\n", handle, obj, win7_typeindex[obj_hdr.type_index]);
-
-    if (type_index != 28)
+    if (VMI_FAILURE == vmi_read_8(vmi, &ctx, &type_index))
         return;
 
-    addr_t file = obj + struct_sizes[OBJECT_HEADER];
+    //printf("Handle: 0x%lx. Obj @ 0x%lx. Type: %s\n", handle, obj, win7_typeindex[type_index]);
+
+    if (type_index >= WIN7_TYPEINDEX_LAST || type_index != 28)
+        return;
+
+    addr_t file = obj + offsets[OBJECT_HEADER_BODY];
+    addr_t file_pa = vmi_pagetable_lookup(vmi, cr3, file);
     addr_t filename = file + offsets[FILE_OBJECT_FILENAME];
-    printf("Object header is @ 0x%lx. File Object is @ 0x%lx.\n", obj, file);
+    //printf("Object header is @ 0x%lx. File Object is @ 0x%lx.\n", obj, file);
 
     uint16_t length = 0;
     addr_t buffer = 0;
@@ -234,7 +236,7 @@ void grab_file_by_handle(honeymon_clone_t *clone, vmi_event_t *event, reg_t cr3,
         if (rc == VMI_SUCCESS) {
             printf("\tExtracting file: %s\n", str2.contents);
 
-            volatility_extract_file(clone, file);
+            volatility_extract_file(clone, file_pa);
 
             free(str2.contents);
         }
@@ -282,7 +284,7 @@ void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
             ctx.addr = info;
             vmi_read_8(vmi, &ctx, &del);
             if (del) {
-                printf("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", handle);
+                //printf("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", handle);
                 grab_file_by_handle(clone, event, cr3, handle);
             }
         }
