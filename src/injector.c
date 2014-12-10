@@ -137,6 +137,10 @@ struct injector {
     addr_t userspace_return;
     uint8_t userspace_return_backup;
 
+    void *stack_backup;
+    size_t stack_backup_size;
+    addr_t stack_limit;
+
     vmi_event_t cr3_event;
     vmi_event_t mm_event;
     vmi_event_t ss_event;
@@ -252,9 +256,14 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
     printf("RSP: 0x%lx. RIP: 0x%lx. RCX: 0x%lx\n", rsp, rip, rcx);
     printf("Stack base: 0x%lx. Limit: 0x%lx\n", stack_base, stack_limit);
 
+    // Backup stack contents
+    injector->stack_backup_size = rsp - stack_limit;
+    injector->stack_backup = g_malloc0(injector->stack_backup_size);
+    injector->stack_limit = stack_limit;
+    vmi_read_va(vmi, stack_limit, pid, injector->stack_backup, injector->stack_backup_size);
+
     //Push input arguments on the stack
-    //CreateProcess(NULL, TARGETPROC,
-    //                 NULL, NULL, 0, CREATE_SUSPENDED, NULL, NULL, &si, pi))
+    //CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, CREATE_SUSPENDED, NULL, NULL, &si, pi))
 
     uint64_t nul64 = 0;
     uint32_t nul32 = 0;
@@ -738,6 +747,12 @@ void injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
             }
         } else {
             injector->clone->interrupted = 1;
+        }
+
+        // Restore stack
+        if(injector->stack_backup) {
+            vmi_write_va(vmi, injector->stack_limit, pid, injector->stack_backup, injector->stack_backup_size);
+            free(injector->stack_backup);
         }
 
         vmi_write_8_pa(vmi, pa, &injector->backup);
