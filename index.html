@@ -39,11 +39,11 @@
         <h3>
 <a name="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages"><span class="octicon octicon-link"></span></a>Introduction</h3>
 
-<p>DRAKVUF is an agentless dynamic malware analysis system built on Xen, LibVMI, Volatility and Rekall. It allows for in-depth execution tracing of malware samples, extracting deleted files from memory and more.</p>
+<p>DRAKVUF is an agentless dynamic malware analysis system built on Xen, LibVMI, Volatility and Rekall. It allows for in-depth execution tracing of malware samples, extracting deleted files from memory and more without having to install any special software within the virtual machine used for analysis.</p>
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Hardware requirements</h3>
-<p>For DRAKVUF to work you will need an Intel CPU with virtualization support and with Extended Page Tables (EPT). DRAKVUF is not going to work on any other CPUs or without EPT. It is recommended to have at least 8GB RAM but you may be able get by with less.</p>
+<p>DRAKVUF uses hardware virtualization extensions found in Intel CPUs. You will need an Intel CPU with virtualization support (VT-x) and with Extended Page Tables (EPT). DRAKVUF is not going to work on any other CPUs (such as AMD) or on Intel CPUs without the required virtualization extensions.</p>
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Supported guests</h3>
@@ -52,14 +52,39 @@
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Demos</h3>
 
+<p>Using DRAKVUF to trace Windows internal kernel functions, including heap allocations.</p>
+
 <p><center><iframe width="560" height="315" src="http://www.youtube.com/embed/ZJPHfpDiN4o" frameborder="0" allowfullscreen></iframe></center></p>
 
 <p>This demo shows the process injection component of DRAKVUF that can start arbitrary executables within the guest, without the aid of any in-guest helper. In the demo we hijack the execution of the standard Windows Task Manager to initiate the execution of our tasks.</p>
 
 <p><center><iframe width="560" height="315" src="http://www.youtube.com/embed/0Dk5RehrA-Q" frameborder="0" allowfullscreen></iframe></center></p>
 
-<p>This presentation describes some of the features of DRAKVUF, showcased at Hacktivity 2014</p>
-<p><center><iframe src="http://www.slideshare.net/slideshow/embed_code/40610439" width="476" height="400" frameborder="0" marginwidth="0" marginheight="0" scrolling="no"></iframe></center></p>
+<p>Extracting deleted files from memory before they are actually discarded by the operating system. Many files created by malware droppes are only present in memory and never show up on disk.</p>
+
+<p><center><iframe width="560" height="315" src="http://www.youtube.com/embed/sOmD9tDU3lM" frameborder="0" allowfullscreen></iframe></center></p>
+
+<h3>
+<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Presentations</h3>
+
+<p>This is a presentation describing the system at the Annual Computer Security Applications Conference (ACSAC) 2014</p>
+<p><center><iframe src="http://www.slideshare.net/slideshow/embed_code/42644318" width="476" height="400" frameborder="0" marginwidth="0" marginheight="0" scrolling="no"></iframe></center></p>
+
+<p>This presentation also describes some of the features of DRAKVUF, showcased at Hacktivity 2014</p>
+<p><center><iframe width="560" height="315" src="https://www.youtube.com/embed/EZPXy314q3E?rel=0" frameborder="0" allowfullscreen></iframe></center></p>
+
+<h3>
+<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Citation</h3>
+
+If you use DRAKVUF in an academic project, please cite using the following bibtex key:
+
+<pre><code>@inproceedings{lengyel2014drakvuf,
+  author = {Lengyel, Tamas K. and Maresca, Steve and Payne, Bryan D. and Webster, George D. and Vogl, Sebastian and Kiayias, Aggelos},
+  title = {Scalability, Fidelity and Stealth in the DRAKVUF Dynamic Malware Analysis System},
+  booktitle = {Proceedings of the 30th Annual Computer Security Applications Conference},
+  year = {2014}
+}
+</code></pre>
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Installation guide</h3>
