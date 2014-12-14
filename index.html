@@ -39,7 +39,7 @@
         <h3>
 <a name="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages"><span class="octicon octicon-link"></span></a>Introduction</h3>
 
-<p>DRAKVUF is an agentless dynamic malware analysis system built on Xen, LibVMI, Volatility and Rekall. It allows for in-depth execution tracing of malware samples, extracting deleted files from memory and more without having to install any special software within the virtual machine used for analysis.</p>
+<p>DRAKVUF is an agentless dynamic malware analysis system built on Xen, LibVMI, Volatility and Rekall. It allows for in-depth execution tracing of malware samples and extracting deleted files from memory, all without having to install any special software within the virtual machine used for analysis.</p>
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Hardware requirements</h3>
@@ -47,7 +47,7 @@
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Supported guests</h3>
-<p>DRAKVUF currently supports Windows 7 VMs, both 32 and 64-bit versions.</p>
+<p>DRAKVUF currently supports Windows 7, both 32 and 64-bit versions.</p>
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Demos</h3>
@@ -74,17 +74,32 @@
 <p><center><iframe width="560" height="315" src="https://www.youtube.com/embed/EZPXy314q3E?rel=0" frameborder="0" allowfullscreen></iframe></center></p>
 
 <h3>
-<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Citation</h3>
+<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Current status</h3>
 
-If you use DRAKVUF in an academic project, please cite using the following bibtex key:
+<p>Currently the following core features are available:</p>
 
-<pre><code>@inproceedings{lengyel2014drakvuf,
-  author = {Lengyel, Tamas K. and Maresca, Steve and Payne, Bryan D. and Webster, George D. and Vogl, Sebastian and Kiayias, Aggelos},
-  title = {Scalability, Fidelity and Stealth in the DRAKVUF Dynamic Malware Analysis System},
-  booktitle = {Proceedings of the 30th Annual Computer Security Applications Conference},
-  year = {2014}
-}
-</code></pre>
+<ul>
+<li>Agentless start of malware execution.</li>
+<li>Agentless monitoring of Windows internal kernel functions.</li>
+<li>Tracing heap allocations.</li>
+<li>Tracing files being accessed.</li>
+<li>Extracting files from memory before they are deleted.</li>
+<li>Cloning of analysis VMs via copy-on-write memory and disk.</li>
+<li>VLAN tagging and NATing support of clone analysis network when used in combination with <a href="https://github.com/tklengyel/honeybrid">Honeybrid</a>.</li>
+</ul>
+
+<p>Be advised that DRAKVUF is still in its early development stage and lacks features other malware analyzers may have. There are many opportunities to improve and extend DRAKVUF. Just to name a few:</p>
+
+<ul>
+<li>Structured logging into JSON/MySQL/MongoDB.</li>
+<li>Automatic submission of extracted files to VirusTotal.</li>
+<li>Guest multi-vCPU support.</li>
+<li>Linux support.</li>
+<li>Run-time deduplication of unused memory with Xen's memory sharing.</li>
+<li>Integration into malware analysis operations, such as <a href="https://crits.github.io">CRITS</a>.</li>
+</ul>
+
+<p>As DRAKVUF is an open-source project, patches and bug reports are always welcome on the <a href="https://github.com/tklengyel/drakvuf">Github page</a>!</p>
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Installation guide</h3>
@@ -334,6 +349,19 @@ To simply trace the execution of the system:
 
 For example:
 <pre><code>./src/drakvuf -d /root/windows7-sp1.rekall.json 7</code></pre>
+
+<h3>
+<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Citation</h3>
+
+If you use DRAKVUF in an academic project, please cite using the following bibtex key:
+
+<pre><code>@inproceedings{lengyel2014drakvuf,
+  author = {Lengyel, Tamas K. and Maresca, Steve and Payne, Bryan D. and Webster, George D. and Vogl, Sebastian and Kiayias, Aggelos},
+  title = {Scalability, Fidelity and Stealth in the DRAKVUF Dynamic Malware Analysis System},
+  booktitle = {Proceedings of the 30th Annual Computer Security Applications Conference},
+  year = {2014}
+}
+</code></pre>
 
       </section>
     </div>    
