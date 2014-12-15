@@ -211,7 +211,6 @@ int main(int argc, char** argv) {
 
     _clone.honeymon = &_honeymon;
     _clone.origin = &_origin;
-    _clone.vlan = atoi(argv[3]);
 
     xen_init_interface(&_honeymon.xen);
 
@@ -227,6 +226,7 @@ int main(int argc, char** argv) {
             return 1;
         }
 
+        _clone.vlan = atoi(argv[4]);
         make_clone(_honeymon.xen, _origin.name, &_clone.domID, _clone.vlan, &_clone.clone_name);
 
         memshare(&_clone);
