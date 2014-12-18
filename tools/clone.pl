@@ -120,7 +120,7 @@ use warnings;
 ## Settings
 #
 # The LVM volume group
-our $lvm_vg = "t1vg";
+our $lvm_vg = "t0vg";
 # Path to DRAKVUF xen_domconfig
 our $xen_domconfig = "../src/xen_domconfig";
 # Clone network bridge name
@@ -175,15 +175,19 @@ sub clone {
             my $value;
             my $count = 0;
             foreach $value (@values) {
-                if(index($value, "bridge")!=-1) {
+                if(index($value, "bridge")!=-1 && index($value, "vif-bridge")==-1) {
                     print $fh "bridge = $clone_bridge.$vlan, $vif_script";
                 } else {
                     if(index($value, "script")==-1 && index($value, "backend")==-1) {
                         print $fh "$value";
+                    } else {
+                        if($count == $#values) {
+                            print $fh "']";
+                        }
                     }
                 }
 
-                if($count != $#values) {
+                if($count < $#values) {
                     print $fh ",";
                 }
                 $count++;
@@ -200,6 +204,7 @@ sub clone {
                 $pos = index( $disk, $origin, $pos + length( $clone ));
             }
             print $fh $disk;
+            print $fh "\n";
             next;
         }
 
