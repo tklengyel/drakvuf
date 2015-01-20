@@ -162,8 +162,11 @@ enum offset {
     KTHREAD_PROCESS,
     KTHREAD_TRAPFRAME,
 
-    KTRAP_FRAME_EIP,
+    KTRAP_FRAME_EBP,
     KTRAP_FRAME_RIP,
+
+    ETHREAD_CID,
+    CLIENT_ID_UNIQUETHREAD,
 
     OBJECT_HEADER_TYPEINDEX,
     OBJECT_HEADER_BODY,
@@ -205,8 +208,10 @@ static const char *offset_names[OFFSET_MAX][2] = {
     [KPRCB_CURRENTTHREAD] = { "_KPRCB", "CurrentThread" },
     [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
     [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
-    [KTRAP_FRAME_EIP] = {"_KTRAP_FRAME", "Eip" },
+    [KTRAP_FRAME_EBP] = {"_KTRAP_FRAME", "Ebp" },
     [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
+    [ETHREAD_CID] = {"_ETHREAD", "Cid" },
+    [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
     [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
     [UNICODE_STRING_LENGTH] = {"_UNICODE_STRING", "Length" },

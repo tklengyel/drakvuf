@@ -243,7 +243,7 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
     if (injector->pm == VMI_PM_LEGACY || injector->pm == VMI_PM_PAE) {
         vmi_get_vcpureg(vmi, &fsgs, FS_BASE, vcpu);
         vmi_get_vcpureg(vmi, &rbp, RBP, vcpu);
-        printf("FS: 0x%lx RBP: 0x%lx", fsgs, rbp);
+        printf("FS: 0x%lx RBP: 0x%lx ", fsgs, rbp);
         vmi_read_addr_va(vmi, fsgs + 0x4, pid, &stack_base);
         vmi_read_addr_va(vmi, fsgs + 0x8, pid, &stack_limit);
     } else {
@@ -436,14 +436,17 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
     printf("Done with hijack routine\n");
 }
 
-void ss_callback(vmi_instance_t vmi, vmi_event_t *event) {
-    reg_t rip, cr3;
+/*
+ * These functions may be useful for debugging
+ */
+/*void ss_callback(vmi_instance_t vmi, vmi_event_t *event) {
+    reg_t rip, cr3, cs;
     vmi_get_vcpureg(vmi, &rip, RIP, event->vcpu_id);
     vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
+    vmi_get_vcpureg(vmi, &cs, CS_SEL, event->vcpu_id);
     page_mode_t pm = vmi_get_page_mode(vmi);
     vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
-    printf("----- Singlestep: CR3 0x%lx PID %u executing RIP 0x%lx\n", cr3, pid,
-            rip);
+    printf("----- Singlestep: CR3 0x%lx PID %u executing RIP 0x%lx CPL %u\n", cr3, pid, rip, VMI_BIT_MASK(0,2) & cs);
 
     if ((PM2BIT(pm) == BIT32 && rip < KERNEL32)
             || (PM2BIT(pm) == BIT64 && rip < KERNEL64)) {
@@ -498,11 +501,11 @@ void mm_callback(vmi_instance_t vmi, vmi_event_t *event) {
 
     vmi_clear_event(vmi, event);
     vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
-}
+}*/
 
 void cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
 
-    //printf("CR3 changed to 0x%lx\n", event->reg_event.value);
+    //printf("CR3 changed to 0x%lx - PID %i\n", event->reg_event.value, vmi_dtb_to_pid(vmi, event->reg_event.value));
     struct injector *injector = event->data;
 
     addr_t thread = 0, kpcrb_offset = 0, trapframe = 0;
@@ -512,34 +515,14 @@ void cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
     if (event->reg_event.value == injector->target_cr3) {
         if (!injector->target_rip) {
 
-            /* TODO: Trap frame approach only works on 64-bit */
-            if (PM2BIT(injector->pm) == BIT32) {
-                if(!injector->mm_enabled) {
-                    vmi_pid_t pid = vmi_dtb_to_pid(vmi, event->reg_event.value);
-                    addr_t waitfor = sym2va(vmi, pid, "kernel32.dll", "WaitForMultipleObjects");
-                    //printf("PID %u waitfor 0x%lx\n", pid, waitfor);
+            /* We determine the point where we want to hijack the thread by
+               looking at the trap frame "_KTRAP_FRAME".
+               While on x86-64 we can trap the RIP saved directly in the
+               trap frame, on x86 that point is not yet safe. Thus, on x86 we
+               read the stack base pointer (EBP/RBP) and get the return address
+               from that stack frame. Remember, EBP points to another saved EBP,
+               the return address is saved directly above it. */
 
-                    if (!waitfor) {
-                        //injector->clone->interrupted = 1;
-                        printf("Target process doesn't have kernel32.dll mapped!\n");
-                        return;
-                    }
-
-                    injector->mm_enabled=1;
-                    memset(&injector->mm_event, 0, sizeof(vmi_event_t));
-                    injector->mm_event.type = VMI_EVENT_MEMORY;
-                    injector->mm_event.mem_event.physical_address = vmi_translate_uv2p(vmi, waitfor, pid);
-                    injector->mm_event.mem_event.npages = 1;
-                    injector->mm_event.mem_event.granularity=VMI_MEMEVENT_PAGE;
-                    injector->mm_event.mem_event.in_access = VMI_MEMACCESS_X;
-                    injector->mm_event.callback=mm_callback;
-                    injector->mm_event.data = injector;
-                    vmi_register_event(vmi, &injector->mm_event);
-                }
-                return;
-            }
-
-            /* Read return to userspace RIP out of the stack trap frame. */
             if (PM2BIT(injector->pm) == BIT32) {
                 vmi_get_vcpureg(vmi, &fsgs, FS_BASE, event->vcpu_id);
                 kpcrb_offset = offsets[KPCR_PRCBDATA];
@@ -551,16 +534,38 @@ void cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
             vmi_read_addr_va(vmi,
                 fsgs + kpcrb_offset + offsets[KPRCB_CURRENTTHREAD],
                 0, &thread);
+
+            if (!thread) {
+                printf("cr3_cb: Failed to find current thread\n");
+                return;
+            }
+
+            //printf("Current thread @ 0x%lx\n", thread);
+
             vmi_read_addr_va(vmi,
                 thread + offsets[KTHREAD_TRAPFRAME],
                 0, &trapframe);
 
+            if (!trapframe) {
+                printf("cr3_cb: Failed to find trapframe\n");
+                return;
+            }
+
             //printf("Trap frame @ 0x%lx\n", trapframe);
 
+            addr_t tid;
+            vmi_read_addr_va(vmi,
+                thread + offsets[ETHREAD_CID] + offsets[CLIENT_ID_UNIQUETHREAD],
+                0, &tid);
+
+            addr_t rbp;
+            vmi_pid_t pid = vmi_dtb_to_pid(vmi, injector->target_cr3);
             if (PM2BIT(injector->pm) == BIT32) {
                 vmi_read_addr_va(vmi,
-                    trapframe + offsets[KTRAP_FRAME_EIP],
-                    0, &userspace_return_va);
+                    trapframe + offsets[KTRAP_FRAME_EBP],
+                    0, &rbp);
+                vmi_read_addr_va(vmi, rbp + 0x4, pid, &userspace_return_va);
+
             } else {
                 vmi_read_addr_va(vmi,
                     trapframe + offsets[KTRAP_FRAME_RIP],
@@ -568,23 +573,13 @@ void cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
             }
 
             injector->userspace_return = vmi_pagetable_lookup(vmi, event->reg_event.value, userspace_return_va);
-            //printf("Userspace return @ VA 0x%lx -> PA 0x%lx\n", userspace_return_va, injector->userspace_return);
+            printf("Trapping userspace return of Thread: %u @ VA 0x%lx -> PA 0x%lx\n",
+                   tid, userspace_return_va, injector->userspace_return);
 
             uint8_t trap = 0xCC;
             vmi_read_8_pa(vmi, injector->userspace_return, &injector->userspace_return_backup);
             vmi_write_8_pa(vmi, injector->userspace_return, &trap);
 
-            /*if (!injector->ss_enabled) {
-                printf("My target process is executing, registering singlestep\n");
-                injector->ss_enabled = 1;
-                memset(&injector->ss_event, 0, sizeof(vmi_event_t));
-                injector->ss_event.type = VMI_EVENT_SINGLESTEP;
-                injector->ss_event.callback = ss_callback;
-                injector->ss_event.data = injector;
-                SET_VCPU_SINGLESTEP(injector->ss_event.ss_event,
-                        event->vcpu_id);
-                vmi_register_event(vmi, &injector->ss_event);
-            }*/
         }
     } else {
         //printf("CR3 0x%lx is executing, not my process!\n",
@@ -595,7 +590,6 @@ void cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
             vmi_clear_event(vmi, &injector->mm_event);
         }
         if (injector->ss_enabled) {
-            //printf("\tDisabling singlestep\n");
             injector->ss_enabled = 0;
             vmi_clear_event(vmi, &injector->ss_event);
         }
@@ -629,11 +623,21 @@ void injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     addr_t pa = (event->interrupt_event.gfn << 12)
             + event->interrupt_event.offset;
 
-    reg_t cr3;
+    reg_t cr3, cs, fsgs, rbp;
     vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
+    vmi_get_vcpureg(vmi, &rbp, RBP, event->vcpu_id);
+    vmi_get_vcpureg(vmi, &cs, CS_SEL, event->vcpu_id);
     vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
 
-    printf("INT3 @ 0x%lx. PID %u\n", pa, pid);
+    /*addr_t ret = 0;
+
+    if (PM2BIT(injector->pm) == BIT32) {
+        vmi_read_addr_va(vmi, rbp + 0x4, pid, &ret);
+    } else {
+        vmi_read_addr_va(vmi, rbp + 0x8, pid, &ret);
+    }
+
+    printf("INT3 @ 0x%lx. PID %u. CPL: %u. Stack ret: 0x%lx\n", pa, pid, VMI_BIT_MASK(0,2) & cs, ret);*/
 
     if (pa == injector->userspace_return) {
 
@@ -647,28 +651,25 @@ void injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
             return;
         }
 
-        injector->target_pid = pid;
-        injector->target_rip = pa;
-        injector->backup = injector->userspace_return_backup;
-        injector->userspace_return = 0;
+            injector->target_pid = pid;
+            injector->target_rip = pa;
+            injector->backup = injector->userspace_return_backup;
+            injector->userspace_return = 0;
 
-        hijack_thread(injector, vmi, event->vcpu_id, pid);
+            hijack_thread(injector, vmi, event->vcpu_id, pid);
 
-/*
-                injector->ss_enabled = 1;
+                /*injector->ss_enabled = 1;
                 memset(&injector->ss_event, 0, sizeof(vmi_event_t));
                 injector->ss_event.type = VMI_EVENT_SINGLESTEP;
                 injector->ss_event.callback = ss_callback;
                 injector->ss_event.data = injector;
                 SET_VCPU_SINGLESTEP(injector->ss_event.ss_event,
                         event->vcpu_id);
-                vmi_register_event(vmi, &injector->ss_event);
-*/
+                vmi_register_event(vmi, &injector->ss_event);*/
 
-
-        vmi_clear_event(vmi, &injector->cr3_event);
-        injector->mm_count++;
-        return;
+            vmi_clear_event(vmi, &injector->cr3_event);
+            injector->mm_count++;
+            return;
     }
 
     if (pa == injector->target_rip) {
@@ -681,6 +682,7 @@ void injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
             vmi_write_8_pa(vmi, pa, &injector->backup);
             vmi_step_event(vmi, event, event->vcpu_id, 1, reset_return_trap);
             return;
+
         }
 
         reg_t rax;
@@ -773,11 +775,15 @@ int start_app(honeymon_clone_t *clone, vmi_pid_t pid, const char *app) {
         .target_pid = pid,
         .target_proc = app,
         .winver = clone->winver,
-        .pm = vmi_get_page_mode(clone->vmi)
+        .pm = vmi_get_page_mode(clone->vmi),
+        .ret = 0
     };
 
     if (!injector.target_cr3)
+    {
+        printf("Unable to find target PID's DTB\n");
         return 0;
+    }
 
     printf("Target PID %u with DTB 0x%lx to start '%s'\n", pid,
             injector.target_cr3, app);
