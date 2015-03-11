@@ -108,15 +108,18 @@ drakvuf_SOURCES = main.c \
                       vmi.c vmi-poolmon.c \
                       win-exports.c win-handles.c win-symbols.c \
                       pooltag.c injector.c \
-                      file_extractor.c xen_helper.c \
-                      xmlrpc_client.c
+                      file_extractor.c xen_helper.c
 
 drakvuf_h = structures.h \
                       vmi.h vmi-poolmon.h \
                       win-exports.h win-handles.h \
                       pooltag.h injector.h \
-                      file_extractor.h xen_helper.h \
-                      xmlrpc_client.h
+                      file_extractor.h xen_helper.h
+
+if XMLRPC
+drakvuf_SOURCES += xmlrpc_client.c
+drakvuf_h += xmlrpc_client.h
+endif
 
 drakvuf_SOURCES += $(vmi_honeymon_h)
 
@@ -128,8 +131,10 @@ injector_SOURCES = injector_standalone.c injector.c xen_helper.c \
 AM_CFLAGS = $(CFLAGS)
 AM_CFLAGS += $(VMI_CFLAGS)
 AM_CFLAGS += $(GLIB_CFLAGS)
+
+if XMLRPC
 AM_CFLAGS += $(XMLRPC_CLIENT_CFLAGS)
-#AM_CFLAGS += $(MYSQL_CFLAGS)
+endif
 
 if HARDENING
 AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
@@ -144,8 +149,11 @@ AM_CFLAGS += -pg
 endif
 endif
 
-drakvuf_LDADD = $(XMLRPC_CLIENT_LIBS)
+drakvuf_LDADD =
 
+if XMLRPC
+drakvuf_LDADD += $(XMLRPC_CLIENT_LIBS)
+endif
 if HARDENING
 drakvuf_LDADD += $(HARDEN_LDFLAGS)
 endif

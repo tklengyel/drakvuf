@@ -141,15 +141,21 @@ AC_ARG_ENABLE([hardening],
     [Enable compiler and linker options to frustrate memory corruption exploits @<:@yes@:>@])],
   [hardening="$enableval"],
   [hardening="yes"])
+AM_CONDITIONAL([HARDENING], [test x$hardening = xyes])  
   
 AC_ARG_ENABLE([debug],
   [AS_HELP_STRING([--enable-debug],
     [Enable verbose debug output to be compiled @<:@no@:>@])],
   [debug="$enableval"],
   [debug="no"])   
-
 AM_CONDITIONAL([DEBUG], [test x$debug = xyes])
-AM_CONDITIONAL([HARDENING], [test x$hardening = xyes])  
+
+AC_ARG_WITH([xmlrpc],
+      [AS_HELP_STRING([--with-xmlrpc],
+         [Build DRAKVUF with Honeybrid (xmlrpc) support])],
+      [with_xmlrpc=$withval],
+      [with_xmlrpc=no])
+AM_CONDITIONAL([XMLRPC], [test x"$with_xmlrpc" = xyes])
 
 HARDEN_CFLAGS=""
 HARDEN_LDFLAGS=""
@@ -245,21 +251,23 @@ AC_CHECK_LIB([xenctrl],
 	[xc_interface_open, xc_memshr_control, xc_memshr_nominate_gfn, xc_memshr_share_gfns], 
 	[], [AC_ERROR([XenCtrl is unusable! Do you have Xen 4.2+ installed?])])
 
-AC_PATH_PROG(XMLRPC_C_CONFIG, xmlrpc-c-config)
-if test "x$XMLRPC_C_CONFIG" != "x"; then
+if test "x$with_xmlrpc" != "xno"; then
+    AC_PATH_PROG(XMLRPC_C_CONFIG, xmlrpc-c-config)
+    if test "x$XMLRPC_C_CONFIG" != "x"; then
 
-    PKG_CHECK_MODULES([CURL], [libcurl], [
+        PKG_CHECK_MODULES([CURL], [libcurl], [
     
-        XMLRPC_CLIENT_LIBS=$($XMLRPC_C_CONFIG client --libs)
-        XMLRPC_CLIENT_CFLAGS=$($XMLRPC_C_CONFIG client --cflags)
+            XMLRPC_CLIENT_LIBS=$($XMLRPC_C_CONFIG client --libs)
+            XMLRPC_CLIENT_CFLAGS=$($XMLRPC_C_CONFIG client --cflags)
     
-        AC_DEFINE(HAVE_XMLRPC, 1, "Working XMLRPC C library found")
+            AC_DEFINE(HAVE_XMLRPC, 1, "Working XMLRPC C library found")
     
-        AC_SUBST(XMLRPC_CLIENT_LIBS)
-        AC_SUBST(XMLRPC_CLIENT_CFLAGS)
+            AC_SUBST(XMLRPC_CLIENT_LIBS)
+            AC_SUBST(XMLRPC_CLIENT_CFLAGS)
     
-    ], [AC_ERROR(No CURL installed)])
+        ], [AC_ERROR(No CURL installed)])
 
+    fi
 fi
 
 AC_CONFIG_FILES([Makefile src/Makefile])
