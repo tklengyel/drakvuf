@@ -120,6 +120,7 @@
 
 #include <glib.h>
 #include <libvmi/libvmi.h>
+#include <libvmi/events.h>
 
 #ifdef HAVE_XMLRPC
 #include <xmlrpc-c/base.h>
