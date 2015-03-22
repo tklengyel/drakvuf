@@ -257,8 +257,8 @@ void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
     if (!strcmp(s->symbol->name, "NtSetInformationFile")
             || !strcmp(s->symbol->name, "ZwSetInformationFile")) {
 
-        uint32_t fileinfoclass;
-        reg_t handle, info, length, rsp;
+        uint32_t fileinfoclass = 0;
+        reg_t handle = 0, info = 0, length = 0, rsp = 0;
         vmi_get_vcpureg(vmi, &rsp, RSP, event->vcpu_id); // stack pointer
 
         if (PM2BIT(clone->pm) == BIT32) {
