@@ -655,8 +655,6 @@ void clone_vmi_init(honeymon_clone_t *clone) {
     clone->pm = vmi_get_page_mode(clone->vmi);
 
     // Crete tables to lokup symbols from
-    clone->page_lookup = g_hash_table_new_full(g_int64_hash, g_int64_equal,
-            free, NULL);
     clone->pa_lookup = g_hash_table_new_full(g_int64_hash, g_int64_equal, free,
             NULL);
 
@@ -760,7 +758,6 @@ void close_vmi_clone(honeymon_clone_t *clone) {
     } while (0);
 
     g_hash_table_destroy(clone->pool_lookup);
-    g_hash_table_destroy(clone->page_lookup);
     g_hash_table_destroy(clone->file_watch);
     g_hash_table_destroy(clone->files_accessed);
 

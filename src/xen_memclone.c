@@ -102,265 +102,53 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef STRUCTURES_H
-#define STRUCTURES_H
-
-/******************************************/
-
-#define LIBXL_API_VERSION 0x040300
-#define INVALID_DOMID ~(uint32_t)0
-
 #include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
-//#include <libxl.h>
-#include <libxl_utils.h>
-#include <xenctrl.h>
-//#include <xenstore.h>
-
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <dirent.h>
 #include <glib.h>
-#include <libvmi/libvmi.h>
-#include <libvmi/events.h>
+#include <math.h>
+#include <err.h>
 
-#ifdef HAVE_XMLRPC
-#include <xmlrpc-c/base.h>
-#include <xmlrpc-c/server.h>
-#include <xmlrpc-c/server_abyss.h>
-#endif
+#include <xenctrl.h>
 
-typedef struct xen_interface {
-  //struct xs_handle *xsh;
-  xc_interface *xc;
-  libxl_ctx *xl_ctx;
-  xentoollog_logger *xl_logger;
-} xen_interface_t;
+#include "xen_helper.h"
+#include "structures.h"
 
-typedef struct xen_domconfig_raw {
-  uint8_t *config_data;
-  int config_length;
-} xen_domconfig_raw_t;
+int main(int argc, char **argv) {
 
-typedef struct log_interface {
+    if (argc < 3) {
+        printf("Usage: %s <origin domain> <clone domain>\n", argv[0]);
+        return 1;
+    }
 
-  pthread_mutex_t log_IDX_lock;
-  uint32_t log_IDX;
+    xen_interface_t *xen = NULL;
+    xen_init_interface(&xen);
 
-  pthread_mutex_t mysql_lock;
-  bool mysql_enabled;
-  char* mysql_address;
-  char* mysql_user;
-  char* mysql_pass;
-  char* mysql_db;
-  uint32_t mysql_port;
+    if (!xen) {
+        printf("Failed to init Xen interface\n");
+        return 1;
+    }
 
-#ifdef HAVE_MYSQL
-  MYSQL* mysql_conn;
-#endif
+    char *origin_name = NULL, *clone_name = NULL;
+    uint32_t origin_domID = 0, clone_domID = 0;
 
-} honeymon_log_interface_t;
+    get_dom_info(xen, argv[1], &origin_domID, &origin_name);
+    get_dom_info(xen, argv[2], &clone_domID, &clone_name);
 
-typedef struct honeymon {
+    if (origin_domID && origin_name && clone_domID && clone_name) {
+        printf("Shared %lu pages %s -> %s\n",
+               xen_memshare(xen, origin_domID, clone_domID),
+               origin_name, clone_name);
+    }
 
-  GMutex lock;
-
-  xen_interface_t* xen;
-  honeymon_log_interface_t* log;
-
-  bool stealthy;
-  bool interactive;
-  uint32_t action;
-  char* action_option;
-
-  char* workdir;
-  char* originsdir;
-  char* honeypotsdir;
-  char* backupdir;
-  char* virusdir;
-
-  GTree* honeypots; // a tree of honeymon_honeypot_t's
-  uint16_t vlans :12; //vlan id
-
-  // clone factory
-  GAsyncQueue *clone_requests;
-  pthread_t clone_factory;
-
-  GTree *pooltags;
-  GTree *guids;
-
-#ifdef HAVE_XMLRPC
-  GMutex rpc_lock;
-  GCond rpc_cond;
-  pthread_t rpc_server_thread;
-
-  xmlrpc_server_abyss_t *rpc_server;
-#endif
-
-#ifdef HAVE_LIBMAGIC
-  magic_t magic_cookie;
-#endif
-
-} honeymon_t;
-
-/* These structs are opaque in xlu but we need them
- * to parse the configuration files. */
-typedef struct {
-  struct XLU_ConfigList2 *next;
-  char *name;
-  int nvalues, avalues; /* lists have avalues>1 */
-  char **values;
-  int lineno;
-} XLU_ConfigList2;
-
-typedef struct {
-  XLU_ConfigList2 *settings;
-  FILE *report;
-  char *config_source;
-} XLU_Config2;
-
-typedef struct honeypot {
-
-  GMutex lock;
-
-  char* name;
-  char* snapshot_path;
-  char* config_path;
-  char* ip_path;
-
-  // Rekall profile of the Kernel
-  char *rekall_profile;
-  struct sym_config *sym_config;
-
-  XLU_Config2 *config;
-
-  // network info
-  char ip[INET_ADDRSTRLEN];
-  char *mac;
-
-  win_ver_t winver;
-
-  unsigned int domID; // 0 if not actually running but restorable
-  unsigned int clones; // number of active clones
-  unsigned int max_clones; // max number of active clones
-  unsigned int clone_buffer; // number of inactive clones to keep around at any time
-  GTree* clone_list; // clone list of honeymon_clone_t
-
-  GTree* fschecksum; // each node is a GTree with the file path as key and hash as value
-} honeymon_honeypot_t;
-
-struct symbol {
-  char *name;
-  addr_t rva;
-  uint8_t type;
-  int inputs;
-} __attribute__ ((packed));
-
-struct sym_config {
-  char *name;
-  //const char **guids;
-  struct symbol *syms;
-  uint64_t sym_count;
-} __attribute__ ((packed));
-
-/*struct guid_lookup {
-  struct config *conf;
-  GHashTable *rva_lookup;
-  uint8_t free;
-};*/
-
-typedef struct clone {
-  honeymon_t* honeymon;
-  honeymon_honeypot_t* origin;
-  char* origin_name;
-  char* clone_name;
-  char* config_path;
-
-  char* disk_path;
-
-  uint16_t vlan;
-  uint32_t domID;
-  uint32_t honeybridID;
-
-  // thread stuff
-  pthread_t signal_thread;
-  pthread_t vmi_thread;
-
-  GMutex lock;
-  GMutex scan_lock;
-  GCond cond;
-  bool active;
-  bool paused;
-
-  // scan scheduling
-  uint32_t nscans; // number of scans to be scheduled
-  uint32_t cscan; // the scan to be scheduled next (cscan is always < nscans)
-  uint32_t* tscan; // list of times to wait between scans
-  pthread_t* scan_threads;
-  bool* scan_results;
-  uint32_t scan_initiator; //0=scheduled, 1=network event, 2=timeout
-
-  // log IDX
-  uint32_t logIDX;
-  uint32_t start_time;
-
-  GTimer *timer;
-
-  // VMI
-  int interrupted;
-  page_mode_t pm;
-  vmi_instance_t vmi;
-  win_ver_t winver;
-  GTree *guid_lookup; // key: both PE and PDB GUIDs
-  GHashTable *pa_lookup; // key: PA of trap
-  GHashTable *pool_lookup; // key: PA of trap
-  GHashTable *file_watch;
-  GSList *trap_reset;
-
-  GHashTable *files_accessed;
-
-} honeymon_clone_t;
-
-//sID = 3
-#define FILE_WATCH 3
-struct file_watch {
-  honeymon_clone_t *clone;
-  addr_t file_base;
-  addr_t file_name;
-  addr_t obj;
-}__attribute__ ((packed));
-
-//sID = 2
-#define POOL_LOOKUP 2
-struct pool_lookup {
-  uint8_t backup;
-  union {
-      unsigned char ctag[4];
-      uint32_t tag;
-  };
-  reg_t cr3;
-  uint32_t size;
-  uint32_t count;
-}__attribute__ ((packed));
-
-//sID = 1
-#define SYMBOLWRAP 1
-struct symbolwrap {
-  const struct sym_config *config;
-  const struct symbol *symbol;
-  uint8_t backup;
-  honeymon_clone_t *clone;
-}__attribute__ ((packed));
-
-struct memevent {
-  uint8_t sID;
-  honeymon_clone_t *clone;
-  vmi_instance_t vmi;
-  vmi_event_t *guard;
-  addr_t pa;
-  union {
-      struct symbolwrap symbol;
-      struct pool_lookup pool;
-      struct file_watch file;
-  };
-}__attribute__ ((packed));
-
-#endif
+    xen_free_interface(xen);
+}

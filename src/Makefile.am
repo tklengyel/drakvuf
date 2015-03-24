@@ -102,7 +102,7 @@
  #                                                                         #
  #*************************************************************************# 
 
-bin_PROGRAMS = drakvuf xen_domconfig injector
+bin_PROGRAMS = drakvuf xen_domconfig xen_memclone injector
 
 drakvuf_SOURCES = main.c \
                       vmi.c vmi-poolmon.c \
@@ -124,6 +124,7 @@ endif
 drakvuf_SOURCES += $(vmi_honeymon_h)
 
 xen_domconfig_SOURCES = xen_helper.c xen_domconfig.c
+xen_memclone_SOURCES  = xen_helper.c xen_memclone.c
 injector_SOURCES = injector_standalone.c injector.c xen_helper.c \
                    win-exports.c vmi.c file_extractor.c \
                    win-symbols.c vmi-poolmon.c win-handles.c

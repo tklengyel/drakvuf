@@ -115,8 +115,7 @@ void xen_free_interface(xen_interface_t* xen);
 int get_dom_info(xen_interface_t *xen, const char *input, uint32_t *domID,
 		char **name);
 
-uint8_t xen_memshare(xen_interface_t *xen, uint32_t domID, uint32_t cloneID,
-		uint64_t page);
+uint64_t xen_memshare(xen_interface_t *xen, uint32_t domID, uint32_t cloneID);
 
 void print_sharing_info(xen_interface_t *xen, uint32_t domID);
 

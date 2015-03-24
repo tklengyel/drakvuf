@@ -146,27 +146,10 @@ static void memshare(honeymon_clone_t *clone) {
     if (clone->origin->domID == INVALID_DOMID)
         return;
 
-    uint64_t page = xc_domain_maximum_gpfn(clone->honeymon->xen->xc,
-            clone->domID);
-
-    if (page == 0) {
-        printf("Failed to get max gpfn!\n");
-        return;
-    }
-
-    uint64_t shared = 0;
-    for (; page > 0; page--) {
-        if (!g_hash_table_lookup(clone->page_lookup, &page)) {
-            if (xen_memshare(clone->honeymon->xen, clone->origin->domID,
-                    clone->domID, page)) {
-                shared++;
-            }
-        } else {
-            printf("Skipping page %lu from memory sharing\n", page);
-        }
-    }
-
-    printf("Shared %lu pages\n", shared);
+    printf("Shared %lu pages\n",
+           xen_memshare(clone->honeymon->xen,
+                        clone->origin->domID,
+                        clone->domID));
 }
 
 static int init_origin(honeymon_honeypot_t *origin) {

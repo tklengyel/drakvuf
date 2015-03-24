@@ -188,10 +188,16 @@ int get_dom_info(xen_interface_t *xen, const char *input, uint32_t *domID,
     return 1;
 }
 
-uint8_t xen_memshare(xen_interface_t *xen, uint32_t domID, uint32_t cloneID,
-        uint64_t page) {
+uint64_t xen_memshare(xen_interface_t *xen, uint32_t domID, uint32_t cloneID) {
 
-    uint8_t shared = 0;
+    uint64_t shared = 0;
+    uint64_t page = xc_domain_maximum_gpfn(xen->xc,
+                                           domID);
+
+    if (page == 0) {
+        printf("Failed to get max gpfn!\n");
+        goto done;
+    }
 
     if (xc_memshr_control(xen->xc, domID, 1)) {
         printf("Failed to enable memsharing on origin!\n");
@@ -202,17 +208,19 @@ uint8_t xen_memshare(xen_interface_t *xen, uint32_t domID, uint32_t cloneID,
         goto done;
     }
 
-    uint64_t shandle, chandle;
+    for (; page >= 0; page--) {
+        uint64_t shandle, chandle;
 
-    if (xc_memshr_nominate_gfn(xen->xc, domID, page, &shandle))
-        goto done;
-    if (xc_memshr_nominate_gfn(xen->xc, cloneID, page, &chandle))
-        goto done;
-    if (xc_memshr_share_gfns(xen->xc, domID, page, shandle, cloneID, page,
+        if (xc_memshr_nominate_gfn(xen->xc, domID, page, &shandle))
+            continue;
+        if (xc_memshr_nominate_gfn(xen->xc, cloneID, page, &chandle))
+            continue;
+        if (xc_memshr_share_gfns(xen->xc, domID, page, shandle, cloneID, page,
             chandle))
-        goto done;
+            continue;
 
-    shared++;
+        shared++;
+    }
 
     done: return shared;
 }
