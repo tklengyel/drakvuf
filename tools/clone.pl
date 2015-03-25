@@ -224,8 +224,8 @@ sub clone {
     }
 
     `$lvcreate -s -n $clone -L20G /dev/$lvm_vg/$origin 2>&1`;
-    `$mkfifo /tmp/drakvuf_pipe 2>&1`;
-    `$xl save -c $origin /tmp/drakvuf_pipe 2>&1 | $xl restore -p -e /tmp/$clone.config /tmp/drakvuf_pipe 2>&1`;
+    `$mkfifo /tmp/drakvuf_pipe_$clone 2>&1`;
+    `$xl save -c $origin /tmp/drakvuf_pipe_$clone 2>&1 | $xl restore -p -e /tmp/$clone.config /tmp/drakvuf_pipe_$clone 2>&1`;
     my $cloneID = `$xl domid $clone`;
     print "$cloneID";
 }
