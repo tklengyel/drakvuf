@@ -193,6 +193,7 @@ uint64_t xen_memshare(xen_interface_t *xen, uint32_t domID, uint32_t cloneID) {
     uint64_t shared = 0;
     uint64_t page = xc_domain_maximum_gpfn(xen->xc,
                                            domID);
+    uint64_t max_page = page;
 
     if (page == 0) {
         printf("Failed to get max gpfn!\n");
@@ -208,7 +209,10 @@ uint64_t xen_memshare(xen_interface_t *xen, uint32_t domID, uint32_t cloneID) {
         goto done;
     }
 
-    for (; page >= 0; page--) {
+    /*
+     * page will underflow when done
+     */
+    for (; page <= max_page; page--) {
         uint64_t shandle, chandle;
 
         if (xc_memshr_nominate_gfn(xen->xc, domID, page, &shandle))
