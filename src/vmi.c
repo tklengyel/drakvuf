@@ -543,7 +543,9 @@ void inject_traps(honeymon_clone_t *clone) {
     do {
 
         vmi_pid_t pid;
+        uint32_t dtb;
         vmi_read_32_va(vmi, current_process + offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
+        vmi_read_32_va(vmi, current_process + offsets[EPROCESS_PDBASE], 0, &dtb);
 
         char *procname = vmi_read_str_va(vmi, current_process + offsets[EPROCESS_PNAME], 0);
 
@@ -551,7 +553,7 @@ void inject_traps(honeymon_clone_t *clone) {
             goto exit;
         }
 
-        printf("Found process: [%5d] %s\n", pid, procname);
+        printf("Found process: [PID: %5d, CR3: 0x%lx] %s\n", pid, dtb, procname);
         free(procname);
 
         addr_t imagebase = 0, peb = 0, ldr = 0, modlist = 0;
