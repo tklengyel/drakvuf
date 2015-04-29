@@ -115,7 +115,7 @@ You can also install Xen from your repository but the recommended way is to buil
 tar xzvf xen-4.4.1.tar.gz
 cd ./xen-4.4.1
 export C_INCLUDE_PATH=/usr/include/x86_64-linux-gnu
-./configure
+./configure --enable-systemd --enable-githttp
 make -j4 dist-xen
 make -j4 dist-tools
 </code></pre>
@@ -125,8 +125,9 @@ To install Xen with dom0 getting 4GB RAM assigned and two dedicated CPU cores (t
 <pre><code>sudo su
 make -j4 install-xen
 make -j4 install-tools
-echo "GRUB_CMDLINE_XEN_DEFAULT=\"dom0_mem=4096M,max:4096M dom0_max_vcpus=2 dom0_vcpus_pin=true\"" >> /etc/default/grub
-echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
+echo "GRUB_CMDLINE_XEN_DEFAULT=\"dom0_mem=4096M,max:4096M dom0_max_vcpus=4 dom0_vcpus_pin=true hap_1gb=false hap_2mb=false\"" >> /etc/default/grub
+echo "/usr/local/lib" > /etc/ld.so.conf.d/xen.conf
+ldconfig
 update-grub
 echo "none /proc/xen xenfs defaults,nofail 0 0" >> /etc/fstab
 echo "xen-evtchn" >> /etc/modules
@@ -168,12 +169,13 @@ builder = "hvm"
 boot = "cd"
 hap = 1
 acpi = 1
-shadow_memory = 32
 on_poweroff = "destroy"
-on_reboot = "restart"
-on_crash = "preserve"
+on_reboot = "destroy"
+on_crash = "destroy"
 vnc=1
 vnclisten="0.0.0.0"
+usb = 1
+usbdevice = "tablet"
 vif = ['type=ioemu,model=e1000,bridge=xenbr0,mac=00:06:5B:BA:7C:01']
 disk = [
     'phy:/dev/vg/windows7-sp1,xvda,w', 
