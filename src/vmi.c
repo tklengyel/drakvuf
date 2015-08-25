@@ -267,8 +267,7 @@ void int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
      deltatsc = rdtsc();
      vmi_get_vcpureg(vmi, &tsc, TSC, event->vcpu_id);*/
 
-    reg_t cr3;
-    vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
+    reg_t cr3 = event->regs.x86->cr3;
 
     char *ts;
     NOW(&ts);
