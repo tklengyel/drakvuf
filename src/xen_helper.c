@@ -176,7 +176,6 @@ int get_dom_info(xen_interface_t *xen, const char *input, uint32_t *domID,
         if (_name == NULL) {
             printf(
                     "Failed to get domain name from ID, is the domain running?\n");
-            return -1;
         } else {
             //printf("Got name from domID: %s\n", _name);
         }
