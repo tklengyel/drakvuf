@@ -292,7 +292,7 @@ void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
 }
 
 // post-write
-void file_name_post_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t file_name_post_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     struct memevent *container = event->data;
     struct file_watch *watch = &container->file;
@@ -338,10 +338,12 @@ void file_name_post_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     if (VMI_FAILURE == rc)
         vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
+
+    return 0;
 }
 
 // pre-write
-void file_name_pre_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t file_name_pre_cb(vmi_instance_t vmi, vmi_event_t *event) {
     vmi_clear_event(vmi, event);
     addr_t pa = (event->mem_event.gfn << 12) + event->mem_event.offset;
 
@@ -350,6 +352,7 @@ void file_name_pre_cb(vmi_instance_t vmi, vmi_event_t *event) {
     } else {
         vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
     }
+    return 0;
 }
 
 // Create mem event to catch when the memory space of the struct gets written to
