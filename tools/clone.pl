@@ -154,7 +154,7 @@ sub clone {
         die "0";
     }
 
-    my $clone_test = `$xl domid $clone`;
+    my $clone_test = `$xl domid $clone 2>/dev/null`;
     if(length $clone_test) {
         `$xl destroy $clone`;
     }
@@ -176,7 +176,7 @@ sub clone {
             my $count = 0;
             foreach $value (@values) {
                 if(index($value, "bridge")!=-1 && index($value, "vif-bridge")==-1) {
-                    print $fh "bridge = $clone_bridge.$vlan, $vif_script";
+                    print $fh "bridge=$clone_bridge.$vlan,$vif_script";
                 } else {
                     if(index($value, "script")==-1 && index($value, "backend")==-1) {
                         print $fh "$value";
@@ -227,6 +227,7 @@ sub clone {
     `$mkfifo /tmp/drakvuf_pipe_$clone 2>&1`;
     `$xl save -c $origin /tmp/drakvuf_pipe_$clone 2>&1 | $xl restore -p -e /tmp/$clone.config /tmp/drakvuf_pipe_$clone 2>&1`;
     my $cloneID = `$xl domid $clone`;
+    chomp($cloneID);
     print "$cloneID";
 }
 
