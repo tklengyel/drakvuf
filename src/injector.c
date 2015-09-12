@@ -503,7 +503,7 @@ void mm_callback(vmi_instance_t vmi, vmi_event_t *event) {
     vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
 }*/
 
-void cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
 
     //printf("CR3 changed to 0x%lx - PID %i\n", event->reg_event.value, vmi_dtb_to_pid(vmi, event->reg_event.value));
     struct injector *injector = event->data;
@@ -537,7 +537,7 @@ void cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
 
             if (!thread) {
                 printf("cr3_cb: Failed to find current thread\n");
-                return;
+                return 0;
             }
 
             //printf("Current thread @ 0x%lx\n", thread);
@@ -548,7 +548,7 @@ void cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
 
             if (!trapframe) {
                 printf("cr3_cb: Failed to find trapframe\n");
-                return;
+                return 0;
             }
 
             //printf("Trap frame @ 0x%lx\n", trapframe);
@@ -600,24 +600,28 @@ void cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
             injector->userspace_return = 0;
         }
     }
+
+    return 0;
 }
 
-void waitfor_cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t waitfor_cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
     struct injector *injector = event->data;
     injector->clone->interrupted = 1;
     printf("Injected process is scheduled to execute\n");
     vmi_pause_vm(vmi);
     vmi_clear_event(vmi, event);
+    return 0;
 }
 
-void reset_return_trap(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t reset_return_trap(vmi_instance_t vmi, vmi_event_t *event) {
     addr_t pa = (event->interrupt_event.gfn << 12)
             + event->interrupt_event.offset;
     uint8_t trap = 0xCC;
     vmi_write_8_pa(vmi, pa, &trap);
+    return 0;
 }
 
-void injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     struct injector *injector = event->data;
     addr_t pa = (event->interrupt_event.gfn << 12)
@@ -648,7 +652,7 @@ void injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
                     injector->target_pid);
             vmi_write_8_pa(vmi, pa, &injector->userspace_return_backup);
             vmi_step_event(vmi, event, event->vcpu_id, 1, reset_return_trap);
-            return;
+            return 0;
         }
 
             injector->target_pid = pid;
@@ -669,7 +673,7 @@ void injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
             vmi_clear_event(vmi, &injector->cr3_event);
             injector->mm_count++;
-            return;
+            return 0;
     }
 
     if (pa == injector->target_rip) {
@@ -681,7 +685,7 @@ void injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
                     injector->target_pid);
             vmi_write_8_pa(vmi, pa, &injector->backup);
             vmi_step_event(vmi, event, event->vcpu_id, 1, reset_return_trap);
-            return;
+            return 0;
 
         }
 
@@ -763,6 +767,8 @@ void injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     } else {
         event->interrupt_event.reinject = 1;
     }
+
+    return 0;
 }
 
 int start_app(honeymon_clone_t *clone, vmi_pid_t pid, const char *app) {
