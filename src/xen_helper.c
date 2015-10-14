@@ -173,13 +173,6 @@ int get_dom_info(xen_interface_t *xen, const char *input, uint32_t *domID,
     } else {
         //printf("Converting domid %u to name\n", _domID);
         _name = libxl_domid_to_name(xen->xl_ctx, _domID);
-        if (_name == NULL) {
-            printf(
-                    "Failed to get domain name from ID, is the domain running?\n");
-            return -1;
-        } else {
-            //printf("Got name from domID: %s\n", _name);
-        }
     }
 
     *name = _name;
