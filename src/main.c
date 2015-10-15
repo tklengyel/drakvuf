@@ -134,7 +134,7 @@ static inline void free_sym_config(struct sym_config *sym_config) {
 }
 
 static inline void drakvuf_init(drakvuf_t *drakvuf) {
-    drakvuf->sym_config = get_all_symbols(drakvuf->rekall_profile);
+    memset(drakvuf, 0, sizeof(drakvuf_t));
     drakvuf->pooltags = pooltag_build_tree();
     xen_init_interface(&drakvuf->xen);
 }
@@ -147,23 +147,50 @@ static inline void close_drakvuf(drakvuf_t *drakvuf) {
 
 int main(int argc, char** argv) {
 
+    int c;
+    char *executable = NULL;
+    char *domain = NULL;
+    vmi_pid_t injection_pid = -1;
+    struct sigaction act;
+
     printf("%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
 
     if (argc < 4) {
         printf("To start on existing domain:"
-               "  %s -d <rekall profile> <domid> [injection pid] [injection executable path]\n",
+               " %s -r <rekall profile> -d <domain ID or name> [-i <injection_pid> -e <injection_executable_path>]\n",
                argv[0]);
         return 1;
     }
 
-    memset(&drakvuf, 0, sizeof(drakvuf_t));
-    drakvuf.rekall_profile = argv[2];
-
     drakvuf_init(&drakvuf);
 
-    if (!strcmp(argv[1], "-d")) {
-        get_dom_info(drakvuf.xen, argv[3], &drakvuf.domID, &drakvuf.dom_name);
+    while ((c = getopt (argc, argv, "r:d:p:e:")) != -1)
+    switch (c)
+    {
+    case 'r':
+        drakvuf.rekall_profile = optarg;
+        break;
+    case 'd':
+        domain = optarg;
+        break;
+    case 'i':
+        injection_pid = atoi(optarg);
+        break;
+    case 'e':
+        executable = optarg;
+    default:
+        printf("Unrecognized option: %c\n", c);
+        goto exit;
     }
+
+    drakvuf.sym_config = get_all_symbols(drakvuf.rekall_profile);
+    if (!drakvuf.sym_config)
+    {
+        printf("Failed to parse Rekall profile at %s\n", drakvuf.rekall_profile);
+        goto exit;
+    }
+
+    get_dom_info(drakvuf.xen, domain, &drakvuf.domID, &drakvuf.dom_name);
 
     init_vmi(&drakvuf);
 
@@ -171,25 +198,8 @@ int main(int argc, char** argv) {
         goto exit;
     }
 
-    vmi_pid_t pid = -1;
-    char *app = NULL;
-    if (argc == 6) {
-        pid = atoi(argv[4]);
-        app = argv[5];
-    }
-
-    /* for a clean exit */
-    struct sigaction act;
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
-
-    if (pid > 0 && app) {
-        int rc = start_app(&drakvuf, pid, app);
+    if (injection_pid > 0 && executable) {
+        int rc = start_app(&drakvuf, injection_pid, executable);
 
         if (!rc) {
             printf("Process startup failed\n");
@@ -198,6 +208,15 @@ int main(int argc, char** argv) {
     }
 
     inject_traps(&drakvuf);
+
+    /* for a clean exit */
+    act.sa_handler = close_handler;
+    act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGHUP, &act, NULL);
+    sigaction(SIGTERM, &act, NULL);
+    sigaction(SIGINT, &act, NULL);
+    sigaction(SIGALRM, &act, NULL);
 
     drakvuf_loop(&drakvuf);
 
