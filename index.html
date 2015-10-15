@@ -104,16 +104,26 @@
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Installation guide</h3>
 
-The following packages are normally required to build Xen and DRAKVUF on Debian based Linux distros. The system has been mainly tested on Debian Wheezy and Debian Jessie.
+The following packages are normally required to build Xen and DRAKVUF on Debian based Linux distros. The system has been mainly tested on Debian Jessie and Ubuntu 14.04 LTS.
 
-<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute libcurl3 libcurl4-openssl-dev bzip2 module-init-tools pciutils-dev build-essential make gcc libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev python python-dev python-twisted python-gevent python-setuptools libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool check libjansson-dev libfuse-dev
+<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute libcurl3 libcurl4-openssl-dev bzip2 module-init-tools pciutils-dev build-essential make gcc libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev python python-dev python-twisted python-gevent python-setuptools libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool check libjansson-dev libfuse-dev libsystemd-daemon-dev
 </code></pre>
 
 You can also install Xen from your repository but the recommended way is to build it from source.
 
-<pre><code>wget http://bits.xensource.com/oss-xen/release/4.4.1/xen-4.4.1.tar.gz
-tar xzvf xen-4.4.1.tar.gz
-cd ./xen-4.4.1
+<pre><code>wget http://bits.xensource.com/oss-xen/release/4.6.0/xen-4.6.0.tar.gz
+wget http://bits.xensource.com/oss-xen/release/4.6.0/xen-4.6.0.tar.gz.sig
+gpg --keyserver pgp.mit.edu --recv-keys 0x83fe14c957e82bd9
+gpg --verify xen-4.6.0.tar.gz.sig
+</code></pre>
+
+The result should be: 
+
+<pre><code>gpg: Good signature from "Xen.org Xen tree code signing (signatures on the xen hypervisor and tools) <pgp@xen.org>"</code></pre>
+
+<pre><code>
+tar xzvf xen-4.6.0.tar.gz
+cd ./xen-4.6.0
 export C_INCLUDE_PATH=/usr/include/x86_64-linux-gnu
 ./configure --enable-systemd --enable-githttp
 make -j4 dist-xen
@@ -183,9 +193,9 @@ disk = [
 ]
 </pre></code>
 
-Download LibVMI and prepare to build it:
+Download the DRAKVUF branch of LibVMI and prepare to build it:
 
-<pre><code>git clone https://github.com/libvmi/libvmi
+<pre><code>git clone -b drakvuf https://github.com/tklengyel/libvmi
 cd libvmi
 ./autogen.sh
 ./configure --enable-xen --enable-xen-events
@@ -196,13 +206,14 @@ Make sure the output is like the following:
 -------------|---------------------------|----------------------------
 Xen Support  | --enable-xen=yes          | yes
 Xen Events   | --enable-xen-events=yes   | yes
-KVM Support  | --enable-kvm=no           | kernel module is not loaded
+KVM Support  | --enable-kvm=no           | libvirt missing
 File Support | --enable-file=yes         | yes
 Shm-snapshot | --enable-shm-snapshot=no  | no
 -------------|---------------------------|----------------------------
 
 Tools        | Option                    | Reason
 -------------|---------------------------|----------------------------
+Examples     | --enable-examples=yes     | yes
 VMIFS        | --enable-vmifs=yes        | yes
 
 Extra features
@@ -224,7 +235,7 @@ Download Volatility:
 
 <pre><code>git clone https://github.com/volatilityfoundation/volatility
 cd volatility
-cp ../libvmi/tools/pyvmi/pyvmiaddressspace.py volatility/plugins/addresspace
+cp ../libvmi/tools/pyvmi/pyvmiaddressspace.py volatility/plugins/addresspaces
 python setup.py build
 sudo python setup.py install
 cd ..
