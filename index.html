@@ -119,10 +119,9 @@ gpg --verify xen-4.6.0.tar.gz.sig
 
 The result should be: 
 
-<pre><code>gpg: Good signature from "Xen.org Xen tree code signing (signatures on the xen hypervisor and tools) <pgp@xen.org>"</code></pre>
+<pre><code>gpg: Good signature from "Xen.org Xen tree code signing (signatures on the xen hypervisor and tools) &lt;pgp@xen.org&gt;"</code></pre>
 
-<pre><code>
-tar xzvf xen-4.6.0.tar.gz
+<pre><code>tar xzvf xen-4.6.0.tar.gz
 cd ./xen-4.6.0
 export C_INCLUDE_PATH=/usr/include/x86_64-linux-gnu
 ./configure --enable-systemd --enable-githttp
