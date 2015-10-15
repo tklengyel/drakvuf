@@ -103,7 +103,7 @@
  #*************************************************************************#
 
 AC_PREREQ([2.60])
-AC_INIT([DRAKVUF], [0.1], [tamas.k.lengyel@gmail.com], [], [http://github.com/tklengyel/drakvuf])
+AC_INIT([DRAKVUF], [0.2], [tamas.k.lengyel@gmail.com], [], [http://github.com/tklengyel/drakvuf])
 AM_INIT_AUTOMAKE([1.10 no-define foreign])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
