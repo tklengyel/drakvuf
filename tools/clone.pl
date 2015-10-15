@@ -121,8 +121,6 @@ use warnings;
 #
 # The LVM volume group
 our $lvm_vg = "t0vg";
-# Path to DRAKVUF xen_domconfig
-our $xen_domconfig = "../src/xen_domconfig";
 # Clone network bridge name
 our $clone_bridge = "xenbr1";
 # Vif script to pass to clone Xen config.
@@ -144,9 +142,13 @@ $xl =~ s/\015?\012?$//;;
 $mkfifo =~ s/\015?\012?$//;
 
 sub clone {
+    if (@ARGV != 3) {
+        die "Insufficient number of arguments!\nUsage: ./clone.pl <domain name> <vlan> <path/to/domain.cfg>\n";
+    }
+
     my $origin = $_[0];
     my $vlan = $_[1];
-
+    my $config = $_[2];
     my $clone = "$origin-$vlan-clone";
 
     my $origin_test = `$xl domid $origin`;
@@ -159,7 +161,11 @@ sub clone {
         `$xl destroy $clone`;
     }
 
-    my $domconfig = `$xen_domconfig $origin`;
+    unless (-e $config) {
+        die "0";
+    }
+
+    my $domconfig = `cat $config`;
 
     open(my $fh, '>', "/tmp/$clone.config") or die "Could not open file!";
 
@@ -233,4 +239,4 @@ sub clone {
 
 ############################################################
 
-clone($ARGV[0], $ARGV[1]);
+clone($ARGV[0], $ARGV[1], $ARGV[2]);
