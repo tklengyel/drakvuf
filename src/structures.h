@@ -166,8 +166,6 @@ typedef struct clone {
     GSList *trap_reset;
 } honeymon_clone_t;
 
-//sID = 3
-#define FILE_WATCH 3
 struct file_watch {
     honeymon_clone_t *clone;
     addr_t file_base;
@@ -175,8 +173,6 @@ struct file_watch {
     addr_t obj;
 }__attribute__ ((packed));
 
-//sID = 2
-#define POOL_LOOKUP 2
 struct pool_lookup {
     uint8_t backup;
     union {
@@ -188,8 +184,6 @@ struct pool_lookup {
     uint32_t count;
 }__attribute__ ((packed));
 
-//sID = 1
-#define SYMBOLWRAP 1
 struct symbolwrap {
     const struct sym_config *config;
     const struct symbol *symbol;
@@ -197,8 +191,14 @@ struct symbolwrap {
     honeymon_clone_t *clone;
 }__attribute__ ((packed));
 
+typedef enum {
+    FILE_WATCH,
+    POOL_LOOKUP,
+    SYMBOLWRAP
+} memevent_type_t;
+
 struct memevent {
-    uint8_t sID;
+    memevent_type_t sID;
     honeymon_clone_t *clone;
     vmi_instance_t vmi;
     vmi_event_t *guard;
