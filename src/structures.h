@@ -113,249 +113,101 @@
 #include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
-//#include <libxl.h>
 #include <libxl_utils.h>
 #include <xenctrl.h>
-//#include <xenstore.h>
 
 #include <glib.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
 
-#ifdef HAVE_XMLRPC
-#include <xmlrpc-c/base.h>
-#include <xmlrpc-c/server.h>
-#include <xmlrpc-c/server_abyss.h>
-#endif
-
 typedef struct xen_interface {
-  //struct xs_handle *xsh;
-  xc_interface *xc;
-  libxl_ctx *xl_ctx;
-  xentoollog_logger *xl_logger;
-} xen_interface_t;
-
-typedef struct log_interface {
-
-  pthread_mutex_t log_IDX_lock;
-  uint32_t log_IDX;
-
-  pthread_mutex_t mysql_lock;
-  bool mysql_enabled;
-  char* mysql_address;
-  char* mysql_user;
-  char* mysql_pass;
-  char* mysql_db;
-  uint32_t mysql_port;
-
-#ifdef HAVE_MYSQL
-  MYSQL* mysql_conn;
-#endif
-
-} honeymon_log_interface_t;
-
-typedef struct honeymon {
-
-  GMutex lock;
-
-  xen_interface_t* xen;
-  honeymon_log_interface_t* log;
-
-  bool stealthy;
-  bool interactive;
-  uint32_t action;
-  char* action_option;
-
-  char* workdir;
-  char* originsdir;
-  char* honeypotsdir;
-  char* backupdir;
-  char* virusdir;
-
-  GTree* honeypots; // a tree of honeymon_honeypot_t's
-  uint16_t vlans :12; //vlan id
-
-  // clone factory
-  GAsyncQueue *clone_requests;
-  pthread_t clone_factory;
-
-  GTree *pooltags;
-  GTree *guids;
-
-#ifdef HAVE_XMLRPC
-  GMutex rpc_lock;
-  GCond rpc_cond;
-  pthread_t rpc_server_thread;
-
-  xmlrpc_server_abyss_t *rpc_server;
-#endif
-
-#ifdef HAVE_LIBMAGIC
-  magic_t magic_cookie;
-#endif
-
-} honeymon_t;
-
-/* These structs are opaque in xlu but we need them
- * to parse the configuration files. */
-typedef struct {
-  struct XLU_ConfigList2 *next;
-  char *name;
-  int nvalues, avalues; /* lists have avalues>1 */
-  char **values;
-  int lineno;
-} XLU_ConfigList2;
-
-typedef struct {
-  XLU_ConfigList2 *settings;
-  FILE *report;
-  char *config_source;
-} XLU_Config2;
-
-typedef struct honeypot {
-
-  GMutex lock;
-
-  char* name;
-  char* snapshot_path;
-  char* config_path;
-  char* ip_path;
-
-  // Rekall profile of the Kernel
-  char *rekall_profile;
-  struct sym_config *sym_config;
-
-  XLU_Config2 *config;
-
-  // network info
-  char ip[INET_ADDRSTRLEN];
-  char *mac;
-
-  win_ver_t winver;
-
-  unsigned int domID; // 0 if not actually running but restorable
-  unsigned int clones; // number of active clones
-  unsigned int max_clones; // max number of active clones
-  unsigned int clone_buffer; // number of inactive clones to keep around at any time
-  GTree* clone_list; // clone list of honeymon_clone_t
-
-  GTree* fschecksum; // each node is a GTree with the file path as key and hash as value
-} honeymon_honeypot_t;
+    //struct xs_handle *xsh;
+    xc_interface *xc;
+    libxl_ctx *xl_ctx;
+    xentoollog_logger *xl_logger;
+}   xen_interface_t;
 
 struct symbol {
-  char *name;
-  addr_t rva;
-  uint8_t type;
-  int inputs;
+    char *name;
+    addr_t rva;
+    uint8_t type;
+    int inputs;
 } __attribute__ ((packed));
 
 struct sym_config {
-  char *name;
-  //const char **guids;
-  struct symbol *syms;
-  uint64_t sym_count;
+    char *name;
+    //const char **guids;
+    struct symbol *syms;
+    uint64_t sym_count;
 } __attribute__ ((packed));
 
-/*struct guid_lookup {
-  struct config *conf;
-  GHashTable *rva_lookup;
-  uint8_t free;
-};*/
-
 typedef struct clone {
-  honeymon_t* honeymon;
-  honeymon_honeypot_t* origin;
-  char* origin_name;
-  char* clone_name;
-  char* config_path;
+    xen_interface_t *xen;
+    char* clone_name;
+    char* rekall_profile;
 
-  char* disk_path;
+    uint16_t vlan;
+    uint32_t domID;
 
-  uint16_t vlan;
-  uint32_t domID;
-  uint32_t honeybridID;
+    pthread_t vmi_thread;
 
-  // thread stuff
-  pthread_t signal_thread;
-  pthread_t vmi_thread;
+    GTimer *timer;
+    struct sym_config *sym_config;
+    GTree *pooltags;
 
-  GMutex lock;
-  GMutex scan_lock;
-  GCond cond;
-  bool active;
-  bool paused;
-
-  // scan scheduling
-  uint32_t nscans; // number of scans to be scheduled
-  uint32_t cscan; // the scan to be scheduled next (cscan is always < nscans)
-  uint32_t* tscan; // list of times to wait between scans
-  pthread_t* scan_threads;
-  bool* scan_results;
-  uint32_t scan_initiator; //0=scheduled, 1=network event, 2=timeout
-
-  // log IDX
-  uint32_t logIDX;
-  uint32_t start_time;
-
-  GTimer *timer;
-
-  // VMI
-  int interrupted;
-  page_mode_t pm;
-  vmi_instance_t vmi;
-  win_ver_t winver;
-  GTree *guid_lookup; // key: both PE and PDB GUIDs
-  GHashTable *pa_lookup; // key: PA of trap
-  GHashTable *pool_lookup; // key: PA of trap
-  GHashTable *file_watch;
-  GSList *trap_reset;
-
-  GHashTable *files_accessed;
-
+    // VMI
+    int interrupted;
+    page_mode_t pm;
+    vmi_instance_t vmi;
+    win_ver_t winver;
+    GHashTable *pa_lookup; // key: PA of trap
+    GHashTable *pool_lookup; // key: PA of trap
+    GHashTable *file_watch;
+    GSList *trap_reset;
 } honeymon_clone_t;
 
 //sID = 3
 #define FILE_WATCH 3
 struct file_watch {
-  honeymon_clone_t *clone;
-  addr_t file_base;
-  addr_t file_name;
-  addr_t obj;
+    honeymon_clone_t *clone;
+    addr_t file_base;
+    addr_t file_name;
+    addr_t obj;
 }__attribute__ ((packed));
 
 //sID = 2
 #define POOL_LOOKUP 2
 struct pool_lookup {
-  uint8_t backup;
-  union {
-      unsigned char ctag[4];
-      uint32_t tag;
-  };
-  reg_t cr3;
-  uint32_t size;
-  uint32_t count;
+    uint8_t backup;
+    union {
+        unsigned char ctag[4];
+        uint32_t tag;
+    };
+    reg_t cr3;
+    uint32_t size;
+    uint32_t count;
 }__attribute__ ((packed));
 
 //sID = 1
 #define SYMBOLWRAP 1
 struct symbolwrap {
-  const struct sym_config *config;
-  const struct symbol *symbol;
-  uint8_t backup;
-  honeymon_clone_t *clone;
+    const struct sym_config *config;
+    const struct symbol *symbol;
+    uint8_t backup;
+    honeymon_clone_t *clone;
 }__attribute__ ((packed));
 
 struct memevent {
-  uint8_t sID;
-  honeymon_clone_t *clone;
-  vmi_instance_t vmi;
-  vmi_event_t *guard;
-  addr_t pa;
-  union {
-      struct symbolwrap symbol;
-      struct pool_lookup pool;
-      struct file_watch file;
-  };
+    uint8_t sID;
+    honeymon_clone_t *clone;
+    vmi_instance_t vmi;
+    vmi_event_t *guard;
+    addr_t pa;
+    union {
+        struct symbolwrap symbol;
+        struct pool_lookup pool;
+        struct file_watch file;
+    };
 }__attribute__ ((packed));
 
 #endif

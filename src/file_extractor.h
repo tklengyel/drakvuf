@@ -113,7 +113,6 @@ void grab_file_by_handle(honeymon_clone_t *clone, vmi_event_t *event, reg_t cr3,
         addr_t handle);
 void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
         struct symbolwrap *s);
-void create_checksum(honeymon_t *honeymon, honeymon_honeypot_t *honeypot);
 void setup_file_watch(honeymon_clone_t *clone, vmi_instance_t vmi,
         addr_t obj_pa, addr_t ph_base, uint32_t block_size);
 void carve_file_from_memory(honeymon_clone_t *clone, addr_t ph_base,

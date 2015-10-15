@@ -242,7 +242,6 @@ static const char *size_names[SIZE_LIST_MAX] = {
 // Aligned object sizes
 size_t struct_sizes[SIZE_LIST_MAX];
 
-void vmi_build_guid_tree(honeymon_t *honeymon);
 void inject_traps(honeymon_clone_t *clonec);
 
 void *clone_vmi_thread(void *input);

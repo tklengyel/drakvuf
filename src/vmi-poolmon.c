@@ -201,7 +201,7 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
     vmi_read_addr(vmi, &ctx, &ret_va);
     addr_t ret_pa = vmi_pagetable_lookup(vmi, cr3, ret_va);
 
-    struct pooltag *s = g_tree_lookup(clone->honeymon->pooltags, ctag);
+    struct pooltag *s = g_tree_lookup(clone->pooltags, ctag);
 
     if (s) {
         printf(

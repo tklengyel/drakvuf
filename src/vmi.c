@@ -347,7 +347,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     return 0;
 }
 
-void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid, struct sym_config *sym_config) {
+void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid, const struct sym_config *sym_config) {
 
     vmi_instance_t vmi = clone->vmi;
 
@@ -509,7 +509,7 @@ void inject_traps_modules(honeymon_clone_t *clone, addr_t list_head,
         if(out.contents) {
             //TODO: We only care about the kernel at this point
             if(!strcmp((char*)out.contents,"ntoskrnl.exe")) {
-                inject_traps_pe(clone, dllbase, pid, clone->origin->sym_config);
+                inject_traps_pe(clone, dllbase, pid, clone->sym_config);
             }
             free(out.contents);
         }
@@ -627,7 +627,7 @@ void *clone_vmi_thread(void *input) {
     }
 
     vmi_pause_vm(clone->vmi);
-    print_sharing_info(clone->honeymon->xen, clone->domID);
+    print_sharing_info(clone->xen, clone->domID);
 
     printf("Vmi clone thread exiting\n");
     pthread_exit(0);
@@ -641,7 +641,7 @@ void clone_vmi_init(honeymon_clone_t *clone) {
     GHashTable *config = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(config, "os_type", "Windows");
     g_hash_table_insert(config, "domid", &clone->domID);
-    g_hash_table_insert(config, "sysmap", clone->origin->rekall_profile);
+    g_hash_table_insert(config, "sysmap", clone->rekall_profile);
 
     // Initialize the libvmi library.
     if (vmi_init_custom(&clone->vmi,
@@ -669,16 +669,12 @@ void clone_vmi_init(honeymon_clone_t *clone) {
     clone->file_watch = g_hash_table_new_full(g_int64_hash, g_int64_equal, free,
             NULL);
 
-    // Files accessed
-    clone->files_accessed = g_hash_table_new_full(g_str_hash, g_str_equal, free,
-            NULL);
-
     // Get the offsets from the Rekall profile
     int i;
     for (i = 0; i < OFFSET_MAX; i++) {
         if (VMI_FAILURE
                 == windows_system_map_symbol_to_address(
-                        clone->origin->rekall_profile, offset_names[i][0],
+                        clone->rekall_profile, offset_names[i][0],
                         offset_names[i][1], &offsets[i], NULL)) {
             printf("Failed to find offset for %s:%s\n", offset_names[i][0],
                     offset_names[i][1]);
@@ -688,7 +684,7 @@ void clone_vmi_init(honeymon_clone_t *clone) {
     for (i = 0; i < SIZE_LIST_MAX; i++) {
         if (VMI_FAILURE
                 == windows_system_map_symbol_to_address(
-                        clone->origin->rekall_profile, size_names[i],
+                        clone->rekall_profile, size_names[i],
                         (char *) &i, NULL, &struct_sizes[i])) {
             printf("Failed to find offset for %s:%s\n", offset_names[i][0],
                     offset_names[i][1]);
@@ -764,7 +760,6 @@ void close_vmi_clone(honeymon_clone_t *clone) {
 
     g_hash_table_destroy(clone->pool_lookup);
     g_hash_table_destroy(clone->file_watch);
-    g_hash_table_destroy(clone->files_accessed);
 
     if (clone->timer) {
         g_timer_destroy(clone->timer);

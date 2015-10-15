@@ -109,8 +109,6 @@
 #include "xen_helper.h"
 #include "injector.h"
 
-static honeymon_t _honeymon;
-static honeymon_honeypot_t _origin;
 static honeymon_clone_t _clone;
 
 static void close_handler(int sig) {
@@ -139,16 +137,12 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    memset(&_honeymon, 0, sizeof(honeymon_t));
-    memset(&_origin, 0, sizeof(honeymon_honeypot_t));
     memset(&_clone, 0, sizeof(honeymon_clone_t));
 
-    _origin.rekall_profile = argv[1];
-    _clone.honeymon = &_honeymon;
-    _clone.origin = &_origin;
+    _clone.rekall_profile = argv[1];
 
-    xen_init_interface(&_honeymon.xen);
-    get_dom_info(_honeymon.xen, argv[2], &_clone.domID, &_clone.clone_name);
+    xen_init_interface(&_clone.xen);
+    get_dom_info(_clone.xen, argv[2], &_clone.domID, &_clone.clone_name);
 
     clone_vmi_init(&_clone);
 
@@ -169,6 +163,6 @@ int main(int argc, char** argv)
     close_vmi_clone(&_clone);
 
 exit:
-    xen_free_interface(_honeymon.xen);
+    xen_free_interface(_clone.xen);
     return rc;
 }
