@@ -382,7 +382,7 @@ void pool_alloc_return(vmi_instance_t vmi, vmi_event_t *event, addr_t pa,
                 printf("\t'%c%c%c%c' heap allocation verified @ PA 0x%lx. Size: %u\n",
                         pool->ctag[0], pool->ctag[1], pool->ctag[2], pool->ctag[3], obj_pa, block_size);
 
-                if (!strncmp(pool->ctag, POOLTAG_FILE, 4)) {
+                if (!strncmp((char*)pool->ctag, POOLTAG_FILE, 4)) {
                     setup_file_watch(drakvuf, vmi, rax, ph_base, block_size);
                 }
             }
