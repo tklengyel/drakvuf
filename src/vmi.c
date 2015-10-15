@@ -347,7 +347,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     return 0;
 }
 
-void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid, const struct sym_config *sym_config) {
+void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid) {
 
     vmi_instance_t vmi = clone->vmi;
 
@@ -361,9 +361,9 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid, const 
     uint32_t i = 0;
     uint64_t trapped = 0;
 
-    for (; i < sym_config->sym_count; i++) {
+    for (; i < clone->sym_config->sym_count; i++) {
 
-        const struct symbol *symbol = &sym_config->syms[i];
+        const struct symbol *symbol = &clone->sym_config->syms[i];
 
         //Kernel
         if (
@@ -380,7 +380,7 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid, const 
 
         // get pa
         addr_t pa = vmi_pagetable_lookup(vmi, dtb,
-                vaddr + sym_config->syms[i].rva);
+                vaddr + clone->sym_config->syms[i].rva);
 
         if (!pa)
             continue;
@@ -394,15 +394,15 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid, const 
         vmi_read_8_pa(vmi, pa, &byte);
         if (byte == TRAP) {
             printf("\n\n** SKIPPING, PA IS ALREADY TRAPPED @ 0x%lx %s!%s**\n\n",
-                    pa, sym_config->name,
-                    sym_config->syms[i].name);
+                    pa, clone->sym_config->name,
+                    clone->sym_config->syms[i].name);
             continue;
         }
 
         struct memevent *container = g_malloc0(sizeof(struct memevent));
         container->sID = SYMBOLWRAP;
         container->symbol.clone = clone;
-        container->symbol.config = sym_config;
+        container->symbol.config = clone->sym_config;
         container->symbol.symbol = symbol;
         container->symbol.backup = byte;
         container->pa = pa;
@@ -455,9 +455,9 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid, const 
         trapped++;
         printf(
                 "\t\tTrap added @ VA 0x%lx PA 0x%lx Page %lu for %s!%s. Backup: 0x%x.\n",
-                vaddr + sym_config->syms[i].rva, container->pa,
-                pa >> 12, sym_config->name,
-                sym_config->syms[i].name,
+                vaddr + clone->sym_config->syms[i].rva, container->pa,
+                pa >> 12, clone->sym_config->name,
+                clone->sym_config->syms[i].name,
                 container->symbol.backup);
     }
 
@@ -509,7 +509,7 @@ void inject_traps_modules(honeymon_clone_t *clone, addr_t list_head,
         if(out.contents) {
             //TODO: We only care about the kernel at this point
             if(!strcmp((char*)out.contents,"ntoskrnl.exe")) {
-                inject_traps_pe(clone, dllbase, pid, clone->sym_config);
+                inject_traps_pe(clone, dllbase, pid);
             }
             free(out.contents);
         }
