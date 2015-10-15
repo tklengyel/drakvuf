@@ -126,7 +126,7 @@ struct injector {
     reg_t target_cr3;
     vmi_pid_t target_pid;
 
-    honeymon_clone_t *clone;
+    drakvuf_t *drakvuf;
     win_ver_t winver;
     page_mode_t pm;
 
@@ -606,7 +606,7 @@ event_response_t cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
 
 event_response_t waitfor_cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
     struct injector *injector = event->data;
-    injector->clone->interrupted = 1;
+    injector->drakvuf->interrupted = 1;
     printf("Injected process is scheduled to execute\n");
     vmi_pause_vm(vmi);
     vmi_clear_event(vmi, event);
@@ -752,7 +752,7 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
                         injector->cr3_event.reg_event.equal);
             }
         } else {
-            injector->clone->interrupted = 1;
+            injector->drakvuf->interrupted = 1;
         }
 
         // Restore stack
@@ -771,17 +771,17 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     return 0;
 }
 
-int start_app(honeymon_clone_t *clone, vmi_pid_t pid, const char *app) {
+int start_app(drakvuf_t *drakvuf, vmi_pid_t pid, const char *app) {
 
-    vmi_pause_vm(clone->vmi);
+    vmi_pause_vm(drakvuf->vmi);
 
     struct injector injector = {
-        .clone = clone,
-        .target_cr3 = vmi_pid_to_dtb(clone->vmi, pid),
+        .drakvuf = drakvuf,
+        .target_cr3 = vmi_pid_to_dtb(drakvuf->vmi, pid),
         .target_pid = pid,
         .target_proc = app,
-        .winver = clone->winver,
-        .pm = vmi_get_page_mode(clone->vmi),
+        .winver = drakvuf->winver,
+        .pm = vmi_get_page_mode(drakvuf->vmi),
         .ret = 0
     };
 
@@ -799,7 +799,7 @@ int start_app(honeymon_clone_t *clone, vmi_pid_t pid, const char *app) {
     injector.cr3_event.reg_event.in_access = VMI_REGACCESS_W;
     injector.cr3_event.callback = cr3_callback;
     injector.cr3_event.data = &injector;
-    vmi_register_event(clone->vmi, &injector.cr3_event);
+    vmi_register_event(drakvuf->vmi, &injector.cr3_event);
 
     vmi_event_t interrupt_event;
     memset(&interrupt_event, 0, sizeof(vmi_event_t));
@@ -807,25 +807,25 @@ int start_app(honeymon_clone_t *clone, vmi_pid_t pid, const char *app) {
     interrupt_event.interrupt_event.intr = INT3;
     interrupt_event.callback = injector_int3_cb;
     interrupt_event.data = &injector;
-    vmi_register_event(clone->vmi, &interrupt_event);
+    vmi_register_event(drakvuf->vmi, &interrupt_event);
 
     printf("Starting injection loop\n");
-    vmi_resume_vm(clone->vmi);
+    vmi_resume_vm(drakvuf->vmi);
 
     status_t status = VMI_FAILURE;
-    while (!clone->interrupted) {
+    while (!drakvuf->interrupted) {
         //printf("Waiting for events...\n");
-        status = vmi_events_listen(clone->vmi, 500);
+        status = vmi_events_listen(drakvuf->vmi, 500);
         if (status != VMI_SUCCESS) {
             printf("Error waiting for events, quitting...\n");
-            clone->interrupted = -1;
+            drakvuf->interrupted = -1;
         }
     }
 
-    vmi_clear_event(clone->vmi, &injector.cr3_event);
-    vmi_clear_event(clone->vmi, &injector.mm_event);
-    vmi_clear_event(clone->vmi, &injector.ss_event);
-    vmi_clear_event(clone->vmi, &interrupt_event);
+    vmi_clear_event(drakvuf->vmi, &injector.cr3_event);
+    vmi_clear_event(drakvuf->vmi, &injector.mm_event);
+    vmi_clear_event(drakvuf->vmi, &injector.ss_event);
+    vmi_clear_event(drakvuf->vmi, &interrupt_event);
 
     printf("Finished with injection.\n");
     return injector.ret;

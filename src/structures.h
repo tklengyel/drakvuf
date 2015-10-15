@@ -141,9 +141,9 @@ struct sym_config {
     uint64_t sym_count;
 } __attribute__ ((packed));
 
-typedef struct clone {
+typedef struct drakvuf {
     xen_interface_t *xen;
-    char* clone_name;
+    char* dom_name;
     char* rekall_profile;
 
     uint16_t vlan;
@@ -164,10 +164,10 @@ typedef struct clone {
     GHashTable *pool_lookup; // key: PA of trap
     GHashTable *file_watch;
     GSList *trap_reset;
-} honeymon_clone_t;
+} drakvuf_t;
 
 struct file_watch {
-    honeymon_clone_t *clone;
+    drakvuf_t *drakvuf;
     addr_t file_base;
     addr_t file_name;
     addr_t obj;
@@ -188,7 +188,7 @@ struct symbolwrap {
     const struct sym_config *config;
     const struct symbol *symbol;
     uint8_t backup;
-    honeymon_clone_t *clone;
+    drakvuf_t *drakvuf;
 }__attribute__ ((packed));
 
 typedef enum {
@@ -199,7 +199,7 @@ typedef enum {
 
 struct memevent {
     memevent_type_t sID;
-    honeymon_clone_t *clone;
+    drakvuf_t *drakvuf;
     vmi_instance_t vmi;
     vmi_event_t *guard;
     addr_t pa;

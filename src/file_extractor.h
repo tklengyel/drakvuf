@@ -108,14 +108,14 @@
 #include <libvmi/libvmi.h>
 #include "structures.h"
 
-void extract_file(honeymon_clone_t * clone, const char *filename, GTree *files);
-void grab_file_by_handle(honeymon_clone_t *clone, vmi_event_t *event, reg_t cr3,
+void extract_file(drakvuf_t *drakvuf, const char *filename, GTree *files);
+void grab_file_by_handle(drakvuf_t *drakvuf, vmi_event_t *event, reg_t cr3,
         addr_t handle);
 void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
         struct symbolwrap *s);
-void setup_file_watch(honeymon_clone_t *clone, vmi_instance_t vmi,
+void setup_file_watch(drakvuf_t *drakvuf, vmi_instance_t vmi,
         addr_t obj_pa, addr_t ph_base, uint32_t block_size);
-void carve_file_from_memory(honeymon_clone_t *clone, addr_t ph_base,
+void carve_file_from_memory(drakvuf_t *drakvuf, addr_t ph_base,
         addr_t block_size);
 
 #endif

@@ -116,10 +116,10 @@
 #include "xen_helper.h"
 #include "win-symbols.h"
 
-static honeymon_clone_t _clone;
+static drakvuf_t drakvuf;
 
 static void close_handler(int sig) {
-    _clone.interrupted = sig;
+    drakvuf.interrupted = sig;
 }
 
 static inline void free_sym_config(struct sym_config *sym_config) {
@@ -133,16 +133,16 @@ static inline void free_sym_config(struct sym_config *sym_config) {
     free(sym_config);
 }
 
-static inline void clone_init(honeymon_clone_t *clone) {
-    clone->sym_config = get_all_symbols(clone->rekall_profile);
-    clone->pooltags = pooltag_build_tree();
-    xen_init_interface(&clone->xen);
+static inline void drakvuf_init(drakvuf_t *drakvuf) {
+    drakvuf->sym_config = get_all_symbols(drakvuf->rekall_profile);
+    drakvuf->pooltags = pooltag_build_tree();
+    xen_init_interface(&drakvuf->xen);
 }
 
-static inline void close_clone(honeymon_clone_t *clone) {
-    free_sym_config(clone->sym_config);
-    g_tree_destroy(clone->pooltags);
-    xen_free_interface(clone->xen);
+static inline void close_drakvuf(drakvuf_t *drakvuf) {
+    free_sym_config(drakvuf->sym_config);
+    g_tree_destroy(drakvuf->pooltags);
+    xen_free_interface(drakvuf->xen);
 }
 
 int main(int argc, char** argv) {
@@ -156,18 +156,18 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    memset(&_clone, 0, sizeof(honeymon_clone_t));
-    _clone.rekall_profile = argv[2];
+    memset(&drakvuf, 0, sizeof(drakvuf_t));
+    drakvuf.rekall_profile = argv[2];
 
-    clone_init(&_clone);
+    drakvuf_init(&drakvuf);
 
     if (!strcmp(argv[1], "-d")) {
-        get_dom_info(_clone.xen, argv[3], &_clone.domID, &_clone.clone_name);
+        get_dom_info(drakvuf.xen, argv[3], &drakvuf.domID, &drakvuf.dom_name);
     }
 
-    clone_vmi_init(&_clone);
+    init_vmi(&drakvuf);
 
-    if (!_clone.vmi) {
+    if (!drakvuf.vmi) {
         goto exit;
     }
 
@@ -189,7 +189,7 @@ int main(int argc, char** argv) {
     sigaction(SIGALRM, &act, NULL);
 
     if (pid > 0 && app) {
-        int rc = start_app(&_clone, pid, app);
+        int rc = start_app(&drakvuf, pid, app);
 
         if (!rc) {
             printf("Process startup failed\n");
@@ -197,16 +197,14 @@ int main(int argc, char** argv) {
         }
     }
 
-    inject_traps(&_clone);
+    inject_traps(&drakvuf);
 
-    pthread_t clone_thread;
-    pthread_create(&clone_thread, NULL, clone_vmi_thread, (void*) &_clone);
-    pthread_join(clone_thread, NULL);
+    drakvuf_loop(&drakvuf);
 
-    close_vmi_clone(&_clone);
+    close_vmi(&drakvuf);
 
 exit:
-    close_clone(&_clone);
+    close_drakvuf(&drakvuf);
 
     return 0;
 }

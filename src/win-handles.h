@@ -108,6 +108,6 @@
 #include <libvmi/libvmi.h>
 #include "structures.h"
 
-addr_t get_obj_by_handle(honeymon_clone_t *clone, vmi_instance_t vmi, uint64_t vcpu_id, uint64_t handle);
+addr_t get_obj_by_handle(drakvuf_t *drakvuf, vmi_instance_t vmi, uint64_t vcpu_id, uint64_t handle);
 
 #endif
