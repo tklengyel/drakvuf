@@ -611,15 +611,19 @@ void drakvuf_loop(drakvuf_t *drakvuf) {
     vmi_resume_vm(drakvuf->vmi);
     drakvuf->timer = g_timer_new();
 
+    gdouble elapsed;
+
     while (!drakvuf->interrupted) {
         //printf("Waiting for events in DRAKVUF...\n");
         status_t status = vmi_events_listen(drakvuf->vmi, 100);
 
-        //gdouble elapsed = g_timer_elapsed(drakvuf->timer, NULL);
-        //if (status != VMI_SUCCESS || elapsed >= 60) {
+        elapsed = g_timer_elapsed(drakvuf->timer, NULL);
 
-        if ( VMI_SUCCESS != status ) {
-            printf("Error waiting for events or timout, quitting...\n");
+        if ( VMI_SUCCESS != status ||
+             (drakvuf->timeout > 0 && elapsed >= drakvuf->timeout)
+           )
+        {
+            printf("Error waiting for events or timeout, quitting...\n");
             drakvuf->interrupted = -1;
         }
     }
@@ -627,8 +631,7 @@ void drakvuf_loop(drakvuf_t *drakvuf) {
     vmi_pause_vm(drakvuf->vmi);
     print_sharing_info(drakvuf->xen, drakvuf->domID);
 
-    printf("Vmi drakvuf thread exiting\n");
-    pthread_exit(0);
+    printf("DRAKVUF loop finished\n");
 }
 
 void init_vmi(drakvuf_t *drakvuf) {

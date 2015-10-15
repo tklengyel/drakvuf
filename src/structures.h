@@ -151,6 +151,7 @@ typedef struct drakvuf {
 
     pthread_t vmi_thread;
 
+    uint32_t timeout;
     GTimer *timer;
     struct sym_config *sym_config;
     GTree *pooltags;

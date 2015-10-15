@@ -156,15 +156,19 @@ int main(int argc, char** argv) {
     printf("%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
 
     if (argc < 4) {
-        printf("To start on existing domain:"
-               " %s -r <rekall profile> -d <domain ID or name> [-i <injection_pid> -e <injection_executable_path>]\n",
-               argv[0]);
+        printf("Required input:\n"
+               "\t -r <rekall profile>\n"
+               "\t -d <domain ID or name>\n"
+               "Optional inputs:\n"
+               "\t -i <injection pid>\n"
+               "\t -e <injection executable_path>\n"
+               "\t -t <timeout in seconds>\n");
         return 1;
     }
 
     drakvuf_init(&drakvuf);
 
-    while ((c = getopt (argc, argv, "r:d:p:e:")) != -1)
+    while ((c = getopt (argc, argv, "r:d:p:e:t:")) != -1)
     switch (c)
     {
     case 'r':
@@ -178,6 +182,8 @@ int main(int argc, char** argv) {
         break;
     case 'e':
         executable = optarg;
+    case 't':
+        drakvuf.timeout = atoi(optarg);
     default:
         printf("Unrecognized option: %c\n", c);
         goto exit;
