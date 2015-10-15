@@ -236,28 +236,3 @@ void print_sharing_info(xen_interface_t *xen, uint32_t domID) {
 
     printf("Shared memory pages: %lu\n", info.nr_shared_pages);
 }
-
-/*
- * DomU Configuration management stuff
- */
-xen_domconfig_raw_t* xen_domconfig_raw_by_id(xen_interface_t *xen,
-        unsigned int domID) {
-
-    xen_domconfig_raw_t *config = malloc(sizeof(xen_domconfig_raw_t));
-    config->config_data = NULL;
-
-    if (libxl_userdata_retrieve(xen->xl_ctx, domID, "xl",
-	    &(config->config_data), &(config->config_length)))
-    {
-        printf("Unable to get config file\n");
-        free(config);
-        return NULL;
-    }
-
-    return config;
-}
-
-void xen_free_domconfig_raw(xen_domconfig_raw_t* raw_config) {
-    g_free(raw_config->config_data);
-    free(raw_config);
-}

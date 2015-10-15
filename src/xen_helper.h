@@ -118,8 +118,4 @@ int get_dom_info(xen_interface_t *xen, const char *input, uint32_t *domID,
 uint64_t xen_memshare(xen_interface_t *xen, uint32_t domID, uint32_t cloneID);
 
 void print_sharing_info(xen_interface_t *xen, uint32_t domID);
-
-xen_domconfig_raw_t* xen_domconfig_raw_by_id(xen_interface_t *xen,
-		unsigned int domID);
-void xen_free_domconfig_raw(xen_domconfig_raw_t* raw_config);
 #endif

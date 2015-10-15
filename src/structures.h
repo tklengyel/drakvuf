@@ -135,11 +135,6 @@ typedef struct xen_interface {
   xentoollog_logger *xl_logger;
 } xen_interface_t;
 
-typedef struct xen_domconfig_raw {
-  uint8_t *config_data;
-  int config_length;
-} xen_domconfig_raw_t;
-
 typedef struct log_interface {
 
   pthread_mutex_t log_IDX_lock;
