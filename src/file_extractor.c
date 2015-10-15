@@ -122,30 +122,30 @@
 // From FILE_INFORMATION_CLASS
 #define FILE_DISPOSITION_INFORMATION 13
 
-void volatility_extract_file(honeymon_clone_t *clone, addr_t file_object) {
+void volatility_extract_file(drakvuf_t *drakvuf, addr_t file_object) {
 
     char* profile = NULL;
-    if (PM2BIT(clone->pm) == BIT32) {
+    if (PM2BIT(drakvuf->pm) == BIT32) {
         profile = PROFILE32;
     } else {
         profile = PROFILE64;
     }
 
     char *command = g_malloc0(
-            snprintf(NULL, 0, VOL_DUMPFILES, PYTHON, VOLATILITY, clone->domID,
+            snprintf(NULL, 0, VOL_DUMPFILES, PYTHON, VOLATILITY, drakvuf->domID,
                     profile, file_object) + 1);
-    sprintf(command, VOL_DUMPFILES, PYTHON, VOLATILITY, clone->domID, profile,
+    sprintf(command, VOL_DUMPFILES, PYTHON, VOLATILITY, drakvuf->domID, profile,
             file_object);
     printf("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     free(command);
 }
 
-void carve_file_from_memory(honeymon_clone_t *clone, addr_t ph_base,
+void carve_file_from_memory(drakvuf_t *drakvuf, addr_t ph_base,
         addr_t block_size) {
 
     addr_t aligned_file_size = struct_sizes[FILE_OBJECT];
-    if(PM2BIT(clone->pm) == BIT32) {
+    if(PM2BIT(drakvuf->pm) == BIT32) {
         // 8-byte alignment on 32-bit mode
         if(struct_sizes[FILE_OBJECT] % 8) {
             aligned_file_size += 8 - (struct_sizes[FILE_OBJECT] % 8);
@@ -163,21 +163,21 @@ void carve_file_from_memory(honeymon_clone_t *clone, addr_t ph_base,
     addr_t file_name_str = 0;
     uint16_t length = 0;
 
-    vmi_read_addr_pa(clone->vmi, file_name + offsets[UNICODE_STRING_BUFFER], &file_name_str);
-    vmi_read_16_pa(clone->vmi, file_name + offsets[UNICODE_STRING_LENGTH], &length);
+    vmi_read_addr_pa(drakvuf->vmi, file_name + offsets[UNICODE_STRING_BUFFER], &file_name_str);
+    vmi_read_16_pa(drakvuf->vmi, file_name + offsets[UNICODE_STRING_LENGTH], &length);
 
     if (file_name_str && length) {
         unicode_string_t str = { .contents = NULL };
         str.length = length;
         str.encoding = "UTF-16";
         str.contents = malloc(length);
-        vmi_read_va(clone->vmi, file_name, 0, str.contents, length);
+        vmi_read_va(drakvuf->vmi, file_name, 0, str.contents, length);
         unicode_string_t str2 = { .contents = NULL };
         status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
 
         if (VMI_SUCCESS == rc) {
             printf("\tFile closing: %s.\n", str2.contents);
-            volatility_extract_file(clone, file_base);
+            volatility_extract_file(drakvuf, file_base);
             g_free(str2.contents);
         }
 
@@ -186,13 +186,13 @@ void carve_file_from_memory(honeymon_clone_t *clone, addr_t ph_base,
 
 }
 
-void grab_file_by_handle(honeymon_clone_t *clone, vmi_event_t *event, reg_t cr3,
+void grab_file_by_handle(drakvuf_t *drakvuf, vmi_event_t *event, reg_t cr3,
         addr_t handle) {
 
-    vmi_instance_t vmi = clone->vmi;
+    vmi_instance_t vmi = drakvuf->vmi;
     uint8_t type_index = 0;
 
-    addr_t obj = get_obj_by_handle(clone, vmi, event->vcpu_id, handle);
+    addr_t obj = get_obj_by_handle(drakvuf, vmi, event->vcpu_id, handle);
 
     access_context_t ctx = {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -236,7 +236,7 @@ void grab_file_by_handle(honeymon_clone_t *clone, vmi_event_t *event, reg_t cr3,
         if (rc == VMI_SUCCESS) {
             printf("\tExtracting file: %s\n", str2.contents);
 
-            volatility_extract_file(clone, file_pa);
+            volatility_extract_file(drakvuf, file_pa);
 
             free(str2.contents);
         }
@@ -248,7 +248,7 @@ void grab_file_by_handle(honeymon_clone_t *clone, vmi_event_t *event, reg_t cr3,
 void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
         struct symbolwrap *s) {
 
-    honeymon_clone_t *clone = event->data;
+    drakvuf_t *drakvuf = event->data;
     access_context_t ctx = {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = cr3
@@ -261,7 +261,7 @@ void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
         reg_t handle = 0, info = 0, length = 0, rsp = 0;
         vmi_get_vcpureg(vmi, &rsp, RSP, event->vcpu_id); // stack pointer
 
-        if (PM2BIT(clone->pm) == BIT32) {
+        if (PM2BIT(drakvuf->pm) == BIT32) {
             ctx.addr = rsp + sizeof(uint32_t);
             vmi_read_32(vmi, &ctx, (uint32_t*) &handle);
             ctx.addr += 2 * sizeof(uint32_t);
@@ -285,7 +285,7 @@ void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
             vmi_read_8(vmi, &ctx, &del);
             if (del) {
                 //printf("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", handle);
-                grab_file_by_handle(clone, event, cr3, handle);
+                grab_file_by_handle(drakvuf, event, cr3, handle);
             }
         }
     }
@@ -326,7 +326,7 @@ event_response_t file_name_post_cb(vmi_instance_t vmi, vmi_event_t *event) {
                     cr3, str2.contents, watch->obj, watch->file_base);
 
             if (VMI_SUCCESS == rc) {
-                g_hash_table_remove(watch->clone->file_watch, &pa);
+                g_hash_table_remove(watch->drakvuf->file_watch, &pa);
                 free(event);
                 free(container);
             }
@@ -357,11 +357,11 @@ event_response_t file_name_pre_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
 // Create mem event to catch when the memory space of the struct gets written to
 // so we can extract the path of the file
-void setup_file_watch(honeymon_clone_t *clone, vmi_instance_t vmi, addr_t obj,
+void setup_file_watch(drakvuf_t *drakvuf, vmi_instance_t vmi, addr_t obj,
         addr_t ph_base, uint32_t block_size) {
 
     addr_t aligned_file_size = struct_sizes[FILE_OBJECT];
-    if(PM2BIT(clone->pm) == BIT32) {
+    if(PM2BIT(drakvuf->pm) == BIT32) {
         // 8-byte alignment on 32-bit mode
         if(struct_sizes[FILE_OBJECT] % 8) {
             aligned_file_size += 8 - (struct_sizes[FILE_OBJECT] % 8);
@@ -382,17 +382,17 @@ void setup_file_watch(honeymon_clone_t *clone, vmi_instance_t vmi, addr_t obj,
     //printf("File size: 0x%lx File base: 0x%lx. Unicode string @ 0x%lx. Last write @ 0x%lx\n",
     //        aligned_file_size, file_base, file_name, last_write);
 
-    if (g_hash_table_lookup(clone->file_watch, &last_write))
+    if (g_hash_table_lookup(drakvuf->file_watch, &last_write))
         return;
 
     struct memevent *container = g_malloc0(sizeof(struct memevent));
-    container->clone = clone;
+    container->drakvuf = drakvuf;
     container->vmi = vmi;
     container->pa = last_write;
     container->file.file_name = file_name;
     container->file.file_base = file_base;
     container->file.obj = obj;
-    container->file.clone = clone;
+    container->file.drakvuf = drakvuf;
 
     container->guard = g_malloc0(sizeof(vmi_event_t));
     SETUP_MEM_EVENT(container->guard, last_write, VMI_MEMEVENT_PAGE,
@@ -404,6 +404,6 @@ void setup_file_watch(honeymon_clone_t *clone, vmi_instance_t vmi, addr_t obj,
         free(container);
         return;
     }
-    g_hash_table_insert(clone->file_watch, g_memdup(&container->pa, 8),
+    g_hash_table_insert(drakvuf->file_watch, g_memdup(&container->pa, 8),
             container);
 }

@@ -107,6 +107,6 @@
 
 #include "structures.h"
 
-int start_app(honeymon_clone_t *clone, vmi_pid_t pid, const char *app);
+int start_app(drakvuf_t *drakvuf, vmi_pid_t pid, const char *app);
 
 #endif

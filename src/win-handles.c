@@ -202,14 +202,14 @@ addr_t handle_table_get_entry(uint32_t bit, vmi_instance_t vmi,
  *
  * Also see: http://www.csee.umbc.edu/~stephens/SECURITY/491M/HiddenProcesses.ppt
  */
-addr_t get_obj_by_handle(honeymon_clone_t *clone, vmi_instance_t vmi,
+addr_t get_obj_by_handle(drakvuf_t *drakvuf, vmi_instance_t vmi,
         uint64_t vcpu_id, uint64_t handle) {
 
     addr_t ret = 0, thread = 0, current_process = 0;
     reg_t fsgs = 0;
     addr_t offset = 0;
 
-    if (PM2BIT(clone->pm) == BIT32) {
+    if (PM2BIT(drakvuf->pm) == BIT32) {
         vmi_get_vcpureg(vmi, &fsgs, FS_BASE, vcpu_id);
         offset = offsets[KPCR_PRCBDATA];
     } else {
@@ -249,7 +249,7 @@ addr_t get_obj_by_handle(honeymon_clone_t *clone, vmi_instance_t vmi,
     uint32_t table_depth = 0;
 
     //printf("Handle table @ 0x%lx. Handle count %u. Looking for handle: 0x%lx\n", table_base, handlecount, handle);
-    ret = handle_table_get_entry(PM2BIT(clone->pm), vmi, table_base,
+    ret = handle_table_get_entry(PM2BIT(drakvuf->pm), vmi, table_base,
             table_levels, table_depth, &handlecount, handle);
 
     return ret;

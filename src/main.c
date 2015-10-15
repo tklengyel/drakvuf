@@ -115,63 +115,34 @@
 #include "pooltag.h"
 #include "xen_helper.h"
 #include "win-symbols.h"
-#include "xmlrpc_client.h"
 
-#define CLONE "../tools/clone.pl"
-
-static honeymon_t _honeymon;
-static honeymon_honeypot_t _origin;
-static honeymon_clone_t _clone;
+static drakvuf_t drakvuf;
 
 static void close_handler(int sig) {
-    _clone.interrupted = sig;
+    drakvuf.interrupted = sig;
 }
 
-static void make_clone(xen_interface_t *xen, const char *dom, uint32_t *cloneID,
-        uint16_t vlan, char **clone_name) {
-    char *command = g_malloc0(snprintf(NULL, 0, "%s %s %u", CLONE, dom, vlan) + 1);
-    sprintf(command, "%s %s %u", CLONE, dom, vlan);
-    printf("** RUNNING COMMAND: %s\n", command);
-    char *output = NULL;
-    g_spawn_command_line_sync(command, &output, NULL, NULL, NULL);
-    free(command);
+static inline void free_sym_config(struct sym_config *sym_config) {
+    uint32_t i;
+    if (!sym_config) return;
 
-    get_dom_info(xen, output, cloneID, clone_name);
-
-    free(output);
-}
-
-static void memshare(honeymon_clone_t *clone) {
-
-    if (clone->origin->domID == INVALID_DOMID)
-        return;
-
-    printf("Shared %lu pages\n",
-           xen_memshare(clone->honeymon->xen,
-                        clone->origin->domID,
-                        clone->domID));
-}
-
-static int init_origin(honeymon_honeypot_t *origin) {
-    origin->sym_config = get_all_symbols(origin->rekall_profile);
-    if(!origin->sym_config) {
-        printf("Error getting rekall symbols\n");
-        return 1;
+    for (i=0; i < sym_config->sym_count; i++) {
+        free(sym_config->syms[i].name);
     }
-
-    origin->sym_config->name = "ntoskrnl.exe";
-    return 0;
+    free(sym_config->syms);
+    free(sym_config);
 }
 
-static void free_origin(honeymon_honeypot_t *origin) {
-    if (origin->sym_config) {
-        uint32_t i = 0;
-        for (; i < origin->sym_config->sym_count; i++) {
-            free(origin->sym_config->syms[i].name);
-        }
-        free(origin->sym_config->syms);
-        free(origin->sym_config);
-    }
+static inline void drakvuf_init(drakvuf_t *drakvuf) {
+    drakvuf->sym_config = get_all_symbols(drakvuf->rekall_profile);
+    drakvuf->pooltags = pooltag_build_tree();
+    xen_init_interface(&drakvuf->xen);
+}
+
+static inline void close_drakvuf(drakvuf_t *drakvuf) {
+    free_sym_config(drakvuf->sym_config);
+    g_tree_destroy(drakvuf->pooltags);
+    xen_free_interface(drakvuf->xen);
 }
 
 int main(int argc, char** argv) {
@@ -182,58 +153,21 @@ int main(int argc, char** argv) {
         printf("To start on existing domain:"
                "  %s -d <rekall profile> <domid> [injection pid] [injection executable path]\n",
                argv[0]);
-        printf("To create clone domain:"
-               " %s -c <rekall profile> <origin> <vlan> [injection pid] [injection executable path]\n",
-               argv[0]);
         return 1;
     }
 
-    memset(&_honeymon, 0, sizeof(honeymon_t));
-    memset(&_origin, 0, sizeof(honeymon_honeypot_t));
-    memset(&_clone, 0, sizeof(honeymon_clone_t));
+    memset(&drakvuf, 0, sizeof(drakvuf_t));
+    drakvuf.rekall_profile = argv[2];
 
-    _clone.honeymon = &_honeymon;
-    _clone.origin = &_origin;
-
-    xen_init_interface(&_honeymon.xen);
-
-    pooltag_build_tree(&_honeymon);
-    //vmi_build_guid_tree(&honeymon);
-
-    if (!strcmp(argv[1], "-c")) {
-
-        get_dom_info(_honeymon.xen, argv[3], &_origin.domID, &_origin.name);
-
-        if (!_origin.name || _origin.domID == INVALID_DOMID) {
-            printf("Origin domain is not running!\n");
-            return 1;
-        }
-
-        _clone.vlan = atoi(argv[4]);
-        make_clone(_honeymon.xen, _origin.name, &_clone.domID, _clone.vlan, &_clone.clone_name);
-
-        memshare(&_clone);
-
-        honeybrid_client_init();
-        _clone.honeybridID = honeybrid_add_clone(_clone.vlan);
-
-        printf("Clone created with name %s domID %u\n", _clone.clone_name,
-                _clone.domID);
-    }
+    drakvuf_init(&drakvuf);
 
     if (!strcmp(argv[1], "-d")) {
-        _origin.domID = INVALID_DOMID;
-        get_dom_info(_honeymon.xen, argv[3], &_clone.domID, &_clone.clone_name);
+        get_dom_info(drakvuf.xen, argv[3], &drakvuf.domID, &drakvuf.dom_name);
     }
 
-    _origin.rekall_profile = argv[2];
-    if (init_origin(&_origin) == 1) {
-        goto exit;
-    }
+    init_vmi(&drakvuf);
 
-    clone_vmi_init(&_clone);
-
-    if (!_clone.vmi) {
+    if (!drakvuf.vmi) {
         goto exit;
     }
 
@@ -255,7 +189,7 @@ int main(int argc, char** argv) {
     sigaction(SIGALRM, &act, NULL);
 
     if (pid > 0 && app) {
-        int rc = start_app(&_clone, pid, app);
+        int rc = start_app(&drakvuf, pid, app);
 
         if (!rc) {
             printf("Process startup failed\n");
@@ -263,22 +197,14 @@ int main(int argc, char** argv) {
         }
     }
 
-    inject_traps(&_clone);
+    inject_traps(&drakvuf);
 
-    pthread_t clone_thread;
-    pthread_create(&clone_thread, NULL, clone_vmi_thread, (void*) &_clone);
-    pthread_join(clone_thread, NULL);
+    drakvuf_loop(&drakvuf);
 
-    close_vmi_clone(&_clone);
+    close_vmi(&drakvuf);
 
 exit:
-    free_origin(&_origin);
-    xen_free_interface(_honeymon.xen);
-    g_tree_destroy(_honeymon.pooltags);
+    close_drakvuf(&drakvuf);
 
-    if (!strcmp(argv[1], "-c")) {
-        honeybrid_remove_clone(_clone.honeybridID);
-        honeybrid_client_finish();
-    }
     return 0;
 }

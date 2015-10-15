@@ -164,7 +164,7 @@ void objcreate(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3) {
 void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
         const char *ts) {
 
-    honeymon_clone_t *clone = event->data;
+    drakvuf_t *drakvuf = event->data;
     uint8_t trap = TRAP;
     access_context_t ctx = {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -176,7 +176,7 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
     vmi_get_vcpureg(vmi, &rsp, RSP, event->vcpu_id);
 
     // get the inputs of the function
-    if (PM2BIT(clone->pm) == BIT32) {
+    if (PM2BIT(drakvuf->pm) == BIT32) {
         ctx.addr = rsp+12;
         vmi_read_32(vmi, &ctx, (uint32_t*)&tag);
         ctx.addr = rsp+8;
@@ -201,7 +201,7 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
     vmi_read_addr(vmi, &ctx, &ret_va);
     addr_t ret_pa = vmi_pagetable_lookup(vmi, cr3, ret_va);
 
-    struct pooltag *s = g_tree_lookup(clone->honeymon->pooltags, ctag);
+    struct pooltag *s = g_tree_lookup(drakvuf->pooltags, ctag);
 
     if (s) {
         printf(
@@ -219,7 +219,7 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
 
     uint8_t backup = 0;
 
-    GHashTable *pool_rets = g_hash_table_lookup(clone->pool_lookup, &ret_pa);
+    GHashTable *pool_rets = g_hash_table_lookup(drakvuf->pool_lookup, &ret_pa);
     //Return is already trapped
     //This can happen if the allocation is context-switched before returning
     if (pool_rets) {
@@ -281,7 +281,7 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
     // Save the return
     if (!pool_rets) {
         pool_rets = g_hash_table_new(g_int64_hash, g_int64_equal);
-        g_hash_table_insert(clone->pool_lookup, g_memdup(&container->pa, 8),
+        g_hash_table_insert(drakvuf->pool_lookup, g_memdup(&container->pa, 8),
                 pool_rets);
     }
 
@@ -335,7 +335,7 @@ uint32_t get_bits_23to16 (uint32_t value)
 void pool_alloc_return(vmi_instance_t vmi, vmi_event_t *event, addr_t pa,
         reg_t cr3, const char *ts, GHashTable *s) {
 
-    honeymon_clone_t *clone = event->data;
+    drakvuf_t *drakvuf = event->data;
 
     reg_t rax;
     vmi_get_vcpureg(vmi, &rax, RAX, event->vcpu_id);
@@ -363,7 +363,7 @@ void pool_alloc_return(vmi_instance_t vmi, vmi_event_t *event, addr_t pa,
             addr_t ph_base = obj_pa - struct_sizes[POOL_HEADER];
             vmi_read_32_pa(vmi, ph_base + offsets[POOL_HEADER_POOLTAG], &tag);
 
-            if (PM2BIT(clone->pm) == BIT32) {
+            if (PM2BIT(drakvuf->pm) == BIT32) {
                 struct pool_header_x86 ph = { .flags = 0 };
                 vmi_read_pa(vmi, ph_base, &ph, sizeof(struct pool_header_x86));
                 block_size = ph.block_size * 0x8; // align it
@@ -382,8 +382,8 @@ void pool_alloc_return(vmi_instance_t vmi, vmi_event_t *event, addr_t pa,
                 printf("\t'%c%c%c%c' heap allocation verified @ PA 0x%lx. Size: %u\n",
                         pool->ctag[0], pool->ctag[1], pool->ctag[2], pool->ctag[3], obj_pa, block_size);
 
-                if (!strncmp(pool->ctag, POOLTAG_FILE, 4)) {
-                    setup_file_watch(clone, vmi, rax, ph_base, block_size);
+                if (!strncmp((char*)pool->ctag, POOLTAG_FILE, 4)) {
+                    setup_file_watch(drakvuf, vmi, rax, ph_base, block_size);
                 }
             }
         } else {
@@ -414,7 +414,7 @@ void pool_alloc_return(vmi_instance_t vmi, vmi_event_t *event, addr_t pa,
                 }
             }
 
-            g_hash_table_remove(clone->pool_lookup, &pa);
+            g_hash_table_remove(drakvuf->pool_lookup, &pa);
             g_hash_table_destroy(s);
         }
 

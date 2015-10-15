@@ -111,12 +111,14 @@
 #include "structures.h"
 #include "pooltag.h"
 
-void pooltag_build_tree(honeymon_t *honeymon) {
-    honeymon->pooltags = g_tree_new((GCompareFunc) strcmp);
+GTree* pooltag_build_tree() {
+    GTree *pooltags = g_tree_new((GCompareFunc) strcmp);
 
     uint32_t i = 0;
     for (; i < TAG_COUNT; i++) {
-        g_tree_insert(honeymon->pooltags, (char*) tags[i].tag,
+        g_tree_insert(pooltags, (char*) tags[i].tag,
                 (char*) &tags[i]);
     }
+
+    return pooltags;
 }

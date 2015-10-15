@@ -242,12 +242,11 @@ static const char *size_names[SIZE_LIST_MAX] = {
 // Aligned object sizes
 size_t struct_sizes[SIZE_LIST_MAX];
 
-void vmi_build_guid_tree(honeymon_t *honeymon);
-void inject_traps(honeymon_clone_t *clonec);
+void inject_traps(drakvuf_t *drakvuf);
 
-void *clone_vmi_thread(void *input);
-void clone_vmi_init(honeymon_clone_t *clone);
-void close_vmi_clone(honeymon_clone_t *clone);
+void drakvuf_loop(drakvuf_t *drakvuf);
+void init_vmi(drakvuf_t *drakvuf);
+void close_vmi(drakvuf_t *drakvuf);
 
 event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event);
 event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event);

@@ -109,12 +109,10 @@
 #include "xen_helper.h"
 #include "injector.h"
 
-static honeymon_t _honeymon;
-static honeymon_honeypot_t _origin;
-static honeymon_clone_t _clone;
+static drakvuf_t drakvuf;
 
 static void close_handler(int sig) {
-    _clone.interrupted = sig;
+    drakvuf.interrupted = sig;
 }
 
 int main(int argc, char** argv)
@@ -139,36 +137,32 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    memset(&_honeymon, 0, sizeof(honeymon_t));
-    memset(&_origin, 0, sizeof(honeymon_honeypot_t));
-    memset(&_clone, 0, sizeof(honeymon_clone_t));
+    memset(&drakvuf, 0, sizeof(drakvuf_t));
 
-    _origin.rekall_profile = argv[1];
-    _clone.honeymon = &_honeymon;
-    _clone.origin = &_origin;
+    drakvuf.rekall_profile = argv[1];
 
-    xen_init_interface(&_honeymon.xen);
-    get_dom_info(_honeymon.xen, argv[2], &_clone.domID, &_clone.clone_name);
+    xen_init_interface(&drakvuf.xen);
+    get_dom_info(drakvuf.xen, argv[2], &drakvuf.domID, &drakvuf.dom_name);
 
-    clone_vmi_init(&_clone);
+    init_vmi(&drakvuf);
 
-    if (!_clone.vmi) {
+    if (!drakvuf.vmi) {
         goto exit;
     }
 
     if (pid > 0 && app) {
-        rc = start_app(&_clone, pid, app);
+        rc = start_app(&drakvuf, pid, app);
 
         if (!rc) {
             printf("Process startup failed\n");
         } else {
-            vmi_resume_vm(_clone.vmi);
+            vmi_resume_vm(drakvuf.vmi);
         }
     }
 
-    close_vmi_clone(&_clone);
+    close_vmi(&drakvuf);
 
 exit:
-    xen_free_interface(_honeymon.xen);
+    xen_free_interface(drakvuf.xen);
     return rc;
 }

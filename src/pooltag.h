@@ -107,7 +107,7 @@
 
 #include "structures.h"
 
-void pooltag_build_tree(honeymon_t *honeymon);
+GTree* pooltag_build_tree();
 
 enum pool_type {
   NonPagedPool,
