@@ -249,9 +249,9 @@ void *clone_vmi_thread(void *input);
 void clone_vmi_init(honeymon_clone_t *clone);
 void close_vmi_clone(honeymon_clone_t *clone);
 
-void trap_guard(vmi_instance_t vmi, vmi_event_t *event);
-void vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
-void vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
+event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event);
+event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
+event_response_t vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
 
 void free_guid_lookup(gpointer s);
 void free_symbolwrap(gpointer z);

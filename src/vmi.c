@@ -129,7 +129,7 @@
 static uint64_t read_count, write_count, x_count;
 
 // This is the callback when an int3 or a read event happens
-void vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
 
     /*reg_t tsc, deltatsc;
      deltatsc = rdtsc();
@@ -163,10 +163,11 @@ void vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
     }
 
     //vmi_set_vcpureg(vmi, tsc+(rdtsc()-deltatsc), TSC, event->vcpu_id);
+    return 0;
 }
 
 // This is the callback when an write event happens
-void vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
 
     vmi_register_event(vmi, event);
     uint8_t trap = TRAP;
@@ -186,9 +187,10 @@ void vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
             }
         }
     }
+    return 0;
 }
 
-void trap_guard(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event) {
 
     /*reg_t tsc, deltatsc;
      deltatsc = rdtsc();
@@ -259,16 +261,16 @@ void trap_guard(vmi_instance_t vmi, vmi_event_t *event) {
     }
 
     //vmi_set_vcpureg(vmi, tsc+(rdtsc()-deltatsc), TSC, event->vcpu_id);
+    return 0;
 }
 
-void int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     /*reg_t tsc, deltatsc;
      deltatsc = rdtsc();
      vmi_get_vcpureg(vmi, &tsc, TSC, event->vcpu_id);*/
 
-    reg_t cr3;
-    vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
+    reg_t cr3 = event->regs.x86->cr3;
 
     char *ts;
     NOW(&ts);
@@ -342,6 +344,7 @@ void int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     g_free(ts);
     //vmi_set_vcpureg(vmi, tsc+(rdtsc()-deltatsc), TSC, event->vcpu_id);
+    return 0;
 }
 
 void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid, struct sym_config *sym_config) {

@@ -173,13 +173,6 @@ int get_dom_info(xen_interface_t *xen, const char *input, uint32_t *domID,
     } else {
         //printf("Converting domid %u to name\n", _domID);
         _name = libxl_domid_to_name(xen->xl_ctx, _domID);
-        if (_name == NULL) {
-            printf(
-                    "Failed to get domain name from ID, is the domain running?\n");
-            return -1;
-        } else {
-            //printf("Got name from domID: %s\n", _name);
-        }
     }
 
     *name = _name;
@@ -191,11 +184,18 @@ int get_dom_info(xen_interface_t *xen, const char *input, uint32_t *domID,
 uint64_t xen_memshare(xen_interface_t *xen, uint32_t domID, uint32_t cloneID) {
 
     uint64_t shared = 0;
-    uint64_t page = xc_domain_maximum_gpfn(xen->xc,
-                                           domID);
-    uint64_t max_page = page;
 
-    if (page == 0) {
+#if __XEN_INTERFACE_VERSION__ < 0x00040600
+    uint64_t page, max_page = xc_domain_maximum_gpfn(xen->xc, domID);
+#else
+    xen_pfn_t page, max_page;
+    if (xc_domain_maximum_gpfn(xen->xc, domID, &max_page)) {
+        printf("Failed to get max gpfn from Xen!\n");
+        goto done;
+    }
+#endif
+
+    if (!max_page) {
         printf("Failed to get max gpfn!\n");
         goto done;
     }
@@ -212,7 +212,7 @@ uint64_t xen_memshare(xen_interface_t *xen, uint32_t domID, uint32_t cloneID) {
     /*
      * page will underflow when done
      */
-    for (; page <= max_page; page--) {
+    for (page = max_page; page <= max_page; page--) {
         uint64_t shandle, chandle;
 
         if (xc_memshr_nominate_gfn(xen->xc, domID, page, &shandle))
