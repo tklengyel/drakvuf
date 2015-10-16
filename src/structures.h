@@ -125,7 +125,7 @@ typedef struct xen_interface {
     xc_interface *xc;
     libxl_ctx *xl_ctx;
     xentoollog_logger *xl_logger;
-}   xen_interface_t;
+} xen_interface_t;
 
 struct symbol {
     char *name;
@@ -152,7 +152,6 @@ typedef struct drakvuf {
     char* dom_name;
     char* rekall_profile;
 
-    uint16_t vlan;
     uint32_t domID;
 
     pthread_t vmi_thread;
@@ -168,11 +167,9 @@ typedef struct drakvuf {
     int interrupted;
     page_mode_t pm;
     vmi_instance_t vmi;
-    win_ver_t winver;
     GHashTable *pa_lookup; // key: PA of trap
     GHashTable *pool_lookup; // key: PA of trap
     GHashTable *file_watch;
-    GSList *trap_reset;
 } drakvuf_t;
 
 struct file_watch {
@@ -180,7 +177,7 @@ struct file_watch {
     addr_t file_base;
     addr_t file_name;
     addr_t obj;
-}__attribute__ ((packed));
+} __attribute__ ((packed));
 
 struct pool_lookup {
     uint8_t backup;
@@ -191,14 +188,14 @@ struct pool_lookup {
     reg_t cr3;
     uint32_t size;
     uint32_t count;
-}__attribute__ ((packed));
+} __attribute__ ((packed));
 
 struct symbolwrap {
     const struct sym_config *config;
     const struct symbol *symbol;
     uint8_t backup;
     drakvuf_t *drakvuf;
-}__attribute__ ((packed));
+} __attribute__ ((packed));
 
 typedef enum {
     FILE_WATCH,
@@ -217,6 +214,6 @@ struct memevent {
         struct pool_lookup pool;
         struct file_watch file;
     };
-}__attribute__ ((packed));
+} __attribute__ ((packed));
 
 #endif

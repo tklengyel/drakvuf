@@ -128,7 +128,6 @@ struct injector {
     vmi_pid_t target_pid;
 
     drakvuf_t *drakvuf;
-    win_ver_t winver;
     page_mode_t pm;
 
     uint8_t ret;
@@ -775,7 +774,6 @@ int start_app(drakvuf_t *drakvuf, vmi_pid_t pid, const char *app) {
         .target_cr3 = vmi_pid_to_dtb(drakvuf->vmi, pid),
         .target_pid = pid,
         .target_proc = app,
-        .winver = drakvuf->winver,
         .pm = vmi_get_page_mode(drakvuf->vmi),
         .ret = 0
     };

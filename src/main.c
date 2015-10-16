@@ -141,6 +141,7 @@ static inline void close_drakvuf(drakvuf_t *drakvuf) {
     free_sym_config(drakvuf->sym_config);
     g_tree_destroy(drakvuf->pooltags);
     xen_free_interface(drakvuf->xen);
+    free(drakvuf->dom_name);
 }
 
 int main(int argc, char** argv) {
