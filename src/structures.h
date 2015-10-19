@@ -141,6 +141,12 @@ struct sym_config {
     uint64_t sym_count;
 } __attribute__ ((packed));
 
+typedef enum {
+    OUTPUT_DEFAULT,
+    OUTPUT_CSV,
+    __OUTPUT_MAX
+} output_format_t;
+
 typedef struct drakvuf {
     xen_interface_t *xen;
     char* dom_name;
@@ -155,6 +161,8 @@ typedef struct drakvuf {
     GTimer *timer;
     struct sym_config *sym_config;
     GTree *pooltags;
+
+    output_format_t output_format;
 
     // VMI
     int interrupted;

@@ -117,14 +117,14 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
 
-#include "structures.h"
-
+#include "drakvuf.h"
 #include "win-symbols.h"
 #include "vmi.h"
 #include "vmi-poolmon.h"
 #include "file_extractor.h"
 #include "xen_helper.h"
 #include "rdtsc.h"
+#include "output.h"
 
 static uint64_t read_count, write_count, x_count;
 
@@ -140,7 +140,7 @@ event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
 
     if (event->type == VMI_EVENT_INTERRUPT) {
         pa = (event->interrupt_event.gfn << 12) + event->interrupt_event.offset;
-        //printf("Resetting trap @ 0x%lx.\n", pa);
+        //PRINT_DEBUG("Resetting trap @ 0x%lx.\n", pa);
         vmi_write_8_pa(vmi, pa, &trap);
     } else {
 
@@ -156,7 +156,7 @@ event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
         ghashtable_foreach(containers, i, key, s)
         {
             if (pa > s->pa - 7 && pa <= s->pa + 7) {
-                //printf("Violation @ 0x%lx. Resetting trap @ 0x%lx.\n", pa, s->pa);
+                //PRINT_DEBUG("Violation @ 0x%lx. Resetting trap @ 0x%lx.\n", pa, s->pa);
                 vmi_write_8_pa(vmi, s->pa, &trap);
             }
         }
@@ -203,7 +203,7 @@ event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event) {
     vmi_clear_event(vmi, event);
 
     if (event->mem_event.out_access & VMI_MEMACCESS_R) {
-        //printf("Read memaccess @ 0x%lx. Page %lu.\n", pa, event->mem_event.gfn);
+        //PRINT_DEBUG("Read memaccess @ 0x%lx. Page %lu.\n", pa, event->mem_event.gfn);
         //read_count++;
         GHashTable *containers = event->data;
         GHashTableIter i;
@@ -212,14 +212,14 @@ event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event) {
         ghashtable_foreach(containers, i, key, s) {
             if (s && s->sID == SYMBOLWRAP) {
                 if (pa > s->pa - 7 && pa <= s->pa + 7) {
-                    printf("** Mem event removing trap 0x%lx -> %s!%s\n", s->pa,
+                    PRINT_DEBUG("** Mem event removing trap 0x%lx -> %s!%s\n", s->pa,
                             s->symbol.config->name, s->symbol.symbol->name);
                     vmi_write_8_pa(vmi, s->pa, &s->symbol.backup);
                 }
             }
             if (s && s->sID == POOL_LOOKUP) {
                 if (pa > s->pa - 7 && pa <= s->pa + 7) {
-                    printf("** Mem event removing trap pool return 0x%lx\n",
+                    PRINT_DEBUG("** Mem event removing trap pool return 0x%lx\n",
                             s->pa);
                     vmi_write_8_pa(vmi, s->pa, &s->pool.backup);
                 }
@@ -231,7 +231,7 @@ event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event) {
 
     if (event->mem_event.out_access & VMI_MEMACCESS_W) {
         //write_count++;
-        printf("Write memaccess @ 0x%lx. Page %lu.\n", pa,
+        PRINT_DEBUG("Write memaccess @ 0x%lx. Page %lu.\n", pa,
                 event->mem_event.gfn);
 
         GHashTable *containers = event->data;
@@ -239,19 +239,19 @@ event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event) {
         addr_t *key = NULL;
         struct memevent *s = NULL;
         ghashtable_foreach(containers, i, key, s) {
-            /*printf("Write memaccess @ 0x%lx. Page %lu. Symbol: %s!%s\n", pa,
+            /*PRINT_DEBUG("Write memaccess @ 0x%lx. Page %lu. Symbol: %s!%s\n", pa,
                     event->mem_event.gfn, s->symbol.config->name,
                     s->symbol.symbol->name);*/
             if (s && s->sID == SYMBOLWRAP) {
                 if (pa > s->pa - 7 && pa <= s->pa) {
-                    printf("** Mem event removing trap 0x%lx -> %s!%s\n", s->pa,
+                    PRINT_DEBUG("** Mem event removing trap 0x%lx -> %s!%s\n", s->pa,
                             s->symbol.config->name, s->symbol.symbol->name);
                     vmi_write_8_pa(vmi, s->pa, &s->symbol.backup);
                 }
             }
             if (s && s->sID == POOL_LOOKUP) {
                 if (pa > s->pa - 7 && pa <= s->pa) {
-                    printf("** Mem event removing trap 0x%lx\n", s->pa);
+                    PRINT_DEBUG("** Mem event removing trap 0x%lx\n", s->pa);
                     vmi_write_8_pa(vmi, s->pa, &s->pool.backup);
                 }
             }
@@ -281,15 +281,9 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     struct symbolwrap *s = g_hash_table_lookup(drakvuf->pa_lookup, &pa);
 
     if (s) {
-        /*printf(
-                "%s BP CR3: 0x%"PRIx64" Page %"PRIi64" PA=0x%"PRIx64" RIP=0x%"PRIx64" Symbol: %s!%s. Backup 0x%"PRIx8"\n",
-                ts, cr3, pa >> 12, pa, event->interrupt_event.gla,
-                s->config->name, s->symbol->name, s->backup);*/
-
-        printf(
-                "CR3=0x%lx RIP=0x%"PRIx64" %s!%s\n",
-                cr3, event->interrupt_event.gla,
-                s->config->name, s->symbol->name);
+        PRINT(drakvuf, INT3_CB_STRING,
+              cr3, event->interrupt_event.gla,
+              s->config->name, s->symbol->name);
 
         //if (!strcmp(s->config->name, "ntkrnlmp")
         //        || !strcmp(s->config->name, "ntkrpamp")) {
@@ -335,7 +329,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
             pool_alloc_return(vmi, event, pa, cr3, ts, pool_rets);
             event->interrupt_event.reinject = 0;
         } else {
-            printf(
+            fprintf(stderr,
                     "%s Unknown Int3 event: CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64"\n",
                     ts, cr3, pa, event->interrupt_event.gla);
             event->interrupt_event.reinject = 1;
@@ -393,7 +387,7 @@ void inject_traps_pe(drakvuf_t *drakvuf, addr_t vaddr, uint32_t pid) {
         uint8_t byte = 0;
         vmi_read_8_pa(vmi, pa, &byte);
         if (byte == TRAP) {
-            printf("\n\n** SKIPPING, PA IS ALREADY TRAPPED @ 0x%lx %s!%s**\n\n",
+            PRINT_DEBUG("\n\n** SKIPPING, PA IS ALREADY TRAPPED @ 0x%lx %s!%s**\n\n",
                     pa, drakvuf->sym_config->name,
                     drakvuf->sym_config->syms[i].name);
             continue;
@@ -414,7 +408,7 @@ void inject_traps_pe(drakvuf_t *drakvuf, addr_t vaddr, uint32_t pid) {
         // This has to happen before the MEMEVENT is registered because
         // the MFN is yet to be allocated on which we want the MEMEVENT set on
         if (VMI_FAILURE == vmi_write_8_pa(vmi, container->pa, &trap)) {
-            printf("FAILED TO INJECT TRAP @ 0x%lx !\n", container->pa);
+            PRINT_DEBUG("FAILED TO INJECT TRAP @ 0x%lx !\n", container->pa);
             continue;
         }
 
@@ -424,7 +418,7 @@ void inject_traps_pe(drakvuf_t *drakvuf, addr_t vaddr, uint32_t pid) {
             SETUP_MEM_EVENT(container->guard, container->pa, VMI_MEMEVENT_PAGE,
                     VMI_MEMACCESS_RW, trap_guard);
             if (VMI_FAILURE == vmi_register_event(vmi, container->guard)) {
-                printf("*** FAILED TO REGISTER MEMORY GUARD @ PAGE %lu ***\n",
+                PRINT_DEBUG("*** FAILED TO REGISTER MEMORY GUARD @ PAGE %lu ***\n",
                         pa >> 12);
                 free(container->guard);
                 free(container);
@@ -432,9 +426,9 @@ void inject_traps_pe(drakvuf_t *drakvuf, addr_t vaddr, uint32_t pid) {
             }
             container->guard->data = g_hash_table_new(g_int64_hash,
                     g_int64_equal);
-            printf("\t\tNew memory event trap set on page %lu\n", pa >> 12);
+            PRINT_DEBUG("\t\tNew memory event trap set on page %lu\n", pa >> 12);
         } else {
-            printf("\t\tMemory event trap already set on page %lu\n", pa >> 12);
+            PRINT_DEBUG("\t\tMemory event trap already set on page %lu\n", pa >> 12);
         }
 
         struct memevent *test = g_hash_table_lookup(container->guard->data,
@@ -443,9 +437,9 @@ void inject_traps_pe(drakvuf_t *drakvuf, addr_t vaddr, uint32_t pid) {
             g_hash_table_insert(container->guard->data, &container->pa,
                     container);
         } else if (test->sID == SYMBOLWRAP) {
-            printf("Address is already guarded\n");
+            PRINT_DEBUG("Address is already guarded\n");
         } else {
-            printf("Address is trapped by another feature! ERROR/TODO!\n");
+            PRINT_DEBUG("Address is trapped by another feature! ERROR/TODO!\n");
         }
 
         // save trap location into lookup tree
@@ -453,7 +447,7 @@ void inject_traps_pe(drakvuf_t *drakvuf, addr_t vaddr, uint32_t pid) {
                 &container->symbol);
 
         trapped++;
-        printf(
+        PRINT_DEBUG(
                 "\t\tTrap added @ VA 0x%lx PA 0x%lx Page %lu for %s!%s. Backup: 0x%x.\n",
                 vaddr + drakvuf->sym_config->syms[i].rva, container->pa,
                 pa >> 12, drakvuf->sym_config->name,
@@ -461,14 +455,14 @@ void inject_traps_pe(drakvuf_t *drakvuf, addr_t vaddr, uint32_t pid) {
                 container->symbol.backup);
     }
 
-    printf("\tInjected %lu traps into PID %i\n", trapped, pid);
+    PRINT_DEBUG("\tInjected %lu traps into PID %i\n", trapped, pid);
 
 }
 
 void inject_traps_modules(drakvuf_t *drakvuf, addr_t list_head,
         vmi_pid_t pid) {
 
-    printf("Inject traps in module list of PID %u\n", pid);
+    PRINT_DEBUG("Inject traps in module list of PID %u\n", pid);
 
     vmi_instance_t vmi = drakvuf->vmi;
 
@@ -501,7 +495,7 @@ void inject_traps_modules(drakvuf_t *drakvuf, addr_t list_head,
 
         unicode_string_t out = { .contents = NULL };
         if (us && VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8")) {
-            printf("\t%s @ 0x%lx\n", out.contents, dllbase);
+            PRINT_DEBUG("\t%s @ 0x%lx\n", out.contents, dllbase);
         } // if
         if (us)
             vmi_free_unicode_str(us);
@@ -537,7 +531,7 @@ void inject_traps(drakvuf_t *drakvuf) {
     status_t status = vmi_read_addr_va(vmi, current_list_entry, 0,
             &next_list_entry);
     if (status == VMI_FAILURE) {
-        printf(
+        PRINT_DEBUG(
                 "Failed to read next pointer at 0x%"PRIx64" before entering loop\n",
                 current_list_entry);
         return;
@@ -556,7 +550,8 @@ void inject_traps(drakvuf_t *drakvuf) {
             goto exit;
         }
 
-        printf("Found process: [PID: %5d, CR3: 0x%lx] %s\n", pid, dtb, procname);
+        PRINT(drakvuf, FOUND_PROCESS_STRING, pid, dtb, procname);
+
         free(procname);
 
         addr_t imagebase = 0, peb = 0, ldr = 0, modlist = 0;
@@ -580,7 +575,7 @@ void inject_traps(drakvuf_t *drakvuf) {
 
         status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
         if (status == VMI_FAILURE) {
-            printf("Failed to read next pointer in loop at %"PRIx64"\n",
+            PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n",
                     current_list_entry);
             return;
         }
@@ -593,7 +588,7 @@ exit:
 
 void drakvuf_loop(drakvuf_t *drakvuf) {
 
-    printf("Started DRAKVUF loop\n");
+    PRINT_DEBUG("Started DRAKVUF loop\n");
 
     drakvuf->interrupted = 0;
 
@@ -614,7 +609,7 @@ void drakvuf_loop(drakvuf_t *drakvuf) {
     gdouble elapsed;
 
     while (!drakvuf->interrupted) {
-        //printf("Waiting for events in DRAKVUF...\n");
+        //PRINT_DEBUG("Waiting for events in DRAKVUF...\n");
         status_t status = vmi_events_listen(drakvuf->vmi, 100);
 
         elapsed = g_timer_elapsed(drakvuf->timer, NULL);
@@ -623,7 +618,7 @@ void drakvuf_loop(drakvuf_t *drakvuf) {
              (drakvuf->timeout > 0 && elapsed >= drakvuf->timeout)
            )
         {
-            printf("Error waiting for events or timeout, quitting...\n");
+            PRINT_DEBUG("Error waiting for events or timeout, quitting...\n");
             drakvuf->interrupted = -1;
         }
     }
@@ -631,12 +626,12 @@ void drakvuf_loop(drakvuf_t *drakvuf) {
     vmi_pause_vm(drakvuf->vmi);
     print_sharing_info(drakvuf->xen, drakvuf->domID);
 
-    printf("DRAKVUF loop finished\n");
+    PRINT_DEBUG("DRAKVUF loop finished\n");
 }
 
 void init_vmi(drakvuf_t *drakvuf) {
 
-    printf("Init VMI on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
+    PRINT_DEBUG("Init VMI on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
 
     GHashTable *config = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(config, "os_type", "Windows");
@@ -648,7 +643,7 @@ void init_vmi(drakvuf_t *drakvuf) {
             VMI_XEN | VMI_INIT_COMPLETE | VMI_INIT_EVENTS
                     | VMI_CONFIG_GHASHTABLE, (vmi_config_t) config)
             == VMI_FAILURE) {
-        printf("Failed to init LibVMI library.\n");
+        PRINT_DEBUG("Failed to init LibVMI library.\n");
         if (drakvuf->vmi != NULL) {
             vmi_destroy(drakvuf->vmi);
         }
@@ -676,7 +671,7 @@ void init_vmi(drakvuf_t *drakvuf) {
                 == windows_system_map_symbol_to_address(
                         drakvuf->rekall_profile, offset_names[i][0],
                         offset_names[i][1], &offsets[i], NULL)) {
-            printf("Failed to find offset for %s:%s\n", offset_names[i][0],
+            PRINT_DEBUG("Failed to find offset for %s:%s\n", offset_names[i][0],
                     offset_names[i][1]);
         }
     }
@@ -686,7 +681,7 @@ void init_vmi(drakvuf_t *drakvuf) {
                 == windows_system_map_symbol_to_address(
                         drakvuf->rekall_profile, size_names[i],
                         (char *) &i, NULL, &struct_sizes[i])) {
-            printf("Failed to find offset for %s:%s\n", offset_names[i][0],
+            PRINT_DEBUG("Failed to find offset for %s:%s\n", offset_names[i][0],
                     offset_names[i][1]);
             continue;
         }
@@ -770,5 +765,5 @@ void close_vmi(drakvuf_t *drakvuf) {
         vmi_destroy(drakvuf->vmi);
         drakvuf->vmi = NULL;
     }
-    printf("close_vmi_drakvuf finished\n");
+    PRINT_DEBUG("close_vmi_drakvuf finished\n");
 }

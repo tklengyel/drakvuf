@@ -119,9 +119,11 @@
 
 #include <libvmi/libvmi.h>
 
+#include "drakvuf.h"
 #include "vmi.h"
 #include "vmi-poolmon.h"
 #include "file_extractor.h"
+#include "output.h"
 
 #define POOLTAG_FILE "Fil\xe5"
 
@@ -144,6 +146,8 @@ void objcreate(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3) {
 
     uint8_t index = ~0;
     reg_t obj_header_addr;
+    drakvuf_t *drakvuf = event->data;
+
     vmi_get_vcpureg(vmi, &obj_header_addr, RDX, event->vcpu_id);
 
     access_context_t ctx = {
@@ -155,9 +159,9 @@ void objcreate(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3) {
     vmi_read_8(vmi, &ctx, &index);
 
     if (index < WIN7_TYPEINDEX_LAST) {
-        printf("\tObject: %s\n", win7_typeindex[index]);
+        PRINT(drakvuf, OBJCREATE_KNOWN_STRING, index, win7_typeindex[index]);
     } else {
-        printf("\tUnknown object type index: %u\n", index);
+        PRINT(drakvuf, OBJCREATE_UNKNOWN_STRING, index);
     }
 }
 
@@ -204,13 +208,11 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
     struct pooltag *s = g_tree_lookup(drakvuf->pooltags, ctag);
 
     if (s) {
-        printf(
-                "Heap allocation with known pool tag: '%s' (%u), %s, %s.\n",
-                ctag, (uint32_t)tag, s->source, s->description);
+        PRINT(drakvuf, HEAPALLOC_KNOWN_STRING,
+              ctag, (uint32_t)tag, s->source, s->description);
     } else {
-        printf(
-                "Heap allocation with unknown pool tag: '%s' \\x%x\\x%x\\x%x\\x%x\n",
-                ctag, ctag[0], ctag[1], ctag[2], ctag[3]);
+        PRINT(drakvuf, HEAPALLOC_UNKNOWN_STRING,
+              ctag, ctag[0], ctag[1], ctag[2], ctag[3]);
     }
 
     // Only trap the return of File allocations for now
@@ -226,9 +228,8 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
         struct memevent *test = g_hash_table_lookup(pool_rets, &cr3);
         if (test) {
             test->pool.count++;
-            printf(
-                    "Pool allocation double called by the same process with CR3 0x%lx. Count %u\n",
-                    cr3, test->pool.count);
+            PRINT_DEBUG("Pool allocation double called by the same process with CR3 0x%lx. Count %u\n",
+                        cr3, test->pool.count);
             return;
         } else {
             GHashTableIter i;
@@ -236,8 +237,8 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
             struct memevent *container = NULL;
             ghashtable_foreach(pool_rets, i, key, container)
             {
-                printf("Return was already trapped by 0x%lx\n",
-                        container->pool.cr3);
+                PRINT_DEBUG("Return was already trapped by 0x%lx\n",
+                            container->pool.cr3);
                 backup = container->pool.backup;
                 break;
             }
@@ -247,7 +248,7 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
     }
 
     if (backup == trap) {
-        printf("Backup byte is TRAP, TODO\n");
+        PRINT_DEBUG("Backup byte is TRAP, TODO\n");
         return;
     }
 
@@ -298,12 +299,15 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
 void pool_tracker_free(vmi_instance_t vmi, vmi_event_t *event) {
     // TODO: 32-bit inputs are on the stack
     reg_t rcx, rdx;
+    drakvuf_t *drakvuf = event->data;
+
     vmi_get_vcpureg(vmi, &rcx, RCX, event->vcpu_id);
     vmi_get_vcpureg(vmi, &rdx, RDX, event->vcpu_id);
 
     char ctag[5] = { [0 ... 4] = '\0' };
     memcpy(ctag, &rdx, 4);
-    printf("\t Freeing pool allocation @ 0x%lx. Tag '%s'\n", rcx, ctag);
+
+    PRINT(drakvuf, HEAPFREE_STRING, rcx, ctag);
 }
 
 static inline
@@ -374,13 +378,12 @@ void pool_alloc_return(vmi_instance_t vmi, vmi_event_t *event, addr_t pa,
             }
 
             if ((uint32_t)tag != pool->tag) {
-                printf(
-                        "%s --!! Pool tag mangling detected: got '%c%c%c%c', expected '%c%c%c%c' !!--\n",
+                PRINT(drakvuf, HEAPALLOC_MANGLED_STRING,
                         ts, ((char *)&tag)[0], ((char *)&tag)[1], ((char *)&tag)[2], ((char *)&tag)[3],
                         pool->ctag[0], pool->ctag[1], pool->ctag[2], pool->ctag[3]);
             } else {
-                printf("\t'%c%c%c%c' heap allocation verified @ PA 0x%lx. Size: %u\n",
-                        pool->ctag[0], pool->ctag[1], pool->ctag[2], pool->ctag[3], obj_pa, block_size);
+                PRINT(drakvuf, HEAPALLOC_VERIFIED_STRING,
+                      pool->ctag[0], pool->ctag[1], pool->ctag[2], pool->ctag[3], obj_pa, block_size);
 
                 if (!strncmp((char*)pool->ctag, POOLTAG_FILE, 4)) {
                     setup_file_watch(drakvuf, vmi, rax, ph_base, block_size);
@@ -388,7 +391,8 @@ void pool_alloc_return(vmi_instance_t vmi, vmi_event_t *event, addr_t pa,
             }
         } else {
             // TODO: Allocation happened in the big pool
-            printf("Allocation in big pool: %u >= %u\n", pool->size, VMI_PS_4KB);
+            PRINT(drakvuf, HEAPALLOC_BIGPOOL_STRING,
+                  pool->size, pool->ctag[0], pool->ctag[1], pool->ctag[2], pool->ctag[3]);
         }
 
         done:

@@ -102,146 +102,89 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
+#ifndef OUTPUT_H
+#define OUTPUT_H
 
 #include "drakvuf.h"
-#include "injector.h"
-#include "vmi.h"
-#include "pooltag.h"
-#include "xen_helper.h"
-#include "win-symbols.h"
+#include "structures.h"
 
-static void close_handler(int sig) {
-    drakvuf.interrupted = sig;
-}
+enum output_strings {
+    INT3_CB_STRING,
+    FOUND_PROCESS_STRING,
+    HEAPALLOC_KNOWN_STRING,
+    HEAPALLOC_UNKNOWN_STRING,
+    HEAPALLOC_VERIFIED_STRING,
+    HEAPALLOC_BIGPOOL_STRING,
+    HEAPALLOC_MANGLED_STRING,
+    HEAPFREE_STRING,
+    OBJCREATE_KNOWN_STRING,
+    OBJCREATE_UNKNOWN_STRING,
+    INJECTION_START_STRING,
+    INJECTION_STACK_INFO_STRING,
+    INJECTION_STACK_PUSHED_STRING,
+    INJECTION_TRAPFRAME_STRING,
+    INJECTION_SUCCESS_STRING,
+    __STRINGS_MAX
+};
 
-static inline void free_sym_config(struct sym_config *sym_config) {
-    uint32_t i;
-    if (!sym_config) return;
+static const char *strings_list[__OUTPUT_MAX][__STRINGS_MAX] = {
+    [OUTPUT_DEFAULT] = {
+        [0 ... __STRINGS_MAX-1] = NULL,
+        [INT3_CB_STRING] = "int3cb CR3=0x%lx RIP=0x%lx %s!%s\n",
+        [FOUND_PROCESS_STRING] = "Found process: [PID: %5d, CR3: 0x%x] %s\n",
+        [HEAPALLOC_KNOWN_STRING] = "Heap allocation with known pool tag:"
+                                   " '%s' (%u), %s, %s.\n",
+        [HEAPALLOC_UNKNOWN_STRING] = "Heap allocation with unknown pool tag: "
+                                     "'%s' \\x%x\\x%x\\x%x\\x%x\n",
+        [HEAPALLOC_VERIFIED_STRING] = "\t'%c%c%c%c' heap allocation verified @"
+                                      " PA 0x%lx. Size: %u\n",
+        [HEAPALLOC_BIGPOOL_STRING] = "Allocation in big pool: %u, '%c%c%c%c'\n",
+        [HEAPALLOC_MANGLED_STRING] = "Pool tag mangling detected: got '%c%c%c%c'"
+                                     ", expected '%c%c%c%c'\n",
+        [HEAPFREE_STRING] = "Freeing object on heap: 0x%lx, %s\n",
+        [OBJCREATE_KNOWN_STRING] = "Object create: %u -> %s\n",
+        [OBJCREATE_UNKNOWN_STRING] = "Object create: %u\n",
+        [INJECTION_START_STRING] = "Hijacking thread of PID %u on vCPU %u to "
+                                   "execute CreateProcessA at 0x%lx!\n",
+        [INJECTION_STACK_INFO_STRING] = "FS/GS: 0x%lx RSP: 0x%lx RIP: 0x%lx "
+                                        "RCX: 0x%lx RBP: 0x%lx\n"
+                                        "Stack base: 0x%lx Limit: 0x%lx\n",
+        [INJECTION_STACK_PUSHED_STRING] = "\tArgument '%s' pushed on stack at 0x%lx.\n"
+                                          "\tProcess information pushed on stack at 0x%lx\n"
+                                          "\tStartup information pushed on stack at 0x%lx\n"
+                                          "\tReturn address 0x%lx pushed on stack at 0x%lx\n",
+        [INJECTION_TRAPFRAME_STRING] = "Trapping userspace return of Thread:"
+                                       " %lu @ VA 0x%lx -> PA 0x%lx\n",
+        [INJECTION_SUCCESS_STRING] = "-- CreateProcessA SUCCESS --\n"
+                                     "\tProcess handle: 0x%x. Thread handle: 0x%x\n"
+                                     "\tPID: %u. TID: %u\n"
+                                     "\tInjected process DTB: 0x%lx\n",
+    },
+    [OUTPUT_CSV] = {
+        [0 ... __STRINGS_MAX-1] = NULL,
+        [INT3_CB_STRING] = "int3cb,0x%lx,0x%lx,%s,%s\n",
+        [FOUND_PROCESS_STRING] = "process,%d,0x%x,%s\n",
+        [HEAPALLOC_KNOWN_STRING] = "heapalloc,known,%s,%u,%s,%s\n",
+        [HEAPALLOC_UNKNOWN_STRING] = "heapalloc,unknown,%s,\\x%x,\\x%x,\\x%x,\\x%x\n",
+        [HEAPALLOC_VERIFIED_STRING] = "heapalloc,verified,%c,%c,%c,%c,0x%lx,%u\n",
+        [HEAPALLOC_BIGPOOL_STRING] = "heapalloc,bigpool,%u,%c,%c,%c,%c\n",
+        [HEAPALLOC_MANGLED_STRING] = "heapalloc,mangled,%c%c%c%c,%c%c%c%c\n",
+        [HEAPFREE_STRING] = "heapfree,0x%lx,%s\n",
+        [OBJCREATE_KNOWN_STRING] = "objcreate,known,%u,%s\n",
+        [OBJCREATE_UNKNOWN_STRING] = "objcreate,unknown,%u\n",
+        [INJECTION_SUCCESS_STRING] = "injection,0x%lx,0x%lx,%u,%u,0x%lx\n",
+    },
+};
 
-    for (i=0; i < sym_config->sym_count; i++) {
-        free(sym_config->syms[i].name);
-    }
-    free(sym_config->syms);
-    free(sym_config);
-}
+#define PRINT(drakvuf, string, args...) \
+    do { \
+        if ( strings_list[drakvuf->output_format][string] ) \
+            printf(strings_list[drakvuf->output_format][string], ##args); \
+    } while (0)
 
-static inline void drakvuf_init(drakvuf_t *drakvuf) {
-    memset(drakvuf, 0, sizeof(drakvuf_t));
-    drakvuf->pooltags = pooltag_build_tree();
-    xen_init_interface(&drakvuf->xen);
-}
+#define PRINT_DEBUG(args...) \
+    do { \
+        if (verbose) fprintf (stderr, args); \
+    } while (0)
 
-static inline void close_drakvuf(drakvuf_t *drakvuf) {
-    free_sym_config(drakvuf->sym_config);
-    g_tree_destroy(drakvuf->pooltags);
-    xen_free_interface(drakvuf->xen);
-}
-
-int main(int argc, char** argv) {
-
-    int c;
-    char *executable = NULL;
-    char *domain = NULL;
-    vmi_pid_t injection_pid = -1;
-    struct sigaction act;
-
-    fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
-
-    if (argc < 4) {
-        fprintf(stderr, "Required input:\n"
-               "\t -r <rekall profile>       The Rekall profile of the domain\n"
-               "\t -d <domain ID or name>    The domain's ID or name\n"
-               "Optional inputs:\n"
-               "\t -i <injection pid>        The PID of the process to hijack for injection\n"
-               "\t -e <inject_exe>           The executable to start with injection\n"
-               "\t -t <timeout>              Timeout (in seconds)\n"
-               "\t -o <format>               Output format (default or csv)\n"
-               "\t -v                        Turn on verbose (debug) output\n"
-        );
-        return 1;
-    }
-
-    drakvuf_init(&drakvuf);
-
-    while ((c = getopt (argc, argv, "r:d:i:e:t:o:v")) != -1)
-    switch (c)
-    {
-    case 'r':
-        drakvuf.rekall_profile = optarg;
-        break;
-    case 'd':
-        domain = optarg;
-        break;
-    case 'i':
-        injection_pid = atoi(optarg);
-        break;
-    case 'e':
-        executable = optarg;
-        break;
-    case 't':
-        drakvuf.timeout = atoi(optarg);
-        break;
-    case 'o':
-        if(!strncmp(optarg,"csv",3))
-            drakvuf.output_format = OUTPUT_CSV;
-        else
-            drakvuf.output_format = OUTPUT_DEFAULT;
-        break;
-    case 'v':
-        verbose = 1;
-        break;
-    default:
-        fprintf(stderr, "Unrecognized option: %c\n", c);
-        goto exit;
-    }
-
-    drakvuf.sym_config = get_all_symbols(drakvuf.rekall_profile);
-    if (!drakvuf.sym_config)
-    {
-        fprintf(stderr, "Failed to parse Rekall profile at %s\n", drakvuf.rekall_profile);
-        goto exit;
-    }
-
-    get_dom_info(drakvuf.xen, domain, &drakvuf.domID, &drakvuf.dom_name);
-
-    init_vmi(&drakvuf);
-
-    if (!drakvuf.vmi) {
-        goto exit;
-    }
-
-    if (injection_pid > 0 && executable) {
-        int rc = start_app(&drakvuf, injection_pid, executable);
-
-        if (!rc) {
-            fprintf(stderr, "Process startup failed\n");
-            goto exit;
-        }
-    }
-
-    inject_traps(&drakvuf);
-
-    /* for a clean exit */
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
-
-    drakvuf_loop(&drakvuf);
-
-    close_vmi(&drakvuf);
-
-exit:
-    close_drakvuf(&drakvuf);
-
-    return 0;
-}
+#endif
