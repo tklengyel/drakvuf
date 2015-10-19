@@ -158,6 +158,7 @@ struct injector {
     int mm_count;
 
     uint8_t backup;
+    GTimer *timer;
 };
 
 #define SW_SHOWDEFAULT 10
@@ -806,11 +807,19 @@ int start_app(drakvuf_t *drakvuf, vmi_pid_t pid, const char *app) {
     vmi_resume_vm(drakvuf->vmi);
 
     status_t status = VMI_FAILURE;
+    injector.timer = g_timer_new();
+
+    gdouble elapsed;
+
     while (!drakvuf->interrupted) {
-        //printf("Waiting for events...\n");
+
         status = vmi_events_listen(drakvuf->vmi, 500);
-        if (status != VMI_SUCCESS) {
-            fprintf(stderr, "Error waiting for events, quitting...\n");
+        elapsed = g_timer_elapsed(injector.timer, NULL);
+
+        if (status != VMI_SUCCESS ||
+            (drakvuf->timeout && elapsed >= drakvuf->timeout) )
+        {
+            PRINT_DEBUG("Error waiting for events or timeout...\n");
             drakvuf->interrupted = -1;
         }
     }
@@ -819,6 +828,7 @@ int start_app(drakvuf_t *drakvuf, vmi_pid_t pid, const char *app) {
     vmi_clear_event(drakvuf->vmi, &injector.mm_event);
     vmi_clear_event(drakvuf->vmi, &injector.ss_event);
     vmi_clear_event(drakvuf->vmi, &interrupt_event);
+    g_timer_destroy(injector.timer);
 
     PRINT_DEBUG("Finished with injection.\n");
     return injector.ret;
