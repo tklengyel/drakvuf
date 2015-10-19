@@ -209,7 +209,7 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
 
     if (s) {
         PRINT(drakvuf, HEAPALLOC_KNOWN_STRING,
-              ctag, (uint32_t)tag, s->source, s->description);
+              ctag, s->source, s->description);
     } else {
         PRINT(drakvuf, HEAPALLOC_UNKNOWN_STRING,
               ctag, ctag[0], ctag[1], ctag[2], ctag[3]);
