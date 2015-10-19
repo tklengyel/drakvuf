@@ -112,6 +112,7 @@
 #include <inttypes.h>
 #include <glib.h>
 
+#include "output.h"
 #include "injector.h"
 #include "vmi.h"
 #include "win-exports.h"
@@ -223,11 +224,10 @@ struct process_information_64 {
 void hijack_thread(struct injector *injector, vmi_instance_t vmi,
         unsigned int vcpu, vmi_pid_t pid) {
 
-    printf("Ready to hijack thread of PID %u on vCPU %u!\n", pid, vcpu);
-
     addr_t cpa = sym2va(vmi, pid, "kernel32.dll", "CreateProcessA");
 
-    printf("CPA @ 0x%lx\n", cpa);
+    PRINT(injector->drakvuf, INJECTION_START_STRING,
+          pid, vcpu, cpa);
 
     reg_t fsgs, rbp, rsp, rip, rcx, rdx, rax, r8, r9;
     addr_t stack_base, stack_limit;
@@ -243,18 +243,16 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
     if (injector->pm == VMI_PM_LEGACY || injector->pm == VMI_PM_PAE) {
         vmi_get_vcpureg(vmi, &fsgs, FS_BASE, vcpu);
         vmi_get_vcpureg(vmi, &rbp, RBP, vcpu);
-        printf("FS: 0x%lx RBP: 0x%lx ", fsgs, rbp);
         vmi_read_addr_va(vmi, fsgs + 0x4, pid, &stack_base);
         vmi_read_addr_va(vmi, fsgs + 0x8, pid, &stack_limit);
     } else {
         vmi_get_vcpureg(vmi, &fsgs, GS_BASE, vcpu);
-        printf("GS: 0x%lx ", fsgs);
         vmi_read_addr_va(vmi, fsgs + 0x8, pid, &stack_base);
         vmi_read_addr_va(vmi, fsgs + 0x10, pid, &stack_limit);
     }
 
-    printf("RSP: 0x%lx. RIP: 0x%lx. RCX: 0x%lx\n", rsp, rip, rcx);
-    printf("Stack base: 0x%lx. Limit: 0x%lx\n", stack_base, stack_limit);
+    PRINT(injector->drakvuf, INJECTION_STACK_INFO_STRING,
+          fsgs, rsp, rip, rcx, rbp, stack_base, stack_limit);
 
     // Backup stack contents
     injector->stack_backup_size = rsp - stack_limit;
@@ -278,6 +276,8 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
     injector->saved_r8 = r8;
     injector->saved_r9 = r9;
 
+    addr_t str_addr, sip_addr;
+
     if (injector->pm == VMI_PM_LEGACY || injector->pm == VMI_PM_PAE) {
 
         addr -= 0x4; // the stack has to be alligned to 0x4
@@ -287,11 +287,10 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
 
         // this string has to be aligned as well!
         addr -= len + 0x4 - (len % 0x4);
-        addr_t str_addr = addr;
+        str_addr = addr;
         vmi_write_va(vmi, addr, pid, (void*) injector->target_proc, len);
         // add null termination
         vmi_write_8_va(vmi, addr + len, pid, &nul8);
-        printf("%s @ 0x%lx.\n", injector->target_proc, str_addr);
 
         //struct startup_info_32 si = {.wShowWindow = SW_SHOWDEFAULT };
         struct startup_info_32 si;
@@ -301,21 +300,20 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
 
         addr -= sizeof(struct process_information_32);
         injector->process_info = addr;
+
         vmi_write_va(vmi, addr, pid, &pi,
                 sizeof(struct process_information_32));
-        printf("pip @ 0x%lx\n", addr);
 
         addr -= sizeof(struct startup_info_32);
-        addr_t sip = addr;
+        sip_addr = addr;
         vmi_write_va(vmi, addr, pid, &si, sizeof(struct startup_info_32));
-        printf("sip @ 0x%lx\n", addr);
 
         //p10
         addr -= 0x4;
         vmi_write_32_va(vmi, addr, pid, (uint32_t *) &injector->process_info);
         //p9
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, (uint32_t *) &sip);
+        vmi_write_32_va(vmi, addr, pid, (uint32_t *) &sip_addr);
         //p8
         addr -= 0x4;
         vmi_write_32_va(vmi, addr, pid, &nul32);
@@ -355,11 +353,10 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
 
         // this string has to be aligned as well!
         addr -= len + 0x8 - (len % 0x8);
-        addr_t str_addr = addr;
+        str_addr = addr;
         vmi_write_va(vmi, addr, pid, (void*) injector->target_proc, len);
         // add null termination
         vmi_write_8_va(vmi, addr + len, pid, &nul8);
-        printf("%s @ 0x%lx.\n", injector->target_proc, str_addr);
 
         struct startup_info_64 si;
         memset(&si, 0, sizeof(struct startup_info_64));
@@ -370,12 +367,10 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
         injector->process_info = addr;
         vmi_write_va(vmi, addr, pid, &pi,
                 sizeof(struct process_information_64));
-        printf("pip @ 0x%lx\n", addr);
 
         addr -= sizeof(struct startup_info_64);
-        addr_t sip = addr;
+        sip_addr = addr;
         vmi_write_va(vmi, addr, pid, &si, sizeof(struct startup_info_64));
-        printf("sip @ 0x%lx\n", addr);
 
         //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
         //
@@ -388,7 +383,7 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
         vmi_write_64_va(vmi, addr, pid, &injector->process_info);
         //p9
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &sip);
+        vmi_write_64_va(vmi, addr, pid, &sip_addr);
         //p8
         addr -= 0x8;
         vmi_write_64_va(vmi, addr, pid, &nul64);
@@ -426,14 +421,14 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
         vmi_write_64_va(vmi, addr, pid, &rip);
     }
 
-    printf("Return address @ 0x%lx -> 0x%lx. Setting RSP: 0x%lx.\n", addr, rip,
-            addr);
+    PRINT(injector->drakvuf, INJECTION_STACK_PUSHED_STRING,
+          injector->target_proc, str_addr,
+          injector->process_info, sip_addr,
+          rip, addr);
 
     // Grow the stack and switch execution
     vmi_set_vcpureg(vmi, addr, RSP, vcpu);
     vmi_set_vcpureg(vmi, cpa, RIP, vcpu);
-
-    printf("Done with hijack routine\n");
 }
 
 /*
@@ -536,7 +531,7 @@ event_response_t cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
                 0, &thread);
 
             if (!thread) {
-                printf("cr3_cb: Failed to find current thread\n");
+                PRINT_DEBUG("cr3_cb: Failed to find current thread\n");
                 return 0;
             }
 
@@ -547,7 +542,7 @@ event_response_t cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
                 0, &trapframe);
 
             if (!trapframe) {
-                printf("cr3_cb: Failed to find trapframe\n");
+                PRINT_DEBUG("cr3_cb: Failed to find trapframe\n");
                 return 0;
             }
 
@@ -573,8 +568,9 @@ event_response_t cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
             }
 
             injector->userspace_return = vmi_pagetable_lookup(vmi, event->reg_event.value, userspace_return_va);
-            printf("Trapping userspace return of Thread: %u @ VA 0x%lx -> PA 0x%lx\n",
-                   tid, userspace_return_va, injector->userspace_return);
+
+            PRINT(injector->drakvuf, INJECTION_TRAPFRAME_STRING,
+                  tid, userspace_return_va, injector->userspace_return);
 
             uint8_t trap = 0xCC;
             vmi_read_8_pa(vmi, injector->userspace_return, &injector->userspace_return_backup);
@@ -607,7 +603,9 @@ event_response_t cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
 event_response_t waitfor_cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
     struct injector *injector = event->data;
     injector->drakvuf->interrupted = 1;
-    printf("Injected process is scheduled to execute\n");
+
+    PRINT_DEBUG("Injected process is scheduled to execute\n");
+
     vmi_pause_vm(vmi);
     vmi_clear_event(vmi, event);
     return 0;
@@ -648,8 +646,10 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         event->interrupt_event.reinject = 0;
 
         if (pid != injector->target_pid) {
-            printf("Userspace return trap hit by another PID, not the target (%u)\n",
-                    injector->target_pid);
+
+            PRINT_DEBUG("Userspace return trap hit by another PID, not the target (%u)\n",
+                        injector->target_pid);
+
             vmi_write_8_pa(vmi, pa, &injector->userspace_return_backup);
             vmi_step_event(vmi, event, event->vcpu_id, 1, reset_return_trap);
             return 0;
@@ -681,8 +681,8 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         event->interrupt_event.reinject = 0;
 
         if (pid != injector->target_pid) {
-            printf("Return trap hit by another PID, not the target (%u)\n",
-                    injector->target_pid);
+            PRINT_DEBUG("Return trap hit by another PID, not the target (%u)\n",
+                        injector->target_pid);
             vmi_write_8_pa(vmi, pa, &injector->backup);
             vmi_step_event(vmi, event, event->vcpu_id, 1, reset_return_trap);
             return 0;
@@ -693,14 +693,13 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         vmi_get_vcpureg(vmi, &rax, RAX, event->vcpu_id);
         vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
 
-        printf("RAX: 0x%lx\n", rax);
-
-        printf("Restoring RSP to 0x%lx\n", injector->saved_rsp);
-        printf("Restoring RAX to 0x%lx\n", injector->saved_rax);
-        printf("Restoring RCX to 0x%lx\n", injector->saved_rcx);
-        printf("Restoring RDX to 0x%lx\n", injector->saved_rdx);
-        printf("Restoring R8 to 0x%lx\n", injector->saved_r8);
-        printf("Restoring R9 to 0x%lx\n", injector->saved_r9);
+        PRINT_DEBUG("RAX: 0x%lx\n", rax);
+        PRINT_DEBUG("Restoring RSP to 0x%lx\n", injector->saved_rsp);
+        PRINT_DEBUG("Restoring RAX to 0x%lx\n", injector->saved_rax);
+        PRINT_DEBUG("Restoring RCX to 0x%lx\n", injector->saved_rcx);
+        PRINT_DEBUG("Restoring RDX to 0x%lx\n", injector->saved_rdx);
+        PRINT_DEBUG("Restoring R8 to 0x%lx\n", injector->saved_r8);
+        PRINT_DEBUG("Restoring R9 to 0x%lx\n", injector->saved_r9);
 
         vmi_set_vcpureg(vmi, injector->saved_rsp, RSP, event->vcpu_id);
         vmi_set_vcpureg(vmi, injector->saved_rax, RAX, event->vcpu_id);
@@ -710,15 +709,11 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         vmi_set_vcpureg(vmi, injector->saved_r9, R9, event->vcpu_id);
 
         if (rax) {
-            printf("-- CreateProcessA SUCCESS --\n");
 
             if (PM2BIT(injector->pm) == BIT32) {
                 struct process_information_32 pip;
                 vmi_read_va(vmi, injector->process_info, pid, &pip,
                         sizeof(struct process_information_32));
-                printf("\tProcess handle: 0x%x. Thread handle: 0x%x\n",
-                        pip.hProcess, pip.hThread);
-                printf("\tPID: %u. TID: %u\n", pip.dwProcessId, pip.dwThreadId);
 
                 injector->pid = pip.dwProcessId;
                 injector->tid = pip.dwThreadId;
@@ -729,9 +724,6 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
                 struct process_information_64 pip;
                 vmi_read_va(vmi, injector->process_info, pid, &pip,
                         sizeof(struct process_information_64));
-                printf("\tProcess handle: 0x%lx. Thread handle: 0x%lx\n",
-                        pip.hProcess, pip.hThread);
-                printf("\tPID: %u. TID: %u\n", pip.dwProcessId, pip.dwThreadId);
 
                 injector->pid = pip.dwProcessId;
                 injector->tid = pip.dwThreadId;
@@ -748,8 +740,11 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
                         injector->pid);
                 injector->cr3_event.data = injector;
                 vmi_register_event(vmi, &injector->cr3_event);
-                printf("\tInjected process CR3: 0x%lx\n",
-                        injector->cr3_event.reg_event.equal);
+
+                PRINT(injector->drakvuf, INJECTION_SUCCESS_STRING,
+                      injector->pid, injector->tid, injector->hProc, injector->hThr,
+                      injector->cr3_event.reg_event.equal);
+
             }
         } else {
             injector->drakvuf->interrupted = 1;
@@ -787,12 +782,12 @@ int start_app(drakvuf_t *drakvuf, vmi_pid_t pid, const char *app) {
 
     if (!injector.target_cr3)
     {
-        printf("Unable to find target PID's DTB\n");
+        fprintf(stderr, "Unable to find target PID's DTB\n");
         return 0;
     }
 
-    printf("Target PID %u with DTB 0x%lx to start '%s'\n", pid,
-            injector.target_cr3, app);
+    PRINT_DEBUG("Target PID %u with DTB 0x%lx to start '%s'\n", pid,
+                injector.target_cr3, app);
 
     injector.cr3_event.type = VMI_EVENT_REGISTER;
     injector.cr3_event.reg_event.reg = CR3;
@@ -809,7 +804,7 @@ int start_app(drakvuf_t *drakvuf, vmi_pid_t pid, const char *app) {
     interrupt_event.data = &injector;
     vmi_register_event(drakvuf->vmi, &interrupt_event);
 
-    printf("Starting injection loop\n");
+    PRINT_DEBUG("Starting injection loop\n");
     vmi_resume_vm(drakvuf->vmi);
 
     status_t status = VMI_FAILURE;
@@ -817,7 +812,7 @@ int start_app(drakvuf_t *drakvuf, vmi_pid_t pid, const char *app) {
         //printf("Waiting for events...\n");
         status = vmi_events_listen(drakvuf->vmi, 500);
         if (status != VMI_SUCCESS) {
-            printf("Error waiting for events, quitting...\n");
+            fprintf(stderr, "Error waiting for events, quitting...\n");
             drakvuf->interrupted = -1;
         }
     }
@@ -827,6 +822,6 @@ int start_app(drakvuf_t *drakvuf, vmi_pid_t pid, const char *app) {
     vmi_clear_event(drakvuf->vmi, &injector.ss_event);
     vmi_clear_event(drakvuf->vmi, &interrupt_event);
 
-    printf("Finished with injection.\n");
+    PRINT_DEBUG("Finished with injection.\n");
     return injector.ret;
 }

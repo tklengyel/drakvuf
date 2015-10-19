@@ -105,11 +105,11 @@
 #include <stdio.h>
 #include <libvmi/libvmi.h>
 
+#include "drakvuf.h"
+#include "output.h"
 #include "vmi.h"
 #include "xen_helper.h"
 #include "injector.h"
-
-static drakvuf_t drakvuf;
 
 static void close_handler(int sig) {
     drakvuf.interrupted = sig;
@@ -138,6 +138,7 @@ int main(int argc, char** argv)
     sigaction(SIGALRM, &act, NULL);
 
     memset(&drakvuf, 0, sizeof(drakvuf_t));
+    verbose = 1;
 
     drakvuf.rekall_profile = argv[1];
 

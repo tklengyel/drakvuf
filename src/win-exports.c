@@ -116,6 +116,7 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
 
+#include "output.h"
 #include "vmi.h"
 #include "win-exports.h"
 
@@ -143,7 +144,7 @@ status_t modlist_sym2va(vmi_instance_t vmi, addr_t list_head, uint32_t pid,
 
         if (us && VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8")) {
 
-            //printf("Has %s\n", out.contents);
+            PRINT_DEBUG("Found module in PID %u: %s\n", pid, out.contents);
 
             if (!strcasecmp((char*) out.contents, mod_name)) {
 
@@ -154,7 +155,7 @@ status_t modlist_sym2va(vmi_instance_t vmi, addr_t list_head, uint32_t pid,
 
                 *va = vmi_translate_sym2v(vmi, dllbase, pid, (char *) symbol);
 
-                //printf("\t%s @ 0x%lx\n", symbol, *va);
+                PRINT_DEBUG("\t%s @ 0x%lx\n", symbol, *va);
 
                 free(out.contents);
                 vmi_free_unicode_str(us);
@@ -191,7 +192,7 @@ addr_t sym2va(vmi_instance_t vmi, vmi_pid_t target_pid, const char *mod_name,
 
     status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
     if (status == VMI_FAILURE) {
-        printf("Failed to read next pointer at 0x%lx before entering loop\n",
+        PRINT_DEBUG("Failed to read next pointer at 0x%lx before entering loop\n",
                 current_list_entry);
         return ret;
     }
@@ -215,8 +216,8 @@ addr_t sym2va(vmi_instance_t vmi, vmi_pid_t target_pid, const char *mod_name,
                     ldr + offsets[PEB_LDR_DATA_INLOADORDERMODULELIST], pid,
                     &inloadorder);
 
-            //printf("Found target pid of %u. PEB @ 0x%lx. LDR @ 0x%lx. INLOADORDER @ 0x%lx.\n",
-            //    target_pid, peb, ldr, inloadorder);
+            PRINT_DEBUG("Found target pid of %u. PEB @ 0x%lx. LDR @ 0x%lx. INLOADORDER @ 0x%lx.\n",
+                        target_pid, peb, ldr, inloadorder);
 
             if (VMI_SUCCESS
                     == modlist_sym2va(vmi, inloadorder, pid, mod_name, symbol,
@@ -227,7 +228,7 @@ addr_t sym2va(vmi_instance_t vmi, vmi_pid_t target_pid, const char *mod_name,
 
         status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
         if (status == VMI_FAILURE) {
-            printf("Failed to read next pointer in loop at %lx\n",
+            PRINT_DEBUG("Failed to read next pointer in loop at %lx\n",
                     current_list_entry);
             return ret;
         }
@@ -300,7 +301,7 @@ status_t va2sym(vmi_instance_t vmi, addr_t va, vmi_pid_t target_pid,
 
     if (VMI_FAILURE
             == vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry)) {
-        printf("Failed to read next pointer at 0x%lx before entering loop\n",
+        PRINT_DEBUG("Failed to read next pointer at 0x%lx before entering loop\n",
                 current_list_entry);
         return VMI_FAILURE;
     }
@@ -334,7 +335,7 @@ status_t va2sym(vmi_instance_t vmi, addr_t va, vmi_pid_t target_pid,
         if (VMI_FAILURE
                 == vmi_read_addr_va(vmi, current_list_entry, 0,
                         &next_list_entry)) {
-            printf("Failed to read next pointer in loop at %lx\n",
+            PRINT_DEBUG("Failed to read next pointer in loop at %lx\n",
                     current_list_entry);
             return VMI_FAILURE;
         }
