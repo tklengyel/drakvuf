@@ -111,7 +111,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "structures.h"
+#include "output.h"
 #include "vmi.h"
 #include "win-handles.h"
 
@@ -136,7 +136,7 @@ void volatility_extract_file(drakvuf_t *drakvuf, addr_t file_object) {
                     profile, file_object) + 1);
     sprintf(command, VOL_DUMPFILES, PYTHON, VOLATILITY, drakvuf->domID, profile,
             file_object);
-    printf("** RUNNING COMMAND: %s\n", command);
+    PRINT_DEBUG("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     free(command);
 }
@@ -176,7 +176,7 @@ void carve_file_from_memory(drakvuf_t *drakvuf, addr_t ph_base,
         status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
 
         if (VMI_SUCCESS == rc) {
-            printf("\tFile closing: %s.\n", str2.contents);
+            PRINT_DEBUG("\tFile closing: %s.\n", str2.contents);
             volatility_extract_file(drakvuf, file_base);
             g_free(str2.contents);
         }
@@ -202,7 +202,7 @@ void grab_file_by_handle(drakvuf_t *drakvuf, vmi_event_t *event, reg_t cr3,
     if (VMI_FAILURE == vmi_read_8(vmi, &ctx, &type_index))
         return;
 
-    //printf("Handle: 0x%lx. Obj @ 0x%lx. Type: %s\n", handle, obj, win7_typeindex[type_index]);
+    PRINT_DEBUG("Handle: 0x%lx. Obj @ 0x%lx. Type: %s\n", handle, obj, win7_typeindex[type_index]);
 
     if (type_index >= WIN7_TYPEINDEX_LAST || type_index != 28)
         return;
@@ -210,7 +210,8 @@ void grab_file_by_handle(drakvuf_t *drakvuf, vmi_event_t *event, reg_t cr3,
     addr_t file = obj + offsets[OBJECT_HEADER_BODY];
     addr_t file_pa = vmi_pagetable_lookup(vmi, cr3, file);
     addr_t filename = file + offsets[FILE_OBJECT_FILENAME];
-    //printf("Object header is @ 0x%lx. File Object is @ 0x%lx.\n", obj, file);
+
+    PRINT_DEBUG("Object header is @ 0x%lx. File Object is @ 0x%lx.\n", obj, file);
 
     uint16_t length = 0;
     addr_t buffer = 0;
@@ -234,7 +235,7 @@ void grab_file_by_handle(drakvuf_t *drakvuf, vmi_event_t *event, reg_t cr3,
         unicode_string_t str2 = { .contents = NULL };
         status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
         if (rc == VMI_SUCCESS) {
-            printf("\tExtracting file: %s\n", str2.contents);
+            PRINT_DEBUG("\tExtracting file: %s\n", str2.contents);
 
             volatility_extract_file(drakvuf, file_pa);
 
@@ -284,7 +285,7 @@ void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
             ctx.addr = info;
             vmi_read_8(vmi, &ctx, &del);
             if (del) {
-                //printf("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", handle);
+                PRINT_DEBUG("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", handle);
                 grab_file_by_handle(drakvuf, event, cr3, handle);
             }
         }
@@ -306,7 +307,7 @@ event_response_t file_name_post_cb(vmi_instance_t vmi, vmi_event_t *event) {
     vmi_read_addr_pa(vmi, watch->file_name + offsets[UNICODE_STRING_BUFFER], &file_name);
     vmi_read_16_pa(vmi, watch->file_name + offsets[UNICODE_STRING_LENGTH], &length);
 
-    //printf("\n\nFile name @ 0x%lx. Length: %u\n\n", file_name, length);
+    PRINT_DEBUG("File name @ 0x%lx. Length: %u\n", file_name, length);
 
     if (file_name && length) {
         unicode_string_t str = { .contents = NULL };
@@ -322,8 +323,8 @@ event_response_t file_name_post_cb(vmi_instance_t vmi, vmi_event_t *event) {
             reg_t cr3;
             vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
 
-            printf("CR3 0x%lx File accessed: %s.\n File object @ 0x%lx. File base @ 0x%lx.\n",
-                    cr3, str2.contents, watch->obj, watch->file_base);
+            PRINT(watch->drakvuf,FILE_ACCESSED_STRING,
+                  cr3, str2.contents, watch->obj, watch->file_base);
 
             if (VMI_SUCCESS == rc) {
                 g_hash_table_remove(watch->drakvuf->file_watch, &pa);
@@ -399,7 +400,7 @@ void setup_file_watch(drakvuf_t *drakvuf, vmi_instance_t vmi, addr_t obj,
             VMI_MEMACCESS_W, file_name_pre_cb);
     container->guard->data = container;
     if (VMI_FAILURE == vmi_register_event(vmi, container->guard)) {
-        printf("Page is already trapped, can't setup file watch (TODO)\n");
+        PRINT_DEBUG("Page is already trapped, can't setup file watch (TODO)\n");
         free(container->guard);
         free(container);
         return;

@@ -124,6 +124,7 @@ enum output_strings {
     INJECTION_STACK_PUSHED_STRING,
     INJECTION_TRAPFRAME_STRING,
     INJECTION_SUCCESS_STRING,
+    FILE_ACCESSED_STRING,
     __STRINGS_MAX
 };
 
@@ -133,7 +134,7 @@ static const char *strings_list[__OUTPUT_MAX][__STRINGS_MAX] = {
         [INT3_CB_STRING] = "int3cb CR3=0x%lx RIP=0x%lx %s!%s\n",
         [FOUND_PROCESS_STRING] = "Found process: [PID: %5d, CR3: 0x%x] %s\n",
         [HEAPALLOC_KNOWN_STRING] = "Heap allocation with known pool tag:"
-                                   " '%s' (%u), %s, %s.\n",
+                                   " '%s', %s, %s.\n",
         [HEAPALLOC_UNKNOWN_STRING] = "Heap allocation with unknown pool tag: "
                                      "'%s' \\x%x\\x%x\\x%x\\x%x\n",
         [HEAPALLOC_VERIFIED_STRING] = "\t'%c%c%c%c' heap allocation verified @"
@@ -142,7 +143,7 @@ static const char *strings_list[__OUTPUT_MAX][__STRINGS_MAX] = {
         [HEAPALLOC_MANGLED_STRING] = "Pool tag mangling detected: got '%c%c%c%c'"
                                      ", expected '%c%c%c%c'\n",
         [HEAPFREE_STRING] = "Freeing object on heap: 0x%lx, %s\n",
-        [OBJCREATE_KNOWN_STRING] = "Object create: %u -> %s\n",
+        [OBJCREATE_KNOWN_STRING] = "Object create: 0x%lx -> %s\n",
         [OBJCREATE_UNKNOWN_STRING] = "Object create: %u\n",
         [INJECTION_START_STRING] = "Hijacking thread of PID %u on vCPU %u to "
                                    "execute CreateProcessA at 0x%lx!\n",
@@ -159,12 +160,14 @@ static const char *strings_list[__OUTPUT_MAX][__STRINGS_MAX] = {
                                      "\tProcess handle: 0x%x. Thread handle: 0x%x\n"
                                      "\tPID: %u. TID: %u\n"
                                      "\tInjected process DTB: 0x%lx\n",
+        [FILE_ACCESSED_STRING] = "CR3 0x%lx File accessed: %s.\n "
+                                 "File object @ 0x%lx. File base @ 0x%lx.\n",
     },
     [OUTPUT_CSV] = {
         [0 ... __STRINGS_MAX-1] = NULL,
         [INT3_CB_STRING] = "int3cb,0x%lx,0x%lx,%s,%s\n",
         [FOUND_PROCESS_STRING] = "process,%d,0x%x,%s\n",
-        [HEAPALLOC_KNOWN_STRING] = "heapalloc,known,%s,%u,%s,%s\n",
+        [HEAPALLOC_KNOWN_STRING] = "heapalloc,known,%s,%s\n",
         [HEAPALLOC_UNKNOWN_STRING] = "heapalloc,unknown,%s,\\x%x,\\x%x,\\x%x,\\x%x\n",
         [HEAPALLOC_VERIFIED_STRING] = "heapalloc,verified,%c,%c,%c,%c,0x%lx,%u\n",
         [HEAPALLOC_BIGPOOL_STRING] = "heapalloc,bigpool,%u,%c,%c,%c,%c\n",
@@ -173,6 +176,7 @@ static const char *strings_list[__OUTPUT_MAX][__STRINGS_MAX] = {
         [OBJCREATE_KNOWN_STRING] = "objcreate,known,%u,%s\n",
         [OBJCREATE_UNKNOWN_STRING] = "objcreate,unknown,%u\n",
         [INJECTION_SUCCESS_STRING] = "injection,0x%lx,0x%lx,%u,%u,0x%lx\n",
+        [FILE_ACCESSED_STRING] = "fileaccess,0x%lx,%s,0x%lx,0x%lx\n",
     },
 };
 
