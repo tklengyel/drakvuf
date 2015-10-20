@@ -115,39 +115,24 @@
 #include "output.h"
 #include "injector.h"
 #include "vmi.h"
+#include "win-symbols.h"
 #include "win-exports.h"
 #include "win-handles.h"
 
-#define KERNEL32 0x80000000UL
-#define KERNEL64 0xFFFFF80000000000ULL
-#define CREATE_SUSPENDED 0x4ULL
+static uint8_t trap = 0xCC;
 
 struct injector {
+    // Inputs:
     const char *target_proc;
     reg_t target_cr3;
     vmi_pid_t target_pid;
 
+    // Internal:
     drakvuf_t *drakvuf;
     page_mode_t pm;
 
-    uint8_t ret;
-    reg_t cr3;
-    uint32_t pid, tid;
-    uint32_t hProc, hThr;
-    addr_t userspace_return;
-    uint8_t userspace_return_backup;
-
-    void *stack_backup;
-    size_t stack_backup_size;
-    addr_t stack_limit;
-
-    vmi_event_t cr3_event;
-    vmi_event_t mm_event;
-    vmi_event_t ss_event;
-    int mm_enabled;
-    int ss_enabled;
-    addr_t target_rip;
     addr_t process_info;
+
     addr_t saved_rsp;
     addr_t saved_rip;
     addr_t saved_rax;
@@ -155,10 +140,15 @@ struct injector {
     addr_t saved_rdx;
     addr_t saved_r8;
     addr_t saved_r9;
-    int mm_count;
 
-    uint8_t backup;
+    addr_t entry, ret;
+    uint8_t entry_backup, ret_backup;
     GTimer *timer;
+
+    // Results:
+    reg_t cr3;
+    uint32_t pid, tid;
+    uint32_t hProc, hThr;
 };
 
 #define SW_SHOWDEFAULT 10
@@ -183,7 +173,6 @@ struct startup_info_32 {
     uint32_t hStdOutput;
     uint32_t hStdError;
 };
-// __attribute__ ((packed));
 
 struct startup_info_64 {
     uint32_t cb;
@@ -205,60 +194,111 @@ struct startup_info_64 {
     addr_t hStdOutput;
     addr_t hStdError;
 };
-// __attribute__ ((packed));
 
 struct process_information_32 {
     uint32_t hProcess;
     uint32_t hThread;
     uint32_t dwProcessId;
     uint32_t dwThreadId;
-}__attribute__ ((packed));
+} __attribute__ ((packed));
 
 struct process_information_64 {
     addr_t hProcess;
     addr_t hThread;
     uint32_t dwProcessId;
     uint32_t dwThreadId;
-}__attribute__ ((packed));
+} __attribute__ ((packed));
 
-void hijack_thread(struct injector *injector, vmi_instance_t vmi,
+struct list_entry_32 {
+    uint32_t flink;
+    uint32_t blink;
+} __attribute__ ((packed));
+
+struct list_entry_64 {
+    uint64_t flink;
+    uint64_t blink;
+} __attribute__ ((packed));
+
+struct kapc_state_32 {
+    // apc_list_head[0] = kernel apc list
+    // apc_list_head[1] = user apc list
+    struct list_entry_32 apc_list_head[2];
+    uint32_t process;
+    uint8_t kernel_apc_in_progress;
+    uint8_t kernel_apc_pending;
+    uint8_t user_apc_pending;
+} __attribute__ ((packed));
+
+struct kapc_state_64 {
+    // apc_list_head[0] = kernel apc list
+    // apc_list_head[1] = user apc list
+    struct list_entry_64 apc_list_head[2];
+    uint64_t process;
+    uint8_t kernel_apc_in_progress;
+    uint8_t kernel_apc_pending;
+    uint8_t user_apc_pending;
+};
+
+struct kapc_32 {
+    uint8_t type;
+    uint8_t spare_byte0;
+    uint8_t size;
+    uint8_t spare_byte1;
+    uint32_t spare_long0;
+    uint32_t thread;
+    struct list_entry_32 apc_list_entry;
+    uint32_t kernel_routine;
+    uint32_t rundown_routine;
+    uint32_t normal_routine;
+    uint32_t normal_context;
+    uint32_t system_argument_1;
+    uint32_t system_argument_2;
+    uint8_t apc_state_index;
+    uint8_t apc_mode;
+    uint8_t inserted;
+} __attribute__ ((packed));
+
+struct kapc_64 {
+    uint8_t type;
+    uint8_t spare_byte0;
+    uint8_t size;
+    uint8_t spare_byte1;
+    uint32_t spare_long0;
+    uint64_t thread;
+    struct list_entry_64 apc_list_entry;
+    uint64_t kernel_routine;
+    uint64_t rundown_routine;
+    uint64_t normal_routine;
+    uint64_t normal_context;
+    uint64_t system_argument_1;
+    uint64_t system_argument_2;
+    uint8_t apc_state_index;
+    uint8_t apc_mode;
+    uint8_t inserted;
+};
+
+void pass_inputs(struct injector *injector, vmi_instance_t vmi,
         unsigned int vcpu, vmi_pid_t pid) {
 
-    addr_t cpa = sym2va(vmi, pid, "kernel32.dll", "CreateProcessA");
-
-    PRINT(injector->drakvuf, INJECTION_START_STRING,
-          pid, vcpu, cpa);
-
-    reg_t fsgs, rbp, rsp, rip, rcx, rdx, rax, r8, r9;
+    status_t status;
+    reg_t fsgs, rsp;
     addr_t stack_base, stack_limit;
 
-    vmi_get_vcpureg(vmi, &rsp, RSP, vcpu);
-    vmi_get_vcpureg(vmi, &rip, RIP, vcpu);
-    vmi_get_vcpureg(vmi, &rax, RAX, vcpu);
-    vmi_get_vcpureg(vmi, &rcx, RCX, vcpu);
-    vmi_get_vcpureg(vmi, &rdx, RDX, vcpu);
-    vmi_get_vcpureg(vmi, &r8, R8, vcpu);
-    vmi_get_vcpureg(vmi, &r9, R9, vcpu);
+    status = vmi_get_vcpureg(vmi, &rsp, RSP, vcpu);
 
-    if (injector->pm == VMI_PM_LEGACY || injector->pm == VMI_PM_PAE) {
-        vmi_get_vcpureg(vmi, &fsgs, FS_BASE, vcpu);
-        vmi_get_vcpureg(vmi, &rbp, RBP, vcpu);
-        vmi_read_addr_va(vmi, fsgs + 0x4, pid, &stack_base);
-        vmi_read_addr_va(vmi, fsgs + 0x8, pid, &stack_limit);
-    } else {
-        vmi_get_vcpureg(vmi, &fsgs, GS_BASE, vcpu);
-        vmi_read_addr_va(vmi, fsgs + 0x8, pid, &stack_base);
-        vmi_read_addr_va(vmi, fsgs + 0x10, pid, &stack_limit);
-    }
+    if (injector->pm == VMI_PM_LEGACY || injector->pm == VMI_PM_PAE)
+        status = vmi_get_vcpureg(vmi, &fsgs, FS_BASE, vcpu);
+    if (injector->pm == VMI_PM_IA32E)
+        status = vmi_get_vcpureg(vmi, &fsgs, GS_BASE, vcpu);
+
+    vmi_read_addr_va(vmi, fsgs + offsets[NT_TIB_STACKBASE], pid, &stack_base);
+    vmi_read_addr_va(vmi, fsgs + offsets[NT_TIB_STACKLIMIT], pid, &stack_limit);
 
     PRINT(injector->drakvuf, INJECTION_STACK_INFO_STRING,
-          fsgs, rsp, rip, rcx, rbp, stack_base, stack_limit);
+          fsgs, rsp, stack_base, stack_limit);
 
-    // Backup stack contents
-    injector->stack_backup_size = rsp - stack_limit;
-    injector->stack_backup = g_malloc0(injector->stack_backup_size);
-    injector->stack_limit = stack_limit;
-    vmi_read_va(vmi, stack_limit, pid, injector->stack_backup, injector->stack_backup_size);
+    vmi_read_addr_va(vmi, rsp, pid, &injector->ret);
+    vmi_read_8_va(vmi, injector->ret, pid, &injector->ret_backup);
 
     //Push input arguments on the stack
     //CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, CREATE_SUSPENDED, NULL, NULL, &si, pi))
@@ -268,13 +308,6 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
     uint8_t nul8 = 0;
     size_t len = strlen(injector->target_proc);
     addr_t addr = rsp;
-    injector->saved_rsp = rsp;
-    injector->saved_rip = rip;
-    injector->saved_rax = rax;
-    injector->saved_rdx = rdx;
-    injector->saved_rcx = rcx;
-    injector->saved_r8 = r8;
-    injector->saved_r9 = r9;
 
     addr_t str_addr, sip_addr;
 
@@ -339,9 +372,9 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
         addr -= 0x4;
         vmi_write_32_va(vmi, addr, pid, &nul32);
 
-        // save the return address (RIP)
+        // save the return address
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, (uint32_t *) &rip);
+        vmi_write_32_va(vmi, addr, pid, (uint32_t *) &injector->ret);
 
     } else {
 
@@ -416,206 +449,328 @@ void hijack_thread(struct injector *injector, vmi_instance_t vmi,
         //p4
         vmi_set_vcpureg(vmi, 0, R9, vcpu);
 
-        // save the return address (RIP)
+        // save the return address
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &rip);
+        vmi_write_64_va(vmi, addr, pid, &injector->ret);
     }
 
     PRINT(injector->drakvuf, INJECTION_STACK_PUSHED_STRING,
           injector->target_proc, str_addr,
-          injector->process_info, sip_addr,
-          rip, addr);
+          injector->process_info, sip_addr);
 
-    // Grow the stack and switch execution
+    // Grow the stack
     vmi_set_vcpureg(vmi, addr, RSP, vcpu);
-    vmi_set_vcpureg(vmi, cpa, RIP, vcpu);
 }
 
 /*
- * These functions may be useful for debugging
- */
-/*void ss_callback(vmi_instance_t vmi, vmi_event_t *event) {
-    reg_t rip, cr3, cs;
-    vmi_get_vcpureg(vmi, &rip, RIP, event->vcpu_id);
-    vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
-    vmi_get_vcpureg(vmi, &cs, CS_SEL, event->vcpu_id);
-    page_mode_t pm = vmi_get_page_mode(vmi);
-    vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
-    printf("----- Singlestep: CR3 0x%lx PID %u executing RIP 0x%lx CPL %u\n", cr3, pid, rip, VMI_BIT_MASK(0,2) & cs);
+ * Once an apc queueable thread is found, we inject an apc structure
+ * to call CreateProcessA. Since the call arguments cannot be passed
+ * in the APC message, we trap CreateProcessA with an int3 and will
+ * setup the stack for the function just before it is executed
+*/
+void inject_apc(struct injector *injector,
+                vmi_instance_t vmi,
+                unsigned int vcpu,
+                reg_t cr3,
+                addr_t kernbase,
+                addr_t thread)
+{
+    addr_t apc_state_addr, psexit;
+    status_t status;
+    reg_t rsp;
 
-    if ((PM2BIT(pm) == BIT32 && rip < KERNEL32)
-            || (PM2BIT(pm) == BIT64 && rip < KERNEL64)) {
-        printf("Good RIP: 0x%lx\n", rip);
-        struct injector *injector = event->data;
-        injector->ss_enabled = 0;
+    addr_t kstack_base = 0, kstack_limit = 0;
 
-        injector->target_pid = pid;
-        injector->target_rip = vmi_pagetable_lookup(vmi, cr3, rip);
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = cr3,
+    };
 
-        hijack_thread(injector, vmi, event->vcpu_id, pid);
-
-        vmi_clear_event(vmi, event);
-        vmi_clear_event(vmi, &injector->cr3_event);
-        injector->mm_count++;
-
-        uint8_t trap = 0xCC;
-        vmi_read_8_pa(vmi, injector->target_rip, &injector->backup);
-        vmi_write_8_pa(vmi, injector->target_rip, &trap);
-    }
-}
-
-void mm_callback(vmi_instance_t vmi, vmi_event_t *event) {
-    struct injector *injector = event->data;
-    reg_t rip, cr3, rsp;
-    vmi_get_vcpureg(vmi, &rip, RIP, event->vcpu_id);
-    vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
-    vmi_get_vcpureg(vmi, &rsp, RSP, event->vcpu_id);
-    vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
-
-    printf("----- Memevent: PID %u executing RIP 0x%lx. Target PID: %u. Target RIP: 0x%lx. My event count: %u\n",
-        pid, ((event->mem_event.gfn<<12) + event->mem_event.offset), injector->target_pid, injector->target_rip, injector->mm_count);
-
-    if ((PM2BIT(injector->pm) == BIT32 && rip < KERNEL32)
-            || (PM2BIT(injector->pm) == BIT64 && rip < KERNEL64)) {
-        injector->target_pid = pid;
-        injector->target_rip = (event->mem_event.gfn << 12)
-                + event->mem_event.offset;
-
-        hijack_thread(injector, vmi, event->vcpu_id, pid);
-
-        vmi_clear_event(vmi, event);
-        vmi_clear_event(vmi, &injector->cr3_event);
-        injector->mm_count++;
-
-        uint8_t trap = 0xCC;
-        vmi_read_8_pa(vmi, injector->target_rip, &injector->backup);
-        vmi_write_8_pa(vmi, injector->target_rip, &trap);
-
+    status = vmi_read_addr_va(vmi, thread+offsets[KTHREAD_INITIALSTACK], 0, &kstack_base);
+    if(status == VMI_FAILURE) {
+        PRINT_DEBUG("Failed to read kernel thread initial stack\n");
         return;
     }
 
-    vmi_clear_event(vmi, event);
-    vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
-}*/
+    status = vmi_read_addr_va(vmi, thread+offsets[KTHREAD_STACKLIMIT], 0, &kstack_limit);
+    if(status == VMI_FAILURE) {
+        PRINT_DEBUG("Failed to read kernel thread stack limit\n");
+        return;
+    }
+
+    PRINT_DEBUG("Kernel stack base: 0x%lx. Limit: 0x%lx\n", kstack_base, kstack_limit);
+
+    vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
+    if(!pid) {
+        PRINT_DEBUG("Failed to get PID of current process\n");
+        return;
+    }
+
+    injector->entry = sym2va(vmi, pid, "kernel32.dll", "CreateProcessA");
+    if (!injector->entry) {
+        PRINT_DEBUG("Failed to get address of kernel32.dll!CreateProcessA\n");
+        return;
+    }
+
+    /*
+     * Passing PsExitSpecialApc as the kernel_routine does the trick
+     * of scheduling this APC right away. Any other function
+     * crashes the process.
+     */
+    psexit = kernbase + get_function_rva(injector->drakvuf->rekall_profile, "PsExitSpecialApc");
+    if (psexit == kernbase) {
+        PRINT_DEBUG("Failed to get address of ntoskrnl.exe!PsExitSpecialApc\n");
+        return;
+    }
+
+    status = vmi_read_addr_va(vmi, thread + offsets[KTHREAD_APCSTATE], 0, &apc_state_addr);
+    if(status == VMI_FAILURE) {
+        PRINT_DEBUG("inject_apc: Failed to read apc state address\n");
+        return;
+    }
+
+    if (injector->pm == VMI_PM_LEGACY || injector->pm == VMI_PM_PAE) {
+
+        struct kapc_state_32 kapc_state = { 0 };
+        struct kapc_32 kapc = { 0 };
+
+        kapc.type = 0;
+        kapc.apc_mode = 1;
+        kapc.inserted = 1;
+        kapc.thread = thread;
+        kapc.normal_routine = injector->entry;
+        kapc.kernel_routine = psexit;
+
+        PRINT_DEBUG("APC Normal routine @ 0x%x. Kernel routine @ 0x%x\n",
+                    kapc.normal_routine,
+                    kapc.kernel_routine);
+
+        ctx.addr = apc_state_addr;
+        status = vmi_read(vmi, &ctx, &kapc_state, sizeof(struct kapc_state_32));
+        if(status == VMI_FAILURE) {
+            PRINT_DEBUG("Failed to read kapc state\n");
+            return;
+        }
+
+        // Make this apc hook into the linked-list
+        kapc.apc_list_entry.flink = kapc_state.apc_list_head[1].flink;
+        kapc.apc_list_entry.blink = kapc_state.apc_list_head[1].blink;
+
+        // Write this kapc on the kernel stack at the very end
+        // It will be used before anything has a chance to overwrite it
+        addr_t apc_addr = kstack_limit;
+        status = vmi_write_va(vmi, apc_addr, 0, &kapc, sizeof(struct kapc_32));
+        if(status == VMI_FAILURE) {
+            PRINT_DEBUG("Failed to write kapc on the stack at 0x%lx\n", apc_addr);
+            return;
+        }
+
+        PRINT_DEBUG("APC injected at 0x%lx\n", apc_addr);
+
+        // Update _KAPC_STATE
+        // link pointers must point into the list entries in _KAPC
+        kapc_state.user_apc_pending = 1;
+        kapc_state.apc_list_head[1].flink = apc_addr + offsets[KAPC_APCLISTENTRY];
+
+        // Save _KAPC_STATE
+        ctx.addr = apc_state_addr;
+        status = vmi_write(vmi, &ctx, &kapc_state, sizeof(struct kapc_state_32));
+        if(status == VMI_FAILURE) {
+            PRINT_DEBUG("Failed to save updated _KAPC_STATE\n");
+            return;
+        }
+
+    } else {
+
+        /*
+         * This works 100% for process termination
+         * where the normal_routine passed is ntdll.dll!RtlExitUserProcess.
+         * Unfortunately passing non-ntdll functions crashes the host process.
+         * Once in the ntdll function you can divert the flow to any loaded library
+         * but unfortunately the process will crash once returning.
+         * Root cause yet unknown so just disabling this for now.
+         */
+
+        /*
+        struct kapc_state_64 kapc_state = { 0 };
+        struct kapc_64 kapc = { 0 };
+
+        kapc.type = 0;
+        kapc.apc_mode = 1;
+        kapc.inserted = 1;
+        kapc.thread = thread;
+        kapc.normal_routine = injector->entry;
+        kapc.kernel_routine = psexit;
+
+        PRINT_DEBUG("APC Normal routine @ 0x%lx. Kernel routine @ 0x%lx\n",
+                    kapc.normal_routine,
+                    kapc.kernel_routine);
+
+        ctx.addr = apc_state_addr;
+        status = vmi_read(vmi, &ctx, &kapc_state, sizeof(struct kapc_state_64));
+        if(status == VMI_FAILURE) {
+            PRINT_DEBUG("Failed to read kapc state\n");
+            return;
+        }
+
+        // Make this apc hook into the linked-list
+        kapc.apc_list_entry.flink = kapc_state.apc_list_head[1].flink;
+        kapc.apc_list_entry.blink = kapc_state.apc_list_head[1].blink;
+
+        // Write this kapc on the kernel stack at the very end
+        // It will be used before anything has a chance to overwrite it
+        addr_t apc_addr = kstack_limit;
+        status = vmi_write_va(vmi, apc_addr, 0, &kapc, sizeof(struct kapc_64));
+        if(status == VMI_FAILURE) {
+            PRINT_DEBUG("Failed to write kapc on the stack at 0x%lx\n", apc_addr);
+            return;
+        }
+
+        PRINT_DEBUG("APC injected at 0x%lx\n", apc_addr);
+
+        // Update _KAPC_STATE
+        // link pointers must point into the list entries in _KAPC
+        kapc_state.user_apc_pending = 1;
+        kapc_state.apc_list_head[1].flink = apc_addr + offsets[KAPC_APCLISTENTRY];
+
+        // Save _KAPC_STATE
+        ctx.addr = apc_state_addr;
+        status = vmi_write(vmi, &ctx, &kapc_state, sizeof(struct kapc_state_64));
+        if(status == VMI_FAILURE) {
+            PRINT_DEBUG("Failed to save updated _KAPC_STATE\n");
+            return;
+        }
+        */
+    }
+
+    ctx.addr = injector->entry;
+    vmi_read_8(vmi, &ctx, &injector->entry_backup);
+    vmi_write_8(vmi, &ctx, &trap);
+
+    PRINT_DEBUG("Wrote trap to 0x%lx. Backup: %u\n",
+                ctx.addr, injector->entry_backup);
+}
 
 event_response_t cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
 
-    //printf("CR3 changed to 0x%lx - PID %i\n", event->reg_event.value, vmi_dtb_to_pid(vmi, event->reg_event.value));
     struct injector *injector = event->data;
+    addr_t thread = 0, kpcrb_offset = 0, tid = 0, stack_base = 0, stack_limit = 0;
+    addr_t kernbase;
+    uint8_t apcqueueable;
+    reg_t fsgs = 0, cr3 = event->reg_event.value;
+    status_t status;
 
-    addr_t thread = 0, kpcrb_offset = 0, trapframe = 0;
-    addr_t userspace_return_va = 0, userspace_return_pa = 0;
-    reg_t fsgs = 0;
+    /*PRINT_DEBUG("CR3 changed to 0x%lx - PID %i\n",
+                event->reg_event.value,
+                vmi_dtb_to_pid(vmi, event->reg_event.value));*/
 
     if (event->reg_event.value == injector->target_cr3) {
-        if (!injector->target_rip) {
 
-            /* We determine the point where we want to hijack the thread by
-               looking at the trap frame "_KTRAP_FRAME".
-               While on x86-64 we can trap the RIP saved directly in the
-               trap frame, on x86 that point is not yet safe. Thus, on x86 we
-               read the stack base pointer (EBP/RBP) and get the return address
-               from that stack frame. Remember, EBP points to another saved EBP,
-               the return address is saved directly above it. */
-
-            if (PM2BIT(injector->pm) == BIT32) {
-                vmi_get_vcpureg(vmi, &fsgs, FS_BASE, event->vcpu_id);
-                kpcrb_offset = offsets[KPCR_PRCBDATA];
-            } else {
-                vmi_get_vcpureg(vmi, &fsgs, GS_BASE, event->vcpu_id);
-                kpcrb_offset = offsets[KPCR_PRCB];
-            }
-
-            vmi_read_addr_va(vmi,
-                fsgs + kpcrb_offset + offsets[KPRCB_CURRENTTHREAD],
-                0, &thread);
-
-            if (!thread) {
-                PRINT_DEBUG("cr3_cb: Failed to find current thread\n");
-                return 0;
-            }
-
-            //printf("Current thread @ 0x%lx\n", thread);
-
-            vmi_read_addr_va(vmi,
-                thread + offsets[KTHREAD_TRAPFRAME],
-                0, &trapframe);
-
-            if (!trapframe) {
-                PRINT_DEBUG("cr3_cb: Failed to find trapframe\n");
-                return 0;
-            }
-
-            //printf("Trap frame @ 0x%lx\n", trapframe);
-
-            addr_t tid;
-            vmi_read_addr_va(vmi,
-                thread + offsets[ETHREAD_CID] + offsets[CLIENT_ID_UNIQUETHREAD],
-                0, &tid);
-
-            addr_t rbp;
-            vmi_pid_t pid = vmi_dtb_to_pid(vmi, injector->target_cr3);
-            if (PM2BIT(injector->pm) == BIT32) {
-                vmi_read_addr_va(vmi,
-                    trapframe + offsets[KTRAP_FRAME_EBP],
-                    0, &rbp);
-                vmi_read_addr_va(vmi, rbp + 0x4, pid, &userspace_return_va);
-
-            } else {
-                vmi_read_addr_va(vmi,
-                    trapframe + offsets[KTRAP_FRAME_RIP],
-                    0, &userspace_return_va);
-            }
-
-            injector->userspace_return = vmi_pagetable_lookup(vmi, event->reg_event.value, userspace_return_va);
-
-            PRINT(injector->drakvuf, INJECTION_TRAPFRAME_STRING,
-                  tid, userspace_return_va, injector->userspace_return);
-
-            uint8_t trap = 0xCC;
-            vmi_read_8_pa(vmi, injector->userspace_return, &injector->userspace_return_backup);
-            vmi_write_8_pa(vmi, injector->userspace_return, &trap);
-
-        }
-    } else {
-        //printf("CR3 0x%lx is executing, not my process!\n",
-        //        event->reg_event.value);
-
-        if (injector->mm_enabled) {
-            injector->mm_enabled = 0;
-            vmi_clear_event(vmi, &injector->mm_event);
-        }
-        if (injector->ss_enabled) {
-            injector->ss_enabled = 0;
-            vmi_clear_event(vmi, &injector->ss_event);
+        if (PM2BIT(injector->pm) == BIT32) {
+            status = vmi_get_vcpureg(vmi, &fsgs, FS_BASE, event->vcpu_id);
+            kpcrb_offset = offsets[KPCR_PRCBDATA];
+        } else {
+            status = vmi_get_vcpureg(vmi, &fsgs, GS_BASE, event->vcpu_id);
+            kpcrb_offset = offsets[KPCR_PRCB];
         }
 
-        if (injector->userspace_return) {
-            vmi_write_8_pa(vmi, injector->userspace_return, &injector->userspace_return_backup);
-            injector->userspace_return_backup = 0;
-            injector->userspace_return = 0;
+        kernbase = fsgs - offsets[KIINITIALPCR];
+
+        if(status == VMI_FAILURE) {
+            PRINT_DEBUG("Failed to get GS_BASE\n");
+            goto done;
         }
+
+        status = vmi_read_addr_va(vmi,
+                         fsgs + kpcrb_offset + offsets[KPRCB_CURRENTTHREAD],
+                         0, &thread);
+
+        if (status == VMI_FAILURE || !thread) {
+            PRINT_DEBUG("cr3_cb: Failed to find current thread\n");
+            goto done;
+        }
+
+        /*
+         * At this point the process is still in kernel mode, so
+         * we need to trap when it enters into user mode.
+         * For this we use different mechanisms on 32-bit and 64-bit.
+         * The reason for this is that the same methods are not equally
+         * reliably.
+         *
+         * For 32-bit Windows we inject a fake APC structure with a function
+         * that will be trapped and diverted.
+         * This method on Windows 7 64-bit _only_ works if the function is one
+         * defined by ntdll.dll. The host process unfortunatelly crashes
+         * after the APC is delivered.
+         *
+         * For 64-bit Windows we use the trapframe approach, where we read
+         * the saved RIP from the stack trap frame and trap it.
+         * When this address is hit, we hijack the flow and afterwards return
+         * the registers to the original values, thus the process continues to run.
+         * This method is workable on 32-bit Windows as well but finding the trapframe
+         * sometimes fail for yet unknown reasons.
+         */
+        if (PM2BIT(injector->pm) == BIT64) {
+
+            access_context_t ctx = {
+                .translate_mechanism = VMI_TM_PROCESS_DTB,
+                .dtb = cr3,
+            };
+
+            addr_t trapframe = 0;
+            status = vmi_read_addr_va(vmi,
+                        thread + offsets[KTHREAD_TRAPFRAME],
+                        0, &trapframe);
+
+            status = vmi_read_addr_va(vmi,
+                        trapframe + offsets[KTRAP_FRAME_RIP],
+                        0, &injector->entry);
+
+            PRINT_DEBUG("Trapframe @ 0x%lx. Return address: 0x%lx\n",
+                        trapframe, injector->entry);
+
+            ctx.addr = injector->entry;
+            vmi_read_8(vmi, &ctx, &injector->entry_backup);
+            vmi_write_8(vmi, &ctx, &trap);
+
+            PRINT_DEBUG("Wrote trap to 0x%lx. Backup: %u\n",
+                        ctx.addr, injector->entry_backup);
+        } else {
+
+            status = vmi_read_8_va(vmi,
+                       thread + offsets[KTHREAD_APCQUEUEABLE],
+                       0, &apcqueueable);
+
+            if (status == VMI_FAILURE) {
+                PRINT_DEBUG("cr3_cb: Failed to read apc queueable\n");
+                goto done;
+            }
+
+            status = vmi_read_addr_va(vmi,
+                       thread + offsets[ETHREAD_CID] + offsets[CLIENT_ID_UNIQUETHREAD],
+                       0, &tid);
+
+            if (status == VMI_FAILURE) {
+                PRINT_DEBUG("cr3_cb: Failed to read current Thread ID\n");
+                goto done;
+            }
+
+            apcqueueable = !!(apcqueueable & (1<<5));
+
+            PRINT_DEBUG("Current thread: %lu. Base: 0x%lx. ApcQueueable: %u.\n",
+                        tid, thread, apcqueueable);
+
+            if (!apcqueueable)
+                goto done;
+
+            inject_apc(injector, vmi, event->vcpu_id, cr3, kernbase, thread);
+
+        }
+
+        vmi_clear_event(vmi, event);
     }
 
-    return 0;
-}
-
-event_response_t waitfor_cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
-    struct injector *injector = event->data;
-    injector->drakvuf->interrupted = 1;
-
-    PRINT_DEBUG("Injected process is scheduled to execute\n");
-
-    vmi_pause_vm(vmi);
-    vmi_clear_event(vmi, event);
-    return 0;
-}
-
-event_response_t reset_return_trap(vmi_instance_t vmi, vmi_event_t *event) {
-    addr_t pa = (event->interrupt_event.gfn << 12)
-            + event->interrupt_event.offset;
-    uint8_t trap = 0xCC;
-    vmi_write_8_pa(vmi, pa, &trap);
+done:
     return 0;
 }
 
@@ -623,146 +778,109 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     struct injector *injector = event->data;
     addr_t pa = (event->interrupt_event.gfn << 12)
-            + event->interrupt_event.offset;
-
-    reg_t cr3, cs, fsgs, rbp;
+                 + event->interrupt_event.offset;
+    reg_t cr3;
     vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
-    vmi_get_vcpureg(vmi, &rbp, RBP, event->vcpu_id);
-    vmi_get_vcpureg(vmi, &cs, CS_SEL, event->vcpu_id);
     vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
 
-    /*addr_t ret = 0;
+    PRINT_DEBUG("INT3 Callback @ 0x%lx. PID %u. CR3 0x%lx\n",
+                event->interrupt_event.gla, pid, cr3);
 
-    if (PM2BIT(injector->pm) == BIT32) {
-        vmi_read_addr_va(vmi, rbp + 0x4, pid, &ret);
-    } else {
-        vmi_read_addr_va(vmi, rbp + 0x8, pid, &ret);
-    }
+    if ( event->interrupt_event.gla == injector->entry ) {
 
-    printf("INT3 @ 0x%lx. PID %u. CPL: %u. Stack ret: 0x%lx\n", pa, pid, VMI_BIT_MASK(0,2) & cs, ret);*/
+        if (PM2BIT(injector->pm) == BIT64) {
+            addr_t cpa = sym2va(vmi, pid, "kernel32.dll", "CreateProcessA");
 
-    if (pa == injector->userspace_return) {
+            vmi_get_vcpureg(vmi, &injector->saved_rip, RIP, event->vcpu_id);
+            vmi_get_vcpureg(vmi, &injector->saved_rsp, RSP, event->vcpu_id);
+            vmi_get_vcpureg(vmi, &injector->saved_rax, RAX, event->vcpu_id);
+            vmi_get_vcpureg(vmi, &injector->saved_rcx, RCX, event->vcpu_id);
+            vmi_get_vcpureg(vmi, &injector->saved_r8, R8, event->vcpu_id);
+            vmi_get_vcpureg(vmi, &injector->saved_r9, R9, event->vcpu_id);
 
-        event->interrupt_event.reinject = 0;
+            vmi_set_vcpureg(vmi, cpa, RIP, event->vcpu_id);
 
-        if (pid != injector->target_pid) {
-
-            PRINT_DEBUG("Userspace return trap hit by another PID, not the target (%u)\n",
-                        injector->target_pid);
-
-            vmi_write_8_pa(vmi, pa, &injector->userspace_return_backup);
-            vmi_step_event(vmi, event, event->vcpu_id, 1, reset_return_trap);
-            return 0;
+            PRINT_DEBUG("Diverting flow to 0x%lx\n", cpa);
         }
 
-            injector->target_pid = pid;
-            injector->target_rip = pa;
-            injector->backup = injector->userspace_return_backup;
-            injector->userspace_return = 0;
+        // On 32-bit Windows we are already at CreateProcessA
 
-            hijack_thread(injector, vmi, event->vcpu_id, pid);
+        vmi_write_8_pa(vmi, pa, &injector->entry_backup);
+        pass_inputs(injector, vmi, event->vcpu_id, pid);
 
-                /*injector->ss_enabled = 1;
-                memset(&injector->ss_event, 0, sizeof(vmi_event_t));
-                injector->ss_event.type = VMI_EVENT_SINGLESTEP;
-                injector->ss_event.callback = ss_callback;
-                injector->ss_event.data = injector;
-                SET_VCPU_SINGLESTEP(injector->ss_event.ss_event,
-                        event->vcpu_id);
-                vmi_register_event(vmi, &injector->ss_event);*/
-
-            vmi_clear_event(vmi, &injector->cr3_event);
-            injector->mm_count++;
-            return 0;
-    }
-
-    if (pa == injector->target_rip) {
+        vmi_write_8_va(vmi, injector->ret, pid, &trap);
 
         event->interrupt_event.reinject = 0;
+        return 0;
+    }
 
-        if (pid != injector->target_pid) {
-            PRINT_DEBUG("Return trap hit by another PID, not the target (%u)\n",
-                        injector->target_pid);
-            vmi_write_8_pa(vmi, pa, &injector->backup);
-            vmi_step_event(vmi, event, event->vcpu_id, 1, reset_return_trap);
-            return 0;
+    if ( event->interrupt_event.gla != injector->ret )
+        goto notmine;
 
-        }
+    // We are now in the return path from CreateProcessA
 
-        reg_t rax;
-        vmi_get_vcpureg(vmi, &rax, RAX, event->vcpu_id);
-        vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
+    vmi_write_8_pa(vmi, pa, &injector->ret_backup);
+    injector->drakvuf->interrupted=1;
+    event->interrupt_event.reinject = 0;
 
-        PRINT_DEBUG("RAX: 0x%lx\n", rax);
-        PRINT_DEBUG("Restoring RSP to 0x%lx\n", injector->saved_rsp);
-        PRINT_DEBUG("Restoring RAX to 0x%lx\n", injector->saved_rax);
-        PRINT_DEBUG("Restoring RCX to 0x%lx\n", injector->saved_rcx);
-        PRINT_DEBUG("Restoring RDX to 0x%lx\n", injector->saved_rdx);
-        PRINT_DEBUG("Restoring R8 to 0x%lx\n", injector->saved_r8);
-        PRINT_DEBUG("Restoring R9 to 0x%lx\n", injector->saved_r9);
+    reg_t rax;
+    vmi_get_vcpureg(vmi, &rax, RAX, event->vcpu_id);
 
+    if (PM2BIT(injector->pm) == BIT64) {
+        printf("Returning flow to 0x%lx\n", injector->saved_rip);
+        vmi_set_vcpureg(vmi, injector->saved_rip, RIP, event->vcpu_id);
         vmi_set_vcpureg(vmi, injector->saved_rsp, RSP, event->vcpu_id);
         vmi_set_vcpureg(vmi, injector->saved_rax, RAX, event->vcpu_id);
         vmi_set_vcpureg(vmi, injector->saved_rcx, RCX, event->vcpu_id);
-        vmi_set_vcpureg(vmi, injector->saved_rdx, RDX, event->vcpu_id);
         vmi_set_vcpureg(vmi, injector->saved_r8, R8, event->vcpu_id);
         vmi_set_vcpureg(vmi, injector->saved_r9, R9, event->vcpu_id);
-
-        if (rax) {
-
-            if (PM2BIT(injector->pm) == BIT32) {
-                struct process_information_32 pip;
-                vmi_read_va(vmi, injector->process_info, pid, &pip,
-                        sizeof(struct process_information_32));
-
-                injector->pid = pip.dwProcessId;
-                injector->tid = pip.dwThreadId;
-                injector->hProc = pip.hProcess;
-                injector->hThr = pip.hThread;
-
-            } else {
-                struct process_information_64 pip;
-                vmi_read_va(vmi, injector->process_info, pid, &pip,
-                        sizeof(struct process_information_64));
-
-                injector->pid = pip.dwProcessId;
-                injector->tid = pip.dwThreadId;
-                injector->hProc = pip.hProcess;
-                injector->hThr = pip.hThread;
-
-            }
-
-            if (injector->pid && injector->tid) {
-                injector->ret = rax;
-
-                injector->cr3_event.callback = waitfor_cr3_callback;
-                injector->cr3_event.reg_event.equal = vmi_pid_to_dtb(vmi,
-                        injector->pid);
-                injector->cr3_event.data = injector;
-                vmi_register_event(vmi, &injector->cr3_event);
-
-                PRINT(injector->drakvuf, INJECTION_SUCCESS_STRING,
-                      injector->pid, injector->tid, injector->hProc, injector->hThr,
-                      injector->cr3_event.reg_event.equal);
-
-            }
-        } else {
-            injector->drakvuf->interrupted = 1;
-        }
-
-        // Restore stack
-        if(injector->stack_backup) {
-            vmi_write_va(vmi, injector->stack_limit, pid, injector->stack_backup, injector->stack_backup_size);
-            free(injector->stack_backup);
-        }
-
-        vmi_write_8_pa(vmi, pa, &injector->backup);
-        vmi_clear_event(vmi, event);
-
-    } else {
-        event->interrupt_event.reinject = 1;
     }
 
+    PRINT_DEBUG("RAX: 0x%lx\n", rax);
+
+    if (rax) {
+        if (PM2BIT(injector->pm) == BIT32) {
+            struct process_information_32 pip;
+            vmi_read_va(vmi, injector->process_info, pid, &pip,
+                        sizeof(struct process_information_32));
+
+            injector->pid = pip.dwProcessId;
+            injector->tid = pip.dwThreadId;
+            injector->hProc = pip.hProcess;
+            injector->hThr = pip.hThread;
+
+        } else {
+            struct process_information_64 pip;
+            vmi_read_va(vmi, injector->process_info, pid, &pip,
+                        sizeof(struct process_information_64));
+
+            injector->pid = pip.dwProcessId;
+            injector->tid = pip.dwThreadId;
+            injector->hProc = pip.hProcess;
+            injector->hThr = pip.hThread;
+            injector->cr3 = vmi_pid_to_dtb(vmi, injector->pid);
+
+        }
+
+        if (injector->pid && injector->tid) {
+            injector->ret = rax;
+
+            /*injector->cr3_event.callback = waitfor_cr3_callback;
+            injector->cr3_event.reg_event.equal = vmi_pid_to_dtb(vmi,
+                        injector->pid);
+            injector->cr3_event.data = injector;
+            vmi_register_event(vmi, &injector->cr3_event);*/
+
+            PRINT(injector->drakvuf, INJECTION_SUCCESS_STRING,
+                  injector->pid, injector->tid, injector->hProc, injector->hThr,
+                  injector->cr3);
+        }
+    }
+
+    return 0;
+
+notmine:
+    event->interrupt_event.reinject = 1;
     return 0;
 }
 
@@ -788,12 +906,14 @@ int start_app(drakvuf_t *drakvuf, vmi_pid_t pid, const char *app) {
     PRINT_DEBUG("Target PID %u with DTB 0x%lx to start '%s'\n", pid,
                 injector.target_cr3, app);
 
-    injector.cr3_event.type = VMI_EVENT_REGISTER;
-    injector.cr3_event.reg_event.reg = CR3;
-    injector.cr3_event.reg_event.in_access = VMI_REGACCESS_W;
-    injector.cr3_event.callback = cr3_callback;
-    injector.cr3_event.data = &injector;
-    vmi_register_event(drakvuf->vmi, &injector.cr3_event);
+    vmi_event_t cr3_event;
+    memset(&cr3_event, 0, sizeof(vmi_event_t));
+    cr3_event.type = VMI_EVENT_REGISTER;
+    cr3_event.reg_event.reg = CR3;
+    cr3_event.reg_event.in_access = VMI_REGACCESS_W;
+    cr3_event.callback = cr3_callback;
+    cr3_event.data = &injector;
+    vmi_register_event(drakvuf->vmi, &cr3_event);
 
     vmi_event_t interrupt_event;
     memset(&interrupt_event, 0, sizeof(vmi_event_t));
@@ -824,9 +944,7 @@ int start_app(drakvuf_t *drakvuf, vmi_pid_t pid, const char *app) {
         }
     }
 
-    vmi_clear_event(drakvuf->vmi, &injector.cr3_event);
-    vmi_clear_event(drakvuf->vmi, &injector.mm_event);
-    vmi_clear_event(drakvuf->vmi, &injector.ss_event);
+    vmi_clear_event(drakvuf->vmi, &cr3_event);
     vmi_clear_event(drakvuf->vmi, &interrupt_event);
     g_timer_destroy(injector.timer);
 

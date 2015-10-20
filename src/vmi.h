@@ -160,10 +160,18 @@ enum offset {
     KPRCB_CURRENTTHREAD,
 
     KTHREAD_PROCESS,
+    KTHREAD_INITIALSTACK,
+    KTHREAD_STACKLIMIT,
+    KTHREAD_APCSTATE,
     KTHREAD_TRAPFRAME,
+    KTHREAD_APCQUEUEABLE,
 
-    KTRAP_FRAME_EBP,
     KTRAP_FRAME_RIP,
+
+    KAPC_APCLISTENTRY,
+
+    NT_TIB_STACKBASE,
+    NT_TIB_STACKLIMIT,
 
     ETHREAD_CID,
     CLIENT_ID_UNIQUETHREAD,
@@ -207,9 +215,15 @@ static const char *offset_names[OFFSET_MAX][2] = {
     [KPCR_PRCBDATA] = {"_KPCR", "PrcbData" },
     [KPRCB_CURRENTTHREAD] = { "_KPRCB", "CurrentThread" },
     [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
+    [KTHREAD_INITIALSTACK] = {"_KTHREAD", "InitialStack"},
+    [KTHREAD_STACKLIMIT] = {"_KTHREAD", "StackLimit"},
     [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
-    [KTRAP_FRAME_EBP] = {"_KTRAP_FRAME", "Ebp" },
+    [KTHREAD_APCSTATE] = {"_KTHREAD", "ApcState" },
+    [KTHREAD_APCQUEUEABLE] = {"_KTHREAD", "ApcQueueable"},
+    [KAPC_APCLISTENTRY] = {"_KAPC", "ApcListEntry" },
     [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
+    [NT_TIB_STACKBASE] = { "_NT_TIB", "StackBase" },
+    [NT_TIB_STACKLIMIT] = { "_NT_TIB", "StackLimit" },
     [ETHREAD_CID] = {"_ETHREAD", "Cid" },
     [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
     [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },

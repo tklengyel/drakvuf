@@ -116,5 +116,6 @@ windows_system_map_symbol_to_address(
     addr_t *size);
 
 struct sym_config* get_all_symbols(const char *rekall_profile);
+addr_t get_function_rva(const char *rekall_profile, const char *function);
 
 #endif /* WIN_SYMBOLS_H_ */
