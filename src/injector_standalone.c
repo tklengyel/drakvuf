@@ -152,6 +152,7 @@ int main(int argc, char** argv)
     }
 
     if (pid > 0 && app) {
+        printf("Injector starting %s through PID %u\n", app, pid);
         rc = start_app(&drakvuf, pid, app);
 
         if (!rc) {

@@ -107,7 +107,7 @@
 
 #include "structures.h"
 
-static drakvuf_t drakvuf;
-static bool verbose;
+drakvuf_t drakvuf;
+bool verbose;
 
 #endif

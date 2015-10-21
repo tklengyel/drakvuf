@@ -152,8 +152,7 @@ static const char *strings_list[__OUTPUT_MAX][__STRINGS_MAX] = {
                                         "Stack base: 0x%lx Limit: 0x%lx\n",
         [INJECTION_STACK_PUSHED_STRING] = "\tArgument '%s' pushed on stack at 0x%lx.\n"
                                           "\tProcess information pushed on stack at 0x%lx\n"
-                                          "\tStartup information pushed on stack at 0x%lx\n"
-                                          "\tReturn address 0x%lx pushed on stack at 0x%lx\n",
+                                          "\tStartup information pushed on stack at 0x%lx\n",
         [INJECTION_TRAPFRAME_STRING] = "Trapping userspace return of Thread:"
                                        " %lu @ VA 0x%lx -> PA 0x%lx\n",
         [INJECTION_SUCCESS_STRING] = "-- CreateProcessA SUCCESS --\n"
