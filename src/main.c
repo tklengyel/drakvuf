@@ -162,6 +162,7 @@ int main(int argc, char** argv) {
                "\t -i <injection pid>        The PID of the process to hijack for injection\n"
                "\t -e <inject_exe>           The executable to start with injection\n"
                "\t -t <timeout>              Timeout (in seconds)\n"
+               "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
                "\t -o <format>               Output format (default or csv)\n"
                "\t -v                        Turn on verbose (debug) output\n"
         );
@@ -170,7 +171,7 @@ int main(int argc, char** argv) {
 
     drakvuf_init(&drakvuf);
 
-    while ((c = getopt (argc, argv, "r:d:i:e:t:o:v")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:v")) != -1)
     switch (c)
     {
     case 'r':
@@ -187,6 +188,9 @@ int main(int argc, char** argv) {
         break;
     case 't':
         drakvuf.timeout = atoi(optarg);
+        break;
+    case 'D':
+        drakvuf.dump_folder = optarg;
         break;
     case 'o':
         if(!strncmp(optarg,"csv",3))
