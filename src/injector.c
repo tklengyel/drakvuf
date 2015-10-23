@@ -722,19 +722,27 @@ event_response_t cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
                         thread + offsets[KTHREAD_TRAPFRAME],
                         0, &trapframe);
 
+            if (status == VMI_FAILURE || !trapframe) {
+                PRINT_DEBUG("cr3_cb: failed to read trapframe or trapframe is NULL\n");
+                goto done;
+            }
+
             status = vmi_read_addr_va(vmi,
                         trapframe + offsets[KTRAP_FRAME_RIP],
                         0, &injector->entry);
 
-            PRINT_DEBUG("Trapframe @ 0x%lx. Return address: 0x%lx\n",
-                        trapframe, injector->entry);
+            if (status == VMI_FAILURE || !injector->entry) {
+                PRINT_DEBUG("Failed to read RIP from trapframe or RIP is NULL!\n");
+                goto done;
+            }
 
             ctx.addr = injector->entry;
             vmi_read_8(vmi, &ctx, &injector->entry_backup);
             vmi_write_8(vmi, &ctx, &trap);
 
-            PRINT_DEBUG("Wrote trap to 0x%lx. Backup: %u\n",
-                        ctx.addr, injector->entry_backup);
+            PRINT_DEBUG("Trapframe @ 0x%lx. Return address: 0x%lx Backup: %u\n",
+                        trapframe, injector->entry,
+                        injector->entry_backup);
         } else {
 
             status = vmi_read_8_va(vmi,
