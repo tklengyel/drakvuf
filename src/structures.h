@@ -151,6 +151,7 @@ typedef struct drakvuf {
     xen_interface_t *xen;
     char* dom_name;
     char* rekall_profile;
+    char* dump_folder;
 
     uint32_t domID;
 

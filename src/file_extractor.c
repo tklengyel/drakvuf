@@ -115,7 +115,7 @@
 #include "vmi.h"
 #include "win-handles.h"
 
-#define VOL_DUMPFILES "%s %s -l vmi://domid/%u --profile=%s -Q 0x%lx -D /tmp -n dumpfiles 2>&1"
+#define VOL_DUMPFILES "%s %s -l vmi://domid/%u --profile=%s -Q 0x%lx -D %s -n dumpfiles 2>&1"
 #define PROFILE32 "Win7SP1x86"
 #define PROFILE64 "Win7SP1x64"
 
@@ -133,9 +133,9 @@ void volatility_extract_file(drakvuf_t *drakvuf, addr_t file_object) {
 
     char *command = g_malloc0(
             snprintf(NULL, 0, VOL_DUMPFILES, PYTHON, VOLATILITY, drakvuf->domID,
-                    profile, file_object) + 1);
+                    profile, file_object, drakvuf->dump_folder) + 1);
     sprintf(command, VOL_DUMPFILES, PYTHON, VOLATILITY, drakvuf->domID, profile,
-            file_object);
+            file_object, drakvuf->dump_folder);
     PRINT_DEBUG("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     free(command);
