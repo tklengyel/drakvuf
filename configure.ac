@@ -258,7 +258,7 @@ LD="$saved_LD"
 #####################################################
 
 AC_HEADER_STDC
-AC_CHECK_HEADERS([fcntl.h malloc.h stdio.h stdlib.h string.h sys/time.h sys/mman.h syslog.h unistd.h errno.h pthread.h])
+AC_CHECK_HEADERS([fcntl.h malloc.h stdio.h stdlib.h string.h sys/time.h sys/mman.h sys/inotify.h syslog.h unistd.h errno.h pthread.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -294,6 +294,8 @@ AC_CHECK_LIB([xenctrl],
 	[xc_interface_open, xc_memshr_control, xc_memshr_nominate_gfn, xc_memshr_share_gfns], 
 	[], [AC_ERROR([XenCtrl is unusable! Do you have Xen 4.2+ installed?])])
 
+AC_CHECK_LIB([xentoollog], [xtl_logger_destroy])
+
 #####################################################
 
 if test x$plugin_filedelete = xyes; then
@@ -322,6 +324,7 @@ AC_CONFIG_FILES([Makefile src/Makefile
                  src/libdrakvuf/Makefile
                  src/xen_helper/Makefile
                  src/plugins/Makefile
+                 src/dirwatch/Makefile
                ])
 
 AC_OUTPUT
