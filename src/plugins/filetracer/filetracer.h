@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -88,7 +88,7 @@
  * otherwise) that you are offering unlimited, non-exclusive right to      *
  * reuse, modify, and relicense the code.  DRAKVUF will always be          *
  * available Open Source, but this is important because the inability to   *
- * relicense code has caused devastating problems for other Free Software  *
+* relicense code has caused devastating problems for other Free Software  *
  * projects (such as KDE and NASM).                                        *
  * To specify special license conditions of your contributions, just say   *
  * so when you send them.                                                  *
@@ -102,13 +102,11 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_EXPORTS_H
-#define WIN_EXPORTS_H
+#ifndef FILETRACER_H
+#define FILETRACER_H
 
-#include <libvmi/libvmi.h>
-
-addr_t sym2va(vmi_instance_t vmi, vmi_pid_t cr3, const char *mod_name, const char *sym);
-const char *rva2sym(vmi_instance_t vmi, const char *mod_name, addr_t base_vaddr, vmi_pid_t pid, addr_t rva);
-status_t va2sym(vmi_instance_t vmi, addr_t va, vmi_pid_t pid, char **mod, char **sym);
+int plugin_filetracer_init(drakvuf_t drakvuf, const void *config);
+int plugin_filetracer_start(drakvuf_t drakvuf);
+int plugin_filetracer_close(drakvuf_t drakvuf);
 
 #endif

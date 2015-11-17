@@ -8,6 +8,10 @@
 # Libraries
 *.lib
 *.a
+*.la
+*.lax
+*.lo
+*.Plo
 
 # Shared objects (inc. Windows DLLs)
 *.dll
@@ -28,7 +32,6 @@ configure
 Makefile
 Makefile.in
 autom4te.cache/*
-src/.deps
 compile
 aclocal.m4
 config.*
@@ -36,8 +39,11 @@ depcomp
 install-sh
 missing
 stamp-h1
+*.deps
+*.libs
+*.dirstamp
 
 # drakvuf binaries
 drakvuf
 injector
-xen_domconfig
+xen_memclone

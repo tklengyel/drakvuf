@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,119 +102,13 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef STRUCTURES_H
-#define STRUCTURES_H
+#ifndef SYSCALLS_H
+#define SYSCALLS_H
 
-/******************************************/
+#include "plugins.h"
 
-#define LIBXL_API_VERSION 0x040300
-#define INVALID_DOMID ~(uint32_t)0
-
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <libxl_utils.h>
-#include <xenctrl.h>
-
-#include <glib.h>
-#include <libvmi/libvmi.h>
-#include <libvmi/events.h>
-
-typedef struct xen_interface {
-    //struct xs_handle *xsh;
-    xc_interface *xc;
-    libxl_ctx *xl_ctx;
-    xentoollog_logger *xl_logger;
-} xen_interface_t;
-
-struct symbol {
-    char *name;
-    addr_t rva;
-    uint8_t type;
-    int inputs;
-} __attribute__ ((packed));
-
-struct sym_config {
-    char *name;
-    //const char **guids;
-    struct symbol *syms;
-    uint64_t sym_count;
-} __attribute__ ((packed));
-
-typedef enum {
-    OUTPUT_DEFAULT,
-    OUTPUT_CSV,
-    __OUTPUT_MAX
-} output_format_t;
-
-typedef struct drakvuf {
-    xen_interface_t *xen;
-    char* dom_name;
-    char* rekall_profile;
-    char* dump_folder;
-
-    uint32_t domID;
-
-    pthread_t vmi_thread;
-
-    uint32_t timeout;
-    GTimer *timer;
-    struct sym_config *sym_config;
-    GTree *pooltags;
-
-    output_format_t output_format;
-
-    // VMI
-    int interrupted;
-    page_mode_t pm;
-    vmi_instance_t vmi;
-    GHashTable *pa_lookup; // key: PA of trap
-    GHashTable *pool_lookup; // key: PA of trap
-    GHashTable *file_watch;
-} drakvuf_t;
-
-struct file_watch {
-    drakvuf_t *drakvuf;
-    addr_t file_base;
-    addr_t file_name;
-    addr_t obj;
-} __attribute__ ((packed));
-
-struct pool_lookup {
-    uint8_t backup;
-    union {
-        unsigned char ctag[4];
-        uint32_t tag;
-    };
-    reg_t cr3;
-    uint32_t size;
-    uint32_t count;
-} __attribute__ ((packed));
-
-struct symbolwrap {
-    const struct sym_config *config;
-    const struct symbol *symbol;
-    uint8_t backup;
-    drakvuf_t *drakvuf;
-} __attribute__ ((packed));
-
-typedef enum {
-    FILE_WATCH,
-    POOL_LOOKUP,
-    SYMBOLWRAP
-} memevent_type_t;
-
-struct memevent {
-    memevent_type_t sID;
-    drakvuf_t *drakvuf;
-    vmi_instance_t vmi;
-    vmi_event_t *guard;
-    addr_t pa;
-    union {
-        struct symbolwrap symbol;
-        struct pool_lookup pool;
-        struct file_watch file;
-    };
-} __attribute__ ((packed));
+int plugin_syscall_init(drakvuf_t drakvuf, const void *config);
+int plugin_syscall_start(drakvuf_t drakvuf);
+int plugin_syscall_close(drakvuf_t drakvuf);
 
 #endif

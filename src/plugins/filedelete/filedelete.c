@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,120 +102,132 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <error.h>
-#include <stdio.h>
 #include <glib.h>
+#include <config.h>
+#include "../plugins.h"
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <unistd.h>
+#define FILE_DISPOSITION_INFORMATION 13
 
-#include "output.h"
-#include "vmi.h"
-#include "win-handles.h"
+static const char *dump_folder;
+static output_format_t format;
+static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info);
+static page_mode_t pm;
+static uint32_t domid;
 
+enum offset {
+    FILE_OBJECT_FILENAME,
+    HANDLE_TABLE_HANDLECOUNT,
+    KPCR_PRCB,
+    KPRCB_CURRENTTHREAD,
+    KTHREAD_PROCESS,
+    OBJECT_HEADER_TYPEINDEX,
+    OBJECT_HEADER_BODY,
+    UNICODE_STRING_LENGTH,
+    UNICODE_STRING_BUFFER,
+    __OFFSET_MAX
+};
+
+static const char *offset_names[__OFFSET_MAX][2] = {
+    [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
+    [HANDLE_TABLE_HANDLECOUNT] = {"_HANDLE_TABLE", "HandleCount" },
+    [KPRCB_CURRENTTHREAD] = { "_KPRCB", "CurrentThread" },
+    [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
+    [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
+    [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
+    [UNICODE_STRING_LENGTH] = {"_UNICODE_STRING", "Length" },
+    [UNICODE_STRING_BUFFER] = {"_UNICODE_STRING", "Buffer" },
+};
+
+#define WIN7_TYPEINDEX_LAST 44
 #define VOL_DUMPFILES "%s %s -l vmi://domid/%u --profile=%s -Q 0x%lx -D %s -n dumpfiles 2>&1"
 #define PROFILE32 "Win7SP1x86"
 #define PROFILE64 "Win7SP1x64"
 
-// From FILE_INFORMATION_CLASS
-#define FILE_DISPOSITION_INFORMATION 13
+static size_t offsets[__OFFSET_MAX];
 
-void volatility_extract_file(drakvuf_t *drakvuf, addr_t file_object) {
+static drakvuf_trap_t traps[4] = {
+    [0 ... 3] = { .lookup_type = LOOKUP_PID,
+                  .u.pid = 4,
+                  .addr_type = ADDR_RVA,
+                  .type = BREAKPOINT,
+                  .module = "ntoskrnl.exe" }
+};
 
-    char* profile = NULL;
-    if (PM2BIT(drakvuf->pm) == BIT32) {
-        profile = PROFILE32;
-    } else {
+void volatility_extract_file(drakvuf_t drakvuf, addr_t file_object) {
+
+    const char* profile = NULL;
+    if (pm == VMI_PM_IA32E)
         profile = PROFILE64;
-    }
+    else
+        profile = PROFILE32;
 
     char *command = g_malloc0(
-            snprintf(NULL, 0, VOL_DUMPFILES, PYTHON, VOLATILITY, drakvuf->domID,
-                     profile, file_object,
-                    (drakvuf->dump_folder ? drakvuf->dump_folder : "/tmp")
-                    ) + 1);
-    sprintf(command, VOL_DUMPFILES, PYTHON, VOLATILITY, drakvuf->domID, profile,
-            file_object,
-            (drakvuf->dump_folder ? drakvuf->dump_folder : "/tmp"));
+            snprintf(NULL, 0, VOL_DUMPFILES, PYTHON, VOLATILITY, domid,
+                     profile, file_object, dump_folder
+                    )+ 1);
+    sprintf(command, VOL_DUMPFILES, PYTHON, VOLATILITY, domid, profile,
+            file_object, dump_folder);
 
-    PRINT_DEBUG("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     free(command);
 }
 
-void carve_file_from_memory(drakvuf_t *drakvuf, addr_t ph_base,
-        addr_t block_size) {
-
-    addr_t aligned_file_size = struct_sizes[FILE_OBJECT];
-    if(PM2BIT(drakvuf->pm) == BIT32) {
-        // 8-byte alignment on 32-bit mode
-        if(struct_sizes[FILE_OBJECT] % 8) {
-            aligned_file_size += 8 - (struct_sizes[FILE_OBJECT] % 8);
-        }
-    } else {
-        // 16-byte alignment on 64-bit mode
-        if(struct_sizes[FILE_OBJECT] % 16) {
-            aligned_file_size += 16 - (struct_sizes[FILE_OBJECT] % 16);
-        }
-    }
-
-    addr_t file_base = ph_base + block_size - aligned_file_size;
-    addr_t file_name = file_base + offsets[FILE_OBJECT_FILENAME];
-
-    addr_t file_name_str = 0;
-    uint16_t length = 0;
-
-    vmi_read_addr_pa(drakvuf->vmi, file_name + offsets[UNICODE_STRING_BUFFER], &file_name_str);
-    vmi_read_16_pa(drakvuf->vmi, file_name + offsets[UNICODE_STRING_LENGTH], &length);
-
-    if (file_name_str && length) {
-        unicode_string_t str = { .contents = NULL };
-        str.length = length;
-        str.encoding = "UTF-16";
-        str.contents = malloc(length);
-        vmi_read_va(drakvuf->vmi, file_name, 0, str.contents, length);
-        unicode_string_t str2 = { .contents = NULL };
-        status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
-
-        if (VMI_SUCCESS == rc) {
-            PRINT_DEBUG("\tFile closing: %s.\n", str2.contents);
-            volatility_extract_file(drakvuf, file_base);
-            g_free(str2.contents);
-        }
-
-        free(str.contents);
-    }
-
-}
-
-void grab_file_by_handle(drakvuf_t *drakvuf, vmi_event_t *event, reg_t cr3,
-        addr_t handle) {
-
-    vmi_instance_t vmi = drakvuf->vmi;
+/*
+ * The approach where the system process list es enumerated looking for
+ * the matching cr3 value in each _EPROCESS struct is not going to work
+ * if a DKOM attack unhooks the _EPROCESS struct.
+ *
+ * We can access the _EPROCESS structure by reading the FS_BASE register on x86
+ * or the GS_BASE register on x64, which contains the _KPCR.
+ *
+ * FS/GS -> _KPCR._KPRCB.CurrentThread -> _ETHREAD._KTHREAD.Process = _EPROCESS
+ *
+ * Also see: http://www.csee.umbc.edu/~stephens/SECURITY/491M/HiddenProcesses.ppt
+ */
+static void grab_file_by_handle(drakvuf_t drakvuf, uint32_t vcpu_id, vmi_instance_t vmi,
+                                page_mode_t pm,
+                                drakvuf_trap_info_t *info, addr_t handle)
+{
     uint8_t type_index = 0;
+    addr_t thread, process;
+    /*
+     * fs_base/gs_base in the info->regs structure are not actually filled in
+     * by Xen for vm_events, so we need to manually ask for these each time
+     */
+    reg_t fsgs;
+    if(pm == VMI_PM_IA32E)  {
+        vmi_get_vcpureg(vmi, &fsgs, GS_BASE, vcpu_id);
+    } else {
+        vmi_get_vcpureg(vmi, &fsgs, FS_BASE, vcpu_id);
+    }
 
-    addr_t obj = get_obj_by_handle(drakvuf, vmi, event->vcpu_id, handle);
+    vmi_read_addr_va(vmi, fsgs + offsets[KPCR_PRCB] + offsets[KPRCB_CURRENTTHREAD],
+                     0, &thread);
+    vmi_read_addr_va(vmi, thread + offsets[KTHREAD_PROCESS],
+                     0, &process);
+
+    // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
+
+    if (!obj)
+        return;
 
     access_context_t ctx = {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .addr = obj + offsets[OBJECT_HEADER_TYPEINDEX],
-        .dtb = cr3
+        .dtb = info->regs->cr3
     };
+
     if (VMI_FAILURE == vmi_read_8(vmi, &ctx, &type_index))
         return;
-
-    PRINT_DEBUG("Handle: 0x%lx. Obj @ 0x%lx. Type: %s\n", handle, obj, win7_typeindex[type_index]);
 
     if (type_index >= WIN7_TYPEINDEX_LAST || type_index != 28)
         return;
 
     addr_t file = obj + offsets[OBJECT_HEADER_BODY];
-    addr_t file_pa = vmi_pagetable_lookup(vmi, cr3, file);
+    addr_t file_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, file);
     addr_t filename = file + offsets[FILE_OBJECT_FILENAME];
-
-    PRINT_DEBUG("Object header is @ 0x%lx. File Object is @ 0x%lx.\n", obj, file);
 
     uint16_t length = 0;
     addr_t buffer = 0;
@@ -231,7 +243,7 @@ void grab_file_by_handle(drakvuf_t *drakvuf, vmi_event_t *event, reg_t cr3,
         unicode_string_t str = { .contents = NULL };
         str.length = length;
         str.encoding = "UTF-16";
-        str.contents = malloc(length + 1);
+        str.contents = malloc(length);
 
         ctx.addr = buffer;
         vmi_read(vmi, &ctx, str.contents, length);
@@ -239,7 +251,7 @@ void grab_file_by_handle(drakvuf_t *drakvuf, vmi_event_t *event, reg_t cr3,
         unicode_string_t str2 = { .contents = NULL };
         status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
         if (rc == VMI_SUCCESS) {
-            PRINT_DEBUG("\tExtracting file: %s\n", str2.contents);
+            //printf("\tExtracting file: %s\n", str2.contents);
 
             volatility_extract_file(drakvuf, file_pa);
 
@@ -250,165 +262,98 @@ void grab_file_by_handle(drakvuf_t *drakvuf, vmi_event_t *event, reg_t cr3,
     }
 }
 
-void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
-        struct symbolwrap *s) {
+static event_response_t setinformation(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
-    drakvuf_t *drakvuf = event->data;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
     access_context_t ctx = {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = cr3
+        .dtb = info->regs->cr3
     };
 
-    if (!strcmp(s->symbol->name, "NtSetInformationFile")
-            || !strcmp(s->symbol->name, "ZwSetInformationFile")) {
+    uint32_t fileinfoclass = 0;
+    reg_t handle = 0, fileinfo = 0, length = 0;
 
-        uint32_t fileinfoclass = 0;
-        reg_t handle = 0, info = 0, length = 0, rsp = 0;
-        vmi_get_vcpureg(vmi, &rsp, RSP, event->vcpu_id); // stack pointer
+    if (pm == VMI_PM_IA32E) {
+        handle = info->regs->rcx;
+        fileinfo = info->regs->r8;
+        length = info->regs->r9;
 
-        if (PM2BIT(drakvuf->pm) == BIT32) {
-            ctx.addr = rsp + sizeof(uint32_t);
-            vmi_read_32(vmi, &ctx, (uint32_t*) &handle);
-            ctx.addr += 2 * sizeof(uint32_t);
-            vmi_read_32(vmi, &ctx, (uint32_t*) &info);
-            ctx.addr += sizeof(uint32_t);
-            vmi_read_32(vmi, &ctx, (uint32_t*) &length);
-            ctx.addr += sizeof(uint32_t);
-            vmi_read_32(vmi, &ctx, &fileinfoclass);
+        ctx.addr = info->regs->rsp + 5 * sizeof(addr_t); // addr of fileinfoclass
+        vmi_read_32(vmi, &ctx, &fileinfoclass);
+    } else {
+        ctx.addr = info->regs->rsp + sizeof(uint32_t);
+        vmi_read_32(vmi, &ctx, (uint32_t*) &handle);
+        ctx.addr += 2 * sizeof(uint32_t);
+        vmi_read_32(vmi, &ctx, (uint32_t*) &info);
+        ctx.addr += sizeof(uint32_t);
+        vmi_read_32(vmi, &ctx, (uint32_t*) &length);
+        ctx.addr += sizeof(uint32_t);
+        vmi_read_32(vmi, &ctx, &fileinfoclass);
+    }
+
+    if (fileinfoclass == FILE_DISPOSITION_INFORMATION && length == 1) {
+        uint8_t del = 0;
+        ctx.addr = fileinfo;
+        vmi_read_8(vmi, &ctx, &del);
+        if (del) {
+            //printf("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", handle);
+            grab_file_by_handle(drakvuf, info->vcpu, vmi, pm, info, handle);
+        }
+    }
+
+    drakvuf_release_vmi(drakvuf);
+    return 0;
+}
+
+int plugin_filedelete_init(drakvuf_t drakvuf,
+                           const struct filedelete_config *c)
+{
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    pm = vmi_get_page_mode(vmi);
+    domid = vmi_get_vmid(vmi);
+    drakvuf_release_vmi(drakvuf);
+
+    dump_folder = c->dump_folder ? c->dump_folder : "/tmp";
+    format = drakvuf_get_output_format(drakvuf);
+
+    traps[0].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "NtSetInformationFile");
+    traps[0].name = "NtSetInformationFile";
+    traps[0].cb = setinformation;
+    traps[1].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "ZwSetInformationFile");
+    traps[1].name = "ZwSetInformationFile";
+    traps[1].cb = setinformation;
+    /*traps[2].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "NtDeleteFile");
+    traps[2].name = "NtDeleteFile";
+    traps[3].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "ZwDeleteFile");
+    traps[3].name = "ZwDeleteFile";*/
+
+    int i;
+    for(i=0;i<__OFFSET_MAX;i++) {
+        if(i==KPCR_PRCB) {
+            if(pm == VMI_PM_IA32E)
+                windows_system_map_lookup(
+                    c->rekall_profile, "_KPCR", "Prcb", &offsets[KPCR_PRCB], NULL);
+            else
+                windows_system_map_lookup(
+                    c->rekall_profile, "_KPCR", "PrcbData", &offsets[KPCR_PRCB], NULL);
         } else {
-            vmi_get_vcpureg(vmi, &handle, RCX, event->vcpu_id); // HANDLE FileHandle
-            vmi_get_vcpureg(vmi, &info, R8, event->vcpu_id); // PVOID FileInformation
-            vmi_get_vcpureg(vmi, &length, R9, event->vcpu_id); // ULONG Length
-
-            ctx.addr = rsp + 5 * sizeof(addr_t); // addr of fileinfoclass
-            vmi_read_32(vmi, &ctx, &fileinfoclass);
-        }
-
-        if (fileinfoclass == FILE_DISPOSITION_INFORMATION && length == 1) {
-            uint8_t del = 0;
-            ctx.addr = info;
-            vmi_read_8(vmi, &ctx, &del);
-            if (del) {
-                PRINT_DEBUG("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", handle);
-                grab_file_by_handle(drakvuf, event, cr3, handle);
-            }
+            windows_system_map_lookup(
+                c->rekall_profile, offset_names[i][0], offset_names[i][1], &offsets[i], NULL);
         }
     }
+
+    return 1;
 }
 
-// post-write
-event_response_t file_name_post_cb(vmi_instance_t vmi, vmi_event_t *event) {
-
-    struct memevent *container = event->data;
-    struct file_watch *watch = &container->file;
-
-    addr_t pa = (event->mem_event.gfn << 12) + event->mem_event.offset;
-    addr_t file_name = 0;
-    uint16_t length = 0;
-
-    status_t rc = VMI_FAILURE;
-
-    vmi_read_addr_pa(vmi, watch->file_name + offsets[UNICODE_STRING_BUFFER], &file_name);
-    vmi_read_16_pa(vmi, watch->file_name + offsets[UNICODE_STRING_LENGTH], &length);
-
-    PRINT_DEBUG("File name @ 0x%lx. Length: %u\n", file_name, length);
-
-    if (file_name && length) {
-        unicode_string_t str = { .contents = NULL };
-        str.length = length;
-        str.encoding = "UTF-16";
-        str.contents = malloc(length);
-        vmi_read_va(vmi, file_name, 0, str.contents, length);
-        unicode_string_t str2 = { .contents = NULL };
-        rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
-
-        if (VMI_SUCCESS == rc) {
-
-            reg_t cr3;
-            vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
-
-            PRINT(watch->drakvuf,FILE_ACCESSED_STRING,
-                  cr3, str2.contents, watch->obj, watch->file_base);
-
-            if (VMI_SUCCESS == rc) {
-                g_hash_table_remove(watch->drakvuf->file_watch, &pa);
-                free(event);
-                free(container);
-            }
-
-            g_free(str2.contents);
-        }
-        free(str.contents);
-    }
-
-    if (VMI_FAILURE == rc)
-        vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
-
-    return 0;
+int plugin_filedelete_start(drakvuf_t drakvuf) {
+    drakvuf_add_trap(drakvuf, &traps[0]);
+    //drakvuf_add_trap(drakvuf, &traps[1]);
+    //drakvuf_add_trap(drakvuf, &traps[2]);
+    //drakvuf_add_trap(drakvuf, &traps[3]);
+    return 1;
 }
 
-// pre-write
-event_response_t file_name_pre_cb(vmi_instance_t vmi, vmi_event_t *event) {
-    vmi_clear_event(vmi, event);
-    addr_t pa = (event->mem_event.gfn << 12) + event->mem_event.offset;
-
-    if (pa == event->mem_event.physical_address) {
-        vmi_step_event(vmi, event, event->vcpu_id, 1, file_name_post_cb);
-    } else {
-        vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
-    }
-    return 0;
-}
-
-// Create mem event to catch when the memory space of the struct gets written to
-// so we can extract the path of the file
-void setup_file_watch(drakvuf_t *drakvuf, vmi_instance_t vmi, addr_t obj,
-        addr_t ph_base, uint32_t block_size) {
-
-    addr_t aligned_file_size = struct_sizes[FILE_OBJECT];
-    if(PM2BIT(drakvuf->pm) == BIT32) {
-        // 8-byte alignment on 32-bit mode
-        if(struct_sizes[FILE_OBJECT] % 8) {
-            aligned_file_size += 8 - (struct_sizes[FILE_OBJECT] % 8);
-        }
-    } else {
-        // 16-byte alignment on 64-bit mode
-        if(struct_sizes[FILE_OBJECT] % 16) {
-            aligned_file_size += 16 - (struct_sizes[FILE_OBJECT] % 16);
-        }
-    }
-
-    // Write events happen in two chunks
-    addr_t file_base = ph_base + block_size - aligned_file_size; // addr of "_FILE_OBJECT"
-    addr_t file_name = file_base + offsets[FILE_OBJECT_FILENAME]; // addr of "_UNICODE_STRING"
-    addr_t last_write = file_name + offsets[UNICODE_STRING_BUFFER]; // actual file name buffer
-
-    //printf("PH 0x%lx. Block size: %u\n", ph_base, block_size);
-    //printf("File size: 0x%lx File base: 0x%lx. Unicode string @ 0x%lx. Last write @ 0x%lx\n",
-    //        aligned_file_size, file_base, file_name, last_write);
-
-    if (g_hash_table_lookup(drakvuf->file_watch, &last_write))
-        return;
-
-    struct memevent *container = g_malloc0(sizeof(struct memevent));
-    container->drakvuf = drakvuf;
-    container->vmi = vmi;
-    container->pa = last_write;
-    container->file.file_name = file_name;
-    container->file.file_base = file_base;
-    container->file.obj = obj;
-    container->file.drakvuf = drakvuf;
-
-    container->guard = g_malloc0(sizeof(vmi_event_t));
-    SETUP_MEM_EVENT(container->guard, last_write, VMI_MEMEVENT_PAGE,
-            VMI_MEMACCESS_W, file_name_pre_cb);
-    container->guard->data = container;
-    if (VMI_FAILURE == vmi_register_event(vmi, container->guard)) {
-        PRINT_DEBUG("Page is already trapped, can't setup file watch (TODO)\n");
-        free(container->guard);
-        free(container);
-        return;
-    }
-    g_hash_table_insert(drakvuf->file_watch, g_memdup(&container->pa, 8),
-            container);
+int plugin_filedelete_close(drakvuf_t drakvuf) {
+    return 1;
 }

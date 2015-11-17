@@ -102,57 +102,117 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <libvmi/libvmi.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <stdio.h>
+#include <glib.h>
 
-#include "libdrakvuf/drakvuf.h"
+#include "vmi.h"
 
-static drakvuf_t drakvuf;
+/* this should work for both 32 and 64bit */
+#define EX_FAST_REF_MASK    7
+#define HANDLE_MULTIPLIER   4
 
-static void close_handler(int sig) {
-    drakvuf_interrupt(drakvuf, sig);
+// TODO: This is a very slow PoC.. could be optimized
+addr_t handle_table_get_entry(uint32_t bit, vmi_instance_t vmi,
+        addr_t table_base, uint32_t level, uint32_t depth,
+        uint32_t *handle_count, uint64_t handle) {
+
+    uint32_t count;
+    uint32_t table_entry_size = 0;
+
+    if (level > 0) {
+        if (bit == BIT32)
+            table_entry_size = 0x4;
+        else
+            table_entry_size = 0x8;
+    } else if (level == 0) {
+        if (bit == BIT32)
+            table_entry_size = 0x8;
+        else
+            table_entry_size = 0x10;
+    };
+
+    count = VMI_PS_4KB / table_entry_size;
+
+    PRINT_DEBUG("\tHandle table array size: %u at 0x%lx. "
+                "Table entry size is %u. Handle count remaining: %u\n",
+                count, table_base, table_entry_size, *handle_count);
+
+    uint32_t i;
+    for (i = 0; i < count; i++) {
+
+        // Only read the already known number of entries
+        if (*handle_count == 0)
+            break;
+
+        addr_t table_entry_addr = 0;
+        vmi_read_addr_va(vmi, table_base + i * table_entry_size, 0,
+                &table_entry_addr);
+
+        // skip entries that point nowhere
+        if (table_entry_addr == 0) {
+            continue;
+        }
+
+        // real entries are further down the chain
+        if (level > 0) {
+            addr_t next_level = 0;
+            vmi_read_addr_va(vmi, table_base + i * table_entry_size, 0,
+                    &next_level);
+
+            addr_t test = 0;
+            test = handle_table_get_entry(bit, vmi, next_level, level - 1,
+                    depth, handle_count, handle);
+            if (test)
+                return test;
+
+            depth++;
+            continue;
+        }
+
+        // At this point each (table_base + i*entry) is a _HANDLE_TABLE_ENTRY
+
+        uint32_t level_base = depth * count * HANDLE_MULTIPLIER;
+        uint32_t handle_value = (i * table_entry_size * HANDLE_MULTIPLIER)
+                / table_entry_size + level_base;
+
+        PRINT_DEBUG("\t\tHandle #: %u. Addr: 0x%lx. Value: 0x%x\n",
+                    *handle_count, table_entry_addr & ~EX_FAST_REF_MASK, handle_value);
+
+        if (handle_value == handle) {
+            return table_entry_addr & ~EX_FAST_REF_MASK;
+        }
+
+        // decrement the handle counter because we found one here
+        --(*handle_count);
+    }
+    return 0;
 }
 
-int main(int argc, char** argv)
-{
-    if (argc < 5) {
-        printf("Usage: ./%s <rekall profile> <domain> <pid> <app>\n", argv[0]);
-        return 1;
-    }
+addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t handle) {
 
-    int rc = 0;
-    const char *rekall_profile = argv[1];
-    const char *domain = argv[2];
-    vmi_pid_t pid = atoi(argv[3]);
-    char *app = argv[4];
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t handletable = 0, tablecode = 0;
+    vmi_read_addr_va(vmi, process + offsets[EPROCESS_OBJECTTABLE],
+                     0, &handletable);
+    vmi_read_addr_va(vmi, handletable, 0, &tablecode);
 
-    /* for a clean exit */
-    struct sigaction act;
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
+    uint32_t handlecount = 0;
+    vmi_read_32_va(vmi, handletable + offsets[HANDLE_TABLE_HANDLECOUNT],
+            0, &handlecount);
 
-    drakvuf_init(&drakvuf, domain, rekall_profile);
-    drakvuf_pause(drakvuf);
+    // _EX_FAST_REF-style pointer, last three bits are used for storing the number of levels
+    addr_t table_base = tablecode & ~EX_FAST_REF_MASK;
+    uint32_t table_levels = tablecode & EX_FAST_REF_MASK;
+    uint32_t table_depth = 0;
 
-    if (pid > 0 && app) {
-        printf("Injector starting %s through PID %u\n", app, pid);
-        rc = drakvuf_inject_cmd(drakvuf, pid, app);
+    PRINT_DEBUG("Handle table @ 0x%lx. Handle count %u. Looking for handle: 0x%lx\n",
+                table_base, handlecount, handle);
 
-        if (!rc) {
-            printf("Process startup failed\n");
-        } else {
-            printf("Process startup success\n");
-        }
-    }
-
-    drakvuf_resume(drakvuf);
-    drakvuf_close(drakvuf);
-
-    return rc;
+    return handle_table_get_entry(PM2BIT(drakvuf->pm), vmi, table_base,
+            table_levels, table_depth, &handlecount, handle);
 }

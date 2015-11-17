@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,151 +102,250 @@
  *                                                                         *
  ***************************************************************************/
 
+/*
+ * 1) ExAllocatePoolWithTag: is it a FILE?
+ *   - YES: breakpoint RSP
+ * 2) RSP: RAX -> _FILE_OBJECT
+ *    - MEMTRAP W location
+ * 3) MEMTRAP: is it at FileName string buffer?
+ *    - YES: read string and remove trap
+ */
+
+#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <inttypes.h>
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <dirent.h>
+#include <glib.h>
+#include <err.h>
 
-#include "drakvuf.h"
-#include "injector.h"
-#include "vmi.h"
-#include "pooltag.h"
-#include "xen_helper.h"
-#include "win-symbols.h"
+#include <libvmi/libvmi.h>
+#include "../plugins.h"
+#include "private.h"
 
-static void close_handler(int sig) {
-    drakvuf.interrupted = sig;
-}
+#define POOLTAG_FILE "Fil\xe5"
+#define ALIGN_SIZE(alignment, size) \
+    ( (size % alignment) ? (alignment - (size % alignment)) : 0 )
 
-static inline void free_sym_config(struct sym_config *sym_config) {
-    uint32_t i;
-    if (!sym_config) return;
+static drakvuf_trap_t poolalloc;
+static GSList *rettraps, *writetraps;
+static addr_t file_object_size, file_name_offset, string_buffer_offset, string_length_offset;
+static output_format_t format;
 
-    for (i=0; i < sym_config->sym_count; i++) {
-        free(sym_config->syms[i].name);
-    }
-    free(sym_config->syms);
-    free(sym_config);
-}
+struct file_watch {
+    addr_t file_name_buffer;
+    addr_t file_name_length;
+};
 
-static inline void drakvuf_init(drakvuf_t *drakvuf) {
-    memset(drakvuf, 0, sizeof(drakvuf_t));
-    drakvuf->pooltags = pooltag_build_tree();
-    xen_init_interface(&drakvuf->xen);
-}
+static event_response_t file_name_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    struct file_watch *watch = info->trap->data;
 
-static inline void close_drakvuf(drakvuf_t *drakvuf) {
-    free_sym_config(drakvuf->sym_config);
-    g_tree_destroy(drakvuf->pooltags);
-    xen_free_interface(drakvuf->xen);
-    free(drakvuf->dom_name);
-}
-
-int main(int argc, char** argv) {
-
-    int c;
-    char *executable = NULL;
-    char *domain = NULL;
-    vmi_pid_t injection_pid = -1;
-    struct sigaction act;
-
-    fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
-
-    if (argc < 4) {
-        fprintf(stderr, "Required input:\n"
-               "\t -r <rekall profile>       The Rekall profile of the domain\n"
-               "\t -d <domain ID or name>    The domain's ID or name\n"
-               "Optional inputs:\n"
-               "\t -i <injection pid>        The PID of the process to hijack for injection\n"
-               "\t -e <inject_exe>           The executable to start with injection\n"
-               "\t -t <timeout>              Timeout (in seconds)\n"
-               "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
-               "\t -o <format>               Output format (default or csv)\n"
-               "\t -v                        Turn on verbose (debug) output\n"
-        );
-        return 1;
-    }
-
-    drakvuf_init(&drakvuf);
-
-    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:v")) != -1)
-    switch (c)
+    if (info->trap_pa == watch->file_name_buffer)
     {
-    case 'r':
-        drakvuf.rekall_profile = optarg;
-        break;
-    case 'd':
-        domain = optarg;
-        break;
-    case 'i':
-        injection_pid = atoi(optarg);
-        break;
-    case 'e':
-        executable = optarg;
-        break;
-    case 't':
-        drakvuf.timeout = atoi(optarg);
-        break;
-    case 'D':
-        drakvuf.dump_folder = optarg;
-        break;
-    case 'o':
-        if(!strncmp(optarg,"csv",3))
-            drakvuf.output_format = OUTPUT_CSV;
-        else
-            drakvuf.output_format = OUTPUT_DEFAULT;
-        break;
-    case 'v':
-        verbose = 1;
-        break;
-    default:
-        fprintf(stderr, "Unrecognized option: %c\n", c);
-        goto exit;
-    }
+        addr_t file_name = 0;
+        uint16_t length = 0;
+        vmi_read_addr_pa(vmi, watch->file_name_buffer, &file_name);
+        vmi_read_16_pa(vmi, watch->file_name_length, &length);
 
-    drakvuf.sym_config = get_all_symbols(drakvuf.rekall_profile);
-    if (!drakvuf.sym_config)
-    {
-        fprintf(stderr, "Failed to parse Rekall profile at %s\n", drakvuf.rekall_profile);
-        goto exit;
-    }
+        //printf("File name @ 0x%lx. Length: %u\n", file_name, length);
 
-    get_dom_info(drakvuf.xen, domain, &drakvuf.domID, &drakvuf.dom_name);
+        if (file_name && length > 0 && length < VMI_PS_4KB) {
+            unicode_string_t str = { .contents = NULL };
+            str.length = length;
+            str.encoding = "UTF-16";
+            str.contents = malloc(length);
+            vmi_read_va(vmi, file_name, 0, str.contents, length);
+            unicode_string_t str2 = { .contents = NULL };
+            status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
 
-    init_vmi(&drakvuf);
+            if (VMI_SUCCESS == rc) {
 
-    if (!drakvuf.vmi) {
-        goto exit;
-    }
+                switch(format) {
+                case OUTPUT_CSV:
+                    printf("filetracer,%s\n", str2.contents);
+                    break;
+                default:
+                case OUTPUT_DEFAULT:
+                    printf("[FILETRACER] %s\n", str2.contents);
+                    break;
+                };
 
-    if (injection_pid > 0 && executable) {
-        int rc = start_app(&drakvuf, injection_pid, executable);
+                g_free(str2.contents);
+            }
 
-        if (!rc) {
-            fprintf(stderr, "Process startup failed\n");
-            goto exit;
+            free(str.contents);
+            free(info->trap->data);
+            drakvuf_remove_trap(drakvuf, info->trap);
+            writetraps = g_slist_remove(writetraps, info->trap);
+            free(info->trap);
         }
     }
 
-    inject_traps(&drakvuf);
-
-    /* for a clean exit */
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
-
-    drakvuf_loop(&drakvuf);
-
-    close_vmi(&drakvuf);
-
-exit:
-    close_drakvuf(&drakvuf);
-
+    drakvuf_release_vmi(drakvuf);
     return 0;
+}
+
+static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    page_mode_t pm = vmi_get_page_mode(vmi);
+    uint32_t obj_size = GPOINTER_TO_UINT(info->trap->data);
+    addr_t obj_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, info->regs->rax);
+
+    addr_t ph_base = 0;
+    uint32_t block_size = 0;
+    uint32_t aligned_file_size = file_object_size;
+    if ( pm == VMI_PM_IA32E ) {
+        struct pool_header_x64 ph = { 0 };
+        ph_base = obj_pa - sizeof(struct pool_header_x64);
+        vmi_read_pa(vmi, ph_base, &ph, sizeof(struct pool_header_x64));
+        block_size = ph.block_size * 0x10; // align it
+    } else {
+        struct pool_header_x86 ph = { 0 };
+        ph_base = obj_pa - sizeof(struct pool_header_x86);
+        vmi_read_pa(vmi, ph_base, &ph, sizeof(struct pool_header_x86));
+        block_size = ph.block_size * 0x8; // align it
+    }
+
+    // We will need to catch when the file string buffer pointer is updated
+    addr_t file_base = ph_base + block_size - file_object_size; // addr of "_FILE_OBJECT"
+    addr_t file_name = file_base + file_name_offset; // addr of "_UNICODE_STRING"
+
+    struct file_watch *watch = g_malloc0(sizeof(struct file_watch));
+    watch->file_name_buffer = file_name + string_buffer_offset;
+    watch->file_name_length = file_name + string_length_offset;
+
+    /*printf("PH 0x%lx. Block size: %u\n", ph_base, block_size);
+    printf("File size: 0x%lx File base: 0x%lx. Unicode string @ 0x%lx. Last write @ 0x%lx\n",
+           file_object_size, file_base, file_name-file_base, watch->file_name_buffer-file_base);*/
+
+    drakvuf_trap_t *writetrap = g_malloc0(sizeof(drakvuf_trap_t));
+    writetrap->lookup_type = LOOKUP_NONE;
+    writetrap->addr_type = ADDR_PA;
+    writetrap->type = MEMACCESS_W;
+    writetrap->memaccess_type = POST;
+    writetrap->cb = file_name_cb;
+    writetrap->u2.addr = watch->file_name_buffer;
+    writetrap->data = watch;
+
+    writetraps = g_slist_prepend(writetraps, writetrap);
+
+    drakvuf_add_trap(drakvuf, writetrap);
+
+    drakvuf_remove_trap(drakvuf, info->trap);
+    rettraps = g_slist_remove(rettraps, info->trap);
+    free(info->trap);
+    drakvuf_release_vmi(drakvuf);
+    return 1;
+}
+
+static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    page_mode_t pm = vmi_get_page_mode(vmi);
+    reg_t tag = 0, size = 0;
+
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    if (pm == VMI_PM_IA32E) {
+        size = info->regs->rdx;
+        tag = info->regs->r8;
+    } else {
+        ctx.addr = info->regs->rsp+8;
+        vmi_read_32(vmi, &ctx, (uint32_t*)&size);
+        ctx.addr = info->regs->rsp+12;
+        vmi_read_32(vmi, &ctx, (uint32_t*)&tag);
+    }
+
+    if(!memcmp(&tag, &POOLTAG_FILE, 4)) {
+
+        addr_t ret, ret_pa;
+        ctx.addr = info->regs->rsp;
+        vmi_read_addr(vmi, &ctx, &ret);
+        ret_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, ret);
+
+        drakvuf_trap_t *rettrap = g_malloc0(sizeof(drakvuf_trap_t));
+        rettrap->lookup_type = LOOKUP_NONE;
+        rettrap->addr_type = ADDR_PA;
+        rettrap->type = BREAKPOINT;
+        rettrap->name = "HeapRetTrap";
+        rettrap->cb = pool_alloc_return;
+        rettrap->u2.addr = ret_pa;
+        rettrap->data = GUINT_TO_POINTER(size);
+
+        rettraps = g_slist_prepend(rettraps, rettrap);
+
+        drakvuf_add_trap(drakvuf, rettrap);
+    }
+
+    drakvuf_release_vmi(drakvuf);
+    return 0;
+}
+
+/* ----------------------------------------------------- */
+
+int plugin_filetracer_init(drakvuf_t drakvuf, const char *rekall_profile) {
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    page_mode_t pm = vmi_get_page_mode(vmi);
+    drakvuf_release_vmi(drakvuf);
+    rettraps = NULL;
+
+    poolalloc.lookup_type = LOOKUP_PID;
+    poolalloc.u.pid = 4;
+    poolalloc.addr_type = ADDR_RVA;
+    poolalloc.u2.rva = drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag");
+    poolalloc.name = "ExAllocatePoolWithTag";
+    poolalloc.module = "ntoskrnl.exe";
+    poolalloc.type = BREAKPOINT;
+    poolalloc.cb = cb;
+
+    if (!poolalloc.u2.rva) {
+        return 0;
+    }
+
+    windows_system_map_lookup(rekall_profile, "_FILE_OBJECT", "FileName", &file_name_offset, &file_object_size);
+    windows_system_map_lookup(rekall_profile, "_UNICODE_STRING", "Buffer", &string_buffer_offset, NULL);
+    windows_system_map_lookup(rekall_profile, "_UNICODE_STRING", "Length", &string_length_offset, NULL);
+    if (pm == VMI_PM_IA32E)
+        file_object_size += ALIGN_SIZE(16, file_object_size);
+    else
+        file_object_size += ALIGN_SIZE(8, file_object_size);
+
+    format = drakvuf_get_output_format(drakvuf);
+
+    return 1;
+}
+
+int plugin_filetracer_start(drakvuf_t drakvuf) {
+    drakvuf_add_trap(drakvuf, &poolalloc);
+    return 1;
+}
+
+int plugin_filetracer_close(drakvuf_t drakvuf) {
+
+    GSList *loop = rettraps;
+    while(loop) {
+        free(loop->data);
+        loop=loop->next;
+    }
+    g_slist_free(rettraps);
+
+    loop = writetraps;
+    while(loop) {
+        free(loop->data);
+        loop=loop->next;
+    }
+    g_slist_free(rettraps);
+
+    return 1;
 }

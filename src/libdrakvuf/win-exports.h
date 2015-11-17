@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,20 +102,13 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_SYMBOLS_H_
-#define WIN_SYMBOLS_H_
+#ifndef WIN_EXPORTS_H
+#define WIN_EXPORTS_H
 
 #include <libvmi/libvmi.h>
 
-status_t
-windows_system_map_symbol_to_address(
-    const char *rekall_profile,
-    const char *symbol,
-    const char *subsymbol,
-    addr_t *address,
-    addr_t *size);
+addr_t sym2va(vmi_instance_t vmi, vmi_pid_t cr3, const char *mod_name, const char *sym);
+const char *rva2sym(vmi_instance_t vmi, const char *mod_name, addr_t base_vaddr, vmi_pid_t pid, addr_t rva);
+status_t va2sym(vmi_instance_t vmi, addr_t va, vmi_pid_t pid, char **mod, char **sym);
 
-struct sym_config* get_all_symbols(const char *rekall_profile);
-addr_t get_function_rva(const char *rekall_profile, const char *function);
-
-#endif /* WIN_SYMBOLS_H_ */
+#endif

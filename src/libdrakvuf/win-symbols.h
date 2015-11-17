@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,92 +102,17 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef OUTPUT_H
-#define OUTPUT_H
+#ifndef WIN_SYMBOLS_H_
+#define WIN_SYMBOLS_H_
 
-#include "drakvuf.h"
-#include "structures.h"
+#include <libvmi/libvmi.h>
 
-enum output_strings {
-    INT3_CB_STRING,
-    FOUND_PROCESS_STRING,
-    HEAPALLOC_KNOWN_STRING,
-    HEAPALLOC_UNKNOWN_STRING,
-    HEAPALLOC_VERIFIED_STRING,
-    HEAPALLOC_BIGPOOL_STRING,
-    HEAPALLOC_MANGLED_STRING,
-    HEAPFREE_STRING,
-    OBJCREATE_KNOWN_STRING,
-    OBJCREATE_UNKNOWN_STRING,
-    INJECTION_START_STRING,
-    INJECTION_STACK_INFO_STRING,
-    INJECTION_STACK_PUSHED_STRING,
-    INJECTION_TRAPFRAME_STRING,
-    INJECTION_SUCCESS_STRING,
-    FILE_ACCESSED_STRING,
-    __STRINGS_MAX
-};
+status_t
+windows_system_map_symbol_to_address(
+    const char *rekall_profile,
+    const char *symbol,
+    const char *subsymbol,
+    addr_t *address,
+    addr_t *size);
 
-static const char *strings_list[__OUTPUT_MAX][__STRINGS_MAX] = {
-    [OUTPUT_DEFAULT] = {
-        [0 ... __STRINGS_MAX-1] = NULL,
-        [INT3_CB_STRING] = "int3cb CR3=0x%lx RIP=0x%lx %s!%s\n",
-        [FOUND_PROCESS_STRING] = "Found process: [PID: %5d, CR3: 0x%x] %s\n",
-        [HEAPALLOC_KNOWN_STRING] = "Heap allocation with known pool tag:"
-                                   " '%s', %s, %s.\n",
-        [HEAPALLOC_UNKNOWN_STRING] = "Heap allocation with unknown pool tag: "
-                                     "'%s' \\x%x\\x%x\\x%x\\x%x\n",
-        [HEAPALLOC_VERIFIED_STRING] = "\t'%c%c%c%c' heap allocation verified @"
-                                      " PA 0x%lx. Size: %u\n",
-        [HEAPALLOC_BIGPOOL_STRING] = "Allocation in big pool: %u, '%c%c%c%c'\n",
-        [HEAPALLOC_MANGLED_STRING] = "Pool tag mangling detected: got '%c%c%c%c'"
-                                     ", expected '%c%c%c%c'\n",
-        [HEAPFREE_STRING] = "Freeing object on heap: 0x%lx, %s\n",
-        [OBJCREATE_KNOWN_STRING] = "Object create: 0x%lx -> %s\n",
-        [OBJCREATE_UNKNOWN_STRING] = "Object create: %u\n",
-        [INJECTION_START_STRING] = "Hijacking thread of PID %u on vCPU %u to "
-                                   "execute CreateProcessA at 0x%lx!\n",
-        [INJECTION_STACK_INFO_STRING] = "FS/GS: 0x%lx RSP: 0x%lx RIP: 0x%lx "
-                                        "RCX: 0x%lx RBP: 0x%lx\n"
-                                        "Stack base: 0x%lx Limit: 0x%lx\n",
-        [INJECTION_STACK_PUSHED_STRING] = "\tArgument '%s' pushed on stack at 0x%lx.\n"
-                                          "\tProcess information pushed on stack at 0x%lx\n"
-                                          "\tStartup information pushed on stack at 0x%lx\n",
-        [INJECTION_TRAPFRAME_STRING] = "Trapping userspace return of Thread:"
-                                       " %lu @ VA 0x%lx -> PA 0x%lx\n",
-        [INJECTION_SUCCESS_STRING] = "-- CreateProcessA SUCCESS --\n"
-                                     "\tProcess handle: 0x%x. Thread handle: 0x%x\n"
-                                     "\tPID: %u. TID: %u\n"
-                                     "\tInjected process DTB: 0x%lx\n",
-        [FILE_ACCESSED_STRING] = "CR3 0x%lx File accessed: %s.\n "
-                                 "File object @ 0x%lx. File base @ 0x%lx.\n",
-    },
-    [OUTPUT_CSV] = {
-        [0 ... __STRINGS_MAX-1] = NULL,
-        [INT3_CB_STRING] = "int3cb,0x%lx,0x%lx,%s,%s\n",
-        [FOUND_PROCESS_STRING] = "process,%d,0x%x,%s\n",
-        [HEAPALLOC_KNOWN_STRING] = "heapalloc,known,%s,%s\n",
-        [HEAPALLOC_UNKNOWN_STRING] = "heapalloc,unknown,%s,\\x%x,\\x%x,\\x%x,\\x%x\n",
-        [HEAPALLOC_VERIFIED_STRING] = "heapalloc,verified,%c,%c,%c,%c,0x%lx,%u\n",
-        [HEAPALLOC_BIGPOOL_STRING] = "heapalloc,bigpool,%u,%c,%c,%c,%c\n",
-        [HEAPALLOC_MANGLED_STRING] = "heapalloc,mangled,%c%c%c%c,%c%c%c%c\n",
-        [HEAPFREE_STRING] = "heapfree,0x%lx,%s\n",
-        [OBJCREATE_KNOWN_STRING] = "objcreate,known,%u,%s\n",
-        [OBJCREATE_UNKNOWN_STRING] = "objcreate,unknown,%u\n",
-        [INJECTION_SUCCESS_STRING] = "injection,0x%lx,0x%lx,%u,%u,0x%lx\n",
-        [FILE_ACCESSED_STRING] = "fileaccess,0x%lx,%s,0x%lx,0x%lx\n",
-    },
-};
-
-#define PRINT(drakvuf, string, args...) \
-    do { \
-        if ( strings_list[drakvuf->output_format][string] ) \
-            printf(strings_list[drakvuf->output_format][string], ##args); \
-    } while (0)
-
-#define PRINT_DEBUG(args...) \
-    do { \
-        if (verbose) fprintf (stderr, args); \
-    } while (0)
-
-#endif
+#endif /* WIN_SYMBOLS_H_ */

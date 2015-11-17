@@ -102,57 +102,30 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <libvmi/libvmi.h>
+#ifndef XEN_HELPER_H
+#define XEN_HELPER_H
 
-#include "libdrakvuf/drakvuf.h"
+#define LIBXL_API_VERSION 0x040500
 
-static drakvuf_t drakvuf;
+#include <libxl_utils.h>
+#include <xenctrl.h>
 
-static void close_handler(int sig) {
-    drakvuf_interrupt(drakvuf, sig);
-}
+typedef struct xen_interface {
+    //struct xs_handle *xsh;
+    xc_interface *xc;
+    libxl_ctx *xl_ctx;
+    xentoollog_logger *xl_logger;
+} xen_interface_t;
 
-int main(int argc, char** argv)
-{
-    if (argc < 5) {
-        printf("Usage: ./%s <rekall profile> <domain> <pid> <app>\n", argv[0]);
-        return 1;
-    }
+/* FUNCTIONS */
 
-    int rc = 0;
-    const char *rekall_profile = argv[1];
-    const char *domain = argv[2];
-    vmi_pid_t pid = atoi(argv[3]);
-    char *app = argv[4];
+bool xen_init_interface(xen_interface_t** xen);
+void xen_free_interface(xen_interface_t* xen);
 
-    /* for a clean exit */
-    struct sigaction act;
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
+int get_dom_info(xen_interface_t *xen, const char *input, domid_t *domID,
+		char **name);
 
-    drakvuf_init(&drakvuf, domain, rekall_profile);
-    drakvuf_pause(drakvuf);
+uint64_t xen_memshare(xen_interface_t *xen, domid_t domID, domid_t cloneID);
 
-    if (pid > 0 && app) {
-        printf("Injector starting %s through PID %u\n", app, pid);
-        rc = drakvuf_inject_cmd(drakvuf, pid, app);
-
-        if (!rc) {
-            printf("Process startup failed\n");
-        } else {
-            printf("Process startup success\n");
-        }
-    }
-
-    drakvuf_resume(drakvuf);
-    drakvuf_close(drakvuf);
-
-    return rc;
-}
+void print_sharing_info(xen_interface_t *xen, domid_t domID);
+#endif

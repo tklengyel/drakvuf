@@ -102,57 +102,203 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <libvmi/libvmi.h>
+#include <glib.h>
+#include "../xen_helper/xen_helper.h"
 
-#include "libdrakvuf/drakvuf.h"
+#include "drakvuf.h"
+#include "private.h"
+#include "vmi.h"
 
-static drakvuf_t drakvuf;
+void drakvuf_close(drakvuf_t drakvuf) {
+    if (!drakvuf)
+        return;
 
-static void close_handler(int sig) {
-    drakvuf_interrupt(drakvuf, sig);
+    if (drakvuf->xen)
+        xen_free_interface(drakvuf->xen);
+
+    if (drakvuf->vmi)
+        close_vmi(drakvuf);
+
+    g_mutex_clear(&drakvuf->vmi_lock);
+    free(drakvuf->dom_name);
+    free(drakvuf->rekall_profile);
+    free(drakvuf);
 }
 
-int main(int argc, char** argv)
-{
-    if (argc < 5) {
-        printf("Usage: ./%s <rekall profile> <domain> <pid> <app>\n", argv[0]);
-        return 1;
-    }
+bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_profile) {
 
-    int rc = 0;
-    const char *rekall_profile = argv[1];
-    const char *domain = argv[2];
-    vmi_pid_t pid = atoi(argv[3]);
-    char *app = argv[4];
+    if ( !domain || !rekall_profile )
+        return 0;
 
-    /* for a clean exit */
-    struct sigaction act;
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
+    *drakvuf = g_malloc0(sizeof(struct drakvuf));
+    (*drakvuf)->rekall_profile = g_strdup(rekall_profile);
 
-    drakvuf_init(&drakvuf, domain, rekall_profile);
-    drakvuf_pause(drakvuf);
+    g_mutex_init(&(*drakvuf)->vmi_lock);
 
-    if (pid > 0 && app) {
-        printf("Injector starting %s through PID %u\n", app, pid);
-        rc = drakvuf_inject_cmd(drakvuf, pid, app);
+    if ( !xen_init_interface(&(*drakvuf)->xen) )
+        goto err;
 
-        if (!rc) {
-            printf("Process startup failed\n");
-        } else {
-            printf("Process startup success\n");
+    get_dom_info((*drakvuf)->xen, domain, &(*drakvuf)->domID, &(*drakvuf)->dom_name);
+    domid_t test = ~0;
+    if ( (*drakvuf)->domID == test )
+        goto err;
+
+    init_vmi((*drakvuf));
+    if (!(*drakvuf)->vmi)
+        goto err;
+
+    (*drakvuf)->output = OUTPUT_DEFAULT;
+
+    return 1;
+
+err:
+    drakvuf_close(*drakvuf);
+    *drakvuf = NULL;
+    return 0;
+}
+
+void drakvuf_interrupt(drakvuf_t drakvuf, int sig) {
+    drakvuf->interrupted = sig;
+}
+
+void drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
+
+    vmi_pause_vm(drakvuf->vmi);
+
+    if (!trap)
+        goto done;
+
+    if (trap->type == BREAKPOINT) {
+        if(trap->lookup_type == LOOKUP_NONE) {
+            inject_trap_pa(drakvuf, trap, trap->u2.addr);
+            goto done;
         }
+
+        if(trap->lookup_type == LOOKUP_PID && trap->u.pid == 4) {
+            if (trap->module) {
+                vmi_instance_t vmi = drakvuf->vmi;
+
+                // Loop kernel modules
+                addr_t kernel_list_head;
+                vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &kernel_list_head);
+                inject_traps_modules(drakvuf, NULL, trap, kernel_list_head, 4, "System");
+            }
+
+            goto done;
+        }
+    } else {
+        inject_trap_mem(drakvuf, trap);
     }
 
-    drakvuf_resume(drakvuf);
-    drakvuf_close(drakvuf);
+done:
+    vmi_resume_vm(drakvuf->vmi);
+}
 
-    return rc;
+void drakvuf_add_traps(drakvuf_t drakvuf, GSList *traps) {
+    addr_t kernel_list_head;
+    vmi_instance_t vmi = drakvuf->vmi;
+    vmi_pause_vm(vmi);
+
+    // Loop kernel modules
+    vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &kernel_list_head);
+    inject_traps_modules(drakvuf, traps, NULL, kernel_list_head, 4, "System");
+
+    // TODO TODO TODO
+    /*addr_t current_process = 0, next_list_entry = 0;
+    vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
+
+    addr_t list_head = current_process + offsets[EPROCESS_TASKS];
+    addr_t current_list_entry = list_head;
+
+    status_t status = vmi_read_addr_va(vmi, current_list_entry, 0,
+            &next_list_entry);
+    if (status == VMI_FAILURE) {
+        PRINT_DEBUG(
+                "Failed to read next pointer at 0x%"PRIx64" before entering loop\n",
+                current_list_entry);
+        return;
+    }
+
+    do {
+
+        vmi_pid_t pid;
+        uint32_t dtb;
+        vmi_read_32_va(vmi, current_process + offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
+        vmi_read_32_va(vmi, current_process + offsets[EPROCESS_PDBASE], 0, &dtb);
+
+        char *procname = vmi_read_str_va(vmi, current_process + offsets[EPROCESS_PNAME], 0);
+
+        if (!procname) {
+            goto exit;
+        }
+
+        PRINT(drakvuf, FOUND_PROCESS_STRING, pid, dtb, procname);
+
+        free(procname);
+
+        addr_t imagebase = 0, peb = 0, ldr = 0, modlist = 0;
+        vmi_read_addr_va(vmi, current_process + offsets[EPROCESS_PEB], 0, &peb);
+        vmi_read_addr_va(vmi, peb + offsets[PEB_IMAGEBASADDRESS], pid,
+                &imagebase);
+        vmi_read_addr_va(vmi, peb + offsets[PEB_LDR], pid, &ldr);
+        vmi_read_addr_va(vmi, ldr + offsets[PEB_LDR_DATA_INLOADORDERMODULELIST],
+                pid, &modlist);
+
+        inject_traps_pe(drakvuf, traps, imagebase, pid, NULL);
+        inject_traps_modules(drakvuf, traps, modlist, pid);
+
+        current_list_entry = next_list_entry;
+        current_process = current_list_entry - offsets[EPROCESS_TASKS];
+
+        status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
+        if (status == VMI_FAILURE) {
+            PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n",
+                    current_list_entry);
+            return;
+        }
+
+    } while (next_list_entry != list_head);*/
+
+done:
+    vmi_resume_vm(drakvuf->vmi);
+    return;
+}
+
+void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
+    if ( drakvuf->in_callback)
+        drakvuf->remove_traps = g_slist_prepend(drakvuf->remove_traps, trap);
+    else
+        remove_trap(drakvuf, trap);
+}
+
+void drakvuf_remove_traps(drakvuf_t drakvuf, GSList *traps) {
+    while (traps) {
+        remove_trap(drakvuf, traps->data);
+        traps = traps->next;
+    }
+}
+
+vmi_instance_t drakvuf_lock_and_get_vmi(drakvuf_t drakvuf) {
+    g_mutex_lock(&drakvuf->vmi_lock);
+    return drakvuf->vmi;
+}
+
+void drakvuf_release_vmi(drakvuf_t drakvuf) {
+    g_mutex_unlock(&drakvuf->vmi_lock);
+}
+
+void drakvuf_pause (drakvuf_t drakvuf) {
+    vmi_pause_vm(drakvuf->vmi);
+}
+
+void drakvuf_resume (drakvuf_t drakvuf) {
+    vmi_resume_vm(drakvuf->vmi);
+}
+
+void drakvuf_set_output_format(drakvuf_t drakvuf, output_format_t output) {
+    drakvuf->output = output;
+}
+
+output_format_t drakvuf_get_output_format(drakvuf_t drakvuf) {
+    return drakvuf->output;
 }

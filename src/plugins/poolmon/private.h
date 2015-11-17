@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,12 +102,8 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef POOLTAG_H
-#define POOLTAG_H
-
-#include "structures.h"
-
-GTree* pooltag_build_tree();
+#ifndef POOLTAG_PRIVATE_H
+#define POOLTAG_PRIVATE_H
 
 enum pool_type {
   NonPagedPool,
@@ -129,33 +125,6 @@ static const char *pool_types[] = {
   [PagedPoolCacheAligned] = "PagedPoolCacheAligned",
   [NonPagedPoolCacheAlignedMustS] = "NonPagedPoolCacheAlignedMustS",
 };
-
-struct pool_header_x86 {
-    union {
-        struct {
-            uint16_t previous_size :9;
-            uint16_t pool_index :7;
-            uint16_t block_size :9; // bits 0-9
-            uint16_t pool_type :7; // bits 10-16
-        };
-        uint16_t flags;
-    };
-    uint32_t pool_tag;
-}__attribute__ ((packed));
-
-struct pool_header_x64 {
-    union {
-        struct {
-            uint32_t previous_size :8;
-            uint32_t pool_index :8;
-            uint32_t block_size :8;
-            uint32_t pool_type :8;
-        };
-        uint32_t flags;
-    };
-    uint32_t pool_tag;
-    uint64_t process_billed; // _EPROCESS *
-}__attribute__ ((packed));
 
 struct pooltag {
     char* tag;

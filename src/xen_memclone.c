@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -120,8 +120,7 @@
 
 #include <xenctrl.h>
 
-#include "xen_helper.h"
-#include "structures.h"
+#include "xen_helper/xen_helper.h"
 
 int main(int argc, char **argv) {
 
@@ -139,7 +138,7 @@ int main(int argc, char **argv) {
     }
 
     char *origin_name = NULL, *clone_name = NULL;
-    uint32_t origin_domID = 0, clone_domID = 0;
+    domid_t origin_domID = 0, clone_domID = 0;
 
     get_dom_info(xen, argv[1], &origin_domID, &origin_name);
     get_dom_info(xen, argv[2], &clone_domID, &clone_name);

@@ -1,4 +1,4 @@
- #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
+#********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
  #                                                                         #
  # DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  #
  # Tamas K Lengyel is hereinafter referred to as the author.               #
@@ -102,15 +102,31 @@
  #                                                                         #
  #*************************************************************************# 
 
-bin_PROGRAMS = drakvuf xen_memclone injector
+sources =
 
-SUBDIRS = xen_helper libdrakvuf plugins
+###############################################################################
 
-drakvuf_SOURCES = drakvuf.c
-xen_memclone_SOURCES  = xen_memclone.c
-injector_SOURCES = injector.c
+if PLUGIN_SYSCALLS
+sources += syscalls/syscalls.c
+endif
 
-AM_CFLAGS = $(CFLAGS)
+if PLUGIN_POOLMON
+sources += poolmon/poolmon.c
+endif
+
+if PLUGIN_FILETRACER
+sources += filetracer/filetracer.c
+endif
+
+if PLUGIN_FILEDELETE
+sources += filedelete/filedelete.c
+endif
+
+###############################################################################
+sources += plugins.c plugins.h
+
+AM_CFLAGS = -I$(top_srcdir)
+AM_CFLAGS += $(CFLAGS)
 AM_CFLAGS += $(VMI_CFLAGS)
 AM_CFLAGS += $(GLIB_CFLAGS)
 
@@ -127,14 +143,7 @@ AM_CFLAGS += -pg
 endif
 endif
 
-drakvuf_LDADD = libdrakvuf/libdrakvuf.la
-drakvuf_LDADD += xen_helper/libxenhelper.la
-drakvuf_LDADD += plugins/libdrakvufplugins.la
-
-if HARDENING
-drakvuf_LDADD += $(HARDEN_LDFLAGS)
-endif
-
-injector_LDADD = libdrakvuf/libdrakvuf.la
-
-xen_memclone_LDADD = xen_helper/libxenhelper.la
+noinst_LTLIBRARIES= libdrakvufplugins.la
+libdrakvufplugins_la_SOURCES= $(sources)
+libdrakvufplugins_la_LIBADD = ../xen_helper/libxenhelper.la
+libdrakvufplugins_la_LIBADD += ../libdrakvuf/libdrakvuf.la

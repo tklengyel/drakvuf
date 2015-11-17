@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,17 +102,14 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef VMI_POOLMON_H
-#define VMI_POOLMON_H
+#ifndef WIN_HANDLES_H
+#define WIN_HANDLES_H
 
 #include <libvmi/libvmi.h>
-#include "structures.h"
-#include "pooltag.h"
+#include "drakvuf.h"
 
-void objcreate(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3);
-
-void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3, const char *ts);
-void pool_tracker_free(vmi_instance_t vmi, vmi_event_t *event);
-void pool_alloc_return(vmi_instance_t vmi, vmi_event_t *event, addr_t pa, reg_t cr3, const char *ts, GHashTable *s);
+addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
+                                 uint64_t vcpu_id,
+                                 uint64_t handle);
 
 #endif

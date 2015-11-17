@@ -102,57 +102,88 @@
  *                                                                         *
  ***************************************************************************/
 
+#ifndef STRUCTURES_H
+#define STRUCTURES_H
+
+/******************************************/
+
+#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include <glib.h>
 #include <libvmi/libvmi.h>
+#include <libvmi/events.h>
 
-#include "libdrakvuf/drakvuf.h"
+#include "drakvuf.h"
+#include "../xen_helper/xen_helper.h"
 
-static drakvuf_t drakvuf;
+#ifdef DRAKVUF_DEBUG
+#define PRINT_DEBUG(args...) \
+    do { \
+        fprintf (stderr, args); \
+    } while (0)
+#else
+#define PRINT_DEBUG(args...) \
+    do {} while(0)
+#endif
 
-static void close_handler(int sig) {
-    drakvuf_interrupt(drakvuf, sig);
-}
+static vmi_mem_access_t mem_conversion[] = {
+    [MEMACCESS_R] = VMI_MEMACCESS_R,
+    [MEMACCESS_W] = VMI_MEMACCESS_W,
+    [MEMACCESS_X] = VMI_MEMACCESS_X,
+    [MEMACCESS_RW] = VMI_MEMACCESS_RW,
+    [MEMACCESS_RX] = VMI_MEMACCESS_RX,
+    [MEMACCESS_RWX] = VMI_MEMACCESS_RWX
+};
 
-int main(int argc, char** argv)
-{
-    if (argc < 5) {
-        printf("Usage: ./%s <rekall profile> <domain> <pid> <app>\n", argv[0]);
-        return 1;
-    }
+struct drakvuf {
+    char *dom_name;
+    domid_t domID;
+    char *rekall_profile;
+    output_format_t output;
 
-    int rc = 0;
-    const char *rekall_profile = argv[1];
-    const char *domain = argv[2];
-    vmi_pid_t pid = atoi(argv[3]);
-    char *app = argv[4];
+    xen_interface_t *xen;
 
-    /* for a clean exit */
-    struct sigaction act;
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
+    // VMI
+    GMutex vmi_lock;
+    vmi_instance_t vmi;
 
-    drakvuf_init(&drakvuf, domain, rekall_profile);
-    drakvuf_pause(drakvuf);
+    // Processing trap removals in trap callbacks
+    // is problematic so we save all such requests
+    // in a list to be processed after all callbacks
+    // are finished.
+    bool in_callback;
+    GSList *remove_traps;
 
-    if (pid > 0 && app) {
-        printf("Injector starting %s through PID %u\n", app, pid);
-        rc = drakvuf_inject_cmd(drakvuf, pid, app);
+    int interrupted;
+    page_mode_t pm;
 
-        if (!rc) {
-            printf("Process startup failed\n");
-        } else {
-            printf("Process startup success\n");
-        }
-    }
+    GHashTable *breakpoint_lookup_pa;   // key: PA of trap
+                                        // val: struct breakpoint
+    GHashTable *breakpoint_lookup_trap; // key: trap pointer
+                                        // val: struct breakpoint
 
-    drakvuf_resume(drakvuf);
-    drakvuf_close(drakvuf);
+    GHashTable *memaccess_lookup_gfn;  // key: gfn of trap
+                                       // val: struct memaccess
+    GHashTable *memaccess_lookup_trap; // key: trap pointer
+                                       // val: struct memaccess
+};
 
-    return rc;
-}
+struct breakpoint {
+    uint8_t backup;
+    drakvuf_t drakvuf;
+    vmi_instance_t vmi;
+    vmi_event_t *guard;
+    addr_t pa;
+    GSList *traps;
+} __attribute__ ((packed));
+
+struct memaccess {
+    addr_t gfn;
+    drakvuf_t drakvuf;
+    vmi_event_t *memtrap;
+    GSList *traps;
+} __attribute__ ((packed));
+
+#endif

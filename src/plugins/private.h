@@ -102,57 +102,64 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <libvmi/libvmi.h>
+#ifndef PLUGIN_PRIVATE_H
+#define PLUGIN_PRIVATE_H
 
-#include "libdrakvuf/drakvuf.h"
+#include <config.h>
+#include "plugins.h"
 
-static drakvuf_t drakvuf;
+typedef int (*plugin_init_t) (drakvuf_t drakvuf, const void *config);
+typedef int (*plugin_start_t) (drakvuf_t drakvuf);
+typedef int (*plugin_close_t) (drakvuf_t drakvuf);
 
-static void close_handler(int sig) {
-    drakvuf_interrupt(drakvuf, sig);
-}
+typedef struct plugin {
+    plugin_init_t init;
+    plugin_start_t start;
+    plugin_close_t close;
+} plugin_t;
 
-int main(int argc, char** argv)
-{
-    if (argc < 5) {
-        printf("Usage: ./%s <rekall profile> <domain> <pid> <app>\n", argv[0]);
-        return 1;
-    }
+#ifdef ENABLE_PLUGIN_SYSCALLS
+#include "syscalls/syscalls.h"
+#endif
 
-    int rc = 0;
-    const char *rekall_profile = argv[1];
-    const char *domain = argv[2];
-    vmi_pid_t pid = atoi(argv[3]);
-    char *app = argv[4];
+#ifdef ENABLE_PLUGIN_POOLMON
+#include "poolmon/poolmon.h"
+#endif
 
-    /* for a clean exit */
-    struct sigaction act;
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
+#ifdef ENABLE_PLUGIN_FILETRACER
+#include "filetracer/filetracer.h"
+#endif
 
-    drakvuf_init(&drakvuf, domain, rekall_profile);
-    drakvuf_pause(drakvuf);
+#ifdef ENABLE_PLUGIN_FILEDELETE
+#include "filedelete/filedelete.h"
+#endif
 
-    if (pid > 0 && app) {
-        printf("Injector starting %s through PID %u\n", app, pid);
-        rc = drakvuf_inject_cmd(drakvuf, pid, app);
+static plugin_t plugins[] = {
 
-        if (!rc) {
-            printf("Process startup failed\n");
-        } else {
-            printf("Process startup success\n");
-        }
-    }
+    #ifdef ENABLE_PLUGIN_SYSCALLS
+    [PLUGIN_SYSCALLS] = { .init = plugin_syscall_init,
+                          .start = plugin_syscall_start,
+                          .close = plugin_syscall_close},
+    #endif
 
-    drakvuf_resume(drakvuf);
-    drakvuf_close(drakvuf);
+    #ifdef ENABLE_PLUGIN_POOLMON
+    [PLUGIN_POOLMON] = { .init = plugin_poolmon_init,
+                         .start = plugin_poolmon_start,
+                         .close = plugin_poolmon_close },
+    #endif
 
-    return rc;
-}
+    #ifdef ENABLE_PLUGIN_FILETRACER
+    [PLUGIN_FILETRACER] = { .init = plugin_filetracer_init,
+                            .start = plugin_filetracer_start,
+                            .close = plugin_filetracer_close },
+    #endif
+
+    #ifdef ENABLE_PLUGIN_FILEDELETE
+    [PLUGIN_FILEDELETE] = { .init = plugin_filedelete_init,
+                            .start = plugin_filedelete_start,
+                            .close = plugin_filedelete_close },
+    #endif
+
+};
+
+#endif

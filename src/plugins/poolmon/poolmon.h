@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,20 +102,11 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef XEN_HELPER_H
-#define XEN_HELPER_H
+#ifndef POOLMON_H
+#define POOLMON_H
 
-#include "structures.h"
+int plugin_poolmon_init(drakvuf_t drakvuf, const void *config);
+int plugin_poolmon_start(drakvuf_t drakvuf);
+int plugin_poolmon_close(drakvuf_t drakvuf);
 
-/* FUNCTIONS */
-
-bool xen_init_interface(xen_interface_t** honeymon);
-void xen_free_interface(xen_interface_t* xen);
-
-int get_dom_info(xen_interface_t *xen, const char *input, uint32_t *domID,
-		char **name);
-
-uint64_t xen_memshare(xen_interface_t *xen, uint32_t domID, uint32_t cloneID);
-
-void print_sharing_info(xen_interface_t *xen, uint32_t domID);
 #endif

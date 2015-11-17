@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,69 +102,11 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdio.h>
-#include <libvmi/libvmi.h>
+#ifndef INJECTOR_H
+#define INJECTOR_H
 
 #include "drakvuf.h"
-#include "output.h"
-#include "vmi.h"
-#include "xen_helper.h"
-#include "injector.h"
 
-static void close_handler(int sig) {
-    drakvuf.interrupted = sig;
-}
+int start_app(drakvuf_t drakvuf, vmi_pid_t pid, const char *app);
 
-int main(int argc, char** argv)
-{
-    if (argc < 5) {
-        printf("Usage: ./%s <rekall profile> <vm> <pid> <app>\n", argv[0]);
-        return 1;
-    }
-
-    int rc;
-    uint32_t domid = atoi(argv[2]);
-    vmi_pid_t pid = atoi(argv[3]);
-    char *app = argv[4];
-
-    /* for a clean exit */
-    struct sigaction act;
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
-
-    memset(&drakvuf, 0, sizeof(drakvuf_t));
-    verbose = 1;
-
-    drakvuf.rekall_profile = argv[1];
-
-    xen_init_interface(&drakvuf.xen);
-    get_dom_info(drakvuf.xen, argv[2], &drakvuf.domID, &drakvuf.dom_name);
-
-    init_vmi(&drakvuf);
-
-    if (!drakvuf.vmi) {
-        goto exit;
-    }
-
-    if (pid > 0 && app) {
-        printf("Injector starting %s through PID %u\n", app, pid);
-        rc = start_app(&drakvuf, pid, app);
-
-        if (!rc) {
-            printf("Process startup failed\n");
-        } else {
-            vmi_resume_vm(drakvuf.vmi);
-        }
-    }
-
-    close_vmi(&drakvuf);
-
-exit:
-    xen_free_interface(drakvuf.xen);
-    return rc;
-}
+#endif
