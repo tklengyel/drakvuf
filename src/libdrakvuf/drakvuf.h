@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,137 +102,145 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <xenctrl.h>
-#include <libxl_utils.h>
+#ifndef DRAKVUF_H
+#define DRAKVUF_H
 
-#include "xen_helper.h"
+#include <glib.h>
+#include <libvmi/libvmi.h>
+#include <libvmi/events.h>
 
-bool xen_init_interface(xen_interface_t **xen) {
+/*---------------------------------------------------------
+ * Reading in Rekall profile informations
+ */
 
-    *xen = g_malloc0(sizeof(xen_interface_t));
+typedef struct symbol {
+    const char *name;
+    addr_t rva;
+    uint8_t type;
+    int inputs;
+} __attribute__ ((packed)) symbol_t;
 
-    /* We create an xc interface to test connection to it */
-    (*xen)->xc = xc_interface_open(0, 0, 0);
+typedef struct symbols {
+    const char *name;
+    symbol_t *symbols;
+    uint64_t count;
+} symbols_t;
 
-    if ((*xen)->xc == NULL) {
-        fprintf(stderr, "xc_interface_open() failed!\n");
-        xen_free_interface(*xen);
-        return 0;
-    }
+addr_t drakvuf_get_function_rva(const char *rekall_profile, const char *function);
+symbols_t* drakvuf_get_symbols_from_rekall(const char *profile);
+status_t windows_system_map_lookup(
+        const char *rekall_profile,
+        const char *symbol,
+        const char *subsymbol,
+        addr_t *address,
+        addr_t *size);
+void drakvuf_free_symbols(symbols_t *symbols);
 
-    /* We don't need this at the moment, but just in case */
-    //xen->xsh=xs_open(XS_OPEN_READONLY);
-    (*xen)->xl_logger = (xentoollog_logger *) xtl_createlogger_stdiostream(
-            stderr, XTL_PROGRESS, 0);
+/*---------------------------------------------------------
+ * DRAKVUF functions
+ */
 
-    if (!(*xen)->xl_logger)
-        return 0;
+typedef enum {
+    OUTPUT_DEFAULT,
+    OUTPUT_CSV,
+    __OUTPUT_MAX
+} output_format_t;
 
-    if (0
-            != libxl_ctx_alloc(&(*xen)->xl_ctx, LIBXL_VERSION, 0,
-                    (*xen)->xl_logger)) {
-        fprintf(stderr, "libxl_ctx_alloc() failed!\n");
-        xen_free_interface(*xen);
-        return 0;
-    }
+typedef enum lookup_type {
+    LOOKUP_NONE,
+    LOOKUP_DTB,
+    LOOKUP_PID,
+    LOOKUP_NAME,
+} lookup_type_t;
 
-    return 1;
-}
+typedef enum addr_type {
+    ADDR_RVA,
+    ADDR_VA,
+    ADDR_PA
+} addr_type_t;
 
-void xen_free_interface(xen_interface_t* xen) {
-    if (xen) {
-        if (xen->xl_ctx)
-            libxl_ctx_free(xen->xl_ctx);
-        if (xen->xl_logger)
-            xtl_logger_destroy(xen->xl_logger);
-        //if (xen->xsh) xs_close(xen->xsh);
-        if (xen->xc)
-            xc_interface_close(xen->xc);
-        free(xen);
-    }
-}
+typedef enum trap_type {
+    BREAKPOINT      = 1 << 0,
+    MEMACCESS_R     = 1 << 1,
+    MEMACCESS_W     = 1 << 2,
+    MEMACCESS_X     = 1 << 3,
+    MEMACCESS_RW    = (MEMACCESS_R | MEMACCESS_W),
+    MEMACCESS_RX    = (MEMACCESS_R | MEMACCESS_X),
+    MEMACCESS_RWX   = (MEMACCESS_R | MEMACCESS_W | MEMACCESS_W)
+} trap_type_t;
 
-int get_dom_info(xen_interface_t *xen, const char *input, uint32_t *domID,
-        char **name) {
+typedef enum memaccess_type {
+    PRE,
+    POST
+} memaccess_type_t;
 
-    uint32_t _domID = INVALID_DOMID;
-    char *_name = NULL;
+typedef struct drakvuf* drakvuf_t;
+struct drakvuf_trap;
+typedef struct drakvuf_trap drakvuf_trap_t;
 
-    sscanf(input, "%u", &_domID);
+typedef struct drakvuf_trap_info {
+    unsigned int vcpu;
+    addr_t trap_pa;
+    x86_registers_t *regs;
+    drakvuf_trap_t *trap;
+} drakvuf_trap_info_t;
 
-    if (_domID == INVALID_DOMID) {
-        _name = strdup(input);
-        libxl_name_to_domid(xen->xl_ctx, input, &_domID);
-        if (!_domID || _domID == INVALID_DOMID) {
-            printf("Domain is not running, failed to get domID from name!\n");
-            free(_name);
-            return -1;
-        } else {
-            //printf("Got domID from name: %u\n", _domID);
-        }
-    } else {
-        //printf("Converting domid %u to name\n", _domID);
-        _name = libxl_domid_to_name(xen->xl_ctx, _domID);
-    }
+struct drakvuf_trap {
+    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*);
 
-    *name = _name;
-    *domID = _domID;
+    lookup_type_t lookup_type;
+    union {
+        vmi_pid_t pid;
+        const char *proc;
+    } u;
 
-    return 1;
-}
+    /* If specified and RVA is used
+       RVA will be calculated from the base
+       of this module */
+    const char *module;
+    const char *name;
 
-uint64_t xen_memshare(xen_interface_t *xen, uint32_t domID, uint32_t cloneID) {
+    addr_type_t addr_type;
+    union {
+        addr_t rva;
+        addr_t addr;
+    } u2;
 
-    uint64_t shared = 0;
+    trap_type_t type;
+    memaccess_type_t memaccess_type; // iff type == MEMACCESS_*
 
-#if __XEN_INTERFACE_VERSION__ < 0x00040600
-    uint64_t page, max_page = xc_domain_maximum_gpfn(xen->xc, domID);
-#else
-    xen_pfn_t page, max_page;
-    if (xc_domain_maximum_gpfn(xen->xc, domID, &max_page)) {
-        printf("Failed to get max gpfn from Xen!\n");
-        goto done;
-    }
+    void *data;
+};
+
+bool drakvuf_init (drakvuf_t *drakvuf,
+                   const char *domain,
+                   const char *rekall_profile);
+void drakvuf_close (drakvuf_t drakvuf);
+void drakvuf_add_trap(drakvuf_t drakvuf,
+                      drakvuf_trap_t *trap);
+void drakvuf_add_traps(drakvuf_t drakvuf,
+                       GSList *traps);
+void drakvuf_remove_trap (drakvuf_t drakvuf,
+                          drakvuf_trap_t *trap);
+void drakvuf_remove_traps(drakvuf_t drakvuf,
+                          GSList *traps);
+void drakvuf_loop (drakvuf_t drakvuf);
+void drakvuf_interrupt (drakvuf_t drakvuf,
+                        int sig);
+int drakvuf_inject_cmd (drakvuf_t drakvuf,
+                        vmi_pid_t pid,
+                        const char *cmd);
+void drakvuf_pause (drakvuf_t drakvuf);
+void drakvuf_resume (drakvuf_t drakvuf);
+
+vmi_instance_t drakvuf_lock_and_get_vmi(drakvuf_t drakvuf);
+void drakvuf_release_vmi(drakvuf_t drakvuf);
+
+output_format_t drakvuf_get_output_format(drakvuf_t drakvuf);
+void drakvuf_set_output_format(drakvuf_t drakvuf,
+                               output_format_t output);
+addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
+                                 addr_t process,
+                                 uint64_t handle);
+
 #endif
-
-    if (!max_page) {
-        printf("Failed to get max gpfn!\n");
-        goto done;
-    }
-
-    if (xc_memshr_control(xen->xc, domID, 1)) {
-        printf("Failed to enable memsharing on origin!\n");
-        goto done;
-    }
-    if (xc_memshr_control(xen->xc, cloneID, 1)) {
-        printf("Failed to enable memsharing on clone!\n");
-        goto done;
-    }
-
-    /*
-     * page will underflow when done
-     */
-    for (page = max_page; page <= max_page; page--) {
-        uint64_t shandle, chandle;
-
-        if (xc_memshr_nominate_gfn(xen->xc, domID, page, &shandle))
-            continue;
-        if (xc_memshr_nominate_gfn(xen->xc, cloneID, page, &chandle))
-            continue;
-        if (xc_memshr_share_gfns(xen->xc, domID, page, shandle, cloneID, page,
-            chandle))
-            continue;
-
-        shared++;
-    }
-
-    done: return shared;
-}
-
-void print_sharing_info(xen_interface_t *xen, uint32_t domID) {
-
-    xc_dominfo_t info;
-    xc_domain_getinfo(xen->xc, domID, 1, &info);
-
-    printf("Shared memory pages: %lu\n", info.nr_shared_pages);
-}

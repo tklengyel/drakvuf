@@ -102,57 +102,178 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <libvmi/libvmi.h>
+#ifndef VMI_H
+#define VMI_H
 
-#include "libdrakvuf/drakvuf.h"
+#include "private.h"
 
-static drakvuf_t drakvuf;
+#define BIT32 0
+#define BIT64 1
+#define PM2BIT(pm) ((pm == VMI_PM_IA32E) ? BIT64 : BIT32)
 
-static void close_handler(int sig) {
-    drakvuf_interrupt(drakvuf, sig);
-}
+#define TRAP 0xCC
 
-int main(int argc, char** argv)
-{
-    if (argc < 5) {
-        printf("Usage: ./%s <rekall profile> <domain> <pid> <app>\n", argv[0]);
-        return 1;
-    }
+#define ghashtable_foreach(table, i, key, val) \
+      g_hash_table_iter_init(&i, table); \
+      while(g_hash_table_iter_next(&i,(void**)&key,(void**)&val))
 
-    int rc = 0;
-    const char *rekall_profile = argv[1];
-    const char *domain = argv[2];
-    vmi_pid_t pid = atoi(argv[3]);
-    char *app = argv[4];
+#define NOW(ts) \
+      do { \
+          GTimeVal __now; \
+          g_get_current_time(&__now); \
+          *ts = g_time_val_to_iso8601(&__now); \
+      } while(0)
 
-    /* for a clean exit */
-    struct sigaction act;
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
+enum offset {
 
-    drakvuf_init(&drakvuf, domain, rekall_profile);
-    drakvuf_pause(drakvuf);
+    KIINITIALPCR,
+    KDDEBUGGERDATABLOCK,
+    PSINITIALSYSTEMPROCESS,
 
-    if (pid > 0 && app) {
-        printf("Injector starting %s through PID %u\n", app, pid);
-        rc = drakvuf_inject_cmd(drakvuf, pid, app);
+    EPROCESS_PID,
+    EPROCESS_PDBASE,
+    EPROCESS_PNAME,
+    EPROCESS_TASKS,
+    EPROCESS_PEB,
+    EPROCESS_OBJECTTABLE,
 
-        if (!rc) {
-            printf("Process startup failed\n");
-        } else {
-            printf("Process startup success\n");
-        }
-    }
+    PEB_IMAGEBASADDRESS,
+    PEB_LDR,
 
-    drakvuf_resume(drakvuf);
-    drakvuf_close(drakvuf);
+    PEB_LDR_DATA_INLOADORDERMODULELIST,
 
-    return rc;
-}
+    LDR_DATA_TABLE_ENTRY_DLLBASE,
+    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
+    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
+
+    FILE_OBJECT_DEVICEOBJECT,
+    FILE_OBJECT_READACCESS,
+    FILE_OBJECT_WRITEACCESS,
+    FILE_OBJECT_DELETEACCESS,
+    FILE_OBJECT_FILENAME,
+
+    HANDLE_TABLE_HANDLECOUNT,
+
+    KPCR_PRCB,
+    KPCR_PRCBDATA,
+    KPRCB_CURRENTTHREAD,
+
+    KTHREAD_PROCESS,
+    KTHREAD_INITIALSTACK,
+    KTHREAD_STACKLIMIT,
+    KTHREAD_APCSTATE,
+    KTHREAD_TRAPFRAME,
+    KTHREAD_APCQUEUEABLE,
+
+    KTRAP_FRAME_RIP,
+
+    KAPC_APCLISTENTRY,
+
+    NT_TIB_STACKBASE,
+    NT_TIB_STACKLIMIT,
+
+    ETHREAD_CID,
+    CLIENT_ID_UNIQUETHREAD,
+
+    OBJECT_HEADER_TYPEINDEX,
+    OBJECT_HEADER_BODY,
+
+    UNICODE_STRING_LENGTH,
+    UNICODE_STRING_BUFFER,
+
+    POOL_HEADER_BLOCKSIZE,
+    POOL_HEADER_POOLTYPE,
+    POOL_HEADER_POOLTAG,
+
+    OFFSET_MAX
+};
+
+static const char *offset_names[OFFSET_MAX][2] = {
+    [KIINITIALPCR] = { "KiInitialPCR", NULL },
+    [KDDEBUGGERDATABLOCK] = { "KdDebuggerDataBlock", NULL },
+    [PSINITIALSYSTEMPROCESS] = { "PsInitialSystemProcess", NULL },
+    [EPROCESS_PID] = { "_EPROCESS", "UniqueProcessId" },
+    [EPROCESS_PDBASE] = { "_KPROCESS", "DirectoryTableBase" },
+    [EPROCESS_PNAME] = { "_EPROCESS", "ImageFileName" },
+    [EPROCESS_TASKS] = { "_EPROCESS", "ActiveProcessLinks" },
+    [EPROCESS_PEB] = { "_EPROCESS", "Peb" },
+    [EPROCESS_OBJECTTABLE] = {"_EPROCESS", "ObjectTable" },
+    [PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
+    [PEB_LDR] = { "_PEB", "Ldr" },
+    [PEB_LDR_DATA_INLOADORDERMODULELIST] = {"_PEB_LDR_DATA", "InLoadOrderModuleList" },
+    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
+    [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
+    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
+    [FILE_OBJECT_DEVICEOBJECT] = {"_FILE_OBJECT", "DeviceObject" },
+    [FILE_OBJECT_READACCESS] = {"_FILE_OBJECT", "ReadAccess" },
+    [FILE_OBJECT_WRITEACCESS] = {"_FILE_OBJECT", "WriteAccess" },
+    [FILE_OBJECT_DELETEACCESS] = {"_FILE_OBJECT", "DeleteAccess" },
+    [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
+    [HANDLE_TABLE_HANDLECOUNT] = {"_HANDLE_TABLE", "HandleCount" },
+    [KPCR_PRCB] = {"_KPCR", "Prcb" },
+    [KPCR_PRCBDATA] = {"_KPCR", "PrcbData" },
+    [KPRCB_CURRENTTHREAD] = { "_KPRCB", "CurrentThread" },
+    [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
+    [KTHREAD_INITIALSTACK] = {"_KTHREAD", "InitialStack"},
+    [KTHREAD_STACKLIMIT] = {"_KTHREAD", "StackLimit"},
+    [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
+    [KTHREAD_APCSTATE] = {"_KTHREAD", "ApcState" },
+    [KTHREAD_APCQUEUEABLE] = {"_KTHREAD", "ApcQueueable"},
+    [KAPC_APCLISTENTRY] = {"_KAPC", "ApcListEntry" },
+    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
+    [NT_TIB_STACKBASE] = { "_NT_TIB", "StackBase" },
+    [NT_TIB_STACKLIMIT] = { "_NT_TIB", "StackLimit" },
+    [ETHREAD_CID] = {"_ETHREAD", "Cid" },
+    [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
+    [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
+    [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
+    [UNICODE_STRING_LENGTH] = {"_UNICODE_STRING", "Length" },
+    [UNICODE_STRING_BUFFER] = {"_UNICODE_STRING", "Buffer" },
+    [POOL_HEADER_BLOCKSIZE] = {"_POOL_HEADER", "BlockSize" },
+    [POOL_HEADER_POOLTYPE] = {"_POOL_HEADER", "PoolType" },
+    [POOL_HEADER_POOLTAG] = {"_POOL_HEADER", "PoolTag" },
+};
+
+size_t offsets[OFFSET_MAX];
+
+enum size {
+    FILE_OBJECT,
+    //OBJECT_ATTRIBUTES,
+    //OBJECT_HEADER,
+    POOL_HEADER,
+
+    SIZE_LIST_MAX
+};
+
+static const char *size_names[SIZE_LIST_MAX] = {
+        [FILE_OBJECT] = "_FILE_OBJECT",
+        //[OBJECT_ATTRIBUTES] = "_OBJECT_ATTRIBUTES", // May be useful TODO
+        //[OBJECT_HEADER] = "_OBJECT_HEADER",
+        [POOL_HEADER] = "_POOL_HEADER",
+};
+
+// Aligned object sizes
+size_t struct_sizes[SIZE_LIST_MAX];
+
+void init_vmi(drakvuf_t drakvuf);
+void close_vmi(drakvuf_t drakvuf);
+
+event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event);
+event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
+event_response_t vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
+
+void inject_trap_mem(drakvuf_t drakvuf,
+                     drakvuf_trap_t *trap);
+void inject_trap_pa(drakvuf_t drakvuf,
+                    drakvuf_trap_t *trap,
+                    addr_t pa);
+void inject_traps_modules(drakvuf_t drakvuf,
+                          GSList *traps,
+                          drakvuf_trap_t *trap,
+                          addr_t list_head,
+                          vmi_pid_t pid,
+                          const char *name);
+void remove_trap(drakvuf_t drakvuf,
+                 const drakvuf_trap_t *trap);
+
+#endif

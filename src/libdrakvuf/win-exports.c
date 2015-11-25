@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,152 +102,243 @@
  *                                                                         *
  ***************************************************************************/
 
-#define _GNU_SOURCE
-#include <stdio.h>
-#include <ctype.h>
+#include <config.h>
+#include <stdlib.h>
+#include <sys/prctl.h>
 #include <string.h>
-
+#include <strings.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <limits.h>
+#include <glib.h>
 #include <libvmi/libvmi.h>
-#include <jansson.h>
+#include <libvmi/peparse.h>
 
-#include "drakvuf.h"
-#include "output.h"
+#include "vmi.h"
+#include "win-exports.h"
 
-status_t windows_system_map_symbol_to_address(
-        const char *rekall_profile,
-        const char *symbol,
-        const char *subsymbol,
-        addr_t *address,
-        addr_t *size)
-{
+#define MAX_HEADER_SIZE 1024
 
-    status_t ret = VMI_FAILURE;
+// search for the given module+symbol in the given module list
+status_t modlist_sym2va(vmi_instance_t vmi, addr_t list_head, uint32_t pid,
+        const char *mod_name, const char *symbol, addr_t *va) {
 
-    json_error_t error;
-    json_t *root = json_load_file(rekall_profile, 0, &error);
-    if (!root) {
-        PRINT_DEBUG("Rekall profile error on line %d: %s\n", error.line, error.text);
-        goto exit;
-    }
+    addr_t next_module = list_head;
+    /* walk the module list */
+    while (1) {
 
-    if (!json_is_object(root)) {
-        PRINT_DEBUG("Rekall profile: root is not an objet\n");
-        goto err_exit;
-    }
+        /* follow the next pointer */
+        addr_t tmp_next = 0;
+        vmi_read_addr_va(vmi, next_module, pid, &tmp_next);
 
-    if (!subsymbol) {
-        json_t *constants = json_object_get(root, "$CONSTANTS");
-        json_t *jsymbol = json_object_get(constants, symbol);
-        if (!jsymbol) {
-            PRINT_DEBUG("Rekall profile: symbol '%s' not found\n", symbol);
-            goto err_exit;
+        /* if we are back at the list head, we are done */
+        if (list_head == tmp_next || !tmp_next) {
+            break;
         }
+        unicode_string_t *us = vmi_read_unicode_str_va(vmi,
+                next_module + offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
+        unicode_string_t out = { .contents = NULL };
 
-        *address = json_integer_value(jsymbol);
-        ret = VMI_SUCCESS;
+        if (us && VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8")) {
 
-    } else {
-        json_t *structs = json_object_get(root, "$STRUCTS");
-        json_t *jstruct = json_object_get(structs, symbol);
-        if (!jstruct) {
-            PRINT_DEBUG("Rekall profile: structure '%s' not found\n", symbol);
-            goto err_exit;
-        }
+            PRINT_DEBUG("Found module in PID %u: %s\n", pid, out.contents);
 
-        if (size) {
-            json_t *jsize = json_array_get(jstruct, 0);
-            *size = json_integer_value(jsize);
-        } else {
-            json_t *jstruct2 = json_array_get(jstruct, 1);
-            json_t *jmember = json_object_get(jstruct2, subsymbol);
-            if (!jmember) {
-                PRINT_DEBUG("Rekall profile: structure member '%s' not found\n", subsymbol);
-                goto err_exit;
+            if (!strcasecmp((char*) out.contents, mod_name)) {
+
+                addr_t dllbase;
+                vmi_read_addr_va(vmi,
+                        next_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE],
+                        pid, &dllbase);
+
+                *va = vmi_translate_sym2v(vmi, dllbase, pid, (char *) symbol);
+
+                PRINT_DEBUG("\t%s @ 0x%lx\n", symbol, *va);
+
+                free(out.contents);
+                vmi_free_unicode_str(us);
+                return VMI_SUCCESS;
             }
-            json_t *jvalue = json_array_get(jmember, 0);
 
-            *address = json_integer_value(jvalue);
+            free(out.contents);
         }
-        ret = VMI_SUCCESS;
 
+        if (us)
+            vmi_free_unicode_str(us);
+
+        next_module = tmp_next;
     }
 
-    err_exit: json_decref(root);
-
-    exit: return ret;
+    return VMI_FAILURE;
 }
 
-struct sym_config* get_all_symbols(const char *rekall_profile)
-{
+addr_t sym2va(vmi_instance_t vmi, vmi_pid_t target_pid, const char *mod_name,
+        const char *symbol) {
+    addr_t ret = 0;
+    addr_t list_head;
+    status_t status;
 
-    struct sym_config *ret = g_malloc0(sizeof(struct sym_config));
+    size_t pid_offset = vmi_get_offset(vmi, "win_pid");
+    size_t tasks_offset = vmi_get_offset(vmi, "win_tasks");
 
-    json_error_t error;
-    json_t *root = json_load_file(rekall_profile, 0, &error);
-    if (!root) {
-        PRINT_DEBUG("Rekall profile error on line %d: %s\n", error.line, error.text);
-        goto err_exit;
+    addr_t current_process, current_list_entry, next_list_entry;
+    vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
+
+    /* walk the task list */
+    list_head = current_process + tasks_offset;
+    current_list_entry = list_head;
+
+    status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
+    if (status == VMI_FAILURE) {
+        PRINT_DEBUG("Failed to read next pointer at 0x%lx before entering loop\n",
+                current_list_entry);
+        return ret;
     }
 
-    if (!json_is_object(root)) {
-        PRINT_DEBUG("Rekall profile: root is not an objet\n");
-        goto err_exit;
-    }
+    do {
+        current_list_entry = next_list_entry;
+        current_process = current_list_entry - tasks_offset;
 
-    json_t *functions = json_object_get(root, "$FUNCTIONS");
+        /* follow the next pointer */
 
-    ret->sym_count = json_object_size(functions);
-    PRINT_DEBUG("The Rekall profile defines %lu functions\n", ret->sym_count);
+        addr_t peb, ldr, inloadorder;
+        vmi_pid_t pid;
+        vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t*)&pid);
 
-    ret->syms = g_malloc0(sizeof(struct symbol) * ret->sym_count);
+        if (pid == target_pid) {
 
-    const char *key;
-    json_t *value;
-    void *iter = json_object_iter(functions);
-    int i = 0;
-    while (iter) {
-        key = json_object_iter_key(iter);
-        value = json_object_iter_value(iter);
+            vmi_read_addr_va(vmi, current_process + offsets[EPROCESS_PEB], 0,
+                    &peb);
+            vmi_read_addr_va(vmi, peb + offsets[PEB_LDR], pid, &ldr);
+            vmi_read_addr_va(vmi,
+                    ldr + offsets[PEB_LDR_DATA_INLOADORDERMODULELIST], pid,
+                    &inloadorder);
 
-        ret->syms[i].name = strdup(key);
-        ret->syms[i].rva = json_integer_value(value);
+            PRINT_DEBUG("Found target pid of %u. PEB @ 0x%lx. LDR @ 0x%lx. INLOADORDER @ 0x%lx.\n",
+                        target_pid, peb, ldr, inloadorder);
 
-        /* use key and value ... */
-        iter = json_object_iter_next(functions, iter);
-        i++;
-    }
+            if (VMI_SUCCESS
+                    == modlist_sym2va(vmi, inloadorder, pid, mod_name, symbol,
+                            &ret)) {
+                return ret;
+            }
+        }
+
+        status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
+        if (status == VMI_FAILURE) {
+            PRINT_DEBUG("Failed to read next pointer in loop at %lx\n",
+                    current_list_entry);
+            return ret;
+        }
+    } while (next_list_entry != list_head);
 
     return ret;
-
-    err_exit: free(ret);
-    return NULL;
 }
 
-addr_t get_function_rva(const char *rekall_profile, const char *function)
-{
+// search for the given module+symbol in the given module list
+status_t modlist_va2sym(vmi_instance_t vmi, addr_t list_head, addr_t va,
+        vmi_pid_t pid, char **out_mod, char **out_sym) {
 
-    json_error_t error;
-    json_t *root = json_load_file(rekall_profile, 0, &error);
-    if (!root) {
-        PRINT_DEBUG("Rekall profile error on line %d: %s\n", error.line, error.text);
-        goto err_exit;
+    addr_t next_module = list_head;
+    /* walk the module list */
+    while (1) {
+
+        /* follow the next pointer */
+        addr_t tmp_next = 0;
+        vmi_read_addr_va(vmi, next_module, pid, &tmp_next);
+
+        /* if we are back at the list head, we are done */
+        if (list_head == tmp_next || !tmp_next) {
+            break;
+        }
+        unicode_string_t *us = vmi_read_unicode_str_va(vmi,
+                next_module + offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
+        unicode_string_t out = { .contents = NULL };
+
+        if (us && VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8")) {
+            addr_t dllbase;
+            vmi_read_addr_va(vmi,
+                    next_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid,
+                    &dllbase);
+
+            const char *sym = vmi_translate_v2sym(vmi, dllbase, pid, va);
+            if (sym) {
+                *out_mod = g_strdup((char*)out.contents);
+                *out_sym = (char*) sym;
+                free(out.contents);
+                vmi_free_unicode_str(us);
+                return VMI_SUCCESS;
+            } else {
+                free(out.contents);
+            }
+        }
+
+        if (us)
+            vmi_free_unicode_str(us);
+
+        next_module = tmp_next;
     }
 
-    if (!json_is_object(root)) {
-        PRINT_DEBUG("Rekall profile: root is not an objet\n");
-        goto err_exit;
+    return VMI_FAILURE;
+}
+
+status_t va2sym(vmi_instance_t vmi, addr_t va, vmi_pid_t target_pid,
+        char **out_mod, char **out_sym) {
+
+    addr_t list_head;
+
+    size_t pid_offset = vmi_get_offset(vmi, "win_pid");
+    size_t tasks_offset = vmi_get_offset(vmi, "win_tasks");
+
+    addr_t current_process, current_list_entry, next_list_entry;
+    vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
+
+    /* walk the task list */
+    list_head = current_process + tasks_offset;
+    current_list_entry = list_head;
+
+    if (VMI_FAILURE
+            == vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry)) {
+        PRINT_DEBUG("Failed to read next pointer at 0x%lx before entering loop\n",
+                current_list_entry);
+        return VMI_FAILURE;
     }
 
-    json_t *functions = json_object_get(root, "$FUNCTIONS");
-    json_t *jsymbol = json_object_get(functions, function);
+    do {
+        current_list_entry = next_list_entry;
+        current_process = current_list_entry - tasks_offset;
 
-    if(!jsymbol) {
-        PRINT_DEBUG("Rekall profile: symbol '%s' not found\n", function);
-        goto err_exit;
-    }
+        /* follow the next pointer */
 
-    return json_integer_value(jsymbol);
+        addr_t peb, ldr, inloadorder;
+        vmi_pid_t pid;
+        vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t*)&pid);
 
-    err_exit:
-    return 0;
+        if (pid == target_pid) {
+
+            vmi_read_addr_va(vmi, current_process + offsets[EPROCESS_PEB], 0,
+                    &peb);
+            vmi_read_addr_va(vmi, peb + offsets[PEB_LDR], pid, &ldr);
+            vmi_read_addr_va(vmi,
+                    ldr + offsets[PEB_LDR_DATA_INLOADORDERMODULELIST], pid,
+                    &inloadorder);
+
+            if (VMI_SUCCESS
+                    == modlist_va2sym(vmi, inloadorder, va, pid, out_mod,
+                            out_sym)) {
+                return VMI_SUCCESS;
+            }
+        }
+
+        if (VMI_FAILURE
+                == vmi_read_addr_va(vmi, current_list_entry, 0,
+                        &next_list_entry)) {
+            PRINT_DEBUG("Failed to read next pointer in loop at %lx\n",
+                    current_list_entry);
+            return VMI_FAILURE;
+        }
+    } while (next_list_entry != list_head);
+
+    return VMI_FAILURE;
 }

@@ -102,39 +102,11 @@
  #                                                                         #
  #*************************************************************************# 
 
-bin_PROGRAMS = drakvuf xen_memclone injector
+h_sources = xen_helper.h
+c_sources = xen_helper.c
 
-SUBDIRS = xen_helper libdrakvuf plugins
+AM_CFLAGS = -I$(top_srcdir)
+AM_CFLAGS += $(CFLAGS) $(GLIB_CFLAGS)
 
-drakvuf_SOURCES = drakvuf.c
-xen_memclone_SOURCES  = xen_memclone.c
-injector_SOURCES = injector.c
-
-AM_CFLAGS = $(CFLAGS)
-AM_CFLAGS += $(VMI_CFLAGS)
-AM_CFLAGS += $(GLIB_CFLAGS)
-
-if HARDENING
-AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
-endif
-
-# Note that -pg is incompatible with HARDENING
-if DEBUG
-AM_CFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -Wno-override-init -Wno-strict-aliasing -g -ggdb3
-AM_CFLAGS += -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-unused-variable
-if !HARDENING
-AM_CFLAGS += -pg
-endif
-endif
-
-drakvuf_LDADD = libdrakvuf/libdrakvuf.la
-drakvuf_LDADD += xen_helper/libxenhelper.la
-drakvuf_LDADD += plugins/libdrakvufplugins.la
-
-if HARDENING
-drakvuf_LDADD += $(HARDEN_LDFLAGS)
-endif
-
-injector_LDADD = libdrakvuf/libdrakvuf.la
-
-xen_memclone_LDADD = xen_helper/libxenhelper.la
+noinst_LTLIBRARIES= libxenhelper.la
+libxenhelper_la_SOURCES= $(h_sources) $(c_sources)

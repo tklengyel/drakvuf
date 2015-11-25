@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,162 +102,150 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <libvmi/libvmi.h>
 #include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <sys/mman.h>
-#include <stdio.h>
+#include <xenctrl.h>
+#include <libxl_utils.h>
 #include <glib.h>
 
-#include "output.h"
-#include "vmi.h"
+#include "xen_helper.h"
 
-/* this should work for both 32 and 64bit */
-#define EX_FAST_REF_MASK    7
-#define HANDLE_MULTIPLIER   4
+bool xen_init_interface(xen_interface_t **xen) {
 
-// TODO: This is a very slow PoC.. could be optimized
-addr_t handle_table_get_entry(uint32_t bit, vmi_instance_t vmi,
-        addr_t table_base, uint32_t level, uint32_t depth,
-        uint32_t *handle_count, uint64_t handle) {
+    *xen = g_malloc0(sizeof(xen_interface_t));
 
-    uint32_t count;
-    uint32_t table_entry_size = 0;
+    /* We create an xc interface to test connection to it */
+    (*xen)->xc = xc_interface_open(0, 0, 0);
 
-    if (level > 0) {
-        if (bit == BIT32)
-            table_entry_size = 0x4;
-        else
-            table_entry_size = 0x8;
-    } else if (level == 0) {
-        if (bit == BIT32)
-            table_entry_size = 0x8;
-        else
-            table_entry_size = 0x10;
-    };
-
-    count = VMI_PS_4KB / table_entry_size;
-
-    PRINT_DEBUG("\tHandle table array size: %u at 0x%lx. "
-                "Table entry size is %u. Handle count remaining: %u\n",
-                count, table_base, table_entry_size, *handle_count);
-
-    uint32_t i;
-    for (i = 0; i < count; i++) {
-
-        // Only read the already known number of entries
-        if (*handle_count == 0)
-            break;
-
-        addr_t table_entry_addr = 0;
-        vmi_read_addr_va(vmi, table_base + i * table_entry_size, 0,
-                &table_entry_addr);
-
-        // skip entries that point nowhere
-        if (table_entry_addr == 0) {
-            continue;
-        }
-
-        // real entries are further down the chain
-        if (level > 0) {
-            addr_t next_level = 0;
-            vmi_read_addr_va(vmi, table_base + i * table_entry_size, 0,
-                    &next_level);
-
-            addr_t test = 0;
-            test = handle_table_get_entry(bit, vmi, next_level, level - 1,
-                    depth, handle_count, handle);
-            if (test)
-                return test;
-
-            depth++;
-            continue;
-        }
-
-        // At this point each (table_base + i*entry) is a _HANDLE_TABLE_ENTRY
-
-        uint32_t level_base = depth * count * HANDLE_MULTIPLIER;
-        uint32_t handle_value = (i * table_entry_size * HANDLE_MULTIPLIER)
-                / table_entry_size + level_base;
-
-        PRINT_DEBUG("\t\tHandle #: %u. Addr: 0x%lx. Value: 0x%x\n",
-                    *handle_count, table_entry_addr & ~EX_FAST_REF_MASK, handle_value);
-
-        if (handle_value == handle) {
-            return table_entry_addr & ~EX_FAST_REF_MASK;
-        }
-
-        // decrement the handle counter because we found one here
-        --(*handle_count);
+    if ((*xen)->xc == NULL) {
+        fprintf(stderr, "xc_interface_open() failed!\n");
+        goto err;
     }
+
+    /* We don't need this at the moment, but just in case */
+    //xen->xsh=xs_open(XS_OPEN_READONLY);
+    (*xen)->xl_logger = (xentoollog_logger *) xtl_createlogger_stdiostream(
+            stderr, XTL_PROGRESS, 0);
+
+    if (!(*xen)->xl_logger)
+    {
+        goto err;
+    }
+
+    if (libxl_ctx_alloc(&(*xen)->xl_ctx, LIBXL_VERSION, 0,
+                        (*xen)->xl_logger)) {
+        fprintf(stderr, "libxl_ctx_alloc() failed!\n");
+        goto err;
+    }
+
+    return 1;
+
+err:
+    xen_free_interface(*xen);
+    *xen = NULL;
     return 0;
 }
 
-/*
- * The approach where the system process list es enumerated looking for
- * the matching cr3 value in each _EPROCESS struct is not going to work
- * if a DKOM attack unhooks the _EPROCESS struct.
- *
- * We can access the _EPROCESS structure by reading the FS_BASE register on x86
- * or the GS_BASE register on x64, which contains the _KPCR.
- *
- * FS/GS -> _KPCR._KPRCB.CurrentThread -> _ETHREAD._KTHREAD.Process = _EPROCESS
- *
- * Also see: http://www.csee.umbc.edu/~stephens/SECURITY/491M/HiddenProcesses.ppt
- */
-addr_t get_obj_by_handle(drakvuf_t *drakvuf, vmi_instance_t vmi,
-        uint64_t vcpu_id, uint64_t handle) {
+void xen_free_interface(xen_interface_t* xen) {
+    if (xen) {
+        if (xen->xl_ctx)
+            libxl_ctx_free(xen->xl_ctx);
+        if (xen->xl_logger)
+            xtl_logger_destroy(xen->xl_logger);
+        //if (xen->xsh) xs_close(xen->xsh);
+        if (xen->xc)
+            xc_interface_close(xen->xc);
+        free(xen);
+    }
+}
 
-    addr_t ret = 0, thread = 0, current_process = 0;
-    reg_t fsgs = 0;
-    addr_t offset = 0;
+int get_dom_info(xen_interface_t *xen, const char *input, domid_t *domID,
+        char **name) {
 
-    if (PM2BIT(drakvuf->pm) == BIT32) {
-        vmi_get_vcpureg(vmi, &fsgs, FS_BASE, vcpu_id);
-        offset = offsets[KPCR_PRCBDATA];
+    uint32_t _domID = ~0;
+    char *_name = NULL;
+
+    sscanf(input, "%u", &_domID);
+
+    if (_domID == ~0) {
+        _name = strdup(input);
+        libxl_name_to_domid(xen->xl_ctx, input, &_domID);
+        if (!_domID || _domID == ~0) {
+            printf("Domain is not running, failed to get domID from name!\n");
+            free(_name);
+            return -1;
+        } else {
+            //printf("Got domID from name: %u\n", _domID);
+        }
     } else {
-        vmi_get_vcpureg(vmi, &fsgs, GS_BASE, vcpu_id);
-        offset = offsets[KPCR_PRCB];
+
+        xc_dominfo_t info = { 0 };
+        if ( 1 == xc_domain_getinfo(xen->xc, _domID, 1, &info)
+            && info.domid == _domID)
+        {
+            _name = libxl_domid_to_name(xen->xl_ctx, _domID);
+        } else {
+            _domID = ~0;
+        }
     }
 
-    vmi_read_addr_va(vmi,
-            fsgs
-                    + offset + offsets[KPRCB_CURRENTTHREAD],
-            0, &thread);
-    vmi_read_addr_va(vmi,
-            thread
-                    + offsets[KTHREAD_PROCESS],
-            0, &current_process);
+    *name = _name;
+    *domID = (domid_t)_domID;
 
-    PRINT_DEBUG("Get object by handle with FSGS: 0x%lx. Thread: 0x%lx. Process: 0x%lx\n",
-                fsgs, thread, current_process);
+    return 1;
+}
 
-    // TODO: verify that the dtb in the _EPROCESS is the same as the cr3
+uint64_t xen_memshare(xen_interface_t *xen, domid_t domID, domid_t cloneID) {
 
-    addr_t handletable = 0, tablecode = 0;
-    vmi_read_addr_va(vmi,
-            current_process
-                    + offsets[EPROCESS_OBJECTTABLE],
-            0, &handletable);
-    vmi_read_addr_va(vmi, handletable, 0, &tablecode);
+    uint64_t shared = 0;
 
-    uint32_t handlecount = 0;
-    vmi_read_32_va(vmi,
-            handletable
-                    + offsets[HANDLE_TABLE_HANDLECOUNT],
-            0, &handlecount);
+#if __XEN_INTERFACE_VERSION__ < 0x00040600
+    uint64_t page, max_page = xc_domain_maximum_gpfn(xen->xc, domID);
+#else
+    xen_pfn_t page, max_page;
+    if (xc_domain_maximum_gpfn(xen->xc, domID, &max_page)) {
+        printf("Failed to get max gpfn from Xen!\n");
+        goto done;
+    }
+#endif
 
-    // _EX_FAST_REF-style pointer, last three bits are used for storing the number of levels
-    addr_t table_base = tablecode & ~EX_FAST_REF_MASK;
-    uint32_t table_levels = tablecode & EX_FAST_REF_MASK;
-    uint32_t table_depth = 0;
+    if (!max_page) {
+        printf("Failed to get max gpfn!\n");
+        goto done;
+    }
 
-    PRINT_DEBUG("Handle table @ 0x%lx. Handle count %u. Looking for handle: 0x%lx\n",
-                table_base, handlecount, handle);
+    if (xc_memshr_control(xen->xc, domID, 1)) {
+        printf("Failed to enable memsharing on origin!\n");
+        goto done;
+    }
+    if (xc_memshr_control(xen->xc, cloneID, 1)) {
+        printf("Failed to enable memsharing on clone!\n");
+        goto done;
+    }
 
-    ret = handle_table_get_entry(PM2BIT(drakvuf->pm), vmi, table_base,
-            table_levels, table_depth, &handlecount, handle);
+    /*
+     * page will underflow when done
+     */
+    for (page = max_page; page <= max_page; page--) {
+        uint64_t shandle, chandle;
 
-    return ret;
+        if (xc_memshr_nominate_gfn(xen->xc, domID, page, &shandle))
+            continue;
+        if (xc_memshr_nominate_gfn(xen->xc, cloneID, page, &chandle))
+            continue;
+        if (xc_memshr_share_gfns(xen->xc, domID, page, shandle, cloneID, page,
+            chandle))
+            continue;
+
+        shared++;
+    }
+
+    done: return shared;
+}
+
+void print_sharing_info(xen_interface_t *xen, domid_t domID) {
+
+    xc_dominfo_t info;
+    xc_domain_getinfo(xen->xc, domID, 1, &info);
+
+    printf("Shared memory pages: %lu\n", info.nr_shared_pages);
 }

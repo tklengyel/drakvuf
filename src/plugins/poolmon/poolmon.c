@@ -102,57 +102,147 @@
  *                                                                         *
  ***************************************************************************/
 
+#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <dirent.h>
+#include <glib.h>
+#include <err.h>
+
 #include <libvmi/libvmi.h>
+#include "../plugins.h"
+#include "private.h"
 
-#include "libdrakvuf/drakvuf.h"
+#define POOLTAG_FILE "Fil\xe5"
 
-static drakvuf_t drakvuf;
+static GTree *pooltag_tree;
+static GSList *traps;
+static output_format_t format;
 
-static void close_handler(int sig) {
-    drakvuf_interrupt(drakvuf, sig);
+GTree* pooltag_build_tree() {
+    GTree *pooltags = g_tree_new((GCompareFunc) strcmp);
+
+    uint32_t i = 0;
+    for (; i < TAG_COUNT; i++) {
+        g_tree_insert(pooltags, (char*) tags[i].tag,
+                (char*) &tags[i]);
+    }
+
+    return pooltags;
 }
 
-int main(int argc, char** argv)
-{
-    if (argc < 5) {
-        printf("Usage: ./%s <rekall profile> <domain> <pid> <app>\n", argv[0]);
-        return 1;
+static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    page_mode_t pm = vmi_get_page_mode(vmi);
+    reg_t pool_type, size;
+    char tag[5] = { [0 ... 4] = '\0' };
+
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    if (pm == VMI_PM_IA32E) {
+        pool_type = info->regs->rcx;
+        size = info->regs->rdx;
+        *(reg_t*)tag = info->regs->r8;
+    } else {
+        ctx.addr = info->regs->rsp+12;
+        vmi_read_32(vmi, &ctx, (uint32_t*)tag);
+        ctx.addr = info->regs->rsp+8;
+        vmi_read_32(vmi, &ctx, (uint32_t*)&size);
+        ctx.addr = info->regs->rsp+4;
+        vmi_read_32(vmi, &ctx, (uint32_t*)&pool_type);
     }
 
-    int rc = 0;
-    const char *rekall_profile = argv[1];
-    const char *domain = argv[2];
-    vmi_pid_t pid = atoi(argv[3]);
-    char *app = argv[4];
+    struct pooltag *s = g_tree_lookup(pooltag_tree, tag);
 
-    /* for a clean exit */
-    struct sigaction act;
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
+    switch(format) {
+    case OUTPUT_CSV:
+    {
+        printf("poolmon,%s", tag);
+        if (s)
+            printf(",%s,%s", s->source, s->description);
+        break;
+    }
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[POOLMON] %s", tag);
+        if (s)
+            printf(": %s,%s", s->source, s->description);
 
-    drakvuf_init(&drakvuf, domain, rekall_profile);
-    drakvuf_pause(drakvuf);
+        break;
+    };
 
-    if (pid > 0 && app) {
-        printf("Injector starting %s through PID %u\n", app, pid);
-        rc = drakvuf_inject_cmd(drakvuf, pid, app);
+    printf("\n");
 
-        if (!rc) {
-            printf("Process startup failed\n");
-        } else {
-            printf("Process startup success\n");
-        }
+    drakvuf_release_vmi(drakvuf);
+    return 0;
+}
+
+/*void pool_tracker_free(vmi_instance_t vmi, vmi_event_t *event) {
+    // TODO: 32-bit inputs are on the stack
+    reg_t rcx, rdx;
+    drakvuf_t *drakvuf = event->data;
+
+    vmi_get_vcpureg(vmi, &rcx, RCX, event->vcpu_id);
+    vmi_get_vcpureg(vmi, &rdx, RDX, event->vcpu_id);
+
+    char ctag[5] = { [0 ... 4] = '\0' };
+    memcpy(ctag, &rdx, 4);
+
+    PRINT(drakvuf, HEAPFREE_STRING, rcx, ctag);
+}*/
+
+/* ----------------------------------------------------- */
+
+int plugin_poolmon_init(drakvuf_t drakvuf, const char *rekall_profile) {
+    pooltag_tree = pooltag_build_tree();
+
+    drakvuf_trap_t *trap = g_malloc0(sizeof(drakvuf_trap_t));
+    trap->lookup_type = LOOKUP_PID;
+    trap->u.pid = 4;
+    trap->addr_type = ADDR_RVA;
+    trap->u2.rva = drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag");
+    trap->name = "ExAllocatePoolWithTag";
+    trap->module = "ntoskrnl.exe";
+    trap->type = BREAKPOINT;
+    trap->cb = cb;
+
+    if (!trap->u2.rva) {
+        return 0;
     }
 
-    drakvuf_resume(drakvuf);
-    drakvuf_close(drakvuf);
+    traps = g_slist_prepend(traps, trap);
+    format = drakvuf_get_output_format(drakvuf);
 
-    return rc;
+    return 1;
+}
+
+int plugin_poolmon_start(drakvuf_t drakvuf) {
+    drakvuf_add_traps(drakvuf, traps);
+    return 1;
+}
+
+int plugin_poolmon_close(drakvuf_t drakvuf) {
+    if(pooltag_tree)
+        g_tree_destroy(pooltag_tree);
+
+    GSList *loop = traps;
+    while(loop) {
+        free(loop->data);
+        loop = loop->next;
+    }
+    g_slist_free(traps);
+
+    return 1;
 }

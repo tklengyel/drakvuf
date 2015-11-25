@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,171 +102,182 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef VMI_H
-#define VMI_H
+#include <config.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <inttypes.h>
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
+#include <glib.h>
 
-#include "structures.h"
-#include "vmi-poolmon.h"
+#include "libdrakvuf/drakvuf.h"
+#include "plugins/plugins.h"
 
-#define BIT32 0
-#define BIT64 1
-#define PM2BIT(pm) ((pm == VMI_PM_IA32E) ? BIT64 : BIT32)
+static drakvuf_t drakvuf;
+static int interrupted;
 
-#define TRAP 0xCC
+static void close_handler(int sig) {
+    interrupted = sig;
+    drakvuf_interrupt(drakvuf, sig);
+}
 
-#define ghashtable_foreach(table, i, key, val) \
-      g_hash_table_iter_init(&i, table); \
-      while(g_hash_table_iter_next(&i,(void**)&key,(void**)&val))
+static gpointer timer(gpointer data) {
+    int timeout = *(int*)data;
 
-#define NOW(ts) \
-      do { \
-          GTimeVal __now; \
-          g_get_current_time(&__now); \
-          *ts = g_time_val_to_iso8601(&__now); \
-      } while(0)
+    while(timeout && !interrupted) {
+        sleep(1);
+        --timeout;
+    }
 
-enum offset {
+    if (!interrupted) {
+        interrupted = -1;
+        drakvuf_interrupt(drakvuf, -1);
+    }
 
-    KIINITIALPCR,
-    KDDEBUGGERDATABLOCK,
-    PSINITIALSYSTEMPROCESS,
+    g_thread_exit(NULL);
+    return NULL;
+}
 
-    EPROCESS_PID,
-    EPROCESS_PDBASE,
-    EPROCESS_PNAME,
-    EPROCESS_TASKS,
-    EPROCESS_PEB,
-    EPROCESS_OBJECTTABLE,
+int main(int argc, char** argv) {
 
-    PEB_IMAGEBASADDRESS,
-    PEB_LDR,
+    int c;
+    char *inject_cmd = NULL;
+    char *domain = NULL;
+    char *rekall_profile = NULL;
+    char *dump_folder = NULL;
+    vmi_pid_t injection_pid = -1;
+    struct sigaction act;
+    int timeout = 0;
+    GThread *timeout_thread = NULL;
+    output_format_t output = OUTPUT_DEFAULT;
 
-    PEB_LDR_DATA_INLOADORDERMODULELIST,
+    fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
 
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
+    if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 ) {
+        fprintf(stderr, "No plugins have been enabled, nothing to do!\n");
+        return 1;
+    }
 
-    FILE_OBJECT_DEVICEOBJECT,
-    FILE_OBJECT_READACCESS,
-    FILE_OBJECT_WRITEACCESS,
-    FILE_OBJECT_DELETEACCESS,
-    FILE_OBJECT_FILENAME,
+    if (argc < 4) {
+        fprintf(stderr, "Required input:\n"
+               "\t -r <rekall profile>       The Rekall profile of the Windows kernel\n"
+               "\t -d <domain ID or name>    The domain's ID or name\n"
+               "Optional inputs:\n"
+               "\t -i <injection pid>        The PID of the process to hijack for injection\n"
+               "\t -e <inject_exe>           The executable to start with injection\n"
+               "\t -t <timeout>              Timeout (in seconds)\n"
+               "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
+               "\t -o <format>               Output format (default or csv)\n"
+               "\t -v                        Turn on verbose (debug) output\n"
+        );
+        return 1;
+    }
 
-    HANDLE_TABLE_HANDLECOUNT,
-
-    KPCR_PRCB,
-    KPCR_PRCBDATA,
-    KPRCB_CURRENTTHREAD,
-
-    KTHREAD_PROCESS,
-    KTHREAD_INITIALSTACK,
-    KTHREAD_STACKLIMIT,
-    KTHREAD_APCSTATE,
-    KTHREAD_TRAPFRAME,
-    KTHREAD_APCQUEUEABLE,
-
-    KTRAP_FRAME_RIP,
-
-    KAPC_APCLISTENTRY,
-
-    NT_TIB_STACKBASE,
-    NT_TIB_STACKLIMIT,
-
-    ETHREAD_CID,
-    CLIENT_ID_UNIQUETHREAD,
-
-    OBJECT_HEADER_TYPEINDEX,
-    OBJECT_HEADER_BODY,
-
-    UNICODE_STRING_LENGTH,
-    UNICODE_STRING_BUFFER,
-
-    POOL_HEADER_BLOCKSIZE,
-    POOL_HEADER_POOLTYPE,
-    POOL_HEADER_POOLTAG,
-
-    OFFSET_MAX
-};
-
-static const char *offset_names[OFFSET_MAX][2] = {
-    [KIINITIALPCR] = { "KiInitialPCR", NULL },
-    [KDDEBUGGERDATABLOCK] = { "KdDebuggerDataBlock", NULL },
-    [PSINITIALSYSTEMPROCESS] = { "PsInitialSystemProcess", NULL },
-    [EPROCESS_PID] = { "_EPROCESS", "UniqueProcessId" },
-    [EPROCESS_PDBASE] = { "_KPROCESS", "DirectoryTableBase" },
-    [EPROCESS_PNAME] = { "_EPROCESS", "ImageFileName" },
-    [EPROCESS_TASKS] = { "_EPROCESS", "ActiveProcessLinks" },
-    [EPROCESS_PEB] = { "_EPROCESS", "Peb" },
-    [EPROCESS_OBJECTTABLE] = {"_EPROCESS", "ObjectTable" },
-    [PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
-    [PEB_LDR] = { "_PEB", "Ldr" },
-    [PEB_LDR_DATA_INLOADORDERMODULELIST] = {"_PEB_LDR_DATA", "InLoadOrderModuleList" },
-    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
-    [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
-    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
-    [FILE_OBJECT_DEVICEOBJECT] = {"_FILE_OBJECT", "DeviceObject" },
-    [FILE_OBJECT_READACCESS] = {"_FILE_OBJECT", "ReadAccess" },
-    [FILE_OBJECT_WRITEACCESS] = {"_FILE_OBJECT", "WriteAccess" },
-    [FILE_OBJECT_DELETEACCESS] = {"_FILE_OBJECT", "DeleteAccess" },
-    [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
-    [HANDLE_TABLE_HANDLECOUNT] = {"_HANDLE_TABLE", "HandleCount" },
-    [KPCR_PRCB] = {"_KPCR", "Prcb" },
-    [KPCR_PRCBDATA] = {"_KPCR", "PrcbData" },
-    [KPRCB_CURRENTTHREAD] = { "_KPRCB", "CurrentThread" },
-    [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
-    [KTHREAD_INITIALSTACK] = {"_KTHREAD", "InitialStack"},
-    [KTHREAD_STACKLIMIT] = {"_KTHREAD", "StackLimit"},
-    [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
-    [KTHREAD_APCSTATE] = {"_KTHREAD", "ApcState" },
-    [KTHREAD_APCQUEUEABLE] = {"_KTHREAD", "ApcQueueable"},
-    [KAPC_APCLISTENTRY] = {"_KAPC", "ApcListEntry" },
-    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
-    [NT_TIB_STACKBASE] = { "_NT_TIB", "StackBase" },
-    [NT_TIB_STACKLIMIT] = { "_NT_TIB", "StackLimit" },
-    [ETHREAD_CID] = {"_ETHREAD", "Cid" },
-    [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
-    [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
-    [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
-    [UNICODE_STRING_LENGTH] = {"_UNICODE_STRING", "Length" },
-    [UNICODE_STRING_BUFFER] = {"_UNICODE_STRING", "Buffer" },
-    [POOL_HEADER_BLOCKSIZE] = {"_POOL_HEADER", "BlockSize" },
-    [POOL_HEADER_POOLTYPE] = {"_POOL_HEADER", "PoolType" },
-    [POOL_HEADER_POOLTAG] = {"_POOL_HEADER", "PoolTag" },
-};
-
-size_t offsets[OFFSET_MAX];
-
-enum size {
-    FILE_OBJECT,
-    //OBJECT_ATTRIBUTES,
-    //OBJECT_HEADER,
-    POOL_HEADER,
-
-    SIZE_LIST_MAX
-};
-
-static const char *size_names[SIZE_LIST_MAX] = {
-        [FILE_OBJECT] = "_FILE_OBJECT",
-        //[OBJECT_ATTRIBUTES] = "_OBJECT_ATTRIBUTES", // May be useful TODO
-        //[OBJECT_HEADER] = "_OBJECT_HEADER",
-        [POOL_HEADER] = "_POOL_HEADER",
-};
-
-// Aligned object sizes
-size_t struct_sizes[SIZE_LIST_MAX];
-
-void inject_traps(drakvuf_t *drakvuf);
-
-void drakvuf_loop(drakvuf_t *drakvuf);
-void init_vmi(drakvuf_t *drakvuf);
-void close_vmi(drakvuf_t *drakvuf);
-
-event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event);
-event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
-event_response_t vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
-
-void free_guid_lookup(gpointer s);
-void free_symbolwrap(gpointer z);
-void free_file_watch(gpointer z);
+    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:v")) != -1)
+    switch (c)
+    {
+    case 'r':
+        rekall_profile = optarg;
+        break;
+    case 'd':
+        domain = optarg;
+        break;
+    case 'i':
+        injection_pid = atoi(optarg);
+        break;
+    case 'e':
+        inject_cmd = optarg;
+        break;
+    case 't':
+        timeout = atoi(optarg);
+        break;
+#ifdef ENABLE_PLUGIN_FILEDELETE
+    case 'D':
+        dump_folder = optarg;
+        break;
 #endif
+    case 'o':
+        if(!strncmp(optarg,"csv",3))
+            output = OUTPUT_CSV;
+        break;
+    case 'v':
+//        verbose = 1;
+        break;
+    default:
+        fprintf(stderr, "Unrecognized option: %c\n", c);
+        return 1;
+    }
+
+    interrupted = 0;
+
+    if (!drakvuf_init(&drakvuf, domain, rekall_profile))
+        return 1;
+
+    if(output != OUTPUT_DEFAULT)
+        drakvuf_set_output_format(drakvuf, output);
+
+    if(timeout > 0) {
+        timeout_thread = g_thread_new(NULL, timer, &timeout);
+    }
+
+    drakvuf_pause(drakvuf);
+
+    if (injection_pid > 0 && inject_cmd) {
+        int rc = drakvuf_inject_cmd(drakvuf, injection_pid, inject_cmd);
+
+        if (!rc) {
+            fprintf(stderr, "Process startup failed\n");
+            goto exit;
+        }
+    }
+
+#ifdef ENABLE_PLUGIN_SYSCALLS
+    if ( !drakvuf_plugin_init(drakvuf, PLUGIN_SYSCALLS, rekall_profile) )
+        goto exit;
+#endif
+
+#ifdef ENABLE_PLUGIN_POOLMON
+    if ( !drakvuf_plugin_init(drakvuf, PLUGIN_POOLMON, rekall_profile) )
+        goto exit;
+#endif
+
+#ifdef ENABLE_PLUGIN_FILETRACER
+    if ( !drakvuf_plugin_init(drakvuf, PLUGIN_FILETRACER, rekall_profile) )
+        goto exit;
+#endif
+
+#ifdef ENABLE_PLUGIN_FILEDELETE
+    do {
+        struct filedelete_config c= {
+            .rekall_profile = rekall_profile,
+            .dump_folder = dump_folder
+        };
+
+        if ( !drakvuf_plugin_init(drakvuf, PLUGIN_FILEDELETE, &c) )
+            goto exit;
+    } while(0);
+#endif
+
+    /* for a clean exit */
+    act.sa_handler = close_handler;
+    act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGHUP, &act, NULL);
+    sigaction(SIGTERM, &act, NULL);
+    sigaction(SIGINT, &act, NULL);
+    sigaction(SIGALRM, &act, NULL);
+
+    if ( drakvuf_plugins_start(drakvuf) )
+        drakvuf_loop(drakvuf);
+
+exit:
+    drakvuf_pause(drakvuf);
+    drakvuf_plugins_close(drakvuf);
+    drakvuf_close(drakvuf);
+
+    if(timeout_thread)
+        g_thread_join(timeout_thread);
+
+    return 0;
+}

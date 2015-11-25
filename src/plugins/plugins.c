@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,20 +102,53 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef FILE_EXTRACTOR_H
-#define FILE_EXTRACTOR_H
+#include <stdarg.h>
+#include "plugins.h"
+#include "private.h"
 
-#include <libvmi/libvmi.h>
-#include "structures.h"
+int drakvuf_plugin_init(drakvuf_t drakvuf,
+                        drakvuf_plugin_t plugin,
+                        const void *config)
+{
+    if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
+         plugin < __DRAKVUF_PLUGIN_LIST_MAX)
+    {
+        return plugins[plugin].init(drakvuf, config);
+    }
 
-void extract_file(drakvuf_t *drakvuf, const char *filename, GTree *files);
-void grab_file_by_handle(drakvuf_t *drakvuf, vmi_event_t *event, reg_t cr3,
-        addr_t handle);
-void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3,
-        struct symbolwrap *s);
-void setup_file_watch(drakvuf_t *drakvuf, vmi_instance_t vmi,
-        addr_t obj_pa, addr_t ph_base, uint32_t block_size);
-void carve_file_from_memory(drakvuf_t *drakvuf, addr_t ph_base,
-        addr_t block_size);
+    return 0;
+}
 
-#endif
+int drakvuf_plugins_start(drakvuf_t drakvuf)
+{
+    int i;
+    int ret = 0;
+
+    if (__DRAKVUF_PLUGIN_LIST_MAX == 0)
+        return ret;
+
+    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++) {
+        ret = plugins[i].start(drakvuf);
+        if (!ret)
+            break;
+    }
+
+    return ret;
+}
+
+int drakvuf_plugins_close(drakvuf_t drakvuf)
+{
+    int i;
+    int ret = 0;
+
+    if (__DRAKVUF_PLUGIN_LIST_MAX == 0)
+        return ret;
+
+    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++) {
+        ret = plugins[i].close(drakvuf);
+        if (!ret)
+            break;
+    }
+
+    return ret;
+}

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,12 +102,13 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_HANDLES_H
-#define WIN_HANDLES_H
+#ifndef FILEDELETE_H
+#define FILEDELETE_H
 
-#include <libvmi/libvmi.h>
-#include "structures.h"
+#include "plugins.h"
 
-addr_t get_obj_by_handle(drakvuf_t *drakvuf, vmi_instance_t vmi, uint64_t vcpu_id, uint64_t handle);
+int plugin_filedelete_init(drakvuf_t drakvuf, const void *config);
+int plugin_filedelete_start(drakvuf_t drakvuf);
+int plugin_filedelete_close(drakvuf_t drakvuf);
 
 #endif

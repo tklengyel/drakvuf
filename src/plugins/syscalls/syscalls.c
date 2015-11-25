@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,23 +102,92 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
+#ifndef SYSCALLS_H
+#define SYSCALLS_H
 
-#include "structures.h"
-#include "pooltag.h"
+#include <glib.h>
+#include "../plugins.h"
 
-GTree* pooltag_build_tree() {
-    GTree *pooltags = g_tree_new((GCompareFunc) strcmp);
+static GSList *traps;
+static output_format_t format;
 
-    uint32_t i = 0;
-    for (; i < TAG_COUNT; i++) {
-        g_tree_insert(pooltags, (char*) tags[i].tag,
-                (char*) &tags[i]);
+static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+
+    switch(format) {
+    case OUTPUT_CSV:
+        printf("syscall,%s,%s\n", info->trap->module, info->trap->name);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[SYSCALL] %s!%s\n", info->trap->module, info->trap->name);
+        break;
     }
 
-    return pooltags;
+    return 0;
 }
+
+static GSList *create_trap_config(symbols_t *symbols) {
+
+    GSList *ret = NULL;
+    unsigned long i;
+    for (i=0; i < symbols->count; i++) {
+
+        const struct symbol *symbol = &symbols->symbols[i];
+
+        if (strncmp(symbol->name, "Nt", 2))
+            continue;
+
+        drakvuf_trap_t *trap = g_malloc0(sizeof(drakvuf_trap_t));
+        trap->lookup_type = LOOKUP_PID;
+        trap->u.pid = 4;
+        trap->addr_type = ADDR_RVA;
+        trap->u2.rva = symbol->rva;
+        trap->name = g_strdup(symbol->name);
+        trap->module = "ntoskrnl.exe";
+        trap->type = BREAKPOINT;
+        trap->cb = cb;
+
+        ret = g_slist_prepend(ret, trap);
+    }
+
+    return ret;
+}
+
+int plugin_syscall_init(drakvuf_t drakvuf, const char *rekall_profile) {
+
+    symbols_t *symbols = drakvuf_get_symbols_from_rekall(rekall_profile);
+    if (!symbols)
+    {
+        fprintf(stderr, "Failed to parse Rekall profile at %s\n", rekall_profile);
+        return 0;
+    }
+
+    traps = create_trap_config(symbols);
+
+    drakvuf_free_symbols(symbols);
+    format = drakvuf_get_output_format(drakvuf);
+
+    return 1;
+}
+
+int plugin_syscall_start(drakvuf_t drakvuf) {
+    drakvuf_add_traps(drakvuf, traps);
+    return 1;
+}
+
+int plugin_syscall_close(drakvuf_t drakvuf) {
+    GSList *loop = traps;
+    while(loop) {
+        drakvuf_trap_t *trap = loop->data;
+        free((char*)trap->name);
+        free(loop->data);
+        loop = loop->next;
+    }
+
+    g_slist_free(traps);
+    traps = NULL;
+
+    return 1;
+}
+
+#endif

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,11 +102,45 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef INJECTOR_H
-#define INJECTOR_H
+#ifndef DRAKVUF_PLUGINS_H
+#define DRAKVUF_PLUGINS_H
 
-#include "structures.h"
+#include <config.h>
+#include <stdlib.h>
+#include "../libdrakvuf/drakvuf.h"
 
-int start_app(drakvuf_t *drakvuf, vmi_pid_t pid, const char *app);
+typedef enum drakvuf_plugin {
+
+    #ifdef ENABLE_PLUGIN_SYSCALLS
+    PLUGIN_SYSCALLS,
+    #endif
+
+    #ifdef ENABLE_PLUGIN_POOLMON
+    PLUGIN_POOLMON,
+    #endif
+
+    #ifdef ENABLE_PLUGIN_FILETRACER
+    PLUGIN_FILETRACER,
+    #endif
+
+    #ifdef ENABLE_PLUGIN_FILEDELETE
+    PLUGIN_FILEDELETE,
+    #endif
+
+    __DRAKVUF_PLUGIN_LIST_MAX
+} drakvuf_plugin_t;
+
+int drakvuf_plugin_init(drakvuf_t drakvuf,
+                        drakvuf_plugin_t plugin,
+                        const void *);
+int drakvuf_plugins_start(drakvuf_t drakvuf);
+int drakvuf_plugins_close(drakvuf_t drakvuf);
+
+#ifdef ENABLE_PLUGIN_FILEDELETE
+struct filedelete_config {
+    const char *rekall_profile;
+    const char *dump_folder;
+};
+#endif
 
 #endif

@@ -1,6 +1,6 @@
  #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
  #                                                                         #
- # DRAKVUF Dynamic Malware Analysis System (C) 2014 Tamas K Lengyel.       #
+ # DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  #
  # Tamas K Lengyel is hereinafter referred to as the author.               #
  # This program is free software; you may redistribute and/or modify it    #
  # under the terms of the GNU General Public License as published by the   #
@@ -103,14 +103,74 @@
  #*************************************************************************#
 
 AC_PREREQ([2.60])
-AC_INIT([DRAKVUF], [0.2], [tamas.k.lengyel@gmail.com], [], [http://github.com/tklengyel/drakvuf])
-AM_INIT_AUTOMAKE([1.10 no-define foreign])
+AC_INIT([DRAKVUF], [0.2], [tamas@tklengyel.com], [], [http://drakvuf.com])
+AM_INIT_AUTOMAKE([1.10 no-define foreign subdir-objects])
+LT_INIT
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_PROG_CC_STDC
 AC_PROG_CXX
 
+######################################################
+
+AC_ARG_ENABLE([plugin_syscalls],
+  [AS_HELP_STRING([--disable-plugin-syscalls],
+    [Enable the syscall tracing plugin @<:@yes@:>@])],
+  [plugin_syscalls="$enableval"],
+  [plugin_syscalls="yes"])   
+AM_CONDITIONAL([PLUGIN_SYSCALLS], [test x$plugin_syscalls = xyes])
+if test x$plugin_syscalls = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_SYSCALLS, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_poolmon],
+  [AS_HELP_STRING([--disable-plugin-poolmon],
+    [Enable the kernel heap allocation tracer @<:@yes@:>@])],
+  [plugin_poolmon="$enableval"],
+  [plugin_poolmon="yes"])   
+AM_CONDITIONAL([PLUGIN_POOLMON], [test x$plugin_poolmon = xyes])
+if test x$plugin_poolmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_POOLMON, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_filetracer],
+  [AS_HELP_STRING([--disable-plugin-filetracer],
+    [Enable the file tracer plugin @<:@yes@:>@])],
+  [plugin_filetracer="$enableval"],
+  [plugin_filetracer="yes"])   
+AM_CONDITIONAL([PLUGIN_FILETRACER], [test x$plugin_filetracer = xyes])
+if test x$plugin_filetracer = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_FILETRACER, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_filedelete],
+  [AS_HELP_STRING([--disable-plugin-filedelete],
+    [Enable the file delete catching plugin @<:@yes@:>@])],
+  [plugin_filedelete="$enableval"],
+  [plugin_filedelete="yes"])   
+AM_CONDITIONAL([PLUGIN_FILEDELETE], [test x$plugin_filedelete = xyes])
+if test x$plugin_filedelete = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_FILEDELETE, 1, "")
+fi
+
+#####################################################
+
+AC_ARG_ENABLE([hardening],
+  [AS_HELP_STRING([--enable-hardening],
+    [Enable compiler and linker options to frustrate memory corruption exploits @<:@yes@:>@])],
+  [hardening="$enableval"],
+  [hardening="yes"])
+AM_CONDITIONAL([HARDENING], [test x$hardening = xyes])  
+  
+AC_ARG_ENABLE([debug],
+  [AS_HELP_STRING([--enable-debug],
+    [Enable verbose debug output to be compiled @<:@no@:>@])],
+  [debug="$enableval"],
+  [debug="no"])   
+AM_CONDITIONAL([DEBUG], [test x$debug = xyes])
+
+#####################################################
 # AUTOHARDEN START
 # We want to check for compiler flag support, but there is no way to make
 # clang's "argument unused" warning fatal.  So we invoke the compiler through a
@@ -136,26 +196,12 @@ AC_DEFUN([check_cc_cxx_flag],
 AC_DEFUN([check_link_flag],
  [AX_CHECK_LINK_FLAG([$1], [$2], [$3], [-Werror $4])])
 
-AC_ARG_ENABLE([hardening],
-  [AS_HELP_STRING([--enable-hardening],
-    [Enable compiler and linker options to frustrate memory corruption exploits @<:@yes@:>@])],
-  [hardening="$enableval"],
-  [hardening="yes"])
-AM_CONDITIONAL([HARDENING], [test x$hardening = xyes])  
-  
-AC_ARG_ENABLE([debug],
-  [AS_HELP_STRING([--enable-debug],
-    [Enable verbose debug output to be compiled @<:@no@:>@])],
-  [debug="$enableval"],
-  [debug="no"])   
-AM_CONDITIONAL([DEBUG], [test x$debug = xyes])
-
 HARDEN_CFLAGS=""
 HARDEN_LDFLAGS=""
 AS_IF([test x"$hardening" != x"no"], [
   check_cc_cxx_flag([-fno-strict-overflow], [HARDEN_CFLAGS="$HARDEN_CFLAGS -fno-strict-overflow"])
 
-#  This one will likely succeed, even on platforms where it does nothing.
+# This one will likely succeed, even on platforms where it does nothing.
   check_cc_cxx_flag([-D_FORTIFY_SOURCE=2], [HARDEN_CFLAGS="$HARDEN_CFLAGS -D_FORTIFY_SOURCE=2"])
 
   check_cc_cxx_flag([-fstack-protector-all],
@@ -189,6 +235,7 @@ CC="$saved_CC"
 CXX="$saved_CXX"
 LD="$saved_LD"
 # AUTOHARDEN END
+#####################################################
 
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h malloc.h stdio.h stdlib.h string.h sys/time.h sys/mman.h syslog.h unistd.h errno.h pthread.h])
@@ -215,24 +262,6 @@ AC_CHECK_LIB(vmi, [vmi_register_event, vmi_step_event, vmi_read], [], [AC_ERROR(
 PKG_CHECK_MODULES([JANSSON], [jansson >= 2.1], [], [AC_ERROR([LibJANSSON not found])])
 AC_CHECK_LIB(jansson, json_load_file, [], [AC_ERROR([LibJANSSON not usable])])
 
-# Check for Python
-AM_PATH_PYTHON([2.7])
-if test "xPYTHON" != "x"; then
-        AC_DEFINE_UNQUOTED(PYTHON, "$PYTHON", "Python found")
-else
-        AC_ERROR([Python was not found on the system!])
-fi
-
-AX_PYTHON_MODULE([pyvmi], [fatal])
-
-AC_PATH_PROG(VOLATILITY, vol.py)
-
-if test "x$VOLATILITY" != "x"; then
-        AC_DEFINE_UNQUOTED(VOLATILITY, "$VOLATILITY", "Volatility vol.py found")
-else
-        AC_ERROR([** Volatility vol.py was not found in your PATH!])
-fi
-
 AC_CHECK_HEADERS([libxl_utils.h], [], [AC_ERROR([Xenlight (libxl) headers are not usable])])
 AC_CHECK_LIB(xenlight, libxl_name_to_domid, [], [AC_ERROR([Xenlight does not have required features!])])
 
@@ -245,6 +274,49 @@ AC_CHECK_LIB([xenctrl],
 	[xc_interface_open, xc_memshr_control, xc_memshr_nominate_gfn, xc_memshr_share_gfns], 
 	[], [AC_ERROR([XenCtrl is unusable! Do you have Xen 4.2+ installed?])])
 
-AC_CONFIG_FILES([Makefile src/Makefile])
+#####################################################
+
+if test x$plugin_filedelete = xyes; then
+    # Check for Python
+    AM_PATH_PYTHON([2.7])
+    if test "xPYTHON" != "x"; then
+        AC_DEFINE_UNQUOTED(PYTHON, "$PYTHON", "Python found")
+    else
+        AC_ERROR([Python was not found on the system!])
+    fi
+
+    AX_PYTHON_MODULE([pyvmi], [fatal])
+
+    AC_PATH_PROG(VOLATILITY, vol.py)
+
+    if test "x$VOLATILITY" != "x"; then
+        AC_DEFINE_UNQUOTED(VOLATILITY, "$VOLATILITY", "Volatility vol.py found")
+    else
+        AC_ERROR([** Volatility vol.py was not found in your PATH!])
+    fi
+fi
+
+#####################################################
+
+AC_CONFIG_FILES([Makefile src/Makefile
+                 src/libdrakvuf/Makefile
+                 src/xen_helper/Makefile
+                 src/plugins/Makefile
+               ])
+
 AC_OUTPUT
 
+AC_MSG_RESULT([-------------------------------------------------------------------------------
+DRAKVUF is configured as follows. Please verify that this configuration
+matches your expectations.
+
+Host system type: $host
+Build system type: $build
+Installation prefix: $prefix
+-------------------------------------------------------------------------------
+DRAKVUF Plugins
+Syscalls:   $plugin_syscalls
+Poolmon:    $plugin_poolmon
+Filetracer: $plugin_filetracer
+Filedelete: $plugin_filedelete
+-------------------------------------------------------------------------------])

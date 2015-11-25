@@ -102,15 +102,11 @@
  #                                                                         #
  #*************************************************************************# 
 
-bin_PROGRAMS = drakvuf xen_memclone injector
+h_sources = drakvuf.h
+c_sources = drakvuf.c injector.c win-exports.c vmi.c win-symbols.c win-handles.c
 
-SUBDIRS = xen_helper libdrakvuf plugins
-
-drakvuf_SOURCES = drakvuf.c
-xen_memclone_SOURCES  = xen_memclone.c
-injector_SOURCES = injector.c
-
-AM_CFLAGS = $(CFLAGS)
+AM_CFLAGS = -I$(top_srcdir)
+AM_CFLAGS += $(CFLAGS)
 AM_CFLAGS += $(VMI_CFLAGS)
 AM_CFLAGS += $(GLIB_CFLAGS)
 
@@ -127,14 +123,6 @@ AM_CFLAGS += -pg
 endif
 endif
 
-drakvuf_LDADD = libdrakvuf/libdrakvuf.la
-drakvuf_LDADD += xen_helper/libxenhelper.la
-drakvuf_LDADD += plugins/libdrakvufplugins.la
-
-if HARDENING
-drakvuf_LDADD += $(HARDEN_LDFLAGS)
-endif
-
-injector_LDADD = libdrakvuf/libdrakvuf.la
-
-xen_memclone_LDADD = xen_helper/libxenhelper.la
+noinst_LTLIBRARIES= libdrakvuf.la
+libdrakvuf_la_SOURCES= $(h_sources) $(c_sources)
+libdrakvuf_la_LIBADD= ../xen_helper/libxenhelper.la
