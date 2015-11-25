@@ -122,6 +122,10 @@ if PLUGIN_FILEDELETE
 sources += filedelete/filedelete.c
 endif
 
+if PLUGIN_OBJMON
+sources += objmon/objmon.c
+endif
+
 ###############################################################################
 sources += plugins.c plugins.h
 

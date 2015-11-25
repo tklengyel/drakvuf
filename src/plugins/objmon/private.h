@@ -102,74 +102,55 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PLUGIN_PRIVATE_H
-#define PLUGIN_PRIVATE_H
+#ifndef OBJMON_PRIVATE_H
+#define OBJMON_PRIVATE_H
 
-#include <config.h>
-#include "plugins.h"
-
-typedef int (*plugin_init_t) (drakvuf_t drakvuf, const void *config);
-typedef int (*plugin_start_t) (drakvuf_t drakvuf);
-typedef int (*plugin_close_t) (drakvuf_t drakvuf);
-
-typedef struct plugin {
-    plugin_init_t init;
-    plugin_start_t start;
-    plugin_close_t close;
-} plugin_t;
-
-#ifdef ENABLE_PLUGIN_SYSCALLS
-#include "syscalls/syscalls.h"
-#endif
-
-#ifdef ENABLE_PLUGIN_POOLMON
-#include "poolmon/poolmon.h"
-#endif
-
-#ifdef ENABLE_PLUGIN_FILETRACER
-#include "filetracer/filetracer.h"
-#endif
-
-#ifdef ENABLE_PLUGIN_FILEDELETE
-#include "filedelete/filedelete.h"
-#endif
-
-#ifdef ENABLE_PLUGIN_OBJMON
-#include "objmon/objmon.h"
-#endif
-
-static plugin_t plugins[] = {
-
-    #ifdef ENABLE_PLUGIN_SYSCALLS
-    [PLUGIN_SYSCALLS] = { .init = plugin_syscall_init,
-                          .start = plugin_syscall_start,
-                          .close = plugin_syscall_close},
-    #endif
-
-    #ifdef ENABLE_PLUGIN_POOLMON
-    [PLUGIN_POOLMON] = { .init = plugin_poolmon_init,
-                         .start = plugin_poolmon_start,
-                         .close = plugin_poolmon_close },
-    #endif
-
-    #ifdef ENABLE_PLUGIN_FILETRACER
-    [PLUGIN_FILETRACER] = { .init = plugin_filetracer_init,
-                            .start = plugin_filetracer_start,
-                            .close = plugin_filetracer_close },
-    #endif
-
-    #ifdef ENABLE_PLUGIN_FILEDELETE
-    [PLUGIN_FILEDELETE] = { .init = plugin_filedelete_init,
-                            .start = plugin_filedelete_start,
-                            .close = plugin_filedelete_close },
-    #endif
-
-    #ifdef ENABLE_PLUGIN_OBJMON
-    [PLUGIN_OBJMON] = { .init = plugin_objmon_init,
-                        .start = plugin_objmon_start,
-                        .close = plugin_objmon_close },
-    #endif
-
+#define WIN7_TYPEINDEX_LAST 44
+static const char *win7_typeindex[] = {
+         [0] = "",
+         [1] = "",
+         [2] = "Type",
+         [3] = "Directory",
+         [4] = "SymbolicLink",
+         [5] = "Token",
+         [6] = "Job",
+         [7] = "Process",
+         [8] = "Thread",
+         [9] = "UserApcReserve",
+         [10] = "IoCompletionReserve",
+         [11] = "DebugObject",
+         [12] = "Event",
+         [13] = "EventPair",
+         [14] = "Mutant",
+         [15] = "Callback",
+         [16] = "Semaphore",
+         [17] = "Timer",
+         [18] = "Profile",
+         [19] = "KeyedEvent",
+         [20] = "WindowStation",
+         [21] = "Desktop",
+         [22] = "TpWorkerFactory",
+         [23] = "Adapter",
+         [24] = "Controller",
+         [25] = "Device",
+         [26] = "Driver",
+         [27] = "IoCompletion",
+         [28] = "File",
+         [29] = "TmTm",
+         [30] = "TmTx",
+         [31] = "TmRm",
+         [32] = "TmEn",
+         [33] = "Section",
+         [34] = "Session",
+         [35] = "Key",
+         [36] = "ALPC Port",
+         [37] = "PowerRequest",
+         [38] = "WmiGuid",
+         [39] = "EtwRegistration",
+         [40] = "EtwConsumer",
+         [41] = "FilterConnectionPort",
+         [42] = "FilterCommunicationPort",
+         [43] = "PcwObject"
 };
 
 #endif

@@ -135,6 +135,7 @@ enum pool_type {
 };
 
 static const char *pool_types[] = {
+    [0 ... MaxPoolType]                     = NULL,
     [NonPagedPool]                          = "NonPagedPool",
     [NonPagedPoolExecute]                   = "NonPagedPoolExecute",
     [PagedPool]                             = "PagedPool",
@@ -150,54 +151,6 @@ struct pooltag {
     char* source;
     char* description;
 };
-
-#define WIN7_TYPEINDEX_LAST 44
-static const char *win7_typeindex[] = {
-         [0] = "",
-         [1] = "",
-         [2] = "Type",
-         [3] = "Directory",
-         [4] = "SymbolicLink",
-         [5] = "Token",
-         [6] = "Job",
-         [7] = "Process",
-         [8] = "Thread",
-         [9] = "UserApcReserve",
-         [10] = "IoCompletionReserve",
-         [11] = "DebugObject",
-         [12] = "Event",
-         [13] = "EventPair",
-         [14] = "Mutant",
-         [15] = "Callback",
-         [16] = "Semaphore",
-         [17] = "Timer",
-         [18] = "Profile",
-         [19] = "KeyedEvent",
-         [20] = "WindowStation",
-         [21] = "Desktop",
-         [22] = "TpWorkerFactory",
-         [23] = "Adapter",
-         [24] = "Controller",
-         [25] = "Device",
-         [26] = "Driver",
-         [27] = "IoCompletion",
-         [28] = "File",
-         [29] = "TmTm",
-         [30] = "TmTx",
-         [31] = "TmRm",
-         [32] = "TmEn",
-         [33] = "Section",
-         [34] = "Session",
-         [35] = "Key",
-         [36] = "ALPC Port",
-         [37] = "PowerRequest",
-         [38] = "WmiGuid",
-         [39] = "EtwRegistration",
-         [40] = "EtwConsumer",
-         [41] = "FilterConnectionPort",
-         [42] = "FilterCommunicationPort",
-         [43] = "PcwObject"
-  };
 
 #define TAG_COUNT 2254
 static const struct pooltag tags[TAG_COUNT] = {
