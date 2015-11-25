@@ -102,74 +102,107 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PLUGIN_PRIVATE_H
-#define PLUGIN_PRIVATE_H
-
 #include <config.h>
-#include "plugins.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <dirent.h>
+#include <glib.h>
+#include <err.h>
 
-typedef int (*plugin_init_t) (drakvuf_t drakvuf, const void *config);
-typedef int (*plugin_start_t) (drakvuf_t drakvuf);
-typedef int (*plugin_close_t) (drakvuf_t drakvuf);
+#include <libvmi/libvmi.h>
+#include "../plugins.h"
+#include "private.h"
 
-typedef struct plugin {
-    plugin_init_t init;
-    plugin_start_t start;
-    plugin_close_t close;
-} plugin_t;
+static drakvuf_trap_t trap;
+static output_format_t format;
+static addr_t typeindex_offset;
 
-#ifdef ENABLE_PLUGIN_SYSCALLS
-#include "syscalls/syscalls.h"
-#endif
+/*
+ NTKERNELAPI
+ NTSTATUS
+ ObCreateObject (
+ IN KPROCESSOR_MODE ObjectAttributesAccessMode OPTIONAL,
+ IN POBJECT_TYPE ObjectType,
+ IN POBJECT_ATTRIBUTES ObjectAttributes OPTIONAL,
+ IN KPROCESSOR_MODE AccessMode,
+ IN PVOID Reserved,
+ IN ULONG ObjectSizeToAllocate,
+ IN ULONG PagedPoolCharge OPTIONAL,
+ IN ULONG NonPagedPoolCharge OPTIONAL,
+ OUT PVOID *Object
+ );
+ */
+static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
-#ifdef ENABLE_PLUGIN_POOLMON
-#include "poolmon/poolmon.h"
-#endif
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    page_mode_t pm = vmi_get_page_mode(vmi);
+    uint8_t index = ~0;
 
-#ifdef ENABLE_PLUGIN_FILETRACER
-#include "filetracer/filetracer.h"
-#endif
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rdx + typeindex_offset
+    };
 
-#ifdef ENABLE_PLUGIN_FILEDELETE
-#include "filedelete/filedelete.h"
-#endif
+    vmi_read_8(vmi, &ctx, &index);
 
-#ifdef ENABLE_PLUGIN_OBJMON
-#include "objmon/objmon.h"
-#endif
+    if(index < WIN7_TYPEINDEX_LAST)
+    {
+        switch(format) {
+        case OUTPUT_CSV:
+        {
+            printf("objmon,%s", win7_typeindex[index]);
+            break;
+        }
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[OBJMON] %s", win7_typeindex[index]);
+            break;
+        };
 
-static plugin_t plugins[] = {
+        printf("\n");
+    }
 
-    #ifdef ENABLE_PLUGIN_SYSCALLS
-    [PLUGIN_SYSCALLS] = { .init = plugin_syscall_init,
-                          .start = plugin_syscall_start,
-                          .close = plugin_syscall_close},
-    #endif
+    drakvuf_release_vmi(drakvuf);
+    return 0;
+}
 
-    #ifdef ENABLE_PLUGIN_POOLMON
-    [PLUGIN_POOLMON] = { .init = plugin_poolmon_init,
-                         .start = plugin_poolmon_start,
-                         .close = plugin_poolmon_close },
-    #endif
+/* ----------------------------------------------------- */
 
-    #ifdef ENABLE_PLUGIN_FILETRACER
-    [PLUGIN_FILETRACER] = { .init = plugin_filetracer_init,
-                            .start = plugin_filetracer_start,
-                            .close = plugin_filetracer_close },
-    #endif
+int plugin_objmon_init(drakvuf_t drakvuf, const char *rekall_profile) {
+    trap.lookup_type = LOOKUP_PID;
+    trap.u.pid = 4;
+    trap.addr_type = ADDR_RVA;
+    trap.u2.rva = drakvuf_get_function_rva(rekall_profile, "ObCreateObject");
+    trap.name = "ObCreateObject";
+    trap.module = "ntoskrnl.exe";
+    trap.type = BREAKPOINT;
+    trap.cb = cb;
 
-    #ifdef ENABLE_PLUGIN_FILEDELETE
-    [PLUGIN_FILEDELETE] = { .init = plugin_filedelete_init,
-                            .start = plugin_filedelete_start,
-                            .close = plugin_filedelete_close },
-    #endif
+    if (!trap.u2.rva) {
+        return 0;
+    }
 
-    #ifdef ENABLE_PLUGIN_OBJMON
-    [PLUGIN_OBJMON] = { .init = plugin_objmon_init,
-                        .start = plugin_objmon_start,
-                        .close = plugin_objmon_close },
-    #endif
+    format = drakvuf_get_output_format(drakvuf);
 
-};
+    windows_system_map_lookup(rekall_profile, "_OBJECT_HEADER", "TypeIndex", &typeindex_offset, NULL);
 
-#endif
+    return 1;
+}
+
+int plugin_objmon_start(drakvuf_t drakvuf) {
+    drakvuf_add_trap(drakvuf, &trap);
+    return 1;
+}
+
+int plugin_objmon_close(drakvuf_t drakvuf) {
+    return 1;
+}

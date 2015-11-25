@@ -154,6 +154,16 @@ if test x$plugin_filedelete = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_FILEDELETE, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_objmon],
+  [AS_HELP_STRING([--disable-plugin-objmon],
+    [Enable the ObCreateObject watching plugin @<:@yes@:>@])],
+  [plugin_objmon="$enableval"],
+  [plugin_objmon="yes"])   
+AM_CONDITIONAL([PLUGIN_OBJMON], [test x$plugin_objmon = xyes])
+if test x$plugin_objmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_OBJMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -319,4 +329,5 @@ Syscalls:   $plugin_syscalls
 Poolmon:    $plugin_poolmon
 Filetracer: $plugin_filetracer
 Filedelete: $plugin_filedelete
+Objmon:     $plugin_objmon
 -------------------------------------------------------------------------------])
