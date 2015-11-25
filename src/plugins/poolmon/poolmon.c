@@ -169,14 +169,16 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     switch(format) {
     case OUTPUT_CSV:
     {
-        printf("poolmon,%s", tag);
+        printf("poolmon,%s,%s,%zu", tag,
+               pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", (size_t)size);
         if (s)
             printf(",%s,%s", s->source, s->description);
         break;
     }
     default:
     case OUTPUT_DEFAULT:
-        printf("[POOLMON] %s", tag);
+        printf("[POOLMON] %s (type: %s, size: %zu)", tag,
+               pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", (size_t)size);
         if (s)
             printf(": %s,%s", s->source, s->description);
 
