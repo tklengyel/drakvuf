@@ -110,41 +110,24 @@
 #include "../libdrakvuf/drakvuf.h"
 
 typedef enum drakvuf_plugin {
-
-    #ifdef ENABLE_PLUGIN_SYSCALLS
     PLUGIN_SYSCALLS,
-    #endif
-
-    #ifdef ENABLE_PLUGIN_POOLMON
     PLUGIN_POOLMON,
-    #endif
-
-    #ifdef ENABLE_PLUGIN_FILETRACER
     PLUGIN_FILETRACER,
-    #endif
-
-    #ifdef ENABLE_PLUGIN_FILEDELETE
     PLUGIN_FILEDELETE,
-    #endif
-
-    #ifdef ENABLE_PLUGIN_FILEDELETE
     PLUGIN_OBJMON,
-    #endif
-
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
 int drakvuf_plugin_init(drakvuf_t drakvuf,
                         drakvuf_plugin_t plugin,
-                        const void *);
+                        const void *config);
 int drakvuf_plugins_start(drakvuf_t drakvuf);
 int drakvuf_plugins_close(drakvuf_t drakvuf);
 
-#ifdef ENABLE_PLUGIN_FILEDELETE
+/* Plugin-specific configuration input */
 struct filedelete_config {
     const char *rekall_profile;
     const char *dump_folder;
 };
-#endif
 
 #endif

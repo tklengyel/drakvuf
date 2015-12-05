@@ -105,8 +105,24 @@
 #ifndef FILETRACER_H
 #define FILETRACER_H
 
+#ifdef ENABLE_PLUGIN_FILETRACER
+
 int plugin_filetracer_init(drakvuf_t drakvuf, const void *config);
 int plugin_filetracer_start(drakvuf_t drakvuf);
 int plugin_filetracer_close(drakvuf_t drakvuf);
+
+#else
+
+static int plugin_filetracer_init(drakvuf_t drakvuf, const void *config) {
+    return 1;
+}
+static int plugin_filetracer_start(drakvuf_t drakvuf) {
+    return 1;
+}
+static int plugin_filetracer_close(drakvuf_t drakvuf) {
+    return 1;
+}
+
+#endif
 
 #endif
