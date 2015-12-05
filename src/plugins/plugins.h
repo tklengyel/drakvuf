@@ -127,7 +127,7 @@ typedef enum drakvuf_plugin {
     PLUGIN_FILEDELETE,
     #endif
 
-    #ifdef ENABLE_PLUGIN_FILEDELETE
+    #ifdef ENABLE_PLUGIN_OBJMON
     PLUGIN_OBJMON,
     #endif
 

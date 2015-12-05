@@ -246,6 +246,11 @@ int main(int argc, char** argv) {
         goto exit;
 #endif
 
+#ifdef ENABLE_PLUGIN_OBJMON
+    if ( !drakvuf_plugin_init(drakvuf, PLUGIN_OBJMON, rekall_profile) )
+        goto exit;
+#endif
+
 #ifdef ENABLE_PLUGIN_EXMON
     if ( !drakvuf_plugin_init(drakvuf, PLUGIN_EXMON, rekall_profile) )
         goto exit;
