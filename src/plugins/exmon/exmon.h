@@ -102,33 +102,27 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAKVUF_PLUGINS_H
-#define DRAKVUF_PLUGINS_H
+#ifndef EXMON_H
+#define EXMON_H
 
-#include <config.h>
-#include <stdlib.h>
-#include "../libdrakvuf/drakvuf.h"
+#ifdef ENABLE_PLUGIN_EXMON
 
-typedef enum drakvuf_plugin {
-    PLUGIN_SYSCALLS,
-    PLUGIN_POOLMON,
-    PLUGIN_FILETRACER,
-    PLUGIN_FILEDELETE,
-    PLUGIN_OBJMON,
-    PLUGIN_EXMON,
-    __DRAKVUF_PLUGIN_LIST_MAX
-} drakvuf_plugin_t;
+int plugin_exmon_init(drakvuf_t drakvuf, const void *config);
+int plugin_exmon_start(drakvuf_t drakvuf);
+int plugin_exmon_close(drakvuf_t drakvuf);
 
-int drakvuf_plugin_init(drakvuf_t drakvuf,
-                        drakvuf_plugin_t plugin,
-                        const void *config);
-int drakvuf_plugins_start(drakvuf_t drakvuf);
-int drakvuf_plugins_close(drakvuf_t drakvuf);
+#else
 
-/* Plugin-specific configuration input */
-struct filedelete_config {
-    const char *rekall_profile;
-    const char *dump_folder;
-};
+static int plugin_exmon_init(drakvuf_t drakvuf, const void *config) {
+    return 1;
+}
+static int plugin_exmon_start(drakvuf_t drakvuf) {
+    return 1;
+}
+static int plugin_exmon_close(drakvuf_t drakvuf) {
+    return 1;
+}
+
+#endif
 
 #endif
