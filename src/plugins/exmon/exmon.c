@@ -102,85 +102,102 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PLUGIN_PRIVATE_H
-#define PLUGIN_PRIVATE_H
+#include <glib.h>
+#include <libvmi/libvmi.h>
+#include "private.h"
+#include "../plugins.h"
 
-#include <config.h>
-#include "plugins.h"
+static GSList *traps;
+static output_format_t format;
 
-typedef int (*plugin_init_t) (drakvuf_t drakvuf, const void *config);
-typedef int (*plugin_start_t) (drakvuf_t drakvuf);
-typedef int (*plugin_close_t) (drakvuf_t drakvuf);
+static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
-typedef struct plugin {
-    plugin_init_t init;
-    plugin_start_t start;
-    plugin_close_t close;
-} plugin_t;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    KTRAP_FRAME trap_frame;
+    reg_t exception_record, ptrap_frame, exception_code;
 
-#ifdef ENABLE_PLUGIN_SYSCALLS
-#include "syscalls/syscalls.h"
-#endif
+    page_mode_t pm = vmi_get_page_mode(vmi);
+    uint8_t index = ~0;
 
-#ifdef ENABLE_PLUGIN_POOLMON
-#include "poolmon/poolmon.h"
-#endif
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
 
-#ifdef ENABLE_PLUGIN_FILETRACER
-#include "filetracer/filetracer.h"
-#endif
+    if(pm != VMI_PM_IA32E){
+        ctx.addr = info->regs->rsp+4;
+        vmi_read_32(vmi, &ctx, (uint32_t*)&exception_record);
+        ctx.addr = info->regs->rsp+12;
+        vmi_read_32(vmi, &ctx, (uint32_t*)&ptrap_frame);
+        ctx.addr = ptrap_frame;
+        vmi_read(vmi,&ctx, &trap_frame,sizeof(KTRAP_FRAME));
+        ctx.addr = exception_record;
+        vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code);
+    }else{
+        printf("[EXMON] 64-bit not implemented!\n");
+        goto release;
+    }
 
-#ifdef ENABLE_PLUGIN_FILEDELETE
-#include "filedelete/filedelete.h"
-#endif
+    switch(format) {
+    case OUTPUT_CSV:
+        printf("exmon,%s,%s\n", info->trap->module, info->trap->name);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[EXMON] RSP: %x EXCEPTION_RECORD: %x EXCEPTION_CODE: %x EIP: %x EAX: %x EBX: %x ECX: %x EDX: %x EDI: %x ESI: %x EBP: %x ESP: %x \n", \
+		(uint32_t)info->regs->rsp, (uint32_t)exception_record, (uint32_t)exception_code,  \
+		(uint32_t)(trap_frame.Eip), (uint32_t)(trap_frame.Eax), (uint32_t)(trap_frame.Ebx), (uint32_t)(trap_frame.Ecx), \
+		(uint32_t)(trap_frame.Edx), (uint32_t)(trap_frame.Edi), (uint32_t)(trap_frame.Esi), \
+		(uint32_t)(trap_frame.Ebp), (uint32_t)(trap_frame.HardwareEsp));
+        break;
+    }
 
-#ifdef ENABLE_PLUGIN_OBJMON
-#include "objmon/objmon.h"
-#endif
+    release:
+    drakvuf_release_vmi(drakvuf);
+    return 0;
+}
 
-#ifdef ENABLE_PLUGIN_EXMON
-#include "exmon/exmon.h"
-#endif
+int plugin_exmon_init(drakvuf_t drakvuf, const char *rekall_profile) {
 
-static plugin_t plugins[] = {
+    drakvuf_trap_t *trap = g_malloc0(sizeof(drakvuf_trap_t));
+    trap->lookup_type = LOOKUP_PID;
+    trap->u.pid = 4;
+    trap->addr_type = ADDR_RVA;
+    trap->u2.rva = drakvuf_get_function_rva(rekall_profile, "KiDispatchException");
+    trap->name = "KiDispatchException";
+    trap->module = "ntoskrnl.exe";
+    trap->type = BREAKPOINT;
+    trap->cb = cb;
 
-    #ifdef ENABLE_PLUGIN_SYSCALLS
-    [PLUGIN_SYSCALLS] = { .init = plugin_syscall_init,
-                          .start = plugin_syscall_start,
-                          .close = plugin_syscall_close},
-    #endif
+    if (!trap->u2.rva) {
+        return 0;
+    }
 
-    #ifdef ENABLE_PLUGIN_POOLMON
-    [PLUGIN_POOLMON] = { .init = plugin_poolmon_init,
-                         .start = plugin_poolmon_start,
-                         .close = plugin_poolmon_close },
-    #endif
+    traps = g_slist_prepend(traps, trap);
+    format = drakvuf_get_output_format(drakvuf);
 
-    #ifdef ENABLE_PLUGIN_FILETRACER
-    [PLUGIN_FILETRACER] = { .init = plugin_filetracer_init,
-                            .start = plugin_filetracer_start,
-                            .close = plugin_filetracer_close },
-    #endif
-
-    #ifdef ENABLE_PLUGIN_FILEDELETE
-    [PLUGIN_FILEDELETE] = { .init = plugin_filedelete_init,
-                            .start = plugin_filedelete_start,
-                            .close = plugin_filedelete_close },
-    #endif
-
-    #ifdef ENABLE_PLUGIN_OBJMON
-    [PLUGIN_OBJMON] = { .init = plugin_objmon_init,
-                        .start = plugin_objmon_start,
-                        .close = plugin_objmon_close },
-    #endif
-
-    #ifdef ENABLE_PLUGIN_EXMON
-    [PLUGIN_EXMON] = { .init = plugin_exmon_init,
-                        .start = plugin_exmon_start,
-                        .close = plugin_exmon_close },
-    #endif
+    return 1;
+}
 
 
-};
 
-#endif
+int plugin_exmon_start(drakvuf_t drakvuf) {
+    drakvuf_add_traps(drakvuf, traps);
+    return 1;
+}
+
+int plugin_exmon_close(drakvuf_t drakvuf) {
+    GSList *loop = traps;
+    while(loop) {
+        drakvuf_trap_t *trap = loop->data;
+        free((char*)trap->name);
+        free(loop->data);
+        loop = loop->next;
+    }
+
+    g_slist_free(traps);
+    traps = NULL;
+
+    return 1;
+}
+

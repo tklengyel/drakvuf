@@ -102,85 +102,13 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PLUGIN_PRIVATE_H
-#define PLUGIN_PRIVATE_H
+#ifndef EXMON_H
+#define EXMON_H
 
-#include <config.h>
 #include "plugins.h"
 
-typedef int (*plugin_init_t) (drakvuf_t drakvuf, const void *config);
-typedef int (*plugin_start_t) (drakvuf_t drakvuf);
-typedef int (*plugin_close_t) (drakvuf_t drakvuf);
-
-typedef struct plugin {
-    plugin_init_t init;
-    plugin_start_t start;
-    plugin_close_t close;
-} plugin_t;
-
-#ifdef ENABLE_PLUGIN_SYSCALLS
-#include "syscalls/syscalls.h"
-#endif
-
-#ifdef ENABLE_PLUGIN_POOLMON
-#include "poolmon/poolmon.h"
-#endif
-
-#ifdef ENABLE_PLUGIN_FILETRACER
-#include "filetracer/filetracer.h"
-#endif
-
-#ifdef ENABLE_PLUGIN_FILEDELETE
-#include "filedelete/filedelete.h"
-#endif
-
-#ifdef ENABLE_PLUGIN_OBJMON
-#include "objmon/objmon.h"
-#endif
-
-#ifdef ENABLE_PLUGIN_EXMON
-#include "exmon/exmon.h"
-#endif
-
-static plugin_t plugins[] = {
-
-    #ifdef ENABLE_PLUGIN_SYSCALLS
-    [PLUGIN_SYSCALLS] = { .init = plugin_syscall_init,
-                          .start = plugin_syscall_start,
-                          .close = plugin_syscall_close},
-    #endif
-
-    #ifdef ENABLE_PLUGIN_POOLMON
-    [PLUGIN_POOLMON] = { .init = plugin_poolmon_init,
-                         .start = plugin_poolmon_start,
-                         .close = plugin_poolmon_close },
-    #endif
-
-    #ifdef ENABLE_PLUGIN_FILETRACER
-    [PLUGIN_FILETRACER] = { .init = plugin_filetracer_init,
-                            .start = plugin_filetracer_start,
-                            .close = plugin_filetracer_close },
-    #endif
-
-    #ifdef ENABLE_PLUGIN_FILEDELETE
-    [PLUGIN_FILEDELETE] = { .init = plugin_filedelete_init,
-                            .start = plugin_filedelete_start,
-                            .close = plugin_filedelete_close },
-    #endif
-
-    #ifdef ENABLE_PLUGIN_OBJMON
-    [PLUGIN_OBJMON] = { .init = plugin_objmon_init,
-                        .start = plugin_objmon_start,
-                        .close = plugin_objmon_close },
-    #endif
-
-    #ifdef ENABLE_PLUGIN_EXMON
-    [PLUGIN_EXMON] = { .init = plugin_exmon_init,
-                        .start = plugin_exmon_start,
-                        .close = plugin_exmon_close },
-    #endif
-
-
-};
+int plugin_exmon_init(drakvuf_t drakvuf, const void *config);
+int plugin_exmon_start(drakvuf_t drakvuf);
+int plugin_exmon_close(drakvuf_t drakvuf);
 
 #endif

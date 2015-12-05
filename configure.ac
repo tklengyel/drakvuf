@@ -164,6 +164,16 @@ if test x$plugin_objmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_OBJMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_exmon],
+  [AS_HELP_STRING([--disable-plugin-exmon],
+    [Enable the KiDispatchException watching plugin @<:@yes@:>@])],
+  [plugin_exmon="$enableval"],
+  [plugin_exmon="yes"])   
+AM_CONDITIONAL([PLUGIN_EXMON], [test x$plugin_exmon = xyes])
+if test x$plugin_exmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_EXMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -330,4 +340,5 @@ Poolmon:    $plugin_poolmon
 Filetracer: $plugin_filetracer
 Filedelete: $plugin_filedelete
 Objmon:     $plugin_objmon
+Exmon:      $plugin_exmon
 -------------------------------------------------------------------------------])
