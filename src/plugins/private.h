@@ -112,6 +112,7 @@
 #include "filetracer/filetracer.h"
 #include "filedelete/filedelete.h"
 #include "objmon/objmon.h"
+#include "exmon/exmon.h"
 
 typedef int (*plugin_init_t) (drakvuf_t drakvuf, const void *config);
 typedef int (*plugin_start_t) (drakvuf_t drakvuf);
@@ -140,6 +141,9 @@ static plugin_t plugins[] = {
     [PLUGIN_OBJMON] = { .init = plugin_objmon_init,
                         .start = plugin_objmon_start,
                         .close = plugin_objmon_close },
+    [PLUGIN_EXMON] = { .init = plugin_exmon_init,
+                        .start = plugin_exmon_start,
+                        .close = plugin_exmon_close }
 };
 
 #endif

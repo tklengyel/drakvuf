@@ -102,33 +102,48 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAKVUF_PLUGINS_H
-#define DRAKVUF_PLUGINS_H
+#ifndef EXMON_PRIVATE_H
+#define EXMON_PRIVATE_H
 
-#include <config.h>
-#include <stdlib.h>
-#include "../libdrakvuf/drakvuf.h"
-
-typedef enum drakvuf_plugin {
-    PLUGIN_SYSCALLS,
-    PLUGIN_POOLMON,
-    PLUGIN_FILETRACER,
-    PLUGIN_FILEDELETE,
-    PLUGIN_OBJMON,
-    PLUGIN_EXMON,
-    __DRAKVUF_PLUGIN_LIST_MAX
-} drakvuf_plugin_t;
-
-int drakvuf_plugin_init(drakvuf_t drakvuf,
-                        drakvuf_plugin_t plugin,
-                        const void *config);
-int drakvuf_plugins_start(drakvuf_t drakvuf);
-int drakvuf_plugins_close(drakvuf_t drakvuf);
-
-/* Plugin-specific configuration input */
-struct filedelete_config {
-    const char *rekall_profile;
-    const char *dump_folder;
-};
+typedef struct _KTRAP_FRAME
+{
+     uint32_t DbgEbp;
+     uint32_t DbgEip;
+     uint32_t DbgArgMark;
+     uint32_t DbgArgPointer;
+     uint16_t TempSegCs;
+     unsigned char Logging;
+     unsigned char Reserved;
+     uint32_t TempEsp;
+     uint32_t Dr0;
+     uint32_t Dr1;
+     uint32_t Dr2;
+     uint32_t Dr3;
+     uint32_t Dr6;
+     uint32_t Dr7;
+     uint32_t SegGs;
+     uint32_t SegEs;
+     uint32_t SegDs;
+     uint32_t Edx;
+     uint32_t Ecx;
+     uint32_t Eax;
+     uint32_t PreviousPreviousMode;
+     uint32_t ExceptionList;
+     uint32_t SegFs;
+     uint32_t Edi;
+     uint32_t Esi;
+     uint32_t Ebx;
+     uint32_t Ebp;
+     uint32_t ErrCode;
+     uint32_t Eip;
+     uint32_t SegCs;
+     uint32_t EFlags;
+     uint32_t HardwareEsp;
+     uint32_t HardwareSegSs;
+     uint32_t V86Es;
+     uint32_t V86Ds;
+     uint32_t V86Fs;
+     uint32_t V86Gs;
+} KTRAP_FRAME, *PKTRAP_FRAME;
 
 #endif
