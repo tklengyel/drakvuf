@@ -138,7 +138,7 @@ typedef struct plugin {
 #include "objmon/objmon.h"
 #endif
 
-#ifdef ENABLE_PLUGIN_OBJMON
+#ifdef ENABLE_PLUGIN_EXMON
 #include "exmon/exmon.h"
 #endif
 

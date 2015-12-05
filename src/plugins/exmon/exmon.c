@@ -103,6 +103,8 @@
  ***************************************************************************/
 
 #include <glib.h>
+#include <libvmi/libvmi.h>
+#include "private.h"
 #include "../plugins.h"
 
 static GSList *traps;
@@ -110,16 +112,48 @@ static output_format_t format;
 
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    KTRAP_FRAME trap_frame;
+    reg_t exception_record, ptrap_frame, exception_code;
+
+    page_mode_t pm = vmi_get_page_mode(vmi);
+    uint8_t index = ~0;
+
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    if(pm != VMI_PM_IA32E){
+        ctx.addr = info->regs->rsp+4;
+        vmi_read_32(vmi, &ctx, (uint32_t*)&exception_record);
+        ctx.addr = info->regs->rsp+12;
+        vmi_read_32(vmi, &ctx, (uint32_t*)&ptrap_frame);
+        ctx.addr = ptrap_frame;
+        vmi_read(vmi,&ctx, &trap_frame,sizeof(KTRAP_FRAME));
+        ctx.addr = exception_record;
+        vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code);
+    }else{
+        printf("[EXMON] 64-bit not implemented!\n");
+        goto release;
+    }
+
     switch(format) {
     case OUTPUT_CSV:
         printf("exmon,%s,%s\n", info->trap->module, info->trap->name);
         break;
     default:
     case OUTPUT_DEFAULT:
-        printf("[EXMON] %s!%s\n", info->trap->module, info->trap->name);
+        printf("[EXMON] RSP: %x EXCEPTION_RECORD: %x EXCEPTION_CODE: %x EIP: %x EAX: %x EBX: %x ECX: %x EDX: %x EDI: %x ESI: %x EBP: %x ESP: %x \n", \
+		(uint32_t)info->regs->rsp, (uint32_t)exception_record, (uint32_t)exception_code,  \
+		(uint32_t)(trap_frame.Eip), (uint32_t)(trap_frame.Eax), (uint32_t)(trap_frame.Ebx), (uint32_t)(trap_frame.Ecx), \
+		(uint32_t)(trap_frame.Edx), (uint32_t)(trap_frame.Edi), (uint32_t)(trap_frame.Esi), \
+		(uint32_t)(trap_frame.Ebp), (uint32_t)(trap_frame.HardwareEsp));
         break;
     }
 
+    release:
+    drakvuf_release_vmi(drakvuf);
     return 0;
 }
 
