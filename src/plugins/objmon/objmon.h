@@ -105,8 +105,24 @@
 #ifndef OBJMON_H
 #define OBJMON_H
 
+#ifdef ENABLE_PLUGIN_OBJMON
+
 int plugin_objmon_init(drakvuf_t drakvuf, const void *config);
 int plugin_objmon_start(drakvuf_t drakvuf);
 int plugin_objmon_close(drakvuf_t drakvuf);
+
+#else
+
+static int plugin_objmon_init(drakvuf_t drakvuf, const void *config) {
+    return 1;
+}
+static int plugin_objmon_start(drakvuf_t drakvuf) {
+    return 1;
+}
+static int plugin_objmon_close(drakvuf_t drakvuf) {
+    return 1;
+}
+
+#endif
 
 #endif

@@ -141,7 +141,7 @@ static gpointer timer(gpointer data) {
 
 int main(int argc, char** argv) {
 
-    int c;
+    int c, i;
     char *inject_cmd = NULL;
     char *domain = NULL;
     char *rekall_profile = NULL;
@@ -192,11 +192,9 @@ int main(int argc, char** argv) {
     case 't':
         timeout = atoi(optarg);
         break;
-#ifdef ENABLE_PLUGIN_FILEDELETE
     case 'D':
         dump_folder = optarg;
         break;
-#endif
     case 'o':
         if(!strncmp(optarg,"csv",3))
             output = OUTPUT_CSV;
@@ -232,32 +230,31 @@ int main(int argc, char** argv) {
         }
     }
 
-#ifdef ENABLE_PLUGIN_SYSCALLS
-    if ( !drakvuf_plugin_init(drakvuf, PLUGIN_SYSCALLS, rekall_profile) )
-        goto exit;
-#endif
+    /*
+     * Pass the configuration input to the plugins.
+     * Default config is only the rekall profile but plugins
+     * can define additional options which need to be passed
+     * through their own config structure.
+     */
+    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++) {
+        switch (i) {
+        case PLUGIN_FILEDELETE:
+        {
+            struct filedelete_config c = {
+                .rekall_profile = rekall_profile,
+                .dump_folder = dump_folder
+            };
 
-#ifdef ENABLE_PLUGIN_POOLMON
-    if ( !drakvuf_plugin_init(drakvuf, PLUGIN_POOLMON, rekall_profile) )
-        goto exit;
-#endif
-
-#ifdef ENABLE_PLUGIN_FILETRACER
-    if ( !drakvuf_plugin_init(drakvuf, PLUGIN_FILETRACER, rekall_profile) )
-        goto exit;
-#endif
-
-#ifdef ENABLE_PLUGIN_FILEDELETE
-    do {
-        struct filedelete_config c= {
-            .rekall_profile = rekall_profile,
-            .dump_folder = dump_folder
+            if ( !drakvuf_plugin_init(drakvuf, i, &c) )
+                goto exit;
+            break;
+        }
+        default:
+            if ( !drakvuf_plugin_init(drakvuf, i, rekall_profile) )
+                goto exit;
+            break;
         };
-
-        if ( !drakvuf_plugin_init(drakvuf, PLUGIN_FILEDELETE, &c) )
-            goto exit;
-    } while(0);
-#endif
+    }
 
     /* for a clean exit */
     act.sa_handler = close_handler;

@@ -105,8 +105,24 @@
 #ifndef POOLMON_H
 #define POOLMON_H
 
+#ifdef ENABLE_PLUGIN_POOLMON
+
 int plugin_poolmon_init(drakvuf_t drakvuf, const void *config);
 int plugin_poolmon_start(drakvuf_t drakvuf);
 int plugin_poolmon_close(drakvuf_t drakvuf);
+
+#else
+
+static int plugin_poolmon_init(drakvuf_t drakvuf, const void *config) {
+    return 1;
+}
+static int plugin_poolmon_start(drakvuf_t drakvuf) {
+    return 1;
+}
+static int plugin_poolmon_close(drakvuf_t drakvuf) {
+    return 1;
+}
+
+#endif
 
 #endif
