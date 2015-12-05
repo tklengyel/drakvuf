@@ -138,6 +138,10 @@ typedef struct plugin {
 #include "objmon/objmon.h"
 #endif
 
+#ifdef ENABLE_PLUGIN_OBJMON
+#include "exmon/exmon.h"
+#endif
+
 static plugin_t plugins[] = {
 
     #ifdef ENABLE_PLUGIN_SYSCALLS
@@ -169,6 +173,13 @@ static plugin_t plugins[] = {
                         .start = plugin_objmon_start,
                         .close = plugin_objmon_close },
     #endif
+
+    #ifdef ENABLE_PLUGIN_EXMON
+    [PLUGIN_EXMON] = { .init = plugin_exmon_init,
+                        .start = plugin_exmon_start,
+                        .close = plugin_exmon_close },
+    #endif
+
 
 };
 

@@ -1,5 +1,4 @@
-/*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
- *                                                                         *
+/*********************IMPORTANT DRAKVUF LICENSE TERMS*********************** *                                                                         *
  * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
@@ -244,6 +243,11 @@ int main(int argc, char** argv) {
 
 #ifdef ENABLE_PLUGIN_FILETRACER
     if ( !drakvuf_plugin_init(drakvuf, PLUGIN_FILETRACER, rekall_profile) )
+        goto exit;
+#endif
+
+#ifdef ENABLE_PLUGIN_EXMON
+    if ( !drakvuf_plugin_init(drakvuf, PLUGIN_EXMON, rekall_profile) )
         goto exit;
 #endif
 

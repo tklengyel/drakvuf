@@ -102,54 +102,68 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAKVUF_PLUGINS_H
-#define DRAKVUF_PLUGINS_H
+#include <glib.h>
+#include "../plugins.h"
 
-#include <config.h>
-#include <stdlib.h>
-#include "../libdrakvuf/drakvuf.h"
+static GSList *traps;
+static output_format_t format;
 
-typedef enum drakvuf_plugin {
+static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
-    #ifdef ENABLE_PLUGIN_SYSCALLS
-    PLUGIN_SYSCALLS,
-    #endif
+    switch(format) {
+    case OUTPUT_CSV:
+        printf("exmon,%s,%s\n", info->trap->module, info->trap->name);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[EXMON] %s!%s\n", info->trap->module, info->trap->name);
+        break;
+    }
 
-    #ifdef ENABLE_PLUGIN_POOLMON
-    PLUGIN_POOLMON,
-    #endif
+    return 0;
+}
 
-    #ifdef ENABLE_PLUGIN_FILETRACER
-    PLUGIN_FILETRACER,
-    #endif
+int plugin_exmon_init(drakvuf_t drakvuf, const char *rekall_profile) {
 
-    #ifdef ENABLE_PLUGIN_FILEDELETE
-    PLUGIN_FILEDELETE,
-    #endif
+    drakvuf_trap_t *trap = g_malloc0(sizeof(drakvuf_trap_t));
+    trap->lookup_type = LOOKUP_PID;
+    trap->u.pid = 4;
+    trap->addr_type = ADDR_RVA;
+    trap->u2.rva = drakvuf_get_function_rva(rekall_profile, "KiDispatchException");
+    trap->name = "KiDispatchException";
+    trap->module = "ntoskrnl.exe";
+    trap->type = BREAKPOINT;
+    trap->cb = cb;
 
-    #ifdef ENABLE_PLUGIN_FILEDELETE
-    PLUGIN_OBJMON,
-    #endif
+    if (!trap->u2.rva) {
+        return 0;
+    }
 
-    #ifdef ENABLE_PLUGIN_EXMON
-    PLUGIN_EXMON,
-    #endif
+    traps = g_slist_prepend(traps, trap);
+    format = drakvuf_get_output_format(drakvuf);
+
+    return 1;
+}
 
 
-    __DRAKVUF_PLUGIN_LIST_MAX
-} drakvuf_plugin_t;
 
-int drakvuf_plugin_init(drakvuf_t drakvuf,
-                        drakvuf_plugin_t plugin,
-                        const void *);
-int drakvuf_plugins_start(drakvuf_t drakvuf);
-int drakvuf_plugins_close(drakvuf_t drakvuf);
+int plugin_exmon_start(drakvuf_t drakvuf) {
+    drakvuf_add_traps(drakvuf, traps);
+    return 1;
+}
 
-#ifdef ENABLE_PLUGIN_FILEDELETE
-struct filedelete_config {
-    const char *rekall_profile;
-    const char *dump_folder;
-};
-#endif
+int plugin_exmon_close(drakvuf_t drakvuf) {
+    GSList *loop = traps;
+    while(loop) {
+        drakvuf_trap_t *trap = loop->data;
+        free((char*)trap->name);
+        free(loop->data);
+        loop = loop->next;
+    }
 
-#endif
+    g_slist_free(traps);
+    traps = NULL;
+
+    return 1;
+}
+

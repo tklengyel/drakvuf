@@ -126,6 +126,11 @@ if PLUGIN_OBJMON
 sources += objmon/objmon.c
 endif
 
+if PLUGIN_EXMON
+sources += exmon/exmon.c
+endif
+
+
 ###############################################################################
 sources += plugins.c plugins.h
 
