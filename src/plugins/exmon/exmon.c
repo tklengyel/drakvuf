@@ -115,9 +115,7 @@ static output_format_t format;
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    KTRAP_FRAME trap_frame;
-    reg_t exception_record, ptrap_frame, exception_code;
-
+    char *str_format;
     page_mode_t pm = vmi_get_page_mode(vmi);
     uint8_t index = ~0;
 
@@ -127,6 +125,9 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     };
 
     if(pm != VMI_PM_IA32E){
+        KTRAP_FRAME trap_frame;
+        reg_t exception_record, ptrap_frame, exception_code;
+
         ctx.addr = info->regs->rsp+4;
         vmi_read_32(vmi, &ctx, (uint32_t*)&exception_record);
         ctx.addr = info->regs->rsp+12;
@@ -135,26 +136,43 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         vmi_read(vmi,&ctx, &trap_frame,sizeof(KTRAP_FRAME));
         ctx.addr = exception_record;
         vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code);
+        switch(format) {
+        case OUTPUT_CSV:
+            str_format=CSV_FORMAT32;
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            str_format=DEFAULT_FORMAT32;
+            break;
+        }
+        printf(str_format, \
+        (uint32_t)info->regs->rsp, (uint32_t)exception_record, (uint32_t)exception_code,\
+        (uint32_t)(trap_frame.Eip), (uint32_t)(trap_frame.Eax), (uint32_t)(trap_frame.Ebx),\
+        (uint32_t)(trap_frame.Ecx), (uint32_t)(trap_frame.Edx), (uint32_t)(trap_frame.Edi),\
+        (uint32_t)(trap_frame.Esi), (uint32_t)(trap_frame.Ebp), (uint32_t)(trap_frame.HardwareEsp));
     }else{
-        printf("[EXMON] 64-bit not implemented!\n");
-        goto release;
+        KTRAP_FRAME64 trap_frame64;
+        reg_t exception_code;
+
+        ctx.addr = info->regs->r8;
+        vmi_read(vmi,&ctx, &trap_frame64,sizeof(KTRAP_FRAME64));
+        ctx.addr = info->regs->rcx;
+        vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code);
+        switch(format) {
+        case OUTPUT_CSV:
+            str_format=CSV_FORMAT64;
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            str_format=DEFAULT_FORMAT64;
+            break;
+        }
+        printf(str_format, \
+        info->regs->rcx, exception_code, trap_frame64.Rip, trap_frame64.Rax, trap_frame64.Rbx,\
+        trap_frame64.Rsp,  trap_frame64.Rbp, trap_frame64.Rdx,trap_frame64.R8, trap_frame64.R9,\
+        trap_frame64.R10, trap_frame64.R11);
     }
 
-    switch(format) {
-    case OUTPUT_CSV:
-        printf("exmon,%s,%s\n", info->trap->module, info->trap->name);
-        break;
-    default:
-    case OUTPUT_DEFAULT:
-        printf("[EXMON] RSP: %x EXCEPTION_RECORD: %x EXCEPTION_CODE: %x EIP: %x EAX: %x EBX: %x ECX: %x EDX: %x EDI: %x ESI: %x EBP: %x ESP: %x \n", \
-		(uint32_t)info->regs->rsp, (uint32_t)exception_record, (uint32_t)exception_code,  \
-		(uint32_t)(trap_frame.Eip), (uint32_t)(trap_frame.Eax), (uint32_t)(trap_frame.Ebx), (uint32_t)(trap_frame.Ecx), \
-		(uint32_t)(trap_frame.Edx), (uint32_t)(trap_frame.Edi), (uint32_t)(trap_frame.Esi), \
-		(uint32_t)(trap_frame.Ebp), (uint32_t)(trap_frame.HardwareEsp));
-        break;
-    }
-
-    release:
     drakvuf_release_vmi(drakvuf);
     return 0;
 }
