@@ -196,23 +196,30 @@ static event_response_t file_name_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
 static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     page_mode_t pm = vmi_get_page_mode(vmi);
-    uint32_t obj_size = GPOINTER_TO_UINT(info->trap->data);
     addr_t obj_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, info->regs->rax);
 
     addr_t ph_base = 0;
     uint32_t block_size = 0;
     uint32_t aligned_file_size = file_object_size;
+    bool file_alloc = 0;
     if ( pm == VMI_PM_IA32E ) {
         struct pool_header_x64 ph = { 0 };
         ph_base = obj_pa - sizeof(struct pool_header_x64);
         vmi_read_pa(vmi, ph_base, &ph, sizeof(struct pool_header_x64));
         block_size = ph.block_size * 0x10; // align it
+        if(!memcmp(&ph.pool_tag, &POOLTAG_FILE, 4))
+            file_alloc = 1;
     } else {
         struct pool_header_x86 ph = { 0 };
         ph_base = obj_pa - sizeof(struct pool_header_x86);
         vmi_read_pa(vmi, ph_base, &ph, sizeof(struct pool_header_x86));
         block_size = ph.block_size * 0x8; // align it
+        if(!memcmp(&ph.pool_tag, &POOLTAG_FILE, 4))
+            file_alloc = 1;
     }
+
+    /* The trapped return may be hit for other allocations as well */
+    if (!file_alloc) goto done;
 
     // We will need to catch when the file string buffer pointer is updated
     addr_t file_base = ph_base + block_size - file_object_size; // addr of "_FILE_OBJECT"
@@ -242,8 +249,10 @@ static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t
     drakvuf_remove_trap(drakvuf, info->trap);
     rettraps = g_slist_remove(rettraps, info->trap);
     free(info->trap);
+
+done:
     drakvuf_release_vmi(drakvuf);
-    return 1;
+    return 0;
 }
 
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
@@ -281,7 +290,6 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         rettrap->name = "HeapRetTrap";
         rettrap->cb = pool_alloc_return;
         rettrap->u2.addr = ret_pa;
-        rettrap->data = GUINT_TO_POINTER(size);
 
         rettraps = g_slist_prepend(rettraps, rettrap);
 
