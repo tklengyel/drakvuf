@@ -103,7 +103,7 @@
  #*************************************************************************# 
 
 h_sources = drakvuf.h
-c_sources = drakvuf.c injector.c win-exports.c vmi.c win-symbols.c win-handles.c
+c_sources = drakvuf.c injector.c win-exports.c vmi.c win-symbols.c win-handles.c win-processes.c
 
 AM_CFLAGS = -I$(top_srcdir)
 AM_CFLAGS += $(CFLAGS)
