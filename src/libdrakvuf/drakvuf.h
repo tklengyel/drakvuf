@@ -180,6 +180,7 @@ typedef struct drakvuf_trap drakvuf_trap_t;
 
 typedef struct drakvuf_trap_info {
     unsigned int vcpu;
+    uint16_t altp2m_idx;
     addr_t trap_pa;
     x86_registers_t *regs;
     drakvuf_trap_t *trap;
@@ -221,7 +222,8 @@ void drakvuf_add_trap(drakvuf_t drakvuf,
 void drakvuf_add_traps(drakvuf_t drakvuf,
                        GSList *traps);
 void drakvuf_remove_trap (drakvuf_t drakvuf,
-                          drakvuf_trap_t *trap);
+                          drakvuf_trap_t *trap,
+                          void(*free_routine)(drakvuf_trap_t *trap));
 void drakvuf_remove_traps(drakvuf_t drakvuf,
                           GSList *traps);
 void drakvuf_loop (drakvuf_t drakvuf);
