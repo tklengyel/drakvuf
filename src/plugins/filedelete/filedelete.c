@@ -190,6 +190,9 @@ static void grab_file_by_handle(drakvuf_t drakvuf, uint32_t vcpu_id, vmi_instanc
 
     // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
 
+    if (!process)
+        return;
+
     addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
 
     if (!obj)
