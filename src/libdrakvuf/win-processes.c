@@ -116,7 +116,7 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id){
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t thread;
 
-    size_t prcb;
+    addr_t prcb;
 
     /*
      * fs_base/gs_base in the info->regs structure are not actually filled in
@@ -131,8 +131,9 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id){
         prcb=offsets[KPCR_PRCBDATA];
     }
 
-    vmi_read_addr_va(vmi, fsgs + prcb + offsets[KPRCB_CURRENTTHREAD],
-                     0, &thread);
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, fsgs + prcb + offsets[KPRCB_CURRENTTHREAD], 0, &thread)){
+        return 0;
+    }
 
     return thread;
 }
@@ -142,7 +143,9 @@ addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id) {
 
     thread=drakvuf_get_current_thread(drakvuf,vcpu_id); 
     
-    vmi_read_addr_va(drakvuf->vmi, thread + offsets[KTHREAD_PROCESS],
-                     0, &process);
+    if (thread == 0 || VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + offsets[KTHREAD_PROCESS], 0, &process)){
+        return 0;    
+    }
+
     return process;
 }
