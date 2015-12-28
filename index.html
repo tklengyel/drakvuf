@@ -223,7 +223,7 @@ Support of Rekall profiles: yes
 Build and install LibVMI:
 <pre><code>make
 sudo make install
-echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
+echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
 cd tools/pyvmi
 python setup.py build
 sudo python setup.py install
@@ -234,7 +234,7 @@ Download Volatility:
 
 <pre><code>git clone https://github.com/volatilityfoundation/volatility
 cd volatility
-cp ../libvmi/tools/pyvmi/pyvmiaddressspace.py volatility/plugins/addresspaces
+cp ../libvmi/tools/pyvmi/pyvmiaddressspace.py volatility/plugins/addrspaces
 python setup.py build
 sudo python setup.py install
 cd ..
