@@ -134,7 +134,7 @@ To install Xen with dom0 getting 4GB RAM assigned and two dedicated CPU cores (t
 <pre><code>sudo su
 make -j4 install-xen
 make -j4 install-tools
-echo "GRUB_CMDLINE_XEN_DEFAULT=\"dom0_mem=4096M,max:4096M dom0_max_vcpus=4 dom0_vcpus_pin=true hap_1gb=false hap_2mb=false\"" >> /etc/default/grub
+echo "GRUB_CMDLINE_XEN_DEFAULT=\"dom0_mem=4096M,max:4096M dom0_max_vcpus=4 dom0_vcpus_pin=true hap_1gb=false hap_2mb=false altp2m=1\"" >> /etc/default/grub
 echo "/usr/local/lib" > /etc/ld.so.conf.d/xen.conf
 ldconfig
 update-grub
@@ -185,6 +185,7 @@ vnc=1
 vnclisten="0.0.0.0"
 usb = 1
 usbdevice = "tablet"
+altp2mhvm = 1
 vif = ['type=ioemu,model=e1000,bridge=xenbr0,mac=00:06:5B:BA:7C:01']
 disk = [
     'phy:/dev/vg/windows7-sp1,xvda,w', 
