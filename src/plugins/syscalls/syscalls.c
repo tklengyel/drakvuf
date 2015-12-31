@@ -136,6 +136,8 @@ static GSList *create_trap_config(symbols_t *symbols) {
 
         if (strncmp(symbol->name, "Nt", 2))
             continue;
+        //if (strcmp(symbol->name, "NtCallbackReturn"))
+        //    continue;
 
         drakvuf_trap_t *trap = g_malloc0(sizeof(drakvuf_trap_t));
         trap->lookup_type = LOOKUP_PID;

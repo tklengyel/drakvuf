@@ -144,20 +144,31 @@ struct drakvuf {
     output_format_t output;
 
     xen_interface_t *xen;
+    uint16_t altp2m_idx, altp2m_idr;
+
+    xen_pfn_t zero_page_gfn;
 
     // VMI
     GMutex vmi_lock;
     vmi_instance_t vmi;
+
+    vmi_event_t *step_event[16];
 
     // Processing trap removals in trap callbacks
     // is problematic so we save all such requests
     // in a list to be processed after all callbacks
     // are finished.
     bool in_callback;
-    GSList *remove_traps;
+    GHashTable *remove_traps;
 
     int interrupted;
     page_mode_t pm;
+    unsigned int vcpus;
+    unsigned int init_memsize;
+    unsigned int memsize;
+
+    GHashTable *remapped_gfns; // Key: gfn
+                               // val: remapped gfn
 
     GHashTable *breakpoint_lookup_pa;   // key: PA of trap
                                         // val: struct breakpoint
@@ -171,19 +182,41 @@ struct drakvuf {
 };
 
 struct breakpoint {
-    uint8_t backup;
-    drakvuf_t drakvuf;
-    vmi_instance_t vmi;
-    vmi_event_t *guard;
     addr_t pa;
-    GSList *traps;
+    vmi_event_t *guard, *guard2;
 } __attribute__ ((packed));
 
 struct memaccess {
     addr_t gfn;
-    drakvuf_t drakvuf;
+    addr_t pa;
     vmi_event_t *memtrap;
-    GSList *traps;
 } __attribute__ ((packed));
+
+struct wrapper {
+    trap_type_t type;
+    drakvuf_t drakvuf;
+    GSList *traps; /* List of DRAKVUF traps registered for this event */
+    union {
+        struct memaccess memaccess;
+        struct breakpoint breakpoint;
+    };
+} __attribute__ ((packed));
+
+struct free_trap_wrapper {
+    unsigned int counter;
+    drakvuf_trap_t *trap;
+    void (*free_routine)(drakvuf_trap_t *trap);
+};
+
+struct memcb_pass {
+    drakvuf_t drakvuf;
+    addr_t gfn;
+};
+
+struct remapped_gfn {
+    xen_pfn_t o;
+    xen_pfn_t r;
+    bool active;
+};
 
 #endif
