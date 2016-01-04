@@ -28,8 +28,9 @@
         <h2>Dynamic Malware Analysis</h2>
 
         <section id="downloads">
-          <a href="https://github.com/tklengyel/drakvuf/tarball/master" class="btn">Download as .tar.gz</a>
           <a href="https://github.com/tklengyel/drakvuf" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
+          <a href="https://github.com/tklengyel/drakvuf/wiki" class="btn">Wiki Documentation</a>
+          <a href="https://github.com/tklengyel/drakvuf/tarball/master" class="btn">Download as .tar.gz</a>
         </section>
       </div>
     </header>
@@ -81,11 +82,11 @@
 <ul>
 <li>Agentless start of malware execution.</li>
 <li>Agentless monitoring of Windows internal kernel functions.</li>
+<li>Guest multi-vCPU support.</li>
 <li>Tracing heap allocations.</li>
 <li>Tracing files being accessed.</li>
 <li>Extracting files from memory before they are deleted.</li>
 <li>Cloning of analysis VMs via copy-on-write memory and disk.</li>
-<li>VLAN tagging and NATing support of clone analysis network when used in combination with <a href="https://github.com/tklengyel/honeybrid">Honeybrid</a>.</li>
 </ul>
 
 <p>Be advised that DRAKVUF is still in its early development stage and lacks features other malware analyzers may have. There are many opportunities to improve and extend DRAKVUF. Just to name a few:</p>
@@ -93,16 +94,17 @@
 <ul>
 <li>Structured logging into JSON/MySQL/MongoDB.</li>
 <li>Automatic submission of extracted files to VirusTotal.</li>
-<li>Guest multi-vCPU support.</li>
 <li>Linux support.</li>
 <li>Run-time deduplication of unused memory with Xen's memory sharing.</li>
 <li>Integration into malware analysis operations, such as <a href="https://crits.github.io">CRITS</a>.</li>
 </ul>
 
-<p>As DRAKVUF is an open-source project, patches and bug reports are always welcome on the <a href="https://github.com/tklengyel/drakvuf">Github page</a>!</p>
+<p>As DRAKVUF is an open-source project, patches and bug reports are always welcome on the <a href="https://github.com/tklengyel/drakvuf">Github page</a>! More information can be found in the <a href="https://github.com/tklengyel/drakvuf/wiki">DRAKVUF Wiki</a> about working with the project.</p>
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Installation guide</h3>
+
+[[ UPDATED 12/31/2015 ]] If you have a previous version of DRAKVUF installed, pay attention to the updated instructions to enable Xen altp2m on your system!
 
 The following packages are normally required to build Xen and DRAKVUF on Debian based Linux distros. The system has been mainly tested on Debian Jessie and Ubuntu 14.04 LTS.
 
