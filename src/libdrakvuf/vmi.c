@@ -869,7 +869,7 @@ void init_vmi(drakvuf_t drakvuf) {
      * Setup singlestep event handlers but don't turn on MTF.
      * Max 16 CPUs!
      */
-    for (i = 0; i < drakvuf->vcpus && i <= 16; i++) {
+    for (i = 0; i < drakvuf->vcpus && i < 16; i++) {
         drakvuf->step_event[i] = g_malloc0(sizeof(vmi_event_t));
         SETUP_SINGLESTEP_EVENT(drakvuf->step_event[i], 1u << i, vmi_reset_trap, 0);
         drakvuf->step_event[i]->data = drakvuf;
