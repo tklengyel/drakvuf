@@ -245,4 +245,9 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
                                  addr_t process,
                                  uint64_t handle);
 
+addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
+                                   uint64_t vcpu_id);
+addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
+                                   uint64_t vcpu_id);
+
 #endif
