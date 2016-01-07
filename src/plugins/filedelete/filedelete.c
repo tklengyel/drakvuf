@@ -285,7 +285,7 @@ static event_response_t setinformation(drakvuf_t drakvuf, drakvuf_trap_info_t *i
         ctx.addr = info->regs->rsp + sizeof(uint32_t);
         vmi_read_32(vmi, &ctx, (uint32_t*) &handle);
         ctx.addr += 2 * sizeof(uint32_t);
-        vmi_read_32(vmi, &ctx, (uint32_t*) &info);
+        vmi_read_32(vmi, &ctx, (uint32_t*) &fileinfo);
         ctx.addr += sizeof(uint32_t);
         vmi_read_32(vmi, &ctx, (uint32_t*) &length);
         ctx.addr += sizeof(uint32_t);
