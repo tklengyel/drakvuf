@@ -122,19 +122,23 @@ typedef struct symbol {
 
 typedef struct symbols {
     const char *name;
-    symbol_t *symbols;
+    symbol_t *symbols; // array of size count
     uint64_t count;
 } symbols_t;
 
-addr_t drakvuf_get_function_rva(const char *rekall_profile, const char *function);
 symbols_t* drakvuf_get_symbols_from_rekall(const char *profile);
-status_t windows_system_map_lookup(
-        const char *rekall_profile,
-        const char *symbol,
-        const char *subsymbol,
-        addr_t *address,
-        addr_t *size);
 void drakvuf_free_symbols(symbols_t *symbols);
+
+status_t drakvuf_get_function_rva(const char *rekall_profile,
+                                  const char *function,
+                                  addr_t *rva);
+status_t drakvuf_get_struct_size(const char *rekall_profile,
+                                 const char *struct_name,
+                                 size_t *size);
+status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
+                                       const char *struct_name,
+                                       const char *symbol,
+                                       addr_t *rva);
 
 /*---------------------------------------------------------
  * DRAKVUF functions

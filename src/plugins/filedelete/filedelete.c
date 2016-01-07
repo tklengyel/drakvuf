@@ -300,21 +300,27 @@ int plugin_filedelete_init(drakvuf_t drakvuf,
     dump_folder = c->dump_folder ? c->dump_folder : "/tmp";
     format = drakvuf_get_output_format(drakvuf);
 
-    traps[0].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "NtSetInformationFile");
+    if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "NtSetInformationFile", &traps[0].u2.rva))
+        return 0;
+    if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "ZwSetInformationFile", &traps[1].u2.rva))
+        return 0;
+
     traps[0].name = "NtSetInformationFile";
     traps[0].cb = setinformation;
-    traps[1].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "ZwSetInformationFile");
     traps[1].name = "ZwSetInformationFile";
     traps[1].cb = setinformation;
-    /*traps[2].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "NtDeleteFile");
+    /* TODO
+    traps[2].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "NtDeleteFile");
     traps[2].name = "NtDeleteFile";
     traps[3].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "ZwDeleteFile");
     traps[3].name = "ZwDeleteFile";*/
 
     int i;
     for(i=0;i<__OFFSET_MAX;i++) {
-        windows_system_map_lookup( c->rekall_profile, offset_names[i][0], offset_names[i][1], 
-                                   &offsets[i], NULL);
+        if(VMI_FAILURE == drakvuf_get_struct_member_rva(c->rekall_profile,
+                                                        offset_names[i][0], offset_names[i][1],
+                                                        &offsets[i]))
+            return 0;
     }
 
     return 1;

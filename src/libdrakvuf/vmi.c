@@ -846,9 +846,9 @@ void init_vmi(drakvuf_t drakvuf) {
     unsigned int i;
     for (i = 0; i < OFFSET_MAX; i++) {
         if (VMI_FAILURE
-                == windows_system_map_lookup(
+                == drakvuf_get_struct_member_rva(
                         drakvuf->rekall_profile, offset_names[i][0],
-                        offset_names[i][1], &offsets[i], NULL)) {
+                        offset_names[i][1], &offsets[i])) {
             PRINT_DEBUG("Failed to find offset for %s:%s\n", offset_names[i][0],
                     offset_names[i][1]);
         }
@@ -856,9 +856,9 @@ void init_vmi(drakvuf_t drakvuf) {
 
     for (i = 0; i < SIZE_LIST_MAX; i++) {
         if (VMI_FAILURE
-                == windows_system_map_lookup(
+                == drakvuf_get_struct_size(
                         drakvuf->rekall_profile, size_names[i],
-                        (char *) &i, NULL, &struct_sizes[i])) {
+                        &struct_sizes[i])) {
             PRINT_DEBUG("Failed to find offset for %s:%s\n", offset_names[i][0],
                     offset_names[i][1]);
             continue;

@@ -214,16 +214,17 @@ int plugin_poolmon_init(drakvuf_t drakvuf, const char *rekall_profile) {
     trap->lookup_type = LOOKUP_PID;
     trap->u.pid = 4;
     trap->addr_type = ADDR_RVA;
-    trap->u2.rva = drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag");
+    if (VMI_FAILURE == drakvuf_get_function_rva(rekall_profile,
+                                                "ExAllocatePoolWithTag",
+                                                &trap->u2.rva))
+    {
+        return 0;
+    }
+
     trap->name = "ExAllocatePoolWithTag";
     trap->module = "ntoskrnl.exe";
     trap->type = BREAKPOINT;
     trap->cb = cb;
-
-    if (!trap->u2.rva) {
-        return 0;
-    }
-
     traps = g_slist_prepend(traps, trap);
     format = drakvuf_get_output_format(drakvuf);
 

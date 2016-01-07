@@ -138,8 +138,7 @@ static drakvuf_trap_t poolalloc;
 static GSList *writetraps;
 static GHashTable *rettraps;
 static addr_t file_object_size, file_name_offset,
-              string_buffer_offset, string_length_offset,
-              kpcrb_currentthread_offset, kpcrb_offset;
+              string_buffer_offset, string_length_offset;
 static page_mode_t pm;
 static output_format_t format;
 
@@ -216,12 +215,10 @@ static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t
     uint32_t block_size = 0;
     uint32_t tag;
     uint32_t aligned_file_size = file_object_size;
-    reg_t fsgs;
 
     if ( pm == VMI_PM_IA32E ) {
         struct pool_header_x64 ph;
         memset(&ph, 0, sizeof(struct pool_header_x64));
-        vmi_get_vcpureg(vmi, &fsgs, GS_BASE, info->vcpu);
         ph_base = obj_pa - sizeof(struct pool_header_x64);
         vmi_read_pa(vmi, ph_base, &ph, sizeof(struct pool_header_x64));
         block_size = ph.block_size * 0x10; // align it
@@ -230,7 +227,6 @@ static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t
     } else {
         struct pool_header_x86 ph;
         memset(&ph, 0, sizeof(struct pool_header_x86));
-        vmi_get_vcpureg(vmi, &fsgs, FS_BASE, info->vcpu);
         ph_base = obj_pa - sizeof(struct pool_header_x86);
         vmi_read_pa(vmi, ph_base, &ph, sizeof(struct pool_header_x86));
         block_size = ph.block_size * 0x8; // align it
@@ -283,8 +279,7 @@ done:
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    reg_t tag = 0, size = 0, fsgs = 0;
-    addr_t thread = 0;
+    reg_t tag = 0, size = 0;
 
     access_context_t ctx = {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -294,17 +289,12 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     if (pm == VMI_PM_IA32E) {
         size = info->regs->rdx;
         tag = info->regs->r8;
-        vmi_get_vcpureg(vmi, &fsgs, GS_BASE, info->vcpu);
     } else {
         ctx.addr = info->regs->rsp+8;
         vmi_read_32(vmi, &ctx, (uint32_t*)&size);
         ctx.addr = info->regs->rsp+12;
         vmi_read_32(vmi, &ctx, (uint32_t*)&tag);
-        vmi_get_vcpureg(vmi, &fsgs, FS_BASE, info->vcpu);
     }
-
-    vmi_read_addr_va(vmi, fsgs + kpcrb_offset + kpcrb_currentthread_offset,
-                     0, &thread);
 
     /*printf("Got a heap alloc request for tag %c%c%c%c!\n",
            ((uint8_t*)&tag)[0],
@@ -341,8 +331,8 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             g_hash_table_insert(rettraps, &rettrap->u2.addr, s);
         }
 
-        //printf("File alloc request on vCPU %u. Thead 0x%lx. Ret: 0x%lx. Counter: %u\n",
-        //        info->vcpu, thread, ret_pa, s->counter);
+        //printf("File alloc request on vCPU %u. Ret: 0x%lx. Counter: %u\n",
+        //         info->vcpu, ret_pa, s->counter);
     }
 
     drakvuf_release_vmi(drakvuf);
@@ -356,34 +346,31 @@ int plugin_filetracer_init(drakvuf_t drakvuf, const char *rekall_profile) {
     pm = vmi_get_page_mode(vmi);
     drakvuf_release_vmi(drakvuf);
     rettraps = g_hash_table_new(g_int64_hash, g_int64_equal);
+    format = drakvuf_get_output_format(drakvuf);
 
     poolalloc.lookup_type = LOOKUP_PID;
     poolalloc.u.pid = 4;
     poolalloc.addr_type = ADDR_RVA;
-    poolalloc.u2.rva = drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag");
     poolalloc.name = "ExAllocatePoolWithTag";
     poolalloc.module = "ntoskrnl.exe";
     poolalloc.type = BREAKPOINT;
     poolalloc.cb = cb;
 
-    if (!poolalloc.u2.rva) {
+    if (VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag", &poolalloc.u2.rva))
         return 0;
-    }
+    if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_FILE_OBJECT", "FileName", &file_name_offset))
+        return 0;
+    if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_UNICODE_STRING", "Buffer", &string_buffer_offset))
+        return 0;
+    if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_UNICODE_STRING", "Length", &string_length_offset))
+        return 0;
+    if (VMI_FAILURE == drakvuf_get_struct_size(rekall_profile, "_FILE_OBJECT", &file_object_size))
+        return 0;
 
-    windows_system_map_lookup(rekall_profile, "_FILE_OBJECT", "FileName", &file_name_offset, &file_object_size);
-    windows_system_map_lookup(rekall_profile, "_UNICODE_STRING", "Buffer", &string_buffer_offset, NULL);
-    windows_system_map_lookup(rekall_profile, "_UNICODE_STRING", "Length", &string_length_offset, NULL);
-    windows_system_map_lookup(rekall_profile, "_KPCRB", "CurrentThread", &kpcrb_currentthread_offset, NULL);
-
-    if (pm == VMI_PM_IA32E) {
+    if (pm == VMI_PM_IA32E)
         file_object_size += ALIGN_SIZE(16, file_object_size);
-        windows_system_map_lookup(rekall_profile, "_KPCR", "Prcb", &kpcrb_offset, NULL);
-    } else {
+    else
         file_object_size += ALIGN_SIZE(8, file_object_size);
-        windows_system_map_lookup(rekall_profile, "_KPCR", "PrcbData", &kpcrb_offset, NULL);
-    }
-
-    format = drakvuf_get_output_format(drakvuf);
 
     return 1;
 }

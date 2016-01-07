@@ -108,6 +108,7 @@
 #include "drakvuf.h"
 #include "private.h"
 #include "vmi.h"
+#include "win-symbols.h"
 
 void drakvuf_close(drakvuf_t drakvuf) {
     if (!drakvuf)
@@ -323,4 +324,29 @@ void drakvuf_set_output_format(drakvuf_t drakvuf, output_format_t output) {
 
 output_format_t drakvuf_get_output_format(drakvuf_t drakvuf) {
     return drakvuf->output;
+}
+
+status_t drakvuf_get_struct_size(const char *rekall_profile,
+                                 const char *struct_name,
+                                 size_t *size)
+{
+    return windows_system_map_lookup(
+                rekall_profile,
+                struct_name,
+                NULL,
+                NULL,
+                size);
+}
+
+status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
+                                       const char *struct_name,
+                                       const char *symbol,
+                                       addr_t *rva)
+{
+    return windows_system_map_lookup(
+                rekall_profile,
+                struct_name,
+                symbol,
+                rva,
+                NULL);
 }
