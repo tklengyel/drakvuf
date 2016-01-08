@@ -178,22 +178,21 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 /* ----------------------------------------------------- */
 
 int plugin_objmon_init(drakvuf_t drakvuf, const char *rekall_profile) {
+
+    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ObCreateObject", &trap.u2.rva))
+        return 0;
+    if (VMI_FAILURE==drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "TypeIndex", &typeindex_offset))
+        return 0;
+
     trap.lookup_type = LOOKUP_PID;
     trap.u.pid = 4;
     trap.addr_type = ADDR_RVA;
-    trap.u2.rva = drakvuf_get_function_rva(rekall_profile, "ObCreateObject");
     trap.name = "ObCreateObject";
     trap.module = "ntoskrnl.exe";
     trap.type = BREAKPOINT;
     trap.cb = cb;
 
-    if (!trap.u2.rva) {
-        return 0;
-    }
-
     format = drakvuf_get_output_format(drakvuf);
-
-    windows_system_map_lookup(rekall_profile, "_OBJECT_HEADER", "TypeIndex", &typeindex_offset, NULL);
 
     return 1;
 }

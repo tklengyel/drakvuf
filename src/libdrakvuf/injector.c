@@ -516,11 +516,15 @@ void inject_apc(struct injector *injector,
      * of scheduling this APC right away. Any other function
      * crashes the process.
      */
-    psexit = kernbase + drakvuf_get_function_rva(injector->drakvuf->rekall_profile, "PsExitSpecialApc");
-    if (psexit == kernbase) {
+    if (VMI_FAILURE == drakvuf_get_function_rva(injector->drakvuf->rekall_profile,
+                                                "PsExitSpecialApc",
+                                                &psexit))
+    {
         PRINT_DEBUG("Failed to get address of ntoskrnl.exe!PsExitSpecialApc\n");
         return;
     }
+
+    psexit += kernbase;
 
     status = vmi_read_addr_va(vmi, thread + offsets[KTHREAD_APCSTATE], 0, &apc_state_addr);
     if(status == VMI_FAILURE) {

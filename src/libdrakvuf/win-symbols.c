@@ -136,11 +136,11 @@ status_t windows_system_map_lookup(
         goto err_exit;
     }
 
-    if (!subsymbol) {
+    if (!subsymbol && !size) {
         json_t *constants = json_object_get(root, "$CONSTANTS");
         json_t *jsymbol = json_object_get(constants, symbol);
         if (!jsymbol) {
-            PRINT_DEBUG("Rekall profile: symbol '%s' not found\n", symbol);
+            PRINT_DEBUG("Rekall profile: constant '%s' not found\n", symbol);
             goto err_exit;
         }
 
@@ -226,7 +226,7 @@ symbols_t* drakvuf_get_symbols_from_rekall(const char *rekall_profile)
     return NULL;
 }
 
-addr_t drakvuf_get_function_rva(const char *rekall_profile, const char *function)
+status_t drakvuf_get_function_rva(const char *rekall_profile, const char *function, addr_t *rva)
 {
 
     json_error_t error;
@@ -242,17 +242,23 @@ addr_t drakvuf_get_function_rva(const char *rekall_profile, const char *function
     }
 
     json_t *functions = json_object_get(root, "$FUNCTIONS");
-    json_t *jsymbol = json_object_get(functions, function);
-
-    if(!jsymbol) {
-        PRINT_DEBUG("Rekall profile: symbol '%s' not found\n", function);
+    if(!functions) {
+        PRINT_DEBUG("Rekall profile: no functions found\n");
         goto err_exit;
     }
 
-    return json_integer_value(jsymbol);
+    json_t *jsymbol = json_object_get(functions, function);
+
+    if(!jsymbol) {
+        PRINT_DEBUG("Rekall profile: function '%s' not found\n", function);
+        goto err_exit;
+    }
+
+    *rva = json_integer_value(jsymbol);
+    return VMI_SUCCESS;
 
     err_exit:
-    return 0;
+    return VMI_FAILURE;
 }
 
 void drakvuf_free_symbols(symbols_t *symbols) {
