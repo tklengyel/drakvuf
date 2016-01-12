@@ -245,12 +245,12 @@ int main(int argc, char** argv) {
                 .dump_folder = dump_folder
             };
 
-            if ( !drakvuf_plugin_init(drakvuf, i, &c) )
+            if ( !drakvuf_plugin_start(drakvuf, i, &c) )
                 goto exit;
             break;
         }
         default:
-            if ( !drakvuf_plugin_init(drakvuf, i, rekall_profile) )
+            if ( !drakvuf_plugin_start(drakvuf, i, rekall_profile) )
                 goto exit;
             break;
         };
@@ -265,12 +265,12 @@ int main(int argc, char** argv) {
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if ( drakvuf_plugins_start(drakvuf) )
-        drakvuf_loop(drakvuf);
+    /* Start the event listener */
+    drakvuf_loop(drakvuf);
 
 exit:
     drakvuf_pause(drakvuf);
-    drakvuf_plugins_close(drakvuf);
+    drakvuf_plugins_stop(drakvuf);
     drakvuf_close(drakvuf);
 
     if(timeout_thread)

@@ -114,36 +114,33 @@
 #include "objmon/objmon.h"
 #include "exmon/exmon.h"
 
-typedef int (*plugin_init_t) (drakvuf_t drakvuf, const void *config);
-typedef int (*plugin_start_t) (drakvuf_t drakvuf);
-typedef int (*plugin_close_t) (drakvuf_t drakvuf);
+typedef int (*plugin_start_t) (drakvuf_t drakvuf, const void *config);
+typedef int (*plugin_stop_t) (drakvuf_t drakvuf);
 
 typedef struct plugin {
-    plugin_init_t init;
     plugin_start_t start;
-    plugin_close_t close;
+    plugin_stop_t stop;
 } plugin_t;
 
 static plugin_t plugins[] = {
-
-    [PLUGIN_SYSCALLS] = { .init = plugin_syscall_init,
-                          .start = plugin_syscall_start,
-                          .close = plugin_syscall_close},
-    [PLUGIN_POOLMON] = { .init = plugin_poolmon_init,
-                         .start = plugin_poolmon_start,
-                         .close = plugin_poolmon_close },
-    [PLUGIN_FILETRACER] = { .init = plugin_filetracer_init,
-                            .start = plugin_filetracer_start,
-                            .close = plugin_filetracer_close },
-    [PLUGIN_FILEDELETE] = { .init = plugin_filedelete_init,
-                            .start = plugin_filedelete_start,
-                            .close = plugin_filedelete_close },
-    [PLUGIN_OBJMON] = { .init = plugin_objmon_init,
-                        .start = plugin_objmon_start,
-                        .close = plugin_objmon_close },
-    [PLUGIN_EXMON] = { .init = plugin_exmon_init,
-                        .start = plugin_exmon_start,
-                        .close = plugin_exmon_close }
+    [PLUGIN_SYSCALLS] =
+        { .start = plugin_syscall_start,
+          .stop = plugin_syscall_stop },
+    [PLUGIN_POOLMON] =
+        { .start = plugin_poolmon_start,
+          .stop = plugin_poolmon_stop },
+    [PLUGIN_FILETRACER] =
+        { .start = plugin_filetracer_start,
+          .stop = plugin_filetracer_stop },
+    [PLUGIN_FILEDELETE] =
+        { .start = plugin_filedelete_start,
+          .stop = plugin_filedelete_stop },
+    [PLUGIN_OBJMON] =
+        { .start = plugin_objmon_start,
+          .stop = plugin_objmon_stop },
+    [PLUGIN_EXMON] =
+        { .start = plugin_exmon_start,
+          .stop = plugin_exmon_stop },
 };
 
 #endif

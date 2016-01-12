@@ -207,7 +207,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
 /* ----------------------------------------------------- */
 
-int plugin_poolmon_init(drakvuf_t drakvuf, const char *rekall_profile) {
+int plugin_poolmon_start(drakvuf_t drakvuf, const char *rekall_profile) {
     pooltag_tree = pooltag_build_tree();
 
     drakvuf_trap_t *trap = g_malloc0(sizeof(drakvuf_trap_t));
@@ -228,15 +228,12 @@ int plugin_poolmon_init(drakvuf_t drakvuf, const char *rekall_profile) {
     traps = g_slist_prepend(traps, trap);
     format = drakvuf_get_output_format(drakvuf);
 
-    return 1;
-}
-
-int plugin_poolmon_start(drakvuf_t drakvuf) {
     drakvuf_add_traps(drakvuf, traps);
+
     return 1;
 }
 
-int plugin_poolmon_close(drakvuf_t drakvuf) {
+int plugin_poolmon_stop(drakvuf_t drakvuf) {
     if(pooltag_tree)
         g_tree_destroy(pooltag_tree);
 

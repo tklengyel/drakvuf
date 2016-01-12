@@ -341,7 +341,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
 /* ----------------------------------------------------- */
 
-int plugin_filetracer_init(drakvuf_t drakvuf, const char *rekall_profile) {
+int plugin_filetracer_start(drakvuf_t drakvuf, const char *rekall_profile) {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     pm = vmi_get_page_mode(vmi);
     drakvuf_release_vmi(drakvuf);
@@ -372,15 +372,12 @@ int plugin_filetracer_init(drakvuf_t drakvuf, const char *rekall_profile) {
     else
         file_object_size += ALIGN_SIZE(8, file_object_size);
 
-    return 1;
-}
-
-int plugin_filetracer_start(drakvuf_t drakvuf) {
     drakvuf_add_trap(drakvuf, &poolalloc);
+
     return 1;
 }
 
-int plugin_filetracer_close(drakvuf_t drakvuf) {
+int plugin_filetracer_stop(drakvuf_t drakvuf) {
 
     GSList *loop = writetraps;
     while(loop) {

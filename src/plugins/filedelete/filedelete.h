@@ -107,19 +107,15 @@
 
 #ifdef ENABLE_PLUGIN_FILEDELETE
 
-int plugin_filedelete_init(drakvuf_t drakvuf, const void *config);
-int plugin_filedelete_start(drakvuf_t drakvuf);
-int plugin_filedelete_close(drakvuf_t drakvuf);
+int plugin_filedelete_start(drakvuf_t drakvuf, const void *config);
+int plugin_filedelete_stop(drakvuf_t drakvuf);
 
 #else
 
-static int plugin_filedelete_init(drakvuf_t drakvuf, const void *config) {
+static int plugin_filedelete_start(drakvuf_t drakvuf, const void *config) {
     return 1;
 }
-static int plugin_filedelete_start(drakvuf_t drakvuf) {
-    return 1;
-}
-static int plugin_filedelete_close(drakvuf_t drakvuf) {
+static int plugin_filedelete_stop(drakvuf_t drakvuf) {
     return 1;
 }
 

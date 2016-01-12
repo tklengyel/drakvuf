@@ -107,19 +107,15 @@
 
 #ifdef ENABLE_PLUGIN_SYSCALLS
 
-int plugin_syscall_init(drakvuf_t drakvuf, const void *config);
-int plugin_syscall_start(drakvuf_t drakvuf);
-int plugin_syscall_close(drakvuf_t drakvuf);
+int plugin_syscall_start(drakvuf_t drakvuf, const void *config);
+int plugin_syscall_stop(drakvuf_t drakvuf);
 
 #else
 
-static int plugin_syscall_init(drakvuf_t drakvuf, const void *config) {
+static int plugin_syscall_start(drakvuf_t drakvuf, const void *config) {
     return 1;
 }
-static int plugin_syscall_start(drakvuf_t drakvuf) {
-    return 1;
-}
-static int plugin_syscall_close(drakvuf_t drakvuf) {
+static int plugin_syscall_stop(drakvuf_t drakvuf) {
     return 1;
 }
 
