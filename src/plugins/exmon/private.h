@@ -106,10 +106,10 @@
 #define EXMON_PRIVATE_H
 
 #define CSV_FORMAT32 "exmon,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x" 
-#define CSV_FORMAT64 "exmon,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x"
+#define CSV_FORMAT64 "exmon,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x"
 
 #define DEFAULT_FORMAT32 "[EXMON] RSP: %x EXCEPTION_RECORD: %x EXCEPTION_CODE: %x EIP: %x EAX: %x EBX: %x ECX: %x EDX: %x EDI: %x ESI: %x EBP: %x ESP: %x"
-#define DEFAULT_FORMAT64 "[EXMON] EXCEPTION_RECORD: %x EXCEPTION_CODE: %x RIP: %x RAX: %x RBX: %x RSP: %x RBP: %x RDX: %x R8: %x R9: %x R10: %x R11:%x"
+#define DEFAULT_FORMAT64 "[EXMON] EXCEPTION_RECORD: %x EXCEPTION_CODE: %x RIP: %x RAX: %x RBX: %x RCX: %x RDX: %x RSP: %x RBP: %x RSI: %x RDI: %x R8: %x R9: %x R10: %x R11:%x"
 
 #define CSV_FORMAT_USER ",%d,%s\n" 
 
