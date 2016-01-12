@@ -245,12 +245,11 @@ cd ..
 
 Download Rekall and install it:
 
-<pre><code>git clone https://github.com/google/rekall
-cd rekall
-git checkout v1.1.0
+<pre><code>git clone --branch v1.4.1 https://github.com/google/rekall
+cd rekall/rekall-core
 python setup.py build
 sudo python setup.py install
-cd ..
+cd ../..
 </code></pre>
 
 Now we will create the Rekall profile for the Windows domain. First, we need to get the debug information for the Windows kernel via the LibVMI win-guid tool. For example, in the following my domain is named windows7-sp1-x86:
