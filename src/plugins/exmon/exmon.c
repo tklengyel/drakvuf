@@ -312,14 +312,7 @@ int plugin_exmon_start(drakvuf_t drakvuf, const char *rekall_profile) {
     windows_system_map_lookup(rekall_profile, "_KTRAP_FRAME", "",
                                 NULL, &ktrap_frame_size);
 
-    return 1;
-}
-
-
-
-int plugin_exmon_start(drakvuf_t drakvuf) {
-    drakvuf_add_traps(drakvuf, traps);
-
+    drakvuf_add_traps(drakvuf,traps);
     return 1;
 }
 
