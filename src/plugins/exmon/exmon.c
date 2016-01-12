@@ -286,21 +286,20 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     return 0;
 }
 
-int plugin_exmon_init(drakvuf_t drakvuf, const char *rekall_profile) {
+int plugin_exmon_start(drakvuf_t drakvuf, const char *rekall_profile) {
 
     drakvuf_trap_t *trap = g_malloc0(sizeof(drakvuf_trap_t));
     trap->lookup_type = LOOKUP_PID;
     trap->u.pid = 4;
     trap->addr_type = ADDR_RVA;
-    trap->u2.rva = drakvuf_get_function_rva(rekall_profile, "KiDispatchException");
+
+    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "KiDispatchException", &trap->u2.rva))
+        return 0;
+
     trap->name = "KiDispatchException";
     trap->module = "ntoskrnl.exe";
     trap->type = BREAKPOINT;
     trap->cb = cb;
-
-    if (!trap->u2.rva) {
-        return 0;
-    }
 
     traps = g_slist_prepend(traps, trap);
     format = drakvuf_get_output_format(drakvuf);
@@ -320,10 +319,11 @@ int plugin_exmon_init(drakvuf_t drakvuf, const char *rekall_profile) {
 
 int plugin_exmon_start(drakvuf_t drakvuf) {
     drakvuf_add_traps(drakvuf, traps);
+
     return 1;
 }
 
-int plugin_exmon_close(drakvuf_t drakvuf) {
+int plugin_exmon_stop(drakvuf_t drakvuf) {
     GSList *loop = traps;
     while(loop) {
         free(loop->data);

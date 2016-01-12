@@ -106,20 +106,20 @@
 #include "plugins.h"
 #include "private.h"
 
-int drakvuf_plugin_init(drakvuf_t drakvuf,
+int drakvuf_plugin_start(drakvuf_t drakvuf,
                         drakvuf_plugin_t plugin,
                         const void *config)
 {
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
          plugin < __DRAKVUF_PLUGIN_LIST_MAX)
     {
-        return plugins[plugin].init(drakvuf, config);
+        return plugins[plugin].start(drakvuf, config);
     }
 
     return 0;
 }
 
-int drakvuf_plugins_start(drakvuf_t drakvuf)
+int drakvuf_plugins_stop(drakvuf_t drakvuf)
 {
     int i;
     int ret = 0;
@@ -128,24 +128,7 @@ int drakvuf_plugins_start(drakvuf_t drakvuf)
         return ret;
 
     for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++) {
-        ret = plugins[i].start(drakvuf);
-        if (!ret)
-            break;
-    }
-
-    return ret;
-}
-
-int drakvuf_plugins_close(drakvuf_t drakvuf)
-{
-    int i;
-    int ret = 0;
-
-    if (__DRAKVUF_PLUGIN_LIST_MAX == 0)
-        return ret;
-
-    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++) {
-        ret = plugins[i].close(drakvuf);
+        ret = plugins[i].stop(drakvuf);
         if (!ret)
             break;
     }

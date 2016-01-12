@@ -108,16 +108,17 @@
 #include "drakvuf.h"
 #include "private.h"
 #include "vmi.h"
+#include "win-symbols.h"
 
 void drakvuf_close(drakvuf_t drakvuf) {
     if (!drakvuf)
         return;
 
-    if (drakvuf->xen)
-        xen_free_interface(drakvuf->xen);
-
     if (drakvuf->vmi)
         close_vmi(drakvuf);
+
+    if (drakvuf->xen)
+        xen_free_interface(drakvuf->xen);
 
     g_mutex_clear(&drakvuf->vmi_lock);
     free(drakvuf->dom_name);
@@ -167,6 +168,11 @@ void drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
 
     if (!trap)
         goto done;
+
+    if(g_hash_table_lookup(drakvuf->remove_traps, &trap)) {
+        g_hash_table_remove(drakvuf->remove_traps, &trap);
+        goto done;
+    }
 
     if (trap->type == BREAKPOINT) {
         if(trap->lookup_type == LOOKUP_NONE) {
@@ -264,11 +270,28 @@ done:
     return;
 }
 
-void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
-    if ( drakvuf->in_callback)
-        drakvuf->remove_traps = g_slist_prepend(drakvuf->remove_traps, trap);
-    else
+void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap,
+                         void(*free_routine)(drakvuf_trap_t *trap))
+{
+    if ( drakvuf->in_callback) {
+        struct free_trap_wrapper *free_wrapper =
+            g_hash_table_lookup(drakvuf->remove_traps, &trap);
+
+        if (!free_wrapper) {
+            free_wrapper = g_malloc0(sizeof(struct free_trap_wrapper));
+            free_wrapper->free_routine = free_routine;
+            free_wrapper->trap = trap;
+            g_hash_table_insert(drakvuf->remove_traps,
+                                g_memdup(&trap, sizeof(void*)),
+                                free_wrapper);
+        }
+
+        free_wrapper->counter++;
+    } else {
         remove_trap(drakvuf, trap);
+        if(free_routine)
+            free_routine(trap);
+    }
 }
 
 void drakvuf_remove_traps(drakvuf_t drakvuf, GSList *traps) {
@@ -301,4 +324,29 @@ void drakvuf_set_output_format(drakvuf_t drakvuf, output_format_t output) {
 
 output_format_t drakvuf_get_output_format(drakvuf_t drakvuf) {
     return drakvuf->output;
+}
+
+status_t drakvuf_get_struct_size(const char *rekall_profile,
+                                 const char *struct_name,
+                                 size_t *size)
+{
+    return windows_system_map_lookup(
+                rekall_profile,
+                struct_name,
+                NULL,
+                NULL,
+                size);
+}
+
+status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
+                                       const char *struct_name,
+                                       const char *symbol,
+                                       addr_t *rva)
+{
+    return windows_system_map_lookup(
+                rekall_profile,
+                struct_name,
+                symbol,
+                rva,
+                NULL);
 }

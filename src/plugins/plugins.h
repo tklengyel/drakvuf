@@ -119,11 +119,10 @@ typedef enum drakvuf_plugin {
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
-int drakvuf_plugin_init(drakvuf_t drakvuf,
+int drakvuf_plugin_start(drakvuf_t drakvuf,
                         drakvuf_plugin_t plugin,
                         const void *config);
-int drakvuf_plugins_start(drakvuf_t drakvuf);
-int drakvuf_plugins_close(drakvuf_t drakvuf);
+int drakvuf_plugins_stop(drakvuf_t drakvuf);
 
 /* Plugin-specific configuration input */
 struct filedelete_config {

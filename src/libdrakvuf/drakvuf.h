@@ -122,19 +122,23 @@ typedef struct symbol {
 
 typedef struct symbols {
     const char *name;
-    symbol_t *symbols;
+    symbol_t *symbols; // array of size count
     uint64_t count;
 } symbols_t;
 
-addr_t drakvuf_get_function_rva(const char *rekall_profile, const char *function);
 symbols_t* drakvuf_get_symbols_from_rekall(const char *profile);
-status_t windows_system_map_lookup(
-        const char *rekall_profile,
-        const char *symbol,
-        const char *subsymbol,
-        addr_t *address,
-        addr_t *size);
 void drakvuf_free_symbols(symbols_t *symbols);
+
+status_t drakvuf_get_function_rva(const char *rekall_profile,
+                                  const char *function,
+                                  addr_t *rva);
+status_t drakvuf_get_struct_size(const char *rekall_profile,
+                                 const char *struct_name,
+                                 size_t *size);
+status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
+                                       const char *struct_name,
+                                       const char *symbol,
+                                       addr_t *rva);
 
 /*---------------------------------------------------------
  * DRAKVUF functions
@@ -180,6 +184,7 @@ typedef struct drakvuf_trap drakvuf_trap_t;
 
 typedef struct drakvuf_trap_info {
     unsigned int vcpu;
+    uint16_t altp2m_idx;
     addr_t trap_pa;
     x86_registers_t *regs;
     drakvuf_trap_t *trap;
@@ -221,7 +226,8 @@ void drakvuf_add_trap(drakvuf_t drakvuf,
 void drakvuf_add_traps(drakvuf_t drakvuf,
                        GSList *traps);
 void drakvuf_remove_trap (drakvuf_t drakvuf,
-                          drakvuf_trap_t *trap);
+                          drakvuf_trap_t *trap,
+                          void(*free_routine)(drakvuf_trap_t *trap));
 void drakvuf_remove_traps(drakvuf_t drakvuf,
                           GSList *traps);
 void drakvuf_loop (drakvuf_t drakvuf);

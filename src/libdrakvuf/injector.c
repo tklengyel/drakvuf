@@ -516,11 +516,15 @@ void inject_apc(struct injector *injector,
      * of scheduling this APC right away. Any other function
      * crashes the process.
      */
-    psexit = kernbase + drakvuf_get_function_rva(injector->drakvuf->rekall_profile, "PsExitSpecialApc");
-    if (psexit == kernbase) {
+    if (VMI_FAILURE == drakvuf_get_function_rva(injector->drakvuf->rekall_profile,
+                                                "PsExitSpecialApc",
+                                                &psexit))
+    {
         PRINT_DEBUG("Failed to get address of ntoskrnl.exe!PsExitSpecialApc\n");
         return;
     }
+
+    psexit += kernbase;
 
     status = vmi_read_addr_va(vmi, thread + offsets[KTHREAD_APCSTATE], 0, &apc_state_addr);
     if(status == VMI_FAILURE) {
@@ -774,7 +778,7 @@ event_response_t cr3_callback(vmi_instance_t vmi, vmi_event_t *event) {
 
         }
 
-        vmi_clear_event(vmi, event);
+        vmi_clear_event(vmi, event, NULL);
     }
 
 done:
@@ -826,7 +830,7 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     // We are now in the return path from CreateProcessA
 
-    vmi_clear_event(vmi, event);
+    vmi_clear_event(vmi, event, NULL);
     vmi_pause_vm(vmi);
     vmi_write_8_pa(vmi, pa, &injector->ret_backup);
     injector->drakvuf->interrupted=1;
@@ -945,8 +949,8 @@ int drakvuf_inject_cmd(drakvuf_t drakvuf, vmi_pid_t pid, const char *app) {
         }
     }
 
-    vmi_clear_event(drakvuf->vmi, &cr3_event);
-    vmi_clear_event(drakvuf->vmi, &interrupt_event);
+    vmi_clear_event(drakvuf->vmi, &cr3_event, NULL);
+    vmi_clear_event(drakvuf->vmi, &interrupt_event, NULL);
 
     PRINT_DEBUG("Finished with injection.\n");
     return injector.ret;
