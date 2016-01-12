@@ -289,8 +289,8 @@ static event_response_t setinformation(drakvuf_t drakvuf, drakvuf_trap_info_t *i
     return 0;
 }
 
-int plugin_filedelete_init(drakvuf_t drakvuf,
-                           const struct filedelete_config *c)
+int plugin_filedelete_start(drakvuf_t drakvuf,
+                            const struct filedelete_config *c)
 {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     pm = vmi_get_page_mode(vmi);
@@ -323,17 +323,14 @@ int plugin_filedelete_init(drakvuf_t drakvuf,
             return 0;
     }
 
-    return 1;
-}
-
-int plugin_filedelete_start(drakvuf_t drakvuf) {
     drakvuf_add_trap(drakvuf, &traps[0]);
     //drakvuf_add_trap(drakvuf, &traps[1]);
     //drakvuf_add_trap(drakvuf, &traps[2]);
     //drakvuf_add_trap(drakvuf, &traps[3]);
+
     return 1;
 }
 
-int plugin_filedelete_close(drakvuf_t drakvuf) {
+int plugin_filedelete_stop(drakvuf_t drakvuf) {
     return 1;
 }

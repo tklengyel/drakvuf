@@ -177,7 +177,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
 /* ----------------------------------------------------- */
 
-int plugin_objmon_init(drakvuf_t drakvuf, const char *rekall_profile) {
+int plugin_objmon_start(drakvuf_t drakvuf, const char *rekall_profile) {
 
     if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ObCreateObject", &trap.u2.rva))
         return 0;
@@ -194,14 +194,11 @@ int plugin_objmon_init(drakvuf_t drakvuf, const char *rekall_profile) {
 
     format = drakvuf_get_output_format(drakvuf);
 
-    return 1;
-}
-
-int plugin_objmon_start(drakvuf_t drakvuf) {
     drakvuf_add_trap(drakvuf, &trap);
+
     return 1;
 }
 
-int plugin_objmon_close(drakvuf_t drakvuf) {
+int plugin_objmon_stop(drakvuf_t drakvuf) {
     return 1;
 }

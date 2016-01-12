@@ -102,9 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef SYSCALLS_H
-#define SYSCALLS_H
-
 #include <glib.h>
 #include "../plugins.h"
 
@@ -155,7 +152,7 @@ static GSList *create_trap_config(symbols_t *symbols) {
     return ret;
 }
 
-int plugin_syscall_init(drakvuf_t drakvuf, const char *rekall_profile) {
+int plugin_syscall_start(drakvuf_t drakvuf, const char *rekall_profile) {
 
     symbols_t *symbols = drakvuf_get_symbols_from_rekall(rekall_profile);
     if (!symbols)
@@ -169,15 +166,12 @@ int plugin_syscall_init(drakvuf_t drakvuf, const char *rekall_profile) {
     drakvuf_free_symbols(symbols);
     format = drakvuf_get_output_format(drakvuf);
 
-    return 1;
-}
-
-int plugin_syscall_start(drakvuf_t drakvuf) {
     drakvuf_add_traps(drakvuf, traps);
+
     return 1;
 }
 
-int plugin_syscall_close(drakvuf_t drakvuf) {
+int plugin_syscall_stop(drakvuf_t drakvuf) {
     GSList *loop = traps;
     while(loop) {
         drakvuf_trap_t *trap = loop->data;
@@ -191,5 +185,3 @@ int plugin_syscall_close(drakvuf_t drakvuf) {
 
     return 1;
 }
-
-#endif
