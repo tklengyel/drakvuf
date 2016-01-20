@@ -605,7 +605,7 @@ void inject_trap_pa(drakvuf_t drakvuf,
         container->breakpoint.guard->vmm_pagetable_id = drakvuf->altp2m_idx;
 
         if ( VMI_SUCCESS == vmi_register_event(vmi, container->breakpoint.guard) ) {
-            PRINT_DEBUG("\t\tNew memory event guard set on page %lu\n", pa >> 12);
+            PRINT_DEBUG("\t\tNew memory event guard set on page %lu\n", current_gfn);
         } else return;
 
     } else {
@@ -953,7 +953,8 @@ void close_vmi(drakvuf_t drakvuf) {
     addr_t *key2 = NULL;
     ghashtable_foreach(drakvuf->memaccess_lookup_gfn, i2, key2, s)
     {
-        // No need to clear it as altp2m and vmi instance will get destroyed
+        s->memaccess.memtrap->vmm_pagetable_id = 0;
+        vmi_clear_event(vmi, s->memaccess.memtrap, NULL);
         free(s->memaccess.memtrap);
         g_slist_free(s->traps);
     }
@@ -975,9 +976,19 @@ void close_vmi(drakvuf_t drakvuf) {
         vmi_event_t *guard2 =
             vmi_get_mem_event(vmi, remapped_gfn->r<<12, VMI_MEMEVENT_PAGE);
 
-        // No need to clear it as altp2m and vmi instance will get destroyed
-        if(guard && guard->data)
-            g_hash_table_destroy(guard->data);
+        if(guard) {
+            if(guard->data)
+                g_hash_table_destroy(guard->data);
+
+            guard->vmm_pagetable_id = 0;
+            vmi_clear_event(vmi, guard, NULL);
+        }
+
+        if(guard2) {
+            guard2->vmm_pagetable_id = 0;
+            vmi_clear_event(vmi, guard2, NULL);
+        }
+
         free(guard);
         free(guard2);
 
