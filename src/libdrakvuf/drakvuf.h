@@ -105,6 +105,12 @@
 #ifndef DRAKVUF_H
 #define DRAKVUF_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#pragma GCC visibility push(default)
+
 #include <glib.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
@@ -253,5 +259,11 @@ addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
                                    uint64_t vcpu_id);
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
                                    uint64_t vcpu_id);
+
+#pragma GCC visibility pop
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
