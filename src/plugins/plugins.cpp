@@ -102,10 +102,7 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PLUGIN_PRIVATE_H
-#define PLUGIN_PRIVATE_H
-
-#include <config.h>
+#include <stdarg.h>
 #include "plugins.h"
 #include "syscalls/syscalls.h"
 #include "poolmon/poolmon.h"
@@ -114,33 +111,62 @@
 #include "objmon/objmon.h"
 #include "exmon/exmon.h"
 
-typedef int (*plugin_start_t) (drakvuf_t drakvuf, const void *config);
-typedef int (*plugin_stop_t) (drakvuf_t drakvuf);
+drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf)
+{
+    this->drakvuf = drakvuf;
+}
 
-typedef struct plugin {
-    plugin_start_t start;
-    plugin_stop_t stop;
-} plugin_t;
+drakvuf_plugins::~drakvuf_plugins()
+{
+    int i;
+    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
+        if ( this->plugins[i] )
+            delete this->plugins[i];
+}
 
-static plugin_t plugins[] = {
-    [PLUGIN_SYSCALLS] =
-        { .start = plugin_syscall_start,
-          .stop = plugin_syscall_stop },
-    [PLUGIN_POOLMON] =
-        { .start = plugin_poolmon_start,
-          .stop = plugin_poolmon_stop },
-    [PLUGIN_FILETRACER] =
-        { .start = plugin_filetracer_start,
-          .stop = plugin_filetracer_stop },
-    [PLUGIN_FILEDELETE] =
-        { .start = plugin_filedelete_start,
-          .stop = plugin_filedelete_stop },
-    [PLUGIN_OBJMON] =
-        { .start = plugin_objmon_start,
-          .stop = plugin_objmon_stop },
-    [PLUGIN_EXMON] =
-        { .start = plugin_exmon_start,
-          .stop = plugin_exmon_stop },
-};
-
+int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
+                           const void *config)
+{
+    if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
+         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX)
+    {
+        switch(plugin_id) {
+#ifdef ENABLE_PLUGIN_SYSCALLS
+        case PLUGIN_SYSCALLS:
+            this->plugins[plugin_id] = new syscalls(this->drakvuf, config);
+            break;
 #endif
+#ifdef ENABLE_PLUGIN_POOLMON
+        case PLUGIN_POOLMON:
+            this->plugins[plugin_id] = new poolmon(this->drakvuf, config);
+            break;
+#endif
+#ifdef ENABLE_PLUGIN_FILETRACER
+        case PLUGIN_FILETRACER:
+            this->plugins[plugin_id] = new filetracer(this->drakvuf, config);
+            break;
+#endif
+#ifdef ENABLE_PLUGIN_FILEDELETE
+        case PLUGIN_FILEDELETE:
+            this->plugins[plugin_id] = new filedelete(this->drakvuf, config);
+            break;
+#endif
+#ifdef ENABLE_PLUGIN_OBJMON
+        case PLUGIN_OBJMON:
+            this->plugins[plugin_id] = new objmon(this->drakvuf, config);
+            break;
+#endif
+#ifdef ENABLE_PLUGIN_EXMON
+        case PLUGIN_EXMON:
+            this->plugins[plugin_id] = new exmon(this->drakvuf, config);
+            break;
+#endif
+        default:
+            break;
+        };
+
+        return 0;
+    }
+
+    return -EINVAL;
+}

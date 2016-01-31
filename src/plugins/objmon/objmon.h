@@ -105,20 +105,23 @@
 #ifndef OBJMON_H
 #define OBJMON_H
 
-#ifdef ENABLE_PLUGIN_OBJMON
+#include "plugins/plugins.h"
 
-int plugin_objmon_start(drakvuf_t drakvuf, const void *config);
-int plugin_objmon_stop(drakvuf_t drakvuf);
+class objmon: public plugin {
+    public:
+        output_format_t format;
+        drakvuf_trap_t trap = {
+            .lookup_type = LOOKUP_PID,
+            .u.pid = 4,
+            .addr_type = ADDR_RVA,
+            .name = "ObCreateObject",
+            .module = "ntoskrnl.exe",
+            .type = BREAKPOINT
+        };
+        addr_t typeindex_offset;
 
-#else
-
-static int plugin_objmon_start(drakvuf_t drakvuf, const void *config) {
-    return 1;
-}
-static int plugin_objmon_stop(drakvuf_t drakvuf) {
-    return 1;
-}
-
-#endif
+        objmon(drakvuf_t drakvuf, const void *config);
+        ~objmon();
+};
 
 #endif

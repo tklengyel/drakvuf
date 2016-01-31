@@ -102,180 +102,168 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
+#ifndef LIBDRAKVUF_H
+#define LIBDRAKVUF_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#pragma GCC visibility push(default)
+
 #include <glib.h>
+#include <libvmi/libvmi.h>
+#include <libvmi/events.h>
 
-#include "libdrakvuf/drakvuf.h"
-#include "plugins/plugins.h"
+/*---------------------------------------------------------
+ * Reading in Rekall profile informations
+ */
 
-static drakvuf_t drakvuf;
-static int interrupted;
+typedef struct symbol {
+    const char *name;
+    addr_t rva;
+    uint8_t type;
+    int inputs;
+} __attribute__ ((packed)) symbol_t;
 
-static void close_handler(int sig) {
-    interrupted = sig;
-    drakvuf_interrupt(drakvuf, sig);
+typedef struct symbols {
+    const char *name;
+    symbol_t *symbols; // array of size count
+    uint64_t count;
+} symbols_t;
+
+symbols_t* drakvuf_get_symbols_from_rekall(const char *profile);
+void drakvuf_free_symbols(symbols_t *symbols);
+
+status_t drakvuf_get_function_rva(const char *rekall_profile,
+                                  const char *function,
+                                  addr_t *rva);
+status_t drakvuf_get_struct_size(const char *rekall_profile,
+                                 const char *struct_name,
+                                 size_t *size);
+status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
+                                       const char *struct_name,
+                                       const char *symbol,
+                                       addr_t *rva);
+
+/*---------------------------------------------------------
+ * DRAKVUF functions
+ */
+
+typedef enum {
+    OUTPUT_DEFAULT,
+    OUTPUT_CSV,
+    __OUTPUT_MAX
+} output_format_t;
+
+typedef enum lookup_type {
+    LOOKUP_NONE,
+    LOOKUP_DTB,
+    LOOKUP_PID,
+    LOOKUP_NAME,
+} lookup_type_t;
+
+typedef enum addr_type {
+    ADDR_RVA,
+    ADDR_VA,
+    ADDR_PA
+} addr_type_t;
+
+typedef enum trap_type {
+    BREAKPOINT      = 1 << 0,
+    MEMACCESS_R     = 1 << 1,
+    MEMACCESS_W     = 1 << 2,
+    MEMACCESS_X     = 1 << 3,
+    MEMACCESS_RW    = (MEMACCESS_R | MEMACCESS_W),
+    MEMACCESS_RX    = (MEMACCESS_R | MEMACCESS_X),
+    MEMACCESS_RWX   = (MEMACCESS_R | MEMACCESS_W | MEMACCESS_W)
+} trap_type_t;
+
+typedef enum memaccess_type {
+    PRE,
+    POST
+} memaccess_type_t;
+
+typedef struct drakvuf* drakvuf_t;
+struct drakvuf_trap;
+typedef struct drakvuf_trap drakvuf_trap_t;
+
+typedef struct drakvuf_trap_info {
+    unsigned int vcpu;
+    uint16_t altp2m_idx;
+    addr_t trap_pa;
+    x86_registers_t *regs;
+    drakvuf_trap_t *trap;
+} drakvuf_trap_info_t;
+
+struct drakvuf_trap {
+    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*);
+
+    lookup_type_t lookup_type;
+    union {
+        vmi_pid_t pid;
+        const char *proc;
+    } u;
+
+    /* If specified and RVA is used
+       RVA will be calculated from the base
+       of this module */
+    const char *module;
+    const char *name;
+
+    addr_type_t addr_type;
+    union {
+        addr_t rva;
+        addr_t addr;
+    } u2;
+
+    trap_type_t type;
+    memaccess_type_t memaccess_type; // iff type == MEMACCESS_*
+
+    void *data;
+};
+
+bool drakvuf_init (drakvuf_t *drakvuf,
+                   const char *domain,
+                   const char *rekall_profile);
+void drakvuf_close (drakvuf_t drakvuf);
+void drakvuf_add_trap(drakvuf_t drakvuf,
+                      drakvuf_trap_t *trap);
+void drakvuf_add_traps(drakvuf_t drakvuf,
+                       GSList *traps);
+void drakvuf_remove_trap (drakvuf_t drakvuf,
+                          drakvuf_trap_t *trap,
+                          void(*free_routine)(drakvuf_trap_t *trap));
+void drakvuf_remove_traps(drakvuf_t drakvuf,
+                          GSList *traps);
+void drakvuf_loop (drakvuf_t drakvuf);
+void drakvuf_interrupt (drakvuf_t drakvuf,
+                        int sig);
+int drakvuf_inject_cmd (drakvuf_t drakvuf,
+                        vmi_pid_t pid,
+                        const char *cmd);
+void drakvuf_pause (drakvuf_t drakvuf);
+void drakvuf_resume (drakvuf_t drakvuf);
+
+vmi_instance_t drakvuf_lock_and_get_vmi(drakvuf_t drakvuf);
+void drakvuf_release_vmi(drakvuf_t drakvuf);
+
+output_format_t drakvuf_get_output_format(drakvuf_t drakvuf);
+void drakvuf_set_output_format(drakvuf_t drakvuf,
+                               output_format_t output);
+addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
+                                 addr_t process,
+                                 uint64_t handle);
+
+addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
+                                   uint64_t vcpu_id);
+addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
+                                   uint64_t vcpu_id);
+
+#pragma GCC visibility pop
+
+#ifdef __cplusplus
 }
+#endif
 
-static gpointer timer(gpointer data) {
-    int timeout = *(int*)data;
-
-    while(timeout && !interrupted) {
-        sleep(1);
-        --timeout;
-    }
-
-    if (!interrupted) {
-        interrupted = -1;
-        drakvuf_interrupt(drakvuf, -1);
-    }
-
-    g_thread_exit(NULL);
-    return NULL;
-}
-
-int main(int argc, char** argv) {
-
-    int c, i, rc = 0, timeout = 0;
-    char *inject_cmd = NULL;
-    char *domain = NULL;
-    char *rekall_profile = NULL;
-    char *dump_folder = NULL;
-    vmi_pid_t injection_pid = -1;
-    struct sigaction act;
-    GThread *timeout_thread = NULL;
-    output_format_t output = OUTPUT_DEFAULT;
-
-    fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
-
-    if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 ) {
-        fprintf(stderr, "No plugins have been enabled, nothing to do!\n");
-        return rc;
-    }
-
-    if (argc < 4) {
-        fprintf(stderr, "Required input:\n"
-               "\t -r <rekall profile>       The Rekall profile of the Windows kernel\n"
-               "\t -d <domain ID or name>    The domain's ID or name\n"
-               "Optional inputs:\n"
-               "\t -i <injection pid>        The PID of the process to hijack for injection\n"
-               "\t -e <inject_exe>           The executable to start with injection\n"
-               "\t -t <timeout>              Timeout (in seconds)\n"
-               "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
-               "\t -o <format>               Output format (default or csv)\n"
-               "\t -v                        Turn on verbose (debug) output\n"
-        );
-        return rc;
-    }
-
-    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:v")) != -1)
-    switch (c)
-    {
-    case 'r':
-        rekall_profile = optarg;
-        break;
-    case 'd':
-        domain = optarg;
-        break;
-    case 'i':
-        injection_pid = atoi(optarg);
-        break;
-    case 'e':
-        inject_cmd = optarg;
-        break;
-    case 't':
-        timeout = atoi(optarg);
-        break;
-    case 'D':
-        dump_folder = optarg;
-        break;
-    case 'o':
-        if(!strncmp(optarg,"csv",3))
-            output = OUTPUT_CSV;
-        break;
-    case 'v':
-//        verbose = 1;
-        break;
-    default:
-        fprintf(stderr, "Unrecognized option: %c\n", c);
-        return rc;
-    }
-
-    interrupted = 0;
-
-    if (!drakvuf_init(&drakvuf, domain, rekall_profile))
-        return rc;
-
-    if(output != OUTPUT_DEFAULT)
-        drakvuf_set_output_format(drakvuf, output);
-
-    if(timeout > 0) {
-        timeout_thread = g_thread_new(NULL, timer, &timeout);
-    }
-
-    drakvuf_pause(drakvuf);
-
-    if (injection_pid > 0 && inject_cmd) {
-        rc = drakvuf_inject_cmd(drakvuf, injection_pid, inject_cmd);
-
-        if (!rc) {
-            fprintf(stderr, "Process startup failed\n");
-            interrupted = 1;
-            goto exit;
-        }
-    }
-
-    /*
-     * Pass the configuration input to the plugins.
-     * Default config is only the rekall profile but plugins
-     * can define additional options which need to be passed
-     * through their own config structure.
-     */
-    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++) {
-        switch (i) {
-        case PLUGIN_FILEDELETE:
-        {
-            struct filedelete_config c = {
-                .rekall_profile = rekall_profile,
-                .dump_folder = dump_folder
-            };
-
-            if ( !drakvuf_plugin_start(drakvuf, i, &c) )
-                goto exit;
-            break;
-        }
-        default:
-            if ( !drakvuf_plugin_start(drakvuf, i, rekall_profile) )
-                goto exit;
-            break;
-        };
-    }
-
-    /* for a clean exit */
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
-
-    /* Start the event listener */
-    drakvuf_loop(drakvuf);
-    rc = 1;
-
-exit:
-    drakvuf_pause(drakvuf);
-    drakvuf_plugins_stop(drakvuf);
-    drakvuf_close(drakvuf);
-
-    if(timeout_thread)
-        g_thread_join(timeout_thread);
-
-    return rc;
-}
+#endif

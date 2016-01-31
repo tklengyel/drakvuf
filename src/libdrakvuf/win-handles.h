@@ -106,7 +106,7 @@
 #define WIN_HANDLES_H
 
 #include <libvmi/libvmi.h>
-#include "drakvuf.h"
+#include "libdrakvuf.h"
 
 addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
                                  uint64_t vcpu_id,

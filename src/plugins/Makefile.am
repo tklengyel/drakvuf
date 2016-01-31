@@ -107,48 +107,49 @@ sources =
 ###############################################################################
 
 if PLUGIN_SYSCALLS
-sources += syscalls/syscalls.c
+sources += syscalls/syscalls.cpp
 endif
 
 if PLUGIN_POOLMON
-sources += poolmon/poolmon.c
+sources += poolmon/poolmon.cpp
 endif
 
 if PLUGIN_FILETRACER
-sources += filetracer/filetracer.c
+sources += filetracer/filetracer.cpp
 endif
 
 if PLUGIN_FILEDELETE
-sources += filedelete/filedelete.c
+sources += filedelete/filedelete.cpp
 endif
 
 if PLUGIN_OBJMON
-sources += objmon/objmon.c
+sources += objmon/objmon.cpp
 endif
 
 if PLUGIN_EXMON
-sources += exmon/exmon.c
+sources += exmon/exmon.cpp
 endif
 
 
 ###############################################################################
-sources += plugins.c plugins.h
+sources += plugins.cpp plugins.h
 
-AM_CFLAGS = -I$(top_srcdir)
-AM_CFLAGS += $(CFLAGS)
-AM_CFLAGS += $(VMI_CFLAGS)
-AM_CFLAGS += $(GLIB_CFLAGS)
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
+AM_CPPFLAGS += $(CPPFLAGS)
+AM_CPPFLAGS += $(CXXFLAGS)
+AM_CPPFLAGS += $(VMI_CFLAGS)
+AM_CPPFLAGS += $(GLIB_CFLAGS)
 
-if HARDENING
-AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
-endif
+#if HARDENING
+AM_CPPFLAGS += $(HARDEN_CFLAGS) -DHARDENING
+#endif
 
 # Note that -pg is incompatible with HARDENING
 if DEBUG
-AM_CFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -Wno-override-init -Wno-strict-aliasing -g -ggdb3
-AM_CFLAGS += -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-unused-variable
+AM_CPPFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -Wno-strict-aliasing -g -ggdb3
+AM_CPPFLAGS += -Wno-unused-parameter -Wno-unused-variable
 if !HARDENING
-AM_CFLAGS += -pg
+AM_CPPFLAGS += -pg
 endif
 endif
 
