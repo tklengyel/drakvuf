@@ -102,147 +102,82 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/prctl.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <dirent.h>
 #include <glib.h>
-#include <err.h>
-
-#include <libvmi/libvmi.h>
-#include "../plugins.h"
-#include "private.h"
-
-#define POOLTAG_FILE "Fil\xe5"
-
-static GTree *pooltag_tree;
-static GSList *traps;
-static output_format_t format;
-
-GTree* pooltag_build_tree() {
-    GTree *pooltags = g_tree_new((GCompareFunc) strcmp);
-
-    uint32_t i = 0;
-    for (; i < TAG_COUNT; i++) {
-        g_tree_insert(pooltags, (char*) tags[i].tag,
-                (char*) &tags[i]);
-    }
-
-    return pooltags;
-}
+#include <inttypes.h>
+#include "syscalls.h"
 
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    page_mode_t pm = vmi_get_page_mode(vmi);
-    reg_t pool_type, size;
-    char tag[5] = { [0 ... 4] = '\0' };
+    syscalls *s = (syscalls*)info->trap->data;
 
-    access_context_t ctx = {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
-
-    if (pm == VMI_PM_IA32E) {
-        pool_type = info->regs->rcx;
-        size = info->regs->rdx;
-        *(reg_t*)tag = info->regs->r8;
-    } else {
-        ctx.addr = info->regs->rsp+12;
-        vmi_read_32(vmi, &ctx, (uint32_t*)tag);
-        ctx.addr = info->regs->rsp+8;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&size);
-        ctx.addr = info->regs->rsp+4;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&pool_type);
-    }
-
-    struct pooltag *s = g_tree_lookup(pooltag_tree, tag);
-
-    switch(format) {
+    switch(s->format) {
     case OUTPUT_CSV:
-    {
-        printf("poolmon,%s,%s,%zu", tag,
-               pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", (size_t)size);
-        if (s)
-            printf(",%s,%s", s->source, s->description);
+        printf("syscall,0x%" PRIx64 ",%s,%s\n", info->regs->cr3, info->trap->module, info->trap->name);
         break;
-    }
     default:
     case OUTPUT_DEFAULT:
-        printf("[POOLMON] %s (type: %s, size: %zu)", tag,
-               pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", (size_t)size);
-        if (s)
-            printf(": %s,%s", s->source, s->description);
-
+        printf("[SYSCALL] CR3:0x%" PRIx64 " %s!%s\n", info->regs->cr3, info->trap->module, info->trap->name);
         break;
-    };
+    }
 
-    printf("\n");
-
-    drakvuf_release_vmi(drakvuf);
     return 0;
 }
 
-/*void pool_tracker_free(vmi_instance_t vmi, vmi_event_t *event) {
-    // TODO: 32-bit inputs are on the stack
-    reg_t rcx, rdx;
-    drakvuf_t *drakvuf = event->data;
+static GSList* create_trap_config(syscalls *s, symbols_t *symbols) {
 
-    vmi_get_vcpureg(vmi, &rcx, RCX, event->vcpu_id);
-    vmi_get_vcpureg(vmi, &rdx, RDX, event->vcpu_id);
+    GSList *ret = NULL;
+    unsigned long i;
+    for (i=0; i < symbols->count; i++) {
 
-    char ctag[5] = { [0 ... 4] = '\0' };
-    memcpy(ctag, &rdx, 4);
+        const struct symbol *symbol = &symbols->symbols[i];
 
-    PRINT(drakvuf, HEAPFREE_STRING, rcx, ctag);
-}*/
+        if (strncmp(symbol->name, "Nt", 2))
+            continue;
+        //if (strcmp(symbol->name, "NtCallbackReturn"))
+        //    continue;
 
-/* ----------------------------------------------------- */
+        drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
+        trap->lookup_type = LOOKUP_PID;
+        trap->u.pid = 4;
+        trap->addr_type = ADDR_RVA;
+        trap->u2.rva = symbol->rva;
+        trap->name = g_strdup(symbol->name);
+        trap->module = "ntoskrnl.exe";
+        trap->type = BREAKPOINT;
+        trap->cb = cb;
+        trap->data = s;
 
-int plugin_poolmon_start(drakvuf_t drakvuf, const char *rekall_profile) {
-    pooltag_tree = pooltag_build_tree();
-
-    drakvuf_trap_t *trap = g_malloc0(sizeof(drakvuf_trap_t));
-    trap->lookup_type = LOOKUP_PID;
-    trap->u.pid = 4;
-    trap->addr_type = ADDR_RVA;
-    if (VMI_FAILURE == drakvuf_get_function_rva(rekall_profile,
-                                                "ExAllocatePoolWithTag",
-                                                &trap->u2.rva))
-    {
-        return 0;
+        ret = g_slist_prepend(ret, trap);
     }
 
-    trap->name = "ExAllocatePoolWithTag";
-    trap->module = "ntoskrnl.exe";
-    trap->type = BREAKPOINT;
-    trap->cb = cb;
-    traps = g_slist_prepend(traps, trap);
-    format = drakvuf_get_output_format(drakvuf);
-
-    drakvuf_add_traps(drakvuf, traps);
-
-    return 1;
+    return ret;
 }
 
-int plugin_poolmon_stop(drakvuf_t drakvuf) {
-    if(pooltag_tree)
-        g_tree_destroy(pooltag_tree);
+syscalls::syscalls(drakvuf_t drakvuf, const void *config) {
+    const char *rekall_profile = (const char *)config;
+    symbols_t *symbols = drakvuf_get_symbols_from_rekall(rekall_profile);
+    if (!symbols)
+    {
+        fprintf(stderr, "Failed to parse Rekall profile at %s\n", rekall_profile);
+        return;
+    }
 
-    GSList *loop = traps;
+    this->traps = create_trap_config(this, symbols);
+    this->format = drakvuf_get_output_format(drakvuf);
+
+    drakvuf_free_symbols(symbols);
+
+    drakvuf_add_traps(drakvuf, this->traps);
+}
+
+syscalls::~syscalls() {
+    GSList *loop = this->traps;
     while(loop) {
+        drakvuf_trap_t *trap = (drakvuf_trap_t *)loop->data;
+        free((char*)trap->name);
         free(loop->data);
         loop = loop->next;
     }
-    g_slist_free(traps);
 
-    return 1;
+    g_slist_free(this->traps);
 }

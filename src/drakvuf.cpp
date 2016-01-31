@@ -102,235 +102,126 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <glib.h>
-#include <config.h>
-#include "../plugins.h"
+#include "drakvuf.h"
 
-#define FILE_DISPOSITION_INFORMATION 13
+static gpointer timer(gpointer data)
+{
+    drakvuf_c* drakvuf = (drakvuf_c*)data;
 
-static const char *dump_folder;
-static output_format_t format;
-static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info);
-static page_mode_t pm;
-static uint32_t domid;
+    while(drakvuf->timeout && !drakvuf->interrupted) {
+        sleep(1);
+        --drakvuf->timeout;
+    }
 
-enum offset {
-    FILE_OBJECT_FILENAME,
-    HANDLE_TABLE_HANDLECOUNT,
-    OBJECT_HEADER_TYPEINDEX,
-    OBJECT_HEADER_BODY,
-    UNICODE_STRING_LENGTH,
-    UNICODE_STRING_BUFFER,
-    __OFFSET_MAX
-};
+    if (!drakvuf->interrupted) {
+        drakvuf->interrupt(-1);
+    }
 
-static const char *offset_names[__OFFSET_MAX][2] = {
-    [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
-    [HANDLE_TABLE_HANDLECOUNT] = {"_HANDLE_TABLE", "HandleCount" },
-    [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
-    [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
-    [UNICODE_STRING_LENGTH] = {"_UNICODE_STRING", "Length" },
-    [UNICODE_STRING_BUFFER] = {"_UNICODE_STRING", "Buffer" },
-};
-
-#define WIN7_TYPEINDEX_LAST 44
-#define VOL_DUMPFILES "%s %s -l vmi://domid/%u --profile=%s -Q 0x%lx -D %s -n dumpfiles 2>&1"
-#define PROFILE32 "Win7SP1x86"
-#define PROFILE64 "Win7SP1x64"
-
-static size_t offsets[__OFFSET_MAX];
-
-static drakvuf_trap_t traps[4] = {
-    [0 ... 3] = { .lookup_type = LOOKUP_PID,
-                  .u.pid = 4,
-                  .addr_type = ADDR_RVA,
-                  .type = BREAKPOINT,
-                  .module = "ntoskrnl.exe" }
-};
-
-void volatility_extract_file(drakvuf_t drakvuf, addr_t file_object) {
-
-    const char* profile = NULL;
-    if (pm == VMI_PM_IA32E)
-        profile = PROFILE64;
-    else
-        profile = PROFILE32;
-
-    char *command = g_malloc0(
-            snprintf(NULL, 0, VOL_DUMPFILES, PYTHON, VOLATILITY, domid,
-                     profile, file_object, dump_folder
-                    )+ 1);
-    sprintf(command, VOL_DUMPFILES, PYTHON, VOLATILITY, domid, profile,
-            file_object, dump_folder);
-
-    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
-    free(command);
+    g_thread_exit(NULL);
+    return NULL;
 }
 
-/*
- * The approach where the system process list es enumerated looking for
- * the matching cr3 value in each _EPROCESS struct is not going to work
- * if a DKOM attack unhooks the _EPROCESS struct.
- *
- * We can access the _EPROCESS structure by reading the FS_BASE register on x86
- * or the GS_BASE register on x64, which contains the _KPCR.
- *
- * FS/GS -> _KPCR._KPRCB.CurrentThread -> _ETHREAD._KTHREAD.Process = _EPROCESS
- *
- * Also see: http://www.csee.umbc.edu/~stephens/SECURITY/491M/HiddenProcesses.ppt
- */
-static void grab_file_by_handle(drakvuf_t drakvuf, uint32_t vcpu_id, vmi_instance_t vmi,
-                                page_mode_t pm,
-                                drakvuf_trap_info_t *info, addr_t handle)
+int drakvuf_c::start_plugins(const char *dump_folder)
 {
-    uint8_t type_index = 0;
-    addr_t process=drakvuf_get_current_process(drakvuf,vcpu_id);
+    int i, rc;
+    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
+    {
+        switch ((drakvuf_plugin_t)i) {
+        case PLUGIN_FILEDELETE:
+        {
+            struct filedelete_config c = {
+                .rekall_profile = this->rekall_profile,
+                .dump_folder = dump_folder
+            };
 
-    // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
-
-    if (!process)
-        return;
-
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
-
-    if (!obj)
-        return;
-
-    access_context_t ctx = {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .addr = obj + offsets[OBJECT_HEADER_TYPEINDEX],
-        .dtb = info->regs->cr3
-    };
-
-    if (VMI_FAILURE == vmi_read_8(vmi, &ctx, &type_index))
-        return;
-
-    if (type_index >= WIN7_TYPEINDEX_LAST || type_index != 28)
-        return;
-
-    addr_t file = obj + offsets[OBJECT_HEADER_BODY];
-    addr_t file_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, file);
-    addr_t filename = file + offsets[FILE_OBJECT_FILENAME];
-
-    uint16_t length = 0;
-    addr_t buffer = 0;
-
-    ctx.addr = filename + offsets[UNICODE_STRING_BUFFER];
-    vmi_read_addr(vmi, &ctx, &buffer);
-
-    ctx.addr = filename + offsets[UNICODE_STRING_LENGTH];
-    vmi_read_16(vmi, &ctx, &length);
-
-    if (length && buffer) {
-
-        unicode_string_t str = { .contents = NULL };
-        str.length = length;
-        str.encoding = "UTF-16";
-        str.contents = malloc(length);
-
-        ctx.addr = buffer;
-        vmi_read(vmi, &ctx, str.contents, length);
-
-        unicode_string_t str2 = { .contents = NULL };
-        status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
-        if (rc == VMI_SUCCESS) {
-            //printf("\tExtracting file: %s\n", str2.contents);
-
-            volatility_extract_file(drakvuf, file_pa);
-
-            free(str2.contents);
+            rc = this->plugins->start((drakvuf_plugin_t)i, &c);
+            break;
         }
 
-        free(str.contents);
+        default:
+            rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
+            break;
+        };
     }
+
+    return rc;
 }
 
-static event_response_t setinformation(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    access_context_t ctx = {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    };
-
-    uint32_t fileinfoclass = 0;
-    reg_t handle = 0, fileinfo = 0, length = 0;
-
-    if (pm == VMI_PM_IA32E) {
-        handle = info->regs->rcx;
-        fileinfo = info->regs->r8;
-        length = info->regs->r9;
-
-        ctx.addr = info->regs->rsp + 5 * sizeof(addr_t); // addr of fileinfoclass
-        vmi_read_32(vmi, &ctx, &fileinfoclass);
-    } else {
-        ctx.addr = info->regs->rsp + sizeof(uint32_t);
-        vmi_read_32(vmi, &ctx, (uint32_t*) &handle);
-        ctx.addr += 2 * sizeof(uint32_t);
-        vmi_read_32(vmi, &ctx, (uint32_t*) &fileinfo);
-        ctx.addr += sizeof(uint32_t);
-        vmi_read_32(vmi, &ctx, (uint32_t*) &length);
-        ctx.addr += sizeof(uint32_t);
-        vmi_read_32(vmi, &ctx, &fileinfoclass);
-    }
-
-    if (fileinfoclass == FILE_DISPOSITION_INFORMATION && length == 1) {
-        uint8_t del = 0;
-        ctx.addr = fileinfo;
-        vmi_read_8(vmi, &ctx, &del);
-        if (del) {
-            //printf("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", handle);
-            grab_file_by_handle(drakvuf, info->vcpu, vmi, pm, info, handle);
-        }
-    }
-
-    drakvuf_release_vmi(drakvuf);
-    return 0;
-}
-
-int plugin_filedelete_start(drakvuf_t drakvuf,
-                            const struct filedelete_config *c)
+drakvuf_c::drakvuf_c(const char* domain,
+                     const char *rekall_profile,
+                     output_format_t output,
+                     int timeout,
+                     const char* dump_folder)
 {
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    pm = vmi_get_page_mode(vmi);
-    domid = vmi_get_vmid(vmi);
-    drakvuf_release_vmi(drakvuf);
+    this->initialized = 0;
+    this->interrupted = 0;
+    this->timeout = timeout;
+    this->rekall_profile = rekall_profile;
 
-    dump_folder = c->dump_folder ? c->dump_folder : "/tmp";
-    format = drakvuf_get_output_format(drakvuf);
+    if (drakvuf_init(&drakvuf, domain, rekall_profile))
+    {
+        if(output != OUTPUT_DEFAULT)
+            drakvuf_set_output_format(drakvuf, output);
 
-    if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "NtSetInformationFile", &traps[0].u2.rva))
-        return 0;
-    if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "ZwSetInformationFile", &traps[1].u2.rva))
-        return 0;
+        if(timeout > 0)
+            this->timeout_thread = g_thread_new(NULL, timer, (void*)this);
 
-    traps[0].name = "NtSetInformationFile";
-    traps[0].cb = setinformation;
-    traps[1].name = "ZwSetInformationFile";
-    traps[1].cb = setinformation;
-    /* TODO
-    traps[2].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "NtDeleteFile");
-    traps[2].name = "NtDeleteFile";
-    traps[3].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "ZwDeleteFile");
-    traps[3].name = "ZwDeleteFile";*/
+        this->plugins = new drakvuf_plugins(this->drakvuf);
+        this->pause();
 
-    int i;
-    for(i=0;i<__OFFSET_MAX;i++) {
-        if(VMI_FAILURE == drakvuf_get_struct_member_rva(c->rekall_profile,
-                                                        offset_names[i][0], offset_names[i][1],
-                                                        &offsets[i]))
-            return 0;
+        if ( this->start_plugins(dump_folder) == 0 )
+            this->initialized = 1;
     }
-
-    drakvuf_add_trap(drakvuf, &traps[0]);
-    //drakvuf_add_trap(drakvuf, &traps[1]);
-    //drakvuf_add_trap(drakvuf, &traps[2]);
-    //drakvuf_add_trap(drakvuf, &traps[3]);
-
-    return 1;
 }
 
-int plugin_filedelete_stop(drakvuf_t drakvuf) {
-    return 1;
+drakvuf_c::~drakvuf_c()
+{
+    if (this->initialized)
+        delete this->plugins;
+
+    if (this->drakvuf)
+    {
+        this->pause();
+        drakvuf_close(this->drakvuf);
+    }
+
+    if(this->timeout_thread)
+    {
+        this->interrupted = -1;
+        g_thread_join(this->timeout_thread);
+    }
+}
+
+int drakvuf_c::is_initialized()
+{
+    return this->initialized;
+}
+
+void drakvuf_c::interrupt(int signal)
+{
+    this->interrupted = signal;
+    drakvuf_interrupt(this->drakvuf, signal);
+}
+
+void drakvuf_c::loop()
+{
+    drakvuf_loop(this->drakvuf);
+}
+
+void drakvuf_c::pause()
+{
+    drakvuf_pause(this->drakvuf);
+}
+
+void drakvuf_c::resume()
+{
+    drakvuf_resume(this->drakvuf);
+}
+
+int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, const char *inject_cmd)
+{
+    int rc = drakvuf_inject_cmd(this->drakvuf, injection_pid, inject_cmd);
+    if (!rc)
+        fprintf(stderr, "Process startup failed\n");
+    return rc;
 }

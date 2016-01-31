@@ -102,87 +102,107 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <glib.h>
+#include <config.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <inttypes.h>
-#include "../plugins.h"
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
+#include <glib.h>
 
-static GSList *traps;
-static output_format_t format;
+#include "drakvuf.h"
 
-static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+static drakvuf_c* drakvuf;
 
-    switch(format) {
-    case OUTPUT_CSV:
-        printf("syscall,0x%"PRIx64",%s,%s\n", info->regs->cr3, info->trap->module, info->trap->name);
+void close_handler(int signal) {
+    drakvuf->interrupt(signal);
+}
+
+int main(int argc, char** argv) {
+    int c, i, rc = 0, timeout = 0;
+    char *inject_cmd = NULL;
+    char *domain = NULL;
+    char *rekall_profile = NULL;
+    char *dump_folder = NULL;
+    vmi_pid_t injection_pid = -1;
+    struct sigaction act;
+    GThread *timeout_thread = NULL;
+    output_format_t output = OUTPUT_DEFAULT;
+
+    fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
+
+    if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 ) {
+        fprintf(stderr, "No plugins have been enabled, nothing to do!\n");
+        return rc;
+    }
+
+    if (argc < 4) {
+        fprintf(stderr, "Required input:\n"
+               "\t -r <rekall profile>       The Rekall profile of the Windows kernel\n"
+               "\t -d <domain ID or name>    The domain's ID or name\n"
+               "Optional inputs:\n"
+               "\t -i <injection pid>        The PID of the process to hijack for injection\n"
+               "\t -e <inject_exe>           The executable to start with injection\n"
+               "\t -t <timeout>              Timeout (in seconds)\n"
+               "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
+               "\t -o <format>               Output format (default or csv)\n"
+               "\t -v                        Turn on verbose (debug) output\n"
+        );
+        return rc;
+    }
+
+    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:v")) != -1)
+    switch (c)
+    {
+    case 'r':
+        rekall_profile = optarg;
+        break;
+    case 'd':
+        domain = optarg;
+        break;
+    case 'i':
+        injection_pid = atoi(optarg);
+        break;
+    case 'e':
+        inject_cmd = optarg;
+        break;
+    case 't':
+        timeout = atoi(optarg);
+        break;
+    case 'D':
+        dump_folder = optarg;
+        break;
+    case 'o':
+        if(!strncmp(optarg,"csv",3))
+            output = OUTPUT_CSV;
+        break;
+    case 'v':
+//        verbose = 1;
         break;
     default:
-    case OUTPUT_DEFAULT:
-        printf("[SYSCALL] CR3:0x%"PRIx64" %s!%s\n", info->regs->cr3, info->trap->module, info->trap->name);
-        break;
+        fprintf(stderr, "Unrecognized option: %c\n", c);
+        return rc;
     }
 
-    return 0;
-}
+    drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, dump_folder);
+    if( !drakvuf->is_initialized() )
+        goto exit;
 
-static GSList *create_trap_config(symbols_t *symbols) {
+    /* for a clean exit */
+    act.sa_handler = close_handler;
+    act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGHUP, &act, NULL);
+    sigaction(SIGTERM, &act, NULL);
+    sigaction(SIGINT, &act, NULL);
+    sigaction(SIGALRM, &act, NULL);
 
-    GSList *ret = NULL;
-    unsigned long i;
-    for (i=0; i < symbols->count; i++) {
+    /* Start the event listener */
+    drakvuf->loop();
+    rc = 1;
 
-        const struct symbol *symbol = &symbols->symbols[i];
-
-        if (strncmp(symbol->name, "Nt", 2))
-            continue;
-        //if (strcmp(symbol->name, "NtCallbackReturn"))
-        //    continue;
-
-        drakvuf_trap_t *trap = g_malloc0(sizeof(drakvuf_trap_t));
-        trap->lookup_type = LOOKUP_PID;
-        trap->u.pid = 4;
-        trap->addr_type = ADDR_RVA;
-        trap->u2.rva = symbol->rva;
-        trap->name = g_strdup(symbol->name);
-        trap->module = "ntoskrnl.exe";
-        trap->type = BREAKPOINT;
-        trap->cb = cb;
-
-        ret = g_slist_prepend(ret, trap);
-    }
-
-    return ret;
-}
-
-int plugin_syscall_start(drakvuf_t drakvuf, const char *rekall_profile) {
-
-    symbols_t *symbols = drakvuf_get_symbols_from_rekall(rekall_profile);
-    if (!symbols)
-    {
-        fprintf(stderr, "Failed to parse Rekall profile at %s\n", rekall_profile);
-        return 0;
-    }
-
-    traps = create_trap_config(symbols);
-
-    drakvuf_free_symbols(symbols);
-    format = drakvuf_get_output_format(drakvuf);
-
-    drakvuf_add_traps(drakvuf, traps);
-
-    return 1;
-}
-
-int plugin_syscall_stop(drakvuf_t drakvuf) {
-    GSList *loop = traps;
-    while(loop) {
-        drakvuf_trap_t *trap = loop->data;
-        free((char*)trap->name);
-        free(loop->data);
-        loop = loop->next;
-    }
-
-    g_slist_free(traps);
-    traps = NULL;
-
-    return 1;
+exit:
+    delete drakvuf;
+    return rc;
 }

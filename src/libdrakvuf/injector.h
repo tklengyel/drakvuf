@@ -105,7 +105,7 @@
 #ifndef INJECTOR_H
 #define INJECTOR_H
 
-#include "drakvuf.h"
+#include "libdrakvuf.h"
 
 int start_app(drakvuf_t drakvuf, vmi_pid_t pid, const char *app);
 

@@ -102,20 +102,48 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef SYSCALLS_H
-#define SYSCALLS_H
+#ifndef DRAKVUF_H
+#define DRAKVUF_H
 
+#include <config.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <inttypes.h>
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
+#include <glib.h>
+
+#include <libdrakvuf/libdrakvuf.h>
 #include "plugins/plugins.h"
 
-class syscalls: public plugin {
-
+class drakvuf_c {
     private:
-        GSList *traps;
+        int initialized;
+        drakvuf_t drakvuf;
+        drakvuf_plugins* plugins;
+        GThread *timeout_thread;
+        const char *rekall_profile;
+
+        int start_plugins(const char *dump_folder);
 
     public:
-        output_format_t format;
-        syscalls(drakvuf_t drakvuf, const void *config);
-        ~syscalls();
+        int timeout;
+        int interrupted;
+
+        drakvuf_c(const char* domain,
+                  const char *rekall_profile,
+                  output_format_t output,
+                  int timeout,
+                  const char* dump_folder);
+        ~drakvuf_c();
+
+        int is_initialized();
+        void interrupt(int signal);
+        void loop();
+        void pause();
+        void resume();
+        int inject_cmd(vmi_pid_t injection_pid, const char *inject_cmd);
 };
 
 #endif

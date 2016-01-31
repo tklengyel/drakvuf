@@ -129,38 +129,35 @@
 #include <libvmi/libvmi.h>
 #include "../plugins.h"
 #include "private.h"
+#include "filetracer.h"
 
 #define POOLTAG_FILE "Fil\xe5"
 #define ALIGN_SIZE(alignment, size) \
     ( (size % alignment) ? (alignment - (size % alignment)) : 0 )
 
-static drakvuf_trap_t poolalloc;
-static GSList *writetraps;
-static GHashTable *rettraps;
-static addr_t file_object_size, file_name_offset,
-              string_buffer_offset, string_length_offset;
-static page_mode_t pm;
-static output_format_t format;
-
 struct rettrap_struct {
+    filetracer *f;
     drakvuf_trap_t *trap;
     long counter;
 };
 
 struct file_watch {
+    filetracer *f;
     addr_t file_name_buffer;
     addr_t file_name_length;
 };
 
 void free_writetrap(drakvuf_trap_t *trap) {
     //printf("Freeing writetrap @ %p\n", trap);
-    writetraps = g_slist_remove(writetraps, trap);
+    filetracer *f = (filetracer *)trap->data;
+    f->writetraps = g_slist_remove(f->writetraps, trap);
     free(trap);
 }
 
 static event_response_t file_name_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    struct file_watch *watch = info->trap->data;
+    struct file_watch *watch = (struct file_watch*)info->trap->data;
+    filetracer *f = watch->f;
 
     if (info->trap_pa == watch->file_name_buffer)
     {
@@ -175,14 +172,14 @@ static event_response_t file_name_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
             unicode_string_t str = { .contents = NULL };
             str.length = length;
             str.encoding = "UTF-16";
-            str.contents = malloc(length);
+            str.contents = (unsigned char *)g_malloc0(length);
             vmi_read_va(vmi, file_name, 0, str.contents, length);
             unicode_string_t str2 = { .contents = NULL };
             status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
 
             if (VMI_SUCCESS == rc) {
 
-                switch(format) {
+                switch(f->format) {
                 case OUTPUT_CSV:
                     printf("filetracer,%u,%s\n", info->vcpu, str2.contents);
                     break;
@@ -197,6 +194,7 @@ static event_response_t file_name_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
 
             free(str.contents);
             //printf("Requesting to free writetrap @ %p\n", info->trap);
+            info->trap->data=f;
             drakvuf_remove_trap(drakvuf, info->trap, free_writetrap);
         }
     }
@@ -208,15 +206,16 @@ static event_response_t file_name_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
 /* This will be hit for all sorts of heap alloc returns */
 static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    struct rettrap_struct *s = info->trap->data;
+    struct rettrap_struct *s = (struct rettrap_struct *)info->trap->data;
+    filetracer *f = s->f;
     addr_t obj_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, info->regs->rax);
     bool file_alloc = 0;
     addr_t ph_base = 0, thread = 0;
     uint32_t block_size = 0;
     uint32_t tag;
-    uint32_t aligned_file_size = file_object_size;
+    uint32_t aligned_file_size = f->file_object_size;
 
-    if ( pm == VMI_PM_IA32E ) {
+    if ( f->pm == VMI_PM_IA32E ) {
         struct pool_header_x64 ph;
         memset(&ph, 0, sizeof(struct pool_header_x64));
         ph_base = obj_pa - sizeof(struct pool_header_x64);
@@ -234,21 +233,25 @@ static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t
             file_alloc = 1;
     }
 
-    if (!file_alloc) goto done;
+    if (!file_alloc) {
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
 
     // We will need to catch when the file string buffer pointer is updated
-    addr_t file_base = ph_base + block_size - file_object_size; // addr of "_FILE_OBJECT"
-    addr_t file_name = file_base + file_name_offset; // addr of "_UNICODE_STRING"
+    addr_t file_base = ph_base + block_size - f->file_object_size; // addr of "_FILE_OBJECT"
+    addr_t file_name = file_base + f->file_name_offset; // addr of "_UNICODE_STRING"
 
-    struct file_watch *watch = g_malloc0(sizeof(struct file_watch));
-    watch->file_name_buffer = file_name + string_buffer_offset;
-    watch->file_name_length = file_name + string_length_offset;
+    struct file_watch *watch = (struct file_watch *)g_malloc0(sizeof(struct file_watch));
+    watch->f = f;
+    watch->file_name_buffer = file_name + f->string_buffer_offset;
+    watch->file_name_length = file_name + f->string_length_offset;
 
     //printf("PH 0x%lx. Block size: %u\n", ph_base, block_size);
     //printf("File size: 0x%lx File base: 0x%lx. Unicode string @ 0x%lx. Last write @ 0x%lx\n",
     //       file_object_size, file_base, file_name-file_base, watch->file_name_buffer-file_base);
 
-    drakvuf_trap_t *writetrap = g_malloc0(sizeof(drakvuf_trap_t));
+    drakvuf_trap_t *writetrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
     //printf("Made a writetrap @ %p\n", writetrap);
     writetrap->lookup_type = LOOKUP_NONE;
     writetrap->addr_type = ADDR_PA;
@@ -258,7 +261,7 @@ static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t
     writetrap->u2.addr = watch->file_name_buffer;
     writetrap->data = watch;
 
-    writetraps = g_slist_prepend(writetraps, writetrap);
+    f->writetraps = g_slist_prepend(f->writetraps, writetrap);
 
     drakvuf_add_trap(drakvuf, writetrap);
 
@@ -271,22 +274,21 @@ static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t
         free(s);
     }*/
 
-done:
     drakvuf_release_vmi(drakvuf);
     return 0;
 }
 
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
+    filetracer *f = (filetracer*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     reg_t tag = 0, size = 0;
 
-    access_context_t ctx = {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
 
-    if (pm == VMI_PM_IA32E) {
+    if (f->pm == VMI_PM_IA32E) {
         size = info->regs->rdx;
         tag = info->regs->r8;
     } else {
@@ -310,14 +312,15 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         vmi_read_addr(vmi, &ctx, &ret);
         ret_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, ret);
 
-        struct rettrap_struct *s = g_hash_table_lookup(rettraps, &ret_pa);
+        struct rettrap_struct *s = (struct rettrap_struct*)g_hash_table_lookup(f->rettraps, &ret_pa);
         if (s) {
             s->counter++;
         } else {
-            drakvuf_trap_t *rettrap = g_malloc0(sizeof(drakvuf_trap_t));
-            s = g_malloc0(sizeof(struct rettrap_struct));
+            drakvuf_trap_t *rettrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+            s = (struct rettrap_struct*)g_malloc0(sizeof(struct rettrap_struct));
             s->trap = rettrap;
             s->counter = 1;
+            s->f = f;
 
             rettrap->lookup_type = LOOKUP_NONE;
             rettrap->addr_type = ADDR_PA;
@@ -328,7 +331,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             rettrap->data = s;
 
             drakvuf_add_trap(drakvuf, rettrap);
-            g_hash_table_insert(rettraps, &rettrap->u2.addr, s);
+            g_hash_table_insert(f->rettraps, &rettrap->u2.addr, s);
         }
 
         //printf("File alloc request on vCPU %u. Ret: 0x%lx. Counter: %u\n",
@@ -341,53 +344,51 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
 /* ----------------------------------------------------- */
 
-int plugin_filetracer_start(drakvuf_t drakvuf, const char *rekall_profile) {
+filetracer::filetracer(drakvuf_t drakvuf, const void* config) {
+    const char *rekall_profile = (const char *)config;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    pm = vmi_get_page_mode(vmi);
+    this->pm = vmi_get_page_mode(vmi);
     drakvuf_release_vmi(drakvuf);
-    rettraps = g_hash_table_new(g_int64_hash, g_int64_equal);
-    format = drakvuf_get_output_format(drakvuf);
+    this->rettraps = g_hash_table_new(g_int64_hash, g_int64_equal);
+    this->format = drakvuf_get_output_format(drakvuf);
 
-    poolalloc.lookup_type = LOOKUP_PID;
-    poolalloc.u.pid = 4;
-    poolalloc.addr_type = ADDR_RVA;
-    poolalloc.name = "ExAllocatePoolWithTag";
-    poolalloc.module = "ntoskrnl.exe";
-    poolalloc.type = BREAKPOINT;
-    poolalloc.cb = cb;
+    this->poolalloc.lookup_type = LOOKUP_PID;
+    this->poolalloc.u.pid = 4;
+    this->poolalloc.addr_type = ADDR_RVA;
+    this->poolalloc.name = "ExAllocatePoolWithTag";
+    this->poolalloc.module = "ntoskrnl.exe";
+    this->poolalloc.type = BREAKPOINT;
+    this->poolalloc.cb = cb;
+    this->poolalloc.data = (void*)this;
 
-    if (VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag", &poolalloc.u2.rva))
-        return 0;
-    if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_FILE_OBJECT", "FileName", &file_name_offset))
-        return 0;
-    if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_UNICODE_STRING", "Buffer", &string_buffer_offset))
-        return 0;
-    if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_UNICODE_STRING", "Length", &string_length_offset))
-        return 0;
-    if (VMI_FAILURE == drakvuf_get_struct_size(rekall_profile, "_FILE_OBJECT", &file_object_size))
-        return 0;
+    if (VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag", &this->poolalloc.u2.rva))
+        return;
+    if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_FILE_OBJECT", "FileName", &this->file_name_offset))
+        return;
+    if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_UNICODE_STRING", "Buffer", &this->string_buffer_offset))
+        return;
+    if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_UNICODE_STRING", "Length", &this->string_length_offset))
+        return;
+    if (VMI_FAILURE == drakvuf_get_struct_size(rekall_profile, "_FILE_OBJECT", &this->file_object_size))
+        return;
 
-    if (pm == VMI_PM_IA32E)
-        file_object_size += ALIGN_SIZE(16, file_object_size);
+    if (this->pm == VMI_PM_IA32E)
+        this->file_object_size += ALIGN_SIZE(16, this->file_object_size);
     else
-        file_object_size += ALIGN_SIZE(8, file_object_size);
+        this->file_object_size += ALIGN_SIZE(8, this->file_object_size);
 
-    drakvuf_add_trap(drakvuf, &poolalloc);
-
-    return 1;
+    drakvuf_add_trap(drakvuf, &this->poolalloc);
 }
 
-int plugin_filetracer_stop(drakvuf_t drakvuf) {
+filetracer::~filetracer() {
 
-    GSList *loop = writetraps;
+    GSList *loop = this->writetraps;
     while(loop) {
         free(loop->data);
         loop=loop->next;
     }
-    g_slist_free(writetraps);
+    g_slist_free(this->writetraps);
 
-    if ( rettraps )
-        g_hash_table_destroy(rettraps);
-
-    return 1;
+    if ( this->rettraps )
+        g_hash_table_destroy(this->rettraps);
 }

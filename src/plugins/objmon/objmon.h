@@ -105,20 +105,13 @@
 #ifndef OBJMON_H
 #define OBJMON_H
 
-#ifdef ENABLE_PLUGIN_OBJMON
+#include "plugins/plugins.h"
 
-int plugin_objmon_start(drakvuf_t drakvuf, const void *config);
-int plugin_objmon_stop(drakvuf_t drakvuf);
-
-#else
-
-static int plugin_objmon_start(drakvuf_t drakvuf, const void *config) {
-    return 1;
-}
-static int plugin_objmon_stop(drakvuf_t drakvuf) {
-    return 1;
-}
-
-#endif
+class objmon: public plugin {
+    public:
+        output_format_t format;
+        objmon(drakvuf_t drakvuf, const void *config);
+        ~objmon();
+};
 
 #endif
