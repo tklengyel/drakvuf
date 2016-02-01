@@ -141,14 +141,13 @@ static gpointer timer(gpointer data) {
 
 int main(int argc, char** argv) {
 
-    int c, i;
+    int c, i, rc = 0, timeout = 0;
     char *inject_cmd = NULL;
     char *domain = NULL;
     char *rekall_profile = NULL;
     char *dump_folder = NULL;
     vmi_pid_t injection_pid = -1;
     struct sigaction act;
-    int timeout = 0;
     GThread *timeout_thread = NULL;
     output_format_t output = OUTPUT_DEFAULT;
 
@@ -156,7 +155,7 @@ int main(int argc, char** argv) {
 
     if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 ) {
         fprintf(stderr, "No plugins have been enabled, nothing to do!\n");
-        return 1;
+        return rc;
     }
 
     if (argc < 4) {
@@ -171,7 +170,7 @@ int main(int argc, char** argv) {
                "\t -o <format>               Output format (default or csv)\n"
                "\t -v                        Turn on verbose (debug) output\n"
         );
-        return 1;
+        return rc;
     }
 
     while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:v")) != -1)
@@ -204,13 +203,13 @@ int main(int argc, char** argv) {
         break;
     default:
         fprintf(stderr, "Unrecognized option: %c\n", c);
-        return 1;
+        return rc;
     }
 
     interrupted = 0;
 
     if (!drakvuf_init(&drakvuf, domain, rekall_profile))
-        return 1;
+        return rc;
 
     if(output != OUTPUT_DEFAULT)
         drakvuf_set_output_format(drakvuf, output);
@@ -222,7 +221,7 @@ int main(int argc, char** argv) {
     drakvuf_pause(drakvuf);
 
     if (injection_pid > 0 && inject_cmd) {
-        int rc = drakvuf_inject_cmd(drakvuf, injection_pid, inject_cmd);
+        rc = drakvuf_inject_cmd(drakvuf, injection_pid, inject_cmd);
 
         if (!rc) {
             fprintf(stderr, "Process startup failed\n");
@@ -267,6 +266,7 @@ int main(int argc, char** argv) {
 
     /* Start the event listener */
     drakvuf_loop(drakvuf);
+    rc = 1;
 
 exit:
     drakvuf_pause(drakvuf);
@@ -276,5 +276,5 @@ exit:
     if(timeout_thread)
         g_thread_join(timeout_thread);
 
-    return 0;
+    return rc;
 }
