@@ -787,6 +787,8 @@ done:
 
 event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
+    vmi_pause_vm(vmi);
+
     struct injector *injector = event->data;
     addr_t pa = (event->interrupt_event.gfn << 12)
                  + event->interrupt_event.offset;
@@ -822,6 +824,7 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         vmi_write_8_va(vmi, injector->ret, pid, &trap);
 
         event->interrupt_event.reinject = 0;
+        vmi_resume_vm(vmi);
         return 0;
     }
 
@@ -831,7 +834,6 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     // We are now in the return path from CreateProcessA
 
     vmi_clear_event(vmi, event, NULL);
-    vmi_pause_vm(vmi);
     vmi_write_8_pa(vmi, pa, &injector->ret_backup);
     injector->drakvuf->interrupted=1;
     event->interrupt_event.reinject = 0;
@@ -894,6 +896,7 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
 notmine:
     event->interrupt_event.reinject = 1;
+    vmi_resume_vm(vmi);
     return 0;
 }
 
