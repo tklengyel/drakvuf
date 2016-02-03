@@ -386,7 +386,8 @@ int plugin_filetracer_stop(drakvuf_t drakvuf) {
     }
     g_slist_free(writetraps);
 
-    g_hash_table_destroy(rettraps);
+    if ( rettraps )
+        g_hash_table_destroy(rettraps);
 
     return 1;
 }
