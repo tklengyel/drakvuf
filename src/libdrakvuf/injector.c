@@ -277,11 +277,16 @@ struct kapc_64 {
 };
 
 void pass_inputs(struct injector *injector, vmi_instance_t vmi,
-        unsigned int vcpu, vmi_pid_t pid) {
+        unsigned int vcpu, reg_t cr3) {
 
     status_t status;
     reg_t fsgs, rsp;
     addr_t stack_base, stack_limit;
+
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = cr3,
+    };
 
     status = vmi_get_vcpureg(vmi, &rsp, RSP, vcpu);
 
@@ -290,14 +295,18 @@ void pass_inputs(struct injector *injector, vmi_instance_t vmi,
     if (injector->pm == VMI_PM_IA32E)
         status = vmi_get_vcpureg(vmi, &fsgs, GS_BASE, vcpu);
 
-    vmi_read_addr_va(vmi, fsgs + offsets[NT_TIB_STACKBASE], pid, &stack_base);
-    vmi_read_addr_va(vmi, fsgs + offsets[NT_TIB_STACKLIMIT], pid, &stack_limit);
+    ctx.addr = fsgs + offsets[NT_TIB_STACKBASE];
+    vmi_read_addr(vmi, &ctx, &stack_base);
+    ctx.addr = fsgs + offsets[NT_TIB_STACKLIMIT];
+    vmi_read_addr(vmi, &ctx, &stack_limit);
 
     //PRINT(injector->drakvuf, INJECTION_STACK_INFO_STRING,
     //      fsgs, rsp, stack_base, stack_limit);
 
-    vmi_read_addr_va(vmi, rsp, pid, &injector->ret);
-    vmi_read_8_va(vmi, injector->ret, pid, &injector->ret_backup);
+    ctx.addr = rsp;
+    vmi_read_addr(vmi, &ctx, &injector->ret);
+    ctx.addr = injector->ret;
+    vmi_read_8(vmi, &ctx, &injector->ret_backup);
 
     //Push input arguments on the stack
     //CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, CREATE_SUSPENDED, NULL, NULL, &si, pi))
@@ -315,14 +324,17 @@ void pass_inputs(struct injector *injector, vmi_instance_t vmi,
         addr -= 0x4; // the stack has to be alligned to 0x4
                      // and we need a bit of extra buffer before the string for \0
         // we just going to null out that extra space fully
-        vmi_write_32_va(vmi, addr, pid, &nul32);
+        ctx.addr = addr;
+        vmi_write_32(vmi, &ctx, &nul32);
 
         // this string has to be aligned as well!
         addr -= len + 0x4 - (len % 0x4);
         str_addr = addr;
-        vmi_write_va(vmi, addr, pid, (void*) injector->target_proc, len);
+        ctx.addr = addr;
+        vmi_write(vmi, &ctx, (void*) injector->target_proc, len);
         // add null termination
-        vmi_write_8_va(vmi, addr + len, pid, &nul8);
+        ctx.addr = addr + len;
+        vmi_write_8(vmi, &ctx, &nul8);
 
         //struct startup_info_32 si = {.wShowWindow = SW_SHOWDEFAULT };
         struct startup_info_32 si;
@@ -333,47 +345,60 @@ void pass_inputs(struct injector *injector, vmi_instance_t vmi,
         addr -= sizeof(struct process_information_32);
         injector->process_info = addr;
 
-        vmi_write_va(vmi, addr, pid, &pi,
+        ctx.addr = addr;
+        vmi_write(vmi, &ctx, &pi,
                 sizeof(struct process_information_32));
 
         addr -= sizeof(struct startup_info_32);
         sip_addr = addr;
-        vmi_write_va(vmi, addr, pid, &si, sizeof(struct startup_info_32));
+        ctx.addr = addr;
+        vmi_write(vmi, &ctx, &si, sizeof(struct startup_info_32));
 
         //p10
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, (uint32_t *) &injector->process_info);
+        ctx.addr = addr;
+        vmi_write_32(vmi, &ctx, (uint32_t *) &injector->process_info);
         //p9
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, (uint32_t *) &sip_addr);
+        ctx.addr = addr;
+        vmi_write_32(vmi, &ctx, (uint32_t *) &sip_addr);
         //p8
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, &nul32);
+        ctx.addr = addr;
+        vmi_write_32(vmi, &ctx, &nul32);
         //p7
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, &nul32);
+        ctx.addr = addr;
+        vmi_write_32(vmi, &ctx, &nul32);
         //p6
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, &nul32);
+        ctx.addr = addr;
+        vmi_write_32(vmi, &ctx, &nul32);
         //p5
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, &nul32);
+        ctx.addr = addr;
+        vmi_write_32(vmi, &ctx, &nul32);
         //p4
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, &nul32);
+        ctx.addr = addr;
+        vmi_write_32(vmi, &ctx, &nul32);
         //p3
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, &nul32);
+        ctx.addr = addr;
+        vmi_write_32(vmi, &ctx, &nul32);
         //p2
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, (uint32_t *) &str_addr);
+        ctx.addr = addr;
+        vmi_write_32(vmi, &ctx, (uint32_t *) &str_addr);
         //p1
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, &nul32);
+        ctx.addr = addr;
+        vmi_write_32(vmi, &ctx, &nul32);
 
         // save the return address
         addr -= 0x4;
-        vmi_write_32_va(vmi, addr, pid, (uint32_t *) &injector->ret);
+        ctx.addr = addr;
+        vmi_write_32(vmi, &ctx, (uint32_t *) &injector->ret);
 
     } else {
 
@@ -381,14 +406,17 @@ void pass_inputs(struct injector *injector, vmi_instance_t vmi,
                      // and we need a bit of extra buffer before the string for \0
 
         // we just going to null out that extra space fully
-        vmi_write_64_va(vmi, addr, pid, &nul64);
+        ctx.addr = addr;
+        vmi_write_64(vmi, &ctx, &nul64);
 
         // this string has to be aligned as well!
         addr -= len + 0x8 - (len % 0x8);
         str_addr = addr;
-        vmi_write_va(vmi, addr, pid, (void*) injector->target_proc, len);
+        ctx.addr = addr;
+        vmi_write(vmi, &ctx, (void*) injector->target_proc, len);
         // add null termination
-        vmi_write_8_va(vmi, addr + len, pid, &nul8);
+        ctx.addr = addr+len;
+        vmi_write_8(vmi, &ctx, &nul8);
 
         struct startup_info_64 si;
         memset(&si, 0, sizeof(struct startup_info_64));
@@ -397,12 +425,14 @@ void pass_inputs(struct injector *injector, vmi_instance_t vmi,
 
         addr -= sizeof(struct process_information_64);
         injector->process_info = addr;
-        vmi_write_va(vmi, addr, pid, &pi,
+        ctx.addr = addr;
+        vmi_write(vmi, &ctx, &pi,
                 sizeof(struct process_information_64));
 
         addr -= sizeof(struct startup_info_64);
         sip_addr = addr;
-        vmi_write_va(vmi, addr, pid, &si, sizeof(struct startup_info_64));
+        ctx.addr = addr;
+        vmi_write(vmi, &ctx, &si, sizeof(struct startup_info_64));
 
         //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
         //
@@ -412,32 +442,42 @@ void pass_inputs(struct injector *injector, vmi_instance_t vmi,
 
         //p10
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &injector->process_info);
+        ctx.addr = addr;
+        vmi_write_64(vmi, &ctx, &injector->process_info);
         //p9
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &sip_addr);
+        ctx.addr = addr;
+        vmi_write_64(vmi, &ctx, &sip_addr);
         //p8
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &nul64);
+        ctx.addr = addr;
+        vmi_write_64(vmi, &ctx, &nul64);
         //p7
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &nul64);
+        ctx.addr = addr;
+        vmi_write_64(vmi, &ctx, &nul64);
         //p6
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &nul64);
+        ctx.addr = addr;
+        vmi_write_64(vmi, &ctx, &nul64);
         //p5
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &nul64);
+        ctx.addr = addr;
+        vmi_write_64(vmi, &ctx, &nul64);
 
         // allocate 0x20 "homing space"
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &nul64);
+        ctx.addr = addr;
+        vmi_write_64(vmi, &ctx, &nul64);
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &nul64);
+        ctx.addr = addr;
+        vmi_write_64(vmi, &ctx, &nul64);
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &nul64);
+        ctx.addr = addr;
+        vmi_write_64(vmi, &ctx, &nul64);
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &nul64);
+        ctx.addr = addr;
+        vmi_write_64(vmi, &ctx, &nul64);
 
         //p1
         vmi_set_vcpureg(vmi, 0, RCX, vcpu);
@@ -450,7 +490,8 @@ void pass_inputs(struct injector *injector, vmi_instance_t vmi,
 
         // save the return address
         addr -= 0x8;
-        vmi_write_64_va(vmi, addr, pid, &injector->ret);
+        ctx.addr = addr;
+        vmi_write_64(vmi, &ctx, &injector->ret);
     }
 
     //PRINT(injector->drakvuf, INJECTION_STACK_PUSHED_STRING,
@@ -792,9 +833,13 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     struct injector *injector = event->data;
     addr_t pa = (event->interrupt_event.gfn << 12)
                  + event->interrupt_event.offset;
-    reg_t cr3;
-    vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
+    reg_t cr3 = event->regs.x86->cr3;
     vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
+
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = cr3,
+    };
 
     PRINT_DEBUG("INT3 Callback @ 0x%lx. PID %u. CR3 0x%lx\n",
                 event->interrupt_event.gla, pid, cr3);
@@ -804,12 +849,12 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         if (PM2BIT(injector->pm) == BIT64) {
             addr_t cpa = sym2va(vmi, pid, "kernel32.dll", "CreateProcessA");
 
-            vmi_get_vcpureg(vmi, &injector->saved_rip, RIP, event->vcpu_id);
-            vmi_get_vcpureg(vmi, &injector->saved_rsp, RSP, event->vcpu_id);
-            vmi_get_vcpureg(vmi, &injector->saved_rax, RAX, event->vcpu_id);
-            vmi_get_vcpureg(vmi, &injector->saved_rcx, RCX, event->vcpu_id);
-            vmi_get_vcpureg(vmi, &injector->saved_r8, R8, event->vcpu_id);
-            vmi_get_vcpureg(vmi, &injector->saved_r9, R9, event->vcpu_id);
+            injector->saved_rip = event->regs.x86->rip;
+            injector->saved_rsp = event->regs.x86->rsp;
+            injector->saved_rax = event->regs.x86->rax;
+            injector->saved_rcx = event->regs.x86->rcx;
+            injector->saved_r8 = event->regs.x86->r8;
+            injector->saved_r9 = event->regs.x86->r9;
 
             vmi_set_vcpureg(vmi, cpa, RIP, event->vcpu_id);
 
@@ -819,9 +864,10 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         // On 32-bit Windows we are already at CreateProcessA
 
         vmi_write_8_pa(vmi, pa, &injector->entry_backup);
-        pass_inputs(injector, vmi, event->vcpu_id, pid);
+        pass_inputs(injector, vmi, event->vcpu_id, cr3);
 
-        vmi_write_8_va(vmi, injector->ret, pid, &trap);
+        ctx.addr = injector->ret;
+        vmi_write_8(vmi, &ctx, &trap);
 
         event->interrupt_event.reinject = 0;
         vmi_resume_vm(vmi);
@@ -838,11 +884,10 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     injector->drakvuf->interrupted=1;
     event->interrupt_event.reinject = 0;
 
-    reg_t rax;
-    vmi_get_vcpureg(vmi, &rax, RAX, event->vcpu_id);
+    reg_t rax = event->regs.x86->rax;
 
     if (PM2BIT(injector->pm) == BIT64) {
-        printf("Returning flow to 0x%lx\n", injector->saved_rip);
+        PRINT_DEBUG("Returning flow to 0x%lx\n", injector->saved_rip);
         vmi_set_vcpureg(vmi, injector->saved_rip, RIP, event->vcpu_id);
         vmi_set_vcpureg(vmi, injector->saved_rsp, RSP, event->vcpu_id);
         vmi_set_vcpureg(vmi, injector->saved_rax, RAX, event->vcpu_id);
@@ -854,10 +899,12 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     PRINT_DEBUG("RAX: 0x%lx\n", rax);
 
     if (rax) {
+        ctx.addr = injector->process_info;
+
         if (PM2BIT(injector->pm) == BIT32) {
-            struct process_information_32 pip;
-            vmi_read_va(vmi, injector->process_info, pid, &pip,
-                        sizeof(struct process_information_32));
+            struct process_information_32 pip = { 0 };
+            vmi_read(vmi, &ctx, &pip,
+                     sizeof(struct process_information_32));
 
             injector->pid = pip.dwProcessId;
             injector->tid = pip.dwThreadId;
@@ -865,30 +912,32 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
             injector->hThr = pip.hThread;
 
         } else {
-            struct process_information_64 pip;
-            vmi_read_va(vmi, injector->process_info, pid, &pip,
-                        sizeof(struct process_information_64));
+            struct process_information_64 pip = { 0 };
+            vmi_read(vmi, &ctx, &pip,
+                     sizeof(struct process_information_64));
 
             injector->pid = pip.dwProcessId;
             injector->tid = pip.dwThreadId;
             injector->hProc = pip.hProcess;
             injector->hThr = pip.hThread;
-            injector->cr3 = vmi_pid_to_dtb(vmi, injector->pid);
-
         }
 
-        if (injector->pid && injector->tid) {
-            injector->ret = rax;
+        PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
 
-            /*injector->cr3_event.callback = waitfor_cr3_callback;
-            injector->cr3_event.reg_event.equal = vmi_pid_to_dtb(vmi,
-                        injector->pid);
+        /*
+         * Sometimes injection seem to return 1 in RAX but
+         * the host process actually crashed. While investigating
+         * the root cause just return 0 for PID >= 5000.
+         */
+        if (injector->pid < 5000 && injector->tid) {
+            injector->ret = rax;
+            /*injector->cr3 = vmi_pid_to_dtb(vmi, injector->pid);
+            injector->cr3_event.callback = waitfor_cr3_callback;
+            injector->cr3_event.reg_event.equal = injector->cr3;
             injector->cr3_event.data = injector;
             vmi_register_event(vmi, &injector->cr3_event);*/
-
-            //PRINT(injector->drakvuf, INJECTION_SUCCESS_STRING,
-            //      injector->pid, injector->tid, injector->hProc, injector->hThr,
-            //      injector->cr3);
+        } else {
+            injector->ret = 0;
         }
     }
 
@@ -913,7 +962,7 @@ int drakvuf_inject_cmd(drakvuf_t drakvuf, vmi_pid_t pid, const char *app) {
 
     if (!injector.target_cr3)
     {
-        fprintf(stderr, "Unable to find target PID's DTB\n");
+        PRINT_DEBUG("Unable to find target PID's DTB\n");
         return 0;
     }
 
@@ -955,6 +1004,6 @@ int drakvuf_inject_cmd(drakvuf_t drakvuf, vmi_pid_t pid, const char *app) {
     vmi_clear_event(drakvuf->vmi, &cr3_event, NULL);
     vmi_clear_event(drakvuf->vmi, &interrupt_event, NULL);
 
-    PRINT_DEBUG("Finished with injection.\n");
+    PRINT_DEBUG("Finished with injection. Ret: %i\n", injector.ret);
     return injector.ret;
 }

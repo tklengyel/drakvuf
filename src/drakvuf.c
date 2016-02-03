@@ -225,6 +225,7 @@ int main(int argc, char** argv) {
 
         if (!rc) {
             fprintf(stderr, "Process startup failed\n");
+            interrupted = 1;
             goto exit;
         }
     }
