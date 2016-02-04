@@ -111,21 +111,20 @@ fi
 REKALL=$1
 DOMAIN=$2
 PID=$3
-THREAD=$4
-INPUTFOLDER=$5
-INPUTFILE=$6
+VLAN=$4
+RUNFOLDER=$5
+RUNFILE=$6
 OUTPUTFOLDER=$7
-MD5=$(md5sum $INPUTFOLDER/$INPUTFILE | awk -F" " '{print $1}')
+MD5=$(md5sum $RUNFOLDER/$RUNFILE | awk -F" " '{print $1}')
 CMD="C:\\Users\\MrX\\Desktop\\test.exe"
 
-echo "drakvuf -r $REKALL -d $DOMAIN -i $PID -e \"$CMD\" -D $OUTPUTFOLDER/$MD5 -o csv -t 60"
-
-drakvuf -r $REKALL -d $DOMAIN -i $PID -e "$CMD" -D $OUTPUTFOLDER/$MD5 -o csv -t 60 2>&1 > $OUTPUTFOLDER/$MD5/drakvuf.log
+drakvuf -r $REKALL -d $DOMAIN -i $PID -e "$CMD" -D $OUTPUTFOLDER/$MD5 -o csv -t 60 1>$OUTPUTFOLDER/$MD5/drakvuf.log 2>&1
 
 RET=$?
 
-if [ $RET -eq 1 ]; then
-    mv $INPUTFOLDER/$INPUTFILE $OUTPUTFOLDER/$MD5
-fi
+mv $RUNFOLDER/$RUNFILE $OUTPUTFOLDER/$MD5 1>/dev/null 2>&1
+
+TCPDUMPPID=$(ps aux | grep "tcpdump -i xenbr1.$VLAN" | grep -v grep | awk -F" " '{print $2}')
+kill -9 $TCPDUMPPID 1>/dev/null 2>&1
 
 exit $RET;
