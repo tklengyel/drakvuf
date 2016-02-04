@@ -113,7 +113,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     switch(format) {
     case OUTPUT_CSV:
-        printf("syscall,0x%"PRIx64"%s,%s\n", info->regs->cr3, info->trap->module, info->trap->name);
+        printf("syscall,0x%"PRIx64",%s,%s\n", info->regs->cr3, info->trap->module, info->trap->name);
         break;
     default:
     case OUTPUT_DEFAULT:
