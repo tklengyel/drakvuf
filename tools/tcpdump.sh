@@ -104,52 +104,16 @@
 #!/bin/bash
 
 ARGC=$#
-if [ $ARGC -le 1 ]; then
+if [ $ARGC -le 3 ]; then
     exit 0;
 fi
 
-DONE=0
-LOOP=0
-DOMAIN=$1
-VLAN=$2
+VLAN=$1
+RUNFOLDER=$2
+RUNFILE=$3
+OUTPUTFOLDER=$4
+MD5=$(md5sum $RUNFOLDER/$RUNFILE | awk -F" " '{print $1}')
 
-xl pause $1 1>/dev/null 2>&1
-
-TCPDUMPPID=$(ps aux | grep "tcpdump -i xenbr1.$VLAN" | grep -v grep | awk -F" " '{print $2}')
-kill -9 $TCPDUMPPID 1>/dev/null 2>&1
-
-while [ $DONE -lt 1 ]
-do
-
-    PID=$(ps aux | grep injector | grep -v grep | grep $DOMAIN | awk -F" " '{print $2}')
-
-    if [ "$PID" ]; then
-        if [ $LOOP -lt 1 ]; then
-            kill -SIGINT $PID 1>/dev/null 2>&1
-        else
-            kill -9 $PID 1>/dev/null 2>&1
-        fi
-    fi
-
-    PID=$(ps aux | grep drakvuf | grep -v grep | grep "d $DOMAIN" | awk -F" " '{print $2}')
-
-    if [ "$PID" ]; then
-        if [ $LOOP -lt 1 ]; then
-            kill -SIGINT $PID 1>/dev/null 2>&1
-        else
-            kill -9 $PID 1>/dev/null 2>&1
-        fi
-    fi
-
-    if [ $LOOP -lt 1 ]; then
-        LOOP=1
-        sleep 5s
-    else
-        DONE=1
-    fi
-
-done
-
-xl destroy $1 1>/dev/null 2>&1
+tcpdump -i xenbr1.$VLAN -n -U -w $OUTPUTFOLDER/$MD5/tcpdump.pcap 1>/dev/null 2>&1
 
 exit $?;

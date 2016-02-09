@@ -102,54 +102,28 @@
 #                                                                        #
 #************************************************************************#
 #!/bin/bash
+#
+# Configures VLAN interfaces on the Open vSwitch brindge.
+# Change xenbr0 and xenbr1 to the name of your uplink and OVS bridge.
+#
+# Usage: ./network-setup.sh <number of VLAN tags used>
 
-ARGC=$#
-if [ $ARGC -le 1 ]; then
-    exit 0;
-fi
+# Module required for VLAN support
+modprobe 8021q
 
-DONE=0
-LOOP=0
-DOMAIN=$1
-VLAN=$2
+# Enable IP forwarding
+echo 1 > /proc/sys/net/ipv4/ip_forward
 
-xl pause $1 1>/dev/null 2>&1
+# Enable NAT on the uplink interface
+iptables -t nat -A POSTROUTING -o xenbr0 -j MASQUERADE
 
-TCPDUMPPID=$(ps aux | grep "tcpdump -i xenbr1.$VLAN" | grep -v grep | awk -F" " '{print $2}')
-kill -9 $TCPDUMPPID 1>/dev/null 2>&1
-
-while [ $DONE -lt 1 ]
+# Configure the Open vSwitch bridge and add interfaces for each VLAN
+ifconfig xenbr1 up
+for i in `seq 1 $1`;
 do
+    vconfig add xenbr1 $i
+    ifconfig xenbr1.$i 192.168.$i.1 netmask 255.255.255.0 up
 
-    PID=$(ps aux | grep injector | grep -v grep | grep $DOMAIN | awk -F" " '{print $2}')
-
-    if [ "$PID" ]; then
-        if [ $LOOP -lt 1 ]; then
-            kill -SIGINT $PID 1>/dev/null 2>&1
-        else
-            kill -9 $PID 1>/dev/null 2>&1
-        fi
-    fi
-
-    PID=$(ps aux | grep drakvuf | grep -v grep | grep "d $DOMAIN" | awk -F" " '{print $2}')
-
-    if [ "$PID" ]; then
-        if [ $LOOP -lt 1 ]; then
-            kill -SIGINT $PID 1>/dev/null 2>&1
-        else
-            kill -9 $PID 1>/dev/null 2>&1
-        fi
-    fi
-
-    if [ $LOOP -lt 1 ]; then
-        LOOP=1
-        sleep 5s
-    else
-        DONE=1
-    fi
-
+    # Prohibit VLANs talking to each other
+    iptables -A FORWARD -i xenbr1.$i -o !xenbr0 -j DROP
 done
-
-xl destroy $1 1>/dev/null 2>&1
-
-exit $?;

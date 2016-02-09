@@ -118,7 +118,8 @@
 #define CLONE_CMD       "%s %s %u %s"
 #define DRAKVUF_CMD     "%s %s %u %u %u %s %s %s"
 #define CONFIG_CMD      "%s %s %u %u %u %s %s %s"
-#define CLEANUP_CMD     "%s %u"
+#define CLEANUP_CMD     "%s %u %u"
+#define TCPDUMP_CMD     "%s %u %s %s %s"
 
 struct start_drakvuf {
     int threadid;
@@ -140,6 +141,7 @@ static const char *clone_script;
 static const char *config_script;
 static const char *drakvuf_script;
 static const char *cleanup_script;
+static const char *tcpdump_script;
 static const char *name;
 static domid_t domID;
 static uint32_t threads;
@@ -165,6 +167,15 @@ make_clone(xen_interface_t *xen, domid_t *cloneID,
     free(output);
 }
 
+gpointer tcpdump(gpointer data) {
+    struct start_drakvuf *start = (struct start_drakvuf *)data;
+    char *command = g_malloc0(snprintf(NULL, 0, TCPDUMP_CMD, tcpdump_script, start->threadid+1, run_folder, start->input, out_folder) + 1);
+    sprintf(command, TCPDUMP_CMD, tcpdump_script, start->threadid+1, run_folder, start->input, out_folder);
+    printf("** RUNNING COMMAND: %s\n", command);
+    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
+    free(command);
+}
+
 static inline int find_thread()
 {
     int i=0;
@@ -173,6 +184,14 @@ static inline int find_thread()
             return i;
     }
     return -1;
+}
+
+static inline void cleanup(domid_t cloneID, int vlan) {
+    char *command = g_malloc0(snprintf(NULL, 0, CLEANUP_CMD, cleanup_script, cloneID, vlan) + 1);
+    sprintf(command, CLEANUP_CMD, cleanup_script, cloneID, vlan);
+    printf("** RUNNING COMMAND: %s\n", command);
+    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
+    free(command);
 }
 
 gpointer timer_thread(gpointer data) {
@@ -192,13 +211,8 @@ gpointer timer_thread(gpointer data) {
         sleep(1);
     }
 
-    if (!gotlock) {
-        char *command = g_malloc0(snprintf(NULL, 0, CLEANUP_CMD, cleanup_script, start->cloneID) + 1);
-        sprintf(command, CLEANUP_CMD, cleanup_script, start->cloneID);
-        printf("** RUNNING COMMAND: %s\n", command);
-        g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
-        free(command);
-    }
+    if ( !gotlock )
+        cleanup(start->cloneID, start->threadid+1);
 
     return NULL;
 }
@@ -223,7 +237,6 @@ static void prepare(char *sample, struct start_drakvuf *start)
         threadid = find_thread();
     }
 
-    g_mutex_lock(&prepare_lock);
     printf("Making clone %i to run %s in thread %u\n", threadid+1, sample ? sample : start->input, threadid);
     make_clone(xen, &cloneID, threadid+1, &clone_name);
 
@@ -232,13 +245,13 @@ static void prepare(char *sample, struct start_drakvuf *start)
         clone_name = NULL;
         cloneID = 0;
 
-        make_clone(xen, &cloneID, threadid, &clone_name);
+        make_clone(xen, &cloneID, threadid+1, &clone_name);
     }
 
+    //g_mutex_lock(&prepare_lock);
     //uint64_t shared = xen_memshare(xen, domID, cloneID);
     //printf("Shared %"PRIu64" pages\n", shared);
-
-    g_mutex_unlock(&prepare_lock);
+    //g_mutex_unlock(&prepare_lock);
 
     if(!start && sample) {
         start = g_malloc0(sizeof(struct start_drakvuf));
@@ -261,7 +274,7 @@ void run_drakvuf(gpointer data, gpointer user_data)
     char *command;
     char *output, *err;
     gint rc;
-    GThread *timer;
+    GThread *timer, *tcpd;
 
 restart:
     command = NULL;
@@ -281,11 +294,14 @@ restart:
     free(command);
 
     g_mutex_unlock(&start->timer_lock);
+    g_thread_join(timer);
 
-    if(!start->timer)
-        rc = 0;
+    printf("[%i] ** Preconfig finished with RC %i. Timer: %i.\n", start->threadid, rc, start->timer);
 
-    if (!rc) goto end;
+    if (!start->timer)
+        goto end;
+
+    tcpd = g_thread_new("tcpdump", tcpdump, start);
 
     xc_domain_unpause(xen->xc, start->cloneID);
     // Preconfigure script takes a bit to run in the guest
@@ -303,6 +319,10 @@ restart:
     free(command);
 
     g_mutex_unlock(&start->timer_lock);
+    g_thread_join(timer);
+    g_thread_join(tcpd);
+
+    printf("[%i] ** DRAKVUF finished with RC %i. Timer: %i\n", start->threadid, rc, start->timer);
 
     if ( start->timer ) {
         printf("[%i] Finished processing %s\n", start->threadid, start->input);
@@ -313,7 +333,8 @@ restart:
         free(start->clone_name);
         free(start);
         return;
-    }
+    } else
+        cleanup(start->cloneID, start->threadid+1);
 
 end:
     printf("[%i] %s failed to execute on %u because of a timeout, creating new clone\n", start->threadid, start->input, start->cloneID);
@@ -327,9 +348,9 @@ int main(int argc, char** argv)
     struct dirent *ent;
     int i, ret = 1, processed = 0;
 
-    if(argc!=13) {
-        printf("Not enough arguments!\n");
-        printf("%s <origin domain name> <domain config> <rekall_profile> <injection pid> <watch folder> <serve folder> <output folder> <max clones> <clone_script> <config_script> <drakvuf_script> <cleanup_script>\n", argv[0]);
+    if(argc!=14) {
+        printf("Not enough arguments: %i!\n", argc);
+        printf("%s <origin domain name> <domain config> <rekall_profile> <injection pid> <watch folder> <serve folder> <output folder> <max clones> <clone_script> <config_script> <drakvuf_script> <cleanup_script> <tcpdump_script>\n", argv[0]);
         return 1;
     }
 
@@ -347,6 +368,7 @@ int main(int argc, char** argv)
     config_script = argv[10];
     drakvuf_script = argv[11];
     cleanup_script = argv[12];
+    tcpdump_script = argv[13];
 
     if (threads > 128) {
         printf("Too many clones requested (max 128 is specified right now)\n");
