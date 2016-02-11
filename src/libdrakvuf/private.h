@@ -115,7 +115,7 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
 
-#include "libdrakvuf.h"
+#include "drakvuf.h"
 #include "../xen_helper/xen_helper.h"
 
 #ifdef DRAKVUF_DEBUG

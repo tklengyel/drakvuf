@@ -104,9 +104,13 @@
 
 #include <glib.h>
 #include <libvmi/libvmi.h>
-#include "../plugins.h"
 #include "private.h"
-#include "exmon.h"
+#include "../plugins.h"
+
+
+// In case we'll need more APIs hooked, we keep a list handy
+static GSList *traps;
+static output_format_t format;
 
 enum offset {
     KTRAP_FRAME_EIP,
@@ -134,7 +138,7 @@ enum offset {
     EPROCESS_PID,
     EPROCESS_NAME,
     EPROCESS_PPID,
-    __OFFSET_MAX
+   __OFFSET_MAX
 };
 
 static const char *offset_names[__OFFSET_MAX][2] = {
@@ -165,27 +169,31 @@ static const char *offset_names[__OFFSET_MAX][2] = {
     [EPROCESS_PPID] = {"_EPROCESS", "InheritedFromUniqueProcessId"}
 };
 
+static size_t offsets[__OFFSET_MAX];
+
+size_t ktrap_frame_size=0;
+
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    exmon *e = (exmon*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    const char *str_format;
-    const char *user_format;
+    char *str_format;
+    char *user_format;
     page_mode_t pm = vmi_get_page_mode(vmi);
     uint8_t index = ~0;
     uint32_t first_chance;
-    char* trap_frame=(char*)g_malloc0(e->ktrap_frame_size);  // Generic pointer that allows addressing byte-aligned offests
+    char* trap_frame=malloc(ktrap_frame_size);  // Generic pointer that allows addressing byte-aligned offests
 
     if (!trap_frame){
-        printf("[EXMON] Memory allocation failed!\n");
+        printf("[EXMON] Memory allocation failed!\n");    
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
 
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
 
-    if(e->pm != VMI_PM_IA32E){
+    if(pm != VMI_PM_IA32E){
         reg_t exception_record, ptrap_frame, exception_code;
         uint8_t previous_mode;
 
@@ -198,11 +206,11 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         ctx.addr = info->regs->rsp+20;
         vmi_read_32(vmi, &ctx, (uint32_t*)&first_chance);
         ctx.addr = ptrap_frame;
-        vmi_read(vmi,&ctx, trap_frame, e->ktrap_frame_size);
+        vmi_read(vmi,&ctx, trap_frame, ktrap_frame_size);
         ctx.addr = exception_record;
         vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code);
 
-        switch(e->format) {
+        switch(format) {
         case OUTPUT_CSV:
             str_format=CSV_FORMAT32;
             user_format=CSV_FORMAT_USER;
@@ -215,45 +223,45 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         }
 
         printf(str_format, \
-        (uint32_t)info->regs->rsp,
-        (uint32_t)exception_record,
+        (uint32_t)info->regs->rsp, 
+        (uint32_t)exception_record, 
         (uint32_t)exception_code,
         (uint32_t)first_chance,
-        *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EIP]),
-        *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EAX]),
-        *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EBX]),
-        *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_ECX]),
-        *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EDX]),
-        *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EDI]),
-        *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_ESI]),
-        *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EBP]),
-        *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_HWESP]));
-
+        *(uint32_t*)(trap_frame+offsets[KTRAP_FRAME_EIP]), 
+        *(uint32_t*)(trap_frame+offsets[KTRAP_FRAME_EAX]), 
+        *(uint32_t*)(trap_frame+offsets[KTRAP_FRAME_EBX]), 
+        *(uint32_t*)(trap_frame+offsets[KTRAP_FRAME_ECX]), 
+        *(uint32_t*)(trap_frame+offsets[KTRAP_FRAME_EDX]), 
+        *(uint32_t*)(trap_frame+offsets[KTRAP_FRAME_EDI]), 
+        *(uint32_t*)(trap_frame+offsets[KTRAP_FRAME_ESI]), 
+        *(uint32_t*)(trap_frame+offsets[KTRAP_FRAME_EBP]), 
+        *(uint32_t*)(trap_frame+offsets[KTRAP_FRAME_HWESP])); 
+        
         if (previous_mode == 1){
             addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
             if (process){
                 uint32_t pid,ppid;
                 char* name;
-                vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
-                vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PPID], 0, (uint32_t*)&ppid);
-                name = vmi_read_str_va(vmi, process + e->offsets[EPROCESS_NAME], 0);
+                vmi_read_32_va(vmi, process + offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
+                vmi_read_32_va(vmi, process + offsets[EPROCESS_PPID], 0, (uint32_t*)&ppid);
+                name = vmi_read_str_va(vmi, process + offsets[EPROCESS_NAME], 0);
                 printf(user_format,pid,ppid,name);
                 free(name);
             } else printf(user_format,0,"NOPROC");
         }else{
-            printf("\n");
+            printf("\n");    
         }
     }else{
         reg_t exception_code;
 
         ctx.addr = info->regs->r8;
-        vmi_read(vmi,&ctx, trap_frame, e->ktrap_frame_size);
+        vmi_read(vmi,&ctx, trap_frame,ktrap_frame_size);
         ctx.addr = info->regs->rcx;
         vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code);
         ctx.addr = info->regs->rsp+40; // Return address + 32 byte shadow space
         vmi_read_32(vmi, &ctx, (uint32_t*)&first_chance);
 
-        switch(e->format) {
+        switch(format) {
         case OUTPUT_CSV:
             str_format=CSV_FORMAT64;
             user_format=CSV_FORMAT_USER;
@@ -266,33 +274,33 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         }
         printf(str_format, \
         info->regs->rcx, exception_code, first_chance & 1,
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RIP]),
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RAX]),
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RBX]),
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RCX]),
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RDX]),
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RSP]),
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RBP]),
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RSI]),
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RDI]),
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_R8]),
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_R9]),
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_R10]),
-        *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_R11]));
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_RIP]), 
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_RAX]), 
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_RBX]), 
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_RCX]), 
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_RDX]), 
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_RSP]), 
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_RBP]), 
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_RSI]), 
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_RDI]), 
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_R8]), 
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_R9]), 
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_R10]), 
+        *(uint64_t*)(trap_frame+offsets[KTRAP_FRAME_R11])); 
 
         if ((uint8_t)(info->regs->r9) == 1){
             addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
             if (process){
                 uint32_t pid,ppid;
                 char* name;
-                vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
-                vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PPID], 0, (uint32_t*)&ppid);
-                name = vmi_read_str_va(vmi, process + e->offsets[EPROCESS_NAME], 0);
+                vmi_read_32_va(vmi, process + offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
+                vmi_read_32_va(vmi, process + offsets[EPROCESS_PPID], 0, (uint32_t*)&ppid);
+                name = vmi_read_str_va(vmi, process + offsets[EPROCESS_NAME], 0);
                 printf(user_format,pid,ppid,name);
                 free(name);
             } else printf(user_format,0,"NOPROC");
-        } else {
-            printf("\n");
+        }else{
+            printf("\n");    
         }
     }
 
@@ -301,28 +309,46 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     return 0;
 }
 
-exmon::exmon(drakvuf_t drakvuf, const void *config) {
-    const char *rekall_profile =(const char *)config;
+int plugin_exmon_start(drakvuf_t drakvuf, const char *rekall_profile) {
 
-    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "KiDispatchException", &this->trap.u2.rva))
-        return;
+    drakvuf_trap_t *trap = g_malloc0(sizeof(drakvuf_trap_t));
+    trap->lookup_type = LOOKUP_PID;
+    trap->u.pid = 4;
+    trap->addr_type = ADDR_RVA;
 
-    this->trap.cb = cb;
-    this->trap.data = (void*)this;
-    this->format = drakvuf_get_output_format(drakvuf);
-    this->offsets = (size_t*)g_malloc0(__OFFSET_MAX*sizeof(size_t));
+    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "KiDispatchException", &trap->u2.rva))
+        return 0;
+
+    trap->name = "KiDispatchException";
+    trap->module = "ntoskrnl.exe";
+    trap->type = BREAKPOINT;
+    trap->cb = cb;
+
+    traps = g_slist_prepend(traps, trap);
+    format = drakvuf_get_output_format(drakvuf);
 
     int i;
     for(i=0;i<__OFFSET_MAX;i++) {
         drakvuf_get_struct_member_rva(rekall_profile, offset_names[i][0], offset_names[i][1],
-                                      &this->offsets[i]);
+                                        &offsets[i]);
     }
 
-    drakvuf_get_struct_size(rekall_profile, "_KTRAP_FRAME", &this->ktrap_frame_size);
+    drakvuf_get_struct_size(rekall_profile, "_KTRAP_FRAME", &ktrap_frame_size);
 
-    drakvuf_add_trap(drakvuf,&this->trap);
+    drakvuf_add_traps(drakvuf,traps);
+    return 1;
 }
 
-exmon::~exmon() {
-    free(this->offsets);
+int plugin_exmon_stop(drakvuf_t drakvuf) {
+    GSList *loop = traps;
+    while(loop) {
+        free(loop->data);
+        loop = loop->next;
+    }
+
+    g_slist_free(traps);
+    traps = NULL;
+
+    return 1;
 }
+

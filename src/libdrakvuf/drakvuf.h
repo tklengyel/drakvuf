@@ -102,8 +102,8 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef LIBDRAKVUF_H
-#define LIBDRAKVUF_H
+#ifndef DRAKVUF_H
+#define DRAKVUF_H
 
 #ifdef __cplusplus
 extern "C" {

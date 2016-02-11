@@ -110,8 +110,7 @@ AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
 AC_PROG_CC_STDC
-AC_PROG_CXX(clang++)
-AX_CXX_COMPILE_STDCXX_11
+AC_PROG_CXX
 
 ######################################################
 

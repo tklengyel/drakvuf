@@ -107,17 +107,7 @@
 
 #include <config.h>
 #include <stdlib.h>
-#include <libdrakvuf/libdrakvuf.h>
-
-/***************************************************************************/
-
-/* Plugin-specific configuration input */
-struct filedelete_config {
-    const char *rekall_profile;
-    const char *dump_folder;
-};
-
-/***************************************************************************/
+#include "../libdrakvuf/drakvuf.h"
 
 typedef enum drakvuf_plugin {
     PLUGIN_SYSCALLS,
@@ -129,19 +119,15 @@ typedef enum drakvuf_plugin {
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
-class plugin {};
-class drakvuf_plugins
-{
-    private:
-        drakvuf_t drakvuf;
-        plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = NULL };
+int drakvuf_plugin_start(drakvuf_t drakvuf,
+                        drakvuf_plugin_t plugin,
+                        const void *config);
+int drakvuf_plugins_stop(drakvuf_t drakvuf);
 
-    public:
-        drakvuf_plugins(drakvuf_t drakvuf);
-        ~drakvuf_plugins();
-        int start(drakvuf_plugin_t plugin, const void* config);
+/* Plugin-specific configuration input */
+struct filedelete_config {
+    const char *rekall_profile;
+    const char *dump_folder;
 };
-
-/***************************************************************************/
 
 #endif

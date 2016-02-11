@@ -106,7 +106,7 @@
 #include <stdlib.h>
 #include <libvmi/libvmi.h>
 
-#include "libdrakvuf/libdrakvuf.h"
+#include "libdrakvuf/drakvuf.h"
 
 static drakvuf_t drakvuf;
 

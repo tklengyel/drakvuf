@@ -105,20 +105,20 @@
 #ifndef FILETRACER_H
 #define FILETRACER_H
 
-#include "plugins/plugins.h"
+#ifdef ENABLE_PLUGIN_FILETRACER
 
-class filetracer: public plugin {
-    public:
-        page_mode_t pm;
-        output_format_t format;
-        drakvuf_trap_t poolalloc;
-        GSList *writetraps;
-        GHashTable *rettraps;
-        addr_t file_object_size, file_name_offset,
-              string_buffer_offset, string_length_offset;
+int plugin_filetracer_start(drakvuf_t drakvuf, const void *config);
+int plugin_filetracer_stop(drakvuf_t drakvuf);
 
-        filetracer(drakvuf_t drakvuf, const void *config);
-        ~filetracer();
-};
+#else
+
+static int plugin_filetracer_start(drakvuf_t drakvuf, const void *config) {
+    return 1;
+}
+static int plugin_filetracer_stop(drakvuf_t drakvuf) {
+    return 1;
+}
+
+#endif
 
 #endif
