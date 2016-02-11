@@ -109,17 +109,21 @@
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     syscalls *s = (syscalls*)info->trap->data;
+    char *procname = drakvuf_get_current_process_name(drakvuf, info->vcpu, info->regs);
 
     switch(s->format) {
     case OUTPUT_CSV:
-        printf("syscall,0x%" PRIx64 ",%s,%s\n", info->regs->cr3, info->trap->module, info->trap->name);
+        printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%s,%s\n",
+               info->vcpu, info->regs->cr3, procname, info->trap->module, info->trap->name);
         break;
     default:
     case OUTPUT_DEFAULT:
-        printf("[SYSCALL] CR3:0x%" PRIx64 " %s!%s\n", info->regs->cr3, info->trap->module, info->trap->name);
+        printf("[SYSCALL] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s!%s\n",
+               info->vcpu, info->regs->cr3, procname, info->trap->module, info->trap->name);
         break;
     }
 
+    free(procname);
     return 0;
 }
 
