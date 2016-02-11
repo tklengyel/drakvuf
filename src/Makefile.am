@@ -106,24 +106,34 @@ bin_PROGRAMS = drakvuf xen_memclone injector
 
 SUBDIRS = xen_helper libdrakvuf plugins dirwatch
 
-drakvuf_SOURCES = drakvuf.c
+drakvuf_SOURCES = main.cpp drakvuf.cpp
 xen_memclone_SOURCES  = xen_memclone.c
 injector_SOURCES = injector.c
 
 AM_CFLAGS = $(CFLAGS)
 AM_CFLAGS += $(VMI_CFLAGS)
 AM_CFLAGS += $(GLIB_CFLAGS)
+AM_CFLAGS += -I$(top_srcdir) -I$(srcdir)
+
+AM_CPPFLAGS = $(CPPFLAGS)
+AM_CPPFLAGS += $(VMI_CFLAGS)
+AM_CPPFLAGS += $(GLIB_CFLAGS)
+AM_CPPFLAGS += -I$(top_srcdir) -I$(srcdir)
 
 if HARDENING
 AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
+AM_CPPFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 endif
 
 # Note that -pg is incompatible with HARDENING
 if DEBUG
 AM_CFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -Wno-override-init -Wno-strict-aliasing -g -ggdb3
 AM_CFLAGS += -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-unused-variable
+AM_CPPFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -Wno-strict-aliasing -g -ggdb3
+AM_CPPFLAGS += -Wno-unused-parameter -Wno-unused-variable
 if !HARDENING
 AM_CFLAGS += -pg
+AM_CPPFLAGS += -pg
 endif
 endif
 

@@ -134,10 +134,8 @@ enum pool_type {
     NonPagedPoolSessionNx                 = NonPagedPoolNx + 32
 };
 
-static const char *pool_types[] = {
-    [0 ... MaxPoolType]                     = NULL,
+static const char *pool_types[MaxPoolType] = {
     [NonPagedPool]                          = "NonPagedPool",
-    [NonPagedPoolExecute]                   = "NonPagedPoolExecute",
     [PagedPool]                             = "PagedPool",
     [NonPagedPoolMustSucceed]               = "NonPagedPoolMustSucceed",
     [DontUseThisType]                       = "DontUseThisType",
@@ -147,9 +145,9 @@ static const char *pool_types[] = {
 };
 
 struct pooltag {
-    char* tag;
-    char* source;
-    char* description;
+    const char* tag;
+    const char* source;
+    const char* description;
 };
 
 #define TAG_COUNT 2254

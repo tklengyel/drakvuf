@@ -111,7 +111,7 @@
 #include <jansson.h>
 #include <glib.h>
 
-#include "drakvuf.h"
+#include "libdrakvuf.h"
 #include "private.h"
 
 status_t windows_system_map_lookup(
