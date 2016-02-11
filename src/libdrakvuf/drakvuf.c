@@ -105,7 +105,7 @@
 #include <glib.h>
 #include "../xen_helper/xen_helper.h"
 
-#include "libdrakvuf.h"
+#include "drakvuf.h"
 #include "private.h"
 #include "vmi.h"
 #include "win-symbols.h"

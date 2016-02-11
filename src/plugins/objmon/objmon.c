@@ -120,112 +120,85 @@
 #include <libvmi/libvmi.h>
 #include "../plugins.h"
 #include "private.h"
-#include "poolmon.h"
 
-static GTree* pooltag_build_tree() {
-    GTree *pooltags = g_tree_new((GCompareFunc) strcmp);
+static drakvuf_trap_t trap;
+static output_format_t format;
+static addr_t typeindex_offset;
 
-    uint32_t i = 0;
-    for (; i < TAG_COUNT; i++) {
-        g_tree_insert(pooltags, (char*) tags[i].tag,
-                (char*) &tags[i]);
-    }
-
-    return pooltags;
-}
-
+/*
+ NTKERNELAPI
+ NTSTATUS
+ ObCreateObject (
+ IN KPROCESSOR_MODE ObjectAttributesAccessMode OPTIONAL,
+ IN POBJECT_TYPE ObjectType,
+ IN POBJECT_ATTRIBUTES ObjectAttributes OPTIONAL,
+ IN KPROCESSOR_MODE AccessMode,
+ IN PVOID Reserved,
+ IN ULONG ObjectSizeToAllocate,
+ IN ULONG PagedPoolCharge OPTIONAL,
+ IN ULONG NonPagedPoolCharge OPTIONAL,
+ OUT PVOID *Object
+ );
+ */
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    poolmon *p = (poolmon*)info->trap->data;
+
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     page_mode_t pm = vmi_get_page_mode(vmi);
-    reg_t pool_type, size;
-    char tag[5] = { [0 ... 4] = '\0' };
+    uint8_t index = ~0;
 
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    if (pm == VMI_PM_IA32E) {
-        pool_type = info->regs->rcx;
-        size = info->regs->rdx;
-        *(reg_t*)tag = info->regs->r8;
-    } else {
-        ctx.addr = info->regs->rsp+12;
-        vmi_read_32(vmi, &ctx, (uint32_t*)tag);
-        ctx.addr = info->regs->rsp+8;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&size);
-        ctx.addr = info->regs->rsp+4;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&pool_type);
-    }
-
-    struct pooltag *s = (struct pooltag*)g_tree_lookup(p->pooltag_tree, tag);
-
-    switch(p->format) {
-    case OUTPUT_CSV:
-    {
-        printf("poolmon,%s,%s,%zu", tag,
-               pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", (size_t)size);
-        if (s)
-            printf(",%s,%s", s->source, s->description);
-        break;
-    }
-    default:
-    case OUTPUT_DEFAULT:
-        printf("[POOLMON] %s (type: %s, size: %zu)", tag,
-               pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", (size_t)size);
-        if (s)
-            printf(": %s,%s", s->source, s->description);
-
-        break;
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rdx + typeindex_offset
     };
 
-    printf("\n");
+    vmi_read_8(vmi, &ctx, &index);
+
+    if(index < WIN7_TYPEINDEX_LAST)
+    {
+        switch(format) {
+        case OUTPUT_CSV:
+        {
+            printf("objmon,%s", win7_typeindex[index]);
+            break;
+        }
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[OBJMON] %s", win7_typeindex[index]);
+            break;
+        };
+
+        printf("\n");
+    }
 
     drakvuf_release_vmi(drakvuf);
     return 0;
 }
 
-/*void pool_tracker_free(vmi_instance_t vmi, vmi_event_t *event) {
-    // TODO: 32-bit inputs are on the stack
-    reg_t rcx, rdx;
-    drakvuf_t *drakvuf = event->data;
-
-    vmi_get_vcpureg(vmi, &rcx, RCX, event->vcpu_id);
-    vmi_get_vcpureg(vmi, &rdx, RDX, event->vcpu_id);
-
-    char ctag[5] = { [0 ... 4] = '\0' };
-    memcpy(ctag, &rdx, 4);
-
-    PRINT(drakvuf, HEAPFREE_STRING, rcx, ctag);
-}*/
-
 /* ----------------------------------------------------- */
 
-poolmon::poolmon(drakvuf_t drakvuf, const void *config) {
-    const char *rekall_profile = (const char*)config;
-    this->pooltag_tree = pooltag_build_tree();
+int plugin_objmon_start(drakvuf_t drakvuf, const char *rekall_profile) {
 
-    this->trap.lookup_type = LOOKUP_PID;
-    this->trap.u.pid = 4;
-    this->trap.addr_type = ADDR_RVA;
-    if (VMI_FAILURE == drakvuf_get_function_rva(rekall_profile,
-                                                "ExAllocatePoolWithTag",
-                                                &this->trap.u2.rva))
-    {
-        return;
-    }
+    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ObCreateObject", &trap.u2.rva))
+        return 0;
+    if (VMI_FAILURE==drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "TypeIndex", &typeindex_offset))
+        return 0;
 
-    this->trap.name = "ExAllocatePoolWithTag";
-    this->trap.module = "ntoskrnl.exe";
-    this->trap.type = BREAKPOINT;
-    this->trap.cb = cb;
-    this->trap.data = (void*)this;
-    this->format = drakvuf_get_output_format(drakvuf);
+    trap.lookup_type = LOOKUP_PID;
+    trap.u.pid = 4;
+    trap.addr_type = ADDR_RVA;
+    trap.name = "ObCreateObject";
+    trap.module = "ntoskrnl.exe";
+    trap.type = BREAKPOINT;
+    trap.cb = cb;
 
-    drakvuf_add_trap(drakvuf, &this->trap);
+    format = drakvuf_get_output_format(drakvuf);
+
+    drakvuf_add_trap(drakvuf, &trap);
+
+    return 1;
 }
 
-poolmon::~poolmon() {
-    if(this->pooltag_tree)
-        g_tree_destroy(this->pooltag_tree);
+int plugin_objmon_stop(drakvuf_t drakvuf) {
+    return 1;
 }

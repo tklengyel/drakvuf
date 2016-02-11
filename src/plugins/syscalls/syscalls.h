@@ -105,17 +105,20 @@
 #ifndef SYSCALLS_H
 #define SYSCALLS_H
 
-#include "plugins/plugins.h"
+#ifdef ENABLE_PLUGIN_SYSCALLS
 
-class syscalls: public plugin {
+int plugin_syscall_start(drakvuf_t drakvuf, const void *config);
+int plugin_syscall_stop(drakvuf_t drakvuf);
 
-    private:
-        GSList *traps;
+#else
 
-    public:
-        output_format_t format;
-        syscalls(drakvuf_t drakvuf, const void *config);
-        ~syscalls();
-};
+static int plugin_syscall_start(drakvuf_t drakvuf, const void *config) {
+    return 1;
+}
+static int plugin_syscall_stop(drakvuf_t drakvuf) {
+    return 1;
+}
+
+#endif
 
 #endif

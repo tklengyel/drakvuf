@@ -105,16 +105,20 @@
 #ifndef POOLMON_H
 #define POOLMON_H
 
-#include "plugins/plugins.h"
+#ifdef ENABLE_PLUGIN_POOLMON
 
-class poolmon: public plugin {
-    public:
-        output_format_t format;
-        GTree *pooltag_tree;
-        drakvuf_trap_t trap;
+int plugin_poolmon_start(drakvuf_t drakvuf, const void *config);
+int plugin_poolmon_stop(drakvuf_t drakvuf);
 
-        poolmon(drakvuf_t drakvuf, const void *config);
-        ~poolmon();
-};
+#else
+
+static int plugin_poolmon_start(drakvuf_t drakvuf, const void *config) {
+    return 1;
+}
+static int plugin_poolmon_stop(drakvuf_t drakvuf) {
+    return 1;
+}
+
+#endif
 
 #endif

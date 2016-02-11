@@ -119,7 +119,7 @@
 
 #include "../xen_helper/xen_helper.h"
 
-#include "libdrakvuf.h"
+#include "drakvuf.h"
 #include "win-symbols.h"
 #include "vmi.h"
 #include "rdtsc.h"
@@ -554,7 +554,7 @@ void inject_trap_pa(drakvuf_t drakvuf,
 
         rc = xc_domain_increase_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
         if (!rc)
-            PRINT_DEBUG("Reservation increased? %u with new gfn: 0x%lx\n", rc, remapped_gfn->r);
+            PRINT_DEBUG("Reservation increased? %u with new gfn: 0x%lx\n", rc, remapped_gfn);
         else
             return;
 
@@ -637,8 +637,9 @@ void inject_trap_pa(drakvuf_t drakvuf,
         else return;
     }
 
-    addr_t rpa = (remapped_gfn->r<<12) + (container->breakpoint.pa & VMI_BIT_MASK(0,11));
-    if (VMI_FAILURE == vmi_write_8_pa(vmi, rpa, &bp))
+    if (VMI_FAILURE == vmi_write_8_pa(vmi,
+                                      (remapped_gfn->r<<12) + (container->breakpoint.pa & VMI_BIT_MASK(0,11)),
+                                      &bp))
     {
         PRINT_DEBUG("FAILED TO INJECT TRAP @ 0x%lx !\n", container->breakpoint.pa);
         return;
@@ -658,8 +659,10 @@ void inject_trap_pa(drakvuf_t drakvuf,
     g_hash_table_insert(drakvuf->breakpoint_lookup_trap, g_memdup(&trap, sizeof(void*)),
                         container);
 
-    PRINT_DEBUG("\t\tTrap added @ PA 0x%" PRIx64 " RPA 0x%" PRIx64 " Page %" PRIu64 " for %s. \n",
-                container->breakpoint.pa, rpa, pa >> 12, trap->name);
+    PRINT_DEBUG("\t\tTrap added @ PA 0x%lx RPA 0x%lx Page %lu for %s. \n",
+                container->breakpoint.pa,
+                (remapped_gfn->r<<12) + (container->breakpoint.pa & VMI_BIT_MASK(0,11)),
+                pa >> 12, trap->name);
 }
 
 void inject_trap(drakvuf_t drakvuf,
@@ -722,7 +725,7 @@ void inject_traps_modules(drakvuf_t drakvuf,
         unicode_string_t out = { .contents = NULL };
 
         if (us && VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8")) {
-            PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", out.contents, dllbase);
+            PRINT_DEBUG("\t%s @ 0x%lx\n", out.contents, dllbase);
         } // if
         if (us)
             vmi_free_unicode_str(us);

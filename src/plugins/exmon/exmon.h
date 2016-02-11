@@ -105,25 +105,20 @@
 #ifndef EXMON_H
 #define EXMON_H
 
-#include "plugins/plugins.h"
+#ifdef ENABLE_PLUGIN_EXMON
 
-class exmon: public plugin {
-    public:
-        drakvuf_trap_t trap = {
-            .lookup_type = LOOKUP_PID,
-            .u.pid = 4,
-            .addr_type = ADDR_RVA,
-            .name = "KiDispatchException",
-            .module = "ntoskrnl.exe",
-            .type = BREAKPOINT
-        };
-        output_format_t format;
-        page_mode_t pm;
-        size_t *offsets;
-        size_t ktrap_frame_size;
+int plugin_exmon_start(drakvuf_t drakvuf, const void *config);
+int plugin_exmon_stop(drakvuf_t drakvuf);
 
-        exmon(drakvuf_t drakvuf, const void *config);
-        ~exmon();
-};
+#else
+
+static int plugin_exmon_start(drakvuf_t drakvuf, const void *config) {
+    return 1;
+}
+static int plugin_exmon_stop(drakvuf_t drakvuf) {
+    return 1;
+}
+
+#endif
 
 #endif
