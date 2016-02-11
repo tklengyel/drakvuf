@@ -102,103 +102,219 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/prctl.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <dirent.h>
 #include <glib.h>
-#include <err.h>
-
-#include <libvmi/libvmi.h>
+#include <config.h>
 #include "../plugins.h"
-#include "private.h"
+#include "filedelete.h"
 
-static drakvuf_trap_t trap;
-static output_format_t format;
-static addr_t typeindex_offset;
+#define FILE_DISPOSITION_INFORMATION 13
+
+enum offset {
+    FILE_OBJECT_FILENAME,
+    HANDLE_TABLE_HANDLECOUNT,
+    OBJECT_HEADER_TYPEINDEX,
+    OBJECT_HEADER_BODY,
+    UNICODE_STRING_LENGTH,
+    UNICODE_STRING_BUFFER,
+    __OFFSET_MAX
+};
+
+static const char *offset_names[__OFFSET_MAX][2] = {
+    [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
+    [HANDLE_TABLE_HANDLECOUNT] = {"_HANDLE_TABLE", "HandleCount" },
+    [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
+    [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
+    [UNICODE_STRING_LENGTH] = {"_UNICODE_STRING", "Length" },
+    [UNICODE_STRING_BUFFER] = {"_UNICODE_STRING", "Buffer" },
+};
+
+#define WIN7_TYPEINDEX_LAST 44
+#define VOL_DUMPFILES "%s %s -l vmi://domid/%u --profile=%s -Q 0x%lx -D %s -n dumpfiles 2>&1"
+#define PROFILE32 "Win7SP1x86"
+#define PROFILE64 "Win7SP1x64"
+
+void volatility_extract_file(filedelete *f, drakvuf_t drakvuf, addr_t file_object) {
+
+    const char* profile = NULL;
+    if (f->pm == VMI_PM_IA32E)
+        profile = PROFILE64;
+    else
+        profile = PROFILE32;
+
+    char *command = (char *)g_malloc0(
+            snprintf(NULL, 0, VOL_DUMPFILES, PYTHON, VOLATILITY, f->domid,
+                     profile, file_object, f->dump_folder
+                    )+ 1);
+    sprintf(command, VOL_DUMPFILES, PYTHON, VOLATILITY, f->domid, profile,
+            file_object, f->dump_folder);
+
+    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
+    free(command);
+}
 
 /*
- NTKERNELAPI
- NTSTATUS
- ObCreateObject (
- IN KPROCESSOR_MODE ObjectAttributesAccessMode OPTIONAL,
- IN POBJECT_TYPE ObjectType,
- IN POBJECT_ATTRIBUTES ObjectAttributes OPTIONAL,
- IN KPROCESSOR_MODE AccessMode,
- IN PVOID Reserved,
- IN ULONG ObjectSizeToAllocate,
- IN ULONG PagedPoolCharge OPTIONAL,
- IN ULONG NonPagedPoolCharge OPTIONAL,
- OUT PVOID *Object
- );
+ * The approach where the system process list es enumerated looking for
+ * the matching cr3 value in each _EPROCESS struct is not going to work
+ * if a DKOM attack unhooks the _EPROCESS struct.
+ *
+ * We can access the _EPROCESS structure by reading the FS_BASE register on x86
+ * or the GS_BASE register on x64, which contains the _KPCR.
+ *
+ * FS/GS -> _KPCR._KPRCB.CurrentThread -> _ETHREAD._KTHREAD.Process = _EPROCESS
+ *
+ * Also see: http://www.csee.umbc.edu/~stephens/SECURITY/491M/HiddenProcesses.ppt
  */
-static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
+                                uint32_t vcpu_id, vmi_instance_t vmi, page_mode_t pm,
+                                drakvuf_trap_info_t *info, addr_t handle)
+{
+    uint8_t type_index = 0;
+    addr_t process=drakvuf_get_current_process(drakvuf,vcpu_id);
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    page_mode_t pm = vmi_get_page_mode(vmi);
-    uint8_t index = ~0;
+    // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
 
-    access_context_t ctx = {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rdx + typeindex_offset
-    };
+    if (!process)
+        return;
 
-    vmi_read_8(vmi, &ctx, &index);
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
 
-    if(index < WIN7_TYPEINDEX_LAST)
-    {
-        switch(format) {
-        case OUTPUT_CSV:
-        {
-            printf("objmon,%s", win7_typeindex[index]);
-            break;
+    if (!obj)
+        return;
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.addr = obj + f->offsets[OBJECT_HEADER_TYPEINDEX];
+    ctx.dtb = info->regs->cr3;
+
+    if (VMI_FAILURE == vmi_read_8(vmi, &ctx, &type_index))
+        return;
+
+    if (type_index >= WIN7_TYPEINDEX_LAST || type_index != 28)
+        return;
+
+    addr_t file = obj + f->offsets[OBJECT_HEADER_BODY];
+    addr_t file_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, file);
+    addr_t filename = file + f->offsets[FILE_OBJECT_FILENAME];
+
+    uint16_t length = 0;
+    addr_t buffer = 0;
+
+    ctx.addr = filename + f->offsets[UNICODE_STRING_BUFFER];
+    vmi_read_addr(vmi, &ctx, &buffer);
+
+    ctx.addr = filename + f->offsets[UNICODE_STRING_LENGTH];
+    vmi_read_16(vmi, &ctx, &length);
+
+    if (length && buffer) {
+
+        unicode_string_t str;
+        str.length = length;
+        str.encoding = "UTF-16";
+        str.contents = (unsigned char *)g_malloc0(length);
+
+        ctx.addr = buffer;
+        vmi_read(vmi, &ctx, str.contents, length);
+
+        unicode_string_t str2 = { .contents = NULL };
+        status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
+        if (rc == VMI_SUCCESS) {
+            //printf("\tExtracting file: %s\n", str2.contents);
+
+            volatility_extract_file(f, drakvuf, file_pa);
+
+            free(str2.contents);
         }
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[OBJMON] %s", win7_typeindex[index]);
-            break;
-        };
 
-        printf("\n");
+        free(str.contents);
+    }
+}
+
+static event_response_t setinformation(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+
+    filedelete *f = (filedelete *)info->trap->data;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    uint32_t fileinfoclass = 0;
+    reg_t handle = 0, fileinfo = 0, length = 0;
+
+    if (f->pm == VMI_PM_IA32E) {
+        handle = info->regs->rcx;
+        fileinfo = info->regs->r8;
+        length = info->regs->r9;
+
+        ctx.addr = info->regs->rsp + 5 * sizeof(addr_t); // addr of fileinfoclass
+        vmi_read_32(vmi, &ctx, &fileinfoclass);
+    } else {
+        ctx.addr = info->regs->rsp + sizeof(uint32_t);
+        vmi_read_32(vmi, &ctx, (uint32_t*) &handle);
+        ctx.addr += 2 * sizeof(uint32_t);
+        vmi_read_32(vmi, &ctx, (uint32_t*) &fileinfo);
+        ctx.addr += sizeof(uint32_t);
+        vmi_read_32(vmi, &ctx, (uint32_t*) &length);
+        ctx.addr += sizeof(uint32_t);
+        vmi_read_32(vmi, &ctx, &fileinfoclass);
+    }
+
+    if (fileinfoclass == FILE_DISPOSITION_INFORMATION && length == 1) {
+        uint8_t del = 0;
+        ctx.addr = fileinfo;
+        vmi_read_8(vmi, &ctx, &del);
+        if (del) {
+            //printf("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", handle);
+            grab_file_by_handle(f, drakvuf, info->vcpu, vmi, f->pm, info, handle);
+        }
     }
 
     drakvuf_release_vmi(drakvuf);
     return 0;
 }
 
-/* ----------------------------------------------------- */
+filedelete::filedelete(drakvuf_t drakvuf, const void *config)
+{
+    const struct filedelete_config *c = (const struct filedelete_config *)config;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    this->pm = vmi_get_page_mode(vmi);
+    this->domid = vmi_get_vmid(vmi);
+    drakvuf_release_vmi(drakvuf);
 
-int plugin_objmon_start(drakvuf_t drakvuf, const char *rekall_profile) {
+    this->dump_folder = c->dump_folder ? c->dump_folder : "/tmp";
+    this->format = drakvuf_get_output_format(drakvuf);
 
-    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ObCreateObject", &trap.u2.rva))
-        return 0;
-    if (VMI_FAILURE==drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "TypeIndex", &typeindex_offset))
-        return 0;
+    if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "NtSetInformationFile", &this->traps[0].u2.rva))
+        return;
+    if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "ZwSetInformationFile", &this->traps[1].u2.rva))
+        return;
 
-    trap.lookup_type = LOOKUP_PID;
-    trap.u.pid = 4;
-    trap.addr_type = ADDR_RVA;
-    trap.name = "ObCreateObject";
-    trap.module = "ntoskrnl.exe";
-    trap.type = BREAKPOINT;
-    trap.cb = cb;
+    this->traps[0].name = "NtSetInformationFile";
+    this->traps[0].cb = setinformation;
+    this->traps[1].name = "ZwSetInformationFile";
+    this->traps[1].cb = setinformation;
+    /* TODO
+    traps[2].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "NtDeleteFile");
+    traps[2].name = "NtDeleteFile";
+    traps[3].u2.rva = drakvuf_get_function_rva(c->rekall_profile, "ZwDeleteFile");
+    traps[3].name = "ZwDeleteFile";*/
 
-    format = drakvuf_get_output_format(drakvuf);
+    this->offsets = (size_t*)malloc(sizeof(size_t)*__OFFSET_MAX);
 
-    drakvuf_add_trap(drakvuf, &trap);
+    int i;
+    for(i=0;i<__OFFSET_MAX;i++) {
+        if(VMI_FAILURE == drakvuf_get_struct_member_rva(c->rekall_profile,
+                                                        offset_names[i][0], offset_names[i][1],
+                                                        &this->offsets[i]))
+            return;
+    }
 
-    return 1;
+    drakvuf_add_trap(drakvuf, &traps[0]);
+    //drakvuf_add_trap(drakvuf, &traps[1]);
+    //drakvuf_add_trap(drakvuf, &traps[2]);
+    //drakvuf_add_trap(drakvuf, &traps[3]);
 }
 
-int plugin_objmon_stop(drakvuf_t drakvuf) {
-    return 1;
+filedelete::~filedelete() {
+    free(this->offsets);
 }
