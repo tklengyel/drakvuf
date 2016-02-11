@@ -112,22 +112,29 @@
 
 #include "vmi.h"
 
-addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id){
+addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id, x86_registers_t *regs){
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t thread;
-
     addr_t prcb;
+    reg_t fsgs;
 
     /*
      * fs_base/gs_base in the info->regs structure are not actually filled in
      * by Xen for vm_events, so we need to manually ask for these each time
      */
-    reg_t fsgs;
     if(vmi_get_page_mode(vmi) == VMI_PM_IA32E)  {
-        vmi_get_vcpureg(vmi, &fsgs, GS_BASE, vcpu_id);
+        if (!regs->gs_base)
+            vmi_get_vcpureg(vmi, &fsgs, GS_BASE, vcpu_id);
+        else
+            fsgs = regs->gs_base;
+
         prcb=offsets[KPCR_PRCB];
     } else {
-        vmi_get_vcpureg(vmi, &fsgs, FS_BASE, vcpu_id);
+        if (!regs->fs_base)
+            vmi_get_vcpureg(vmi, &fsgs, FS_BASE, vcpu_id);
+        else
+            fsgs = regs->fs_base;
+
         prcb=offsets[KPCR_PRCBDATA];
     }
 
@@ -138,14 +145,22 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id){
     return thread;
 }
 
-addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id) {
+addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id, x86_registers_t *regs) {
     addr_t thread, process;
 
-    thread=drakvuf_get_current_thread(drakvuf,vcpu_id); 
-    
+    thread=drakvuf_get_current_thread(drakvuf,vcpu_id,regs);
+
     if (thread == 0 || VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + offsets[KTHREAD_PROCESS], 0, &process)){
-        return 0;    
+        return 0;
     }
 
     return process;
+}
+
+char *drakvuf_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base) {
+    return vmi_read_str_va(drakvuf->vmi, eprocess_base + offsets[EPROCESS_PNAME], 0);
+}
+
+char *drakvuf_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, x86_registers_t *regs) {
+    return drakvuf_get_process_name(drakvuf, drakvuf_get_current_process(drakvuf, vcpu_id, regs));
 }

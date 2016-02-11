@@ -165,11 +165,11 @@ void volatility_extract_file(filedelete *f, drakvuf_t drakvuf, addr_t file_objec
  * Also see: http://www.csee.umbc.edu/~stephens/SECURITY/491M/HiddenProcesses.ppt
  */
 static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
-                                uint32_t vcpu_id, vmi_instance_t vmi, page_mode_t pm,
+                                vmi_instance_t vmi, page_mode_t pm,
                                 drakvuf_trap_info_t *info, addr_t handle)
 {
     uint8_t type_index = 0;
-    addr_t process=drakvuf_get_current_process(drakvuf,vcpu_id);
+    addr_t process=drakvuf_get_current_process(drakvuf, info->vcpu, info->regs);
 
     // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
 
@@ -265,7 +265,7 @@ static event_response_t setinformation(drakvuf_t drakvuf, drakvuf_trap_info_t *i
         vmi_read_8(vmi, &ctx, &del);
         if (del) {
             //printf("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", handle);
-            grab_file_by_handle(f, drakvuf, info->vcpu, vmi, f->pm, info, handle);
+            grab_file_by_handle(f, drakvuf, vmi, f->pm, info, handle);
         }
     }
 

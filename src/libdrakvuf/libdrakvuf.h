@@ -255,10 +255,24 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
                                  addr_t process,
                                  uint64_t handle);
 
+/*
+ * Specify either vcpu_id and/or regs. If regs don't have the required info
+ * (for example Xen 4.6 doesn't actually send fs_base/gs_base), it falls back
+ * on the vcpu id so it's best to specify both.
+ */
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
-                                   uint64_t vcpu_id);
+                                   uint64_t vcpu_id,
+                                   x86_registers_t *regs);
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
-                                   uint64_t vcpu_id);
+                                   uint64_t vcpu_id,
+                                   x86_registers_t *regs);
+
+/* Caller must free the returned string */
+char *drakvuf_get_process_name(drakvuf_t drakvuf,
+                               addr_t eprocess_base);
+char *drakvuf_get_current_process_name(drakvuf_t drakvuf,
+                                       uint64_t vcpu_id,
+                                       x86_registers_t *regs);
 
 #pragma GCC visibility pop
 

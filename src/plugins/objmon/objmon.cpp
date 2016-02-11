@@ -142,6 +142,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     page_mode_t pm = vmi_get_page_mode(vmi);
     uint8_t index = ~0;
+    char *procname = drakvuf_get_current_process_name(drakvuf, info->vcpu, info->regs);
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -155,18 +156,21 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         switch(o->format) {
         case OUTPUT_CSV:
         {
-            printf("objmon,%s", win7_typeindex[index]);
+            printf("objmon,%" PRIu32 ",0x%" PRIx64 ",%s,%s",
+                   info->vcpu, info->regs->cr3, procname, win7_typeindex[index]);
             break;
         }
         default:
         case OUTPUT_DEFAULT:
-            printf("[OBJMON] %s", win7_typeindex[index]);
+            printf("[OBJMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s",
+                   info->vcpu, info->regs->cr3, procname, win7_typeindex[index]);
             break;
         };
 
         printf("\n");
     }
 
+    free(procname);
     drakvuf_release_vmi(drakvuf);
     return 0;
 }
