@@ -801,7 +801,7 @@ void drakvuf_loop(drakvuf_t drakvuf) {
     PRINT_DEBUG("DRAKVUF loop finished\n");
 }
 
-void init_vmi(drakvuf_t drakvuf) {
+bool init_vmi(drakvuf_t drakvuf) {
 
     int rc;
     PRINT_DEBUG("Init VMI on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
@@ -821,7 +821,7 @@ void init_vmi(drakvuf_t drakvuf) {
             vmi_destroy(drakvuf->vmi);
         }
         drakvuf->vmi = NULL;
-        return;
+        return 0;
     }
     g_hash_table_destroy(config);
 
@@ -880,11 +880,11 @@ void init_vmi(drakvuf_t drakvuf) {
     if (!rc)
         PRINT_DEBUG("Reservation increased? %u with new gfn: 0x%lx\n", rc, drakvuf->zero_page_gfn);
     else
-        return;
+        return 0;
 
     rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &drakvuf->zero_page_gfn);
     if (rc)
-        return;
+        return 0;
 
     /*
      * Create altp2m view
@@ -893,7 +893,7 @@ void init_vmi(drakvuf_t drakvuf) {
     if ( rc < 0 )
     {
         fprintf(stderr, "Failed to enable altp2m on domain!\n");
-        return;
+        return 0;
     }
 
     /*
@@ -904,7 +904,7 @@ void init_vmi(drakvuf_t drakvuf) {
     if ( rc < 0 )
     {
         fprintf(stderr, "Failed to create altp2m view\n");
-        return;
+        return 0;
     }
 
     /*
@@ -919,7 +919,7 @@ void init_vmi(drakvuf_t drakvuf) {
     if ( rc < 0 )
     {
         fprintf(stderr, "Failed to create altp2m view\n");
-        return;
+        return 0;
     }
 
     PRINT_DEBUG("Xen altp2m view created with idx: %u idr: %u\n", drakvuf->altp2m_idx, drakvuf->altp2m_idr);
@@ -928,6 +928,8 @@ void init_vmi(drakvuf_t drakvuf) {
         g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free);
     drakvuf->remove_traps =
         g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+
+    return 1;
 }
 
 // -------------------------- closing

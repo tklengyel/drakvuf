@@ -255,7 +255,7 @@ static const char *size_names[SIZE_LIST_MAX] = {
 // Aligned object sizes
 size_t struct_sizes[SIZE_LIST_MAX];
 
-void init_vmi(drakvuf_t drakvuf);
+bool init_vmi(drakvuf_t drakvuf);
 void close_vmi(drakvuf_t drakvuf);
 
 event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event);

@@ -144,8 +144,7 @@ bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_pro
     if ( (*drakvuf)->domID == test )
         goto err;
 
-    init_vmi((*drakvuf));
-    if (!(*drakvuf)->vmi)
+    if (!init_vmi(*drakvuf))
         goto err;
 
     (*drakvuf)->output = OUTPUT_DEFAULT;
