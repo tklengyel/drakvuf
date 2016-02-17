@@ -198,6 +198,12 @@ int main(int argc, char** argv) {
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
+    if ( injection_pid && inject_cmd ) {
+        rc = drakvuf->inject_cmd(injection_pid, inject_cmd);
+        if (!rc)
+            goto exit;
+    }
+
     /* Start the event listener */
     drakvuf->loop();
     rc = 1;
