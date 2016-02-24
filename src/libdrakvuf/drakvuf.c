@@ -329,7 +329,7 @@ status_t drakvuf_get_struct_size(const char *rekall_profile,
                                  const char *struct_name,
                                  size_t *size)
 {
-    return windows_system_map_lookup(
+    return rekall_lookup(
                 rekall_profile,
                 struct_name,
                 NULL,
@@ -342,7 +342,7 @@ status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
                                        const char *symbol,
                                        addr_t *rva)
 {
-    return windows_system_map_lookup(
+    return rekall_lookup(
                 rekall_profile,
                 struct_name,
                 symbol,
