@@ -108,7 +108,7 @@
 #include <libvmi/libvmi.h>
 
 status_t
-windows_system_map_lookup(
+rekall_lookup(
     const char *rekall_profile,
     const char *symbol,
     const char *subsymbol,
