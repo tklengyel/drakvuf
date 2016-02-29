@@ -153,12 +153,13 @@ drakvuf_c::drakvuf_c(const char* domain,
                      int timeout,
                      const char* dump_folder)
 {
+    this->drakvuf = NULL;
     this->initialized = 0;
     this->interrupted = 0;
     this->timeout = timeout;
     this->rekall_profile = rekall_profile;
 
-    if (drakvuf_init(&drakvuf, domain, rekall_profile))
+    if (drakvuf_init(&this->drakvuf, domain, rekall_profile))
     {
         if(output != OUTPUT_DEFAULT)
             drakvuf_set_output_format(drakvuf, output);
