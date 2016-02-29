@@ -185,6 +185,16 @@ int main(int argc, char** argv) {
         return rc;
     }
 
+    if (!domain) {
+        printf("No domain name specified (-d)!\n");
+        return rc;
+    }
+
+    if (!rekall_profile) {
+        printf("No Rekall profile specified (-r)!\n");
+        return rc;
+    }
+
     drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, dump_folder);
     if( !drakvuf->is_initialized() )
         goto exit;
