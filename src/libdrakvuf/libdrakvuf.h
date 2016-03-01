@@ -227,9 +227,9 @@ bool drakvuf_init (drakvuf_t *drakvuf,
                    const char *domain,
                    const char *rekall_profile);
 void drakvuf_close (drakvuf_t drakvuf);
-void drakvuf_add_trap(drakvuf_t drakvuf,
+bool drakvuf_add_trap(drakvuf_t drakvuf,
                       drakvuf_trap_t *trap);
-void drakvuf_add_traps(drakvuf_t drakvuf,
+bool drakvuf_add_traps(drakvuf_t drakvuf,
                        GSList *traps);
 void drakvuf_remove_trap (drakvuf_t drakvuf,
                           drakvuf_trap_t *trap,

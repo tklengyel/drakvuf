@@ -381,7 +381,8 @@ filetracer::filetracer(drakvuf_t drakvuf, const void* config) {
     else
         this->file_object_size += ALIGN_SIZE(8, this->file_object_size);
 
-    drakvuf_add_trap(drakvuf, &this->poolalloc);
+    if ( !drakvuf_add_trap(drakvuf, &this->poolalloc) )
+        throw -1;
 }
 
 filetracer::~filetracer() {

@@ -124,12 +124,13 @@ drakvuf_plugins::~drakvuf_plugins()
             delete this->plugins[i];
 }
 
-int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
+bool drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                            const void *config)
 {
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
          plugin_id < __DRAKVUF_PLUGIN_LIST_MAX)
     {
+        try {
         switch(plugin_id) {
 #ifdef ENABLE_PLUGIN_SYSCALLS
         case PLUGIN_SYSCALLS:
@@ -164,9 +165,13 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
         default:
             break;
         };
+        } catch (int e) {
+            fprintf(stderr, "Plugin %i startup failed!\n", plugin_id);
+            return 0;
+        }
 
-        return 0;
+        return 1;
     }
 
-    return -EINVAL;
+    return 0;
 }

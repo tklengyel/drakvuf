@@ -262,12 +262,12 @@ event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event);
 event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
 event_response_t vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
 
-void inject_trap_mem(drakvuf_t drakvuf,
+bool inject_trap_mem(drakvuf_t drakvuf,
                      drakvuf_trap_t *trap);
-void inject_trap_pa(drakvuf_t drakvuf,
+bool inject_trap_pa(drakvuf_t drakvuf,
                     drakvuf_trap_t *trap,
                     addr_t pa);
-void inject_traps_modules(drakvuf_t drakvuf,
+bool inject_traps_modules(drakvuf_t drakvuf,
                           GSList *traps,
                           drakvuf_trap_t *trap,
                           addr_t list_head,

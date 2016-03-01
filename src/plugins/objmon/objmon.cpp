@@ -189,5 +189,6 @@ objmon::objmon(drakvuf_t drakvuf, const void *config) {
     this->trap.data = (void*)this;
 
     this->format = drakvuf_get_output_format(drakvuf);
-    drakvuf_add_trap(drakvuf, &this->trap);
+    if ( !drakvuf_add_trap(drakvuf, &this->trap) )
+        throw -1;
 }

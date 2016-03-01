@@ -309,7 +309,8 @@ filedelete::filedelete(drakvuf_t drakvuf, const void *config)
             return;
     }
 
-    drakvuf_add_trap(drakvuf, &traps[0]);
+    if ( !drakvuf_add_trap(drakvuf, &traps[0]) )
+        throw -1;
     //drakvuf_add_trap(drakvuf, &traps[1]);
     //drakvuf_add_trap(drakvuf, &traps[2]);
     //drakvuf_add_trap(drakvuf, &traps[3]);

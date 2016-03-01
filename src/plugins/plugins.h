@@ -139,7 +139,7 @@ class drakvuf_plugins
     public:
         drakvuf_plugins(drakvuf_t drakvuf);
         ~drakvuf_plugins();
-        int start(drakvuf_plugin_t plugin, const void* config);
+        bool start(drakvuf_plugin_t plugin, const void* config);
 };
 
 /***************************************************************************/

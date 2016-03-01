@@ -320,7 +320,8 @@ exmon::exmon(drakvuf_t drakvuf, const void *config) {
 
     drakvuf_get_struct_size(rekall_profile, "_KTRAP_FRAME", &this->ktrap_frame_size);
 
-    drakvuf_add_trap(drakvuf,&this->trap);
+    if ( !drakvuf_add_trap(drakvuf,&this->trap) )
+        throw -1;
 }
 
 exmon::~exmon() {
