@@ -113,20 +113,20 @@
 
 You can also install Xen from your repository but the recommended way is to build it from source.
 
-<pre><code>wget http://bits.xensource.com/oss-xen/release/4.6.0/xen-4.6.0.tar.gz
-wget http://bits.xensource.com/oss-xen/release/4.6.0/xen-4.6.0.tar.gz.sig
+<pre><code>wget http://bits.xensource.com/oss-xen/release/4.6.1/xen-4.6.1.tar.gz
+wget http://bits.xensource.com/oss-xen/release/4.6.1/xen-4.6.1.tar.gz.sig
 gpg --keyserver pgp.mit.edu --recv-keys 0x83fe14c957e82bd9
-gpg --verify xen-4.6.0.tar.gz.sig
+gpg --verify xen-4.6.1.tar.gz.sig
 </code></pre>
 
 The result should be: 
 
 <pre><code>gpg: Good signature from "Xen.org Xen tree code signing (signatures on the xen hypervisor and tools) &lt;pgp@xen.org&gt;"</code></pre>
 
-<pre><code>tar xzvf xen-4.6.0.tar.gz
-cd ./xen-4.6.0
+<pre><code>tar xzvf xen-4.6.1.tar.gz
+cd ./xen-4.6.1
 export C_INCLUDE_PATH=/usr/include/x86_64-linux-gnu
-./configure --enable-systemd --enable-githttp
+./configure --enable-githttp
 make -j4 dist-xen
 make -j4 dist-tools
 </code></pre>
