@@ -216,3 +216,55 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
     return handle_table_get_entry(PM2BIT(drakvuf->pm), vmi, table_base,
             table_levels, table_depth, &handlecount, handle);
 }
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+
+bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t current_eprocess,
+                                addr_t handle, object_manager_object_t obj_type_arg, addr_t *obj_body_addr )
+{
+    bool ret        = false ;
+    addr_t obj_addr = 0 ;
+
+    obj_addr = drakvuf_get_obj_by_handle( drakvuf, current_eprocess, handle );
+
+    if ( obj_addr )
+    {
+        uint8_t object_type ;
+        access_context_t ctx = {
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+        };
+
+        // Get TypeIndex from _OBJ_HEADER...
+        ctx.addr = obj_addr + offsets[ OBJECT_HEADER_TYPEINDEX ] ;
+
+        if ( vmi_read_8( drakvuf->vmi, &ctx, &object_type ) == VMI_SUCCESS )
+        {
+            if ( object_type == obj_type_arg )
+            {
+                if ( object_type == OBJ_MANAGER_PROCESS_OBJECT )
+                {
+                    // Object Body must be an _EPROCESS...
+                    ret = drakvuf_is_eprocess( drakvuf, info, obj_addr + offsets[ OBJECT_HEADER_BODY ] );
+                }
+                else
+                if ( object_type == OBJ_MANAGER_THREAD_OBJECT )
+                {
+                    // Object Body must be an _ETHREAD...
+                    ret = drakvuf_is_ethread( drakvuf, info, obj_addr + offsets[ OBJECT_HEADER_BODY ] );
+                }
+                else // Other object types...
+                    ret = true ;
+            }
+        }
+    }
+
+    if ( ret )
+    {
+        *obj_body_addr = obj_addr + offsets[ OBJECT_HEADER_BODY ];
+    }
+
+    return ret ;
+}
