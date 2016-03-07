@@ -321,12 +321,12 @@ bool drakvuf_is_eprocess( drakvuf_t drakvuf,
                           addr_t eprocess_addr );
 
 // ObReferenceObjectByHandle
-bool drakvuf_obj_ref_by_handleObjReferenceByHandle( drakvuf_t drakvuf, 
-                                                    drakvuf_trap_info_t *info, 
-                                                    addr_t current_eprocess,
-                                                    addr_t handle, 
-                                                    uint8_t obj_type_arg, 
-                                                    addr_t *obj_body_addr );
+bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, 
+                                drakvuf_trap_info_t *info, 
+                                addr_t current_eprocess,
+                                addr_t handle, 
+                                uint8_t obj_type_arg, 
+                                addr_t *obj_body_addr );
 
 #pragma GCC visibility pop
 
