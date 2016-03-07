@@ -164,3 +164,103 @@ char *drakvuf_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base) {
 char *drakvuf_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, x86_registers_t *regs) {
     return drakvuf_get_process_name(drakvuf, drakvuf_get_current_process(drakvuf, vcpu_id, regs));
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+
+bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, x86_registers_t *regs,
+                                    uint32_t *thread_id )
+{
+    addr_t p_tid ;
+    addr_t ethread = drakvuf_get_current_thread( drakvuf, vcpu_id, regs );
+
+    if ( ethread )
+    {
+        if ( vmi_read_addr_va( drakvuf->vmi, ethread + offsets[ ETHREAD_CID ] + offsets[ CLIENT_ID_UNIQUETHREAD ],
+                               0,
+                               &p_tid ) == VMI_SUCCESS )
+        {
+            *thread_id = p_tid;
+
+            return true;
+        }
+    }
+
+    *thread_id = 0 ;
+
+    return false ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+
+bool drakvuf_get_previous_mode( drakvuf_t drakvuf, drakvuf_trap_info_t *info, uint8_t *previous_mode )
+{
+    addr_t kthread = drakvuf_get_current_thread( drakvuf, info->vcpu, info->regs );
+
+    if ( kthread )
+    {
+        if ( vmi_read_8_va( drakvuf->vmi, kthread + offsets[ KTHREAD_PREVIOUSMODE ], 0, previous_mode ) == VMI_SUCCESS )
+
+            return true ;
+    }
+
+    *previous_mode = -1 ;
+
+    return false ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+
+bool drakvuf_is_ethread( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t ethread_addr )
+{
+    uint8_t dispatcher_type = 0 ;
+    access_context_t ctx = {
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+    };
+
+    ctx.addr = ethread_addr + offsets[ ETHREAD_TCB ] + offsets[ KTHREAD_HEADER ]
+                            + offsets[ DISPATCHER_TYPE ] ;
+
+    if ( vmi_read_8( drakvuf->vmi, &ctx, &dispatcher_type ) == VMI_SUCCESS )
+    {
+        if ( dispatcher_type == DispatcherThreadObject )
+
+            return true ;
+    }
+
+    return false ;
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+
+bool drakvuf_is_eprocess( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t eprocess_addr )
+{
+    uint8_t dispatcher_type = 0 ;
+    access_context_t ctx = {
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+    };
+
+    ctx.addr = eprocess_addr + offsets[ EPROCESS_PCB ] + offsets[ KPROCESS_HEADER ]
+                             + offsets[ DISPATCHER_TYPE ] ;
+
+    if ( vmi_read_8( drakvuf->vmi, &ctx, &dispatcher_type ) == VMI_SUCCESS )
+    {
+        if ( dispatcher_type == DispatcherProcessObject )
+
+            return true ;
+    }
+
+    return false ;
+}
+
+
+
+
