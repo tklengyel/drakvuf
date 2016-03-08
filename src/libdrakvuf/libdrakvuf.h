@@ -223,6 +223,34 @@ struct drakvuf_trap {
     void *data;
 };
 
+
+////////////////////////////////////////////////////////////////////////////
+
+// IMHO these definitions must be placed within another file, named
+// libdrakvuf-windows.h or something similar
+
+// For get_previous_mode...
+typedef enum _MODE {
+    KernelMode,
+    UserMode,
+    MaximumMode
+} MODE ;
+
+// Confirmed only on Win7 SP1...
+typedef enum _OBJECT_MANAGER_OBJECT_TYPE {
+    ObjManagerProcessObject = 7,
+    ObjManagerThreadObject  = 8
+} OBJECT_MANAGER_OBJECT_TYPE ;
+
+// Confirmed from Win2K to Win7, I don't know about Win8/Win10...
+typedef enum _DISPATCHER_OBJECT_TYPE {
+    DispatcherProcessObject = 3,
+    DispatcherThreadObject  = 6
+} DISPATCHER_OBJECT_TYPE ;
+
+////////////////////////////////////////////////////////////////////////////
+
+
 bool drakvuf_init (drakvuf_t *drakvuf,
                    const char *domain,
                    const char *rekall_profile);
@@ -273,6 +301,32 @@ char *drakvuf_get_process_name(drakvuf_t drakvuf,
 char *drakvuf_get_current_process_name(drakvuf_t drakvuf,
                                        uint64_t vcpu_id,
                                        x86_registers_t *regs);
+
+
+bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, 
+                                    uint64_t vcpu_id, 
+                                    x86_registers_t *regs,
+                                    uint32_t *thread_id );
+
+bool drakvuf_get_previous_mode( drakvuf_t drakvuf, 
+                                drakvuf_trap_info_t *info, 
+                                uint8_t *previous_mode );
+
+bool drakvuf_is_ethread( drakvuf_t drakvuf, 
+                         drakvuf_trap_info_t *info, 
+                         addr_t ethread_addr );
+
+bool drakvuf_is_eprocess( drakvuf_t drakvuf, 
+                          drakvuf_trap_info_t *info, 
+                          addr_t eprocess_addr );
+
+// ObReferenceObjectByHandle
+bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, 
+                                drakvuf_trap_info_t *info, 
+                                addr_t current_eprocess,
+                                addr_t handle, 
+                                uint8_t obj_type_arg, 
+                                addr_t *obj_body_addr );
 
 #pragma GCC visibility pop
 
