@@ -227,8 +227,6 @@ bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t *info, ad
     bool ret        = false ;
     addr_t obj_addr = 0 ;
 
-    *obj_body_addr = 0 ;
-
     obj_addr = drakvuf_get_obj_by_handle( drakvuf, current_eprocess, handle );
 
     if ( obj_addr )
@@ -257,7 +255,7 @@ bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t *info, ad
                     // Object Body must be an _ETHREAD...
                     ret = drakvuf_is_ethread( drakvuf, info, obj_addr + offsets[ OBJECT_HEADER_BODY ] );
                 }
-                else // Resto de tipos...
+                else // Other object types...
                     ret = true ;
             }
         }

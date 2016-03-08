@@ -186,8 +186,6 @@ bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, x86_reg
         }
     }
 
-    *thread_id = 0 ;
-
     return false ;
 }
 
@@ -205,8 +203,6 @@ bool drakvuf_get_previous_mode( drakvuf_t drakvuf, drakvuf_trap_info_t *info, ui
 
             return true ;
     }
-
-    *previous_mode = -1 ;
 
     return false ;
 }
