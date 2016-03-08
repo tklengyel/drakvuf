@@ -256,7 +256,3 @@ bool drakvuf_is_eprocess( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t e
 
     return false ;
 }
-
-
-
-
