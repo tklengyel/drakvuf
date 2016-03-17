@@ -104,6 +104,7 @@
 
 #include <glib.h>
 #include <config.h>
+#include <inttypes.h>
 #include "../plugins.h"
 #include "filedelete.h"
 
@@ -206,7 +207,6 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
     vmi_read_16(vmi, &ctx, &length);
 
     if (length && buffer) {
-
         unicode_string_t str;
         str.length = length;
         str.encoding = "UTF-16";
@@ -218,13 +218,25 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
         unicode_string_t str2 = { .contents = NULL };
         status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
         if (rc == VMI_SUCCESS) {
-            //printf("\tExtracting file: %s\n", str2.contents);
+            char *procname; 
+            procname = drakvuf_get_current_process_name(drakvuf, info->vcpu, info->regs);
+            switch(f->format) {
+            case OUTPUT_CSV:
+                printf("filedelete,%" PRIu32 ",0x%" PRIx64 ",%s,\"%s\"\n",
+                       info->vcpu, info->regs->cr3, procname, str2.contents);
+                break;
+            default:
+            case OUTPUT_DEFAULT:
+                printf("[FILEDELETE] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s \"%s\"\n",
+                       info->vcpu, info->regs->cr3, procname, str2.contents);
+                break;
+            };
 
             volatility_extract_file(f, drakvuf, file_pa);
 
+            free(procname);
             free(str2.contents);
         }
-
         free(str.contents);
     }
 }
