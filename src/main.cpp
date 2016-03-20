@@ -195,9 +195,12 @@ int main(int argc, char** argv) {
         return rc;
     }
 
-    drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, dump_folder);
-    if( !drakvuf->is_initialized() )
-        goto exit;
+    try {
+        drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, dump_folder);
+    } catch(int e) {
+        printf("Failed to initialize DRAKVUF (%i)!\n", e);
+        return rc;
+    }
 
     /* for a clean exit */
     act.sa_handler = close_handler;

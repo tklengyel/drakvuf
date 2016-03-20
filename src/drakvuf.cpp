@@ -142,9 +142,12 @@ int drakvuf_c::start_plugins(const char *dump_folder)
             rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
             break;
         };
+
+        if ( !rc )
+            return rc;
     }
 
-    return rc;
+    return 1;
 }
 
 drakvuf_c::drakvuf_c(const char* domain,
@@ -154,35 +157,35 @@ drakvuf_c::drakvuf_c(const char* domain,
                      const char* dump_folder)
 {
     this->drakvuf = NULL;
-    this->initialized = 0;
     this->interrupted = 0;
     this->timeout = timeout;
     this->rekall_profile = rekall_profile;
 
-    if (drakvuf_init(&this->drakvuf, domain, rekall_profile))
-    {
-        if(output != OUTPUT_DEFAULT)
-            drakvuf_set_output_format(drakvuf, output);
+    if (!drakvuf_init(&this->drakvuf, domain, rekall_profile))
+        throw -1;
 
-        if(timeout > 0)
-            this->timeout_thread = g_thread_new(NULL, timer, (void*)this);
+    if(output != OUTPUT_DEFAULT)
+        drakvuf_set_output_format(drakvuf, output);
 
-        this->plugins = new drakvuf_plugins(this->drakvuf);
-        this->pause();
+    if(timeout > 0)
+        this->timeout_thread = g_thread_new(NULL, timer, (void*)this);
 
-        if ( this->start_plugins(dump_folder) == 0 )
-            this->initialized = 1;
+    this->plugins = new drakvuf_plugins(this->drakvuf);
+    this->pause();
+
+    if ( !this->start_plugins(dump_folder) ) {
+        this->close();
+        throw -2;
     }
 }
 
-drakvuf_c::~drakvuf_c()
+void drakvuf_c::close()
 {
-    if (this->initialized)
+    if (this->plugins)
         delete this->plugins;
 
     if (this->drakvuf)
     {
-        this->pause();
         drakvuf_close(this->drakvuf);
     }
 
@@ -191,6 +194,12 @@ drakvuf_c::~drakvuf_c()
         this->interrupted = -1;
         g_thread_join(this->timeout_thread);
     }
+}
+
+drakvuf_c::~drakvuf_c()
+{
+    this->pause();
+    this->close();
 }
 
 int drakvuf_c::is_initialized()

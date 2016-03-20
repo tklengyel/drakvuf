@@ -126,6 +126,7 @@ class drakvuf_c {
         const char *rekall_profile;
 
         int start_plugins(const char *dump_folder);
+        void close();
 
     public:
         int timeout;

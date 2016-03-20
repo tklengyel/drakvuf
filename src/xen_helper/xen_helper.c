@@ -249,3 +249,11 @@ void print_sharing_info(xen_interface_t *xen, domid_t domID) {
 
     printf("Shared memory pages: %lu\n", info.nr_shared_pages);
 }
+
+void xen_pause(xen_interface_t *xen, domid_t domID) {
+    xc_domain_pause(xen->xc, domID);
+}
+
+void xen_unpause(xen_interface_t *xen, domid_t domID) {
+    xc_domain_unpause(xen->xc, domID);
+}

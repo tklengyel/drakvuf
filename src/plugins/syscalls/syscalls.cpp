@@ -171,7 +171,8 @@ syscalls::syscalls(drakvuf_t drakvuf, const void *config) {
 
     drakvuf_free_symbols(symbols);
 
-    drakvuf_add_traps(drakvuf, this->traps);
+    if ( !drakvuf_add_traps(drakvuf, this->traps) )
+        throw -1;
 }
 
 syscalls::~syscalls() {

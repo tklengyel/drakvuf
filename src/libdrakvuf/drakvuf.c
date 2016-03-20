@@ -161,8 +161,9 @@ void drakvuf_interrupt(drakvuf_t drakvuf, int sig) {
     drakvuf->interrupted = sig;
 }
 
-void drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
+bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
 
+    bool ret = 0;
     vmi_pause_vm(drakvuf->vmi);
 
     if (!trap)
@@ -170,12 +171,13 @@ void drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
 
     if(g_hash_table_lookup(drakvuf->remove_traps, &trap)) {
         g_hash_table_remove(drakvuf->remove_traps, &trap);
+        ret = 1;
         goto done;
     }
 
     if (trap->type == BREAKPOINT) {
         if(trap->lookup_type == LOOKUP_NONE) {
-            inject_trap_pa(drakvuf, trap, trap->u2.addr);
+            ret = inject_trap_pa(drakvuf, trap, trap->u2.addr);
             goto done;
         }
 
@@ -186,27 +188,29 @@ void drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
                 // Loop kernel modules
                 addr_t kernel_list_head;
                 vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &kernel_list_head);
-                inject_traps_modules(drakvuf, NULL, trap, kernel_list_head, 4, "System");
+                ret = inject_traps_modules(drakvuf, NULL, trap, kernel_list_head, 4, "System");
             }
 
             goto done;
         }
     } else {
-        inject_trap_mem(drakvuf, trap);
+        ret = inject_trap_mem(drakvuf, trap);
     }
 
 done:
     vmi_resume_vm(drakvuf->vmi);
+    return ret;
 }
 
-void drakvuf_add_traps(drakvuf_t drakvuf, GSList *traps) {
+bool drakvuf_add_traps(drakvuf_t drakvuf, GSList *traps) {
+    bool ret = 0;
     addr_t kernel_list_head;
     vmi_instance_t vmi = drakvuf->vmi;
     vmi_pause_vm(vmi);
 
     // Loop kernel modules
     vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &kernel_list_head);
-    inject_traps_modules(drakvuf, traps, NULL, kernel_list_head, 4, "System");
+    ret = inject_traps_modules(drakvuf, traps, NULL, kernel_list_head, 4, "System");
 
     // TODO TODO TODO
     /*addr_t current_process = 0, next_list_entry = 0;
@@ -266,7 +270,7 @@ void drakvuf_add_traps(drakvuf_t drakvuf, GSList *traps) {
 
 done:
     vmi_resume_vm(drakvuf->vmi);
-    return;
+    return ret;
 }
 
 void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap,
@@ -310,11 +314,11 @@ void drakvuf_release_vmi(drakvuf_t drakvuf) {
 }
 
 void drakvuf_pause (drakvuf_t drakvuf) {
-    vmi_pause_vm(drakvuf->vmi);
+    xen_pause(drakvuf->xen, drakvuf->domID);
 }
 
 void drakvuf_resume (drakvuf_t drakvuf) {
-    vmi_resume_vm(drakvuf->vmi);
+    xen_unpause(drakvuf->xen, drakvuf->domID);
 }
 
 void drakvuf_set_output_format(drakvuf_t drakvuf, output_format_t output) {
