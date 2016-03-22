@@ -112,6 +112,7 @@
 #include <inttypes.h>
 #include <glib.h>
 
+#include "libdrakvuf.h"
 #include "injector.h"
 #include "vmi.h"
 #include "win-symbols.h"
@@ -987,7 +988,7 @@ int drakvuf_inject_cmd(drakvuf_t drakvuf, vmi_pid_t pid, const char *app) {
     vmi_register_event(drakvuf->vmi, &interrupt_event);
 
     PRINT_DEBUG("Starting injection loop\n");
-    vmi_resume_vm(drakvuf->vmi);
+    drakvuf_resume(drakvuf);
 
     status_t status = VMI_FAILURE;
     while (!drakvuf->interrupted) {
