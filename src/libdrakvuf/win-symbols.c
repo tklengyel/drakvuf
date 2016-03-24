@@ -237,7 +237,7 @@ symbols_t* drakvuf_get_symbols_from_rekall(const char *rekall_profile)
     struct json_object_iterator itEnd = json_object_iter_end(functions);
     uint32_t i=0;
 
-    while (!json_object_iter_equal(&it, &itEnd)) {
+    while (!json_object_iter_equal(&it, &itEnd) && i < ret->count) {
         ret->symbols[i].name = g_strdup(json_object_iter_peek_name(&it));
         ret->symbols[i].rva = json_object_get_int64(json_object_iter_peek_value(&it));
         i++;
