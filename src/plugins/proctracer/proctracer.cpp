@@ -102,83 +102,78 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdarg.h>
-#include "plugins.h"
-#include "syscalls/syscalls.h"
-#include "poolmon/poolmon.h"
-#include "filetracer/filetracer.h"
-#include "filedelete/filedelete.h"
-#include "objmon/objmon.h"
-#include "exmon/exmon.h"
-#include "proctracer/proctracer.h"
+#include <glib.h>
+#include <libvmi/libvmi.h>
+#include "../plugins.h"
+#include "private.h"
+#include "proctracer.h"
 
-drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output)
-{
-    this->drakvuf = drakvuf;
-    this->output = output;
-}
+static event_response_t trace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info){
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-drakvuf_plugins::~drakvuf_plugins()
-{
-    int i;
-    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
-        if ( this->plugins[i] )
-            delete this->plugins[i];
-}
+    printf("[PROCTRACER] Trace point hit: 0x%lx\n",info->regs->rip);
 
-bool drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
-                           const void *config)
-{
-    if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
-         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX)
-    {
-        try {
-        switch(plugin_id) {
-#ifdef ENABLE_PLUGIN_SYSCALLS
-        case PLUGIN_SYSCALLS:
-            this->plugins[plugin_id] = new syscalls(this->drakvuf, config, this->output);
-            break;
-#endif
-#ifdef ENABLE_PLUGIN_POOLMON
-        case PLUGIN_POOLMON:
-            this->plugins[plugin_id] = new poolmon(this->drakvuf, config, this->output);
-            break;
-#endif
-#ifdef ENABLE_PLUGIN_FILETRACER
-        case PLUGIN_FILETRACER:
-            this->plugins[plugin_id] = new filetracer(this->drakvuf, config, this->output);
-            break;
-#endif
-#ifdef ENABLE_PLUGIN_FILEDELETE
-        case PLUGIN_FILEDELETE:
-            this->plugins[plugin_id] = new filedelete(this->drakvuf, config, this->output);
-            break;
-#endif
-#ifdef ENABLE_PLUGIN_OBJMON
-        case PLUGIN_OBJMON:
-            this->plugins[plugin_id] = new objmon(this->drakvuf, config, this->output);
-            break;
-#endif
-#ifdef ENABLE_PLUGIN_EXMON
-        case PLUGIN_EXMON:
-            this->plugins[plugin_id] = new exmon(this->drakvuf, config, this->output);
-            break;
-#endif
-#ifdef ENABLE_PLUGIN_PROCTRACER
-        case PLUGIN_PROCTRACER:
-            this->plugins[plugin_id] = new proctracer(this->drakvuf, config);
-            break;
-#endif
-        default:
-            break;
-        };
-        } catch (int e) {
-            fprintf(stderr, "Plugin %i startup failed!\n", plugin_id);
-            return 0;
-        }
-
-        return 1;
-    }
-
+    drakvuf_release_vmi(drakvuf);
     return 0;
+}
+
+static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+    proctracer *p = (proctracer*)info->trap->data;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    //page_mode_t pm = vmi_get_page_mode(vmi);
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu, info->regs);
+    char *proc_name = drakvuf_get_process_name(drakvuf, process); 
+    printf("[PROCTRACER] CR3: %lx NAME: %s\n", info->regs->cr3, proc_name);
+    if (strcmp(proc_name,"CrashMe.exe")){
+        free(proc_name);
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
+    addr_t base_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, 0x42ff8f);
+    printf("[PROCTRACER] Base PA: %lx\n", base_pa);
+    if (base_pa){
+        printf("[PROCTRACER] Adding dynamic trap\n");
+        drakvuf_trap_t *maintrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+
+        maintrap->lookup_type = LOOKUP_NONE;
+        maintrap->addr_type = ADDR_PA;
+        maintrap->type = BREAKPOINT;
+        maintrap->name = "CrashMeMainTrap";
+        maintrap->cb = trace_cb;
+        maintrap->u2.addr = base_pa;
+        maintrap->data = p;
+
+        drakvuf_add_trap(drakvuf, maintrap);
+    }else{
+        printf("[PROCTRACER] Couldn't find physical address!\n");    
+    }
+    free(proc_name);
+    drakvuf_release_vmi(drakvuf);
+    return 0;
+}
+
+proctracer::proctracer(drakvuf_t drakvuf, const void *config) {
+    const char *rekall_profile =(const char *)config;
+    printf("[PROCTRACER] Starting...\n");
+    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PsGetCurrentThreadTeb", &this->trap.u2.rva))
+        return;
+
+    this->trap.cb = cb;
+    this->trap.data = (void*)this;
+    this->format = drakvuf_get_output_format(drakvuf);
+    //this->offsets = (size_t*)g_malloc0(__OFFSET_MAX*sizeof(size_t));
+    this->offsets = NULL;
+
+    if ( !drakvuf_add_trap(drakvuf,&this->trap) )
+        throw -1;
+    printf("[PROCTRACER] Started successfully\n");
+}
+
+proctracer::~proctracer() {
+    free(this->offsets);
 }

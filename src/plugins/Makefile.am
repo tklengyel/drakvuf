@@ -130,6 +130,9 @@ if PLUGIN_EXMON
 sources += exmon/exmon.cpp
 endif
 
+if PLUGIN_PROCTRACER
+sources += proctracer/proctracer.cpp
+endif
 
 ###############################################################################
 sources += plugins.cpp plugins.h

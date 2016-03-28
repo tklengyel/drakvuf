@@ -102,83 +102,27 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdarg.h>
-#include "plugins.h"
-#include "syscalls/syscalls.h"
-#include "poolmon/poolmon.h"
-#include "filetracer/filetracer.h"
-#include "filedelete/filedelete.h"
-#include "objmon/objmon.h"
-#include "exmon/exmon.h"
-#include "proctracer/proctracer.h"
+#ifndef PROCTRACER_H
+#define PROCTRACER_H
 
-drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output)
-{
-    this->drakvuf = drakvuf;
-    this->output = output;
-}
+#include "plugins/plugins.h"
 
-drakvuf_plugins::~drakvuf_plugins()
-{
-    int i;
-    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
-        if ( this->plugins[i] )
-            delete this->plugins[i];
-}
-
-bool drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
-                           const void *config)
-{
-    if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
-         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX)
-    {
-        try {
-        switch(plugin_id) {
-#ifdef ENABLE_PLUGIN_SYSCALLS
-        case PLUGIN_SYSCALLS:
-            this->plugins[plugin_id] = new syscalls(this->drakvuf, config, this->output);
-            break;
-#endif
-#ifdef ENABLE_PLUGIN_POOLMON
-        case PLUGIN_POOLMON:
-            this->plugins[plugin_id] = new poolmon(this->drakvuf, config, this->output);
-            break;
-#endif
-#ifdef ENABLE_PLUGIN_FILETRACER
-        case PLUGIN_FILETRACER:
-            this->plugins[plugin_id] = new filetracer(this->drakvuf, config, this->output);
-            break;
-#endif
-#ifdef ENABLE_PLUGIN_FILEDELETE
-        case PLUGIN_FILEDELETE:
-            this->plugins[plugin_id] = new filedelete(this->drakvuf, config, this->output);
-            break;
-#endif
-#ifdef ENABLE_PLUGIN_OBJMON
-        case PLUGIN_OBJMON:
-            this->plugins[plugin_id] = new objmon(this->drakvuf, config, this->output);
-            break;
-#endif
-#ifdef ENABLE_PLUGIN_EXMON
-        case PLUGIN_EXMON:
-            this->plugins[plugin_id] = new exmon(this->drakvuf, config, this->output);
-            break;
-#endif
-#ifdef ENABLE_PLUGIN_PROCTRACER
-        case PLUGIN_PROCTRACER:
-            this->plugins[plugin_id] = new proctracer(this->drakvuf, config);
-            break;
-#endif
-        default:
-            break;
+class proctracer: public plugin {
+    public:
+        drakvuf_trap_t trap = {
+            .lookup_type = LOOKUP_PID,
+            .u.pid = 4,
+            .addr_type = ADDR_RVA,
+            .name = "PsGetCurrentThreadTeb",
+            .module = "ntoskrnl.exe",
+            .type = BREAKPOINT
         };
-        } catch (int e) {
-            fprintf(stderr, "Plugin %i startup failed!\n", plugin_id);
-            return 0;
-        }
+        output_format_t format;
+        page_mode_t pm;
+        size_t *offsets;
 
-        return 1;
-    }
+        proctracer(drakvuf_t drakvuf, const void *config);
+        ~proctracer();
+};
 
-    return 0;
-}
+#endif
