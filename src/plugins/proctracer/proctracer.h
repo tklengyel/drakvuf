@@ -130,7 +130,7 @@ class proctracer: public plugin {
         output_format_t format;
         GHashTable *tracetraps;
 
-        proctracer(drakvuf_t drakvuf, const void *config);
+        proctracer(drakvuf_t drakvuf, const void *config, output_format_t output);
         ~proctracer();
 };
 

@@ -166,7 +166,7 @@ bool drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #endif
 #ifdef ENABLE_PLUGIN_PROCTRACER
         case PLUGIN_PROCTRACER:
-            this->plugins[plugin_id] = new proctracer(this->drakvuf, config);
+            this->plugins[plugin_id] = new proctracer(this->drakvuf, config, this->output);
             break;
 #endif
         default:

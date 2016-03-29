@@ -189,7 +189,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     return 0;
 }
 
-proctracer::proctracer(drakvuf_t drakvuf, const void *config) {
+proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t output) {
     const char *rekall_profile =(const char *)config;
     printf("[PROCTRACER] Starting...\n");
     this->tracetraps=g_hash_table_new(g_int64_hash, g_int64_equal);
@@ -205,7 +205,7 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config) {
     this->exit_trap.cb = exit_cb;
     this->exit_trap.data = (void*)this;
 
-    this->format = drakvuf_get_output_format(drakvuf);
+    this->format = output;
 
     if ( !drakvuf_add_trap(drakvuf,&this->trap) || !drakvuf_add_trap(drakvuf,&this->exit_trap))
         throw -1;
