@@ -136,6 +136,9 @@ enum offset {
     EPROCESS_TASKS,
     EPROCESS_PEB,
     EPROCESS_OBJECTTABLE,
+    EPROCESS_PCB,
+
+    KPROCESS_HEADER,
 
     PEB_IMAGEBASADDRESS,
     PEB_LDR,
@@ -164,6 +167,8 @@ enum offset {
     KTHREAD_APCSTATE,
     KTHREAD_TRAPFRAME,
     KTHREAD_APCQUEUEABLE,
+    KTHREAD_PREVIOUSMODE,
+    KTHREAD_HEADER,
 
     KTRAP_FRAME_RIP,
 
@@ -173,6 +178,7 @@ enum offset {
     NT_TIB_STACKLIMIT,
 
     ETHREAD_CID,
+    ETHREAD_TCB,
     CLIENT_ID_UNIQUETHREAD,
 
     OBJECT_HEADER_TYPEINDEX,
@@ -184,6 +190,8 @@ enum offset {
     POOL_HEADER_BLOCKSIZE,
     POOL_HEADER_POOLTYPE,
     POOL_HEADER_POOLTAG,
+
+    DISPATCHER_TYPE,
 
     OFFSET_MAX
 };
@@ -198,6 +206,8 @@ static const char *offset_names[OFFSET_MAX][2] = {
     [EPROCESS_TASKS] = { "_EPROCESS", "ActiveProcessLinks" },
     [EPROCESS_PEB] = { "_EPROCESS", "Peb" },
     [EPROCESS_OBJECTTABLE] = {"_EPROCESS", "ObjectTable" },
+    [EPROCESS_PCB] = { "_EPROCESS", "Pcb" },
+    [KPROCESS_HEADER] = { "_KPROCESS", "Header" },
     [PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
     [PEB_LDR] = { "_PEB", "Ldr" },
     [PEB_LDR_DATA_INLOADORDERMODULELIST] = {"_PEB_LDR_DATA", "InLoadOrderModuleList" },
@@ -219,11 +229,14 @@ static const char *offset_names[OFFSET_MAX][2] = {
     [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
     [KTHREAD_APCSTATE] = {"_KTHREAD", "ApcState" },
     [KTHREAD_APCQUEUEABLE] = {"_KTHREAD", "ApcQueueable"},
+    [KTHREAD_PREVIOUSMODE] = { "_KTHREAD", "PreviousMode" },
+    [KTHREAD_HEADER] = { "_KTHREAD", "Header" },
     [KAPC_APCLISTENTRY] = {"_KAPC", "ApcListEntry" },
     [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
     [NT_TIB_STACKBASE] = { "_NT_TIB", "StackBase" },
     [NT_TIB_STACKLIMIT] = { "_NT_TIB", "StackLimit" },
     [ETHREAD_CID] = {"_ETHREAD", "Cid" },
+    [ETHREAD_TCB] = { "_ETHREAD", "Tcb" },
     [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
     [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
@@ -232,6 +245,7 @@ static const char *offset_names[OFFSET_MAX][2] = {
     [POOL_HEADER_BLOCKSIZE] = {"_POOL_HEADER", "BlockSize" },
     [POOL_HEADER_POOLTYPE] = {"_POOL_HEADER", "PoolType" },
     [POOL_HEADER_POOLTAG] = {"_POOL_HEADER", "PoolTag" },
+    [DISPATCHER_TYPE] = { "_DISPATCHER_HEADER",  "Type" },
 };
 
 size_t offsets[OFFSET_MAX];
