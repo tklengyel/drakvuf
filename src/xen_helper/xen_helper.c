@@ -253,16 +253,16 @@ void print_sharing_info(xen_interface_t *xen, domid_t domID) {
 void xen_pause(xen_interface_t *xen, domid_t domID) {
     xc_dominfo_t info = { 0 };
 
-    if (1 == xc_domain_getinfo(xen->xc, domID, 1, &info) && info.running) {
+    if (1 == xc_domain_getinfo(xen->xc, domID, 1, &info) && info.domid == domID && !info.paused)
         xc_domain_pause(xen->xc, domID);
-    }
+
 }
 
 void xen_unpause(xen_interface_t *xen, domid_t domID) {
     do {
         xc_dominfo_t info = { 0 };
 
-        if (1 == xc_domain_getinfo(xen->xc, domID, 1, &info) && info.paused)
+        if (1 == xc_domain_getinfo(xen->xc, domID, 1, &info) && info.domid == domID && info.paused)
             xc_domain_unpause(xen->xc, domID);
         else
             break;

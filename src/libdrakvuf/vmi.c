@@ -797,7 +797,7 @@ void drakvuf_loop(drakvuf_t drakvuf) {
         return;
     }
 
-    vmi_resume_vm(drakvuf->vmi);
+    drakvuf_resume(drakvuf);
 
     while (!drakvuf->interrupted) {
         PRINT_DEBUG("Waiting for events in DRAKVUF...\n");
@@ -810,7 +810,7 @@ void drakvuf_loop(drakvuf_t drakvuf) {
         }
     }
 
-    vmi_pause_vm(drakvuf->vmi);
+    drakvuf_pause(drakvuf);
     //print_sharing_info(drakvuf->xen, drakvuf->domID);
 
     PRINT_DEBUG("DRAKVUF loop finished\n");
