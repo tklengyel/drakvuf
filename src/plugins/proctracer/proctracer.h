@@ -117,9 +117,18 @@ class proctracer: public plugin {
             .module = "ntoskrnl.exe",
             .type = BREAKPOINT
         };
+
+        drakvuf_trap_t exit_trap = {
+            .lookup_type = LOOKUP_PID,
+            .u.pid = 4,
+            .addr_type = ADDR_RVA,
+            .name = "PspExitProcess",
+            .module = "ntoskrnl.exe",
+            .type = BREAKPOINT
+        };
+ 
         output_format_t format;
-        page_mode_t pm;
-        size_t *offsets;
+        GHashTable *tracetraps;
 
         proctracer(drakvuf_t drakvuf, const void *config);
         ~proctracer();

@@ -108,6 +108,12 @@
 #include "private.h"
 #include "proctracer.h"
 
+struct trace_trap_struct{
+    char* proc_name;
+    addr_t pa;
+    drakvuf_trap_t *trap;
+};
+
 static event_response_t trace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info){
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -117,10 +123,27 @@ static event_response_t trace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info){
     return 0;
 }
 
+static event_response_t exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+    proctracer *p = (proctracer*)info->trap->data;
+    struct trace_trap_struct *tts = (struct trace_trap_struct*)g_hash_table_lookup(p->tracetraps, &info->regs->cr3);
+
+    if (tts){
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+        printf("[PROCTRACER] Removing %s (%lx) from trace\n", tts->proc_name, info->regs->cr3);
+        drakvuf_remove_trap(drakvuf,tts->trap,NULL);
+        free(tts->proc_name);
+        g_hash_table_remove(p->tracetraps,&info->regs->cr3);
+
+        drakvuf_release_vmi(drakvuf);
+    }
+    
+    return 0;
+}
+
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     proctracer *p = (proctracer*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    //page_mode_t pm = vmi_get_page_mode(vmi);
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -134,21 +157,30 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
-    addr_t base_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, 0x42ff8f);
+    addr_t base_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, 0x45bfd0);
     printf("[PROCTRACER] Base PA: %lx\n", base_pa);
     if (base_pa){
+        trace_trap_struct *tts = (struct trace_trap_struct*)g_malloc0(sizeof(struct trace_trap_struct)); 
         printf("[PROCTRACER] Adding dynamic trap\n");
+        //uint32_t mark;
+        //vmi_read_32_pa(vmi,base_pa,&mark);
+        //printf("Mark before: %lx\n",mark);
         drakvuf_trap_t *maintrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
-
+        
         maintrap->lookup_type = LOOKUP_NONE;
         maintrap->addr_type = ADDR_PA;
         maintrap->type = BREAKPOINT;
-        maintrap->name = "CrashMeMainTrap";
+        maintrap->name = "TraceTrap";
         maintrap->cb = trace_cb;
         maintrap->u2.addr = base_pa;
         maintrap->data = p;
 
         drakvuf_add_trap(drakvuf, maintrap);
+
+        tts->pa = base_pa;
+        tts->trap=maintrap;
+        tts->proc_name=g_strdup(proc_name);
+        g_hash_table_insert(p->tracetraps, &info->regs->cr3, tts);
     }else{
         printf("[PROCTRACER] Couldn't find physical address!\n");    
     }
@@ -160,20 +192,28 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 proctracer::proctracer(drakvuf_t drakvuf, const void *config) {
     const char *rekall_profile =(const char *)config;
     printf("[PROCTRACER] Starting...\n");
+    this->tracetraps=g_hash_table_new(g_int64_hash, g_int64_equal);
     if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PsGetCurrentThreadTeb", &this->trap.u2.rva))
+        return;
+
+    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PspExitProcess", &this->exit_trap.u2.rva))
         return;
 
     this->trap.cb = cb;
     this->trap.data = (void*)this;
-    this->format = drakvuf_get_output_format(drakvuf);
-    //this->offsets = (size_t*)g_malloc0(__OFFSET_MAX*sizeof(size_t));
-    this->offsets = NULL;
 
-    if ( !drakvuf_add_trap(drakvuf,&this->trap) )
+    this->exit_trap.cb = exit_cb;
+    this->exit_trap.data = (void*)this;
+
+    this->format = drakvuf_get_output_format(drakvuf);
+
+    if ( !drakvuf_add_trap(drakvuf,&this->trap) || !drakvuf_add_trap(drakvuf,&this->exit_trap))
         throw -1;
     printf("[PROCTRACER] Started successfully\n");
 }
 
 proctracer::~proctracer() {
-    free(this->offsets);
+    if (this->tracetraps){
+        g_hash_table_destroy(this->tracetraps);    
+    }
 }
