@@ -111,9 +111,10 @@
 #include "objmon/objmon.h"
 #include "exmon/exmon.h"
 
-drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf)
+drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output)
 {
     this->drakvuf = drakvuf;
+    this->output = output;
 }
 
 drakvuf_plugins::~drakvuf_plugins()
@@ -134,32 +135,32 @@ bool drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
         switch(plugin_id) {
 #ifdef ENABLE_PLUGIN_SYSCALLS
         case PLUGIN_SYSCALLS:
-            this->plugins[plugin_id] = new syscalls(this->drakvuf, config);
+            this->plugins[plugin_id] = new syscalls(this->drakvuf, config, this->output);
             break;
 #endif
 #ifdef ENABLE_PLUGIN_POOLMON
         case PLUGIN_POOLMON:
-            this->plugins[plugin_id] = new poolmon(this->drakvuf, config);
+            this->plugins[plugin_id] = new poolmon(this->drakvuf, config, this->output);
             break;
 #endif
 #ifdef ENABLE_PLUGIN_FILETRACER
         case PLUGIN_FILETRACER:
-            this->plugins[plugin_id] = new filetracer(this->drakvuf, config);
+            this->plugins[plugin_id] = new filetracer(this->drakvuf, config, this->output);
             break;
 #endif
 #ifdef ENABLE_PLUGIN_FILEDELETE
         case PLUGIN_FILEDELETE:
-            this->plugins[plugin_id] = new filedelete(this->drakvuf, config);
+            this->plugins[plugin_id] = new filedelete(this->drakvuf, config, this->output);
             break;
 #endif
 #ifdef ENABLE_PLUGIN_OBJMON
         case PLUGIN_OBJMON:
-            this->plugins[plugin_id] = new objmon(this->drakvuf, config);
+            this->plugins[plugin_id] = new objmon(this->drakvuf, config, this->output);
             break;
 #endif
 #ifdef ENABLE_PLUGIN_EXMON
         case PLUGIN_EXMON:
-            this->plugins[plugin_id] = new exmon(this->drakvuf, config);
+            this->plugins[plugin_id] = new exmon(this->drakvuf, config, this->output);
             break;
 #endif
         default:

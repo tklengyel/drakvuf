@@ -122,7 +122,7 @@ class exmon: public plugin {
         size_t *offsets;
         size_t ktrap_frame_size;
 
-        exmon(drakvuf_t drakvuf, const void *config);
+        exmon(drakvuf_t drakvuf, const void *config, output_format_t output);
         ~exmon();
 };
 

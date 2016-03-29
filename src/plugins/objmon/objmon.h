@@ -120,7 +120,7 @@ class objmon: public plugin {
         };
         addr_t typeindex_offset;
 
-        objmon(drakvuf_t drakvuf, const void *config);
+        objmon(drakvuf_t drakvuf, const void *config, output_format_t output);
         ~objmon();
 };
 

@@ -285,7 +285,7 @@ static event_response_t setinformation(drakvuf_t drakvuf, drakvuf_trap_info_t *i
     return 0;
 }
 
-filedelete::filedelete(drakvuf_t drakvuf, const void *config)
+filedelete::filedelete(drakvuf_t drakvuf, const void *config, output_format_t output)
 {
     const struct filedelete_config *c = (const struct filedelete_config *)config;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -294,7 +294,7 @@ filedelete::filedelete(drakvuf_t drakvuf, const void *config)
     drakvuf_release_vmi(drakvuf);
 
     this->dump_folder = c->dump_folder ? c->dump_folder : "/tmp";
-    this->format = drakvuf_get_output_format(drakvuf);
+    this->format = output;
 
     if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "NtSetInformationFile", &this->traps[0].u2.rva))
         return;

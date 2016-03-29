@@ -301,7 +301,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     return 0;
 }
 
-exmon::exmon(drakvuf_t drakvuf, const void *config) {
+exmon::exmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
     const char *rekall_profile =(const char *)config;
 
     if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "KiDispatchException", &this->trap.u2.rva))
@@ -309,7 +309,7 @@ exmon::exmon(drakvuf_t drakvuf, const void *config) {
 
     this->trap.cb = cb;
     this->trap.data = (void*)this;
-    this->format = drakvuf_get_output_format(drakvuf);
+    this->format = output;
     this->offsets = (size_t*)g_malloc0(__OFFSET_MAX*sizeof(size_t));
 
     int i;

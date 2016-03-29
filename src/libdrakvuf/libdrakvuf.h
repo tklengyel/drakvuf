@@ -150,12 +150,6 @@ status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
  * DRAKVUF functions
  */
 
-typedef enum {
-    OUTPUT_DEFAULT,
-    OUTPUT_CSV,
-    __OUTPUT_MAX
-} output_format_t;
-
 typedef enum lookup_type {
     LOOKUP_NONE,
     LOOKUP_DTB,
@@ -248,9 +242,6 @@ void drakvuf_resume (drakvuf_t drakvuf);
 vmi_instance_t drakvuf_lock_and_get_vmi(drakvuf_t drakvuf);
 void drakvuf_release_vmi(drakvuf_t drakvuf);
 
-output_format_t drakvuf_get_output_format(drakvuf_t drakvuf);
-void drakvuf_set_output_format(drakvuf_t drakvuf,
-                               output_format_t output);
 addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
                                  addr_t process,
                                  uint64_t handle);

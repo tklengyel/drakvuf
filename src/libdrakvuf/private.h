@@ -141,7 +141,6 @@ struct drakvuf {
     char *dom_name;
     domid_t domID;
     char *rekall_profile;
-    output_format_t output;
 
     xen_interface_t *xen;
     uint16_t altp2m_idx, altp2m_idr;

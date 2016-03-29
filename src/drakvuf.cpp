@@ -164,13 +164,10 @@ drakvuf_c::drakvuf_c(const char* domain,
     if (!drakvuf_init(&this->drakvuf, domain, rekall_profile))
         throw -1;
 
-    if(output != OUTPUT_DEFAULT)
-        drakvuf_set_output_format(drakvuf, output);
-
     if(timeout > 0)
         this->timeout_thread = g_thread_new(NULL, timer, (void*)this);
 
-    this->plugins = new drakvuf_plugins(this->drakvuf);
+    this->plugins = new drakvuf_plugins(this->drakvuf, output);
     this->pause();
 
     if ( !this->start_plugins(dump_folder) ) {

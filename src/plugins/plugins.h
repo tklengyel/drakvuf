@@ -119,6 +119,12 @@ struct filedelete_config {
 
 /***************************************************************************/
 
+typedef enum {
+    OUTPUT_DEFAULT,
+    OUTPUT_CSV,
+    __OUTPUT_MAX
+} output_format_t;
+
 typedef enum drakvuf_plugin {
     PLUGIN_SYSCALLS,
     PLUGIN_POOLMON,
@@ -134,10 +140,11 @@ class drakvuf_plugins
 {
     private:
         drakvuf_t drakvuf;
+        output_format_t output;
         plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = NULL };
 
     public:
-        drakvuf_plugins(drakvuf_t drakvuf);
+        drakvuf_plugins(drakvuf_t drakvuf, output_format_t output);
         ~drakvuf_plugins();
         bool start(drakvuf_plugin_t plugin, const void* config);
 };

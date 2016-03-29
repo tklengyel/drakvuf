@@ -157,7 +157,7 @@ static GSList* create_trap_config(syscalls *s, symbols_t *symbols) {
     return ret;
 }
 
-syscalls::syscalls(drakvuf_t drakvuf, const void *config) {
+syscalls::syscalls(drakvuf_t drakvuf, const void *config, output_format_t output) {
     const char *rekall_profile = (const char *)config;
     symbols_t *symbols = drakvuf_get_symbols_from_rekall(rekall_profile);
     if (!symbols)
@@ -167,7 +167,7 @@ syscalls::syscalls(drakvuf_t drakvuf, const void *config) {
     }
 
     this->traps = create_trap_config(this, symbols);
-    this->format = drakvuf_get_output_format(drakvuf);
+    this->format = output;
 
     drakvuf_free_symbols(symbols);
 
