@@ -125,7 +125,7 @@ class filedelete: public plugin {
         page_mode_t pm;
         uint32_t domid;
         output_format_t format;
-        filedelete(drakvuf_t drakvuf, const void *config);
+        filedelete(drakvuf_t drakvuf, const void *config, output_format_t output);
         ~filedelete();
 };
 

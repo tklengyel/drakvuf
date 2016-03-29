@@ -117,7 +117,7 @@ class filetracer: public plugin {
         addr_t file_object_size, file_name_offset,
               string_buffer_offset, string_length_offset;
 
-        filetracer(drakvuf_t drakvuf, const void *config);
+        filetracer(drakvuf_t drakvuf, const void *config, output_format_t output);
         ~filetracer();
 };
 

@@ -147,8 +147,6 @@ bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_pro
     if (!init_vmi(*drakvuf))
         goto err;
 
-    (*drakvuf)->output = OUTPUT_DEFAULT;
-
     return 1;
 
 err:
@@ -319,14 +317,6 @@ void drakvuf_pause (drakvuf_t drakvuf) {
 
 void drakvuf_resume (drakvuf_t drakvuf) {
     xen_unpause(drakvuf->xen, drakvuf->domID);
-}
-
-void drakvuf_set_output_format(drakvuf_t drakvuf, output_format_t output) {
-    drakvuf->output = output;
-}
-
-output_format_t drakvuf_get_output_format(drakvuf_t drakvuf) {
-    return drakvuf->output;
 }
 
 status_t drakvuf_get_struct_size(const char *rekall_profile,

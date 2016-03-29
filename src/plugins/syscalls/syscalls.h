@@ -114,7 +114,7 @@ class syscalls: public plugin {
 
     public:
         output_format_t format;
-        syscalls(drakvuf_t drakvuf, const void *config);
+        syscalls(drakvuf_t drakvuf, const void *config, output_format_t output);
         ~syscalls();
 };
 
