@@ -110,7 +110,7 @@
 #include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <inttypes.h>
 #include <glib.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>

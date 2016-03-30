@@ -179,92 +179,62 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
             goto done;
         }
 
-        if(trap->lookup_type == LOOKUP_PID && trap->u.pid == 4) {
-            if (trap->module) {
-                vmi_instance_t vmi = drakvuf->vmi;
+        if(trap->lookup_type == LOOKUP_PID || trap->lookup_type == LOOKUP_NAME) {
+            if (trap->addr_type == ADDR_RVA && trap->module) {
 
-                // Loop kernel modules
-                addr_t kernel_list_head;
-                vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &kernel_list_head);
-                ret = inject_traps_modules(drakvuf, NULL, trap, kernel_list_head, 4, "System");
+                vmi_pid_t pid = ~0;
+                const char *name = NULL;
+                addr_t module_list = 0;
+
+                if(trap->u.pid == 4 || !strcmp(trap->u.proc, "System")) {
+                    pid = 4;
+                    name = "System";
+
+                    if(VMI_FAILURE == vmi_read_addr_ksym(drakvuf->vmi, "PsLoadedModuleList", &module_list))
+                        goto done;
+                } else {
+                    /* Process library */
+                    addr_t process_base;
+
+                    if(trap->lookup_type == LOOKUP_PID)
+                        pid = trap->u.pid;
+                    if(trap->lookup_type == LOOKUP_NAME)
+                        name = trap->u.proc;
+
+                    if( !drakvuf_find_eprocess(drakvuf, pid, name, &process_base) )
+                        goto done;
+
+                    if(pid == ~0 && VMI_FAILURE == vmi_read_32_va(drakvuf->vmi, process_base + offsets[EPROCESS_PID], 0, (uint32_t*)&pid))
+                            goto done;
+
+                    if( !drakvuf_get_module_list(drakvuf, process_base, &module_list) )
+                        goto done;
+                }
+
+                ret = inject_traps_modules(drakvuf, trap, module_list, pid);
             }
 
-            goto done;
+            if(trap->addr_type == ADDR_VA) {
+                addr_t dtb = vmi_pid_to_dtb(drakvuf->vmi, trap->u.pid);
+                if(!dtb)
+                    goto done;
+
+                addr_t trap_pa = vmi_pagetable_lookup(drakvuf->vmi, dtb, trap->u2.addr);
+                if(!trap_pa)
+                    goto done;
+
+                ret = inject_trap_pa(drakvuf, trap, trap_pa);
+                goto done;
+            }
+
+            if(trap->addr_type == ADDR_PA) {
+                fprintf(stderr, "DRAKVUF Trap misconfiguration: PID lookup specified for PA location\n");
+            }
         }
+
     } else {
         ret = inject_trap_mem(drakvuf, trap);
     }
-
-done:
-    vmi_resume_vm(drakvuf->vmi);
-    return ret;
-}
-
-bool drakvuf_add_traps(drakvuf_t drakvuf, GSList *traps) {
-    bool ret = 0;
-    addr_t kernel_list_head;
-    vmi_instance_t vmi = drakvuf->vmi;
-    vmi_pause_vm(vmi);
-
-    // Loop kernel modules
-    vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &kernel_list_head);
-    ret = inject_traps_modules(drakvuf, traps, NULL, kernel_list_head, 4, "System");
-
-    // TODO TODO TODO
-    /*addr_t current_process = 0, next_list_entry = 0;
-    vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
-
-    addr_t list_head = current_process + offsets[EPROCESS_TASKS];
-    addr_t current_list_entry = list_head;
-
-    status_t status = vmi_read_addr_va(vmi, current_list_entry, 0,
-            &next_list_entry);
-    if (status == VMI_FAILURE) {
-        PRINT_DEBUG(
-                "Failed to read next pointer at 0x%"PRIx64" before entering loop\n",
-                current_list_entry);
-        return;
-    }
-
-    do {
-
-        vmi_pid_t pid;
-        uint32_t dtb;
-        vmi_read_32_va(vmi, current_process + offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
-        vmi_read_32_va(vmi, current_process + offsets[EPROCESS_PDBASE], 0, &dtb);
-
-        char *procname = vmi_read_str_va(vmi, current_process + offsets[EPROCESS_PNAME], 0);
-
-        if (!procname) {
-            goto exit;
-        }
-
-        PRINT(drakvuf, FOUND_PROCESS_STRING, pid, dtb, procname);
-
-        free(procname);
-
-        addr_t imagebase = 0, peb = 0, ldr = 0, modlist = 0;
-        vmi_read_addr_va(vmi, current_process + offsets[EPROCESS_PEB], 0, &peb);
-        vmi_read_addr_va(vmi, peb + offsets[PEB_IMAGEBASADDRESS], pid,
-                &imagebase);
-        vmi_read_addr_va(vmi, peb + offsets[PEB_LDR], pid, &ldr);
-        vmi_read_addr_va(vmi, ldr + offsets[PEB_LDR_DATA_INLOADORDERMODULELIST],
-                pid, &modlist);
-
-        inject_traps_pe(drakvuf, traps, imagebase, pid, NULL);
-        inject_traps_modules(drakvuf, traps, modlist, pid);
-
-        current_list_entry = next_list_entry;
-        current_process = current_list_entry - offsets[EPROCESS_TASKS];
-
-        status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
-        if (status == VMI_FAILURE) {
-            PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n",
-                    current_list_entry);
-            return;
-        }
-
-    } while (next_list_entry != list_head);*/
 
 done:
     vmi_resume_vm(drakvuf->vmi);
@@ -292,13 +262,6 @@ void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap,
         remove_trap(drakvuf, trap);
         if(free_routine)
             free_routine(trap);
-    }
-}
-
-void drakvuf_remove_traps(drakvuf_t drakvuf, GSList *traps) {
-    while (traps) {
-        remove_trap(drakvuf, traps->data);
-        traps = traps->next;
     }
 }
 

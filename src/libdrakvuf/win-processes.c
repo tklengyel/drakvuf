@@ -271,3 +271,72 @@ bool drakvuf_is_eprocess( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t e
 
     return false ;
 }
+
+bool drakvuf_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t *module_list) {
+
+    vmi_instance_t vmi = drakvuf->vmi;
+    vmi_pid_t pid;
+    addr_t peb, ldr, modlist;
+
+    if(!eprocess_base)
+        return false;
+
+    if(VMI_FAILURE == vmi_read_32_va(vmi, eprocess_base + offsets[EPROCESS_PID], 0, (uint32_t*)&pid))
+        return false;
+
+    if(VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + offsets[EPROCESS_PEB], 0, &peb))
+        return false;
+
+    if(VMI_FAILURE == vmi_read_addr_va(vmi, peb + offsets[PEB_LDR], pid, &ldr))
+        return false;
+
+    if(VMI_FAILURE == vmi_read_addr_va(vmi, ldr + offsets[PEB_LDR_DATA_INLOADORDERMODULELIST], pid, &modlist))
+        return false;
+
+    *module_list = modlist;
+
+    return true;
+}
+
+bool drakvuf_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_procname, addr_t *eprocess_addr) {
+    addr_t current_process = 0, next_list_entry = 0;
+    vmi_instance_t vmi = drakvuf->vmi;
+    vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
+
+    addr_t list_head = current_process + offsets[EPROCESS_TASKS];
+    addr_t current_list_entry = list_head;
+
+    status_t status = vmi_read_addr_va(vmi, current_list_entry, 0,
+                                       &next_list_entry);
+    if (status == VMI_FAILURE) {
+        PRINT_DEBUG(
+                "Failed to read next pointer at 0x%"PRIx64" before entering loop\n",
+                current_list_entry);
+        return false;
+    }
+
+    do {
+        vmi_pid_t pid = ~0;
+        vmi_read_32_va(vmi, current_process + offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
+        char *procname = vmi_read_str_va(vmi, current_process + offsets[EPROCESS_PNAME], 0);
+
+        if((pid != ~0 && find_pid != ~0 && pid == find_pid) || (find_procname && procname && !strcmp(procname, find_procname))) {
+            *eprocess_addr = current_list_entry - offsets[EPROCESS_TASKS];
+            free(procname);
+            return true;
+        }
+
+        free(procname);
+
+        current_list_entry = next_list_entry;
+        status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
+        if (status == VMI_FAILURE) {
+            PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n",
+                    current_list_entry);
+            return false;
+        }
+
+    } while (next_list_entry != list_head);
+
+    return false;
+}
