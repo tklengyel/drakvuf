@@ -697,9 +697,7 @@ bool inject_trap(drakvuf_t drakvuf,
 bool inject_traps_modules(drakvuf_t drakvuf,
                           drakvuf_trap_t *trap,
                           addr_t list_head,
-                          vmi_pid_t pid,
-                          const char *name)
-
+                          vmi_pid_t pid)
 {
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t next_module = list_head;
@@ -707,7 +705,7 @@ bool inject_traps_modules(drakvuf_t drakvuf,
     if (!trap)
         return 0;
 
-    PRINT_DEBUG("Inject traps in module list of [%u]: %s\n", pid, name);
+    PRINT_DEBUG("Inject traps in module list of PID %u\n", pid);
 
     while (1) {
 
@@ -718,9 +716,7 @@ bool inject_traps_modules(drakvuf_t drakvuf,
             break;
 
         addr_t dllbase = 0;
-        vmi_read_addr_va(vmi,
-                         next_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid,
-                         &dllbase);
+        vmi_read_addr_va(vmi, next_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid, &dllbase);
 
         if (!dllbase)
             break;
