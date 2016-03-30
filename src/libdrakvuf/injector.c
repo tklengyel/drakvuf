@@ -132,7 +132,6 @@ struct injector {
     page_mode_t pm;
 
     addr_t process_info;
-
     addr_t saved_rsp;
     addr_t saved_rip;
     addr_t saved_rax;
@@ -827,8 +826,15 @@ done:
     return 0;
 }
 
-event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
+event_response_t singlestep_cb(vmi_instance_t vmi, vmi_event_t *event) {
+    addr_t *pa = event->data;
+    vmi_write_8_pa(vmi, *pa, &trap);
+    free(pa);
+    return 1u<<VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP;
+}
+
+event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     vmi_pause_vm(vmi);
 
     struct injector *injector = event->data;
@@ -844,6 +850,24 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     PRINT_DEBUG("INT3 Callback @ 0x%lx. PID %u. CR3 0x%lx\n",
                 event->interrupt_event.gla, pid, cr3);
+
+    if ( cr3 != injector->target_cr3 ) {
+        PRINT_DEBUG("Stepping INT3 as CR3 doesn't match target process\n");
+
+        if ( event->interrupt_event.gla == injector->entry )
+            vmi_write_8_pa(vmi, pa, &injector->entry_backup);
+        else if ( event->interrupt_event.gla == injector->ret )
+            vmi_write_8_pa(vmi, pa, &injector->ret_backup);
+        else
+            goto notmine;
+
+        injector->drakvuf->step_event[event->vcpu_id]->callback = singlestep_cb;
+        injector->drakvuf->step_event[event->vcpu_id]->data = g_memdup(&pa, sizeof(addr_t));
+        event->interrupt_event.reinject = 0;
+        vmi_resume_vm(vmi);
+
+        return 1u<<VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP;
+    }
 
     if ( event->interrupt_event.gla == injector->entry ) {
 
@@ -869,6 +893,8 @@ event_response_t injector_int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
         ctx.addr = injector->ret;
         vmi_write_8(vmi, &ctx, &trap);
+
+        PRINT_DEBUG("Stack setup finished and return trap added @ 0x%" PRIx64 "\n", injector->ret);
 
         event->interrupt_event.reinject = 0;
         vmi_resume_vm(vmi);
