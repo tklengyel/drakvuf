@@ -306,6 +306,15 @@ bool drakvuf_is_eprocess( drakvuf_t drakvuf,
                           drakvuf_trap_info_t *info, 
                           addr_t eprocess_addr );
 
+bool drakvuf_find_eprocess(drakvuf_t drakvuf,
+                           vmi_pid_t find_pid,
+                           const char *find_procname,
+                           addr_t *eprocess_addr);
+
+bool drakvuf_get_module_list(drakvuf_t drakvuf,
+                             addr_t eprocess_base,
+                             addr_t *module_list);
+
 // ObReferenceObjectByHandle
 bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, 
                                 drakvuf_trap_info_t *info, 
