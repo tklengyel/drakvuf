@@ -282,7 +282,6 @@ bool inject_trap_pa(drakvuf_t drakvuf,
                     drakvuf_trap_t *trap,
                     addr_t pa);
 bool inject_traps_modules(drakvuf_t drakvuf,
-                          GSList *traps,
                           drakvuf_trap_t *trap,
                           addr_t list_head,
                           vmi_pid_t pid,

@@ -104,6 +104,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <libvmi/libvmi.h>
 
 #include "libdrakvuf/libdrakvuf.h"

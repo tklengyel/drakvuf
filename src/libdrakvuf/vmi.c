@@ -695,21 +695,20 @@ bool inject_trap(drakvuf_t drakvuf,
 }
 
 bool inject_traps_modules(drakvuf_t drakvuf,
-                          GSList *traps,
                           drakvuf_trap_t *trap,
                           addr_t list_head,
                           vmi_pid_t pid,
                           const char *name)
 
 {
-    PRINT_DEBUG("Inject traps in module list of [%u]: %s\n", pid, name);
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t next_module = list_head;
 
-    if (traps == NULL && trap == NULL)
+    if (!trap)
         return 0;
 
-    vmi_instance_t vmi = drakvuf->vmi;
+    PRINT_DEBUG("Inject traps in module list of [%u]: %s\n", pid, name);
 
-    addr_t next_module = list_head;
     while (1) {
 
         addr_t tmp_next = 0;
@@ -720,54 +719,28 @@ bool inject_traps_modules(drakvuf_t drakvuf,
 
         addr_t dllbase = 0;
         vmi_read_addr_va(vmi,
-                    next_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid,
-                    &dllbase);
+                         next_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid,
+                         &dllbase);
 
         if (!dllbase)
             break;
 
-        unicode_string_t *us =
-            vmi_read_unicode_str_va(vmi, next_module + offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
+        unicode_string_t *us = vmi_read_unicode_str_va(vmi, next_module + offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
         unicode_string_t out = { .contents = NULL };
 
-        if (us && VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8")) {
-            PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", out.contents, dllbase);
-        } // if
-        if (us)
+        if (us) {
+            status_t status = vmi_convert_str_encoding(us, &out, "UTF-8");
+            if(VMI_SUCCESS == status)
+                PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", out.contents, dllbase);
+
             vmi_free_unicode_str(us);
+        }
 
-        if(out.contents) {
-
-            if (traps) {
-                GSList *loop = traps;
-                while(loop) {
-
-                    drakvuf_trap_t *curtrap = loop->data;
-
-                    if (curtrap->module &&
-                        (
-                        (curtrap->lookup_type == LOOKUP_PID && pid == curtrap->u.pid)
-                        ||
-                        (curtrap->lookup_type == LOOKUP_NAME && !strcmp(name,curtrap->u.proc))
-                        ) &&
-                        !strcmp((char*)out.contents,curtrap->module))
-                    {
-                        if ( !inject_trap(drakvuf, curtrap, dllbase, pid) )
-                            return 0;
-                    }
-
-                    loop = loop->next;
-                }
-            } else if(!strcmp((char*)out.contents,trap->module)) {
-                free(out.contents);
-
-                if ( !inject_trap(drakvuf, trap, dllbase, pid) )
-                    return 0;
-
-                break;
-            }
-
+        if(out.contents && !strcmp((char*)out.contents,trap->module)) {
             free(out.contents);
+
+            if ( !inject_trap(drakvuf, trap, dllbase, pid) )
+                return 0;
         }
 
         next_module = tmp_next;

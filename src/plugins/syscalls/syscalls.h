@@ -105,6 +105,7 @@
 #ifndef SYSCALLS_H
 #define SYSCALLS_H
 
+#include <glib.h>
 #include "plugins/plugins.h"
 
 class syscalls: public plugin {

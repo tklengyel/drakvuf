@@ -171,8 +171,15 @@ syscalls::syscalls(drakvuf_t drakvuf, const void *config, output_format_t output
 
     drakvuf_free_symbols(symbols);
 
-    if ( !drakvuf_add_traps(drakvuf, this->traps) )
-        throw -1;
+    GSList *loop = this->traps;
+    while(loop) {
+        drakvuf_trap_t *trap = (drakvuf_trap_t *)loop->data;
+
+        if ( !drakvuf_add_trap(drakvuf, trap) )
+            throw -1;
+
+        loop = loop->next;
+    }
 }
 
 syscalls::~syscalls() {
