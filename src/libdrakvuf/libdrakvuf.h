@@ -270,27 +270,27 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
  */
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
                                    uint64_t vcpu_id,
-                                   x86_registers_t *regs);
+                                   const x86_registers_t *regs);
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
                                    uint64_t vcpu_id,
-                                   x86_registers_t *regs);
+                                   const x86_registers_t *regs);
 
 /* Caller must free the returned string */
 char *drakvuf_get_process_name(drakvuf_t drakvuf,
                                addr_t eprocess_base);
 char *drakvuf_get_current_process_name(drakvuf_t drakvuf,
                                        uint64_t vcpu_id,
-                                       x86_registers_t *regs);
+                                       const x86_registers_t *regs);
 
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
                                     uint64_t vcpu_id,
-                                    x86_registers_t *regs,
+                                    const x86_registers_t *regs,
                                     uint32_t *thread_id);
 
 // Microsoft PreviousMode KTHREAD explanation:
 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff559860(v=vs.85).aspx
 bool drakvuf_get_current_thread_previous_mode(drakvuf_t drakvuf,
-                                              drakvuf_trap_info_t *info,
+                                              uint64_t vcpu_id, const x86_registers_t *regs,
                                               privilege_mode_t *previous_mode);
 
 bool drakvuf_get_thread_previous_mode(drakvuf_t drakvuf,
@@ -298,11 +298,11 @@ bool drakvuf_get_thread_previous_mode(drakvuf_t drakvuf,
                                       privilege_mode_t *previous_mode);
 
 bool drakvuf_is_ethread(drakvuf_t drakvuf,
-                        drakvuf_trap_info_t *info,
+                        addr_t dtb,
                         addr_t ethread_addr);
 
 bool drakvuf_is_eprocess(drakvuf_t drakvuf,
-                         drakvuf_trap_info_t *info,
+                         addr_t dtb,
                          addr_t eprocess_addr);
 
 bool drakvuf_find_eprocess(drakvuf_t drakvuf,
