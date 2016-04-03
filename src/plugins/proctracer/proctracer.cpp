@@ -111,6 +111,8 @@
 enum offset {
     EPROCESS_PEB,
     EPROCESS_PID,
+    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
+    LDR_DATA_TABLE_ENTRY_DLLBASE,
     PEB_IMGBASE,
     __OFFSET_MAX
 };
@@ -118,6 +120,8 @@ enum offset {
 static const char *offset_names[__OFFSET_MAX][2] = {
     [EPROCESS_PEB] = {"_EPROCESS","Peb"},
     [EPROCESS_PID] = {"_EPROCESS","UniqueProcessId"},
+    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
+    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
     [PEB_IMGBASE] = {"_PEB","ImageBaseAddress"}
 };
 
@@ -152,6 +156,43 @@ static event_response_t exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     }
     
     return 0;
+}
+
+static void print_process_modules(vmi_instance_t vmi,addr_t process, proctracer* p, addr_t list_head){
+    vmi_pid_t pid;
+
+    if(VMI_FAILURE == vmi_read_32_va(vmi, process + p->offsets[EPROCESS_PID], 0, (uint32_t*)&pid)){
+        printf("[PROCTRACER] Couldn't find PID!\n");
+        return;
+    }
+    addr_t next_module = list_head;
+
+    while (1) {
+        addr_t tmp_next = 0;
+        vmi_read_addr_va(vmi, next_module, pid, &tmp_next);
+
+        if (list_head == tmp_next)
+            break;
+
+        addr_t dllbase = 0;
+        vmi_read_addr_va(vmi, next_module + p->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid, &dllbase);
+
+        if (!dllbase)
+            break;
+
+        unicode_string_t *us = vmi_read_unicode_str_va(vmi, next_module + p->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
+        unicode_string_t out = { .contents = NULL };
+
+        if (us) {
+            status_t status = vmi_convert_str_encoding(us, &out, "UTF-8");
+            if(VMI_SUCCESS == status)
+                printf("\t%s @ 0x%lx\n", out.contents, dllbase);
+
+            vmi_free_unicode_str(us);
+        }
+
+        next_module = tmp_next;
+    }  
 }
 
 static addr_t get_process_base(vmi_instance_t vmi,addr_t process, proctracer* p){
@@ -198,6 +239,9 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
 
     printf("[PROCTRACER] Base PA: %lx\n", base_pa);
+    addr_t module_list;
+    drakvuf_get_module_list(drakvuf, process, &module_list);
+    print_process_modules(vmi, process, p, module_list);
     if (base_pa){
         trace_trap_struct *tts = (struct trace_trap_struct*)g_malloc0(sizeof(struct trace_trap_struct)); 
         printf("[PROCTRACER] Adding dynamic trap\n");
