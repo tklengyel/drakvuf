@@ -108,6 +108,19 @@
 #include "private.h"
 #include "proctracer.h"
 
+enum offset {
+    EPROCESS_PEB,
+    EPROCESS_PID,
+    PEB_IMGBASE,
+    __OFFSET_MAX
+};
+
+static const char *offset_names[__OFFSET_MAX][2] = {
+    [EPROCESS_PEB] = {"_EPROCESS","Peb"},
+    [EPROCESS_PID] = {"_EPROCESS","UniqueProcessId"},
+    [PEB_IMGBASE] = {"_PEB","ImageBaseAddress"}
+};
+
 struct trace_trap_struct{
     char* proc_name;
     addr_t pa;
@@ -141,6 +154,30 @@ static event_response_t exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     return 0;
 }
 
+static addr_t get_process_base(vmi_instance_t vmi,addr_t process, proctracer* p){
+    addr_t peb, imgbase;
+    vmi_pid_t pid;
+
+    if(VMI_FAILURE == vmi_read_32_va(vmi, process + p->offsets[EPROCESS_PID], 0, (uint32_t*)&pid)){
+        printf("[PROCTRACER] Couldn't find PID!\n");
+        return 0;
+    }
+
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, process + p->offsets[EPROCESS_PEB], 0, &peb)){
+        printf("[PROCTRACER] Couldn't find PEB!\n");
+        return 0;
+    }
+    
+    printf("[PROCTRACER] PEB @ %lx\n",peb);
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, peb + p->offsets[PEB_IMGBASE], pid, &imgbase)){
+        printf("[PROCTRACER] Couldn't find Image Base!\n");
+        return 0;
+    }
+
+    return imgbase;
+}
+
+// Runs on PsGetCurrentThreadTeb (process context)
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     proctracer *p = (proctracer*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -157,7 +194,9 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
-    addr_t base_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, 0x45bfd0);
+    addr_t base_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, get_process_base(vmi, process, p) + 0x5bfd0);
+
+
     printf("[PROCTRACER] Base PA: %lx\n", base_pa);
     if (base_pa){
         trace_trap_struct *tts = (struct trace_trap_struct*)g_malloc0(sizeof(struct trace_trap_struct)); 
@@ -192,6 +231,14 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t output) {
     const char *rekall_profile =(const char *)config;
     printf("[PROCTRACER] Starting...\n");
+
+    this->offsets = (size_t*)g_malloc0(__OFFSET_MAX*sizeof(size_t));
+
+    for(int i=0;i<__OFFSET_MAX;i++) {
+        drakvuf_get_struct_member_rva(rekall_profile, offset_names[i][0], offset_names[i][1],
+                                      &this->offsets[i]);
+    }
+
     this->tracetraps=g_hash_table_new(g_int64_hash, g_int64_equal);
     if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PsGetCurrentThreadTeb", &this->trap.u2.rva))
         return;

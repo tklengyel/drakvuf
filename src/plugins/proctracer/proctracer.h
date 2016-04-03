@@ -126,6 +126,8 @@ class proctracer: public plugin {
             .module = "ntoskrnl.exe",
             .type = BREAKPOINT
         };
+
+        size_t *offsets;
  
         output_format_t format;
         GHashTable *tracetraps;
