@@ -734,15 +734,13 @@ bool inject_traps_modules(drakvuf_t drakvuf,
 
         if(out.contents && !strcmp((char*)out.contents,trap->module)) {
             free(out.contents);
-
-            if ( !inject_trap(drakvuf, trap, dllbase, pid) )
-                return 0;
+            return inject_trap(drakvuf, trap, dllbase, pid);
         }
 
         next_module = tmp_next;
     }
 
-    return 1;
+    return 0;
 }
 
 void drakvuf_loop(drakvuf_t drakvuf) {
