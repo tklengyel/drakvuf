@@ -142,32 +142,83 @@ static event_response_t trace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info){
 
 static event_response_t exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     proctracer *p = (proctracer*)info->trap->data;
-    struct trace_trap_struct *tts = (struct trace_trap_struct*)g_hash_table_lookup(p->tracetraps, &info->regs->cr3);
+    if (p->trace_status.find(info->regs->cr3) == p->trace_status.end())
+        return 0;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    if (p->trace_status.find(info->regs->cr3) == p->trace_status.end()){
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
+
+    list<mod_info*> *module_traps=p->trace_status[info->regs->cr3];
+    for (mod_info* mi: *module_traps){
+        printf("Removing traps from %s\n", mi->mod_name.c_str());        
+        for (drakvuf_trap_t* dt: mi->traps){
+            printf("Trap remove\n");
+            drakvuf_remove_trap(drakvuf,dt,NULL);
+        }
+        /*printf("Deleting mod_name\n");
+        delete mi->mod_name;
+        printf("Deleting traps");
+        delete mi->traps;*/
+        //printf("Removing mod_info element\n");
+        delete mi;
+    }
+    printf("Erasing trace status\n");
+    p->trace_status.erase(info->regs->cr3);
+
+/*    struct trace_trap_struct *tts = (struct trace_trap_struct*)g_hash_table_lookup(p->tracetraps, &info->regs->cr3);
 
     if (tts){
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
         printf("[PROCTRACER] Removing %s (%lx) from trace\n", tts->proc_name, info->regs->cr3);
         drakvuf_remove_trap(drakvuf,tts->trap,NULL);
         free(tts->proc_name);
         g_hash_table_remove(p->tracetraps,&info->regs->cr3);
 
-        drakvuf_release_vmi(drakvuf);
     }
-    
+  */  
+    drakvuf_release_vmi(drakvuf);
     return 0;
 }
 
-static void print_process_modules(vmi_instance_t vmi,addr_t process, proctracer* p, addr_t list_head){
+// Runs on PsGetCurrentThreadTeb (process context)
+static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+    proctracer *p = (proctracer*)info->trap->data;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu, info->regs);
+    char *proc_name = drakvuf_get_process_name(drakvuf, process); 
+    printf("[PROCTRACER] CR3: %lx NAME: %s\n", info->regs->cr3, proc_name);
+    if (p->mod_config.find(proc_name) == p->mod_config.end()){
+        free(proc_name);
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
+
+    //addr_t base_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, get_process_base(vmi, process, p) + 0x5bfd0);
+    //printf("[PROCTRACER] Base PA: %lx\n", base_pa);
+
+    // [TODO] This is basically duplicate code from inject_traps_modules() - Maybe the library func should provide a callback parameter?
+
+    addr_t module_list;
+    bool traps_ok = drakvuf_get_module_list(drakvuf, process, &module_list);
+
     vmi_pid_t pid;
 
     if(VMI_FAILURE == vmi_read_32_va(vmi, process + p->offsets[EPROCESS_PID], 0, (uint32_t*)&pid)){
         printf("[PROCTRACER] Couldn't find PID!\n");
-        return;
+        traps_ok = false;
     }
+    addr_t list_head = module_list;
     addr_t next_module = list_head;
 
-    while (1) {
+    while (traps_ok) {
         addr_t tmp_next = 0;
         vmi_read_addr_va(vmi, next_module, pid, &tmp_next);
 
@@ -185,64 +236,46 @@ static void print_process_modules(vmi_instance_t vmi,addr_t process, proctracer*
 
         if (us) {
             status_t status = vmi_convert_str_encoding(us, &out, "UTF-8");
-            if(VMI_SUCCESS == status)
+            if(VMI_SUCCESS == status){
                 printf("\t%s @ 0x%lx\n", out.contents, dllbase);
+                if (p->mod_config.find((char*)out.contents) != p->mod_config.end()){
+                    printf ("CAN TRAP THIS \\o/\n"); 
+                    for (addr_t off: *p->mod_config[(char*)out.contents]){
+                        printf("Offset: %lx",off);
+                        mod_info *mi = new mod_info;
+                        mi->mod_name=(char*)out.contents;
+                        //mi->traps=new list<drakvuf_trap_t*>();
+                        if (p->trace_status.find(info->regs->cr3) == p->trace_status.end()){
+                            p->trace_status[info->regs->cr3]=new list<mod_info*>();
 
+                        }
+
+                        drakvuf_trap_t *maintrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+        
+                        addr_t trap_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, dllbase+off);
+                        maintrap->lookup_type = LOOKUP_NONE;
+                        maintrap->addr_type = ADDR_PA;
+                        maintrap->type = BREAKPOINT;
+                        maintrap->name = "TraceTrap";
+                        maintrap->cb = trace_cb;
+                        maintrap->u2.addr = trap_pa;
+                        maintrap->data = p;
+                        
+                        drakvuf_add_trap(drakvuf,maintrap);
+                        mi->traps.insert(++(mi->traps.begin()),maintrap);
+
+                        p->trace_status[info->regs->cr3]->insert(++(p->trace_status[info->regs->cr3]->end()),mi);
+                    }
+                }
+            }
             vmi_free_unicode_str(us);
         }
 
         next_module = tmp_next;
     }  
-}
-
-static addr_t get_process_base(vmi_instance_t vmi,addr_t process, proctracer* p){
-    addr_t peb, imgbase;
-    vmi_pid_t pid;
-
-    if(VMI_FAILURE == vmi_read_32_va(vmi, process + p->offsets[EPROCESS_PID], 0, (uint32_t*)&pid)){
-        printf("[PROCTRACER] Couldn't find PID!\n");
-        return 0;
-    }
-
-    if (VMI_FAILURE == vmi_read_addr_va(vmi, process + p->offsets[EPROCESS_PEB], 0, &peb)){
-        printf("[PROCTRACER] Couldn't find PEB!\n");
-        return 0;
-    }
-    
-    printf("[PROCTRACER] PEB @ %lx\n",peb);
-    if (VMI_FAILURE == vmi_read_addr_va(vmi, peb + p->offsets[PEB_IMGBASE], pid, &imgbase)){
-        printf("[PROCTRACER] Couldn't find Image Base!\n");
-        return 0;
-    }
-
-    return imgbase;
-}
-
-// Runs on PsGetCurrentThreadTeb (process context)
-static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    proctracer *p = (proctracer*)info->trap->data;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu, info->regs);
-    char *proc_name = drakvuf_get_process_name(drakvuf, process); 
-    printf("[PROCTRACER] CR3: %lx NAME: %s\n", info->regs->cr3, proc_name);
-    if (strcmp(proc_name,"CrashMe.exe")){
-        free(proc_name);
-        drakvuf_release_vmi(drakvuf);
-        return 0;
-    }
-    addr_t base_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, get_process_base(vmi, process, p) + 0x5bfd0);
 
 
-    printf("[PROCTRACER] Base PA: %lx\n", base_pa);
-    addr_t module_list;
-    drakvuf_get_module_list(drakvuf, process, &module_list);
-    print_process_modules(vmi, process, p, module_list);
-    if (base_pa){
+    /*if (base_pa){
         trace_trap_struct *tts = (struct trace_trap_struct*)g_malloc0(sizeof(struct trace_trap_struct)); 
         printf("[PROCTRACER] Adding dynamic trap\n");
         //uint32_t mark;
@@ -266,7 +299,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         g_hash_table_insert(p->tracetraps, &info->regs->cr3, tts);
     }else{
         printf("[PROCTRACER] Couldn't find physical address!\n");    
-    }
+    }*/
     free(proc_name);
     drakvuf_release_vmi(drakvuf);
     return 0;
@@ -282,6 +315,14 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
         drakvuf_get_struct_member_rva(rekall_profile, offset_names[i][0], offset_names[i][1],
                                       &this->offsets[i]);
     }
+
+    /* TESTING */
+
+    list<addr_t> *cm_offsets=new list<addr_t>();
+    cm_offsets->insert(++cm_offsets->end(),0x5bfd0);
+    this->mod_config["CrashMe.exe"]=cm_offsets;
+
+    /***********/
 
     this->tracetraps=g_hash_table_new(g_int64_hash, g_int64_equal);
     if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PsGetCurrentThreadTeb", &this->trap.u2.rva))
@@ -307,4 +348,16 @@ proctracer::~proctracer() {
     if (this->tracetraps){
         g_hash_table_destroy(this->tracetraps);    
     }
+
+    for(const auto& n : this->mod_config){
+        delete n.second;    
+    } 
+
+    /*for(const auto& n : this->trace_status){
+        for (mod_info* mi: *n.second){
+            //delete mi->mod_name;
+            delete mi->traps;
+        } 
+        delete n.second;
+    }*/
 }

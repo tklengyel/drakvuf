@@ -106,6 +106,15 @@
 #define PROCTRACER_H
 
 #include "plugins/plugins.h"
+#include<list>
+#include<unordered_map>
+
+using namespace std;
+
+struct mod_info{
+    string mod_name;
+    list<drakvuf_trap_t*> traps;
+};
 
 class proctracer: public plugin {
     public:
@@ -131,6 +140,9 @@ class proctracer: public plugin {
  
         output_format_t format;
         GHashTable *tracetraps;
+        unordered_map<addr_t,list<mod_info*>*> trace_status;
+        unordered_map<string,list<addr_t>*> mod_config;
+
 
         proctracer(drakvuf_t drakvuf, const void *config, output_format_t output);
         ~proctracer();
