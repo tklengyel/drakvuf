@@ -140,8 +140,8 @@ class proctracer: public plugin {
  
         output_format_t format;
         GHashTable *tracetraps;
-        unordered_map<addr_t,list<mod_info*>*> trace_status;
-        unordered_map<string,list<addr_t>*> mod_config;
+        unordered_map<addr_t,list<mod_info*>> trace_status;
+        unordered_map<string,list<addr_t>> mod_config;
 
 
         proctracer(drakvuf_t drakvuf, const void *config, output_format_t output);
