@@ -157,6 +157,7 @@ static event_response_t exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     for (mod_info* mi: module_traps){
         printf("Removing traps from %s\n", mi->mod_name.c_str());        
         for (drakvuf_trap_t* dt: mi->traps){
+            printf("remove_trap\n");
             drakvuf_remove_trap(drakvuf,dt,NULL);
         }
         delete mi;
@@ -233,10 +234,10 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             if(VMI_SUCCESS == status){
                 printf("\t%s @ 0x%lx\n", out.contents, dllbase);
                 if (p->mod_config.find((char*)out.contents) != p->mod_config.end()){
+                    mod_info *mi = new mod_info;
+                    mi->mod_name=(char*)out.contents;
                     for (addr_t off: p->mod_config[(char*)out.contents]){
                         printf("Offset: %lx\n",off);
-                        mod_info *mi = new mod_info;
-                        mi->mod_name=(char*)out.contents;
 
                         drakvuf_trap_t *tracetrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
         
@@ -251,9 +252,8 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                         
                         drakvuf_add_trap(drakvuf,tracetrap);
                         mi->traps.push_back(tracetrap);
-
-                        p->trace_status[info->regs->cr3].push_back(mi);
                     }
+                    p->trace_status[info->regs->cr3].push_back(mi);
                 }
             }
             vmi_free_unicode_str(us);
