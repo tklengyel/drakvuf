@@ -205,6 +205,8 @@ bool drakvuf_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privil
 {
     if ( kthread )
     {
+        *previous_mode = 0 ;
+
         if ( vmi_read_8_va( drakvuf->vmi, kthread + offsets[ KTHREAD_PREVIOUSMODE ], 0,
                             (uint8_t *)previous_mode ) == VMI_SUCCESS )
         {
@@ -231,7 +233,7 @@ bool drakvuf_get_current_thread_previous_mode( drakvuf_t drakvuf,
 
 bool drakvuf_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 {
-    dispatcher_object_t dispatcher_type ;
+    dispatcher_object_t dispatcher_type = 0 ;
     access_context_t ctx = {
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = dtb,
@@ -255,7 +257,7 @@ bool drakvuf_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 
 bool drakvuf_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
 {
-    dispatcher_object_t dispatcher_type ;
+    dispatcher_object_t dispatcher_type = 0;
     access_context_t ctx = {
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = dtb,
@@ -318,11 +320,12 @@ bool drakvuf_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *fi
 
     do {
         vmi_pid_t pid = ~0;
+        current_process = current_list_entry - offsets[EPROCESS_TASKS] ;
         vmi_read_32_va(vmi, current_process + offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
         char *procname = vmi_read_str_va(vmi, current_process + offsets[EPROCESS_PNAME], 0);
 
         if((pid != ~0 && find_pid != ~0 && pid == find_pid) || (find_procname && procname && !strcmp(procname, find_procname))) {
-            *eprocess_addr = current_list_entry - offsets[EPROCESS_TASKS];
+            *eprocess_addr = current_process;
             free(procname);
             return true;
         }
