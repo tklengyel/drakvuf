@@ -176,33 +176,9 @@ static event_response_t exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     return 0;
 }
 
-// Runs on PsGetCurrentThreadTeb (process context)
-static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    proctracer *p = (proctracer*)info->trap->data;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu, info->regs);
-    char *proc_name = drakvuf_get_process_name(drakvuf, process); 
-    switch(p->format){
-        case OUTPUT_CSV:
-            printf("proctracer,start,%lx,\"%s\"\n", info->regs->cr3, proc_name);
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[PROCTRACER] Starting CR3: %lx NAME: %s\n", info->regs->cr3, proc_name);
-            break;
-    }
-    if (p->mod_config.find(proc_name) == p->mod_config.end() || p->trace_status.find(info->regs->cr3) != p->trace_status.end()){
-        free(proc_name);
-        drakvuf_release_vmi(drakvuf);
-        return 0;
-    }
-
+static bool add_trace_points(proctracer* p, drakvuf_t drakvuf, vmi_instance_t vmi, addr_t process, addr_t cr3, char *proc_name){
     // [TODO] This is basically duplicate code from inject_traps_modules() - Maybe the library func should provide a callback parameter?
+    // [TODO] Refactored from cb(), can we have a cleaner function signature?
 
     addr_t module_list=0;
     bool traps_ok = true;
@@ -230,8 +206,10 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         addr_t dllbase = 0;
         vmi_read_addr_va(vmi, next_module + p->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid, &dllbase);
 
-        if (!dllbase)
+        if (!dllbase){
+            traps_ok = false;
             break;
+        }
 
         unicode_string_t *us = vmi_read_unicode_str_va(vmi, next_module + p->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
         unicode_string_t out = { .contents = NULL };
@@ -250,7 +228,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                         ti->offset = off;
                         ti->p = p;
         
-                        addr_t trap_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, dllbase+off);
+                        addr_t trap_pa = vmi_pagetable_lookup(vmi, cr3, dllbase+off);
                         tracetrap->lookup_type = LOOKUP_NONE;
                         tracetrap->addr_type = ADDR_PA;
                         tracetrap->type = BREAKPOINT;
@@ -262,7 +240,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                         drakvuf_add_trap(drakvuf,tracetrap);
                         mi->traps.push_back(tracetrap);
                     }
-                    p->trace_status[info->regs->cr3].push_back(mi);
+                    p->trace_status[cr3].push_back(mi);
                 }
             }
             vmi_free_unicode_str(us);
@@ -270,7 +248,36 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
         next_module = tmp_next;
     }  
+   
+    return traps_ok;   
+}
 
+// Runs on PsGetCurrentThreadTeb (process context)
+static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+    proctracer *p = (proctracer*)info->trap->data;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu, info->regs);
+    char *proc_name = drakvuf_get_process_name(drakvuf, process); 
+    switch(p->format){
+        case OUTPUT_CSV:
+            printf("proctracer,start,%lx,\"%s\"\n", info->regs->cr3, proc_name);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[PROCTRACER] Starting CR3: %lx NAME: %s\n", info->regs->cr3, proc_name);
+            break;
+    }
+    if (p->mod_config.find(proc_name) == p->mod_config.end() || p->trace_status.find(info->regs->cr3) != p->trace_status.end()){
+        free(proc_name);
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
+    add_trace_points(p, drakvuf, vmi, process, info->regs->cr3, proc_name);
     free(proc_name);
     drakvuf_release_vmi(drakvuf);
     return 0;
