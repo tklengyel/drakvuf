@@ -105,4 +105,35 @@
 #ifndef PROCTRACER_PRIVATE_H
 #define PROCTRACER_PRIVATE_H
 
+#include "proctracer.h"
+
+enum offset {
+    EPROCESS_PEB,
+    EPROCESS_PID,
+    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
+    LDR_DATA_TABLE_ENTRY_DLLBASE,
+    PEB_IMGBASE,
+    __OFFSET_MAX
+};
+
+static const char *offset_names[__OFFSET_MAX][2] = {
+    [EPROCESS_PEB] = {"_EPROCESS","Peb"},
+    [EPROCESS_PID] = {"_EPROCESS","UniqueProcessId"},
+    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
+    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
+    [PEB_IMGBASE] = {"_PEB","ImageBaseAddress"}
+};
+
+struct trace_trap_struct{
+    char* proc_name;
+    addr_t pa;
+    drakvuf_trap_t *trap;
+};
+
+struct trace_info{
+    char* mod_name;
+    addr_t offset;
+    proctracer *p;
+};
+
 #endif

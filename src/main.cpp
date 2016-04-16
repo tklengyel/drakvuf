@@ -125,6 +125,7 @@ int main(int argc, char** argv) {
     char *domain = NULL;
     char *rekall_profile = NULL;
     char *dump_folder = NULL;
+    char *proctracer_config = NULL;
     vmi_pid_t injection_pid = -1;
     struct sigaction act;
     GThread *timeout_thread = NULL;
@@ -145,9 +146,16 @@ int main(int argc, char** argv) {
                "\t -i <injection pid>        The PID of the process to hijack for injection\n"
                "\t -e <inject_exe>           The executable to start with injection\n"
                "\t -t <timeout>              Timeout (in seconds)\n"
-               "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
                "\t -o <format>               Output format (default or csv)\n"
+#ifdef DRAKVUF_DEBUG
                "\t -v                        Turn on verbose (debug) output\n"
+#endif
+#ifdef ENABLE_PLUGIN_FILEDELETE
+               "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
+#endif
+#ifdef ENABLE_PLUGIN_PROCTRACER
+               "\t -P <proctracer config>    Proctracer config json location\n"
+#endif
         );
         return rc;
     }
@@ -170,16 +178,25 @@ int main(int argc, char** argv) {
     case 't':
         timeout = atoi(optarg);
         break;
-    case 'D':
-        dump_folder = optarg;
-        break;
     case 'o':
         if(!strncmp(optarg,"csv",3))
             output = OUTPUT_CSV;
         break;
+#ifdef DRAKVUF_DEBUG
     case 'v':
 //        verbose = 1;
         break;
+#endif
+#ifdef ENABLE_PLUGIN_FILEDELETE
+    case 'D':
+        dump_folder = optarg;
+        break;
+#endif
+#ifdef ENABLE_PLUGIN_PROCTRACER
+    case 'P':
+        proctracer_config = optarg;
+        break;
+#endif
     default:
         fprintf(stderr, "Unrecognized option: %c\n", c);
         return rc;
@@ -212,7 +229,7 @@ int main(int argc, char** argv) {
             goto exit;
     }
 
-    rc = drakvuf->start_plugins(dump_folder);
+    rc = drakvuf->start_plugins(dump_folder, proctracer_config);
     if (!rc)
         goto exit;
 

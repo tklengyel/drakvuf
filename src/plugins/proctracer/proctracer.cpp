@@ -104,38 +104,13 @@
 
 #include <glib.h>
 #include <libvmi/libvmi.h>
-#include "../plugins.h"
-#include "private.h"
-#include "proctracer.h"
 #include <json-c/json.h>
-
-enum offset {
-    EPROCESS_PEB,
-    EPROCESS_PID,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    PEB_IMGBASE,
-    __OFFSET_MAX
-};
-
-static const char *offset_names[__OFFSET_MAX][2] = {
-    [EPROCESS_PEB] = {"_EPROCESS","Peb"},
-    [EPROCESS_PID] = {"_EPROCESS","UniqueProcessId"},
-    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
-    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
-    [PEB_IMGBASE] = {"_PEB","ImageBaseAddress"}
-};
-
-struct trace_trap_struct{
-    char* proc_name;
-    addr_t pa;
-    drakvuf_trap_t *trap;
-};
+#include "private.h"
 
 static event_response_t trace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info){
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     trace_info *ti=(trace_info*)info->trap->data;
-    proctracer *p=(proctracer*)ti->p; 
+    proctracer *p=(proctracer*)ti->p;
     switch(p->format){
         case OUTPUT_CSV:
             printf("proctracer,trace,0x%lx,\"%s\",0x%lx\n",info->regs->cr3, ti->mod_name, ti->offset);
@@ -227,7 +202,7 @@ static bool add_trace_points(proctracer* p, drakvuf_t drakvuf, vmi_instance_t vm
                         ti->mod_name = strdup((char*)out.contents);
                         ti->offset = off;
                         ti->p = p;
-        
+
                         addr_t trap_pa = vmi_pagetable_lookup(vmi, cr3, dllbase+off);
                         tracetrap->lookup_type = LOOKUP_NONE;
                         tracetrap->addr_type = ADDR_PA;
@@ -236,7 +211,7 @@ static bool add_trace_points(proctracer* p, drakvuf_t drakvuf, vmi_instance_t vm
                         tracetrap->cb = trace_cb;
                         tracetrap->u2.addr = trap_pa;
                         tracetrap->data = ti;
-                        
+
                         drakvuf_add_trap(drakvuf,tracetrap);
                         mi->traps.push_back(tracetrap);
                     }
@@ -247,9 +222,9 @@ static bool add_trace_points(proctracer* p, drakvuf_t drakvuf, vmi_instance_t vm
         }
 
         next_module = tmp_next;
-    }  
-   
-    return traps_ok;   
+    }
+
+    return traps_ok;
 }
 
 // Runs on PsGetCurrentThreadTeb (process context)
@@ -262,7 +237,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     ctx.dtb = info->regs->cr3;
 
     addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu, info->regs);
-    char *proc_name = drakvuf_get_process_name(drakvuf, process); 
+    char *proc_name = drakvuf_get_process_name(drakvuf, process);
     switch(p->format){
         case OUTPUT_CSV:
             printf("proctracer,start,%lx,\"%s\"\n", info->regs->cr3, proc_name);
@@ -284,7 +259,10 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 }
 
 proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t output) {
-    const char *rekall_profile =(const char *)config;
+    const struct proctracer_config *c = (const struct proctracer_config *)config;
+    const char *rekall_profile = c->rekall_profile;
+    const char *proctracer_config = c->proctracer_config;
+
     printf("[PROCTRACER] Starting...\n");
 
     this->offsets = (size_t*)g_malloc0(__OFFSET_MAX*sizeof(size_t));
@@ -294,7 +272,7 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
                                       &this->offsets[i]);
     }
 
-    json_object *conf_root = json_object_from_file("proctracer.json");
+    json_object *conf_root = json_object_from_file(proctracer_config);
     if (!conf_root){
         printf("[PROCTRACER] Can't find config!\n");
         return;
@@ -309,13 +287,13 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
     int conf_modules_len=json_object_array_length(conf_modules);
     printf("[PROCTRACER] Modules to trace: %d\n",conf_modules_len);
     for (int i=0; i<conf_modules_len; i++){
-        char *mod_name=(char*)json_object_get_string(json_object_array_get_idx(conf_modules,i));       
+        char *mod_name=(char*)json_object_get_string(json_object_array_get_idx(conf_modules,i));
         string mod_path=mod_name;
         mod_path+=".proctracer.json";
         symbols_t *symbols=drakvuf_get_symbols_from_rekall(mod_path.c_str());
         for (int i=0; i < symbols->count; i++) {
             const struct symbol *symbol = &symbols->symbols[i];
-            this->mod_config[mod_name].push_back(symbol->rva);    
+            this->mod_config[mod_name].push_back(symbol->rva);
         }
         drakvuf_free_symbols(symbols);
     }
