@@ -134,8 +134,17 @@ struct trace_trap_struct{
 
 static event_response_t trace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info){
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    printf("[PROCTRACER] Trace point hit: 0x%lx\n",info->regs->rip);
+    trace_info *ti=(trace_info*)info->trap->data;
+    proctracer *p=(proctracer*)ti->p; 
+    switch(p->format){
+        case OUTPUT_CSV:
+            printf("proctracer,trace,0x%lx,\"%s\",0x%lx\n",info->regs->cr3, ti->mod_name, ti->offset);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[PROCTRACER] Trace point hit - CR3: 0x%lx Module: %s Offset: 0x%lx \n",info->regs->cr3, ti->mod_name, ti->offset);
+            break;
+    }
 
     drakvuf_release_vmi(drakvuf);
     return 0;
@@ -154,8 +163,9 @@ static event_response_t exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     list<mod_info*> module_traps=p->trace_status[info->regs->cr3];
     for (mod_info* mi: module_traps){
-        printf("Removing traps from %s\n", mi->mod_name.c_str());        
         for (drakvuf_trap_t* dt: mi->traps){
+            trace_info *ti=(trace_info*)dt->data;
+            free(ti->mod_name);
             drakvuf_remove_trap(drakvuf,dt,NULL);
         }
         delete mi;
@@ -177,7 +187,15 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu, info->regs);
     char *proc_name = drakvuf_get_process_name(drakvuf, process); 
-    printf("[PROCTRACER] CR3: %lx NAME: %s\n", info->regs->cr3, proc_name);
+    switch(p->format){
+        case OUTPUT_CSV:
+            printf("proctracer,start,%lx,\"%s\"\n", info->regs->cr3, proc_name);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[PROCTRACER] Starting CR3: %lx NAME: %s\n", info->regs->cr3, proc_name);
+            break;
+    }
     if (p->mod_config.find(proc_name) == p->mod_config.end() || p->trace_status.find(info->regs->cr3) != p->trace_status.end()){
         free(proc_name);
         drakvuf_release_vmi(drakvuf);
@@ -197,16 +215,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     }
 
     drakvuf_get_module_list(drakvuf, process, &module_list);
-    //if (module_list == 0) traps_ok=false; // See #114
-
-    if (module_list == 0){
-        printf("Module list NULL! [ %d ]\n",pid);
-        vmi_pause_vm(vmi);
-        //this_thread::sleep_for(chrono::seconds(15));
-        getchar();
-        vmi_resume_vm(vmi);
-        drakvuf_get_module_list(drakvuf, process, &module_list);
-    }
+    if (module_list == 0) traps_ok=false; // See #114
 
     addr_t list_head = module_list;
     addr_t next_module = list_head;
@@ -232,9 +241,14 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             if(VMI_SUCCESS == status){
                 if (p->mod_config.find((char*)out.contents) != p->mod_config.end()){
                     mod_info *mi = new mod_info;
-                    mi->mod_name=(char*)out.contents;
+                    mi->mod_name = (char*)out.contents;
                     for (addr_t off: p->mod_config[(char*)out.contents]){
+                        trace_info *ti = new trace_info;
                         drakvuf_trap_t *tracetrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+
+                        ti->mod_name = strdup((char*)out.contents);
+                        ti->offset = off;
+                        ti->p = p;
         
                         addr_t trap_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, dllbase+off);
                         tracetrap->lookup_type = LOOKUP_NONE;
@@ -243,7 +257,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                         tracetrap->name = "TraceTrap";
                         tracetrap->cb = trace_cb;
                         tracetrap->u2.addr = trap_pa;
-                        tracetrap->data = p;
+                        tracetrap->data = ti;
                         
                         drakvuf_add_trap(drakvuf,tracetrap);
                         mi->traps.push_back(tracetrap);
@@ -297,9 +311,10 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
             this->mod_config[mod_name].push_back(symbol->rva);    
         }
         drakvuf_free_symbols(symbols);
-
     }
-    this->tracetraps=g_hash_table_new(g_int64_hash, g_int64_equal);
+    json_object_put(conf_modules);
+    json_object_put(conf_root);
+
     if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PsGetCurrentThreadTeb", &this->trap.u2.rva))
         return;
 
@@ -322,11 +337,11 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
 
 proctracer::~proctracer() {
 
-    //list<mod_info*> module_traps=this->trace_status[info->regs->cr3];
     for (const auto& m : this->trace_status){
         for (mod_info* mi: m.second){
-            printf("Removing traps from %s\n", mi->mod_name.c_str());        
             for (drakvuf_trap_t* dt: mi->traps){
+                trace_info *ti=(trace_info*)dt->data;
+                free(ti->mod_name);
                 free((char*)dt->name); // From syscalls.cpp
             }
             delete mi;
