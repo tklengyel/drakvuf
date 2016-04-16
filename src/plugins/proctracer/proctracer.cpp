@@ -107,8 +107,7 @@
 #include "../plugins.h"
 #include "private.h"
 #include "proctracer.h"
-#include<chrono>
-#include<thread>
+#include <json-c/json.h>
 
 enum offset {
     EPROCESS_PEB,
@@ -157,7 +156,6 @@ static event_response_t exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     for (mod_info* mi: module_traps){
         printf("Removing traps from %s\n", mi->mod_name.c_str());        
         for (drakvuf_trap_t* dt: mi->traps){
-            printf("remove_trap\n");
             drakvuf_remove_trap(drakvuf,dt,NULL);
         }
         delete mi;
@@ -232,13 +230,10 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         if (us) {
             status_t status = vmi_convert_str_encoding(us, &out, "UTF-8");
             if(VMI_SUCCESS == status){
-                printf("\t%s @ 0x%lx\n", out.contents, dllbase);
                 if (p->mod_config.find((char*)out.contents) != p->mod_config.end()){
                     mod_info *mi = new mod_info;
                     mi->mod_name=(char*)out.contents;
                     for (addr_t off: p->mod_config[(char*)out.contents]){
-                        printf("Offset: %lx\n",off);
-
                         drakvuf_trap_t *tracetrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
         
                         addr_t trap_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, dllbase+off);
@@ -278,20 +273,32 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
                                       &this->offsets[i]);
     }
 
-    /* TESTING */
-
-    //this->mod_config["CrashMe.exe"].push_back(0x5bfd0);
-    //this->mod_config["notepad.exe"].push_back(0x0);
-
-    /***********/
-
-    symbols_t *symbols=drakvuf_get_symbols_from_rekall("/home/b/CrashMe.json");
-    for (int i=0; i < symbols->count; i++) {
-        const struct symbol *symbol = &symbols->symbols[i];
-        this->mod_config["CrashMe.exe"].push_back(symbol->rva);    
+    json_object *conf_root = json_object_from_file("proctracer.json");
+    if (!conf_root){
+        printf("[PROCTRACER] Can't find config!\n");
+        return;
     }
-    drakvuf_free_symbols(symbols);
+    printf("[PROCTRACER] Main config loaded\n");
+    json_object *conf_modules=NULL;
+    if (!json_object_object_get_ex(conf_root, "modules", &conf_modules)) {
+        printf("[PROCTRACER] Can't find any modules to trace\n");
+        json_object_put(conf_root);
+        return;
+    }
+    int conf_modules_len=json_object_array_length(conf_modules);
+    printf("[PROCTRACER] Modules to trace: %d\n",conf_modules_len);
+    for (int i=0; i<conf_modules_len; i++){
+        char *mod_name=(char*)json_object_get_string(json_object_array_get_idx(conf_modules,i));       
+        string mod_path=mod_name;
+        mod_path+=".proctracer.json";
+        symbols_t *symbols=drakvuf_get_symbols_from_rekall(mod_path.c_str());
+        for (int i=0; i < symbols->count; i++) {
+            const struct symbol *symbol = &symbols->symbols[i];
+            this->mod_config[mod_name].push_back(symbol->rva);    
+        }
+        drakvuf_free_symbols(symbols);
 
+    }
     this->tracetraps=g_hash_table_new(g_int64_hash, g_int64_equal);
     if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PsGetCurrentThreadTeb", &this->trap.u2.rva))
         return;
@@ -314,19 +321,16 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
 }
 
 proctracer::~proctracer() {
-    if (this->tracetraps){
-        g_hash_table_destroy(this->tracetraps);    
+
+    //list<mod_info*> module_traps=this->trace_status[info->regs->cr3];
+    for (const auto& m : this->trace_status){
+        for (mod_info* mi: m.second){
+            printf("Removing traps from %s\n", mi->mod_name.c_str());        
+            for (drakvuf_trap_t* dt: mi->traps){
+                free((char*)dt->name); // From syscalls.cpp
+            }
+            delete mi;
+        }
+        this->trace_status.erase(m.first);
     }
-
-    /*for(const auto& n : this->mod_config){
-        delete n.second;    
-    } */
-
-    /*for(const auto& n : this->trace_status){
-        for (mod_info* mi: *n.second){
-            //delete mi->mod_name;
-            delete mi->traps;
-        } 
-        delete n.second;
-    }*/
 }
