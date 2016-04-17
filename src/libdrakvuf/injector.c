@@ -1032,6 +1032,6 @@ int drakvuf_inject_cmd(drakvuf_t drakvuf, vmi_pid_t pid, const char *app) {
     vmi_clear_event(drakvuf->vmi, &cr3_event, NULL);
     vmi_clear_event(drakvuf->vmi, &interrupt_event, NULL);
 
-    PRINT_DEBUG("Finished with injection. Ret: %i\n", injector.ret);
+    PRINT_DEBUG("Finished with injection. Ret: %lu\n", injector.ret);
     return injector.ret;
 }
