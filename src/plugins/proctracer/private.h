@@ -110,6 +110,7 @@
 enum offset {
     EPROCESS_PEB,
     EPROCESS_PID,
+    KPROCESS_DTB,
     LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
     LDR_DATA_TABLE_ENTRY_DLLBASE,
     PEB_IMGBASE,
@@ -119,6 +120,7 @@ enum offset {
 static const char *offset_names[__OFFSET_MAX][2] = {
     [EPROCESS_PEB] = {"_EPROCESS","Peb"},
     [EPROCESS_PID] = {"_EPROCESS","UniqueProcessId"},
+    [KPROCESS_DTB] = {"_KPROCESS","DirectoryTableBase"},
     [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
     [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
     [PEB_IMGBASE] = {"_PEB","ImageBaseAddress"}
