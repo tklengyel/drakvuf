@@ -261,7 +261,12 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t output) {
     const struct proctracer_config *c = (const struct proctracer_config *)config;
     const char *rekall_profile = c->rekall_profile;
-    const char *proctracer_config = c->proctracer_config;
+    const char *proctracer_config;
+    if (c->proctracer_config){
+        proctracer_config = c->proctracer_config;
+    }else{
+        proctracer_config = "proctracer.json";    
+    }
 
     printf("[PROCTRACER] Starting...\n");
 
@@ -297,6 +302,41 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
         }
         drakvuf_free_symbols(symbols);
     }
+
+    for(int i=0; i<conf_modules_len; i++){ // We need a different loop so DLLs of already running processes can be traced
+        char *mod_name=(char*)json_object_get_string(json_object_array_get_idx(conf_modules,i));
+        addr_t cur_proc;
+        if (drakvuf_find_eprocess(drakvuf,0,mod_name,&cur_proc)){
+            printf("[PROCTRACER] %s already running, placing trace traps\n",mod_name);
+
+            addr_t dtb=0;
+            vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+            
+            if (vmi_get_page_mode(vmi) == VMI_PM_IA32E){
+                uint32_t res=0;
+                if(VMI_FAILURE == vmi_read_32_va(vmi, cur_proc + this->offsets[KPROCESS_DTB], 0, (uint32_t*)&res)){
+                    printf("[PROCTRACER] DTB not found!\n");
+                    dtb=0;
+                }else{
+                    dtb=res; // [TODO] Well, this is just ugly...
+                }
+            }else{
+                uint64_t res=0;
+                if(VMI_FAILURE == vmi_read_64_va(vmi, cur_proc + this->offsets[KPROCESS_DTB], 0, (addr_t*)&res)){
+                    printf("[PROCTRACER] DTB not found!\n");
+                    dtb=0;
+                }else{
+                    dtb=res;    
+                }
+            }
+            
+            if (dtb!=0){
+                add_trace_points(this, drakvuf, vmi, cur_proc, dtb, mod_name);
+            }
+            drakvuf_release_vmi(drakvuf);
+        } 
+    }
+
     json_object_put(conf_modules);
     json_object_put(conf_root);
 
