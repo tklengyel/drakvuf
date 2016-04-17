@@ -153,8 +153,7 @@ int drakvuf_c::start_plugins(const char *dump_folder)
 drakvuf_c::drakvuf_c(const char* domain,
                      const char *rekall_profile,
                      output_format_t output,
-                     int timeout,
-                     const char* dump_folder)
+                     int timeout)
 {
     this->drakvuf = NULL;
     this->interrupted = 0;
@@ -169,11 +168,6 @@ drakvuf_c::drakvuf_c(const char* domain,
 
     this->plugins = new drakvuf_plugins(this->drakvuf, output);
     this->pause();
-
-    if ( !this->start_plugins(dump_folder) ) {
-        this->close();
-        throw -2;
-    }
 }
 
 void drakvuf_c::close()

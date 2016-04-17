@@ -195,12 +195,7 @@ int main(int argc, char** argv) {
         return rc;
     }
 
-    try {
-        drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, dump_folder);
-    } catch(int e) {
-        printf("Failed to initialize DRAKVUF (%i)!\n", e);
-        return rc;
-    }
+    drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout);
 
     /* for a clean exit */
     act.sa_handler = close_handler;
@@ -216,6 +211,10 @@ int main(int argc, char** argv) {
         if (!rc)
             goto exit;
     }
+
+    rc = drakvuf->start_plugins(dump_folder);
+    if (!rc)
+        goto exit;
 
     /* Start the event listener */
     drakvuf->loop();
