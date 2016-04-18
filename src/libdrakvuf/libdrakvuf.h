@@ -322,6 +322,8 @@ bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
                                object_manager_object_t obj_type_arg,
                                addr_t *obj_body_addr);
 
+bool drakvuf_get_process_pid( drakvuf_t drakvuf, const char *process_name, uint32_t *pid );
+
 #pragma GCC visibility pop
 
 #ifdef __cplusplus
