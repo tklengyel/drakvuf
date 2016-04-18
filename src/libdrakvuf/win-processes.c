@@ -344,3 +344,17 @@ bool drakvuf_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *fi
 
     return false;
 }
+
+bool drakvuf_get_process_pid( drakvuf_t drakvuf, const char *process_name, uint32_t *pid )
+{
+    bool ret = false ;
+    addr_t eprocess_addr = 0 ;
+
+    if ( drakvuf_find_eprocess( drakvuf, 0, process_name, &eprocess_addr ) )
+    {
+        if ( vmi_read_32_va( drakvuf->vmi, eprocess_addr + offsets[ EPROCESS_PID ], 0, pid ) == VMI_SUCCESS )
+            ret = true ;
+    }
+
+    return ret ;
+}
