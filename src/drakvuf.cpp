@@ -108,6 +108,10 @@ static gpointer timer(gpointer data)
 {
     drakvuf_c* drakvuf = (drakvuf_c*)data;
 
+    /* Wait for the loop to start */
+    g_mutex_lock(&drakvuf->loop_signal);
+    g_mutex_unlock(&drakvuf->loop_signal);
+
     while(drakvuf->timeout && !drakvuf->interrupted) {
         sleep(1);
         --drakvuf->timeout;
@@ -159,6 +163,8 @@ drakvuf_c::drakvuf_c(const char* domain,
     this->interrupted = 0;
     this->timeout = timeout;
     this->rekall_profile = rekall_profile;
+    g_mutex_init(&this->loop_signal);
+    g_mutex_lock(&this->loop_signal);
 
     if (!drakvuf_init(&this->drakvuf, domain, rekall_profile))
         throw -1;
@@ -172,6 +178,8 @@ drakvuf_c::drakvuf_c(const char* domain,
 
 void drakvuf_c::close()
 {
+    g_mutex_clear(&this->loop_signal);
+
     if (this->plugins)
         delete this->plugins;
 
@@ -206,6 +214,7 @@ void drakvuf_c::interrupt(int signal)
 
 void drakvuf_c::loop()
 {
+    g_mutex_unlock(&this->loop_signal);
     drakvuf_loop(this->drakvuf);
 }
 
