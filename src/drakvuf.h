@@ -129,6 +129,7 @@ class drakvuf_c {
     public:
         int timeout;
         int interrupted;
+        GMutex loop_signal;
 
         drakvuf_c(const char* domain,
                   const char *rekall_profile,
