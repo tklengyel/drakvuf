@@ -127,6 +127,11 @@ int main(int argc, char** argv)
     const char *domain = argv[2];
     vmi_pid_t pid = atoi(argv[3]);
     char *app = argv[4];
+    bool verbose = 0;
+
+#ifdef DRAKVUF_DEBUG
+    verbose = 1;
+#endif
 
     /* for a clean exit */
     struct sigaction act;
@@ -138,7 +143,7 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    drakvuf_init(&drakvuf, domain, rekall_profile);
+    drakvuf_init(&drakvuf, domain, rekall_profile, verbose);
     drakvuf_pause(drakvuf);
 
     if (pid > 0 && app) {

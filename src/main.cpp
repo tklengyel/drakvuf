@@ -119,6 +119,13 @@ void close_handler(int signal) {
     drakvuf->interrupt(signal);
 }
 
+static inline void disable_plugin(char *optarg, bool *plugin_list) {
+    int i;
+    for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
+        if(!strcmp(optarg, drakvuf_plugin_names[i]))
+            plugin_list[i] = 0;
+}
+
 int main(int argc, char** argv) {
     int c, i, rc = 0, timeout = 0;
     char *inject_cmd = NULL;
@@ -129,6 +136,8 @@ int main(int argc, char** argv) {
     struct sigaction act;
     GThread *timeout_thread = NULL;
     output_format_t output = OUTPUT_DEFAULT;
+    bool plugin_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 1};
+    bool verbose = 0;
 
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
 
@@ -147,12 +156,15 @@ int main(int argc, char** argv) {
                "\t -t <timeout>              Timeout (in seconds)\n"
                "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
                "\t -o <format>               Output format (default or csv)\n"
+               "\t -x <plugin>               Don't activate the specified plugin\n"
+#ifdef DRAKVUF_DEBUG
                "\t -v                        Turn on verbose (debug) output\n"
+#endif
         );
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:v")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:vx:")) != -1)
     switch (c)
     {
     case 'r':
@@ -177,9 +189,14 @@ int main(int argc, char** argv) {
         if(!strncmp(optarg,"csv",3))
             output = OUTPUT_CSV;
         break;
-    case 'v':
-//        verbose = 1;
+    case 'x':
+        disable_plugin(optarg, plugin_list);
         break;
+#ifdef DRAKVUF_DEBUG
+    case 'v':
+        verbose = 1;
+        break;
+#endif
     default:
         fprintf(stderr, "Unrecognized option: %c\n", c);
         return rc;
@@ -195,7 +212,7 @@ int main(int argc, char** argv) {
         return rc;
     }
 
-    drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout);
+    drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose);
 
     /* for a clean exit */
     act.sa_handler = close_handler;
@@ -212,7 +229,7 @@ int main(int argc, char** argv) {
             goto exit;
     }
 
-    rc = drakvuf->start_plugins(dump_folder);
+    rc = drakvuf->start_plugins(plugin_list, dump_folder);
     if (!rc)
         goto exit;
 

@@ -113,6 +113,7 @@
 #include <glib.h>
 
 #include "libdrakvuf.h"
+#include "private.h"
 #include "injector.h"
 #include "vmi.h"
 #include "win-symbols.h"

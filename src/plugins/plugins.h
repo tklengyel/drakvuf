@@ -135,6 +135,15 @@ typedef enum drakvuf_plugin {
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
+static const char *drakvuf_plugin_names[] = {
+    [PLUGIN_SYSCALLS] = "syscalls",
+    [PLUGIN_POOLMON] = "poolmon",
+    [PLUGIN_FILETRACER] = "filetracer",
+    [PLUGIN_FILEDELETE] = "filedelete",
+    [PLUGIN_OBJMON] = "objmon",
+    [PLUGIN_EXMON] = "exmon"
+};
+
 class plugin {};
 class drakvuf_plugins
 {

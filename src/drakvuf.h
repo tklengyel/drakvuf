@@ -133,8 +133,9 @@ class drakvuf_c {
 
         drakvuf_c(const char* domain,
                   const char *rekall_profile,
-                  output_format_t output,
-                  int timeout);
+                  const output_format_t output,
+                  const int timeout,
+                  const bool verbose);
         ~drakvuf_c();
 
         int is_initialized();
@@ -143,7 +144,7 @@ class drakvuf_c {
         void pause();
         void resume();
         int inject_cmd(vmi_pid_t injection_pid, const char *inject_cmd);
-        int start_plugins(const char *dump_folder);
+        int start_plugins(const bool* plugin_list, const char *dump_folder);
 };
 
 #endif
