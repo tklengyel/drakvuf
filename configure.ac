@@ -103,7 +103,7 @@
  #*************************************************************************#
 
 AC_PREREQ([2.60])
-AC_INIT([DRAKVUF], [0.2], [tamas@tklengyel.com], [], [http://drakvuf.com])
+AC_INIT([DRAKVUF], [0.3], [tamas@tklengyel.com], [], [http://drakvuf.com])
 AM_INIT_AUTOMAKE([1.10 no-define foreign subdir-objects])
 LT_INIT
 AC_CONFIG_HEADERS([config.h])
