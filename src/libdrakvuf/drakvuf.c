@@ -306,3 +306,55 @@ status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
                 rva,
                 NULL);
 }
+
+bool drakvuf_get_module_base_addr( drakvuf_t drakvuf, addr_t *module_list_head, const char *module_name, addr_t *base_addr_out )
+{
+    addr_t base_addr ;
+    size_t name_len = strlen( module_name );
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t next_module = *module_list_head;
+
+    while( 1 )
+    {
+        addr_t tmp_next = 0;
+
+        if ( vmi_read_addr_va( vmi, next_module, 4, &tmp_next ) != VMI_SUCCESS )
+            break;
+
+        if ( *module_list_head == tmp_next )
+            break;
+
+        base_addr = 0 ;
+
+        if ( vmi_read_addr_va( vmi, next_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], 4, &base_addr ) != VMI_SUCCESS )
+            break;
+
+        if ( ! base_addr )
+            break;
+
+        unicode_string_t *us = vmi_read_unicode_str_va( vmi, next_module + offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4 );
+
+        if ( us )
+        {
+            unicode_string_t out = { 0 };
+            if ( vmi_convert_str_encoding( us, &out, "UTF-8" ) == VMI_SUCCESS  )
+            {
+                if ( ! strncasecmp( (char *)out.contents, module_name, name_len ) )
+                {
+                    free( out.contents );
+                    vmi_free_unicode_str( us );
+                    *base_addr_out = base_addr ;
+                    return true ;
+                }
+
+                if ( out.contents ) 
+                    free( out.contents );
+            }
+            vmi_free_unicode_str( us );
+        }
+
+        next_module = tmp_next ;
+    }
+
+    return false ;
+}
