@@ -307,8 +307,9 @@ status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
                 NULL);
 }
 
-bool drakvuf_get_module_base_addr( drakvuf_t drakvuf, addr_t *module_list_head, char *module_name, addr_t *base_addr )
+bool drakvuf_get_module_base_addr( drakvuf_t drakvuf, addr_t *module_list_head, const char *module_name, addr_t *base_addr_out )
 {
+    addr_t base_addr ;
     size_t name_len = strlen( module_name );
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t next_module = *module_list_head;
@@ -323,11 +324,12 @@ bool drakvuf_get_module_base_addr( drakvuf_t drakvuf, addr_t *module_list_head, 
         if ( *module_list_head == tmp_next )
             break;
 
-        *base_addr = 0 ;
+        base_addr = 0 ;
 
-        vmi_read_addr_va( vmi, next_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], 4, base_addr );
+        if ( vmi_read_addr_va( vmi, next_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], 4, &base_addr ) != VMI_SUCCESS )
+            break;
 
-        if ( ! *base_addr )
+        if ( ! base_addr )
             break;
 
         unicode_string_t *us = vmi_read_unicode_str_va( vmi, next_module + offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4 );
@@ -341,6 +343,7 @@ bool drakvuf_get_module_base_addr( drakvuf_t drakvuf, addr_t *module_list_head, 
                 {
                     free( out.contents );
                     vmi_free_unicode_str( us );
+                    *base_addr_out = base_addr ;
                     return true ;
                 }
 
