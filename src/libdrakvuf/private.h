@@ -119,10 +119,14 @@
 #include "../xen_helper/xen_helper.h"
 
 #ifdef DRAKVUF_DEBUG
+
+extern bool verbose;
+
 #define PRINT_DEBUG(args...) \
     do { \
-        fprintf (stderr, args); \
+        if(verbose) fprintf (stderr, args); \
     } while (0)
+
 #else
 #define PRINT_DEBUG(args...) \
     do {} while(0)

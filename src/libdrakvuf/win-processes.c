@@ -318,9 +318,7 @@ bool drakvuf_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *fi
     status_t status = vmi_read_addr_va(vmi, current_list_entry, 0,
                                        &next_list_entry);
     if (status == VMI_FAILURE) {
-        PRINT_DEBUG(
-                "Failed to read next pointer at 0x%"PRIx64" before entering loop\n",
-                current_list_entry);
+        PRINT_DEBUG("Failed to read next pointer at 0x%"PRIx64" before entering loop\n", current_list_entry);
         return false;
     }
 

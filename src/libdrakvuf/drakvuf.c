@@ -110,6 +110,10 @@
 #include "vmi.h"
 #include "win-symbols.h"
 
+#ifdef DRAKVUF_DEBUG
+bool verbose = 0;
+#endif
+
 void drakvuf_close(drakvuf_t drakvuf) {
     if (!drakvuf)
         return;
@@ -126,10 +130,14 @@ void drakvuf_close(drakvuf_t drakvuf) {
     free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_profile) {
+bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_profile, bool _verbose) {
 
     if ( !domain || !rekall_profile )
         return 0;
+
+#ifdef DRAKVUF_DEBUG
+    verbose = _verbose;
+#endif
 
     *drakvuf = g_malloc0(sizeof(struct drakvuf));
     (*drakvuf)->rekall_profile = g_strdup(rekall_profile);

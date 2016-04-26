@@ -119,6 +119,7 @@
 
 #include "../xen_helper/xen_helper.h"
 
+#include "private.h"
 #include "libdrakvuf.h"
 #include "win-symbols.h"
 #include "vmi.h"

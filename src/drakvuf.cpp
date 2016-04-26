@@ -125,30 +125,32 @@ static gpointer timer(gpointer data)
     return NULL;
 }
 
-int drakvuf_c::start_plugins(const char *dump_folder)
+int drakvuf_c::start_plugins(const bool* plugin_list, const char *dump_folder)
 {
     int i, rc;
     for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
     {
-        switch ((drakvuf_plugin_t)i) {
-        case PLUGIN_FILEDELETE:
-        {
-            struct filedelete_config c = {
-                .rekall_profile = this->rekall_profile,
-                .dump_folder = dump_folder
+        if (plugin_list[i]) {
+            switch ((drakvuf_plugin_t)i) {
+            case PLUGIN_FILEDELETE:
+            {
+                struct filedelete_config c = {
+                    .rekall_profile = this->rekall_profile,
+                    .dump_folder = dump_folder
+                };
+
+                rc = this->plugins->start((drakvuf_plugin_t)i, &c);
+                break;
+            }
+
+            default:
+                rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
+                break;
             };
 
-            rc = this->plugins->start((drakvuf_plugin_t)i, &c);
-            break;
+            if ( !rc )
+                return rc;
         }
-
-        default:
-            rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
-            break;
-        };
-
-        if ( !rc )
-            return rc;
     }
 
     return 1;
@@ -156,8 +158,9 @@ int drakvuf_c::start_plugins(const char *dump_folder)
 
 drakvuf_c::drakvuf_c(const char* domain,
                      const char *rekall_profile,
-                     output_format_t output,
-                     int timeout)
+                     const output_format_t output,
+                     const int timeout,
+                     const bool verbose)
 {
     this->drakvuf = NULL;
     this->interrupted = 0;
@@ -166,7 +169,7 @@ drakvuf_c::drakvuf_c(const char* domain,
     g_mutex_init(&this->loop_signal);
     g_mutex_lock(&this->loop_signal);
 
-    if (!drakvuf_init(&this->drakvuf, domain, rekall_profile))
+    if (!drakvuf_init(&this->drakvuf, domain, rekall_profile, verbose))
         throw -1;
 
     if(timeout > 0)
