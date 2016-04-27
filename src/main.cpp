@@ -212,7 +212,12 @@ int main(int argc, char** argv) {
         return rc;
     }
 
-    drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose);
+    try {
+        drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose);
+    } catch(int e) {
+        printf("Failed to initialize DRAKVUF\n");
+        return rc;
+    }
 
     /* for a clean exit */
     act.sa_handler = close_handler;
