@@ -324,7 +324,7 @@ bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
                                addr_t *obj_body_addr);
 
 bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
-                                   addr_t *module_list_head,
+                                   addr_t module_list_head,
                                    const char *module_name,
                                    addr_t *base_addr );
 #pragma GCC visibility pop
