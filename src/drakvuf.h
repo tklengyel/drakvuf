@@ -119,10 +119,9 @@
 
 class drakvuf_c {
     private:
-        int initialized;
         drakvuf_t drakvuf;
         drakvuf_plugins* plugins;
-        GThread *timeout_thread;
+        GThread *timeout_thread = NULL;
         const char *rekall_profile;
         void close();
 
