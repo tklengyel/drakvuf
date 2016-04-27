@@ -310,21 +310,21 @@ exmon::exmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
     this->trap.cb = cb;
     this->trap.data = (void*)this;
     this->format = output;
+    this->offsets = (addr_t*)g_malloc0(__OFFSET_MAX*sizeof(addr_t));
 
     int i;
-    for(i=0;i<__OFFSET_MAX;i++) {
-        if(VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, offset_names[i][0], offset_names[i][1],
-                                                       &this->offsets[i]) )
-            throw -1;
+    for(i=0;i<__OFFSET_MAX;i++)
+        drakvuf_get_struct_member_rva(rekall_profile, offset_names[i][0], offset_names[i][1], &this->offsets[i]);
+
+    if(VMI_FAILURE == drakvuf_get_struct_size(rekall_profile, "_KTRAP_FRAME", &this->ktrap_frame_size)) {
+        free(this->offsets);
+        throw -1;
     }
 
-    if(VMI_FAILURE == drakvuf_get_struct_size(rekall_profile, "_KTRAP_FRAME", &this->ktrap_frame_size))
+    if ( !drakvuf_add_trap(drakvuf,&this->trap) ) {
+        free(this->offsets);
         throw -1;
-
-    if ( !drakvuf_add_trap(drakvuf,&this->trap) )
-        throw -1;
-
-    this->offsets = (size_t*)g_malloc0(__OFFSET_MAX*sizeof(size_t));
+    }
 }
 
 exmon::~exmon() {
