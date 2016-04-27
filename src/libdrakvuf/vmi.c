@@ -757,7 +757,10 @@ void drakvuf_loop(drakvuf_t drakvuf) {
     interrupt_event.callback = int3_cb;
     interrupt_event.data = drakvuf;
 
-    vmi_register_event(drakvuf->vmi, &interrupt_event);
+    if(VMI_FAILURE == vmi_register_event(drakvuf->vmi, &interrupt_event)) {
+        fprintf(stderr, "Failed to register interrupt event\n");
+        return;
+    }
 
     int rc = xc_altp2m_switch_to_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx);
     if ( rc < 0 ) {
