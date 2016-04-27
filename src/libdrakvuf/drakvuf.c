@@ -315,12 +315,12 @@ status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
                 NULL);
 }
 
-bool drakvuf_get_module_base_addr( drakvuf_t drakvuf, addr_t *module_list_head, const char *module_name, addr_t *base_addr_out )
+bool drakvuf_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const char *module_name, addr_t *base_addr_out )
 {
     addr_t base_addr ;
     size_t name_len = strlen( module_name );
     vmi_instance_t vmi = drakvuf->vmi;
-    addr_t next_module = *module_list_head;
+    addr_t next_module = module_list_head;
 
     while( 1 )
     {
@@ -329,7 +329,7 @@ bool drakvuf_get_module_base_addr( drakvuf_t drakvuf, addr_t *module_list_head, 
         if ( vmi_read_addr_va( vmi, next_module, 4, &tmp_next ) != VMI_SUCCESS )
             break;
 
-        if ( *module_list_head == tmp_next )
+        if ( module_list_head == tmp_next )
             break;
 
         base_addr = 0 ;
@@ -355,8 +355,7 @@ bool drakvuf_get_module_base_addr( drakvuf_t drakvuf, addr_t *module_list_head, 
                     return true ;
                 }
 
-                if ( out.contents )
-                    free( out.contents );
+                free( out.contents );
             }
             vmi_free_unicode_str( us );
         }
