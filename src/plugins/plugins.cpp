@@ -167,7 +167,7 @@ bool drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
             break;
         };
         } catch (int e) {
-            fprintf(stderr, "Plugin %i startup failed!\n", plugin_id);
+            fprintf(stderr, "Plugin %s startup failed!\n", drakvuf_plugin_names[plugin_id]);
             return 0;
         }
 
