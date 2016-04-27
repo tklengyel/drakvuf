@@ -204,11 +204,6 @@ drakvuf_c::~drakvuf_c()
     this->close();
 }
 
-int drakvuf_c::is_initialized()
-{
-    return this->initialized;
-}
-
 void drakvuf_c::interrupt(int signal)
 {
     this->interrupted = signal;
