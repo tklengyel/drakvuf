@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2016 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -205,7 +205,7 @@ bool drakvuf_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privil
 {
     if ( kthread )
     {
-        *previous_mode = 0;
+        *previous_mode = 0 ;
 
         if ( vmi_read_8_va( drakvuf->vmi, kthread + offsets[ KTHREAD_PREVIOUSMODE ], 0,
                             (uint8_t *)previous_mode ) == VMI_SUCCESS )
@@ -233,7 +233,7 @@ bool drakvuf_get_current_thread_previous_mode( drakvuf_t drakvuf,
 
 bool drakvuf_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 {
-    dispatcher_object_t dispatcher_type = 0;
+    dispatcher_object_t dispatcher_type = 0 ;
     access_context_t ctx = {
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = dtb,
@@ -278,22 +278,28 @@ bool drakvuf_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
 bool drakvuf_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t *module_list) {
 
     vmi_instance_t vmi = drakvuf->vmi;
-    vmi_pid_t pid;
-    addr_t peb, ldr, modlist;
+    addr_t peb=0, ldr=0, modlist=0;
+
+    access_context_t ctx = {.translate_mechanism = VMI_TM_PROCESS_DTB};
 
     if(!eprocess_base)
         return false;
 
-    if(VMI_FAILURE == vmi_read_32_va(vmi, eprocess_base + offsets[EPROCESS_PID], 0, (uint32_t*)&pid))
+    if(VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
         return false;
 
     if(VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + offsets[EPROCESS_PEB], 0, &peb))
         return false;
 
-    if(VMI_FAILURE == vmi_read_addr_va(vmi, peb + offsets[PEB_LDR], pid, &ldr))
+    ctx.addr = peb + offsets[PEB_LDR];
+    if(VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ldr))
         return false;
 
-    if(VMI_FAILURE == vmi_read_addr_va(vmi, ldr + offsets[PEB_LDR_DATA_INLOADORDERMODULELIST], pid, &modlist))
+    ctx.addr = ldr + offsets[PEB_LDR_DATA_INLOADORDERMODULELIST];
+    if(VMI_FAILURE == vmi_read_addr(vmi, &ctx, &modlist))
+        return false;
+
+    if(!modlist)
         return false;
 
     *module_list = modlist;
@@ -312,9 +318,7 @@ bool drakvuf_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *fi
     status_t status = vmi_read_addr_va(vmi, current_list_entry, 0,
                                        &next_list_entry);
     if (status == VMI_FAILURE) {
-        PRINT_DEBUG(
-                "Failed to read next pointer at 0x%"PRIx64" before entering loop\n",
-                current_list_entry);
+        PRINT_DEBUG("Failed to read next pointer at 0x%"PRIx64" before entering loop\n", current_list_entry);
         return false;
     }
 

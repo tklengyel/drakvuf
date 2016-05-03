@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2016 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -119,21 +119,22 @@
 
 class drakvuf_c {
     private:
-        int initialized;
         drakvuf_t drakvuf;
         drakvuf_plugins* plugins;
-        GThread *timeout_thread;
+        GThread *timeout_thread = NULL;
         const char *rekall_profile;
         void close();
 
     public:
         int timeout;
         int interrupted;
+        GMutex loop_signal;
 
         drakvuf_c(const char* domain,
                   const char *rekall_profile,
-                  output_format_t output,
-                  int timeout);
+                  const output_format_t output,
+                  const int timeout,
+                  const bool verbose);
         ~drakvuf_c();
 
         int is_initialized();

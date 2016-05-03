@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2016 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -240,7 +240,8 @@ typedef enum object_manager_object {
 
 bool drakvuf_init (drakvuf_t *drakvuf,
                    const char *domain,
-                   const char *rekall_profile);
+                   const char *rekall_profile,
+                   const bool verbose);
 void drakvuf_close (drakvuf_t drakvuf);
 bool drakvuf_add_trap(drakvuf_t drakvuf,
                       drakvuf_trap_t *trap);
@@ -322,6 +323,10 @@ bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
                                object_manager_object_t obj_type_arg,
                                addr_t *obj_body_addr);
 
+bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
+                                   addr_t module_list_head,
+                                   const char *module_name,
+                                   addr_t *base_addr );
 #pragma GCC visibility pop
 
 #ifdef __cplusplus

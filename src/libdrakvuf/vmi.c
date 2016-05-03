@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2016 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -119,6 +119,7 @@
 
 #include "../xen_helper/xen_helper.h"
 
+#include "private.h"
 #include "libdrakvuf.h"
 #include "win-symbols.h"
 #include "vmi.h"
@@ -756,7 +757,10 @@ void drakvuf_loop(drakvuf_t drakvuf) {
     interrupt_event.callback = int3_cb;
     interrupt_event.data = drakvuf;
 
-    vmi_register_event(drakvuf->vmi, &interrupt_event);
+    if(VMI_FAILURE == vmi_register_event(drakvuf->vmi, &interrupt_event)) {
+        fprintf(stderr, "Failed to register interrupt event\n");
+        return;
+    }
 
     int rc = xc_altp2m_switch_to_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx);
     if ( rc < 0 ) {
@@ -824,6 +828,10 @@ bool init_vmi(drakvuf_t drakvuf) {
         g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free);
     drakvuf->memaccess_lookup_trap =
         g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->remapped_gfns =
+        g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free);
+    drakvuf->remove_traps =
+        g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
 
     // Get the offsets from the Rekall profile
     unsigned int i;
@@ -856,10 +864,18 @@ bool init_vmi(drakvuf_t drakvuf) {
         drakvuf->step_event[i] = g_malloc0(sizeof(vmi_event_t));
         SETUP_SINGLESTEP_EVENT(drakvuf->step_event[i], 1u << i, vmi_reset_trap, 0);
         drakvuf->step_event[i]->data = drakvuf;
-        vmi_register_event(drakvuf->vmi, drakvuf->step_event[i]);
+        if (VMI_FAILURE == vmi_register_event(drakvuf->vmi, drakvuf->step_event[i])) {
+            fprintf(stderr, "Failed to register singlestep for vCPU %u\n", i);
+            return 0;
+        }
     }
 
     rc = xc_domain_setmaxmem(drakvuf->xen->xc, drakvuf->domID, drakvuf->memsize+VMI_PS_4KB);
+    if ( rc ) {
+        fprintf(stderr, "Failed to increase max memory\n");
+        return 0;
+    }
+
     drakvuf->memsize+=VMI_PS_4KB;
 
     rc = xc_domain_increase_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &drakvuf->zero_page_gfn);
@@ -910,11 +926,6 @@ bool init_vmi(drakvuf_t drakvuf) {
 
     PRINT_DEBUG("Xen altp2m view created with idx: %u idr: %u\n", drakvuf->altp2m_idx, drakvuf->altp2m_idr);
 
-    drakvuf->remapped_gfns =
-        g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free);
-    drakvuf->remove_traps =
-        g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
-
     return 1;
 }
 
@@ -927,15 +938,16 @@ void close_vmi(drakvuf_t drakvuf) {
         drakvuf->vmi = NULL;
     }
 
-    do {
+    if(drakvuf->breakpoint_lookup_pa) {
         GHashTableIter i;
         addr_t *key = NULL;
         struct wrapper *s = NULL;
         ghashtable_foreach(drakvuf->breakpoint_lookup_pa, i, key, s)
             g_slist_free(s->traps);
-    } while (0);
+        g_hash_table_destroy(drakvuf->breakpoint_lookup_pa);
+    }
 
-    do {
+    if(drakvuf->guards) {
         GHashTableIter i;
         addr_t *key = NULL;
         vmi_event_t *guard = NULL;
@@ -945,14 +957,10 @@ void close_vmi(drakvuf_t drakvuf) {
             }
             free(guard);
         }
-    } while (0);
+        g_hash_table_destroy(drakvuf->guards);
+    }
 
-    g_hash_table_destroy(drakvuf->guards);
-    g_hash_table_destroy(drakvuf->guards2);
-    g_hash_table_destroy(drakvuf->breakpoint_lookup_pa);
-    g_hash_table_destroy(drakvuf->breakpoint_lookup_trap);
-
-    do {
+    if(drakvuf->memaccess_lookup_gfn) {
         GHashTableIter i;
         addr_t *key = NULL;
         struct wrapper *s = NULL;
@@ -961,32 +969,41 @@ void close_vmi(drakvuf_t drakvuf) {
             free(s->memaccess.memtrap);
             g_slist_free(s->traps);
         }
-    } while (0);
-
-    g_hash_table_destroy(drakvuf->memaccess_lookup_gfn);
-
-    unsigned int i3;
-    for (i3 = 0; i3 < drakvuf->vcpus; i3++) {
-        free(drakvuf->step_event[i3]);
+        g_hash_table_destroy(drakvuf->memaccess_lookup_gfn);
     }
 
-    do {
+    if(drakvuf->remapped_gfns) {
         GHashTableIter i;
         xen_pfn_t *key;
         struct remapped_gfn *remapped_gfn = NULL;
         ghashtable_foreach(drakvuf->remapped_gfns, i, key, remapped_gfn) {
             xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &remapped_gfn->r);
         }
-    } while (0);
+        g_hash_table_destroy(drakvuf->remapped_gfns);
+    };
+
+    if(drakvuf->guards2)
+        g_hash_table_destroy(drakvuf->guards2);
+    if(drakvuf->breakpoint_lookup_trap)
+        g_hash_table_destroy(drakvuf->breakpoint_lookup_trap);
+    if(drakvuf->remove_traps)
+        g_hash_table_destroy(drakvuf->remove_traps);
+
+    unsigned int i3;
+    for (i3 = 0; i3 < drakvuf->vcpus; i3++) {
+        free(drakvuf->step_event[i3]);
+    }
 
     xc_altp2m_switch_to_view(drakvuf->xen->xc, drakvuf->domID, 0);
-    xc_altp2m_destroy_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx);
-    xc_altp2m_destroy_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr);
+    if(drakvuf->altp2m_idx)
+        xc_altp2m_destroy_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx);
+    if(drakvuf->altp2m_idr)
+        xc_altp2m_destroy_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr);
     xc_altp2m_set_domain_state(drakvuf->xen->xc, drakvuf->domID, 0);
-    xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &drakvuf->zero_page_gfn);
+
+    if(drakvuf->zero_page_gfn)
+        xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &drakvuf->zero_page_gfn);
     xc_domain_setmaxmem(drakvuf->xen->xc, drakvuf->domID, drakvuf->init_memsize);
-    g_hash_table_destroy(drakvuf->remapped_gfns);
-    g_hash_table_destroy(drakvuf->remove_traps);
 
     PRINT_DEBUG("close_vmi_drakvuf finished\n");
 }

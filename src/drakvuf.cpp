@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2016 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -108,6 +108,10 @@ static gpointer timer(gpointer data)
 {
     drakvuf_c* drakvuf = (drakvuf_c*)data;
 
+    /* Wait for the loop to start */
+    g_mutex_lock(&drakvuf->loop_signal);
+    g_mutex_unlock(&drakvuf->loop_signal);
+
     while(drakvuf->timeout && !drakvuf->interrupted) {
         sleep(1);
         --drakvuf->timeout;
@@ -128,31 +132,31 @@ int drakvuf_c::start_plugins(const char *dump_folder,
     for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
     {
         switch ((drakvuf_plugin_t)i) {
-        case PLUGIN_FILEDELETE:
-        {
-            struct filedelete_config c = {
-                .rekall_profile = this->rekall_profile,
-                .dump_folder = dump_folder
-            };
+            case PLUGIN_FILEDELETE:
+            {
+                struct filedelete_config c = {
+                    .rekall_profile = this->rekall_profile,
+                    .dump_folder = dump_folder
+                };
 
-            rc = this->plugins->start((drakvuf_plugin_t)i, &c);
-            break;
-        }
+                rc = this->plugins->start((drakvuf_plugin_t)i, &c);
+                break;
+            }
 
-        case PLUGIN_PROCTRACER:
-        {
-            struct proctracer_config c = {
-                .rekall_profile = this->rekall_profile,
-                .proctracer_config = proctracer_config
-            };
+            case PLUGIN_PROCTRACER:
+            {
+                struct proctracer_config c = {
+                    .rekall_profile = this->rekall_profile,
+                    .proctracer_config = proctracer_config
+                };
 
-            rc = this->plugins->start((drakvuf_plugin_t)i, &c);
-            break;
-        }
+                rc = this->plugins->start((drakvuf_plugin_t)i, &c);
+                break;
+            }
 
-        default:
-            rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
-            break;
+            default:
+                rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
+                break;
         };
 
         if ( !rc )
@@ -164,15 +168,18 @@ int drakvuf_c::start_plugins(const char *dump_folder,
 
 drakvuf_c::drakvuf_c(const char* domain,
                      const char *rekall_profile,
-                     output_format_t output,
-                     int timeout)
+                     const output_format_t output,
+                     const int timeout,
+                     const bool verbose)
 {
     this->drakvuf = NULL;
     this->interrupted = 0;
     this->timeout = timeout;
     this->rekall_profile = rekall_profile;
+    g_mutex_init(&this->loop_signal);
+    g_mutex_lock(&this->loop_signal);
 
-    if (!drakvuf_init(&this->drakvuf, domain, rekall_profile))
+    if (!drakvuf_init(&this->drakvuf, domain, rekall_profile, verbose))
         throw -1;
 
     if(timeout > 0)
@@ -184,6 +191,8 @@ drakvuf_c::drakvuf_c(const char* domain,
 
 void drakvuf_c::close()
 {
+    g_mutex_clear(&this->loop_signal);
+
     if (this->plugins)
         delete this->plugins;
 
@@ -205,11 +214,6 @@ drakvuf_c::~drakvuf_c()
     this->close();
 }
 
-int drakvuf_c::is_initialized()
-{
-    return this->initialized;
-}
-
 void drakvuf_c::interrupt(int signal)
 {
     this->interrupted = signal;
@@ -218,6 +222,7 @@ void drakvuf_c::interrupt(int signal)
 
 void drakvuf_c::loop()
 {
+    g_mutex_unlock(&this->loop_signal);
     drakvuf_loop(this->drakvuf);
 }
 

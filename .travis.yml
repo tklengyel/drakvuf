@@ -1,6 +1,5 @@
-language: c
+language: cpp
 compiler:
-- gcc
 - clang
 
 before_install:
@@ -8,9 +7,10 @@ before_install:
   - sudo add-apt-repository "deb mirror://mirrors.ubuntu.com/mirrors.txt trusty main restricted universe multiverse" -y
   - sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 3B4FE6ACC0B21F32
   - sudo apt-get update -qq
-  - sudo apt-get install -y bison flex check libjansson-dev uuid-dev libfuse-dev
+  - sudo apt-get install -y bison flex check libjson-c-dev uuid-dev libstdc++6
   - sudo apt-get build-dep libxen-dev
   - sudo dpkg -i test-packages/xen-4.6.0-tools_amd64.deb
+  - sudo ln -s /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /usr/lib/x86_64-linux-gnu/libstdc++.so
   - git clone -b drakvuf https://github.com/tklengyel/libvmi
   - cd libvmi && ./autogen.sh && ./configure --enable-xen --enable-xen-events
   - make && sudo make install

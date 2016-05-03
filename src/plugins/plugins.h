@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2016 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -140,6 +140,15 @@ typedef enum drakvuf_plugin {
     PLUGIN_PROCTRACER,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
+
+static const char *drakvuf_plugin_names[] = {
+    [PLUGIN_SYSCALLS] = "syscalls",
+    [PLUGIN_POOLMON] = "poolmon",
+    [PLUGIN_FILETRACER] = "filetracer",
+    [PLUGIN_FILEDELETE] = "filedelete",
+    [PLUGIN_OBJMON] = "objmon",
+    [PLUGIN_EXMON] = "exmon"
+};
 
 class plugin {};
 class drakvuf_plugins

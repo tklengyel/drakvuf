@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2016 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -127,10 +127,20 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     return 0;
 }
 
-static GSList* create_trap_config(syscalls *s, symbols_t *symbols) {
+static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *symbols) {
 
     GSList *ret = NULL;
     unsigned long i;
+    addr_t module_list, ntoskrnl;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    if(VMI_FAILURE == vmi_read_addr_ksym(vmi, (char *)"PsLoadedModuleList", &module_list))
+        goto done;
+
+    if( !drakvuf_get_module_base_addr(drakvuf, module_list, "ntoskrnl.exe", &ntoskrnl) )
+        goto done;
+
     for (i=0; i < symbols->count; i++) {
 
         const struct symbol *symbol = &symbols->symbols[i];
@@ -143,8 +153,8 @@ static GSList* create_trap_config(syscalls *s, symbols_t *symbols) {
         drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
         trap->lookup_type = LOOKUP_PID;
         trap->u.pid = 4;
-        trap->addr_type = ADDR_RVA;
-        trap->u2.rva = symbol->rva;
+        trap->addr_type = ADDR_VA;
+        trap->u2.addr = ntoskrnl + symbol->rva;
         trap->name = g_strdup(symbol->name);
         trap->module = "ntoskrnl.exe";
         trap->type = BREAKPOINT;
@@ -154,6 +164,8 @@ static GSList* create_trap_config(syscalls *s, symbols_t *symbols) {
         ret = g_slist_prepend(ret, trap);
     }
 
+done:
+    drakvuf_release_vmi(drakvuf);
     return ret;
 }
 
@@ -166,7 +178,7 @@ syscalls::syscalls(drakvuf_t drakvuf, const void *config, output_format_t output
         return;
     }
 
-    this->traps = create_trap_config(this, symbols);
+    this->traps = create_trap_config(drakvuf, this, symbols);
     this->format = output;
 
     drakvuf_free_symbols(symbols);

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2016 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -310,18 +310,21 @@ exmon::exmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
     this->trap.cb = cb;
     this->trap.data = (void*)this;
     this->format = output;
-    this->offsets = (size_t*)g_malloc0(__OFFSET_MAX*sizeof(size_t));
+    this->offsets = (addr_t*)g_malloc0(__OFFSET_MAX*sizeof(addr_t));
 
     int i;
-    for(i=0;i<__OFFSET_MAX;i++) {
-        drakvuf_get_struct_member_rva(rekall_profile, offset_names[i][0], offset_names[i][1],
-                                      &this->offsets[i]);
+    for(i=0;i<__OFFSET_MAX;i++)
+        drakvuf_get_struct_member_rva(rekall_profile, offset_names[i][0], offset_names[i][1], &this->offsets[i]);
+
+    if(VMI_FAILURE == drakvuf_get_struct_size(rekall_profile, "_KTRAP_FRAME", &this->ktrap_frame_size)) {
+        free(this->offsets);
+        throw -1;
     }
 
-    drakvuf_get_struct_size(rekall_profile, "_KTRAP_FRAME", &this->ktrap_frame_size);
-
-    if ( !drakvuf_add_trap(drakvuf,&this->trap) )
+    if ( !drakvuf_add_trap(drakvuf,&this->trap) ) {
+        free(this->offsets);
         throw -1;
+    }
 }
 
 exmon::~exmon() {

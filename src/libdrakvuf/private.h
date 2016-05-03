@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2016 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -119,10 +119,14 @@
 #include "../xen_helper/xen_helper.h"
 
 #ifdef DRAKVUF_DEBUG
+
+extern bool verbose;
+
 #define PRINT_DEBUG(args...) \
     do { \
-        fprintf (stderr, args); \
+        if(verbose) fprintf (stderr, args); \
     } while (0)
+
 #else
 #define PRINT_DEBUG(args...) \
     do {} while(0)

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2016 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -119,6 +119,13 @@ void close_handler(int signal) {
     drakvuf->interrupt(signal);
 }
 
+static inline void disable_plugin(char *optarg, bool *plugin_list) {
+    int i;
+    for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
+        if(!strcmp(optarg, drakvuf_plugin_names[i]))
+            plugin_list[i] = 0;
+}
+
 int main(int argc, char** argv) {
     int c, i, rc = 0, timeout = 0;
     char *inject_cmd = NULL;
@@ -130,6 +137,8 @@ int main(int argc, char** argv) {
     struct sigaction act;
     GThread *timeout_thread = NULL;
     output_format_t output = OUTPUT_DEFAULT;
+    bool plugin_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 1};
+    bool verbose = 0;
 
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
 
@@ -146,21 +155,20 @@ int main(int argc, char** argv) {
                "\t -i <injection pid>        The PID of the process to hijack for injection\n"
                "\t -e <inject_exe>           The executable to start with injection\n"
                "\t -t <timeout>              Timeout (in seconds)\n"
-               "\t -o <format>               Output format (default or csv)\n"
-#ifdef DRAKVUF_DEBUG
-               "\t -v                        Turn on verbose (debug) output\n"
-#endif
-#ifdef ENABLE_PLUGIN_FILEDELETE
                "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
-#endif
+               "\t -o <format>               Output format (default or csv)\n"
+               "\t -x <plugin>               Don't activate the specified plugin\n"
 #ifdef ENABLE_PLUGIN_PROCTRACER
                "\t -P <proctracer config>    Proctracer config json location\n"
+#endif
+#ifdef DRAKVUF_DEBUG
+               "\t -v                        Turn on verbose (debug) output\n"
 #endif
         );
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:v")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:vx:")) != -1)
     switch (c)
     {
     case 'r':
@@ -178,18 +186,19 @@ int main(int argc, char** argv) {
     case 't':
         timeout = atoi(optarg);
         break;
+    case 'D':
+        dump_folder = optarg;
+        break;
     case 'o':
         if(!strncmp(optarg,"csv",3))
             output = OUTPUT_CSV;
         break;
+    case 'x':
+        disable_plugin(optarg, plugin_list);
+        break;
 #ifdef DRAKVUF_DEBUG
     case 'v':
-//        verbose = 1;
-        break;
-#endif
-#ifdef ENABLE_PLUGIN_FILEDELETE
-    case 'D':
-        dump_folder = optarg;
+        verbose = 1;
         break;
 #endif
 #ifdef ENABLE_PLUGIN_PROCTRACER
@@ -212,7 +221,12 @@ int main(int argc, char** argv) {
         return rc;
     }
 
-    drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout);
+    try {
+        drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose);
+    } catch(int e) {
+        printf("Failed to initialize DRAKVUF\n");
+        return rc;
+    }
 
     /* for a clean exit */
     act.sa_handler = close_handler;
