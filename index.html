@@ -227,7 +227,7 @@ Support of Rekall profiles: yes
 Build and install LibVMI:
 <pre><code>make
 sudo make install
-echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
+sudo echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
 cd tools/pyvmi
 python setup.py build
 sudo python setup.py install
@@ -255,11 +255,11 @@ cd ../..
 
 Now we will create the Rekall profile for the Windows domain. First, we need to get the debug information for the Windows kernel via the LibVMI win-guid tool. For example, in the following my domain is named windows7-sp1-x86:
 
-<pre><code>$ xl list
+<pre><code>$ sudo xl list
 Name                                        ID   Mem VCPUs	State	Time(s)
 Domain-0                                     0  4024     4     r-----     848.8
 windows7-sp1-x86                             7  3000     1     -b----      94.7
-$ win-guid name windows7-sp1-x86
+$ sudo win-guid name windows7-sp1-x86
 Windows Kernel found @ 0x2604000
 	Version: 32-bit Windows 7
 	PE GUID: 4ce78a09412000
@@ -316,10 +316,11 @@ printf "windows7-sp1 { \n\
     ostype = \"Windows\"; \n\
     rekall_profile = \"/root/windows7-sp1.rekall.json\"; \n\
 }" > /etc/libvmi.conf
+exit
 </code></pre>
 
 Test if LibVMI is working by running process-list:
-<pre><code>process-list windows7-sp1</code></pre>
+<pre><code>sudo process-list windows7-sp1</code></pre>
 
 Output should be something similar:
 <pre><code>Process listing for VM windows7-sp1-x86 (id=7)
@@ -361,10 +362,10 @@ make
 </code></pre>
 
 To simply trace the execution of the system:
-<pre><code>./src/drakvuf -r &lt;rekall profile&gt; -d &lt;domid&gt;</code></pre>
+<pre><code>sudo ./src/drakvuf -r &lt;rekall profile&gt; -d &lt;domid&gt;</code></pre>
 
 For example:
-<pre><code>./src/drakvuf -r /root/windows7-sp1.rekall.json -d 7</code></pre>
+<pre><code>sudo ./src/drakvuf -r /root/windows7-sp1.rekall.json -d 7</code></pre>
 
 To see all available options:
 <pre><code>./src/drakvuf</code></pre>
