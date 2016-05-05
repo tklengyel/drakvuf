@@ -111,11 +111,11 @@ class filedelete: public plugin {
     public:
         drakvuf_trap_t traps[4] = {
             [0 ... 3] = {
-                .lookup_type = LOOKUP_PID,
-                .u.pid = 4,
-                .addr_type = ADDR_RVA,
+                .breakpoint.lookup_type = LOOKUP_PID,
+                .breakpoint.pid = 4,
+                .breakpoint.addr_type = ADDR_RVA,
+                .breakpoint.module = "ntoskrnl.exe",
                 .type = BREAKPOINT,
-                .module = "ntoskrnl.exe",
                 .data = (void*)this
             }
         };

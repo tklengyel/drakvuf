@@ -150,6 +150,7 @@ status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
  */
 
 typedef enum lookup_type {
+    __INVALID_LOOKUP_TYPE,
     LOOKUP_NONE,
     LOOKUP_DTB,
     LOOKUP_PID,
@@ -157,22 +158,21 @@ typedef enum lookup_type {
 } lookup_type_t;
 
 typedef enum addr_type {
+    __INVALID_ADDR_TYPE,
     ADDR_RVA,
     ADDR_VA,
     ADDR_PA
 } addr_type_t;
 
 typedef enum trap_type {
-    BREAKPOINT      = 1 << 0,
-    MEMACCESS_R     = 1 << 1,
-    MEMACCESS_W     = 1 << 2,
-    MEMACCESS_X     = 1 << 3,
-    MEMACCESS_RW    = (MEMACCESS_R | MEMACCESS_W),
-    MEMACCESS_RX    = (MEMACCESS_R | MEMACCESS_X),
-    MEMACCESS_RWX   = (MEMACCESS_R | MEMACCESS_W | MEMACCESS_W)
+    __INVALID_TRAP_TYPE,
+    BREAKPOINT,
+    MEMACCESS,
+    REGISTER
 } trap_type_t;
 
 typedef enum memaccess_type {
+    __INVALID_MEMACCESS_TYPE,
     PRE,
     POST
 } memaccess_type_t;
@@ -190,30 +190,40 @@ typedef struct drakvuf_trap_info {
 } drakvuf_trap_info_t;
 
 struct drakvuf_trap {
-    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*);
-
-    lookup_type_t lookup_type;
-    union {
-        vmi_pid_t pid;
-        const char *proc;
-    } u;
-
-    /* If specified and RVA is used
-       RVA will be calculated from the base
-       of this module */
-    const char *module;
-    const char *name;
-
-    addr_type_t addr_type;
-    union {
-        addr_t rva;
-        addr_t addr;
-    } u2;
-
     trap_type_t type;
-    memaccess_type_t memaccess_type; // iff type == MEMACCESS_*
-
+    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*);
     void *data;
+    const char *name; // Only used for informational/debugging purposes
+
+    union {
+        struct {
+            lookup_type_t lookup_type;
+            union {
+                vmi_pid_t pid;
+                const char *proc;
+                addr_t dtb;
+            };
+
+            /* If specified and RVA is used
+               RVA will be calculated from the base
+               of this module */
+            const char *module;
+
+            addr_type_t addr_type;
+            union {
+                addr_t rva;
+                addr_t addr;
+            };
+        } breakpoint;
+
+        struct {
+            addr_t gfn;
+            vmi_mem_access_t access;
+            memaccess_type_t type;
+        } memaccess;
+
+        register_t reg;
+    };
 };
 
 

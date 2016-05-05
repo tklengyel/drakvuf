@@ -167,6 +167,80 @@ void drakvuf_interrupt(drakvuf_t drakvuf, int sig) {
     drakvuf->interrupted = sig;
 }
 
+bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
+
+    if(trap->breakpoint.lookup_type == LOOKUP_NONE) {
+        return inject_trap_pa(drakvuf, trap, trap->breakpoint.addr);
+    }
+
+    if(trap->breakpoint.lookup_type == LOOKUP_PID || trap->breakpoint.lookup_type == LOOKUP_NAME) {
+        if (trap->breakpoint.addr_type == ADDR_RVA && trap->breakpoint.module) {
+
+            vmi_pid_t pid = ~0;
+            const char *name = NULL;
+            addr_t module_list = 0;
+
+            if(trap->breakpoint.pid == 4 || !strcmp(trap->breakpoint.proc, "System")) {
+
+                pid = 4;
+                name = "System";
+                if(VMI_FAILURE == vmi_read_addr_ksym(drakvuf->vmi, "PsLoadedModuleList", &module_list))
+                    return 0;
+
+            } else {
+
+                /* Process library */
+                addr_t process_base;
+
+                if(trap->breakpoint.lookup_type == LOOKUP_PID)
+                    pid = trap->breakpoint.pid;
+                if(trap->breakpoint.lookup_type == LOOKUP_NAME)
+                    name = trap->breakpoint.proc;
+
+                if( !drakvuf_find_eprocess(drakvuf, pid, name, &process_base) )
+                    return 0;
+
+               if(pid == ~0 && VMI_FAILURE == vmi_read_32_va(drakvuf->vmi, process_base + offsets[EPROCESS_PID], 0, (uint32_t*)&pid))
+                    return 0;
+
+               if( !drakvuf_get_module_list(drakvuf, process_base, &module_list) )
+                    return 0;
+            }
+
+            return inject_traps_modules(drakvuf, trap, module_list, pid);
+        }
+
+        if(trap->breakpoint.addr_type == ADDR_VA) {
+            addr_t dtb = vmi_pid_to_dtb(drakvuf->vmi, trap->breakpoint.pid);
+            if (!dtb)
+                return 0;
+
+            addr_t trap_pa = vmi_pagetable_lookup(drakvuf->vmi, dtb, trap->breakpoint.addr);
+            if (!trap_pa)
+                return 0;
+
+            return inject_trap_pa(drakvuf, trap, trap_pa);
+        }
+
+        if(trap->breakpoint.addr_type == ADDR_PA) {
+            fprintf(stderr, "DRAKVUF Trap misconfiguration: PID lookup specified for PA location\n");
+        }
+    }
+
+    return 0;
+}
+
+bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
+    if(CR3 == trap->reg) {
+        drakvuf->cr3 = g_slist_prepend(drakvuf->cr3, trap);
+        return 1;
+    }
+
+    fprintf(stderr, "Support for trapping requested register is not (yet) implemented!\n");
+
+    return 0;
+}
+
 bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
 
     bool ret = 0;
@@ -181,67 +255,18 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
         goto done;
     }
 
-    if (trap->type == BREAKPOINT) {
-        if(trap->lookup_type == LOOKUP_NONE) {
-            ret = inject_trap_pa(drakvuf, trap, trap->u2.addr);
-            goto done;
-        }
-
-        if(trap->lookup_type == LOOKUP_PID || trap->lookup_type == LOOKUP_NAME) {
-            if (trap->addr_type == ADDR_RVA && trap->module) {
-
-                vmi_pid_t pid = ~0;
-                const char *name = NULL;
-                addr_t module_list = 0;
-
-                if(trap->u.pid == 4 || !strcmp(trap->u.proc, "System")) {
-                    pid = 4;
-                    name = "System";
-
-                    if(VMI_FAILURE == vmi_read_addr_ksym(drakvuf->vmi, "PsLoadedModuleList", &module_list))
-                        goto done;
-                } else {
-                    /* Process library */
-                    addr_t process_base;
-
-                    if(trap->lookup_type == LOOKUP_PID)
-                        pid = trap->u.pid;
-                    if(trap->lookup_type == LOOKUP_NAME)
-                        name = trap->u.proc;
-
-                    if( !drakvuf_find_eprocess(drakvuf, pid, name, &process_base) )
-                        goto done;
-
-                    if(pid == ~0 && VMI_FAILURE == vmi_read_32_va(drakvuf->vmi, process_base + offsets[EPROCESS_PID], 0, (uint32_t*)&pid))
-                            goto done;
-
-                    if( !drakvuf_get_module_list(drakvuf, process_base, &module_list) )
-                        goto done;
-                }
-
-                ret = inject_traps_modules(drakvuf, trap, module_list, pid);
-            }
-
-            if(trap->addr_type == ADDR_VA) {
-                addr_t dtb = vmi_pid_to_dtb(drakvuf->vmi, trap->u.pid);
-                if(!dtb)
-                    goto done;
-
-                addr_t trap_pa = vmi_pagetable_lookup(drakvuf->vmi, dtb, trap->u2.addr);
-                if(!trap_pa)
-                    goto done;
-
-                ret = inject_trap_pa(drakvuf, trap, trap_pa);
-                goto done;
-            }
-
-            if(trap->addr_type == ADDR_PA) {
-                fprintf(stderr, "DRAKVUF Trap misconfiguration: PID lookup specified for PA location\n");
-            }
-        }
-
-    } else {
-        ret = inject_trap_mem(drakvuf, trap);
+    switch(trap->type) {
+        case BREAKPOINT:
+            ret = inject_trap_breakpoint(drakvuf, trap);
+            break;
+        case MEMACCESS:
+            ret = inject_trap_mem(drakvuf, trap);
+            break;
+        case REGISTER:
+            ret = inject_trap_reg(drakvuf, trap);
+            break;
+        default:
+            break;
     }
 
 done:

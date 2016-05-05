@@ -296,9 +296,9 @@ filedelete::filedelete(drakvuf_t drakvuf, const void *config, output_format_t ou
     this->dump_folder = c->dump_folder ? c->dump_folder : "/tmp";
     this->format = output;
 
-    if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "NtSetInformationFile", &this->traps[0].u2.rva))
+    if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "NtSetInformationFile", &this->traps[0].breakpoint.rva))
         return;
-    if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "ZwSetInformationFile", &this->traps[1].u2.rva))
+    if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "ZwSetInformationFile", &this->traps[1].breakpoint.rva))
         return;
 
     this->traps[0].name = "NtSetInformationFile";

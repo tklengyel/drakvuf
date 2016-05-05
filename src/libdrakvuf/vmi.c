@@ -220,7 +220,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
     while(loop) {
         drakvuf_trap_t *trap = loop->data;
 
-        if(trap->memaccess_type == POST) {
+        if(trap->memaccess.type == POST) {
             drakvuf_trap_info_t trap_info = {
                 .trap = trap,
                 .trap_pa = s->memaccess.pa,
@@ -274,7 +274,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
     while(loop) {
         drakvuf_trap_t *trap = loop->data;
 
-        if(trap->memaccess_type == PRE) {
+        if(trap->memaccess.type == PRE) {
             drakvuf_trap_info_t trap_info = {
                 .trap = trap,
                 .trap_pa = s->memaccess.pa,
@@ -382,6 +382,34 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     return 0;
 }
 
+event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
+    PRINT_DEBUG("CR3 cb on vCPU %u: 0x%" PRIx64 "\n", event->vcpu_id, event->reg_event.value);
+    drakvuf_t drakvuf = (drakvuf_t)event->data;
+
+    /* Flush the LibVMI caches */
+    vmi_v2pcache_flush(drakvuf->vmi);
+    vmi_pidcache_flush(drakvuf->vmi);
+    vmi_rvacache_flush(drakvuf->vmi);
+    vmi_symcache_flush(drakvuf->vmi);
+
+    drakvuf->in_callback = 1;
+    GSList *loop = drakvuf->cr3;
+    while(loop) {
+        drakvuf_trap_t *trap = loop->data;
+        drakvuf_trap_info_t trap_info = {
+            .trap = trap,
+            .regs = event->regs.x86,
+            .vcpu = event->vcpu_id,
+        };
+
+        loop = loop->next;
+        trap->cb(drakvuf, &trap_info);
+    }
+    drakvuf->in_callback = 0;
+
+    return 0;
+}
+
 void clear_guard(vmi_event_t *event, status_t rc) {
     if(event->data)
         g_hash_table_destroy(event->data);
@@ -400,7 +428,9 @@ void remove_trap(drakvuf_t drakvuf,
 {
     vmi_instance_t vmi = drakvuf->vmi;
 
-    if (trap->type == BREAKPOINT) {
+    switch(trap->type) {
+    case BREAKPOINT:
+    {
         struct wrapper *container =
             g_hash_table_lookup(drakvuf->breakpoint_lookup_trap, &trap);
         if ( !container )
@@ -444,7 +474,10 @@ void remove_trap(drakvuf_t drakvuf,
                 }
             }
         }
-    } else {
+        break;
+    }
+    case MEMACCESS:
+    {
         struct wrapper *container =
             g_hash_table_lookup(drakvuf->memaccess_lookup_trap, &trap);
 
@@ -466,20 +499,34 @@ void remove_trap(drakvuf_t drakvuf,
             g_hash_table_remove(drakvuf->memaccess_lookup_trap, &trap);
             g_hash_table_remove(drakvuf->memaccess_lookup_gfn, &container->memaccess.gfn);
         }
+        break;
     }
+    case REGISTER:
+    {
+        if(CR3 == trap->reg) {
+            /* We don't disable the event itself even if the list is empty
+               as we may use it to flush the LibVMI cache */
+            drakvuf->cr3 = g_slist_remove(drakvuf->cr3, trap);
+        }
+        break;
+    }
+    default:
+        break;
+    };
 }
 
 bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
-    addr_t gfn = trap->u2.addr >> 12;
     struct wrapper *s =
-        g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &gfn);
+        g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &trap->memaccess.gfn);
 
     // We already have a trap registered on this page
     // check if type matches, if so, add trap to the list
     if (s) {
         drakvuf_trap_t *havetrap = s->traps->data;
-        if(havetrap->type != trap->type)
+        if(havetrap->type != trap->type) {
+            PRINT_DEBUG("Failed to add memaccess trap as gfn is already trapped!\n");
             return 0;
+        }
 
         s->traps = g_slist_prepend(s->traps, trap);
         g_hash_table_insert(drakvuf->memaccess_lookup_trap, g_memdup(&trap, sizeof(void*)),
@@ -488,23 +535,25 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
     } else {
         // No trap registered, check if guard is used on this page
         // TODO allow traps and guards to co-exists
-        vmi_event_t *guard = vmi_get_mem_event(drakvuf->vmi, trap->u2.addr, VMI_MEMEVENT_PAGE);
-        if ( guard )
+        vmi_event_t *guard = vmi_get_mem_event(drakvuf->vmi, trap->memaccess.gfn, VMI_MEMEVENT_PAGE);
+        if ( guard ) {
+            PRINT_DEBUG("Failed to add memaccess trap as gfn is already trapped by a breakpoint guard!\n");
             return 0;
+        }
 
         s = g_malloc0(sizeof(struct wrapper));
         s->drakvuf = drakvuf;
         s->traps = g_slist_prepend(s->traps, trap);
-        s->memaccess.gfn = gfn;
+        s->memaccess.gfn = trap->memaccess.gfn;
         s->memaccess.memtrap = g_malloc0(sizeof(vmi_event_t));
         s->memaccess.memtrap->data = drakvuf;
-        SETUP_MEM_EVENT(s->memaccess.memtrap, trap->u2.addr, VMI_MEMEVENT_PAGE,
-                        mem_conversion[trap->type], pre_mem_cb);
+        SETUP_MEM_EVENT(s->memaccess.memtrap, trap->memaccess.gfn<<12, VMI_MEMEVENT_PAGE,
+                        trap->memaccess.access, pre_mem_cb);
         s->memaccess.memtrap->vmm_pagetable_id = drakvuf->altp2m_idx;
 
         if (VMI_FAILURE == vmi_register_event(drakvuf->vmi, s->memaccess.memtrap)) {
             PRINT_DEBUG("*** FAILED TO REGISTER MEMORY TRAP @ PAGE %lu ***\n",
-                        trap->u2.addr >> 12);
+                        trap->memaccess.gfn);
             free(s->memaccess.memtrap);
             g_slist_free(s->traps);
             free(s);
@@ -684,10 +733,10 @@ bool inject_trap(drakvuf_t drakvuf,
     // get pa
     addr_t pa = 0;
 
-    if (trap->addr_type == ADDR_VA)
-        pa = vmi_pagetable_lookup(vmi, dtb, trap->u2.addr);
+    if (trap->breakpoint.addr_type == ADDR_VA)
+        pa = vmi_pagetable_lookup(vmi, dtb, trap->breakpoint.addr);
     else
-        pa = vmi_pagetable_lookup(vmi, dtb, vaddr + trap->u2.rva);
+        pa = vmi_pagetable_lookup(vmi, dtb, vaddr + trap->breakpoint.rva);
 
     if (!pa)
         return 0;
@@ -733,7 +782,7 @@ bool inject_traps_modules(drakvuf_t drakvuf,
             vmi_free_unicode_str(us);
         }
 
-        if(out.contents && !strcmp((char*)out.contents,trap->module)) {
+        if(out.contents && !strcmp((char*)out.contents,trap->breakpoint.module)) {
             free(out.contents);
             return inject_trap(drakvuf, trap, dllbase, pid);
         }
@@ -750,15 +799,21 @@ void drakvuf_loop(drakvuf_t drakvuf) {
 
     drakvuf->interrupted = 0;
 
-    vmi_event_t interrupt_event;
-    memset(&interrupt_event, 0, sizeof(vmi_event_t));
-    interrupt_event.type = VMI_EVENT_INTERRUPT;
-    interrupt_event.interrupt_event.intr = INT3;
-    interrupt_event.callback = int3_cb;
+    vmi_event_t interrupt_event = { 0 };
+    SETUP_INTERRUPT_EVENT(&interrupt_event, 0, int3_cb);
     interrupt_event.data = drakvuf;
 
     if(VMI_FAILURE == vmi_register_event(drakvuf->vmi, &interrupt_event)) {
         fprintf(stderr, "Failed to register interrupt event\n");
+        return;
+    }
+
+    vmi_event_t cr3_event = { 0 };
+    SETUP_REG_EVENT(&cr3_event, CR3, VMI_REGACCESS_W, 0, cr3_cb);
+    cr3_event.data = drakvuf;
+
+    if(VMI_FAILURE == vmi_register_event(drakvuf->vmi, &cr3_event)) {
+        fprintf(stderr, "Failed to register CR3 event\n");
         return;
     }
 

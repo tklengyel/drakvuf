@@ -180,13 +180,12 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 objmon::objmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
     const char *rekall_profile = (const char *)config;
 
-    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ObCreateObject", &this->trap.u2.rva))
+    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ObCreateObject", &this->trap.breakpoint.rva))
         return;
     if (VMI_FAILURE==drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "TypeIndex", &this->typeindex_offset))
         return;
 
     this->trap.cb = cb;
-    this->trap.data = (void*)this;
 
     this->format = output;
     if ( !drakvuf_add_trap(drakvuf, &this->trap) )

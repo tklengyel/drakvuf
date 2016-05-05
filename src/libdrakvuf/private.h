@@ -132,15 +132,6 @@ extern bool verbose;
     do {} while(0)
 #endif
 
-static vmi_mem_access_t mem_conversion[] = {
-    [MEMACCESS_R] = VMI_MEMACCESS_R,
-    [MEMACCESS_W] = VMI_MEMACCESS_W,
-    [MEMACCESS_X] = VMI_MEMACCESS_X,
-    [MEMACCESS_RW] = VMI_MEMACCESS_RW,
-    [MEMACCESS_RX] = VMI_MEMACCESS_RX,
-    [MEMACCESS_RWX] = VMI_MEMACCESS_RWX
-};
-
 struct drakvuf {
     char *dom_name;
     domid_t domID;
@@ -187,6 +178,8 @@ struct drakvuf {
                                        // val: struct memaccess
     GHashTable *memaccess_lookup_trap; // key: trap pointer
                                        // val: struct memaccess
+
+    GSList *cr0, *cr3, *cr4;
 };
 
 struct breakpoint {

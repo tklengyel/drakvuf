@@ -209,18 +209,18 @@ poolmon::poolmon(drakvuf_t drakvuf, const void *config, output_format_t output) 
     const char *rekall_profile = (const char*)config;
     this->pooltag_tree = pooltag_build_tree();
 
-    this->trap.lookup_type = LOOKUP_PID;
-    this->trap.u.pid = 4;
-    this->trap.addr_type = ADDR_RVA;
+    this->trap.breakpoint.lookup_type = LOOKUP_PID;
+    this->trap.breakpoint.pid = 4;
+    this->trap.breakpoint.addr_type = ADDR_RVA;
     if (VMI_FAILURE == drakvuf_get_function_rva(rekall_profile,
                                                 "ExAllocatePoolWithTag",
-                                                &this->trap.u2.rva))
+                                                &this->trap.breakpoint.rva))
     {
-        return;
+        throw -1;
     }
 
+    this->trap.breakpoint.module = "ntoskrnl.exe";
     this->trap.name = "ExAllocatePoolWithTag";
-    this->trap.module = "ntoskrnl.exe";
     this->trap.type = BREAKPOINT;
     this->trap.cb = cb;
     this->trap.data = (void*)this;
