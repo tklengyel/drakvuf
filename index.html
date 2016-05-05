@@ -201,7 +201,7 @@ Download the DRAKVUF branch of LibVMI and prepare to build it:
 <pre><code>git clone -b drakvuf https://github.com/tklengyel/libvmi
 cd libvmi
 ./autogen.sh
-./configure --enable-xen --enable-xen-events --disable-address-cache
+./configure
 </code></pre>
 
 Make sure the output is like the following:
@@ -314,7 +314,7 @@ With this profile ready we can create the LibVMI config:
 <pre><code>sudo su
 printf "windows7-sp1 { \n\
     ostype = \"Windows\"; \n\
-    sysmap = \"/root/windows7-sp1.rekall.json\"; \n\
+    rekall_profile = \"/root/windows7-sp1.rekall.json\"; \n\
 }" > /etc/libvmi.conf
 </code></pre>
 
@@ -365,6 +365,9 @@ To simply trace the execution of the system:
 
 For example:
 <pre><code>./src/drakvuf -r /root/windows7-sp1.rekall.json -d 7</code></pre>
+
+To see all available options:
+<pre><code>./src/drakvuf</code></pre>
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Citation</h3>
