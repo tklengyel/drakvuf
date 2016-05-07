@@ -168,7 +168,7 @@ int main(int argc, char** argv) {
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:vx:")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:vx:P")) != -1)
     switch (c)
     {
     case 'r':
