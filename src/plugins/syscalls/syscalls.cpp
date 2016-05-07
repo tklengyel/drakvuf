@@ -114,12 +114,12 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     switch(s->format) {
     case OUTPUT_CSV:
         printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%s,%s\n",
-               info->vcpu, info->regs->cr3, procname, info->trap->module, info->trap->name);
+               info->vcpu, info->regs->cr3, procname, info->trap->breakpoint.module, info->trap->name);
         break;
     default:
     case OUTPUT_DEFAULT:
         printf("[SYSCALL] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s!%s\n",
-               info->vcpu, info->regs->cr3, procname, info->trap->module, info->trap->name);
+               info->vcpu, info->regs->cr3, procname, info->trap->breakpoint.module, info->trap->name);
         break;
     }
 
@@ -151,12 +151,12 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
         //    continue;
 
         drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
-        trap->lookup_type = LOOKUP_PID;
-        trap->u.pid = 4;
-        trap->addr_type = ADDR_VA;
-        trap->u2.addr = ntoskrnl + symbol->rva;
+        trap->breakpoint.lookup_type = LOOKUP_PID;
+        trap->breakpoint.pid = 4;
+        trap->breakpoint.addr_type = ADDR_VA;
+        trap->breakpoint.addr = ntoskrnl + symbol->rva;
+        trap->breakpoint.module = "ntoskrnl.exe";
         trap->name = g_strdup(symbol->name);
-        trap->module = "ntoskrnl.exe";
         trap->type = BREAKPOINT;
         trap->cb = cb;
         trap->data = s;

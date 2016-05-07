@@ -111,12 +111,13 @@ class objmon: public plugin {
     public:
         output_format_t format;
         drakvuf_trap_t trap = {
-            .lookup_type = LOOKUP_PID,
-            .u.pid = 4,
-            .addr_type = ADDR_RVA,
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 4,
+            .breakpoint.addr_type = ADDR_RVA,
+            .breakpoint.module = "ntoskrnl.exe",
             .name = "ObCreateObject",
-            .module = "ntoskrnl.exe",
-            .type = BREAKPOINT
+            .type = BREAKPOINT,
+            .data = (void*)this,
         };
         addr_t typeindex_offset;
 

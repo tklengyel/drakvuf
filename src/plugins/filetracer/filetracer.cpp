@@ -138,7 +138,7 @@
 struct rettrap_struct {
     filetracer *f;
     drakvuf_trap_t *trap;
-    long counter;
+    unsigned long counter;
 };
 
 struct file_watch {
@@ -253,21 +253,20 @@ static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     //printf("PH 0x%lx. Block size: %u\n", ph_base, block_size);
     //printf("File size: 0x%lx File base: 0x%lx. Unicode string @ 0x%lx. Last write @ 0x%lx\n",
-    //       file_object_size, file_base, file_name-file_base, watch->file_name_buffer-file_base);
+    //       f->file_object_size, file_base, file_name-file_base, watch->file_name_buffer-file_base);
 
     drakvuf_trap_t *writetrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
-    //printf("Made a writetrap @ %p\n", writetrap);
-    writetrap->lookup_type = LOOKUP_NONE;
-    writetrap->addr_type = ADDR_PA;
-    writetrap->type = MEMACCESS_W;
-    writetrap->memaccess_type = POST;
+    writetrap->memaccess.access = VMI_MEMACCESS_W;
+    writetrap->memaccess.type = POST;
+    writetrap->memaccess.gfn = watch->file_name_buffer >> 12;
     writetrap->cb = file_name_cb;
-    writetrap->u2.addr = watch->file_name_buffer;
     writetrap->data = watch;
+    writetrap->type = MEMACCESS;
 
     f->writetraps = g_slist_prepend(f->writetraps, writetrap);
 
-    drakvuf_add_trap(drakvuf, writetrap);
+    if (!drakvuf_add_trap(drakvuf, writetrap))
+        fprintf(stderr, "[FILETRACER] Error: failed to add write memaccess trap!\n");
 
     s->counter--;
 
@@ -326,19 +325,19 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             s->counter = 1;
             s->f = f;
 
-            rettrap->lookup_type = LOOKUP_NONE;
-            rettrap->addr_type = ADDR_PA;
+            rettrap->breakpoint.lookup_type = LOOKUP_NONE;
+            rettrap->breakpoint.addr_type = ADDR_PA;
+            rettrap->breakpoint.addr = ret_pa;
             rettrap->type = BREAKPOINT;
             rettrap->name = "HeapRetTrap";
             rettrap->cb = pool_alloc_return;
-            rettrap->u2.addr = ret_pa;
             rettrap->data = s;
 
             drakvuf_add_trap(drakvuf, rettrap);
-            g_hash_table_insert(f->rettraps, &rettrap->u2.addr, s);
+            g_hash_table_insert(f->rettraps, &rettrap->breakpoint.addr, s);
         }
 
-        //printf("File alloc request on vCPU %u. Ret: 0x%lx. Counter: %u\n",
+        //printf("File alloc request on vCPU %u. Ret: 0x%lx. Counter: %lu\n",
         //         info->vcpu, ret_pa, s->counter);
     }
 
@@ -356,16 +355,16 @@ filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t ou
     this->rettraps = g_hash_table_new(g_int64_hash, g_int64_equal);
     this->format = output;
 
-    this->poolalloc.lookup_type = LOOKUP_PID;
-    this->poolalloc.u.pid = 4;
-    this->poolalloc.addr_type = ADDR_RVA;
+    this->poolalloc.breakpoint.lookup_type = LOOKUP_PID;
+    this->poolalloc.breakpoint.pid = 4;
+    this->poolalloc.breakpoint.addr_type = ADDR_RVA;
+    this->poolalloc.breakpoint.module = "ntoskrnl.exe";
     this->poolalloc.name = "ExAllocatePoolWithTag";
-    this->poolalloc.module = "ntoskrnl.exe";
     this->poolalloc.type = BREAKPOINT;
     this->poolalloc.cb = cb;
     this->poolalloc.data = (void*)this;
 
-    if (VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag", &this->poolalloc.u2.rva))
+    if (VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag", &this->poolalloc.breakpoint.rva))
         return;
     if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_FILE_OBJECT", "FileName", &this->file_name_offset))
         return;

@@ -212,19 +212,19 @@ int main(int argc, char** argv) {
     }
 
     if (!domain) {
-        printf("No domain name specified (-d)!\n");
+        fprintf(stderr, "No domain name specified (-d)!\n");
         return rc;
     }
 
     if (!rekall_profile) {
-        printf("No Rekall profile specified (-r)!\n");
+        fprintf(stderr, "No Rekall profile specified (-r)!\n");
         return rc;
     }
 
     try {
         drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose);
     } catch(int e) {
-        printf("Failed to initialize DRAKVUF\n");
+        fprintf(stderr, "Failed to initialize DRAKVUF\n");
         return rc;
     }
 

@@ -110,12 +110,13 @@
 class exmon: public plugin {
     public:
         drakvuf_trap_t trap = {
-            .lookup_type = LOOKUP_PID,
-            .u.pid = 4,
-            .addr_type = ADDR_RVA,
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 4,
+            .breakpoint.addr_type = ADDR_RVA,
+            .breakpoint.module = "ntoskrnl.exe",
             .name = "KiDispatchException",
-            .module = "ntoskrnl.exe",
-            .type = BREAKPOINT
+            .type = BREAKPOINT,
+            .data = (void*)this
         };
         output_format_t format;
         page_mode_t pm;
