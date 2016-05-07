@@ -204,12 +204,12 @@ static bool add_trace_points(proctracer* p, drakvuf_t drakvuf, vmi_instance_t vm
                         ti->p = p;
 
                         addr_t trap_pa = vmi_pagetable_lookup(vmi, cr3, dllbase+off);
-                        tracetrap->lookup_type = LOOKUP_NONE;
-                        tracetrap->addr_type = ADDR_PA;
+                        tracetrap->breakpoint.lookup_type = LOOKUP_NONE;
+                        tracetrap->breakpoint.addr_type = ADDR_PA;
                         tracetrap->type = BREAKPOINT;
                         tracetrap->name = "TraceTrap";
                         tracetrap->cb = trace_cb;
-                        tracetrap->u2.addr = trap_pa;
+                        tracetrap->breakpoint.addr = trap_pa;
                         tracetrap->data = ti;
 
                         drakvuf_add_trap(drakvuf,tracetrap);
@@ -340,10 +340,10 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
     json_object_put(conf_modules);
     json_object_put(conf_root);
 
-    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PsGetCurrentThreadTeb", &this->trap.u2.rva))
+    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PsGetCurrentThreadTeb", &this->trap.breakpoint.rva))
         return;
 
-    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PspExitProcess", &this->exit_trap.u2.rva))
+    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PspExitProcess", &this->exit_trap.breakpoint.rva))
         return;
 
     this->trap.cb = cb;
