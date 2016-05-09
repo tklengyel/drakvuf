@@ -122,7 +122,7 @@ drakvuf -r $REKALL -d $DOMAIN -i $PID -e "$CMD" -D $OUTPUTFOLDER/$MD5 -o csv -t 
 
 RET=$?
 
-if [ $RET -eq 0 ]; then
+if [ $RET -eq 1 ]; then
    mv $RUNFOLDER/$RUNFILE $OUTPUTFOLDER/$MD5 1>/dev/null 2>&1
 fi
 
