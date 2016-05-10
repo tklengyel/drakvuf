@@ -122,7 +122,9 @@ drakvuf -r $REKALL -d $DOMAIN -i $PID -e "$CMD" -D $OUTPUTFOLDER/$MD5 -o csv -t 
 
 RET=$?
 
-mv $RUNFOLDER/$RUNFILE $OUTPUTFOLDER/$MD5 1>/dev/null 2>&1
+if [ $RET -eq 1 ]; then
+   mv $RUNFOLDER/$RUNFILE $OUTPUTFOLDER/$MD5 1>/dev/null 2>&1
+fi
 
 TCPDUMPPID=$(ps aux | grep "tcpdump -i xenbr1.$VLAN" | grep -v grep | awk -F" " '{print $2}')
 kill -9 $TCPDUMPPID 1>/dev/null 2>&1

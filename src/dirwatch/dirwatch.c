@@ -381,9 +381,9 @@ int main(int argc, char** argv)
 
     pool = g_thread_pool_new(run_drakvuf, NULL, threads, TRUE, NULL);
 
-    char buffer[sizeof(struct inotify_event) + 16];
+    char buffer[sizeof(struct inotify_event) + NAME_MAX + 1];
     int fd = inotify_init();
-    int wd = inotify_add_watch( fd, in_folder, IN_CREATE );
+    int wd = inotify_add_watch( fd, in_folder, IN_CLOSE_WRITE );
 
     do {
         processed = 0;
@@ -411,7 +411,7 @@ int main(int argc, char** argv)
 
         if (!processed) {
             printf("Run folder is empty, waiting for file creation\n");
-            int l = read( fd, buffer, sizeof(struct inotify_event) + 16 );
+            int l = read( fd, buffer, sizeof(struct inotify_event) + NAME_MAX + 1 );
         }
     } while(1);
 
