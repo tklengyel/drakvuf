@@ -232,7 +232,8 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
                 break;
             };
 
-            volatility_extract_file(f, drakvuf, file_pa);
+            if (f->dump_folder)
+                volatility_extract_file(f, drakvuf, file_pa);
 
             free(procname);
             free(str2.contents);
@@ -293,7 +294,7 @@ filedelete::filedelete(drakvuf_t drakvuf, const void *config, output_format_t ou
     this->domid = vmi_get_vmid(vmi);
     drakvuf_release_vmi(drakvuf);
 
-    this->dump_folder = c->dump_folder ? c->dump_folder : "/tmp";
+    this->dump_folder = c->dump_folder;
     this->format = output;
 
     if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "NtSetInformationFile", &this->traps[0].u2.rva))
