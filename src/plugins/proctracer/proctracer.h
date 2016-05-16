@@ -137,10 +137,12 @@ class proctracer: public plugin {
         };
 
         size_t *offsets;
+        uint64_t ccov_limit = -1;
 
         output_format_t format;
         unordered_map<addr_t,list<mod_info*>> trace_status;
         unordered_map<string,list<addr_t>> mod_config;
+        unordered_map<uint64_t,uint64_t> trace_statistics;
 
         proctracer(drakvuf_t drakvuf, const void *config, output_format_t output);
         ~proctracer();

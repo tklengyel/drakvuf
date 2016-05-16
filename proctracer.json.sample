@@ -1,0 +1,4 @@
+{
+    "modules":["MainModule.exe","DynamicModule1.dll","DynamicModule2.DLL"],
+    "ccov_limit":100 // Limit to dynamically adjust trap density, -1 to disable
+}

@@ -120,7 +120,11 @@ static event_response_t trace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info){
             printf("[PROCTRACER] Trace point hit - CR3: 0x%lx Module: %s Offset: 0x%lx \n",info->regs->cr3, ti->mod_name, ti->offset);
             break;
     }
-
+    
+    p->trace_statistics[info->trap_pa]+=1;
+    if (p->ccov_limit > 0 && p->trace_statistics[info->trap_pa] > p->ccov_limit){
+        drakvuf_remove_trap(drakvuf,info->trap,NULL);
+    }
     drakvuf_release_vmi(drakvuf);
     return 0;
 }
@@ -192,6 +196,7 @@ static bool add_trace_points(proctracer* p, drakvuf_t drakvuf, vmi_instance_t vm
         if (us) {
             status_t status = vmi_convert_str_encoding(us, &out, "UTF-8");
             if(VMI_SUCCESS == status){
+                printf("Module name: %s\n", (char*)out.contents);
                 if (p->mod_config.find((char*)out.contents) != p->mod_config.end()){
                     mod_info *mi = new mod_info;
                     mi->mod_name = (char*)out.contents;
@@ -213,6 +218,7 @@ static bool add_trace_points(proctracer* p, drakvuf_t drakvuf, vmi_instance_t vm
                         tracetrap->data = ti;
 
                         drakvuf_add_trap(drakvuf,tracetrap);
+                        p->trace_statistics[trap_pa]=0;
                         mi->traps.push_back(tracetrap);
                     }
                     p->trace_status[cr3].push_back(mi);
@@ -264,6 +270,7 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
     const char *proctracer_config;
     if (c->proctracer_config){
         proctracer_config = c->proctracer_config;
+        printf("Proctracer config: %s\n",proctracer_config);
     }else{
         proctracer_config = "proctracer.json";    
     }
@@ -284,11 +291,18 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
     }
     printf("[PROCTRACER] Main config loaded\n");
     json_object *conf_modules=NULL;
+    json_object *conf_ccov_limit=NULL;
     if (!json_object_object_get_ex(conf_root, "modules", &conf_modules)) {
         printf("[PROCTRACER] Can't find any modules to trace\n");
         json_object_put(conf_root);
         return;
     }
+
+    if (json_object_object_get_ex(conf_root, "ccov_limit", &conf_ccov_limit)){
+        this->ccov_limit=(uint64_t)json_object_get_int64(conf_ccov_limit);
+    }
+    printf("CCOV limit: %lu\n",this->ccov_limit);
+
     int conf_modules_len=json_object_array_length(conf_modules);
     printf("[PROCTRACER] Modules to trace: %d\n",conf_modules_len);
     for (int i=0; i<conf_modules_len; i++){
