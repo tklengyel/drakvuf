@@ -108,9 +108,10 @@
 #include "private.h"
 
 static event_response_t trace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info){
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     trace_info *ti=(trace_info*)info->trap->data;
     proctracer *p=(proctracer*)ti->p;
+    if (p->trace_status.find(info->regs->cr3) == p->trace_status.end())
+        return 0;
     switch(p->format){
         case OUTPUT_CSV:
             printf("proctracer,trace,0x%lx,\"%s\",0x%lx\n",info->regs->cr3, ti->mod_name, ti->offset);
@@ -125,7 +126,6 @@ static event_response_t trace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info){
     if (p->ccov_limit > 0 && p->trace_statistics[info->trap_pa] > p->ccov_limit){
         drakvuf_remove_trap(drakvuf,info->trap,NULL);
     }
-    drakvuf_release_vmi(drakvuf);
     return 0;
 }
 
