@@ -102,51 +102,28 @@
 #                                                                         #
 #*************************************************************************# 
 
-bin_PROGRAMS = drakvuf xen_memclone injector
+h_sources = libinjector.h private.h
+c_sources = injector.c
 
-SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch
-
-drakvuf_SOURCES = main.cpp drakvuf.cpp
-xen_memclone_SOURCES  = xen_memclone.c
-injector_SOURCES = injector.c
-
-AM_CFLAGS = $(CFLAGS)
+AM_CFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
+AM_CFLAGS += $(CFLAGS)
 AM_CFLAGS += $(VMI_CFLAGS)
 AM_CFLAGS += $(GLIB_CFLAGS)
-AM_CFLAGS += -I$(top_srcdir) -I$(srcdir)
-
-AM_CPPFLAGS = $(CPPFLAGS)
-AM_CPPFLAGS += $(VMI_CFLAGS)
-AM_CPPFLAGS += $(GLIB_CFLAGS)
-AM_CPPFLAGS += -I$(top_srcdir) -I$(srcdir)
 
 if HARDENING
 AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
-AM_CPPFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 endif
 
 # Note that -pg is incompatible with HARDENING
 if DEBUG
 AM_CFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -Wno-override-init -Wno-strict-aliasing -g -ggdb3
 AM_CFLAGS += -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-unused-variable
-AM_CPPFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -Wno-strict-aliasing -g -ggdb3
-AM_CPPFLAGS += -Wno-unused-parameter -Wno-unused-variable
 if !HARDENING
 AM_CFLAGS += -pg
-AM_CPPFLAGS += -pg
 endif
 endif
 
-drakvuf_LDADD = libdrakvuf/libdrakvuf.la
-drakvuf_LDADD += xen_helper/libxenhelper.la
-drakvuf_LDADD += plugins/libdrakvufplugins.la
-drakvuf_LDADD += libinjector/libinjector.la
-
-if HARDENING
-drakvuf_LDADD += $(HARDEN_LDFLAGS)
-endif
-
-injector_LDADD = libdrakvuf/libdrakvuf.la
-injector_LDADD += libinjector/libinjector.la
-
-xen_memclone_LDADD = xen_helper/libxenhelper.la
+noinst_LTLIBRARIES= libinjector.la
+libinjector_la_SOURCES= $(h_sources) $(c_sources)
+libinjector_la_LIBADD= ../xen_helper/libxenhelper.la
+libinjector_la_LIBADD+= ../libdrakvuf/libdrakvuf.la

@@ -102,11 +102,23 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef INJECTOR_H
-#define INJECTOR_H
+#ifndef LIBINJECTOR_H
+#define LIBINJECTOR_H
 
-#include "libdrakvuf.h"
-
-int start_app(drakvuf_t drakvuf, vmi_pid_t pid, const char *app);
-
+#ifdef __cplusplus
+extern "C" {
 #endif
+
+#pragma GCC visibility push(default)
+
+#include <libdrakvuf/libdrakvuf.h>
+
+int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, const char *app);
+
+#pragma GCC visibility pop
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // LIBINJECTOR_H

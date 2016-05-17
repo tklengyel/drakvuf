@@ -261,9 +261,6 @@ void drakvuf_remove_trap (drakvuf_t drakvuf,
 void drakvuf_loop (drakvuf_t drakvuf);
 void drakvuf_interrupt (drakvuf_t drakvuf,
                         int sig);
-int drakvuf_inject_cmd (drakvuf_t drakvuf,
-                        vmi_pid_t pid,
-                        const char *cmd);
 void drakvuf_pause (drakvuf_t drakvuf);
 void drakvuf_resume (drakvuf_t drakvuf);
 
@@ -273,6 +270,8 @@ void drakvuf_release_vmi(drakvuf_t drakvuf);
 addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
                                  addr_t process,
                                  uint64_t handle);
+
+const char *drakvuf_get_rekall_profile(drakvuf_t drakvuf);
 
 /*
  * Specify either vcpu_id and/or regs. If regs don't have the required info
@@ -297,6 +296,9 @@ bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
                                     uint64_t vcpu_id,
                                     const x86_registers_t *regs,
                                     uint32_t *thread_id);
+
+addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t eprocess_addr,
+                               const char *module, const char *sym);
 
 // Microsoft PreviousMode KTHREAD explanation:
 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff559860(v=vs.85).aspx

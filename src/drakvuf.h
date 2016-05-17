@@ -115,7 +115,8 @@
 #include <glib.h>
 
 #include <libdrakvuf/libdrakvuf.h>
-#include "plugins/plugins.h"
+#include <plugins/plugins.h>
+#include <libinjector/libinjector.h>
 
 class drakvuf_c {
     private:

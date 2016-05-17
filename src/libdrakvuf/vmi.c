@@ -352,8 +352,16 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 }
 
 event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
-    PRINT_DEBUG("CR3 cb on vCPU %u: 0x%" PRIx64 "\n", event->vcpu_id, event->reg_event.value);
     drakvuf_t drakvuf = (drakvuf_t)event->data;
+
+#ifdef DRAKVUF_DEBUG
+    /* This is very verbose and always on so we only print debug information
+     * when there is a subscriber trap */
+    if(drakvuf->cr3)
+        PRINT_DEBUG("CR3 cb on vCPU %u: 0x%" PRIx64 "\n", event->vcpu_id, event->reg_event.value);
+#endif
+
+    event->regs.x86->cr3 = event->reg_event.value;
 
     /* Flush the LibVMI caches */
     vmi_v2pcache_flush(drakvuf->vmi);
@@ -375,6 +383,8 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         trap->cb(drakvuf, &trap_info);
     }
     drakvuf->in_callback = 0;
+
+    process_free_requests(drakvuf);
 
     return 0;
 }
@@ -723,12 +733,12 @@ bool inject_traps_modules(drakvuf_t drakvuf,
             break;
 
         addr_t dllbase = 0;
-        vmi_read_addr_va(vmi, next_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid, &dllbase);
+        vmi_read_addr_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid, &dllbase);
 
         if (!dllbase)
             break;
 
-        unicode_string_t *us = vmi_read_unicode_str_va(vmi, next_module + offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
+        unicode_string_t *us = vmi_read_unicode_str_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
         unicode_string_t out = { .contents = NULL };
 
         if (us) {
@@ -755,35 +765,10 @@ void drakvuf_loop(drakvuf_t drakvuf) {
     PRINT_DEBUG("Started DRAKVUF loop\n");
 
     drakvuf->interrupted = 0;
-
-    vmi_event_t interrupt_event = { 0 };
-    SETUP_INTERRUPT_EVENT(&interrupt_event, 0, int3_cb);
-    interrupt_event.data = drakvuf;
-
-    if(VMI_FAILURE == vmi_register_event(drakvuf->vmi, &interrupt_event)) {
-        fprintf(stderr, "Failed to register interrupt event\n");
-        return;
-    }
-
-    vmi_event_t cr3_event = { 0 };
-    SETUP_REG_EVENT(&cr3_event, CR3, VMI_REGACCESS_W, 0, cr3_cb);
-    cr3_event.data = drakvuf;
-
-    if(VMI_FAILURE == vmi_register_event(drakvuf->vmi, &cr3_event)) {
-        fprintf(stderr, "Failed to register CR3 event\n");
-        return;
-    }
-
-    int rc = xc_altp2m_switch_to_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx);
-    if ( rc < 0 ) {
-        fprintf(stderr, "Failed to switch to altp2m view %u\n", drakvuf->altp2m_idx);
-        return;
-    }
-
     drakvuf_resume(drakvuf);
 
     while (!drakvuf->interrupted) {
-        PRINT_DEBUG("Waiting for events in DRAKVUF...\n");
+        //PRINT_DEBUG("Waiting for events in DRAKVUF...\n");
         status_t status = vmi_events_listen(drakvuf->vmi, 1000);
 
         if ( VMI_SUCCESS != status )
@@ -847,20 +832,9 @@ bool init_vmi(drakvuf_t drakvuf) {
         if (VMI_FAILURE
                 == drakvuf_get_struct_member_rva(
                         drakvuf->rekall_profile, offset_names[i][0],
-                        offset_names[i][1], &offsets[i])) {
+                        offset_names[i][1], &drakvuf->offsets[i])) {
             PRINT_DEBUG("Failed to find offset for %s:%s\n", offset_names[i][0],
                     offset_names[i][1]);
-        }
-    }
-
-    for (i = 0; i < SIZE_LIST_MAX; i++) {
-        if (VMI_FAILURE
-                == drakvuf_get_struct_size(
-                        drakvuf->rekall_profile, size_names[i],
-                        &struct_sizes[i])) {
-            PRINT_DEBUG("Failed to find offset for %s:%s\n", offset_names[i][0],
-                    offset_names[i][1]);
-            continue;
         }
     }
 
@@ -931,8 +905,29 @@ bool init_vmi(drakvuf_t drakvuf) {
         fprintf(stderr, "Failed to create altp2m view\n");
         return 0;
     }
-
     PRINT_DEBUG("Xen altp2m view created with idx: %u idr: %u\n", drakvuf->altp2m_idx, drakvuf->altp2m_idr);
+
+    SETUP_INTERRUPT_EVENT(&drakvuf->interrupt_event, 0, int3_cb);
+    drakvuf->interrupt_event.data = drakvuf;
+
+    if(VMI_FAILURE == vmi_register_event(drakvuf->vmi, &drakvuf->interrupt_event)) {
+        fprintf(stderr, "Failed to register interrupt event\n");
+        return 0;
+    }
+
+    SETUP_REG_EVENT(&drakvuf->cr3_event, CR3, VMI_REGACCESS_W, 0, cr3_cb);
+    drakvuf->cr3_event.data = drakvuf;
+
+    if(VMI_FAILURE == vmi_register_event(drakvuf->vmi, &drakvuf->cr3_event)) {
+        fprintf(stderr, "Failed to register CR3 event\n");
+        return 0;
+    }
+
+    rc = xc_altp2m_switch_to_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx);
+    if ( rc < 0 ) {
+        fprintf(stderr, "Failed to switch to altp2m view %u\n", drakvuf->altp2m_idx);
+        return 0;
+    }
 
     return 1;
 }

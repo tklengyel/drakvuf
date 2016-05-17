@@ -110,7 +110,7 @@
 #include <stdio.h>
 #include <glib.h>
 
-#include "vmi.h"
+#include "private.h"
 
 typedef enum dispatcher_object {
     DISPATCHER_PROCESS_OBJECT = 3,
@@ -134,17 +134,17 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id, const x86
         else
             fsgs = regs->gs_base;
 
-        prcb=offsets[KPCR_PRCB];
+        prcb=drakvuf->offsets[KPCR_PRCB];
     } else {
         if (!regs->fs_base)
             vmi_get_vcpureg(vmi, &fsgs, FS_BASE, vcpu_id);
         else
             fsgs = regs->fs_base;
 
-        prcb=offsets[KPCR_PRCBDATA];
+        prcb=drakvuf->offsets[KPCR_PRCBDATA];
     }
 
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, fsgs + prcb + offsets[KPRCB_CURRENTTHREAD], 0, &thread)){
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, fsgs + prcb + drakvuf->offsets[KPRCB_CURRENTTHREAD], 0, &thread)){
         return 0;
     }
 
@@ -156,7 +156,7 @@ addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id, const x8
 
     thread=drakvuf_get_current_thread(drakvuf,vcpu_id,regs);
 
-    if (thread == 0 || VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + offsets[KTHREAD_PROCESS], 0, &process)){
+    if (thread == 0 || VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_PROCESS], 0, &process)){
         return 0;
     }
 
@@ -164,7 +164,7 @@ addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id, const x8
 }
 
 char *drakvuf_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base) {
-    return vmi_read_str_va(drakvuf->vmi, eprocess_base + offsets[EPROCESS_PNAME], 0);
+    return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
 }
 
 char *drakvuf_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, const x86_registers_t *regs) {
@@ -182,7 +182,7 @@ bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, const x
 
     if ( ethread )
     {
-        if ( vmi_read_addr_va( drakvuf->vmi, ethread + offsets[ ETHREAD_CID ] + offsets[ CLIENT_ID_UNIQUETHREAD ],
+        if ( vmi_read_addr_va( drakvuf->vmi, ethread + drakvuf->offsets[ ETHREAD_CID ] + drakvuf->offsets[ CLIENT_ID_UNIQUETHREAD ],
                                0,
                                &p_tid ) == VMI_SUCCESS )
         {
@@ -207,7 +207,7 @@ bool drakvuf_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privil
     {
         *previous_mode = 0 ;
 
-        if ( vmi_read_8_va( drakvuf->vmi, kthread + offsets[ KTHREAD_PREVIOUSMODE ], 0,
+        if ( vmi_read_8_va( drakvuf->vmi, kthread + drakvuf->offsets[ KTHREAD_PREVIOUSMODE ], 0,
                             (uint8_t *)previous_mode ) == VMI_SUCCESS )
         {
             if ( ( *previous_mode == KERNEL_MODE ) || ( *previous_mode == USER_MODE ) )
@@ -239,8 +239,8 @@ bool drakvuf_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
             .dtb = dtb,
     };
 
-    ctx.addr = ethread_addr + offsets[ ETHREAD_TCB ] + offsets[ KTHREAD_HEADER ]
-                            + offsets[ DISPATCHER_TYPE ] ;
+    ctx.addr = ethread_addr + drakvuf->offsets[ ETHREAD_TCB ] + drakvuf->offsets[ KTHREAD_HEADER ]
+                            + drakvuf->offsets[ DISPATCHER_TYPE ] ;
 
     if ( vmi_read_8( drakvuf->vmi, &ctx, (uint8_t *)&dispatcher_type ) == VMI_SUCCESS )
     {
@@ -263,8 +263,8 @@ bool drakvuf_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
             .dtb = dtb,
     };
 
-    ctx.addr = eprocess_addr + offsets[ EPROCESS_PCB ] + offsets[ KPROCESS_HEADER ]
-                             + offsets[ DISPATCHER_TYPE ] ;
+    ctx.addr = eprocess_addr + drakvuf->offsets[ EPROCESS_PCB ] + drakvuf->offsets[ KPROCESS_HEADER ]
+                             + drakvuf->offsets[ DISPATCHER_TYPE ] ;
 
     if ( vmi_read_8( drakvuf->vmi, &ctx, (uint8_t *)&dispatcher_type ) == VMI_SUCCESS )
     {
@@ -285,17 +285,17 @@ bool drakvuf_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t *mo
     if(!eprocess_base)
         return false;
 
-    if(VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
+    if(VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
         return false;
 
-    if(VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + offsets[EPROCESS_PEB], 0, &peb))
+    if(VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb))
         return false;
 
-    ctx.addr = peb + offsets[PEB_LDR];
+    ctx.addr = peb + drakvuf->offsets[PEB_LDR];
     if(VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ldr))
         return false;
 
-    ctx.addr = ldr + offsets[PEB_LDR_DATA_INLOADORDERMODULELIST];
+    ctx.addr = ldr + drakvuf->offsets[PEB_LDR_DATA_INLOADORDERMODULELIST];
     if(VMI_FAILURE == vmi_read_addr(vmi, &ctx, &modlist))
         return false;
 
@@ -312,7 +312,7 @@ bool drakvuf_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *fi
     vmi_instance_t vmi = drakvuf->vmi;
     vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
 
-    addr_t list_head = current_process + offsets[EPROCESS_TASKS];
+    addr_t list_head = current_process + drakvuf->offsets[EPROCESS_TASKS];
     addr_t current_list_entry = list_head;
 
     status_t status = vmi_read_addr_va(vmi, current_list_entry, 0,
@@ -324,9 +324,9 @@ bool drakvuf_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *fi
 
     do {
         vmi_pid_t pid = ~0;
-        current_process = current_list_entry - offsets[EPROCESS_TASKS] ;
-        vmi_read_32_va(vmi, current_process + offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
-        char *procname = vmi_read_str_va(vmi, current_process + offsets[EPROCESS_PNAME], 0);
+        current_process = current_list_entry - drakvuf->offsets[EPROCESS_TASKS] ;
+        vmi_read_32_va(vmi, current_process + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
+        char *procname = vmi_read_str_va(vmi, current_process + drakvuf->offsets[EPROCESS_PNAME], 0);
 
         if((pid != ~0 && find_pid != ~0 && pid == find_pid) || (find_procname && procname && !strcmp(procname, find_procname))) {
             *eprocess_addr = current_process;

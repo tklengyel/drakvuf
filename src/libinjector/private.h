@@ -102,68 +102,41 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <libvmi/libvmi.h>
-
-#include <libdrakvuf/libdrakvuf.h>
-#include <libinjector/libinjector.h>
-
-static drakvuf_t drakvuf;
-
-static void close_handler(int sig) {
-    drakvuf_interrupt(drakvuf, sig);
-}
-
-int main(int argc, char** argv)
-{
-    if (argc < 5) {
-        printf("Usage: ./%s <rekall profile> <domain> <pid> <app>\n", argv[0]);
-        return 1;
-    }
-
-    int rc = 0;
-    const char *rekall_profile = argv[1];
-    const char *domain = argv[2];
-    vmi_pid_t pid = atoi(argv[3]);
-    char *app = argv[4];
-    bool verbose = 0;
+#ifndef LIBINJECTOR_PRIVATE_H
+#define LIBINJECTOR_PRIVATE_H
 
 #ifdef DRAKVUF_DEBUG
-    verbose = 1;
+
+extern bool verbose;
+
+#define PRINT_DEBUG(args...) \
+    do { \
+        if(verbose) fprintf (stderr, args); \
+    } while (0)
+
+#else
+#define PRINT_DEBUG(args...) \
+    do {} while(0)
 #endif
 
-    /* for a clean exit */
-    struct sigaction act;
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
+enum offset {
+    NT_TIB_STACKBASE,
+    NT_TIB_STACKLIMIT,
+    KTHREAD_TRAPFRAME,
+    KTRAP_FRAME_RIP,
 
-    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose)) {
-        fprintf(stderr, "Failed to initialize on domain %s\n", domain);
-        return rc;
-    }
+    OFFSET_MAX
+};
 
-    drakvuf_pause(drakvuf);
+static const char *offset_names[OFFSET_MAX][2] = {
+    [NT_TIB_STACKBASE] = { "_NT_TIB", "StackBase" },
+    [NT_TIB_STACKLIMIT] = { "_NT_TIB", "StackLimit" },
+    [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
+    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
+};
 
-    if (pid > 0 && app) {
-        printf("Injector starting %s through PID %u\n", app, pid);
-        rc = injector_start_app(drakvuf, pid, app);
+event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info);
+event_response_t psexit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info);
+event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info);
 
-        if (!rc) {
-            printf("Process startup failed\n");
-        } else {
-            printf("Process startup success\n");
-        }
-    }
-
-    drakvuf_resume(drakvuf);
-    drakvuf_close(drakvuf);
-
-    return rc;
-}
+#endif

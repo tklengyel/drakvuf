@@ -105,13 +105,15 @@
 #ifndef VMI_H
 #define VMI_H
 
-#include "private.h"
-
 #define BIT32 0
 #define BIT64 1
 #define PM2BIT(pm) ((pm == VMI_PM_IA32E) ? BIT64 : BIT32)
 
 #define TRAP 0xCC
+
+#include <glib.h>
+#include <stdbool.h>
+#include "libdrakvuf.h"
 
 #define ghashtable_foreach(table, i, key, val) \
       g_hash_table_iter_init(&i, table); \
@@ -247,27 +249,6 @@ static const char *offset_names[OFFSET_MAX][2] = {
     [POOL_HEADER_POOLTAG] = {"_POOL_HEADER", "PoolTag" },
     [DISPATCHER_TYPE] = { "_DISPATCHER_HEADER",  "Type" },
 };
-
-size_t offsets[OFFSET_MAX];
-
-enum size {
-    FILE_OBJECT,
-    //OBJECT_ATTRIBUTES,
-    //OBJECT_HEADER,
-    POOL_HEADER,
-
-    SIZE_LIST_MAX
-};
-
-static const char *size_names[SIZE_LIST_MAX] = {
-        [FILE_OBJECT] = "_FILE_OBJECT",
-        //[OBJECT_ATTRIBUTES] = "_OBJECT_ATTRIBUTES", // May be useful TODO
-        //[OBJECT_HEADER] = "_OBJECT_HEADER",
-        [POOL_HEADER] = "_POOL_HEADER",
-};
-
-// Aligned object sizes
-size_t struct_sizes[SIZE_LIST_MAX];
 
 bool init_vmi(drakvuf_t drakvuf);
 void close_vmi(drakvuf_t drakvuf);
