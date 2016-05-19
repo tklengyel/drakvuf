@@ -1032,6 +1032,7 @@ void close_vmi(drakvuf_t drakvuf) {
         xen_pfn_t *key;
         struct remapped_gfn *remapped_gfn = NULL;
         ghashtable_foreach(drakvuf->remapped_gfns, i, key, remapped_gfn) {
+            xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx, remapped_gfn->o, ~0);
             xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &remapped_gfn->r);
         }
         g_hash_table_destroy(drakvuf->remapped_gfns);
