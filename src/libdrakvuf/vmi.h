@@ -277,7 +277,8 @@ event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
 event_response_t vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
 
 bool inject_trap_mem(drakvuf_t drakvuf,
-                     drakvuf_trap_t *trap);
+                     drakvuf_trap_t *trap,
+                     bool guard2);
 bool inject_trap_pa(drakvuf_t drakvuf,
                     drakvuf_trap_t *trap,
                     addr_t pa);
