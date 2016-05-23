@@ -125,14 +125,14 @@ static gpointer timer(gpointer data)
     return NULL;
 }
 
-int drakvuf_c::start_plugins(const bool* plugin_list, const char *dump_folder)
+int drakvuf_c::start_plugins(const char *dump_folder,
+                             const char *proctracer_config)
 {
     int i, rc;
 
     for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
     {
-        if (plugin_list[i]) {
-            switch ((drakvuf_plugin_t)i) {
+        switch ((drakvuf_plugin_t)i) {
             case PLUGIN_FILEDELETE:
             {
                 struct filedelete_config c = {
@@ -144,14 +144,24 @@ int drakvuf_c::start_plugins(const bool* plugin_list, const char *dump_folder)
                 break;
             }
 
+            case PLUGIN_PROCTRACER:
+            {
+                struct proctracer_config c = {
+                    .rekall_profile = this->rekall_profile,
+                    .proctracer_config = proctracer_config
+                };
+
+                rc = this->plugins->start((drakvuf_plugin_t)i, &c);
+                break;
+            }
+
             default:
                 rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
                 break;
-            };
+        };
 
-            if ( !rc )
-                return rc;
-        }
+        if ( !rc )
+            return rc;
     }
 
     return 1;

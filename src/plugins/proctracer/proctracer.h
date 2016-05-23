@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,157 +102,50 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
-#include <glib.h>
+#ifndef PROCTRACER_H
+#define PROCTRACER_H
 
-#include "drakvuf.h"
+#include "plugins/plugins.h"
+#include<list>
+#include<unordered_map>
 
-static drakvuf_c* drakvuf;
+using namespace std;
 
-void close_handler(int signal) {
-    drakvuf->interrupt(signal);
-}
+struct mod_info{
+    string mod_name;
+    list<drakvuf_trap_t*> traps;
+};
 
-static inline void disable_plugin(char *optarg, bool *plugin_list) {
-    int i;
-    for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
-        if(!strcmp(optarg, drakvuf_plugin_names[i]))
-            plugin_list[i] = 0;
-}
+class proctracer: public plugin {
+    public:
+        drakvuf_trap_t trap = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 4,
+            .breakpoint.addr_type = ADDR_RVA,
+            .name = "PsGetCurrentThreadTeb",
+            .breakpoint.module = "ntoskrnl.exe",
+            .type = BREAKPOINT
+        };
 
-int main(int argc, char** argv) {
-    int c, i, rc = 0, timeout = 0;
-    char *inject_cmd = NULL;
-    char *domain = NULL;
-    char *rekall_profile = NULL;
-    char *dump_folder = NULL;
-    char *proctracer_config = NULL;
-    vmi_pid_t injection_pid = -1;
-    struct sigaction act;
-    GThread *timeout_thread = NULL;
-    output_format_t output = OUTPUT_DEFAULT;
-    bool plugin_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 1};
-    bool verbose = 0;
+        drakvuf_trap_t exit_trap = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 4,
+            .breakpoint.addr_type = ADDR_RVA,
+            .name = "PspExitProcess",
+            .breakpoint.module = "ntoskrnl.exe",
+            .type = BREAKPOINT
+        };
 
-    fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
+        size_t *offsets;
+        uint64_t ccov_limit = -1;
 
-    if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 ) {
-        fprintf(stderr, "No plugins have been enabled, nothing to do!\n");
-        return rc;
-    }
+        output_format_t format;
+        unordered_map<addr_t,list<mod_info*>> trace_status;
+        unordered_map<string,list<addr_t>> mod_config;
+        unordered_map<uint64_t,uint64_t> trace_statistics;
 
-    if (argc < 4) {
-        fprintf(stderr, "Required input:\n"
-               "\t -r <rekall profile>       The Rekall profile of the Windows kernel\n"
-               "\t -d <domain ID or name>    The domain's ID or name\n"
-               "Optional inputs:\n"
-               "\t -i <injection pid>        The PID of the process to hijack for injection\n"
-               "\t -e <inject_exe>           The executable to start with injection\n"
-               "\t -t <timeout>              Timeout (in seconds)\n"
-               "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
-               "\t -o <format>               Output format (default or csv)\n"
-               "\t -x <plugin>               Don't activate the specified plugin\n"
-#ifdef ENABLE_PLUGIN_PROCTRACER
-               "\t -P <proctracer config>    Proctracer config json location\n"
+        proctracer(drakvuf_t drakvuf, const void *config, output_format_t output);
+        ~proctracer();
+};
+
 #endif
-#ifdef DRAKVUF_DEBUG
-               "\t -v                        Turn on verbose (debug) output\n"
-#endif
-        );
-        return rc;
-    }
-
-    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:vx:P")) != -1)
-    switch (c)
-    {
-    case 'r':
-        rekall_profile = optarg;
-        break;
-    case 'd':
-        domain = optarg;
-        break;
-    case 'i':
-        injection_pid = atoi(optarg);
-        break;
-    case 'e':
-        inject_cmd = optarg;
-        break;
-    case 't':
-        timeout = atoi(optarg);
-        break;
-    case 'D':
-        dump_folder = optarg;
-        break;
-    case 'o':
-        if(!strncmp(optarg,"csv",3))
-            output = OUTPUT_CSV;
-        break;
-    case 'x':
-        disable_plugin(optarg, plugin_list);
-        break;
-#ifdef DRAKVUF_DEBUG
-    case 'v':
-        verbose = 1;
-        break;
-#endif
-#ifdef ENABLE_PLUGIN_PROCTRACER
-    case 'P':
-        proctracer_config = optarg;
-        break;
-#endif
-    default:
-        fprintf(stderr, "Unrecognized option: %c\n", c);
-        return rc;
-    }
-
-    if (!domain) {
-        fprintf(stderr, "No domain name specified (-d)!\n");
-        return rc;
-    }
-
-    if (!rekall_profile) {
-        fprintf(stderr, "No Rekall profile specified (-r)!\n");
-        return rc;
-    }
-
-    try {
-        drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose);
-    } catch(int e) {
-        fprintf(stderr, "Failed to initialize DRAKVUF\n");
-        return rc;
-    }
-
-    /* for a clean exit */
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
-
-    if ( injection_pid > 0 && inject_cmd ) {
-        rc = drakvuf->inject_cmd(injection_pid, inject_cmd);
-        if (!rc)
-            goto exit;
-    }
-
-    rc = drakvuf->start_plugins(dump_folder, proctracer_config);
-    if (!rc)
-        goto exit;
-
-    /* Start the event listener */
-    drakvuf->loop();
-    rc = 1;
-
-exit:
-    drakvuf->pause();
-    delete drakvuf;
-    return rc;
-}
