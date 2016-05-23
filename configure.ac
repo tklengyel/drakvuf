@@ -123,7 +123,7 @@ AC_ARG_ENABLE([plugin_syscalls],
   [AS_HELP_STRING([--disable-plugin-syscalls],
     [Enable the syscall tracing plugin @<:@yes@:>@])],
   [plugin_syscalls="$enableval"],
-  [plugin_syscalls="yes"])   
+  [plugin_syscalls="yes"]) 
 AM_CONDITIONAL([PLUGIN_SYSCALLS], [test x$plugin_syscalls = xyes])
 if test x$plugin_syscalls = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_SYSCALLS, 1, "")
@@ -133,7 +133,7 @@ AC_ARG_ENABLE([plugin_poolmon],
   [AS_HELP_STRING([--disable-plugin-poolmon],
     [Enable the kernel heap allocation tracer @<:@yes@:>@])],
   [plugin_poolmon="$enableval"],
-  [plugin_poolmon="yes"])   
+  [plugin_poolmon="yes"])
 AM_CONDITIONAL([PLUGIN_POOLMON], [test x$plugin_poolmon = xyes])
 if test x$plugin_poolmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_POOLMON, 1, "")
@@ -143,7 +143,7 @@ AC_ARG_ENABLE([plugin_filetracer],
   [AS_HELP_STRING([--disable-plugin-filetracer],
     [Enable the file tracer plugin @<:@yes@:>@])],
   [plugin_filetracer="$enableval"],
-  [plugin_filetracer="yes"])   
+  [plugin_filetracer="yes"])
 AM_CONDITIONAL([PLUGIN_FILETRACER], [test x$plugin_filetracer = xyes])
 if test x$plugin_filetracer = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_FILETRACER, 1, "")
@@ -153,7 +153,7 @@ AC_ARG_ENABLE([plugin_filedelete],
   [AS_HELP_STRING([--disable-plugin-filedelete],
     [Enable the file delete catching plugin @<:@yes@:>@])],
   [plugin_filedelete="$enableval"],
-  [plugin_filedelete="yes"])   
+  [plugin_filedelete="yes"])
 AM_CONDITIONAL([PLUGIN_FILEDELETE], [test x$plugin_filedelete = xyes])
 if test x$plugin_filedelete = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_FILEDELETE, 1, "")
@@ -163,7 +163,7 @@ AC_ARG_ENABLE([plugin_objmon],
   [AS_HELP_STRING([--disable-plugin-objmon],
     [Enable the ObCreateObject watching plugin @<:@yes@:>@])],
   [plugin_objmon="$enableval"],
-  [plugin_objmon="yes"])   
+  [plugin_objmon="yes"])
 AM_CONDITIONAL([PLUGIN_OBJMON], [test x$plugin_objmon = xyes])
 if test x$plugin_objmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_OBJMON, 1, "")
@@ -173,7 +173,7 @@ AC_ARG_ENABLE([plugin_exmon],
   [AS_HELP_STRING([--disable-plugin-exmon],
     [Enable the KiDispatchException watching plugin @<:@yes@:>@])],
   [plugin_exmon="$enableval"],
-  [plugin_exmon="yes"])   
+  [plugin_exmon="yes"])
 AM_CONDITIONAL([PLUGIN_EXMON], [test x$plugin_exmon = xyes])
 if test x$plugin_exmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_EXMON, 1, "")
@@ -183,7 +183,7 @@ AC_ARG_ENABLE([plugin_proctracer],
   [AS_HELP_STRING([--disable-plugin-proctracer],
     [Enable the Proctracer plugin @<:@yes@:>@])],
   [plugin_proctracer="$enableval"],
-  [plugin_proctracer="yes"])   
+  [plugin_proctracer="yes"])
 AM_CONDITIONAL([PLUGIN_PROCTRACER], [test x$plugin_proctracer = xyes])
 if test x$plugin_proctracer = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PROCTRACER, 1, "")
@@ -196,13 +196,13 @@ AC_ARG_ENABLE([hardening],
     [Enable compiler and linker options to frustrate memory corruption exploits @<:@yes@:>@])],
   [hardening="$enableval"],
   [hardening="yes"])
-AM_CONDITIONAL([HARDENING], [test x$hardening = xyes])  
-  
+AM_CONDITIONAL([HARDENING], [test x$hardening = xyes]) 
+
 AC_ARG_ENABLE([debug],
   [AS_HELP_STRING([--enable-debug],
     [Enable verbose debug output to be compiled @<:@no@:>@])],
   [debug="$enableval"],
-  [debug="no"])   
+  [debug="no"])
 AM_CONDITIONAL([DEBUG], [test x$debug = xyes])
 
 #####################################################
