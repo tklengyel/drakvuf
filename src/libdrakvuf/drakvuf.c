@@ -107,8 +107,8 @@
 
 #include "libdrakvuf.h"
 #include "private.h"
-#include "vmi.h"
 #include "win-symbols.h"
+#include "win-exports.h"
 
 #ifdef DRAKVUF_DEBUG
 bool verbose = 0;
@@ -200,7 +200,7 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
                 if( !drakvuf_find_eprocess(drakvuf, pid, name, &process_base) )
                     return 0;
 
-               if(pid == ~0 && VMI_FAILURE == vmi_read_32_va(drakvuf->vmi, process_base + offsets[EPROCESS_PID], 0, (uint32_t*)&pid))
+               if(pid == ~0 && VMI_FAILURE == vmi_read_32_va(drakvuf->vmi, process_base + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)&pid))
                     return 0;
 
                if( !drakvuf_get_module_list(drakvuf, process_base, &module_list) )
@@ -224,7 +224,21 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
 
         if(trap->breakpoint.addr_type == ADDR_PA) {
             fprintf(stderr, "DRAKVUF Trap misconfiguration: PID lookup specified for PA location\n");
+            return 0;
         }
+    }
+
+    if(trap->breakpoint.lookup_type == LOOKUP_DTB) {
+        if(trap->breakpoint.addr_type == ADDR_VA) {
+            addr_t trap_pa = vmi_pagetable_lookup(drakvuf->vmi, trap->breakpoint.dtb, trap->breakpoint.addr);
+            PRINT_DEBUG("Breakpoint VA 0x%" PRIx64" -> PA 0x%" PRIx64 "\n", trap->breakpoint.addr, trap_pa);
+            if (!trap_pa)
+                return 0;
+
+            return inject_trap_pa(drakvuf, trap, trap_pa);
+        }
+
+        //TODO: ADDR_RVA
     }
 
     return 0;
@@ -359,13 +373,13 @@ bool drakvuf_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, c
 
         base_addr = 0 ;
 
-        if ( vmi_read_addr_va( vmi, next_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], 4, &base_addr ) != VMI_SUCCESS )
+        if ( vmi_read_addr_va( vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], 4, &base_addr ) != VMI_SUCCESS )
             break;
 
         if ( ! base_addr )
             break;
 
-        unicode_string_t *us = vmi_read_unicode_str_va( vmi, next_module + offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4 );
+        unicode_string_t *us = vmi_read_unicode_str_va( vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4 );
 
         if ( us )
         {
@@ -389,4 +403,15 @@ bool drakvuf_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, c
     }
 
     return false ;
+}
+
+
+const char *drakvuf_get_rekall_profile(drakvuf_t drakvuf) {
+    return drakvuf->rekall_profile;
+}
+
+addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t eprocess_addr,
+                               const char *module, const char *sym)
+{
+    return eprocess_sym2va(drakvuf, eprocess_addr, module, sym);
 }

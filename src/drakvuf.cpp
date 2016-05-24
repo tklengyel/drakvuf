@@ -181,6 +181,9 @@ drakvuf_c::drakvuf_c(const char* domain,
 
 void drakvuf_c::close()
 {
+    this->interrupted = -1;
+    g_mutex_trylock(&this->loop_signal);
+    g_mutex_unlock(&this->loop_signal);
     g_mutex_clear(&this->loop_signal);
 
     if (this->plugins)
@@ -228,7 +231,7 @@ void drakvuf_c::resume()
 
 int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, const char *inject_cmd)
 {
-    int rc = drakvuf_inject_cmd(this->drakvuf, injection_pid, inject_cmd);
+    int rc = injector_start_app(this->drakvuf, injection_pid, inject_cmd);
     if (!rc)
         fprintf(stderr, "Process startup failed\n");
     return rc;

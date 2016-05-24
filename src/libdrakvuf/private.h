@@ -116,6 +116,7 @@
 #include <libvmi/events.h>
 
 #include "libdrakvuf.h"
+#include "vmi.h"
 #include "../xen_helper/xen_helper.h"
 
 #ifdef DRAKVUF_DEBUG
@@ -146,7 +147,11 @@ struct drakvuf {
     GMutex vmi_lock;
     vmi_instance_t vmi;
 
+    vmi_event_t cr3_event;
+    vmi_event_t interrupt_event;
     vmi_event_t *step_event[16];
+
+    size_t offsets[OFFSET_MAX];
 
     // Processing trap removals in trap callbacks
     // is problematic so we save all such requests

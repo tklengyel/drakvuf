@@ -110,7 +110,7 @@
 #include <stdio.h>
 #include <glib.h>
 
-#include "vmi.h"
+#include "private.h"
 
 /* this should work for both 32 and 64bit */
 #define EX_FAST_REF_MASK    7
@@ -197,12 +197,12 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
 
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t handletable = 0, tablecode = 0;
-    vmi_read_addr_va(vmi, process + offsets[EPROCESS_OBJECTTABLE],
+    vmi_read_addr_va(vmi, process + drakvuf->offsets[EPROCESS_OBJECTTABLE],
                      0, &handletable);
     vmi_read_addr_va(vmi, handletable, 0, &tablecode);
 
     uint32_t handlecount = 0;
-    vmi_read_32_va(vmi, handletable + offsets[HANDLE_TABLE_HANDLECOUNT],
+    vmi_read_32_va(vmi, handletable + drakvuf->offsets[HANDLE_TABLE_HANDLECOUNT],
             0, &handlecount);
 
     // _EX_FAST_REF-style pointer, last three bits are used for storing the number of levels
@@ -238,7 +238,7 @@ bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t *info, ad
         };
 
         // Get TypeIndex from _OBJ_HEADER...
-        ctx.addr = obj_addr + offsets[ OBJECT_HEADER_TYPEINDEX ] ;
+        ctx.addr = obj_addr + drakvuf->offsets[ OBJECT_HEADER_TYPEINDEX ] ;
 
         if ( vmi_read_8( drakvuf->vmi, &ctx, &object_type ) == VMI_SUCCESS )
         {
@@ -247,13 +247,13 @@ bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t *info, ad
                 if ( object_type == OBJ_MANAGER_PROCESS_OBJECT )
                 {
                     // Object Body must be an _EPROCESS...
-                    ret = drakvuf_is_eprocess( drakvuf, info->regs->cr3, obj_addr + offsets[ OBJECT_HEADER_BODY ] );
+                    ret = drakvuf_is_eprocess( drakvuf, info->regs->cr3, obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ] );
                 }
                 else
                 if ( object_type == OBJ_MANAGER_THREAD_OBJECT )
                 {
                     // Object Body must be an _ETHREAD...
-                    ret = drakvuf_is_ethread( drakvuf, info->regs->cr3, obj_addr + offsets[ OBJECT_HEADER_BODY ] );
+                    ret = drakvuf_is_ethread( drakvuf, info->regs->cr3, obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ] );
                 }
                 else // Other object types...
                     ret = true ;
@@ -263,7 +263,7 @@ bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t *info, ad
 
     if ( ret )
     {
-        *obj_body_addr = obj_addr + offsets[ OBJECT_HEADER_BODY ];
+        *obj_body_addr = obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ];
     }
 
     return ret ;

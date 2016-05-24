@@ -228,7 +228,7 @@ int main(int argc, char** argv) {
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if ( injection_pid && inject_cmd ) {
+    if ( injection_pid > 0 && inject_cmd ) {
         rc = drakvuf->inject_cmd(injection_pid, inject_cmd);
         if (!rc)
             goto exit;
