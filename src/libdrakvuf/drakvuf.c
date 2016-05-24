@@ -260,7 +260,7 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
             ret = inject_trap_breakpoint(drakvuf, trap);
             break;
         case MEMACCESS:
-            ret = inject_trap_mem(drakvuf, trap);
+            ret = inject_trap_mem(drakvuf, trap, 0);
             break;
         case REGISTER:
             ret = inject_trap_reg(drakvuf, trap);

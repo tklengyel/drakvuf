@@ -164,11 +164,6 @@ struct drakvuf {
     GHashTable *remapped_gfns; // Key: gfn
                                // val: remapped gfn
 
-    GHashTable *guards;  // Key: gfn
-                         // val: vmi_event_t
-    GHashTable *guards2; // Key: gfn
-                         // val: vmi_event_t
-
     GHashTable *breakpoint_lookup_pa;   // key: PA of trap
                                         // val: struct breakpoint
     GHashTable *breakpoint_lookup_trap; // key: trap pointer
@@ -184,12 +179,13 @@ struct drakvuf {
 
 struct breakpoint {
     addr_t pa;
-    vmi_event_t *guard, *guard2;
+    drakvuf_trap_t guard, guard2;
 } __attribute__ ((packed));
 
 struct memaccess {
     addr_t gfn;
     addr_t pa;
+    bool guard2;
     vmi_event_t *memtrap;
 } __attribute__ ((packed));
 
