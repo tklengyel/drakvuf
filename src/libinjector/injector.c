@@ -139,7 +139,7 @@ struct injector {
     addr_t saved_r8;
     addr_t saved_r9;
 
-    drakvuf_trap_t entry, ret, cr3_event;
+    drakvuf_trap_t bp, cr3_event;
     GSList *memtraps;
     GTimer *timer;
 
@@ -488,19 +488,6 @@ void pass_inputs(struct injector *injector, drakvuf_trap_info_t *info) {
 
     // Grow the stack
     vmi_set_vcpureg(vmi, addr, RSP, info->vcpu);
-
-    injector->ret.type = BREAKPOINT;
-    injector->ret.name = "ret";
-    injector->ret.cb = injector_int3_cb;
-    injector->ret.data = injector;
-    injector->ret.breakpoint.lookup_type = LOOKUP_DTB;
-    injector->ret.breakpoint.dtb = info->regs->cr3;
-    injector->ret.breakpoint.addr_type = ADDR_VA;
-    injector->ret.breakpoint.addr = info->regs->rip;
-
-    if ( !drakvuf_add_trap(injector->drakvuf, &injector->ret) )
-        fprintf(stderr, "Failed to trap return location of injected function call @ 0x%lx!\n",
-                injector->ret.breakpoint.addr);
 }
 
 event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
@@ -536,7 +523,21 @@ event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     vmi_set_vcpureg(injector->vmi, injector->createprocessa, RIP, info->vcpu);
     pass_inputs(injector, info);
 
-    PRINT_DEBUG("Stack setup finished and return trap added @ 0x%" PRIx64 "\n", injector->ret.breakpoint.addr);
+    injector->bp.type = BREAKPOINT;
+    injector->bp.name = "ret";
+    injector->bp.cb = injector_int3_cb;
+    injector->bp.data = injector;
+    injector->bp.breakpoint.lookup_type = LOOKUP_DTB;
+    injector->bp.breakpoint.dtb = info->regs->cr3;
+    injector->bp.breakpoint.addr_type = ADDR_VA;
+    injector->bp.breakpoint.addr = info->regs->rip;
+
+    if ( !drakvuf_add_trap(injector->drakvuf, &injector->bp) )
+        fprintf(stderr, "Failed to trap return location of injected function call @ 0x%lx!\n",
+                injector->bp.breakpoint.addr);
+
+    PRINT_DEBUG("Stack setup finished and return trap added @ 0x%" PRIx64 "\n",
+                injector->bp.breakpoint.addr);
 
     injector->hijacked = 1;
 
@@ -601,24 +602,24 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
         status = vmi_read_addr_va(injector->vmi,
                         trapframe + injector->offsets[KTRAP_FRAME_RIP],
-                        0, &injector->entry.breakpoint.addr);
+                        0, &injector->bp.breakpoint.addr);
 
-        if (status == VMI_FAILURE || !injector->entry.breakpoint.addr) {
+        if (status == VMI_FAILURE || !injector->bp.breakpoint.addr) {
             PRINT_DEBUG("Failed to read RIP from trapframe or RIP is NULL!\n");
             return 0;
         }
 
-        injector->entry.type = BREAKPOINT;
-        injector->entry.name = "entry";
-        injector->entry.cb = injector_int3_cb;
-        injector->entry.data = injector;
-        injector->entry.breakpoint.lookup_type = LOOKUP_DTB;
-        injector->entry.breakpoint.dtb = cr3;
-        injector->entry.breakpoint.addr_type = ADDR_VA;
+        injector->bp.type = BREAKPOINT;
+        injector->bp.name = "entry";
+        injector->bp.cb = injector_int3_cb;
+        injector->bp.data = injector;
+        injector->bp.breakpoint.lookup_type = LOOKUP_DTB;
+        injector->bp.breakpoint.dtb = cr3;
+        injector->bp.breakpoint.addr_type = ADDR_VA;
 
-        if ( drakvuf_add_trap(drakvuf, &injector->entry) ) {
+        if ( drakvuf_add_trap(drakvuf, &injector->bp) ) {
             PRINT_DEBUG("Got return address 0x%lx from trapframe and it's now trapped!\n",
-                        injector->entry.breakpoint.addr);
+                        injector->bp.breakpoint.addr);
 
             // Unsubscribe from the CR3 trap
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
@@ -674,7 +675,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
         return 0;
     }
 
-    if ( !injector->is32bit && info->regs->rip == injector->entry.breakpoint.addr ) {
+    if ( !injector->is32bit && !injector->hijacked && info->regs->rip == injector->bp.breakpoint.addr ) {
         /* We just hit the RIP from the trapframe */
 
         injector->saved_rsp = info->regs->rsp;
@@ -683,25 +684,21 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
         injector->saved_rdx = info->regs->rdx;
         injector->saved_r8 = info->regs->r8;
         injector->saved_r9 = info->regs->r9;
-
-        drakvuf_remove_trap(drakvuf, &injector->entry, NULL);
-        injector->entry.breakpoint.addr = 0;
+        injector->hijacked = 1;
 
         vmi_set_vcpureg(injector->vmi, injector->createprocessa, RIP, info->vcpu);
         pass_inputs(injector, info);
 
-        PRINT_DEBUG("Stack setup finished and return trap added @ 0x%" PRIx64 "\n", injector->ret.breakpoint.addr);
-
         return 0;
     }
 
-    if ( info->regs->rip != injector->ret.breakpoint.addr )
+    if ( !injector->hijacked || info->regs->rip != injector->bp.breakpoint.addr )
         return 0;
 
     // We are now in the return path from CreateProcessA
 
     drakvuf_interrupt(drakvuf, -1);
-    drakvuf_remove_trap(drakvuf, &injector->ret, NULL);
+    drakvuf_remove_trap(drakvuf, &injector->bp, NULL);
 
     reg_t rax = info->regs->rax;
 
