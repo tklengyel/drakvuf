@@ -541,6 +541,9 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t *trap, bool guard2) {
         g_hash_table_insert(drakvuf->memaccess_lookup_trap, g_memdup(&trap, sizeof(void*)), s);
         return 1;
     } else {
+
+        xen_unshare_gfn(drakvuf->xen, drakvuf->domID, trap->memaccess.gfn);
+
         s = g_malloc0(sizeof(struct wrapper));
         s->drakvuf = drakvuf;
         s->traps = g_slist_prepend(s->traps, trap);
