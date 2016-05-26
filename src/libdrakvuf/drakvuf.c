@@ -118,8 +118,10 @@ void drakvuf_close(drakvuf_t drakvuf) {
     if (!drakvuf)
         return;
 
-    if (drakvuf->vmi)
+    if (drakvuf->vmi) {
+        vmi_pause_vm(drakvuf->vmi);
         close_vmi(drakvuf);
+    }
 
     if (drakvuf->xen)
         xen_free_interface(drakvuf->xen);
@@ -257,17 +259,17 @@ bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
 
 bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
 
-    bool ret = 0;
-    vmi_pause_vm(drakvuf->vmi);
+    bool ret;
 
     if (!trap)
-        goto done;
+        return 0;
 
     if(g_hash_table_lookup(drakvuf->remove_traps, &trap)) {
         g_hash_table_remove(drakvuf->remove_traps, &trap);
-        ret = 1;
-        goto done;
+        return 1;
     }
+
+    drakvuf_pause(drakvuf);
 
     switch(trap->type) {
         case BREAKPOINT:
@@ -280,11 +282,11 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
             ret = inject_trap_reg(drakvuf, trap);
             break;
         default:
+            ret = 0;
             break;
     }
 
-done:
-    vmi_resume_vm(drakvuf->vmi);
+    drakvuf_resume(drakvuf);
     return ret;
 }
 
@@ -326,7 +328,11 @@ void drakvuf_pause (drakvuf_t drakvuf) {
 }
 
 void drakvuf_resume (drakvuf_t drakvuf) {
-    xen_unpause(drakvuf->xen, drakvuf->domID);
+    xen_resume(drakvuf->xen, drakvuf->domID);
+}
+
+void drakvuf_force_resume (drakvuf_t drakvuf) {
+    xen_force_resume(drakvuf->xen, drakvuf->domID);
 }
 
 status_t drakvuf_get_struct_size(const char *rekall_profile,

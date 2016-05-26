@@ -250,15 +250,21 @@ void print_sharing_info(xen_interface_t *xen, domid_t domID) {
     printf("Shared memory pages: %lu\n", info.nr_shared_pages);
 }
 
-void xen_pause(xen_interface_t *xen, domid_t domID) {
-    xc_dominfo_t info = { 0 };
+/* Increments Xen's pause count if paused */
+bool xen_pause(xen_interface_t *xen, domid_t domID) {
+    int rc = xc_domain_pause(xen->xc, domID);
+    if ( rc < 0 )
+        return 0;
 
-    if (1 == xc_domain_getinfo(xen->xc, domID, 1, &info) && info.domid == domID && !info.paused)
-        xc_domain_pause(xen->xc, domID);
-
+   return 1;
 }
 
-void xen_unpause(xen_interface_t *xen, domid_t domID) {
+/* Decrements Xen's pause count and only resumes when it reaches 0 */
+void xen_resume(xen_interface_t *xen, domid_t domID) {
+    xc_domain_unpause(xen->xc, domID);
+}
+
+void xen_force_resume(xen_interface_t *xen, domid_t domID) {
     do {
         xc_dominfo_t info = { 0 };
 

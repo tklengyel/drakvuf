@@ -149,8 +149,6 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    drakvuf_pause(drakvuf);
-
     if (pid > 0 && app) {
         printf("Injector starting %s through PID %u\n", app, pid);
         rc = injector_start_app(drakvuf, pid, app);
