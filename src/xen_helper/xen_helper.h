@@ -126,6 +126,7 @@ int get_dom_info(xen_interface_t *xen, const char *input, domid_t *domID,
 		char **name);
 
 uint64_t xen_memshare(xen_interface_t *xen, domid_t domID, domid_t cloneID);
+void xen_unshare_gfn(xen_interface_t *xen, domid_t domID, unsigned long gfn);
 
 void print_sharing_info(xen_interface_t *xen, domid_t domID);
 

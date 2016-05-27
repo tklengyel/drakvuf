@@ -102,10 +102,13 @@
  *                                                                         *
  ***************************************************************************/
 
+#define XC_WANT_COMPAT_MAP_FOREIGN_API 1
+
 #include <stdlib.h>
 #include <xenctrl.h>
 #include <libxl_utils.h>
 #include <glib.h>
+#include <sys/mman.h>
 
 #include "xen_helper.h"
 
@@ -240,6 +243,11 @@ uint64_t xen_memshare(xen_interface_t *xen, domid_t domID, domid_t cloneID) {
     }
 
     done: return shared;
+}
+
+void xen_unshare_gfn(xen_interface_t *xen, domid_t domID, unsigned long gfn) {
+    void *memory = xc_map_foreign_range(xen->xc, domID, XC_PAGE_SIZE, PROT_WRITE, gfn);
+    if(memory) munmap(memory, XC_PAGE_SIZE);
 }
 
 void print_sharing_info(xen_interface_t *xen, domid_t domID) {
