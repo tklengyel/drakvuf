@@ -389,12 +389,6 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     return 0;
 }
 
-void clear_guard(vmi_event_t *event, status_t rc) {
-    if(event->data)
-        g_hash_table_destroy(event->data);
-    free(event);
-}
-
 void clear_memtrap(vmi_event_t *event, status_t rc) {
     drakvuf_t drakvuf = event->data;
     xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID,
@@ -619,7 +613,6 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         remapped_gfn = g_malloc0(sizeof(struct remapped_gfn));
         remapped_gfn->o = current_gfn;
 
-        vmi_pause_vm(drakvuf->vmi);
         int rc = xc_domain_setmaxmem(drakvuf->xen->xc, drakvuf->domID, drakvuf->memsize+VMI_PS_4KB);
         drakvuf->memsize+=VMI_PS_4KB;
 
@@ -632,7 +625,6 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
         if (rc)
             return 0;
-        vmi_resume_vm(drakvuf->vmi);
 
         g_hash_table_insert(drakvuf->remapped_gfns,
                             &remapped_gfn->o,
@@ -765,7 +757,7 @@ void drakvuf_loop(drakvuf_t drakvuf) {
     PRINT_DEBUG("Started DRAKVUF loop\n");
 
     drakvuf->interrupted = 0;
-    drakvuf_resume(drakvuf);
+    drakvuf_force_resume(drakvuf);
 
     while (!drakvuf->interrupted) {
         //PRINT_DEBUG("Waiting for events in DRAKVUF...\n");
@@ -778,7 +770,7 @@ void drakvuf_loop(drakvuf_t drakvuf) {
         }
     }
 
-    drakvuf_pause(drakvuf);
+    vmi_pause_vm(drakvuf->vmi);
     //print_sharing_info(drakvuf->xen, drakvuf->domID);
 
     PRINT_DEBUG("DRAKVUF loop finished\n");
@@ -968,6 +960,7 @@ void close_vmi(drakvuf_t drakvuf) {
         struct wrapper *s = NULL;
         ghashtable_foreach(drakvuf->memaccess_lookup_gfn, i, key, s)
         {
+            xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx, s->memaccess.gfn, ~0);
             free(s->memaccess.memtrap);
             g_slist_free(s->traps);
         }
@@ -980,6 +973,7 @@ void close_vmi(drakvuf_t drakvuf) {
         struct remapped_gfn *remapped_gfn = NULL;
         ghashtable_foreach(drakvuf->remapped_gfns, i, key, remapped_gfn) {
             xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx, remapped_gfn->o, ~0);
+            xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr, remapped_gfn->r, ~0);
             xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &remapped_gfn->r);
         }
         g_hash_table_destroy(drakvuf->remapped_gfns);

@@ -221,4 +221,6 @@ struct remapped_gfn {
     bool active;
 };
 
+void drakvuf_force_resume (drakvuf_t drakvuf);
+
 #endif

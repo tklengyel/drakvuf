@@ -128,6 +128,7 @@ static gpointer timer(gpointer data)
 int drakvuf_c::start_plugins(const bool* plugin_list, const char *dump_folder)
 {
     int i, rc;
+
     for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
     {
         if (plugin_list[i]) {

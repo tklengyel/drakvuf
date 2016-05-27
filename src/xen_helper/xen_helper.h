@@ -129,8 +129,9 @@ uint64_t xen_memshare(xen_interface_t *xen, domid_t domID, domid_t cloneID);
 
 void print_sharing_info(xen_interface_t *xen, domid_t domID);
 
-void xen_pause(xen_interface_t *xen, domid_t domID);
-void xen_unpause(xen_interface_t *xen, domid_t domID);
+bool xen_pause(xen_interface_t *xen, domid_t domID);
+void xen_resume(xen_interface_t *xen, domid_t domID);
+void xen_force_resume(xen_interface_t *xen, domid_t domID);
 
 
 #endif

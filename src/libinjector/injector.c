@@ -104,6 +104,7 @@
 
 #include <libvmi/libvmi.h>
 #include <libvmi/libvmi_extra.h>
+#include <libvmi/x86.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -520,6 +521,8 @@ event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     injector->saved_r8 = info->regs->r8;
     injector->saved_r9 = info->regs->r9;
 
+    drakvuf_pause(drakvuf);
+
     vmi_set_vcpureg(injector->vmi, injector->createprocessa, RIP, info->vcpu);
     pass_inputs(injector, info);
 
@@ -539,6 +542,7 @@ event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     PRINT_DEBUG("Stack setup finished and return trap added @ 0x%" PRIx64 "\n",
                 injector->bp.breakpoint.addr);
 
+    drakvuf_resume(drakvuf);
     injector->hijacked = 1;
 
     return 0;
@@ -628,9 +632,10 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     } else {
         GSList *va_pages = vmi_get_va_pages(injector->vmi, info->regs->cr3);
         GSList *loop = va_pages;
+        drakvuf_pause(drakvuf);
         while(loop) {
             page_info_t *page = loop->data;
-            if(page->vaddr < 0x80000000) {
+            if(page->vaddr < 0x80000000  && USER_SUPERVISOR(page->x86_pae.pte_value)) {
                 vmi_event_t *new_event = vmi_get_mem_event(injector->vmi, page->paddr);
                 if(!new_event) {
                     drakvuf_trap_t *new_trap = g_malloc0(sizeof(drakvuf_trap_t));
@@ -649,6 +654,7 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         }
         g_slist_free(va_pages);
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_resume(drakvuf);
     }
 
     return 0;
@@ -684,10 +690,13 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
         injector->saved_rdx = info->regs->rdx;
         injector->saved_r8 = info->regs->r8;
         injector->saved_r9 = info->regs->r9;
-        injector->hijacked = 1;
 
+        drakvuf_pause(drakvuf);
         vmi_set_vcpureg(injector->vmi, injector->createprocessa, RIP, info->vcpu);
         pass_inputs(injector, info);
+        drakvuf_resume(drakvuf);
+
+        injector->hijacked = 1;
 
         return 0;
     }
@@ -810,16 +819,13 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, const char *app) {
         return 0;
     }
 
-
-        injector.cr3_event.type = REGISTER;
-        injector.cr3_event.reg = CR3;
-        injector.cr3_event.cb = cr3_callback;
-        injector.cr3_event.data = &injector;
-        drakvuf_add_trap(drakvuf, &injector.cr3_event);
-
+    injector.cr3_event.type = REGISTER;
+    injector.cr3_event.reg = CR3;
+    injector.cr3_event.cb = cr3_callback;
+    injector.cr3_event.data = &injector;
+    drakvuf_add_trap(drakvuf, &injector.cr3_event);
 
     PRINT_DEBUG("Starting injection loop\n");
-    drakvuf_resume(drakvuf);
     drakvuf_loop(drakvuf);
 
     if(injector.is32bit) {
@@ -832,6 +838,7 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, const char *app) {
     }
 
     drakvuf_remove_trap(drakvuf, &injector.cr3_event, NULL);
+    vmi_pause_vm(injector.vmi);
 
 done:
     PRINT_DEBUG("Finished with injection. Ret: %i\n", injector.rc);
