@@ -147,7 +147,8 @@ static const char *drakvuf_plugin_names[] = {
     [PLUGIN_FILETRACER] = "filetracer",
     [PLUGIN_FILEDELETE] = "filedelete",
     [PLUGIN_OBJMON] = "objmon",
-    [PLUGIN_EXMON] = "exmon"
+    [PLUGIN_EXMON] = "exmon",
+    [PLUGIN_PROCTRACER] = "proctracer"
 };
 
 class plugin {};

@@ -243,7 +243,7 @@ int main(int argc, char** argv) {
             goto exit;
     }
 
-    rc = drakvuf->start_plugins(dump_folder, proctracer_config);
+    rc = drakvuf->start_plugins(plugin_list, dump_folder, proctracer_config);
     if (!rc)
         goto exit;
 
