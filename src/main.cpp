@@ -243,6 +243,7 @@ int main(int argc, char** argv) {
     rc = 1;
 
 exit:
+    drakvuf->pause();
     delete drakvuf;
     return rc;
 }
