@@ -931,6 +931,8 @@ bool init_vmi(drakvuf_t drakvuf) {
 
 void close_vmi(drakvuf_t drakvuf) {
 
+    xen_pause(drakvuf->xen, drakvuf->domID);
+
     /*
      * Make sure all memaccess events are on altp2m_idx
      * so that vmi_destroy can properly reset the permissions.
@@ -1002,6 +1004,8 @@ void close_vmi(drakvuf_t drakvuf) {
     if(drakvuf->zero_page_gfn)
         xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &drakvuf->zero_page_gfn);
     xc_domain_setmaxmem(drakvuf->xen->xc, drakvuf->domID, drakvuf->init_memsize);
+
+    xen_resume(drakvuf->xen, drakvuf->domID);
 
     PRINT_DEBUG("close_vmi_drakvuf finished\n");
 }

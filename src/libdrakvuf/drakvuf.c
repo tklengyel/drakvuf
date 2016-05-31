@@ -119,7 +119,6 @@ void drakvuf_close(drakvuf_t drakvuf) {
         return;
 
     if (drakvuf->vmi) {
-        vmi_pause_vm(drakvuf->vmi);
         close_vmi(drakvuf);
     }
 
