@@ -189,11 +189,10 @@ usb = 1
 usbdevice = "tablet"
 altp2mhvm = 1
 shadow_memory = 16
-vif = ['type=ioemu,model=e1000,bridge=xenbr0,mac=00:06:5B:BA:7C:01']
-disk = [
-    'phy:/dev/vg/windows7-sp1,xvda,w', 
-    'file:/path/to/your/windows7.iso,hdc:cdrom,r'
-]
+audio=1
+soundhw='hda'
+vif = [ 'type=ioemu,model=e1000,bridge=xenbr0,mac=00:06:5B:BA:7C:01' ]
+disk = [ 'phy:/dev/vg/windows7-sp1,hda,w', 'file:/path/to/your/windows7.iso,hdc:cdrom,r' ]
 </pre></code>
 
 Download the DRAKVUF branch of LibVMI and prepare to build it:
