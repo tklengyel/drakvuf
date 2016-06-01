@@ -8,7 +8,7 @@
     <link rel="stylesheet" type="text/css" href="stylesheets/pygment_trac.css" media="screen">
     <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
 
-    <title>DRAKVUF&trade; Dynamic Malware Analysis</title>
+    <title>DRAKVUF&trade; Black-box Binary Analysis System</title>
 <script>
   (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
   (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
@@ -25,7 +25,7 @@
     <header>
       <div class="container">
         <h1>DRAKVUF&trade;</h1>
-        <h2>Dynamic Malware Analysis</h2>
+        <h2>Black-box Binary Analysis System</h2>
 
         <section id="downloads">
           <a href="https://github.com/tklengyel/drakvuf" class="btn btn-github"><span class="icon"></span>View on GitHub</a>
@@ -40,7 +40,7 @@
         <h3>
 <a name="welcome-to-github-pages" class="anchor" href="#welcome-to-github-pages"><span class="octicon octicon-link"></span></a>Introduction</h3>
 
-<p>DRAKVUF is an agentless dynamic malware analysis system built on Xen, LibVMI, Volatility and Rekall. It allows for in-depth execution tracing of malware samples and extracting deleted files from memory, all without having to install any special software within the virtual machine used for analysis.</p>
+<p>DRAKVUF is a virtualization based agentless black-box binary analysis system. DRAKVUF allows for in-depth execution tracing of arbitrary binaries (including operating systems), all without having to install any special software within the virtual machine used for analysis.</p>
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Hardware requirements</h3>
@@ -49,6 +49,10 @@
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Supported guests</h3>
 <p>DRAKVUF currently supports Windows 7, both 32 and 64-bit versions.</p>
+
+<h3>
+<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Malware analysis</h3>
+<p>DRAKVUF provides a perfect platform for stealthy malware analysis as its footprint is nearly undectebable from the malware's perspective. While DRAKVUF has been mainly developed with malware analysis in mind, it is certainly not limited to that task as it can be used to monitor the execution of arbitrary binaries.</p>
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Demos</h3>
@@ -80,7 +84,7 @@
 <p>Currently the following core features are available:</p>
 
 <ul>
-<li>Agentless start of malware execution.</li>
+<li>Agentless start of binary execution.</li>
 <li>Agentless monitoring of Windows internal kernel functions.</li>
 <li>Guest multi-vCPU support.</li>
 <li>Tracing heap allocations.</li>
@@ -89,14 +93,14 @@
 <li>Cloning of analysis VMs via copy-on-write memory and disk.</li>
 </ul>
 
-<p>Be advised that DRAKVUF is still in its early development stage and lacks features other malware analyzers may have. There are many opportunities to improve and extend DRAKVUF. Just to name a few:</p>
+<p>Be advised that DRAKVUF is still in its early development stage and lacks features other binary analyzers may have. There are many opportunities to improve and extend DRAKVUF. Just to name a few:</p>
 
 <ul>
 <li>Structured logging into JSON/MySQL/MongoDB.</li>
 <li>Automatic submission of extracted files to VirusTotal.</li>
 <li>Linux support.</li>
 <li>Run-time deduplication of unused memory with Xen's memory sharing.</li>
-<li>Integration into malware analysis operations, such as <a href="https://crits.github.io">CRITS</a>.</li>
+<li>Integration into malware analysis operations, such as <a href="https://holmesprocessing.github.io">HOLMES</a>.</li>
 </ul>
 
 <p>As DRAKVUF is an open-source project, patches and bug reports are always welcome on the <a href="https://github.com/tklengyel/drakvuf">Github page</a>! More information can be found in the <a href="https://github.com/tklengyel/drakvuf/wiki">DRAKVUF Wiki</a> about working with the project.</p>
