@@ -1,12 +1,12 @@
 #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
 #                                                                         #
-# DRAKVUF Dynamic Malware Analysis System (C) 2014-2016 Tamas K Lengyel.  #
+# DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  #
 # Tamas K Lengyel is hereinafter referred to as the author.               #
 # This program is free software; you may redistribute and/or modify it    #
 # under the terms of the GNU General Public License as published by the   #
 # Free Software Foundation; Version 2 ("GPL"), BUT ONLY WITH ALL OF THE   #
-# CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   # 
-# right to use, modify, and redistribute this software under certain      # 
+# CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   #
+# right to use, modify, and redistribute this software under certain      #
 # conditions.  If you wish to embed DRAKVUF technology into proprietary   #
 # software, alternative licenses can be aquired from the author.          #
 #                                                                         #
