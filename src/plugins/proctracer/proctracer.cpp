@@ -287,7 +287,7 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
     json_object *conf_root = json_object_from_file(proctracer_config);
     if (!conf_root){
         printf("[PROCTRACER] Can't find config!\n");
-        return;
+        throw -1;
     }
     printf("[PROCTRACER] Main config loaded\n");
     json_object *conf_modules=NULL;
@@ -295,7 +295,7 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
     if (!json_object_object_get_ex(conf_root, "modules", &conf_modules)) {
         printf("[PROCTRACER] Can't find any modules to trace\n");
         json_object_put(conf_root);
-        return;
+        throw -1;
     }
 
     if (json_object_object_get_ex(conf_root, "ccov_limit", &conf_ccov_limit)){
@@ -354,11 +354,15 @@ proctracer::proctracer(drakvuf_t drakvuf, const void *config, output_format_t ou
     json_object_put(conf_modules);
     json_object_put(conf_root);
 
-    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PsGetCurrentThreadTeb", &this->trap.breakpoint.rva))
-        return;
+    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PsGetCurrentThreadTeb", &this->trap.breakpoint.rva)){
+        printf("[PROCTRACER] Can't find PsGetCurrentThreadTeb!\n");
+        throw -1;
+    }
 
-    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PspExitProcess", &this->exit_trap.breakpoint.rva))
-        return;
+    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "PspExitProcess", &this->exit_trap.breakpoint.rva)){
+        printf("[PROCTRACER] Can't find PspExitProcess!\n");
+        throw -1;
+    }
 
     this->trap.cb = cb;
     this->trap.data = (void*)this;
