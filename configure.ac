@@ -123,7 +123,7 @@ AC_ARG_ENABLE([plugin_syscalls],
   [AS_HELP_STRING([--disable-plugin-syscalls],
     [Enable the syscall tracing plugin @<:@yes@:>@])],
   [plugin_syscalls="$enableval"],
-  [plugin_syscalls="yes"]) 
+  [plugin_syscalls="yes"])
 AM_CONDITIONAL([PLUGIN_SYSCALLS], [test x$plugin_syscalls = xyes])
 if test x$plugin_syscalls = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_SYSCALLS, 1, "")
@@ -196,7 +196,7 @@ AC_ARG_ENABLE([hardening],
     [Enable compiler and linker options to frustrate memory corruption exploits @<:@yes@:>@])],
   [hardening="$enableval"],
   [hardening="yes"])
-AM_CONDITIONAL([HARDENING], [test x$hardening = xyes]) 
+AM_CONDITIONAL([HARDENING], [test x$hardening = xyes])
 
 AC_ARG_ENABLE([debug],
   [AS_HELP_STRING([--enable-debug],
@@ -284,6 +284,13 @@ AC_STRUCT_TM
 
 # Checks for library functions.
 AC_FUNC_MALLOC
+
+# Make sure we get standard PRI... definitions.
+AH_VERBATIM([__STDC_FORMAT_MACROS],
+            [/* C99 says: define this to get the PRI... macros from stdint.h */
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS 1
+#endif])
 
 AC_CHECK_LIB(pthread, pthread_create, [], [AC_ERROR([Pthread library is not functional!])])
 
