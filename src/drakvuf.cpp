@@ -133,7 +133,7 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
 
     for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
     {
-        if (plugin_list[i]){
+        if (plugin_list[i]) {
             switch ((drakvuf_plugin_t)i) {
                 case PLUGIN_FILEDELETE:
                 {
@@ -159,9 +159,9 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
                     break;
             };
+            if ( !rc )
+                return rc;
         }
-        if ( !rc )
-            return rc;
     }
 
     return 1;
