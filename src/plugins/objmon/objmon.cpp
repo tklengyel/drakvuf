@@ -181,9 +181,9 @@ objmon::objmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
     const char *rekall_profile = (const char *)config;
 
     if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ObCreateObject", &this->trap.breakpoint.rva))
-        return;
+        throw -1;
     if (VMI_FAILURE==drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "TypeIndex", &this->typeindex_offset))
-        return;
+        throw -1;
 
     this->trap.cb = cb;
 

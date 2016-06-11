@@ -298,9 +298,9 @@ filedelete::filedelete(drakvuf_t drakvuf, const void *config, output_format_t ou
     this->format = output;
 
     if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "NtSetInformationFile", &this->traps[0].breakpoint.rva))
-        return;
+        throw -1;
     if(VMI_FAILURE == drakvuf_get_function_rva(c->rekall_profile, "ZwSetInformationFile", &this->traps[1].breakpoint.rva))
-        return;
+        throw -1;
 
     this->traps[0].name = "NtSetInformationFile";
     this->traps[0].cb = setinformation;
@@ -319,7 +319,7 @@ filedelete::filedelete(drakvuf_t drakvuf, const void *config, output_format_t ou
         if(VMI_FAILURE == drakvuf_get_struct_member_rva(c->rekall_profile,
                                                         offset_names[i][0], offset_names[i][1],
                                                         &this->offsets[i]))
-            return;
+            throw -1;
     }
 
     if ( !drakvuf_add_trap(drakvuf, &traps[0]) )
