@@ -102,108 +102,22 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <glib.h>
-#include <inttypes.h>
-#include "syscalls.h"
+#ifndef DRAKVUF_PLUGINS_PRIVATE_H
+#define DRAKVUF_PLUGINS_PRIVATE_H
 
-static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+#ifdef DRAKVUF_DEBUG
 
-    syscalls *s = (syscalls*)info->trap->data;
-    char *procname = drakvuf_get_current_process_name(drakvuf, info->vcpu, info->regs);
+// This is defined in libdrakvuf
+extern bool verbose;
 
-    switch(s->format) {
-    case OUTPUT_CSV:
-        printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%s,%s\n",
-               info->vcpu, info->regs->cr3, procname, info->trap->breakpoint.module, info->trap->name);
-        break;
-    default:
-    case OUTPUT_DEFAULT:
-        printf("[SYSCALL] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s!%s\n",
-               info->vcpu, info->regs->cr3, procname, info->trap->breakpoint.module, info->trap->name);
-        break;
-    }
+#define PRINT_DEBUG(args...) \
+    do { \
+        if(verbose) fprintf (stderr, args); \
+    } while (0)
 
-    free(procname);
-    return 0;
-}
+#else
+#define PRINT_DEBUG(args...) \
+    do {} while(0)
+#endif
 
-static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *symbols) {
-
-    GSList *ret = NULL;
-    unsigned long i;
-    addr_t module_list, ntoskrnl;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    if(VMI_FAILURE == vmi_read_addr_ksym(vmi, (char *)"PsLoadedModuleList", &module_list))
-        goto done;
-
-    if( !drakvuf_get_module_base_addr(drakvuf, module_list, "ntoskrnl.exe", &ntoskrnl) )
-        goto done;
-
-    for (i=0; i < symbols->count; i++) {
-
-        const struct symbol *symbol = &symbols->symbols[i];
-
-        if (strncmp(symbol->name, "Nt", 2))
-            continue;
-        //if (strcmp(symbol->name, "NtCallbackReturn"))
-        //    continue;
-
-        PRINT_DEBUG("[SYSCALLS] Adding trap to %s\n", symbol->name);
-
-        drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
-        trap->breakpoint.lookup_type = LOOKUP_PID;
-        trap->breakpoint.pid = 4;
-        trap->breakpoint.addr_type = ADDR_VA;
-        trap->breakpoint.addr = ntoskrnl + symbol->rva;
-        trap->breakpoint.module = "ntoskrnl.exe";
-        trap->name = g_strdup(symbol->name);
-        trap->type = BREAKPOINT;
-        trap->cb = cb;
-        trap->data = s;
-
-        ret = g_slist_prepend(ret, trap);
-    }
-
-done:
-    drakvuf_release_vmi(drakvuf);
-    return ret;
-}
-
-syscalls::syscalls(drakvuf_t drakvuf, const void *config, output_format_t output) {
-    const char *rekall_profile = (const char *)config;
-    symbols_t *symbols = drakvuf_get_symbols_from_rekall(rekall_profile);
-    if (!symbols)
-    {
-        fprintf(stderr, "Failed to parse Rekall profile at %s\n", rekall_profile);
-        throw -1;
-    }
-
-    this->traps = create_trap_config(drakvuf, this, symbols);
-    this->format = output;
-
-    drakvuf_free_symbols(symbols);
-
-    GSList *loop = this->traps;
-    while(loop) {
-        drakvuf_trap_t *trap = (drakvuf_trap_t *)loop->data;
-
-        if ( !drakvuf_add_trap(drakvuf, trap) )
-            throw -1;
-
-        loop = loop->next;
-    }
-}
-
-syscalls::~syscalls() {
-    GSList *loop = this->traps;
-    while(loop) {
-        drakvuf_trap_t *trap = (drakvuf_trap_t *)loop->data;
-        free((char*)trap->name);
-        free(loop->data);
-        loop = loop->next;
-    }
-
-    g_slist_free(this->traps);
-}
+#endif
