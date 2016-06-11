@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
+ * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -124,7 +124,7 @@ static event_response_t trace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info){
     
     p->trace_statistics[info->trap_pa]+=1;
     if (p->ccov_limit > 0 && p->trace_statistics[info->trap_pa] > p->ccov_limit){
-        drakvuf_remove_trap(drakvuf,info->trap,NULL);
+        drakvuf_remove_trap(drakvuf,info->trap,NULL); 
     }
     return 0;
 }
@@ -135,17 +135,12 @@ static event_response_t exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         return 0;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    if (p->trace_status.find(info->regs->cr3) == p->trace_status.end()){
-        drakvuf_release_vmi(drakvuf);
-        return 0;
-    }
-
     list<mod_info*> module_traps=p->trace_status[info->regs->cr3];
     for (mod_info* mi: module_traps){
         for (drakvuf_trap_t* dt: mi->traps){
             trace_info *ti=(trace_info*)dt->data;
             free(ti->mod_name);
-            drakvuf_remove_trap(drakvuf,dt,NULL);
+            drakvuf_remove_trap(drakvuf, dt, (void (*)(drakvuf_trap_t *))free);
         }
         delete mi;
     }
@@ -199,7 +194,7 @@ static bool add_trace_points(proctracer* p, drakvuf_t drakvuf, vmi_instance_t vm
                 printf("Module name: %s\n", (char*)out.contents);
                 if (p->mod_config.find((char*)out.contents) != p->mod_config.end()){
                     mod_info *mi = new mod_info;
-                    mi->mod_name = (char*)out.contents;
+                    mi->mod_name = strdup((char*)out.contents);
                     for (addr_t off: p->mod_config[(char*)out.contents]){
                         trace_info *ti = new trace_info;
                         drakvuf_trap_t *tracetrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
@@ -217,9 +212,14 @@ static bool add_trace_points(proctracer* p, drakvuf_t drakvuf, vmi_instance_t vm
                         tracetrap->breakpoint.addr = trap_pa;
                         tracetrap->data = ti;
 
-                        drakvuf_add_trap(drakvuf,tracetrap);
-                        p->trace_statistics[trap_pa]=0;
-                        mi->traps.push_back(tracetrap);
+                        if (drakvuf_add_trap(drakvuf,tracetrap)){
+                            p->trace_statistics[trap_pa]=0;
+                            mi->traps.push_back(tracetrap);
+                        }else{
+                            g_free(tracetrap);
+                            free(ti->mod_name);
+                            delete(ti);
+                        }
                     }
                     p->trace_status[cr3].push_back(mi);
                 }
@@ -243,6 +243,12 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     ctx.dtb = info->regs->cr3;
 
     addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu, info->regs);
+
+    if (!process){ 
+        drakvuf_release_vmi(drakvuf);
+        return -1;
+    }
+
     char *proc_name = drakvuf_get_process_name(drakvuf, process);
     switch(p->format){
         case OUTPUT_CSV:
@@ -386,6 +392,7 @@ proctracer::~proctracer() {
                 trace_info *ti=(trace_info*)dt->data;
                 free(ti->mod_name);
                 free((char*)dt->name); // From syscalls.cpp
+                g_free(dt);
             }
             delete mi;
         }
