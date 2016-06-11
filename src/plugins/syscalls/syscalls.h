@@ -107,6 +107,7 @@
 
 #include <glib.h>
 #include "plugins/plugins.h"
+#include "plugins/private.h"
 
 class syscalls: public plugin {
 
