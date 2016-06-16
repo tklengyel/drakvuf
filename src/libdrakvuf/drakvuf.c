@@ -290,7 +290,7 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
 }
 
 void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap,
-                         void(*free_routine)(drakvuf_trap_t *trap))
+                         drakvuf_trap_free_t free_routine)
 {
     if ( drakvuf->in_callback) {
         struct free_trap_wrapper *free_wrapper =

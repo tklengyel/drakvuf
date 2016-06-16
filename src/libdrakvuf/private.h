@@ -207,7 +207,7 @@ struct wrapper {
 struct free_trap_wrapper {
     unsigned int counter;
     drakvuf_trap_t *trap;
-    void (*free_routine)(drakvuf_trap_t *trap);
+    drakvuf_trap_free_t free_routine;
 };
 
 struct memcb_pass {

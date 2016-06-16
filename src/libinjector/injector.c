@@ -581,7 +581,7 @@ event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     GSList* loop = injector->memtraps;
     while(loop) {
-        drakvuf_remove_trap(injector->drakvuf, loop->data, free);
+        drakvuf_remove_trap(injector->drakvuf, loop->data, (drakvuf_trap_free_t)free);
         loop=loop->next;
     }
     g_slist_free(injector->memtraps);
@@ -904,7 +904,7 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, const char *app) {
     if(injector.is32bit) {
         GSList *loop = injector.memtraps;
         while(loop) {
-            drakvuf_remove_trap(drakvuf, loop->data, free);
+            drakvuf_remove_trap(drakvuf, loop->data, (drakvuf_trap_free_t)free);
             loop=loop->next;
         }
         g_slist_free(loop);
