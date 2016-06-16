@@ -816,7 +816,7 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, const char *app) {
     injector.createprocessa = drakvuf_exportsym_to_va(injector.drakvuf, eprocess_base, "kernel32.dll", "CreateProcessA");
     if (!injector.createprocessa) {
         PRINT_DEBUG("Failed to get address of kernel32.dll!CreateProcessA\n");
-        return 0;
+        goto done;
     }
 
     injector.cr3_event.type = REGISTER;
