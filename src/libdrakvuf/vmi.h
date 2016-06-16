@@ -176,9 +176,6 @@ enum offset {
 
     KAPC_APCLISTENTRY,
 
-    NT_TIB_STACKBASE,
-    NT_TIB_STACKLIMIT,
-
     ETHREAD_CID,
     ETHREAD_TCB,
     CLIENT_ID_UNIQUETHREAD,
@@ -235,8 +232,6 @@ static const char *offset_names[OFFSET_MAX][2] = {
     [KTHREAD_HEADER] = { "_KTHREAD", "Header" },
     [KAPC_APCLISTENTRY] = {"_KAPC", "ApcListEntry" },
     [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
-    [NT_TIB_STACKBASE] = { "_NT_TIB", "StackBase" },
-    [NT_TIB_STACKLIMIT] = { "_NT_TIB", "StackLimit" },
     [ETHREAD_CID] = {"_ETHREAD", "Cid" },
     [ETHREAD_TCB] = { "_ETHREAD", "Tcb" },
     [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
