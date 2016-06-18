@@ -1008,6 +1008,15 @@ void close_vmi(drakvuf_t drakvuf) {
         drakvuf->vmi = NULL;
     }
 
+    if(drakvuf->breakpoint_lookup_gfn) {
+        GHashTableIter i;
+        uint64_t *key = NULL;
+        GSList *list = NULL;
+        ghashtable_foreach(drakvuf->breakpoint_lookup_gfn, i, key, list)
+            g_slist_free(list);
+        g_hash_table_destroy(drakvuf->breakpoint_lookup_gfn);
+    }
+
     if(drakvuf->breakpoint_lookup_pa) {
         GHashTableIter i;
         addr_t *key = NULL;
@@ -1015,10 +1024,6 @@ void close_vmi(drakvuf_t drakvuf) {
         ghashtable_foreach(drakvuf->breakpoint_lookup_pa, i, key, s)
             g_slist_free(s->traps);
         g_hash_table_destroy(drakvuf->breakpoint_lookup_pa);
-    }
-
-    if(drakvuf->breakpoint_lookup_gfn) {
-        g_hash_table_destroy(drakvuf->breakpoint_lookup_gfn);
     }
 
     if(drakvuf->memaccess_lookup_gfn) {
