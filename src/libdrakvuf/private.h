@@ -171,6 +171,8 @@ struct drakvuf {
 
     GHashTable *breakpoint_lookup_pa;   // key: PA of trap
                                         // val: struct breakpoint
+    GHashTable *breakpoint_lookup_gfn;  // key: gfn (size uint64_t)
+                                        // val: GSList of addr_t* for trap locations
     GHashTable *breakpoint_lookup_trap; // key: trap pointer
                                         // val: struct breakpoint
 
@@ -210,15 +212,17 @@ struct free_trap_wrapper {
     drakvuf_trap_free_t free_routine;
 };
 
-struct memcb_pass {
-    drakvuf_t drakvuf;
-    addr_t gfn;
-};
-
 struct remapped_gfn {
     xen_pfn_t o;
     xen_pfn_t r;
     bool active;
+};
+
+struct memcb_pass {
+    drakvuf_t drakvuf;
+    uint64_t gfn;
+    struct remapped_gfn *remapped_gfn;
+    GSList *traps;
 };
 
 void drakvuf_force_resume (drakvuf_t drakvuf);
