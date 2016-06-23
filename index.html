@@ -115,21 +115,10 @@
 <pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute libcurl3 libcurl4-openssl-dev bzip2 module-init-tools pciutils-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev python python-dev python-twisted python-gevent python-setuptools libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool check libjson-c-dev libfuse-dev libsystemd-daemon-dev
 </code></pre>
 
-You can also install Xen from your repository but the recommended way is to build it from source.
+We will be installing a slightly modified version of Xen 4.7 that includes critical bugfixes which are not backported.
 
-<pre><code>wget http://bits.xensource.com/oss-xen/release/4.6.1/xen-4.6.1.tar.gz
-wget http://bits.xensource.com/oss-xen/release/4.6.1/xen-4.6.1.tar.gz.sig
-gpg --keyserver pgp.mit.edu --recv-keys 0x83fe14c957e82bd9
-gpg --verify xen-4.6.1.tar.gz.sig
-</code></pre>
-
-The result should be: 
-
-<pre><code>gpg: Good signature from "Xen.org Xen tree code signing (signatures on the xen hypervisor and tools) &lt;pgp@xen.org&gt;"</code></pre>
-
-<pre><code>tar xzvf xen-4.6.1.tar.gz
-cd ./xen-4.6.1
-export C_INCLUDE_PATH=/usr/include/x86_64-linux-gnu
+<pre><code>git clone -b drakvuf https://github.com/tklengyel/xen
+cd xen
 ./configure --enable-githttp
 make -j4 dist-xen
 make -j4 dist-tools
@@ -160,7 +149,7 @@ reboot
 Once you are booted into Xen, verify that everything works as such:
 <pre><code>sudo xen-detect</code></pre>
 
-The output should be: Running in PV context on Xen v4.6
+The output should be: Running in PV context on Xen v4.7
 
 <pre><code>xl list</code></pre>
 
