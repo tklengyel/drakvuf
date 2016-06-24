@@ -521,9 +521,8 @@ void remove_trap(drakvuf_t drakvuf,
             loop=loop->next;
         }
 
-        if(VMI_SUCCESS == vmi_swap_events(vmi, event, update_event)) {
+        if(VMI_SUCCESS == vmi_swap_events(vmi, event, update_event, (vmi_event_free_t)free)) {
             PRINT_DEBUG("Successfully requested to swap events!\n");
-            vmi_clear_event(vmi, event, (vmi_event_free_t)free);
             container->memaccess.memtrap = update_event;
         } else {
             PRINT_DEBUG("Failed to update memaccess trap settings!\n");
@@ -571,14 +570,13 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t *trap, bool guard2) {
             update_event->mem_event.in_access |= trap->memaccess.access;
             update_event->vmm_pagetable_id = drakvuf->altp2m_idx;
 
-            if (VMI_FAILURE == vmi_swap_events(drakvuf->vmi, s->memaccess.memtrap, update_event)) {
+            if (VMI_FAILURE == vmi_swap_events(drakvuf->vmi, s->memaccess.memtrap, update_event, (vmi_event_free_t)free)) {
                 PRINT_DEBUG("*** FAILED TO SWAP MEMORY TRAP @ PAGE %lu ***\n",
                             trap->memaccess.gfn);
                 free(update_event);
                 return 0;
             } else {
                 PRINT_DEBUG("Requested swapping events on 0x%lx\n", trap->memaccess.gfn);
-                vmi_clear_event(drakvuf->vmi, s->memaccess.memtrap, (vmi_event_free_t)free);
                 s->memaccess.memtrap = update_event;
             }
         }
