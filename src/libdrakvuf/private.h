@@ -187,6 +187,7 @@ struct drakvuf {
 struct breakpoint {
     addr_t pa;
     drakvuf_trap_t guard, guard2;
+    bool doubletrap;
 } __attribute__ ((packed));
 
 struct memaccess {
