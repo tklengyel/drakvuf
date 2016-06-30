@@ -223,6 +223,7 @@ struct memcb_pass {
     drakvuf_t drakvuf;
     uint64_t gfn;
     struct remapped_gfn *remapped_gfn;
+    vmi_mem_access_t access;
     GSList *traps;
 };
 

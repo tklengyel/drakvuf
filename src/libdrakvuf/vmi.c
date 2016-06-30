@@ -185,7 +185,9 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
     while(loop) {
         drakvuf_trap_t *trap = loop->data;
 
-        if(trap->cb && trap->memaccess.type == POST) {
+        if(trap->cb && trap->memaccess.type == POST &&
+           (trap->memaccess.access & pass->access))
+        {
             drakvuf_trap_info_t trap_info = {
                 .trap = trap,
                 .trap_pa = s->memaccess.pa,
@@ -283,7 +285,9 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
     while(loop) {
         drakvuf_trap_t *trap = loop->data;
 
-        if(trap->cb && trap->memaccess.type == PRE) {
+        if(trap->cb && trap->memaccess.type == PRE &&
+           (trap->memaccess.access & event->mem_event.out_access))
+        {
             drakvuf_trap_info_t trap_info = {
                 .trap = trap,
                 .trap_pa = s->memaccess.pa,
@@ -314,6 +318,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
         struct memcb_pass *pass = g_malloc0(sizeof(struct memcb_pass));
         pass->drakvuf = drakvuf;
         pass->gfn = event->mem_event.gfn;
+        pass->access = event->mem_event.out_access;
         if(!s->memaccess.guard2) {
             event->vmm_pagetable_id = 0;
 
