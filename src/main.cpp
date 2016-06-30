@@ -132,6 +132,7 @@ int main(int argc, char** argv) {
     char *domain = NULL;
     char *rekall_profile = NULL;
     char *dump_folder = NULL;
+    char *proctracer_config = NULL;
     vmi_pid_t injection_pid = -1;
     struct sigaction act;
     GThread *timeout_thread = NULL;
@@ -157,6 +158,9 @@ int main(int argc, char** argv) {
                "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
                "\t -o <format>               Output format (default or csv)\n"
                "\t -x <plugin>               Don't activate the specified plugin\n"
+#ifdef ENABLE_PLUGIN_PROCTRACER
+               "\t -P <proctracer config>    Proctracer config json location\n"
+#endif
 #ifdef DRAKVUF_DEBUG
                "\t -v                        Turn on verbose (debug) output\n"
 #endif
@@ -164,7 +168,7 @@ int main(int argc, char** argv) {
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:vx:")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:vx:P:")) != -1)
     switch (c)
     {
     case 'r':
@@ -195,6 +199,11 @@ int main(int argc, char** argv) {
 #ifdef DRAKVUF_DEBUG
     case 'v':
         verbose = 1;
+        break;
+#endif
+#ifdef ENABLE_PLUGIN_PROCTRACER
+    case 'P':
+        proctracer_config = optarg;
         break;
 #endif
     default:
@@ -234,7 +243,7 @@ int main(int argc, char** argv) {
             goto exit;
     }
 
-    rc = drakvuf->start_plugins(plugin_list, dump_folder);
+    rc = drakvuf->start_plugins(plugin_list, dump_folder, proctracer_config);
     if (!rc)
         goto exit;
 

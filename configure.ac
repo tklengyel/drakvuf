@@ -179,6 +179,16 @@ if test x$plugin_exmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_EXMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_proctracer],
+  [AS_HELP_STRING([--disable-plugin-proctracer],
+    [Enable the Proctracer plugin @<:@yes@:>@])],
+  [plugin_proctracer="$enableval"],
+  [plugin_proctracer="yes"])
+AM_CONDITIONAL([PLUGIN_PROCTRACER], [test x$plugin_proctracer = xyes])
+if test x$plugin_proctracer = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PROCTRACER, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -357,4 +367,5 @@ Filetracer: $plugin_filetracer
 Filedelete: $plugin_filedelete
 Objmon:     $plugin_objmon
 Exmon:      $plugin_exmon
+Proctracer: $plugin_proctracer
 -------------------------------------------------------------------------------])

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF Dynamic Malware Analysis System (C) 2014-2015 Tamas K Lengyel.  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,49 +102,50 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAKVUF_H
-#define DRAKVUF_H
+#ifndef PROCTRACER_H
+#define PROCTRACER_H
 
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
-#include <glib.h>
+#include "plugins/plugins.h"
+#include<list>
+#include<unordered_map>
 
-#include <libdrakvuf/libdrakvuf.h>
-#include <plugins/plugins.h>
-#include <libinjector/libinjector.h>
+using namespace std;
 
-class drakvuf_c {
-    private:
-        drakvuf_t drakvuf;
-        drakvuf_plugins* plugins;
-        GThread *timeout_thread = NULL;
-        const char *rekall_profile;
-        void close();
+struct mod_info{
+    string mod_name;
+    list<drakvuf_trap_t*> traps;
+};
 
+class proctracer: public plugin {
     public:
-        int timeout;
-        int interrupted;
-        GMutex loop_signal;
+        drakvuf_trap_t trap = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 4,
+            .breakpoint.addr_type = ADDR_RVA,
+            .name = "PsGetCurrentThreadTeb",
+            .breakpoint.module = "ntoskrnl.exe",
+            .type = BREAKPOINT
+        };
 
-        drakvuf_c(const char* domain,
-                  const char *rekall_profile,
-                  const output_format_t output,
-                  const int timeout,
-                  const bool verbose);
-        ~drakvuf_c();
+        drakvuf_trap_t exit_trap = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 4,
+            .breakpoint.addr_type = ADDR_RVA,
+            .name = "PspExitProcess",
+            .breakpoint.module = "ntoskrnl.exe",
+            .type = BREAKPOINT
+        };
 
-        int is_initialized();
-        void interrupt(int signal);
-        void loop();
-        void pause();
-        void resume();
-        int inject_cmd(vmi_pid_t injection_pid, const char *inject_cmd);
-        int start_plugins(const bool* plugin_list, const char *dump_folder, const char *proctracer_config);
+        size_t *offsets;
+        uint64_t ccov_limit = -1;
+
+        output_format_t format;
+        unordered_map<addr_t,list<mod_info*>> trace_status;
+        unordered_map<string,list<addr_t>> mod_config;
+        unordered_map<uint64_t,uint64_t> trace_statistics;
+
+        proctracer(drakvuf_t drakvuf, const void *config, output_format_t output);
+        ~proctracer();
 };
 
 #endif
