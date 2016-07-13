@@ -131,16 +131,24 @@ To install Xen with dom0 getting 4GB RAM assigned and two dedicated CPU cores (t
 <pre><code>sudo su
 make -j4 install-xen
 make -j4 install-tools
-echo "GRUB_CMDLINE_XEN_DEFAULT=\"dom0_mem=4096M,max:4096M dom0_max_vcpus=4 dom0_vcpus_pin=true hap_1gb=false hap_2mb=false altp2m=1\"" >> /etc/default/grub
+echo "GRUB_CMDLINE_XEN_DEFAULT=\"dom0_mem=4096M,max:4096M dom0_max_vcpus=4 dom0_vcpus_pin=true hap_1gb=false hap_2mb=false altp2m=1 flask_enforcing=1\"" >> /etc/default/grub
 echo "/usr/local/lib" > /etc/ld.so.conf.d/xen.conf
 ldconfig
-update-grub
 echo "none /proc/xen xenfs defaults,nofail 0 0" >> /etc/fstab
 echo "xen-evtchn" >> /etc/modules
 echo "xen-privcmd" >> /etc/modules
 update-rc.d xencommons defaults 19 18
 update-rc.d xendomains defaults 21 20
 update-rc.d xen-watchdog defaults 22 23
+</code></pre>
+
+To enable the loading of the Xen XSM module required for DRAKVUF you will need to edit your GRUB Xen discovery rule script, usually found at <b>/etc/grub.d/20_linux_xen</b>, and add the following line <b>after the multiboot</b> entry
+<pre><code>module ${rel_dirname}/xenpolicy-4.7.0
+</code></pre>
+
+Once you are done with these steps, you can finalize your setup:
+
+<pre><code>update-grub
 reboot
 </code></pre>
 
@@ -167,6 +175,7 @@ Setup an LVM Volume Group to hold your VMs disks, then create a volume:
 Install Windows 7 from your ISO using the following template (tune it as needed):
 <pre><code>arch = 'x86_64'
 name = "windows7-sp1"
+seclabel='normal:vm_r:drakvuf_domU_t'
 maxmem = 3000
 memory = 3000
 vcpus = 1
