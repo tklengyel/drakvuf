@@ -119,7 +119,11 @@
 
 We will be installing a slightly modified version of Xen 4.7 that includes critical bugfixes which are not backported.
 
-<pre><code>git clone -b drakvuf https://github.com/tklengyel/xen
+<pre><code>cd ~
+git clone https://github.com/tklengyel/drakvuf
+cd drakvuf
+git submodule init
+git submodule update
 cd xen
 ./configure --enable-githttp
 make -j4 dist-xen
@@ -199,10 +203,9 @@ vif = [ 'type=ioemu,model=e1000,bridge=xenbr0,mac=00:06:5B:BA:7C:01' ]
 disk = [ 'phy:/dev/vg/windows7-sp1,hda,w', 'file:/path/to/your/windows7.iso,hdc:cdrom,r' ]
 </pre></code>
 
-Download the DRAKVUF branch of LibVMI and prepare to build it:
+Enter the LibVMI folder in the drakvuf folder and build it:
 
-<pre><code>git clone -b drakvuf https://github.com/tklengyel/libvmi
-cd libvmi
+<pre><code>cd ~/drakvuf/libvmi
 ./autogen.sh
 ./configure
 </code></pre>
@@ -234,26 +237,25 @@ sudo echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
 cd tools/pyvmi
 python setup.py build
 sudo python setup.py install
-cd ../../..
 </code></pre>
 
 Download Volatility:
 
-<pre><code>git clone https://github.com/volatilityfoundation/volatility
+<pre><code>cd ~
+git clone https://github.com/volatilityfoundation/volatility
 cd volatility
-cp ../libvmi/tools/pyvmi/pyvmiaddressspace.py volatility/plugins/addrspaces
+cp ~/drakvuf/libvmi/tools/pyvmi/pyvmiaddressspace.py volatility/plugins/addrspaces
 python setup.py build
 sudo python setup.py install
-cd ..
 </code></pre>
 
 Download Rekall and install it:
 
-<pre><code>git clone --branch v1.4.1 https://github.com/google/rekall
+<pre><code>cd ~
+git clone --branch v1.4.1 https://github.com/google/rekall
 cd rekall/rekall-core
 python setup.py build
 sudo python setup.py install
-cd ../..
 </code></pre>
 
 Now we will create the Rekall profile for the Windows domain. First, we need to get the debug information for the Windows kernel via the LibVMI win-guid tool. For example, in the following my domain is named windows7-sp1-x86:
@@ -357,8 +359,7 @@ Output should be something similar:
 </code></pre>
 
 Now we are ready to build and install DRAKVUF:
-<pre><code>git clone https://github.com/tklengyel/drakvuf
-cd drakvuf
+<pre><code>cd ~/drakvuf
 autoreconf -vi
 ./configure
 make
