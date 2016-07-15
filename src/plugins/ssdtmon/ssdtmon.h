@@ -102,162 +102,23 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef VMI_H
-#define VMI_H
+#ifndef SSDTMON_H
+#define SSDTMON_H
 
-#define BIT32 0
-#define BIT64 1
-#define PM2BIT(pm) ((pm == VMI_PM_IA32E) ? BIT64 : BIT32)
+#include "plugins/plugins.h"
 
-#define TRAP 0xCC
+class ssdtmon: public plugin {
+    public:
+        output_format_t format;
+        drakvuf_trap_t ssdtwrite;
+        drakvuf_trap_t ssdtwrite2;
 
-#include <glib.h>
-#include <stdbool.h>
-#include "libdrakvuf.h"
+        size_t ulongs;
+        addr_t kiservicetable;
+        uint32_t kiservicelimit;
 
-#define ghashtable_foreach(table, i, key, val) \
-      g_hash_table_iter_init(&i, table); \
-      while(g_hash_table_iter_next(&i,(void**)&key,(void**)&val))
-
-#define NOW(ts) \
-      do { \
-          GTimeVal __now; \
-          g_get_current_time(&__now); \
-          *ts = g_time_val_to_iso8601(&__now); \
-      } while(0)
-
-enum offset {
-    KIINITIALPCR,
-
-    EPROCESS_PID,
-    EPROCESS_PDBASE,
-    EPROCESS_PNAME,
-    EPROCESS_TASKS,
-    EPROCESS_PEB,
-    EPROCESS_OBJECTTABLE,
-    EPROCESS_PCB,
-
-    KPROCESS_HEADER,
-
-    PEB_IMAGEBASADDRESS,
-    PEB_LDR,
-
-    PEB_LDR_DATA_INLOADORDERMODULELIST,
-
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-
-    FILE_OBJECT_DEVICEOBJECT,
-    FILE_OBJECT_READACCESS,
-    FILE_OBJECT_WRITEACCESS,
-    FILE_OBJECT_DELETEACCESS,
-    FILE_OBJECT_FILENAME,
-
-    HANDLE_TABLE_HANDLECOUNT,
-
-    KPCR_PRCB,
-    KPCR_PRCBDATA,
-    KPRCB_CURRENTTHREAD,
-
-    KTHREAD_PROCESS,
-    KTHREAD_INITIALSTACK,
-    KTHREAD_STACKLIMIT,
-    KTHREAD_APCSTATE,
-    KTHREAD_TRAPFRAME,
-    KTHREAD_APCQUEUEABLE,
-    KTHREAD_PREVIOUSMODE,
-    KTHREAD_HEADER,
-
-    KTRAP_FRAME_RIP,
-
-    KAPC_APCLISTENTRY,
-
-    ETHREAD_CID,
-    ETHREAD_TCB,
-    CLIENT_ID_UNIQUETHREAD,
-
-    OBJECT_HEADER_TYPEINDEX,
-    OBJECT_HEADER_BODY,
-
-    UNICODE_STRING_LENGTH,
-    UNICODE_STRING_BUFFER,
-
-    POOL_HEADER_BLOCKSIZE,
-    POOL_HEADER_POOLTYPE,
-    POOL_HEADER_POOLTAG,
-
-    DISPATCHER_TYPE,
-
-    OFFSET_MAX
+        ssdtmon(drakvuf_t drakvuf, const void *config, output_format_t output);
+        ~ssdtmon();
 };
-
-static const char *offset_names[OFFSET_MAX][2] = {
-    [KIINITIALPCR] = { "KiInitialPCR", NULL },
-    [EPROCESS_PID] = { "_EPROCESS", "UniqueProcessId" },
-    [EPROCESS_PDBASE] = { "_KPROCESS", "DirectoryTableBase" },
-    [EPROCESS_PNAME] = { "_EPROCESS", "ImageFileName" },
-    [EPROCESS_TASKS] = { "_EPROCESS", "ActiveProcessLinks" },
-    [EPROCESS_PEB] = { "_EPROCESS", "Peb" },
-    [EPROCESS_OBJECTTABLE] = {"_EPROCESS", "ObjectTable" },
-    [EPROCESS_PCB] = { "_EPROCESS", "Pcb" },
-    [KPROCESS_HEADER] = { "_KPROCESS", "Header" },
-    [PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
-    [PEB_LDR] = { "_PEB", "Ldr" },
-    [PEB_LDR_DATA_INLOADORDERMODULELIST] = {"_PEB_LDR_DATA", "InLoadOrderModuleList" },
-    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
-    [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
-    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
-    [FILE_OBJECT_DEVICEOBJECT] = {"_FILE_OBJECT", "DeviceObject" },
-    [FILE_OBJECT_READACCESS] = {"_FILE_OBJECT", "ReadAccess" },
-    [FILE_OBJECT_WRITEACCESS] = {"_FILE_OBJECT", "WriteAccess" },
-    [FILE_OBJECT_DELETEACCESS] = {"_FILE_OBJECT", "DeleteAccess" },
-    [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
-    [HANDLE_TABLE_HANDLECOUNT] = {"_HANDLE_TABLE", "HandleCount" },
-    [KPCR_PRCB] = {"_KPCR", "Prcb" },
-    [KPCR_PRCBDATA] = {"_KPCR", "PrcbData" },
-    [KPRCB_CURRENTTHREAD] = { "_KPRCB", "CurrentThread" },
-    [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
-    [KTHREAD_INITIALSTACK] = {"_KTHREAD", "InitialStack"},
-    [KTHREAD_STACKLIMIT] = {"_KTHREAD", "StackLimit"},
-    [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
-    [KTHREAD_APCSTATE] = {"_KTHREAD", "ApcState" },
-    [KTHREAD_APCQUEUEABLE] = {"_KTHREAD", "ApcQueueable"},
-    [KTHREAD_PREVIOUSMODE] = { "_KTHREAD", "PreviousMode" },
-    [KTHREAD_HEADER] = { "_KTHREAD", "Header" },
-    [KAPC_APCLISTENTRY] = {"_KAPC", "ApcListEntry" },
-    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
-    [ETHREAD_CID] = {"_ETHREAD", "Cid" },
-    [ETHREAD_TCB] = { "_ETHREAD", "Tcb" },
-    [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
-    [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
-    [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
-    [UNICODE_STRING_LENGTH] = {"_UNICODE_STRING", "Length" },
-    [UNICODE_STRING_BUFFER] = {"_UNICODE_STRING", "Buffer" },
-    [POOL_HEADER_BLOCKSIZE] = {"_POOL_HEADER", "BlockSize" },
-    [POOL_HEADER_POOLTYPE] = {"_POOL_HEADER", "PoolType" },
-    [POOL_HEADER_POOLTAG] = {"_POOL_HEADER", "PoolTag" },
-    [DISPATCHER_TYPE] = { "_DISPATCHER_HEADER",  "Type" },
-};
-
-bool init_vmi(drakvuf_t drakvuf);
-void close_vmi(drakvuf_t drakvuf);
-
-event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event);
-event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
-event_response_t vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
-
-bool inject_trap_mem(drakvuf_t drakvuf,
-                     drakvuf_trap_t *trap,
-                     bool guard2);
-bool inject_trap_pa(drakvuf_t drakvuf,
-                    drakvuf_trap_t *trap,
-                    addr_t pa);
-bool inject_traps_modules(drakvuf_t drakvuf,
-                          drakvuf_trap_t *trap,
-                          addr_t list_head,
-                          vmi_pid_t pid);
-void remove_trap(drakvuf_t drakvuf,
-                 const drakvuf_trap_t *trap);
 
 #endif

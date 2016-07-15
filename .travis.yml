@@ -11,7 +11,7 @@ before_install:
   - sudo apt-get build-dep libxen-dev
   - sudo dpkg -i test-packages/xen-4.6.0-tools_amd64.deb
   - sudo ln -s /usr/lib/gcc/x86_64-linux-gnu/4.8/libstdc++.so /usr/lib/x86_64-linux-gnu/libstdc++.so
-  - git clone -b drakvuf https://github.com/tklengyel/libvmi
+  - git submodule init && git submodule update
   - cd libvmi && ./autogen.sh && ./configure --enable-xen --enable-xen-events
   - make && sudo make install
   - cd tools/pyvmi && python setup.py build && sudo python setup.py install

@@ -282,6 +282,36 @@ status_t drakvuf_get_function_rva(const char *rekall_profile, const char *functi
     return VMI_FAILURE;
 }
 
+status_t drakvuf_get_constant_rva(const char *rekall_profile, const char *constant, addr_t *rva)
+{
+
+    json_object *root = json_object_from_file(rekall_profile);
+    if(!root) {
+        fprintf(stderr, "Rekall profile couldn't be opened!\n");
+        goto err_exit;
+    }
+
+    json_object *constants = NULL, *jsymbol = NULL;
+    if (!json_object_object_get_ex(root, "$CONSTANTS", &constants)) {
+        PRINT_DEBUG("Rekall profile: no $CONSTANTS section found\n");
+        goto err_exit;
+    }
+
+    if (!json_object_object_get_ex(constants, constant, &jsymbol)) {
+        PRINT_DEBUG("Rekall profile: no '%s' found\n", constant);
+        json_object_put(constants);
+        goto err_exit;
+    }
+
+    *rva = json_object_get_int64(jsymbol);
+    json_object_put(constants);
+    json_object_put(jsymbol);
+    return VMI_SUCCESS;
+
+    err_exit:
+    return VMI_FAILURE;
+}
+
 void drakvuf_free_symbols(symbols_t *symbols) {
     uint32_t i;
     if (!symbols) return;

@@ -137,6 +137,9 @@ void drakvuf_free_symbols(symbols_t *symbols);
 status_t drakvuf_get_function_rva(const char *rekall_profile,
                                   const char *function,
                                   addr_t *rva);
+status_t drakvuf_get_constant_rva(const char *rekall_profile,
+                                  const char *constant,
+                                  addr_t *rva);
 status_t drakvuf_get_struct_size(const char *rekall_profile,
                                  const char *struct_name,
                                  size_t *size);
@@ -273,6 +276,8 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
                                  uint64_t handle);
 
 const char *drakvuf_get_rekall_profile(drakvuf_t drakvuf);
+
+addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf);
 
 /*
  * Specify either vcpu_id and/or regs. If regs don't have the required info

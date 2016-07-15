@@ -179,6 +179,16 @@ if test x$plugin_exmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_EXMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_ssdtmon],
+  [AS_HELP_STRING([--disable-plugin-ssdtmon],
+    [Enable the KiServiceTable watching plugin @<:@yes@:>@])],
+  [plugin_ssdtmon="$enableval"],
+  [plugin_ssdtmon="yes"])
+AM_CONDITIONAL([PLUGIN_SSDTMON], [test x$plugin_ssdtmon = xyes])
+if test x$plugin_ssdtmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_SSDTMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -357,4 +367,5 @@ Filetracer: $plugin_filetracer
 Filedelete: $plugin_filedelete
 Objmon:     $plugin_objmon
 Exmon:      $plugin_exmon
+SSDTmon:    $plugin_ssdtmon
 -------------------------------------------------------------------------------])
