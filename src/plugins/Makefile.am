@@ -130,6 +130,9 @@ if PLUGIN_EXMON
 sources += exmon/exmon.cpp
 endif
 
+if PLUGIN_SSDTMON
+sources += ssdtmon/ssdtmon.cpp
+endif
 
 ###############################################################################
 sources += plugins.cpp plugins.h
