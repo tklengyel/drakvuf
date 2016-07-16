@@ -133,6 +133,7 @@ int main(int argc, char** argv) {
     char *rekall_profile = NULL;
     char *dump_folder = NULL;
     vmi_pid_t injection_pid = -1;
+    uint32_t injection_thread = 0;
     struct sigaction act;
     GThread *timeout_thread = NULL;
     output_format_t output = OUTPUT_DEFAULT;
@@ -152,6 +153,7 @@ int main(int argc, char** argv) {
                "\t -d <domain ID or name>    The domain's ID or name\n"
                "Optional inputs:\n"
                "\t -i <injection pid>        The PID of the process to hijack for injection\n"
+               "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
                "\t -e <inject_exe>           The executable to start with injection\n"
                "\t -t <timeout>              Timeout (in seconds)\n"
                "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
@@ -164,7 +166,7 @@ int main(int argc, char** argv) {
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:e:t:D:o:vx:")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:t:D:o:vx:")) != -1)
     switch (c)
     {
     case 'r':
@@ -175,6 +177,9 @@ int main(int argc, char** argv) {
         break;
     case 'i':
         injection_pid = atoi(optarg);
+        break;
+    case 'I':
+        injection_thread = atoi(optarg);
         break;
     case 'e':
         inject_cmd = optarg;
@@ -229,7 +234,7 @@ int main(int argc, char** argv) {
     sigaction(SIGALRM, &act, NULL);
 
     if ( injection_pid > 0 && inject_cmd ) {
-        rc = drakvuf->inject_cmd(injection_pid, inject_cmd);
+        rc = drakvuf->inject_cmd(injection_pid, injection_thread, inject_cmd);
         if (!rc)
             goto exit;
     }

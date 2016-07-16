@@ -113,7 +113,10 @@ extern "C" {
 
 #include <libdrakvuf/libdrakvuf.h>
 
-int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, const char *app);
+int injector_start_app(drakvuf_t drakvuf,
+                       vmi_pid_t pid,
+                       uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
+                       const char *app);
 
 #pragma GCC visibility pop
 

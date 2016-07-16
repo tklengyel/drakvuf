@@ -124,6 +124,7 @@ struct injector {
     const char *target_proc;
     reg_t target_cr3;
     vmi_pid_t target_pid;
+    uint32_t target_tid;
 
     // Internal:
     drakvuf_t drakvuf;
@@ -288,10 +289,6 @@ bool pass_inputs(struct injector *injector, drakvuf_trap_info_t *info) {
         .dtb = info->regs->cr3,
     };
 
-    /*
-    TODO: On xen 4.6 fs/gs here might be 0. This is fixed on 4.7, so once we update to Xen 4.7
-          we should also check that the inputs will fit onto the stack.
-
     addr_t stack_base, stack_limit;
 
     if (injector->is32bit)
@@ -306,7 +303,6 @@ bool pass_inputs(struct injector *injector, drakvuf_trap_info_t *info) {
     ctx.addr = fsgs + injector->offsets[NT_TIB_STACKLIMIT];
     if(VMI_FAILURE == vmi_read_addr(vmi, &ctx, &stack_limit))
         goto err;
-    */
 
     //Push input arguments on the stack
     //CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, CREATE_SUSPENDED, NULL, NULL, &si, pi))
@@ -650,6 +646,9 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     PRINT_DEBUG("Thread @ 0x%lx. ThreadID: %u\n", thread, threadid);
 
+    if ( injector->target_tid && injector->target_tid != threadid)
+        return 0;
+
     /*
      * At this point the process is still in kernel mode, so
      * we need to trap when it enters into user mode.
@@ -848,13 +847,14 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
     return 0;
 }
 
-int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, const char *app) {
+int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char *app) {
 
     struct injector injector = {
         .drakvuf = drakvuf,
         .vmi = drakvuf_lock_and_get_vmi(drakvuf),
         .rekall_profile = drakvuf_get_rekall_profile(drakvuf),
         .target_pid = pid,
+        .target_tid = tid,
         .target_proc = app,
         .rc = 0
     };
