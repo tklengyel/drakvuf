@@ -300,6 +300,30 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
         loop = loop->next;
     }
+
+    /* We need to call breakpoint handlers registered for this physical address */
+    if (event->mem_event.out_access & VMI_MEMACCESS_X) {
+        struct wrapper *sbp = g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &s->memaccess.pa);
+        
+        if (sbp) {
+            PRINT_DEBUG("Simulated INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64"\n",
+                event->vcpu_id, event->vmm_pagetable_id, event->regs.x86->cr3, s->memaccess.pa, event->regs.x86->rip);
+
+            loop = sbp->traps;
+            while(loop) {
+                drakvuf_trap_t *trap = loop->data;
+                drakvuf_trap_info_t trap_info = {
+                    .trap = trap,
+                    .trap_pa = s->memaccess.pa,
+                    .regs = event->regs.x86,
+                    .vcpu = event->vcpu_id,
+                };
+
+                loop = loop->next;
+                trap->cb(drakvuf, &trap_info);
+            }
+        }
+    }
     drakvuf->in_callback = 0;
 
     /*
