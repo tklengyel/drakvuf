@@ -372,11 +372,12 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     drakvuf_t drakvuf = event->data;
     addr_t pa = (event->interrupt_event.gfn << 12)
-            + event->interrupt_event.offset;
+            + event->interrupt_event.offset + event->interrupt_event.insn_length - 1;
     struct wrapper *s = g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
 
-    PRINT_DEBUG("INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64"\n",
-                event->vcpu_id, event->vmm_pagetable_id, cr3, pa, event->interrupt_event.gla);
+    PRINT_DEBUG("INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64". Insn_length: %u\n",
+                event->vcpu_id, event->vmm_pagetable_id, cr3, pa,
+                event->interrupt_event.gla, event->interrupt_event.insn_length);
 
     if (!s) {
         /*
@@ -397,39 +398,40 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
             PRINT_DEBUG("Ignoring old breakpoint event found in the queue\n");
             event->interrupt_event.reinject = 0;
         }
-    } else {
-        if ( s->breakpoint.doubletrap )
-            event->interrupt_event.reinject = 1;
-        else
-            event->interrupt_event.reinject = 0;
+        return 0;
+    }
 
-        drakvuf->in_callback = 1;
-        GSList *loop = s->traps;
-        while(loop) {
-            drakvuf_trap_t *trap = loop->data;
-            drakvuf_trap_info_t trap_info = {
-                .trap = trap,
-                .trap_pa = pa,
-                .regs = event->regs.x86,
-                .vcpu = event->vcpu_id,
-            };
+    if ( s->breakpoint.doubletrap )
+        event->interrupt_event.reinject = 1;
+    else
+        event->interrupt_event.reinject = 0;
 
-            loop = loop->next;
-            trap->cb(drakvuf, &trap_info);
-        }
-        drakvuf->in_callback = 0;
+    drakvuf->in_callback = 1;
+    GSList *loop = s->traps;
+    while(loop) {
+        drakvuf_trap_t *trap = loop->data;
+        drakvuf_trap_info_t trap_info = {
+            .trap = trap,
+            .trap_pa = pa,
+            .regs = event->regs.x86,
+            .vcpu = event->vcpu_id,
+        };
 
-        process_free_requests(drakvuf);
+        loop = loop->next;
+        trap->cb(drakvuf, &trap_info);
+    }
+    drakvuf->in_callback = 0;
 
-        // Check if we have traps still active on this breakpoint
-        if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa) ) {
-            PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u\n", event->vcpu_id);
-            event->vmm_pagetable_id = 0;
-            drakvuf->step_event[event->vcpu_id]->callback = vmi_reset_trap;
-            drakvuf->step_event[event->vcpu_id]->data = drakvuf;
-            return (1u << VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP) | // Enable singlestep
-                   (1u << VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID);
-        }
+    process_free_requests(drakvuf);
+
+    // Check if we have traps still active on this breakpoint
+    if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa) ) {
+        PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u\n", event->vcpu_id);
+        event->vmm_pagetable_id = 0;
+        drakvuf->step_event[event->vcpu_id]->callback = vmi_reset_trap;
+        drakvuf->step_event[event->vcpu_id]->data = drakvuf;
+        return (1u << VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP) | // Enable singlestep
+               (1u << VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID);
     }
 
     return 0;
