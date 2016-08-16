@@ -576,10 +576,11 @@ void remove_trap(drakvuf_t drakvuf,
         }
 
         if(VMI_SUCCESS == vmi_swap_events(vmi, event, update_event, (vmi_event_free_t)free)) {
-            PRINT_DEBUG("Successfully requested to swap events to permission %c%c%c!\n",
+            PRINT_DEBUG("Successfully requested to swap events to permission %c%c%c on GFN 0x%lx!\n",
                         (update_event->mem_event.in_access & VMI_MEMACCESS_R) ? 'r' : '-',
                         (update_event->mem_event.in_access & VMI_MEMACCESS_W) ? 'w' : '-',
-                        (update_event->mem_event.in_access & VMI_MEMACCESS_X) ? 'x' : '-'
+                        (update_event->mem_event.in_access & VMI_MEMACCESS_X) ? 'x' : '-',
+                        (update_event->mem_event.physical_address >> 12)
                         );
             container->memaccess.memtrap = update_event;
         } else {
@@ -634,10 +635,11 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t *trap, bool guard2) {
                 free(update_event);
                 return 0;
             } else {
-                PRINT_DEBUG("Successfully requested to swap events to permission %c%c%c!\n",
+                PRINT_DEBUG("Successfully requested to swap events to permission %c%c%c on GFN 0x%lx!\n",
                             (update_event->mem_event.in_access & VMI_MEMACCESS_R) ? 'r' : '-',
                             (update_event->mem_event.in_access & VMI_MEMACCESS_W) ? 'w' : '-',
-                            (update_event->mem_event.in_access & VMI_MEMACCESS_X) ? 'x' : '-'
+                            (update_event->mem_event.in_access & VMI_MEMACCESS_X) ? 'x' : '-',
+                            (update_event->mem_event.physical_address >> 12)
                             );
                 s->memaccess.memtrap = update_event;
             }
