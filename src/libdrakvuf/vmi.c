@@ -716,7 +716,8 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     container->traps = g_slist_prepend(container->traps, trap);
     container->breakpoint.pa = pa;
     container->breakpoint.guard.type = MEMACCESS;
-    container->breakpoint.guard.memaccess.access = VMI_MEMACCESS_RW;
+    /* We need to merge rights of the previous traps on this page (if any) */
+    container->breakpoint.guard.memaccess.access = VMI_MEMACCESS_RW | old_access;
     container->breakpoint.guard.memaccess.type = PRE;
     container->breakpoint.guard.memaccess.gfn = current_gfn;
 
@@ -772,17 +773,6 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         }
     }
 
-    container->breakpoint.guard2.type = MEMACCESS;
-    /* We need to merge rights of the previous traps on this page */
-    container->breakpoint.guard2.memaccess.access = VMI_MEMACCESS_RW | old_access;
-    container->breakpoint.guard2.memaccess.type = PRE;
-    container->breakpoint.guard2.memaccess.gfn = remapped_gfn->r;
-
-    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard2, 1) ) {
-        PRINT_DEBUG("Failed to create guard2 trap for the breakpoint!\n");
-        return 0;
-    }
-
     if ( !remapped_gfn->active ) {
         PRINT_DEBUG("Activating remapped gfns in the altp2m views!\n");
         remapped_gfn->active = 1;
@@ -791,6 +781,17 @@ bool inject_trap_pa(drakvuf_t drakvuf,
                          drakvuf->altp2m_idx, current_gfn, remapped_gfn->r);
         xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID,
                          drakvuf->altp2m_idr, remapped_gfn->r, drakvuf->zero_page_gfn);
+    }
+
+    /* We set guard2 memaccess after remapping as otherwise it overwrites the memaccess settings */
+    container->breakpoint.guard2.type = MEMACCESS;
+    container->breakpoint.guard2.memaccess.access = VMI_MEMACCESS_RWX;
+    container->breakpoint.guard2.memaccess.type = PRE;
+    container->breakpoint.guard2.memaccess.gfn = remapped_gfn->r;
+
+    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard2, 1) ) {
+        PRINT_DEBUG("Failed to create guard2 trap for the breakpoint!\n");
+        return 0;
     }
 
     addr_t rpa = (remapped_gfn->r<<12) + (container->breakpoint.pa & VMI_BIT_MASK(0,11));
