@@ -156,14 +156,20 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const void *config, output_format_t output) 
 
     this->format = output;
 
-    if ( drakvuf_get_constant_rva(rekall_profile, "KiServiceTable", &kiservicetable_rva) == VMI_FAILURE )
+    if ( drakvuf_get_constant_rva(rekall_profile, "KiServiceTable", &kiservicetable_rva) == VMI_FAILURE ) {
+        PRINT_DEBUG("SSDT plugin can't find KiServiceTable RVA\n");
         throw -1;
-    if ( drakvuf_get_constant_rva(rekall_profile, "KiServiceLimit", &kiservicelimit_rva) == VMI_FAILURE )
+    }
+    if ( drakvuf_get_constant_rva(rekall_profile, "KiServiceLimit", &kiservicelimit_rva) == VMI_FAILURE ) {
+        PRINT_DEBUG("SSDT plugin can't find KiServiceLimit RVA\n");
         throw -1;
+    }
 
     kernbase = drakvuf_get_kernel_base(drakvuf);
-    if ( !kernbase )
+    if ( !kernbase ) {
+        PRINT_DEBUG("SSDT plugin can't find kernel base address\n");
         throw -1;
+    }
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     page_mode_t pm = vmi_get_page_mode(vmi);
@@ -171,10 +177,14 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const void *config, output_format_t output) 
     vmi_read_32_va(vmi, kernbase + kiservicelimit_rva, 0, &this->kiservicelimit);
     drakvuf_release_vmi(drakvuf);
 
-    if ( !this->kiservicetable )
+    if ( !this->kiservicetable ) {
+        PRINT_DEBUG("SSDT plugin can't find the physical address of KiServiceTable\n");
         throw -1;
-    if ( !this->kiservicelimit )
+    }
+    if ( !this->kiservicelimit ) {
+        PRINT_DEBUG("SSDT plugin can't read the value of KiServiceLimit\n");
         throw -1;
+    }
 
     this->ulongs = (pm == VMI_PM_IA32E) ? 8 : 4;
 
@@ -190,15 +200,17 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const void *config, output_format_t output) 
     this->ssdtwrite.memaccess.type = PRE;
     this->ssdtwrite.memaccess.access = VMI_MEMACCESS_W;
 
-    addr_t gfn_end = (this->kiservicetable + this->ulongs * this->kiservicelimit) >> 12;
+    addr_t ssdtwrite_end = (this->kiservicetable + this->ulongs * this->kiservicelimit) >> 12;
 
-    if ( !drakvuf_add_trap(drakvuf, &this->ssdtwrite) )
+    if ( !drakvuf_add_trap(drakvuf, &this->ssdtwrite) ) {
+        PRINT_DEBUG("SSDT plugin failed to trap on \n");
         throw -1;
+    }
 
-    if ( gfn_end != this->ssdtwrite.memaccess.gfn )
+    if ( ssdtwrite_end != this->ssdtwrite.memaccess.gfn )
     {
         this->ssdtwrite2 = this->ssdtwrite;
-        this->ssdtwrite2.memaccess.gfn = gfn_end;
+        this->ssdtwrite2.memaccess.gfn = ssdtwrite_end;
 
         if ( !drakvuf_add_trap(drakvuf, &this->ssdtwrite2) )
             throw -1;
