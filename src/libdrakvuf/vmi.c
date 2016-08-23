@@ -492,11 +492,12 @@ void remove_trap(drakvuf_t drakvuf,
     {
         struct wrapper *container =
             g_hash_table_lookup(drakvuf->breakpoint_lookup_trap, &trap);
-        xen_pfn_t current_gfn = container->breakpoint.pa >> 12;
-        uint64_t _current_gfn = current_gfn;
 
         if ( !container )
             return;
+
+        xen_pfn_t current_gfn = container->breakpoint.pa >> 12;
+        uint64_t _current_gfn = current_gfn;
 
         PRINT_DEBUG("Removing breakpoint trap from 0x%lx.\n",
                     container->breakpoint.pa);
