@@ -299,7 +299,8 @@ AC_CHECK_LIB(glib-2.0, [g_malloc0, g_tree_lookup], [], [AC_ERROR([glib-2.0 libra
 
 PKG_CHECK_MODULES([VMI], [libvmi >= 0.11], [], [AC_ERROR([LibVMI not found])])
 AC_CHECK_HEADERS([libvmi/events.h], [], [AC_ERROR([LibVMI doesn't have events support.])], [#include <libvmi/libvmi.h>])
-AC_CHECK_LIB(vmi, [vmi_register_event, vmi_step_event, vmi_read], [], [AC_ERROR([LibVMI doesn't have events support.])])
+AC_CHECK_LIB(vmi, [vmi_register_event], [], [AC_ERROR([LibVMI doesn't have required events support. Please update LibVMI!])])
+AC_CHECK_LIB(vmi, [vmi_events_version], [], [AC_ERROR([LibVMI doesn't have required events support. Please update LibVMI!])])
 
 AC_CHECK_LIB(json-c, json_object_get_int64,, [AC_ERROR([libjson-c-dev is missing])])
 AC_CHECK_HEADERS([json-c/json.h], [], [AC_ERROR([libjson-c-dev is missing])])

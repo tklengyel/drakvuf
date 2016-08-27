@@ -711,19 +711,16 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         drakvuf_pause(drakvuf);
         while(loop) {
             page_info_t *page = loop->data;
-            if(page->vaddr < 0x80000000  && USER_SUPERVISOR(page->x86_pae.pte_value)) {
-                vmi_event_t *new_event = vmi_get_mem_event(injector->vmi, page->paddr);
-                if(!new_event) {
-                    drakvuf_trap_t *new_trap = g_malloc0(sizeof(drakvuf_trap_t));
-                    new_trap->type = MEMACCESS;
-                    new_trap->cb = mem_callback;
-                    new_trap->data = injector;
-                    new_trap->memaccess.access = VMI_MEMACCESS_X;
-                    new_trap->memaccess.type = POST;
-                    new_trap->memaccess.gfn = page->paddr >> 12;
-                    injector->memtraps = g_slist_prepend(injector->memtraps, new_trap);
-                    drakvuf_add_trap(injector->drakvuf, new_trap);
-                }
+            if(page->vaddr < 0x80000000 && USER_SUPERVISOR(page->x86_pae.pte_value)) {
+                drakvuf_trap_t *new_trap = g_malloc0(sizeof(drakvuf_trap_t));
+                new_trap->type = MEMACCESS;
+                new_trap->cb = mem_callback;
+                new_trap->data = injector;
+                new_trap->memaccess.access = VMI_MEMACCESS_X;
+                new_trap->memaccess.type = POST;
+                new_trap->memaccess.gfn = page->paddr >> 12;
+                injector->memtraps = g_slist_prepend(injector->memtraps, new_trap);
+                drakvuf_add_trap(injector->drakvuf, new_trap);
             }
             free(page);
             loop = loop->next;
