@@ -693,16 +693,6 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     container->drakvuf = drakvuf;
     container->traps = g_slist_prepend(container->traps, trap);
     container->breakpoint.pa = pa;
-    container->breakpoint.guard.type = MEMACCESS;
-    /* We need to merge rights of the previous traps on this page (if any) */
-    container->breakpoint.guard.memaccess.access = VMI_MEMACCESS_RW | old_access;
-    container->breakpoint.guard.memaccess.type = PRE;
-    container->breakpoint.guard.memaccess.gfn = current_gfn;
-
-    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard, 0) ) {
-        PRINT_DEBUG("Failed to create guard trap for the breakpoint!\n");
-        return 0;
-    }
 
     /* Let's see if we have already created the shadow copy of this page */
     struct remapped_gfn *remapped_gfn = g_hash_table_lookup(drakvuf->remapped_gfns, &current_gfn);
@@ -761,11 +751,24 @@ bool inject_trap_pa(drakvuf_t drakvuf,
                          drakvuf->altp2m_idr, remapped_gfn->r, drakvuf->zero_page_gfn);
     }
 
-    /* We set guard2 memaccess after remapping as otherwise it overwrites the memaccess settings */
+    /*
+     * We MUST set guard and guard2 memaccess _after_ remapping as otherwise remapping
+     * overwrites the memaccess settings.
+     */
+    container->breakpoint.guard.type = MEMACCESS;
+    /* We need to merge rights of the previous traps on this page (if any) */
+    container->breakpoint.guard.memaccess.access = VMI_MEMACCESS_RW | old_access;
+    container->breakpoint.guard.memaccess.type = PRE;
+    container->breakpoint.guard.memaccess.gfn = current_gfn;
     container->breakpoint.guard2.type = MEMACCESS;
     container->breakpoint.guard2.memaccess.access = VMI_MEMACCESS_RWX;
     container->breakpoint.guard2.memaccess.type = PRE;
     container->breakpoint.guard2.memaccess.gfn = remapped_gfn->r;
+
+    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard, 0) ) {
+        PRINT_DEBUG("Failed to create guard trap for the breakpoint!\n");
+        return 0;
+    }
 
     if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard2, 1) ) {
         PRINT_DEBUG("Failed to create guard2 trap for the breakpoint!\n");
