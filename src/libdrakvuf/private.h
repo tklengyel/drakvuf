@@ -149,6 +149,7 @@ struct drakvuf {
 
     vmi_event_t cr3_event;
     vmi_event_t interrupt_event;
+    vmi_event_t mem_event;
     vmi_event_t *step_event[16];
 
     size_t offsets[OFFSET_MAX];
@@ -165,6 +166,7 @@ struct drakvuf {
     unsigned int vcpus;
     unsigned int init_memsize;
     unsigned int memsize;
+    addr_t kernbase;
 
     GHashTable *remapped_gfns; // Key: gfn
                                // val: remapped gfn
@@ -194,7 +196,7 @@ struct memaccess {
     addr_t gfn;
     addr_t pa;
     bool guard2;
-    vmi_event_t *memtrap;
+    vmi_mem_access_t access;
 } __attribute__ ((packed));
 
 struct wrapper {
