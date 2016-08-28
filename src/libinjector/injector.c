@@ -720,9 +720,12 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                 new_trap->memaccess.type = POST;
                 new_trap->memaccess.gfn = page->paddr >> 12;
                 injector->memtraps = g_slist_prepend(injector->memtraps, new_trap);
-                drakvuf_add_trap(injector->drakvuf, new_trap);
+                if ( drakvuf_add_trap(injector->drakvuf, new_trap) )
+                    injector->memtraps = g_slist_prepend(injector->memtraps, new_trap);
+                else
+                    g_free(new_trap);
             }
-            free(page);
+            g_free(page);
             loop = loop->next;
         }
         g_slist_free(va_pages);
@@ -893,7 +896,8 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
     injector.cr3_event.reg = CR3;
     injector.cr3_event.cb = cr3_callback;
     injector.cr3_event.data = &injector;
-    drakvuf_add_trap(drakvuf, &injector.cr3_event);
+    if ( !drakvuf_add_trap(drakvuf, &injector.cr3_event) )
+        goto done;
 
     PRINT_DEBUG("Starting injection loop\n");
     drakvuf_loop(drakvuf);

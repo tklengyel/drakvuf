@@ -188,7 +188,7 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const void *config, output_format_t output) 
 
     this->ulongs = (pm == VMI_PM_IA32E) ? 8 : 4;
 
-    PRINT_DEBUG("SSDT is at 0x%lx. Number of syscalls: %lu. Size: %lu\n",
+    PRINT_DEBUG("SSDT is at 0x%lx. Number of syscalls: %u. Size: %lu\n",
                 this->kiservicetable,
                 this->kiservicelimit,
                 this->ulongs*this->kiservicelimit);

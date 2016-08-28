@@ -153,7 +153,7 @@ void process_free_requests(drakvuf_t drakvuf) {
         remove_trap(drakvuf, free_wrapper->trap);
         if(free_wrapper->free_routine)
             free_wrapper->free_routine(free_wrapper->trap);
-        free(free_wrapper);
+        g_free(free_wrapper);
     }
 
     g_hash_table_destroy(drakvuf->remove_traps);
@@ -249,7 +249,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
     }
 
 done:
-    free(pass);
+    g_free(pass);
     /* We switch back to the altp2m view no matter what */
     event->slat_id = drakvuf->altp2m_idx;
     drakvuf->step_event[event->vcpu_id]->callback = vmi_reset_trap;
@@ -649,7 +649,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t *trap, bool guard2) {
             PRINT_DEBUG("*** FAILED TO SET MEMORY TRAP @ PAGE %lu ***\n",
                         trap->memaccess.gfn);
             g_slist_free(s->traps);
-            free(s);
+            g_free(s);
             return 0;
         }
 
@@ -880,7 +880,7 @@ bool inject_traps_modules(drakvuf_t drakvuf,
         }
 
         if(out.contents && !strcmp((char*)out.contents,trap->breakpoint.module)) {
-            free(out.contents);
+            g_free(out.contents);
             return inject_trap(drakvuf, trap, dllbase, pid);
         }
 
@@ -1148,7 +1148,7 @@ void close_vmi(drakvuf_t drakvuf) {
 
     unsigned int i3;
     for (i3 = 0; i3 < drakvuf->vcpus; i3++) {
-        free(drakvuf->step_event[i3]);
+        g_free(drakvuf->step_event[i3]);
     }
 
     xc_altp2m_switch_to_view(drakvuf->xen->xc, drakvuf->domID, 0);
