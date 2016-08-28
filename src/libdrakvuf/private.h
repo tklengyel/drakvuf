@@ -166,6 +166,7 @@ struct drakvuf {
     unsigned int vcpus;
     unsigned int init_memsize;
     unsigned int memsize;
+    addr_t kernbase;
 
     GHashTable *remapped_gfns; // Key: gfn
                                // val: remapped gfn

@@ -420,3 +420,7 @@ addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t eprocess_addr,
 {
     return eprocess_sym2va(drakvuf, eprocess_addr, module, sym);
 }
+
+addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf) {
+    return drakvuf->kernbase;
+}

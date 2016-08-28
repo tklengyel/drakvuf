@@ -117,18 +117,6 @@ typedef enum dispatcher_object {
     DISPATCHER_THREAD_OBJECT  = 6
 } dispatcher_object_t ;
 
-addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf) {
-    reg_t fsgs;
-
-    if(vmi_get_page_mode(drakvuf->vmi) == VMI_PM_IA32E)  {
-        vmi_get_vcpureg(drakvuf->vmi, &fsgs, GS_BASE, 0);
-    } else {
-        vmi_get_vcpureg(drakvuf->vmi, &fsgs, FS_BASE, 0);
-    }
-
-    return fsgs - drakvuf->offsets[KIINITIALPCR];
-}
-
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id, const x86_registers_t *regs){
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t thread;

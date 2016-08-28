@@ -1069,6 +1069,21 @@ bool init_vmi(drakvuf_t drakvuf) {
         return 0;
     }
 
+    addr_t sysproc_rva;
+    addr_t sysproc = vmi_translate_ksym2v(drakvuf->vmi, "PsInitialSystemProcess");
+    if ( !sysproc ) {
+        printf("LibVMI failed to get us the VA of PsInitialSystemProcess!\n");
+        return 0;
+    }
+
+    if ( VMI_FAILURE == drakvuf_get_constant_rva(drakvuf->rekall_profile, "PsInitialSystemProcess", &sysproc_rva) ) {
+        fprintf(stderr, "Failed to get PsInitialSystemProcess RVA from Rekall profile!\n");
+        return 0;
+    }
+
+    drakvuf->kernbase = sysproc - sysproc_rva;
+    PRINT_DEBUG("Windows kernel base address is 0x%lx\n", drakvuf->kernbase);
+
     return 1;
 }
 
