@@ -122,7 +122,6 @@ status_t rekall_lookup(
         addr_t *size)
 {
     status_t ret = VMI_FAILURE;
-    addr_t mask = 0;
     if(!rekall_profile || !symbol) {
         return ret;
     }

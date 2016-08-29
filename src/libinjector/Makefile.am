@@ -100,7 +100,7 @@
 # DRAKVUF, and also available from                                        #
 # https://github.com/tklengyel/drakvuf/COPYING)                           #
 #                                                                         #
-#*************************************************************************# 
+#*************************************************************************#
 
 h_sources = libinjector.h private.h
 c_sources = injector.c
@@ -116,8 +116,8 @@ endif
 
 # Note that -pg is incompatible with HARDENING
 if DEBUG
-AM_CFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -Wno-override-init -Wno-strict-aliasing -g -ggdb3
-AM_CFLAGS += -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-unused-variable
+AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
+AM_CFLAGS += -Wno-missing-field-initializers
 if !HARDENING
 AM_CFLAGS += -pg
 endif

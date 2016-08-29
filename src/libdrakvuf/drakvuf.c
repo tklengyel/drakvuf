@@ -109,6 +109,7 @@
 #include "private.h"
 #include "win-symbols.h"
 #include "win-exports.h"
+#include "win-offsets.h"
 
 #ifdef DRAKVUF_DEBUG
 bool verbose = 0;
@@ -125,10 +126,11 @@ void drakvuf_close(drakvuf_t drakvuf) {
     if (drakvuf->xen)
         xen_free_interface(drakvuf->xen);
 
+    g_free(drakvuf->offsets);
     g_mutex_clear(&drakvuf->vmi_lock);
-    free(drakvuf->dom_name);
-    free(drakvuf->rekall_profile);
-    free(drakvuf);
+    g_free(drakvuf->dom_name);
+    g_free(drakvuf->rekall_profile);
+    g_free(drakvuf);
 }
 
 bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_profile, bool _verbose) {
@@ -152,6 +154,8 @@ bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_pro
     domid_t test = ~0;
     if ( (*drakvuf)->domID == test )
         goto err;
+
+    (*drakvuf)->offsets = g_malloc0(sizeof(addr_t) * OFFSET_MAX);
 
     if (!init_vmi(*drakvuf))
         goto err;

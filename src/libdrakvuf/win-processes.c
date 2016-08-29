@@ -111,6 +111,7 @@
 #include <glib.h>
 
 #include "private.h"
+#include "win-offsets.h"
 
 typedef enum dispatcher_object {
     DISPATCHER_PROCESS_OBJECT = 3,

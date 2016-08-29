@@ -100,12 +100,13 @@
 # DRAKVUF, and also available from                                        #
 # https://github.com/tklengyel/drakvuf/COPYING)                           #
 #                                                                         #
-#*************************************************************************# 
+#*************************************************************************#
 
 bin_PROGRAMS = dirwatch
 
 dirwatch_SOURCES = dirwatch.c
 dirwatch_LDADD = ../xen_helper/libxenhelper.la
 
-AM_CFLAGS = $(CFLAGS) $(GLIB_CFLAGS)
+AM_CFLAGS = -Werror -Wall -Wextra $(CFLAGS) $(GLIB_CFLAGS)
+AM_CFLAGS += -Wno-missing-field-initializers
 
