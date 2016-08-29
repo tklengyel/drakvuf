@@ -160,11 +160,11 @@ make_clone(xen_interface_t *xen, domid_t *cloneID,
     printf("** RUNNING COMMAND: %s\n", command);
     char *output = NULL;
     g_spawn_command_line_sync(command, &output, NULL, NULL, NULL);
-    free(command);
+    g_free(command);
 
     get_dom_info(xen, output, cloneID, clone_name);
 
-    free(output);
+    g_free(output);
 }
 
 gpointer tcpdump(gpointer data) {
@@ -173,7 +173,8 @@ gpointer tcpdump(gpointer data) {
     sprintf(command, TCPDUMP_CMD, tcpdump_script, start->threadid+1, run_folder, start->input, out_folder);
     printf("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
-    free(command);
+    g_free(command);
+    return NULL;
 }
 
 static inline int find_thread()
@@ -191,7 +192,7 @@ static inline void cleanup(domid_t cloneID, int vlan) {
     sprintf(command, CLEANUP_CMD, cleanup_script, cloneID, vlan);
     printf("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
-    free(command);
+    g_free(command);
 }
 
 gpointer timer_thread(gpointer data) {
@@ -242,6 +243,7 @@ static void prepare(char *sample, struct start_drakvuf *start)
 
     while(!clone_name || !cloneID) {
         printf("Clone creation failed, trying again\n");
+        free(clone_name);
         clone_name = NULL;
         cloneID = 0;
 
@@ -291,7 +293,7 @@ restart:
     sprintf(command, CONFIG_CMD, config_script, rekall_profile, start->cloneID, injection_pid, start->threadid+1, run_folder, start->input, out_folder);
     printf("[%i] ** RUNNING COMMAND: %s\n", start->threadid, command);
     g_spawn_command_line_sync(command, NULL, NULL, &rc, NULL);
-    free(command);
+    g_free(command);
 
     g_mutex_unlock(&start->timer_lock);
     g_thread_join(timer);
@@ -316,7 +318,7 @@ restart:
     sprintf(command, DRAKVUF_CMD, drakvuf_script, rekall_profile, start->cloneID, injection_pid, start->threadid+1, run_folder, start->input, out_folder);
     printf("[%i] ** RUNNING COMMAND: %s\n", start->threadid, command);
     g_spawn_command_line_sync(command, NULL, NULL, &rc, NULL);
-    free(command);
+    g_free(command);
 
     g_mutex_unlock(&start->timer_lock);
     g_thread_join(timer);
@@ -329,9 +331,9 @@ restart:
 
         g_mutex_unlock(&locks[start->threadid]);
         g_mutex_clear(&start->timer_lock);
-        free(start->input);
-        free(start->clone_name);
-        free(start);
+        g_free(start->input);
+        g_free(start->clone_name);
+        g_free(start);
         return;
     } else
         cleanup(start->cloneID, start->threadid+1);
@@ -397,7 +399,7 @@ int main(int argc, char** argv)
                 sprintf(command, "mv %s/%s %s/%s", in_folder, ent->d_name, run_folder, ent->d_name);
                 printf("** MOVING FILE FOR PROCESSING: %s\n", command);
                 g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
-                free(command);
+                g_free(command);
 
                 prepare(g_strdup(ent->d_name), NULL);
                 processed++;
