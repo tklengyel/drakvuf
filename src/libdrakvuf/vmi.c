@@ -123,14 +123,17 @@
 #include "libdrakvuf.h"
 #include "win-symbols.h"
 #include "vmi.h"
+#include "win-offsets.h"
+#include "win-offsets-map.h"
 
-static uint8_t bp = 0xCC;
+static uint8_t bp = TRAP;
 
 /*
  * This function gets called from the singlestep event
  * after an int3 or a read event happens.
  */
 event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
+    UNUSED(vmi);
     drakvuf_t drakvuf = event->data;
     PRINT_DEBUG("reset trap, switching %u->%u\n", event->slat_id, drakvuf->altp2m_idx);
     event->slat_id = drakvuf->altp2m_idx;
@@ -163,7 +166,7 @@ void process_free_requests(drakvuf_t drakvuf) {
 
 /* Here we are in singlestep mode already and this is a singlstep cb */
 event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
-
+    UNUSED(vmi);
     struct memcb_pass *pass = event->data;
     drakvuf_t drakvuf = pass->drakvuf;
     struct wrapper *s =
@@ -260,7 +263,7 @@ done:
 
 /* This hits on the first access on a page, so not in singlestep yet */
 event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
-
+    UNUSED(vmi);
     drakvuf_t drakvuf = event->data;
     struct wrapper *s =
         g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &event->mem_event.gfn);
@@ -304,7 +307,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
     /* We need to call breakpoint handlers registered for this physical address */
     if (event->mem_event.out_access & VMI_MEMACCESS_X) {
         struct wrapper *sbp = g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &s->memaccess.pa);
-        
+
         if (sbp) {
             PRINT_DEBUG("Simulated INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64"\n",
                 event->vcpu_id, event->slat_id, event->regs.x86->cr3, s->memaccess.pa, event->regs.x86->rip);
@@ -367,9 +370,8 @@ done:
 }
 
 event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
-
+    UNUSED(vmi);
     reg_t cr3 = event->regs.x86->cr3;
-
     drakvuf_t drakvuf = event->data;
     addr_t pa = (event->interrupt_event.gfn << 12)
             + event->interrupt_event.offset + event->interrupt_event.insn_length - 1;
@@ -438,6 +440,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 }
 
 event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
+    UNUSED(vmi);
     drakvuf_t drakvuf = (drakvuf_t)event->data;
 
 #ifdef DRAKVUF_DEBUG

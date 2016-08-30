@@ -100,13 +100,14 @@
 # DRAKVUF, and also available from                                        #
 # https://github.com/tklengyel/drakvuf/COPYING)                           #
 #                                                                         #
-#*************************************************************************# 
+#*************************************************************************#
 
 h_sources = xen_helper.h
 c_sources = xen_helper.c
 
 AM_CFLAGS = -I$(top_srcdir)
-AM_CFLAGS += $(CFLAGS) $(GLIB_CFLAGS)
+AM_CFLAGS += -Werror -Wall -Wextra $(CFLAGS) $(GLIB_CFLAGS)
+AM_CFLAGS += -Wno-missing-field-initializers
 
 noinst_LTLIBRARIES= libxenhelper.la
 libxenhelper_la_SOURCES= $(h_sources) $(c_sources)

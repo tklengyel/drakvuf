@@ -140,7 +140,6 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     objmon *o = (objmon *)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    page_mode_t pm = vmi_get_page_mode(vmi);
     uint8_t index = ~0;
     char *procname = drakvuf_get_current_process_name(drakvuf, info->vcpu, info->regs);
 

@@ -111,6 +111,7 @@
 #include <glib.h>
 
 #include "private.h"
+#include "win-offsets.h"
 
 /* this should work for both 32 and 64bit */
 #define EX_FAST_REF_MASK    7

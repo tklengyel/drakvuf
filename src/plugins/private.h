@@ -110,13 +110,13 @@
 // This is defined in libdrakvuf
 extern bool verbose;
 
-#define PRINT_DEBUG(args...) \
+#define PRINT_DEBUG(...) \
     do { \
-        if(verbose) fprintf (stderr, args); \
+        if(verbose) fprintf (stderr, __VA_ARGS__); \
     } while (0)
 
 #else
-#define PRINT_DEBUG(args...) \
+#define PRINT_DEBUG(...) \
     do {} while(0)
 #endif
 

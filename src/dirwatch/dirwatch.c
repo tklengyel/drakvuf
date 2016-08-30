@@ -121,6 +121,8 @@
 #define CLEANUP_CMD     "%s %u %u"
 #define TCPDUMP_CMD     "%s %u %s %s %s"
 
+#define UNUSED(x) (void)(x)
+
 struct start_drakvuf {
     int threadid;
     domid_t cloneID;
@@ -142,18 +144,16 @@ static const char *config_script;
 static const char *drakvuf_script;
 static const char *cleanup_script;
 static const char *tcpdump_script;
-static const char *name;
-static domid_t domID;
 static uint32_t threads;
 static uint32_t injection_pid;
 
 static GMutex locks[128];
 static GMutex prepare_lock;
+
 xen_interface_t *xen;
 
 static void
-make_clone(xen_interface_t *xen, domid_t *cloneID,
-           uint16_t vlan, char **clone_name)
+make_clone(xen_interface_t *xen, domid_t *cloneID, uint16_t vlan, char **clone_name)
 {
     char *command = g_malloc0(snprintf(NULL, 0, CLONE_CMD, clone_script, domain_name, vlan, domain_config) + 1);
     sprintf(command, CLONE_CMD, clone_script, domain_name, vlan, domain_config);
@@ -179,7 +179,7 @@ gpointer tcpdump(gpointer data) {
 
 static inline int find_thread()
 {
-    int i=0;
+    unsigned int i=0;
     for (;i<threads;i++) {
         if(g_mutex_trylock(&locks[i]))
             return i;
@@ -272,16 +272,14 @@ static void prepare(char *sample, struct start_drakvuf *start)
 
 void run_drakvuf(gpointer data, gpointer user_data)
 {
+    UNUSED(user_data);
     struct start_drakvuf *start = data;
     char *command;
-    char *output, *err;
     gint rc;
     GThread *timer, *tcpd;
 
 restart:
     command = NULL;
-    output = NULL;
-    err = NULL;
     rc = 0;
     printf("[%i] Starting %s on domid %u\n", start->threadid, start->input, start->cloneID);
 
@@ -348,7 +346,8 @@ int main(int argc, char** argv)
 {
     DIR *dir;
     struct dirent *ent;
-    int i, ret = 1, processed = 0;
+    unsigned int i, processed = 0;
+    int ret = 0;
 
     if(argc!=14) {
         printf("Not enough arguments: %i!\n", argc);
@@ -408,21 +407,23 @@ int main(int argc, char** argv)
             closedir (dir);
         } else {
             printf("Failed to open target folder!\n");
-            goto exit;
+            ret = 1;
+            break;
         }
 
         if (!processed) {
             printf("Run folder is empty, waiting for file creation\n");
             int l = read( fd, buffer, sizeof(struct inotify_event) + NAME_MAX + 1 );
+            if ( l <= 0 ) {
+                ret = 1;
+                break;
+            }
         }
     } while(1);
 
     inotify_rm_watch( fd, wd );
     close(fd);
 
-    ret = 0;
-
-exit:
     g_thread_pool_free(pool, FALSE, TRUE);
 
     g_mutex_clear(&prepare_lock);

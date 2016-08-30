@@ -214,10 +214,8 @@ static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t
     filetracer *f = s->f;
     addr_t obj_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, info->regs->rax);
     bool file_alloc = 0;
-    addr_t ph_base = 0, thread = 0;
+    addr_t ph_base = 0;
     uint32_t block_size = 0;
-    uint32_t tag;
-    uint32_t aligned_file_size = f->file_object_size;
 
     if ( f->pm == VMI_PM_IA32E ) {
         struct pool_header_x64 ph;

@@ -100,7 +100,7 @@
 # DRAKVUF, and also available from                                        #
 # https://github.com/tklengyel/drakvuf/COPYING)                           #
 #                                                                         #
-#*************************************************************************# 
+#*************************************************************************#
 
 sources =
 
@@ -149,8 +149,8 @@ AM_CPPFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 
 # Note that -pg is incompatible with HARDENING
 if DEBUG
-AM_CPPFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -Wno-strict-aliasing -g -ggdb3
-AM_CPPFLAGS += -Wno-unused-parameter -Wno-unused-variable
+AM_CPPFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
+AM_CPPFLAGS += -Wno-missing-field-initializers
 if !HARDENING
 AM_CPPFLAGS += -pg
 endif

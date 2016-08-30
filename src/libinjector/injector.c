@@ -117,8 +117,6 @@
 #include "libdrakvuf/libdrakvuf.h"
 #include "private.h"
 
-static uint8_t trap = 0xCC;
-
 struct injector {
     // Inputs:
     const char *target_proc;
@@ -282,7 +280,6 @@ struct kapc_64 {
 bool pass_inputs(struct injector *injector, drakvuf_trap_info_t *info) {
 
     vmi_instance_t vmi = injector->vmi;
-    status_t status;
     reg_t fsgs, rsp = info->regs->rsp;
     access_context_t ctx = {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -624,9 +621,8 @@ event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     struct injector *injector = info->trap->data;
-    addr_t thread = 0, kpcrb_offset = 0, tid = 0, stack_base = 0, stack_limit = 0;
-    uint8_t apcqueueable;
-    reg_t fsgs = 0, cr3 = info->regs->cr3;
+    addr_t thread = 0;
+    reg_t cr3 = info->regs->cr3;
     status_t status;
 
     PRINT_DEBUG("CR3 changed to 0x%" PRIx64 "\n", info->regs->cr3);
@@ -664,11 +660,6 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
      * sometimes fail for yet unknown reasons.
      */
      if (!injector->is32bit) {
-
-        access_context_t ctx = {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = cr3,
-        };
 
         addr_t trapframe = 0;
         status = vmi_read_addr_va(injector->vmi,
@@ -738,7 +729,6 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
 event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     struct injector *injector = info->trap->data;
-    addr_t pa = info->trap_pa;
     reg_t cr3 = info->regs->cr3;
 
     vmi_pid_t pid = vmi_dtb_to_pid(injector->vmi, cr3);

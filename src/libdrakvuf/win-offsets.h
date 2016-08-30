@@ -102,41 +102,77 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef VMI_H
-#define VMI_H
+#ifndef WIN_OFFSETS_H
+#define WIN_OFFSETS_H
 
-#define BIT32 0
-#define BIT64 1
-#define PM2BIT(pm) ((pm == VMI_PM_IA32E) ? BIT64 : BIT32)
+/*
+ * Easy-to-use structure offsets to be loaded from the Rekall profile.
+ * Define actual mapping in win-offsets-map.h
+ */
+enum offset {
+    KIINITIALPCR,
 
-#define TRAP 0xCC
+    EPROCESS_PID,
+    EPROCESS_PDBASE,
+    EPROCESS_PNAME,
+    EPROCESS_TASKS,
+    EPROCESS_PEB,
+    EPROCESS_OBJECTTABLE,
+    EPROCESS_PCB,
 
-#include <glib.h>
-#include <stdbool.h>
-#include "libdrakvuf.h"
+    KPROCESS_HEADER,
 
-#define ghashtable_foreach(table, i, key, val) \
-      g_hash_table_iter_init(&i, table); \
-      while(g_hash_table_iter_next(&i,(void**)&key,(void**)&val))
+    PEB_IMAGEBASADDRESS,
+    PEB_LDR,
 
-bool init_vmi(drakvuf_t drakvuf);
-void close_vmi(drakvuf_t drakvuf);
+    PEB_LDR_DATA_INLOADORDERMODULELIST,
 
-event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t *event);
-event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
-event_response_t vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
+    LDR_DATA_TABLE_ENTRY_DLLBASE,
+    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
+    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
 
-bool inject_trap_mem(drakvuf_t drakvuf,
-                     drakvuf_trap_t *trap,
-                     bool guard2);
-bool inject_trap_pa(drakvuf_t drakvuf,
-                    drakvuf_trap_t *trap,
-                    addr_t pa);
-bool inject_traps_modules(drakvuf_t drakvuf,
-                          drakvuf_trap_t *trap,
-                          addr_t list_head,
-                          vmi_pid_t pid);
-void remove_trap(drakvuf_t drakvuf,
-                 const drakvuf_trap_t *trap);
+    FILE_OBJECT_DEVICEOBJECT,
+    FILE_OBJECT_READACCESS,
+    FILE_OBJECT_WRITEACCESS,
+    FILE_OBJECT_DELETEACCESS,
+    FILE_OBJECT_FILENAME,
+
+    HANDLE_TABLE_HANDLECOUNT,
+
+    KPCR_PRCB,
+    KPCR_PRCBDATA,
+    KPRCB_CURRENTTHREAD,
+
+    KTHREAD_PROCESS,
+    KTHREAD_INITIALSTACK,
+    KTHREAD_STACKLIMIT,
+    KTHREAD_APCSTATE,
+    KTHREAD_TRAPFRAME,
+    KTHREAD_APCQUEUEABLE,
+    KTHREAD_PREVIOUSMODE,
+    KTHREAD_HEADER,
+
+    KTRAP_FRAME_RIP,
+
+    KAPC_APCLISTENTRY,
+
+    ETHREAD_CID,
+    ETHREAD_TCB,
+    CLIENT_ID_UNIQUETHREAD,
+
+    OBJECT_HEADER_TYPEINDEX,
+    OBJECT_HEADER_BODY,
+
+    UNICODE_STRING_LENGTH,
+    UNICODE_STRING_BUFFER,
+
+    POOL_HEADER_BLOCKSIZE,
+    POOL_HEADER_POOLTYPE,
+    POOL_HEADER_POOLTAG,
+
+    DISPATCHER_TYPE,
+
+    OFFSET_MAX
+};
 
 #endif

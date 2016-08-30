@@ -1,4 +1,4 @@
-/*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
+ /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
  * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
@@ -134,7 +134,7 @@ static const char *offset_names[__OFFSET_MAX][2] = {
 #define PROFILE32 "Win7SP1x86"
 #define PROFILE64 "Win7SP1x64"
 
-void volatility_extract_file(filedelete *f, drakvuf_t drakvuf, addr_t file_object) {
+void volatility_extract_file(filedelete *f, addr_t file_object) {
 
     const char* profile = NULL;
     if (f->pm == VMI_PM_IA32E)
@@ -150,7 +150,7 @@ void volatility_extract_file(filedelete *f, drakvuf_t drakvuf, addr_t file_objec
             file_object, f->dump_folder);
 
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
-    free(command);
+    g_free(command);
 }
 
 /*
@@ -166,7 +166,7 @@ void volatility_extract_file(filedelete *f, drakvuf_t drakvuf, addr_t file_objec
  * Also see: http://www.csee.umbc.edu/~stephens/SECURITY/491M/HiddenProcesses.ppt
  */
 static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
-                                vmi_instance_t vmi, page_mode_t pm,
+                                vmi_instance_t vmi,
                                 drakvuf_trap_info_t *info, addr_t handle)
 {
     uint8_t type_index = 0;
@@ -233,7 +233,7 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
             };
 
             if (f->dump_folder)
-                volatility_extract_file(f, drakvuf, file_pa);
+                volatility_extract_file(f, file_pa);
 
             free(procname);
             free(str2.contents);
@@ -278,7 +278,7 @@ static event_response_t setinformation(drakvuf_t drakvuf, drakvuf_trap_info_t *i
         vmi_read_8(vmi, &ctx, &del);
         if (del) {
             //printf("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", handle);
-            grab_file_by_handle(f, drakvuf, vmi, f->pm, info, handle);
+            grab_file_by_handle(f, drakvuf, vmi, info, handle);
         }
     }
 

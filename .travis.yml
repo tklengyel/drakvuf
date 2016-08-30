@@ -19,7 +19,7 @@ before_install:
   - cd volatility && python setup.py build && sudo python setup.py install
   - cd ..
 
-script: "./autogen.sh; ./configure; make clean; make"
+script: "./autogen.sh; ./configure --enable-debug; make clean; make"
 
 env:
   global:

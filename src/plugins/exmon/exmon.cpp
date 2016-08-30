@@ -170,8 +170,6 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     const char *str_format;
     const char *user_format;
-    page_mode_t pm = vmi_get_page_mode(vmi);
-    uint8_t index = ~0;
     uint32_t first_chance;
     char* trap_frame=(char*)g_malloc0(e->ktrap_frame_size);  // Generic pointer that allows addressing byte-aligned offests
 

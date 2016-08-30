@@ -123,15 +123,17 @@
 
 extern bool verbose;
 
-#define PRINT_DEBUG(args...) \
+#define PRINT_DEBUG(...) \
     do { \
-        if(verbose) fprintf (stderr, args); \
+        if(verbose) fprintf (stderr, __VA_ARGS__); \
     } while (0)
 
 #else
-#define PRINT_DEBUG(args...) \
+#define PRINT_DEBUG(...) \
     do {} while(0)
 #endif
+
+#define UNUSED(x) (void)(x)
 
 struct drakvuf {
     char *dom_name;
@@ -152,7 +154,7 @@ struct drakvuf {
     vmi_event_t mem_event;
     vmi_event_t *step_event[16];
 
-    size_t offsets[OFFSET_MAX];
+    size_t *offsets;
 
     // Processing trap removals in trap callbacks
     // is problematic so we save all such requests

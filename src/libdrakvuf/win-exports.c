@@ -118,6 +118,7 @@
 
 #include "private.h"
 #include "win-exports.h"
+#include "win-offsets.h"
 
 #define MAX_HEADER_SIZE 1024
 
@@ -181,7 +182,7 @@ modlist_sym2va(drakvuf_t drakvuf, addr_t list_head, access_context_t *ctx,
 }
 
 addr_t eprocess_sym2va (drakvuf_t drakvuf, addr_t eprocess_base, const char *mod_name, const char *symbol) {
-    addr_t peb, ldr, inloadorder, dtb, ret = 0;
+    addr_t peb, ldr, inloadorder, ret = 0;
     access_context_t ctx = {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
     };
