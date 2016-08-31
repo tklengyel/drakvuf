@@ -155,9 +155,11 @@ int main(int argc, char** argv) {
                "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
                "\t -e <inject_exe>           The executable to start with injection\n"
                "\t -t <timeout>              Timeout (in seconds)\n"
-               "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
                "\t -o <format>               Output format (default or csv)\n"
                "\t -x <plugin>               Don't activate the specified plugin\n"
+#ifdef VOLATILITY
+               "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
+#endif
 #ifdef DRAKVUF_DEBUG
                "\t -v                        Turn on verbose (debug) output\n"
 #endif
