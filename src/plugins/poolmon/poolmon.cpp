@@ -139,8 +139,6 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     page_mode_t pm = vmi_get_page_mode(vmi);
     reg_t pool_type, size;
-    char *procname = drakvuf_get_current_process_name(drakvuf, info->vcpu, info->regs);
-    int64_t sessionid = drakvuf_get_current_process_sessionid(drakvuf, info->vcpu, info->regs);
     char tag[5] = { [0 ... 4] = '\0' };
 
     access_context_t ctx;
@@ -166,7 +164,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     case OUTPUT_CSV:
     {
         printf("poolmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s,%" PRIu64 "",
-               info->vcpu, info->regs->cr3, procname, sessionid, tag,
+               info->vcpu, info->regs->cr3, info->procname, info->sessionid, tag,
                pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
         if (s)
             printf(",%s,%s", s->source, s->description);
@@ -174,8 +172,8 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     }
     default:
     case OUTPUT_DEFAULT:
-        printf("[POOLMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s SessionID:%" PRIx64 " %s (type: %s, size: %" PRIu64 ")",
-               info->vcpu, info->regs->cr3, procname, sessionid, tag,
+        printf("[POOLMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s SessionID:%" PRIi64 " %s (type: %s, size: %" PRIu64 ")",
+               info->vcpu, info->regs->cr3, info->procname, info->sessionid, tag,
                pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
         if (s)
             printf(": %s,%s", s->source, s->description);
@@ -185,7 +183,6 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     printf("\n");
 
-    free(procname);
     drakvuf_release_vmi(drakvuf);
     return 0;
 }
