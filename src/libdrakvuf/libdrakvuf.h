@@ -298,6 +298,13 @@ char *drakvuf_get_current_process_name(drakvuf_t drakvuf,
                                        uint64_t vcpu_id,
                                        const x86_registers_t *regs);
 
+/* Process SessionID or -1 on error */
+int64_t drakvuf_get_process_sessionid(drakvuf_t drakvuf,
+                                      addr_t eprocess_base);
+int64_t drakvuf_get_current_process_sessionid(drakvuf_t drakvuf,
+                                              uint64_t vcpu_id,
+                                              const x86_registers_t *regs);
+
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
                                     uint64_t vcpu_id,
                                     const x86_registers_t *regs,

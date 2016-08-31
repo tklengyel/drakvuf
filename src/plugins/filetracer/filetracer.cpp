@@ -170,6 +170,7 @@ static event_response_t file_name_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
 
         if (file_name && length > 0 && length < VMI_PS_4KB) {
             char *procname = drakvuf_get_current_process_name(drakvuf, info->vcpu, info->regs);
+            int64_t sessionid = drakvuf_get_current_process_sessionid(drakvuf, info->vcpu, info->regs);
             unicode_string_t str = { .contents = NULL };
             str.length = length;
             str.encoding = "UTF-16";
@@ -182,13 +183,13 @@ static event_response_t file_name_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
 
                 switch(f->format) {
                 case OUTPUT_CSV:
-                    printf("filetracer,%" PRIu32 ",0x%" PRIx64 ",%s,%s\n",
-                           info->vcpu, info->regs->cr3, procname, str2.contents);
+                    printf("filetracer,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s\n",
+                           info->vcpu, info->regs->cr3, procname, sessionid, str2.contents);
                     break;
                 default:
                 case OUTPUT_DEFAULT:
-                    printf("[FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s\n",
-                           info->vcpu, info->regs->cr3, procname, str2.contents);
+                    printf("[FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s SessionID:%" PRIi64 " %s\n",
+                           info->vcpu, info->regs->cr3, procname, sessionid, str2.contents);
                     break;
                 };
 
