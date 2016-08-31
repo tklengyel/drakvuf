@@ -329,20 +329,23 @@ AC_CHECK_LIB([xentoollog], [xtl_logger_destroy])
 if test x$plugin_filedelete = xyes; then
     # Check for Python
     AM_PATH_PYTHON([2.7])
-    if test "xPYTHON" != "x"; then
+    if test "x$PYTHON" != "x"; then
         AC_DEFINE_UNQUOTED(PYTHON, "$PYTHON", "Python found")
+        AX_PYTHON_MODULE([pyvmi])
+
+        if test "x$HAVE_PYMOD_PYVMI" = "xyes"; then
+            AC_PATH_PROG(VOLATILITY, vol.py)
+
+            if test "x$VOLATILITY" != "x"; then
+                AC_DEFINE_UNQUOTED(VOLATILITY, "$VOLATILITY", "Volatility vol.py found")
+            else
+                plugin_filedelete="yes (log only)"
+            fi
+        else
+            plugin_filedelete="yes (log only)"
+        fi
     else
-        AC_ERROR([Python was not found on the system!])
-    fi
-
-    AX_PYTHON_MODULE([pyvmi], [fatal])
-
-    AC_PATH_PROG(VOLATILITY, vol.py)
-
-    if test "x$VOLATILITY" != "x"; then
-        AC_DEFINE_UNQUOTED(VOLATILITY, "$VOLATILITY", "Volatility vol.py found")
-    else
-        AC_ERROR([** Volatility vol.py was not found in your PATH!])
+        plugin_filedelete="yes (log only)"
     fi
 fi
 

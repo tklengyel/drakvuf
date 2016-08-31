@@ -109,6 +109,7 @@
 #include "filedelete.h"
 
 #define FILE_DISPOSITION_INFORMATION 13
+#define WIN7_TYPEINDEX_LAST 44
 
 enum offset {
     FILE_OBJECT_FILENAME,
@@ -129,7 +130,7 @@ static const char *offset_names[__OFFSET_MAX][2] = {
     [UNICODE_STRING_BUFFER] = {"_UNICODE_STRING", "Buffer" },
 };
 
-#define WIN7_TYPEINDEX_LAST 44
+#ifdef VOLATILITY
 #define VOL_DUMPFILES "%s %s -l vmi://domid/%u --profile=%s -Q 0x%lx -D %s -n dumpfiles 2>&1"
 #define PROFILE32 "Win7SP1x86"
 #define PROFILE64 "Win7SP1x64"
@@ -152,6 +153,7 @@ void volatility_extract_file(filedelete *f, addr_t file_object) {
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     g_free(command);
 }
+#endif
 
 /*
  * The approach where the system process list es enumerated looking for
@@ -194,17 +196,18 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
         return;
 
     addr_t file = obj + f->offsets[OBJECT_HEADER_BODY];
-    addr_t file_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, file);
     addr_t filename = file + f->offsets[FILE_OBJECT_FILENAME];
 
     uint16_t length = 0;
     addr_t buffer = 0;
 
     ctx.addr = filename + f->offsets[UNICODE_STRING_BUFFER];
-    vmi_read_addr(vmi, &ctx, &buffer);
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &buffer) )
+        return;
 
     ctx.addr = filename + f->offsets[UNICODE_STRING_LENGTH];
-    vmi_read_16(vmi, &ctx, &length);
+    if ( VMI_FAILURE == vmi_read_16(vmi, &ctx, &length) )
+        return;
 
     if (length && buffer) {
         unicode_string_t str;
@@ -213,13 +216,13 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
         str.contents = (unsigned char *)g_malloc0(length);
 
         ctx.addr = buffer;
-        vmi_read(vmi, &ctx, str.contents, length);
+        if ( length != vmi_read(vmi, &ctx, str.contents, length) )
+            return;
 
         unicode_string_t str2 = { .contents = NULL };
-        status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
-        if (rc == VMI_SUCCESS) {
-            char *procname; 
-            procname = drakvuf_get_current_process_name(drakvuf, info->vcpu, info->regs);
+        if ( vmi_convert_str_encoding(&str, &str2, "UTF-8") == VMI_SUCCESS )
+        {
+            char *procname = drakvuf_get_current_process_name(drakvuf, info->vcpu, info->regs);
             switch(f->format) {
             case OUTPUT_CSV:
                 printf("filedelete,%" PRIu32 ",0x%" PRIx64 ",%s,\"%s\"\n",
@@ -232,16 +235,34 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
                 break;
             };
 
-            if (f->dump_folder)
+#ifdef VOLATILITY
+            if (f->dump_folder) {
+                addr_t file_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, file);
                 volatility_extract_file(f, file_pa);
+            }
+#endif
 
             free(procname);
             free(str2.contents);
         }
-        free(str.contents);
+        g_free(str.contents);
     }
 }
 
+/*
+ * NTSTATUS ZwSetInformationFile(
+ *  HANDLE                 FileHandle,
+ *  PIO_STATUS_BLOCK       IoStatusBlock,
+ *  PVOID                  FileInformation,
+ *  ULONG                  Length,
+ *  FILE_INFORMATION_CLASS FileInformationClass
+ * );
+ *
+ * When FileInformationClass is FileDispositionInformation then FileInformation points to
+ * struct _FILE_DISPOSITION_INFORMATION {
+ *  BOOLEAN DeleteFile;
+ * }
+ */
 static event_response_t setinformation(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     filedelete *f = (filedelete *)info->trap->data;
@@ -251,37 +272,39 @@ static event_response_t setinformation(drakvuf_t drakvuf, drakvuf_trap_info_t *i
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    uint32_t fileinfoclass = 0;
-    reg_t handle = 0, fileinfo = 0, length = 0;
+    uint32_t fileinfoclass;
+    reg_t handle, fileinfo;
 
     if (f->pm == VMI_PM_IA32E) {
         handle = info->regs->rcx;
         fileinfo = info->regs->r8;
-        length = info->regs->r9;
 
         ctx.addr = info->regs->rsp + 5 * sizeof(addr_t); // addr of fileinfoclass
-        vmi_read_32(vmi, &ctx, &fileinfoclass);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &fileinfoclass) )
+            goto done;
     } else {
         ctx.addr = info->regs->rsp + sizeof(uint32_t);
-        vmi_read_32(vmi, &ctx, (uint32_t*) &handle);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*) &handle) )
+            goto done;
         ctx.addr += 2 * sizeof(uint32_t);
-        vmi_read_32(vmi, &ctx, (uint32_t*) &fileinfo);
-        ctx.addr += sizeof(uint32_t);
-        vmi_read_32(vmi, &ctx, (uint32_t*) &length);
-        ctx.addr += sizeof(uint32_t);
-        vmi_read_32(vmi, &ctx, &fileinfoclass);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*) &fileinfo) )
+            goto done;
+        ctx.addr += 2 * sizeof(uint32_t);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &fileinfoclass) )
+            goto done;
     }
 
-    if (fileinfoclass == FILE_DISPOSITION_INFORMATION && length == 1) {
-        uint8_t del = 0;
+    if (fileinfoclass == FILE_DISPOSITION_INFORMATION) {
+        uint8_t del;
         ctx.addr = fileinfo;
-        vmi_read_8(vmi, &ctx, &del);
-        if (del) {
-            //printf("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", handle);
+        if ( VMI_FAILURE == vmi_read_8(vmi, &ctx, &del) )
+            goto done;
+
+        if (del)
             grab_file_by_handle(f, drakvuf, vmi, info, handle);
-        }
     }
 
+done:
     drakvuf_release_vmi(drakvuf);
     return 0;
 }
