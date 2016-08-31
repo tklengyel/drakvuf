@@ -150,7 +150,7 @@ AM_CPPFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 # Note that -pg is incompatible with HARDENING
 if DEBUG
 AM_CPPFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
-AM_CPPFLAGS += -Wno-missing-field-initializers
+AM_CPPFLAGS += -Wno-missing-field-initializers -Wno-unused-parameter
 if !HARDENING
 AM_CPPFLAGS += -pg
 endif

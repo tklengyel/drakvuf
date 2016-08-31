@@ -226,6 +226,8 @@ struct remapped_gfn {
 struct memcb_pass {
     drakvuf_t drakvuf;
     uint64_t gfn;
+    char *procname;
+    int64_t sessionid;
     struct remapped_gfn *remapped_gfn;
     vmi_mem_access_t access;
     GSList *traps;

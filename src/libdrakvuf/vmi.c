@@ -121,8 +121,9 @@
 
 #include "private.h"
 #include "libdrakvuf.h"
-#include "win-symbols.h"
 #include "vmi.h"
+#include "win-symbols.h"
+#include "win-processes.h"
 #include "win-offsets.h"
 #include "win-offsets-map.h"
 
@@ -193,6 +194,8 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
         {
             drakvuf_trap_info_t trap_info = {
                 .trap = trap,
+                .procname = pass->procname,
+                .sessionid = pass->sessionid,
                 .trap_pa = s->memaccess.pa,
                 .regs = event->regs.x86,
                 .vcpu = event->vcpu_id,
@@ -252,6 +255,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
     }
 
 done:
+    g_free(pass->procname);
     g_free(pass);
     /* We switch back to the altp2m view no matter what */
     event->slat_id = drakvuf->altp2m_idx;
@@ -271,7 +275,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
     if (!s) {
         PRINT_DEBUG("Event has been cleared for GFN 0x%lx but we are still in view %u\n",
                     event->mem_event.gfn, event->slat_id);
-        goto done;
+        return 0;
     }
 
     PRINT_DEBUG("Pre mem cb with vCPU %u @ 0x%lx 0x%lx in view %u: %c%c%c\n",
@@ -282,6 +286,8 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
                 );
 
     s->memaccess.pa = (event->mem_event.gfn << 12) + event->mem_event.offset;
+    char *procname = drakvuf_get_current_process_name(drakvuf, event->vcpu_id, event->regs.x86);
+    int64_t sessionid = drakvuf_get_current_process_sessionid(drakvuf, event->vcpu_id, event->regs.x86);
 
     GSList *loop = s->traps;
     drakvuf->in_callback = 1;
@@ -293,6 +299,8 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
         {
             drakvuf_trap_info_t trap_info = {
                 .trap = trap,
+                .procname = procname,
+                .sessionid = sessionid,
                 .trap_pa = s->memaccess.pa,
                 .regs = event->regs.x86,
                 .vcpu = event->vcpu_id,
@@ -317,6 +325,8 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
                 drakvuf_trap_t *trap = loop->data;
                 drakvuf_trap_info_t trap_info = {
                     .trap = trap,
+                    .procname = procname,
+                    .sessionid = sessionid,
                     .trap_pa = s->memaccess.pa,
                     .regs = event->regs.x86,
                     .vcpu = event->vcpu_id,
@@ -346,6 +356,9 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
         pass->drakvuf = drakvuf;
         pass->gfn = event->mem_event.gfn;
         pass->access = event->mem_event.out_access;
+        pass->procname = procname;
+        pass->sessionid = sessionid;
+
         if(!s->memaccess.guard2) {
             event->slat_id = 0;
 
@@ -359,13 +372,14 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
             }
         } else
             event->slat_id = drakvuf->altp2m_idr;
+
         drakvuf->step_event[event->vcpu_id]->callback = post_mem_cb;
         drakvuf->step_event[event->vcpu_id]->data = pass;
         return (1u << VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP) | // Turn on singlestep
                (1u << VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID);
     }
 
-done:
+    g_free(procname);
     return 0;
 }
 
@@ -408,12 +422,17 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     else
         event->interrupt_event.reinject = 0;
 
+    char *procname = drakvuf_get_current_process_name(drakvuf, event->vcpu_id, event->regs.x86);
+    int64_t sessionid = drakvuf_get_current_process_sessionid(drakvuf, event->vcpu_id, event->regs.x86);
+
     drakvuf->in_callback = 1;
     GSList *loop = s->traps;
     while(loop) {
         drakvuf_trap_t *trap = loop->data;
         drakvuf_trap_info_t trap_info = {
             .trap = trap,
+            .procname = procname,
+            .sessionid = sessionid,
             .trap_pa = pa,
             .regs = event->regs.x86,
             .vcpu = event->vcpu_id,
@@ -423,6 +442,8 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         trap->cb(drakvuf, &trap_info);
     }
     drakvuf->in_callback = 0;
+
+    g_free(procname);
 
     process_free_requests(drakvuf);
 
@@ -458,12 +479,17 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     vmi_rvacache_flush(drakvuf->vmi);
     vmi_symcache_flush(drakvuf->vmi);
 
+    char *procname = drakvuf_get_current_process_name(drakvuf, event->vcpu_id, event->regs.x86);
+    int64_t sessionid = drakvuf_get_current_process_sessionid(drakvuf, event->vcpu_id, event->regs.x86);
+
     drakvuf->in_callback = 1;
     GSList *loop = drakvuf->cr3;
     while(loop) {
         drakvuf_trap_t *trap = loop->data;
         drakvuf_trap_info_t trap_info = {
             .trap = trap,
+            .procname = procname,
+            .sessionid = sessionid,
             .regs = event->regs.x86,
             .vcpu = event->vcpu_id,
         };
@@ -472,6 +498,8 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         trap->cb(drakvuf, &trap_info);
     }
     drakvuf->in_callback = 0;
+
+    g_free(procname);
 
     process_free_requests(drakvuf);
 
