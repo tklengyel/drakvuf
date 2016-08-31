@@ -120,6 +120,7 @@ static const char *offset_names[OFFSET_MAX][2] = {
     [KPROCESS_HEADER] = { "_KPROCESS", "Header" },
     [PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
     [PEB_LDR] = { "_PEB", "Ldr" },
+    [PEB_SESSIONID] = { "_PEB", "SessionId" },
     [PEB_LDR_DATA_INLOADORDERMODULELIST] = {"_PEB_LDR_DATA", "InLoadOrderModuleList" },
     [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
     [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },

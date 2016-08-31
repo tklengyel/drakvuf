@@ -129,16 +129,17 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
     if ( info->trap_pa > s->kiservicetable - 8 && info->trap_pa <= s->kiservicetable + s->ulongs * s->kiservicelimit + s->ulongs - 1 )
     {
         char *procname = drakvuf_get_current_process_name(drakvuf, info->vcpu, info->regs);
+        int64_t sessionid = drakvuf_get_current_process_sessionid(drakvuf, info->vcpu, info->regs);
 
         switch(s->format) {
         case OUTPUT_CSV:
-            printf("ssdtmon,%" PRIu32 ",0x%" PRIx64 ",%s,%li\n",
-                info->vcpu, info->regs->cr3, procname, (info->trap_pa - s->kiservicetable)/s->ulongs);
+            printf("ssdtmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ", %" PRIi64 "\n",
+                info->vcpu, info->regs->cr3, procname, sessionid, (info->trap_pa - s->kiservicetable)/s->ulongs);
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[SSDTMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s Table index:%li\n",
-                   info->vcpu, info->regs->cr3, procname, (info->trap_pa - s->kiservicetable)/s->ulongs);
+            printf("[SSDTMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s SessionID:%" PRIi64" Table index:%" PRIi64 "\n",
+                   info->vcpu, info->regs->cr3, procname, sessionid, (info->trap_pa - s->kiservicetable)/s->ulongs);
             break;
         };
 

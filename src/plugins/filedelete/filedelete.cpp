@@ -223,15 +223,16 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
         if ( vmi_convert_str_encoding(&str, &str2, "UTF-8") == VMI_SUCCESS )
         {
             char *procname = drakvuf_get_current_process_name(drakvuf, info->vcpu, info->regs);
+            int64_t sessionid = drakvuf_get_current_process_sessionid(drakvuf, info->vcpu, info->regs);
             switch(f->format) {
             case OUTPUT_CSV:
-                printf("filedelete,%" PRIu32 ",0x%" PRIx64 ",%s,\"%s\"\n",
-                       info->vcpu, info->regs->cr3, procname, str2.contents);
+                printf("filedelete,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",\"%s\"\n",
+                       info->vcpu, info->regs->cr3, procname, sessionid, str2.contents);
                 break;
             default:
             case OUTPUT_DEFAULT:
-                printf("[FILEDELETE] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s \"%s\"\n",
-                       info->vcpu, info->regs->cr3, procname, str2.contents);
+                printf("[FILEDELETE] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s SessionID:%" PRIi64" \"%s\"\n",
+                       info->vcpu, info->regs->cr3, procname, sessionid, str2.contents);
                 break;
             };
 
