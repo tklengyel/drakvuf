@@ -147,9 +147,6 @@ status_t rekall_lookup(
         *rva = json_object_get_int64(jsymbol);
 
         ret = VMI_SUCCESS;
-
-        json_object_put(jsymbol);
-        json_object_put(constants);
     } else {
         json_object *structs = NULL, *jstruct = NULL, *jstruct2 = NULL, *jmember = NULL, *jvalue = NULL;
         if (!json_object_object_get_ex(root, "$STRUCTS", &structs)) {
@@ -158,15 +155,12 @@ status_t rekall_lookup(
         }
         if (!json_object_object_get_ex(structs, symbol, &jstruct)) {
             PRINT_DEBUG("Rekall profile: no '%s' found\n", symbol);
-            json_object_put(structs);
             goto exit;
         }
 
         if (size) {
             json_object *jsize = json_object_array_get_idx(jstruct, 0);
             *size = json_object_get_int64(jsize);
-            json_object_put(jsize);
-            json_object_put(structs);
 
             ret = VMI_SUCCESS;
             goto exit;
@@ -175,37 +169,23 @@ status_t rekall_lookup(
         jstruct2 = json_object_array_get_idx(jstruct, 1);
         if (!jstruct2) {
             PRINT_DEBUG("Rekall profile: struct '%s' has no second element\n", symbol);
-            json_object_put(jstruct);
-            json_object_put(structs);
             goto exit;
         }
 
         if (!json_object_object_get_ex(jstruct2, subsymbol, &jmember)) {
             PRINT_DEBUG("Rekall profile: '%s' has no '%s' member\n", symbol, subsymbol);
-            json_object_put(jstruct2);
-            json_object_put(jstruct);
-            json_object_put(structs);
             goto exit;
         }
 
         jvalue = json_object_array_get_idx(jmember, 0);
         if (!jvalue) {
             PRINT_DEBUG("Rekall profile: '%s'.'%s' has no RVA defined\n", symbol, subsymbol);
-            json_object_put(jmember);
-            json_object_put(jstruct2);
-            json_object_put(jstruct);
-            json_object_put(structs);
             goto exit;
         }
 
         *rva = json_object_get_int64(jvalue);
 
         ret = VMI_SUCCESS;
-
-        json_object_put(jmember);
-        json_object_put(jstruct2);
-        json_object_put(jstruct);
-        json_object_put(structs);
     }
 
 exit:
@@ -243,11 +223,15 @@ symbols_t* drakvuf_get_symbols_from_rekall(const char *rekall_profile)
         json_object_iter_next(&it);
     }
 
-    json_object_put(functions);
+    json_object_put(root);
 
     return ret;
 
-    err_exit: free(ret);
+err_exit:
+    if ( root )
+        json_object_put(root);
+
+    free(ret);
     return NULL;
 }
 
@@ -268,16 +252,17 @@ status_t drakvuf_get_function_rva(const char *rekall_profile, const char *functi
 
     if (!json_object_object_get_ex(functions, function, &jsymbol)) {
         PRINT_DEBUG("Rekall profile: no '%s' found\n", function);
-        json_object_put(functions);
         goto err_exit;
     }
 
     *rva = json_object_get_int64(jsymbol);
-    json_object_put(functions);
-    json_object_put(jsymbol);
+    json_object_put(root);
     return VMI_SUCCESS;
 
-    err_exit:
+err_exit:
+    if ( root )
+        json_object_put(root);
+
     return VMI_FAILURE;
 }
 
@@ -298,16 +283,17 @@ status_t drakvuf_get_constant_rva(const char *rekall_profile, const char *consta
 
     if (!json_object_object_get_ex(constants, constant, &jsymbol)) {
         PRINT_DEBUG("Rekall profile: no '%s' found\n", constant);
-        json_object_put(constants);
         goto err_exit;
     }
 
     *rva = json_object_get_int64(jsymbol);
-    json_object_put(constants);
-    json_object_put(jsymbol);
+    json_object_put(root);
     return VMI_SUCCESS;
 
-    err_exit:
+err_exit:
+    if ( root )
+        json_object_put(root);
+
     return VMI_FAILURE;
 }
 

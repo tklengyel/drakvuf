@@ -191,3 +191,5 @@ objmon::objmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
     if ( !drakvuf_add_trap(drakvuf, &this->trap) )
         throw -1;
 }
+
+objmon::~objmon() {}

@@ -146,7 +146,11 @@ static const char *drakvuf_plugin_names[] = {
     [PLUGIN_SSDTMON] = "ssdtmon",
 };
 
-class plugin {};
+class plugin {
+    public:
+        virtual ~plugin() {};
+};
+
 class drakvuf_plugins
 {
     private:

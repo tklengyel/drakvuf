@@ -201,8 +201,8 @@ syscalls::~syscalls() {
     GSList *loop = this->traps;
     while(loop) {
         drakvuf_trap_t *trap = (drakvuf_trap_t *)loop->data;
-        free((char*)trap->name);
-        free(loop->data);
+        g_free((char*)trap->name);
+        g_free(loop->data);
         loop = loop->next;
     }
 
