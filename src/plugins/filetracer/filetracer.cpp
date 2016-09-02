@@ -350,6 +350,7 @@ filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t ou
     drakvuf_release_vmi(drakvuf);
     this->rettraps = g_hash_table_new(g_int64_hash, g_int64_equal);
     this->format = output;
+    this->writetraps = NULL;
 
     this->poolalloc.breakpoint.lookup_type = LOOKUP_PID;
     this->poolalloc.breakpoint.pid = 4;

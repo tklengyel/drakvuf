@@ -167,11 +167,12 @@ drakvuf_c::drakvuf_c(const char* domain,
     this->interrupted = 0;
     this->timeout = timeout;
     this->rekall_profile = rekall_profile;
-    g_mutex_init(&this->loop_signal);
-    g_mutex_lock(&this->loop_signal);
 
     if (!drakvuf_init(&this->drakvuf, domain, rekall_profile, verbose))
         throw -1;
+
+    g_mutex_init(&this->loop_signal);
+    g_mutex_lock(&this->loop_signal);
 
     if(timeout > 0)
         this->timeout_thread = g_thread_new(NULL, timer, (void*)this);

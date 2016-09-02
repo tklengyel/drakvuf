@@ -832,7 +832,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     }
 
     // list of traps on this page
-    GSList *traps = NULL;
+    GSList *traps = g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &current_gfn);
     traps = g_slist_append(traps, &container->breakpoint.pa);
 
     // save trap location into lookup tree
@@ -956,18 +956,16 @@ bool init_vmi(drakvuf_t drakvuf) {
     g_hash_table_insert(config, "sysmap", drakvuf->rekall_profile);
 
     // Initialize the libvmi library.
-    if (vmi_init_custom(&drakvuf->vmi,
-            VMI_XEN | VMI_INIT_COMPLETE | VMI_INIT_EVENTS
-                    | VMI_CONFIG_GHASHTABLE, (vmi_config_t) config)
-            == VMI_FAILURE) {
+    status_t ret = vmi_init_custom(&drakvuf->vmi,
+                                   VMI_XEN | VMI_INIT_COMPLETE | VMI_INIT_EVENTS | VMI_CONFIG_GHASHTABLE,
+                                   (vmi_config_t) config);
+    g_hash_table_destroy(config);
+
+    if ( VMI_FAILURE == ret) {
         PRINT_DEBUG("Failed to init LibVMI library.\n");
-        if (drakvuf->vmi != NULL) {
-            vmi_destroy(drakvuf->vmi);
-        }
         drakvuf->vmi = NULL;
         return 0;
     }
-    g_hash_table_destroy(config);
 
     drakvuf->pm = vmi_get_page_mode(drakvuf->vmi);
     drakvuf->vcpus = vmi_get_num_vcpus(drakvuf->vmi);
@@ -1086,7 +1084,7 @@ bool init_vmi(drakvuf_t drakvuf) {
         return 0;
     }
 
-    SETUP_MEM_EVENT(&drakvuf->mem_event, ~0, VMI_MEMACCESS_RWX, pre_mem_cb, 1);
+    SETUP_MEM_EVENT(&drakvuf->mem_event, ~0ULL, VMI_MEMACCESS_RWX, pre_mem_cb, 1);
     drakvuf->mem_event.data = drakvuf;
 
     if(VMI_FAILURE == vmi_register_event(drakvuf->vmi, &drakvuf->mem_event)) {
@@ -1172,14 +1170,18 @@ void close_vmi(drakvuf_t drakvuf) {
         g_hash_table_destroy(drakvuf->remapped_gfns);
     };
 
+    if(drakvuf->memaccess_lookup_trap)
+        g_hash_table_destroy(drakvuf->memaccess_lookup_trap);
     if(drakvuf->breakpoint_lookup_trap)
         g_hash_table_destroy(drakvuf->breakpoint_lookup_trap);
     if(drakvuf->remove_traps)
         g_hash_table_destroy(drakvuf->remove_traps);
 
-    unsigned int i3;
-    for (i3 = 0; i3 < drakvuf->vcpus; i3++) {
-        g_free(drakvuf->step_event[i3]);
+    unsigned int i;
+    for (i = 0; i < drakvuf->vcpus; i++) {
+        if ( drakvuf->step_event[i]->data != drakvuf )
+            g_free(drakvuf->step_event[i]->data);
+        g_free(drakvuf->step_event[i]);
     }
 
     xc_altp2m_switch_to_view(drakvuf->xen->xc, drakvuf->domID, 0);
