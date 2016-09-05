@@ -157,7 +157,8 @@ modlist_sym2va(drakvuf_t drakvuf, addr_t list_head, access_context_t *ctx,
                 addr_t dllbase;
 
                 ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
-                vmi_read_addr(vmi, ctx, &dllbase);
+                if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &dllbase) )
+                    return VMI_FAILURE;
 
                 ctx->addr = dllbase;
                 *va = vmi_translate_sym2v(vmi, ctx, (char *) symbol);
@@ -217,7 +218,10 @@ addr_t sym2va(drakvuf_t drakvuf, vmi_pid_t target_pid, const char *mod_name, con
     size_t tasks_offset = vmi_get_offset(vmi, "win_tasks");
 
     addr_t current_process, current_list_entry, next_list_entry;
-    vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
+
+    status = vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
+    if ( VMI_FAILURE == status )
+        return ret;
 
     /* walk the task list */
     list_head = current_process + tasks_offset;
@@ -225,8 +229,7 @@ addr_t sym2va(drakvuf_t drakvuf, vmi_pid_t target_pid, const char *mod_name, con
 
     status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
     if (status == VMI_FAILURE) {
-        PRINT_DEBUG("Failed to read next pointer at 0x%lx before entering loop\n",
-                current_list_entry);
+        PRINT_DEBUG("Failed to read next pointer at 0x%lx before entering loop\n", current_list_entry);
         return ret;
     }
 
@@ -237,16 +240,16 @@ addr_t sym2va(drakvuf_t drakvuf, vmi_pid_t target_pid, const char *mod_name, con
         /* follow the next pointer */
 
         vmi_pid_t pid = -1;
-        vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t*)&pid);
+        status = vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t*)&pid);
+        if ( VMI_FAILURE == status )
+            return ret;
 
-        if (pid == target_pid) {
+        if (pid == target_pid)
             return eprocess_sym2va(drakvuf, current_process, mod_name, symbol);
-        }
 
         status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
-        if (status == VMI_FAILURE) {
-            PRINT_DEBUG("Failed to read next pointer in loop at %lx\n",
-                    current_list_entry);
+        if ( VMI_FAILURE == status ) {
+            PRINT_DEBUG("Failed to read next pointer in loop at %lx\n", current_list_entry);
             return ret;
         }
     } while (next_list_entry != list_head);
@@ -321,7 +324,8 @@ status_t va2sym(drakvuf_t drakvuf, addr_t va, vmi_pid_t target_pid,
     size_t tasks_offset = vmi_get_offset(vmi, "win_tasks");
 
     addr_t current_process, current_list_entry, next_list_entry;
-    vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
+    if ( VMI_FAILURE == vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process) )
+        return VMI_FAILURE;
 
     /* walk the task list */
     list_head = current_process + tasks_offset;
@@ -341,15 +345,21 @@ status_t va2sym(drakvuf_t drakvuf, addr_t va, vmi_pid_t target_pid,
 
         addr_t peb, ldr, inloadorder;
         vmi_pid_t pid;
-        vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t*)&pid);
+        if ( VMI_FAILURE == vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t*)&pid) )
+            return VMI_FAILURE;
 
         if (pid == target_pid) {
 
-            vmi_read_addr_va(vmi, current_process + drakvuf->offsets[EPROCESS_PEB], 0, &peb);
-            vmi_read_addr_va(vmi, peb + drakvuf->offsets[PEB_LDR], pid, &ldr);
-            vmi_read_addr_va(vmi,
-                    ldr + drakvuf->offsets[PEB_LDR_DATA_INLOADORDERMODULELIST], pid,
-                    &inloadorder);
+            if ( VMI_FAILURE == vmi_read_addr_va(vmi, current_process + drakvuf->offsets[EPROCESS_PEB], 0, &peb) )
+                return VMI_FAILURE;
+
+            if ( VMI_FAILURE == vmi_read_addr_va(vmi, peb + drakvuf->offsets[PEB_LDR], pid, &ldr) )
+                return VMI_FAILURE;
+
+            if ( VMI_FAILURE == vmi_read_addr_va(vmi,
+                                                 ldr + drakvuf->offsets[PEB_LDR_DATA_INLOADORDERMODULELIST], pid,
+                                                 &inloadorder) )
+                return VMI_FAILURE;
 
             access_context_t ctx = {
                 .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -359,11 +369,8 @@ status_t va2sym(drakvuf_t drakvuf, addr_t va, vmi_pid_t target_pid,
             return modlist_va2sym(drakvuf, inloadorder, va, &ctx, out_mod, out_sym);
         }
 
-        if (VMI_FAILURE
-                == vmi_read_addr_va(vmi, current_list_entry, 0,
-                        &next_list_entry)) {
-            PRINT_DEBUG("Failed to read next pointer in loop at %lx\n",
-                    current_list_entry);
+        if ( VMI_FAILURE  == vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry) ) {
+            PRINT_DEBUG("Failed to read next pointer in loop at %lx\n", current_list_entry);
             return VMI_FAILURE;
         }
     } while (next_list_entry != list_head);
