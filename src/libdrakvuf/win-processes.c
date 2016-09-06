@@ -341,27 +341,35 @@ bool drakvuf_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t *mo
 }
 
 bool drakvuf_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_procname, addr_t *eprocess_addr) {
-    addr_t current_process = 0, next_list_entry = 0;
+    addr_t current_process, next_list_entry;
     vmi_instance_t vmi = drakvuf->vmi;
-    vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
+
+    status_t status = vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
+    if ( VMI_FAILURE == status )
+        return false;
 
     addr_t list_head = current_process + drakvuf->offsets[EPROCESS_TASKS];
     addr_t current_list_entry = list_head;
 
-    status_t status = vmi_read_addr_va(vmi, current_list_entry, 0,
-                                       &next_list_entry);
-    if (status == VMI_FAILURE) {
+    status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
+    if ( VMI_FAILURE == status ) {
         PRINT_DEBUG("Failed to read next pointer at 0x%"PRIx64" before entering loop\n", current_list_entry);
         return false;
     }
 
     do {
-        vmi_pid_t pid = ~0;
+        vmi_pid_t pid;
         current_process = current_list_entry - drakvuf->offsets[EPROCESS_TASKS] ;
-        vmi_read_32_va(vmi, current_process + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
+
+        status = vmi_read_32_va(vmi, current_process + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
+        if ( VMI_FAILURE == status ) {
+            PRINT_DEBUG("Failed to read PID of process at %"PRIx64"\n", current_process);
+            return false;
+        }
+
         char *procname = vmi_read_str_va(vmi, current_process + drakvuf->offsets[EPROCESS_PNAME], 0);
 
-        if((pid != ~0 && find_pid != ~0 && pid == find_pid) || (find_procname && procname && !strcmp(procname, find_procname))) {
+        if((find_pid != ~0 && pid == find_pid) || (find_procname && procname && !strcmp(procname, find_procname))) {
             *eprocess_addr = current_process;
             free(procname);
             return true;
@@ -370,10 +378,10 @@ bool drakvuf_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *fi
         free(procname);
 
         current_list_entry = next_list_entry;
+
         status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
-        if (status == VMI_FAILURE) {
-            PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n",
-                    current_list_entry);
+        if ( VMI_FAILURE == status ) {
+            PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
             return false;
         }
 

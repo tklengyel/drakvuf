@@ -224,8 +224,17 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
         uint8_t backup[VMI_PS_4KB] = {0};
 
-        vmi_read_pa(drakvuf->vmi, pass->remapped_gfn->o<<12, &backup, VMI_PS_4KB);
-        vmi_write_pa(drakvuf->vmi, pass->remapped_gfn->r<<12, &backup, VMI_PS_4KB);
+        if ( VMI_FAILURE == vmi_read_pa(drakvuf->vmi, pass->remapped_gfn->o<<12, &backup, VMI_PS_4KB) ) {
+            fprintf(stderr, "Critical error in re-copying remapped gfn\n");
+            drakvuf->interrupted = -1;
+            return 0;
+        }
+
+        if ( VMI_FAILURE == vmi_write_pa(drakvuf->vmi, pass->remapped_gfn->r<<12, &backup, VMI_PS_4KB) ) {
+            fprintf(stderr, "Critical error in re-copying remapped gfn\n");
+            drakvuf->interrupted = -1;
+            return 0;
+        }
 
         GSList *loop = pass->traps;
         while(loop) {
@@ -234,7 +243,11 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
             uint8_t test = 0;
             struct wrapper *s = g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, pa);
 
-            vmi_read_8_pa(drakvuf->vmi, *pa, &test);
+            if ( VMI_FAILURE == vmi_read_8_pa(drakvuf->vmi, *pa, &test) ) {
+                fprintf(stderr, "Critical error in re-copying remapped gfn\n");
+                drakvuf->interrupted = -1;
+                return 0;
+            }
 
             if ( test == bp )
             {
@@ -244,9 +257,14 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
             else
             {
                 s->breakpoint.doubletrap = 0;
-                vmi_write_8_pa(drakvuf->vmi,
-                               (pass->remapped_gfn->r << 12) + (*pa & VMI_BIT_MASK(0,11)),
-                               &bp);
+                if ( VMI_FAILURE == vmi_write_8_pa(drakvuf->vmi,
+                                       (pass->remapped_gfn->r << 12) + (*pa & VMI_BIT_MASK(0,11)),
+                                       &bp) )
+                    {
+                        fprintf(stderr, "Critical error in re-copying remapped gfn\n");
+                        drakvuf->interrupted = -1;
+                        return 0;
+                    }
             }
 
             loop = loop->next;
@@ -402,7 +420,11 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
          * removed.
          */
         uint8_t test = 0;
-        vmi_read_8_pa(vmi, pa, &test);
+        if ( VMI_FAILURE == vmi_read_8_pa(vmi, pa, &test) ) {
+            fprintf(stderr, "Critical error in int3 callback, can't read page\n");
+            drakvuf->interrupted = -1;
+            return 0;
+        }
 
         if (test == bp) {
             // There is a breakpoint instruction in memory here
@@ -545,10 +567,20 @@ void remove_trap(drakvuf_t drakvuf,
             struct remapped_gfn *remapped_gfn = g_hash_table_lookup(drakvuf->remapped_gfns, &current_gfn);
             uint8_t backup;
 
-            vmi_read_8_pa(drakvuf->vmi, container->breakpoint.pa, &backup);
-            vmi_write_8_pa(drakvuf->vmi,
-                           (remapped_gfn->r << 12) + (container->breakpoint.pa & VMI_BIT_MASK(0,11)),
-                           &backup);
+            if ( VMI_FAILURE == vmi_read_8_pa(drakvuf->vmi, container->breakpoint.pa, &backup) ) {
+                fprintf(stderr, "Critical error in removing int3\n");
+                drakvuf->interrupted = -1;
+                break;
+            }
+
+            if ( VMI_FAILURE == vmi_write_8_pa(drakvuf->vmi,
+                                    (remapped_gfn->r << 12) + (container->breakpoint.pa & VMI_BIT_MASK(0,11)),
+                                    &backup) )
+            {
+                fprintf(stderr, "Critical error in removing int3\n");
+                drakvuf->interrupted = -1;
+                break;
+            }
 
             remove_trap(drakvuf, &container->breakpoint.guard);
             remove_trap(drakvuf, &container->breakpoint.guard2);
@@ -879,6 +911,8 @@ bool inject_traps_modules(drakvuf_t drakvuf,
 {
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t next_module = list_head;
+    addr_t tmp_next;
+    addr_t dllbase;
 
     if (!trap)
         return 0;
@@ -887,14 +921,14 @@ bool inject_traps_modules(drakvuf_t drakvuf,
 
     while (1) {
 
-        addr_t tmp_next = 0;
-        vmi_read_addr_va(vmi, next_module, pid, &tmp_next);
+        if ( VMI_FAILURE == vmi_read_addr_va(vmi, next_module, pid, &tmp_next) )
+            break;
 
         if (list_head == tmp_next)
             break;
 
-        addr_t dllbase = 0;
-        vmi_read_addr_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid, &dllbase);
+        if ( VMI_FAILURE == vmi_read_addr_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid, &dllbase) )
+            break;
 
         if (!dllbase)
             break;
