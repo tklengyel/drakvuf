@@ -148,7 +148,7 @@ update-rc.d xendomains defaults 21 20
 update-rc.d xen-watchdog defaults 22 23
 </code></pre>
 
-To enable the loading of the Xen XSM module required for DRAKVUF you will need to edit your GRUB Xen discovery rule script, usually found at <b>/etc/grub.d/20_linux_xen</b>, and add the following line <b>after the multiboot</b> entry
+To enable the loading of the Xen XSM module required for DRAKVUF you will need to edit your GRUB Xen discovery rule script, usually found at <b>/etc/grub.d/20_linux_xen</b>, and add the following line <b>after the multiboot</b> entry just after the module specifying the kernel (ie. the policy should be the <b>last module</b> that gets loaded):
 <pre><code>module ${rel_dirname}/xenpolicy-4.7.0
 </code></pre>
 
