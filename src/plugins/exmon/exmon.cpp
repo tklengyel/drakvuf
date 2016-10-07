@@ -228,7 +228,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_HWESP]));
 
         if (previous_mode == 1){
-            addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu, info->regs);
+            addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
             if (process){
                 uint32_t pid,ppid;
                 char* name;
@@ -279,7 +279,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_R11]));
 
         if ((uint8_t)(info->regs->r9) == 1){
-            addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu, info->regs);
+            addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
             if (process){
                 uint32_t pid,ppid;
                 char* name;

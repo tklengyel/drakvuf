@@ -102,135 +102,77 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "drakvuf.h"
+#include <config.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <dirent.h>
+#include <glib.h>
+#include <err.h>
 
-static gpointer timer(gpointer data)
-{
-    drakvuf_c* drakvuf = (drakvuf_c*)data;
+#include <libvmi/libvmi.h>
+#include "../plugins.h"
+#include "debugmon.h"
 
-    /* Wait for the loop to start */
-    g_mutex_lock(&drakvuf->loop_signal);
-    g_mutex_unlock(&drakvuf->loop_signal);
+# define HVMOP_TRAP_ext_int    0
+# define HVMOP_TRAP_nmi        2
+# define HVMOP_TRAP_hw_exc     3
+# define HVMOP_TRAP_sw_int     4
+# define HVMOP_TRAP_pri_sw_exc 5
+# define HVMOP_TRAP_sw_exc     6
 
-    while(drakvuf->timeout && !drakvuf->interrupted) {
-        sleep(1);
-        --drakvuf->timeout;
-    }
+static const char* debug_type[] = {
+    [HVMOP_TRAP_ext_int] = "external interrupt",
+    [HVMOP_TRAP_nmi] = "nmi",
+    [HVMOP_TRAP_hw_exc] = "hardware exception",
+    [HVMOP_TRAP_sw_int] = "software interrupt",
+    [HVMOP_TRAP_pri_sw_exc] = "ICEBP",
+    [HVMOP_TRAP_sw_exc] = "software exception"
+};
 
-    if (!drakvuf->interrupted) {
-        drakvuf->interrupt(-1);
-    }
+event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
 
-    g_thread_exit(NULL);
-    return NULL;
+    debugmon* s = (debugmon*)info->trap->data;
+
+    switch(s->format) {
+    case OUTPUT_CSV:
+        printf("debugmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%" PRIx64 ",%" PRIi32 ",%s\n",
+               info->vcpu, info->regs->cr3, info->procname, info->sessionid,
+               info->regs->rip, info->debug->type, debug_type[info->debug->type]);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[DEBUGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s SessionID:%" PRIi64". "
+               "RIP: 0x%" PRIx64". Debug type: %" PRIi32 ",%s\n",
+               info->vcpu, info->regs->cr3, info->procname, info->sessionid,
+               info->regs->rip, info->debug->type, debug_type[info->debug->type]);
+        break;
+    };
+
+    return 0;
 }
 
-int drakvuf_c::start_plugins(const bool* plugin_list, const char *dump_folder, bool cpuid_stealth)
-{
-    int i, rc;
+/* ----------------------------------------------------- */
 
-    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
-    {
-        if (plugin_list[i]) {
-            switch ((drakvuf_plugin_t)i) {
-            case PLUGIN_FILEDELETE:
-            {
-                struct filedelete_config c = {
-                    .rekall_profile = this->rekall_profile,
-                    .dump_folder = dump_folder
-                };
+debugmon::debugmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
 
-                rc = this->plugins->start((drakvuf_plugin_t)i, &c);
-                break;
-            }
+    this->format = output;
+    this->drakvuf = drakvuf;
+    this->debug.cb = debug_cb;
+    this->debug.data = (void*)this;
+    this->debug.type = DEBUG;
 
-            case PLUGIN_CPUIDMON:
-                rc = this->plugins->start((drakvuf_plugin_t)i, &cpuid_stealth);
-                break;
-
-            default:
-                rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
-                break;
-            };
-
-            if ( !rc )
-                return rc;
-        }
-    }
-
-    return 1;
-}
-
-drakvuf_c::drakvuf_c(const char* domain,
-                     const char *rekall_profile,
-                     const output_format_t output,
-                     const int timeout,
-                     const bool verbose,
-                     const bool leave_paused)
-{
-    this->drakvuf = NULL;
-    this->interrupted = 0;
-    this->timeout = timeout;
-    this->rekall_profile = rekall_profile;
-    this->leave_paused = leave_paused;
-
-    if (!drakvuf_init(&this->drakvuf, domain, rekall_profile, verbose))
+    if ( !drakvuf_add_trap(drakvuf, &this->debug) ) {
+        fprintf(stderr, "Failed to register Debugmon plugin\n");
         throw -1;
-
-    g_mutex_init(&this->loop_signal);
-    g_mutex_lock(&this->loop_signal);
-
-    if(timeout > 0)
-        this->timeout_thread = g_thread_new(NULL, timer, (void*)this);
-
-    this->plugins = new drakvuf_plugins(this->drakvuf, output);
+    }
 }
 
-drakvuf_c::~drakvuf_c()
-{
-    if ( !this->interrupted )
-        this->interrupt(-1);
-
-    g_mutex_trylock(&this->loop_signal);
-    g_mutex_unlock(&this->loop_signal);
-    g_mutex_clear(&this->loop_signal);
-
-    if (this->drakvuf)
-        drakvuf_close(this->drakvuf, this->leave_paused);
-
-    if (this->plugins)
-        delete this->plugins;
-
-    if(this->timeout_thread)
-        g_thread_join(this->timeout_thread);
-}
-
-void drakvuf_c::interrupt(int signal)
-{
-    this->interrupted = signal;
-    drakvuf_interrupt(this->drakvuf, signal);
-}
-
-void drakvuf_c::loop()
-{
-    g_mutex_unlock(&this->loop_signal);
-    drakvuf_loop(this->drakvuf);
-}
-
-void drakvuf_c::pause()
-{
-    drakvuf_pause(this->drakvuf);
-}
-
-void drakvuf_c::resume()
-{
-    drakvuf_resume(this->drakvuf);
-}
-
-int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char *inject_cmd)
-{
-    int rc = injector_start_app(this->drakvuf, injection_pid, injection_tid, inject_cmd);
-    if (!rc)
-        fprintf(stderr, "Process startup failed\n");
-    return rc;
-}
+debugmon::~debugmon(void) {}

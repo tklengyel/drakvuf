@@ -115,7 +115,7 @@
 bool verbose = 0;
 #endif
 
-void drakvuf_close(drakvuf_t drakvuf) {
+void drakvuf_close(drakvuf_t drakvuf, const bool pause) {
     if (!drakvuf)
         return;
 
@@ -123,8 +123,13 @@ void drakvuf_close(drakvuf_t drakvuf) {
         close_vmi(drakvuf);
     }
 
-    if (drakvuf->xen)
+    if (drakvuf->xen) {
+
+        if ( !pause )
+            drakvuf_force_resume(drakvuf);
+
         xen_free_interface(drakvuf->xen);
+    }
 
     g_free(drakvuf->offsets);
     g_mutex_clear(&drakvuf->vmi_lock);
@@ -157,14 +162,23 @@ bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_pro
 
     (*drakvuf)->offsets = g_malloc0(sizeof(addr_t) * OFFSET_MAX);
 
-    if (!init_vmi(*drakvuf))
+    drakvuf_pause(*drakvuf);
+
+    if (!init_vmi(*drakvuf)) {
+        drakvuf_resume(*drakvuf);
         goto err;
+    }
+
+    PRINT_DEBUG("libdrakvuf initialized\n");
 
     return 1;
 
 err:
-    drakvuf_close(*drakvuf);
+    drakvuf_close(*drakvuf, 1);
     *drakvuf = NULL;
+
+    PRINT_DEBUG("libdrakvuf initialization failed\n");
+
     return 0;
 }
 
@@ -260,6 +274,22 @@ bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
     return 0;
 }
 
+bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
+    if ( !drakvuf->debug && !control_debug_trap(drakvuf, 1) )
+        return 0;
+
+    drakvuf->debug = g_slist_prepend(drakvuf->debug, trap);
+    return 1;
+};
+
+bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
+    if ( !drakvuf->cpuid && !control_cpuid_trap(drakvuf, 1) )
+        return 0;
+
+    drakvuf->cpuid = g_slist_prepend(drakvuf->cpuid, trap);
+    return 1;
+};
+
 bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
 
     bool ret;
@@ -283,6 +313,12 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
             break;
         case REGISTER:
             ret = inject_trap_reg(drakvuf, trap);
+            break;
+        case DEBUG:
+            ret = inject_trap_debug(drakvuf, trap);
+            break;
+        case CPUID:
+            ret = inject_trap_cpuid(drakvuf, trap);
             break;
         default:
             ret = 0;

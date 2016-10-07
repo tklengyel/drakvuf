@@ -165,8 +165,7 @@ int main(int argc, char** argv)
         }
     }
 
-    drakvuf_resume(drakvuf);
-    drakvuf_close(drakvuf);
+    drakvuf_close(drakvuf, 0);
 
     return rc;
 }

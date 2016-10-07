@@ -134,6 +134,14 @@ if PLUGIN_SSDTMON
 sources += ssdtmon/ssdtmon.cpp
 endif
 
+if PLUGIN_DEBUGMON
+sources += debugmon/debugmon.cpp
+endif
+
+if PLUGIN_CPUIDMON
+sources += cpuidmon/cpuidmon.cpp
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h
 

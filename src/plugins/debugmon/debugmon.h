@@ -102,135 +102,19 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "drakvuf.h"
+#ifndef DEBUGMON_H
+#define DEBUGMON_H
 
-static gpointer timer(gpointer data)
-{
-    drakvuf_c* drakvuf = (drakvuf_c*)data;
+#include "plugins/plugins.h"
 
-    /* Wait for the loop to start */
-    g_mutex_lock(&drakvuf->loop_signal);
-    g_mutex_unlock(&drakvuf->loop_signal);
+class debugmon: public plugin {
+    public:
+        output_format_t format;
+        drakvuf_trap_t debug;
+        drakvuf_t drakvuf;
 
-    while(drakvuf->timeout && !drakvuf->interrupted) {
-        sleep(1);
-        --drakvuf->timeout;
-    }
+        debugmon(drakvuf_t drakvuf, const void *config, output_format_t output);
+        ~debugmon();
+};
 
-    if (!drakvuf->interrupted) {
-        drakvuf->interrupt(-1);
-    }
-
-    g_thread_exit(NULL);
-    return NULL;
-}
-
-int drakvuf_c::start_plugins(const bool* plugin_list, const char *dump_folder, bool cpuid_stealth)
-{
-    int i, rc;
-
-    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
-    {
-        if (plugin_list[i]) {
-            switch ((drakvuf_plugin_t)i) {
-            case PLUGIN_FILEDELETE:
-            {
-                struct filedelete_config c = {
-                    .rekall_profile = this->rekall_profile,
-                    .dump_folder = dump_folder
-                };
-
-                rc = this->plugins->start((drakvuf_plugin_t)i, &c);
-                break;
-            }
-
-            case PLUGIN_CPUIDMON:
-                rc = this->plugins->start((drakvuf_plugin_t)i, &cpuid_stealth);
-                break;
-
-            default:
-                rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
-                break;
-            };
-
-            if ( !rc )
-                return rc;
-        }
-    }
-
-    return 1;
-}
-
-drakvuf_c::drakvuf_c(const char* domain,
-                     const char *rekall_profile,
-                     const output_format_t output,
-                     const int timeout,
-                     const bool verbose,
-                     const bool leave_paused)
-{
-    this->drakvuf = NULL;
-    this->interrupted = 0;
-    this->timeout = timeout;
-    this->rekall_profile = rekall_profile;
-    this->leave_paused = leave_paused;
-
-    if (!drakvuf_init(&this->drakvuf, domain, rekall_profile, verbose))
-        throw -1;
-
-    g_mutex_init(&this->loop_signal);
-    g_mutex_lock(&this->loop_signal);
-
-    if(timeout > 0)
-        this->timeout_thread = g_thread_new(NULL, timer, (void*)this);
-
-    this->plugins = new drakvuf_plugins(this->drakvuf, output);
-}
-
-drakvuf_c::~drakvuf_c()
-{
-    if ( !this->interrupted )
-        this->interrupt(-1);
-
-    g_mutex_trylock(&this->loop_signal);
-    g_mutex_unlock(&this->loop_signal);
-    g_mutex_clear(&this->loop_signal);
-
-    if (this->drakvuf)
-        drakvuf_close(this->drakvuf, this->leave_paused);
-
-    if (this->plugins)
-        delete this->plugins;
-
-    if(this->timeout_thread)
-        g_thread_join(this->timeout_thread);
-}
-
-void drakvuf_c::interrupt(int signal)
-{
-    this->interrupted = signal;
-    drakvuf_interrupt(this->drakvuf, signal);
-}
-
-void drakvuf_c::loop()
-{
-    g_mutex_unlock(&this->loop_signal);
-    drakvuf_loop(this->drakvuf);
-}
-
-void drakvuf_c::pause()
-{
-    drakvuf_pause(this->drakvuf);
-}
-
-void drakvuf_c::resume()
-{
-    drakvuf_resume(this->drakvuf);
-}
-
-int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char *inject_cmd)
-{
-    int rc = injector_start_app(this->drakvuf, injection_pid, injection_tid, inject_cmd);
-    if (!rc)
-        fprintf(stderr, "Process startup failed\n");
-    return rc;
-}
+#endif

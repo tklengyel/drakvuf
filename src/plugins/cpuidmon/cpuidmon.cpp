@@ -102,135 +102,78 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "drakvuf.h"
+#include <config.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <dirent.h>
+#include <glib.h>
+#include <err.h>
 
-static gpointer timer(gpointer data)
-{
-    drakvuf_c* drakvuf = (drakvuf_c*)data;
+#include <libvmi/libvmi.h>
+#include "../plugins.h"
+#include "cpuidmon.h"
 
-    /* Wait for the loop to start */
-    g_mutex_lock(&drakvuf->loop_signal);
-    g_mutex_unlock(&drakvuf->loop_signal);
+event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
 
-    while(drakvuf->timeout && !drakvuf->interrupted) {
-        sleep(1);
-        --drakvuf->timeout;
-    }
+    cpuidmon* s = (cpuidmon*)info->trap->data;
 
-    if (!drakvuf->interrupted) {
-        drakvuf->interrupt(-1);
-    }
+    switch(s->format) {
+    case OUTPUT_CSV:
+        printf("cpuidmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 "\n",
+            info->vcpu, info->regs->cr3, info->procname, info->sessionid);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[CPUIDMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s SessionID:%" PRIi64". "
+               "Leaf: 0x%" PRIx32 ". Subleaf: 0x%" PRIx32". "
+               "RAX: 0x%" PRIx64 " RBX: 0x%" PRIx64 " RCX: 0x%" PRIx64 " RDX: 0x%" PRIx64 "\n",
+               info->vcpu, info->regs->cr3, info->procname, info->sessionid,
+               info->cpuid->leaf, info->cpuid->subleaf,
+               info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx
+            );
+        break;
+    };
 
-    g_thread_exit(NULL);
-    return NULL;
-}
+    if ( s->stealth ) {
+        if ( info->cpuid->leaf == 1 ) {
+            info->regs->rcx &= ~0x80000000;
+        }
 
-int drakvuf_c::start_plugins(const bool* plugin_list, const char *dump_folder, bool cpuid_stealth)
-{
-    int i, rc;
-
-    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
-    {
-        if (plugin_list[i]) {
-            switch ((drakvuf_plugin_t)i) {
-            case PLUGIN_FILEDELETE:
-            {
-                struct filedelete_config c = {
-                    .rekall_profile = this->rekall_profile,
-                    .dump_folder = dump_folder
-                };
-
-                rc = this->plugins->start((drakvuf_plugin_t)i, &c);
-                break;
-            }
-
-            case PLUGIN_CPUIDMON:
-                rc = this->plugins->start((drakvuf_plugin_t)i, &cpuid_stealth);
-                break;
-
-            default:
-                rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
-                break;
-            };
-
-            if ( !rc )
-                return rc;
+        if ( info->cpuid->leaf >= 0x40000000 && info->cpuid->leaf <= 0x40000004 ) {
+            info->regs->rax = 0;
+            info->regs->rbx = 0;
+            info->regs->rcx = 0;
+            info->regs->rdx = 0;
         }
     }
 
-    return 1;
+    return 0;
 }
 
-drakvuf_c::drakvuf_c(const char* domain,
-                     const char *rekall_profile,
-                     const output_format_t output,
-                     const int timeout,
-                     const bool verbose,
-                     const bool leave_paused)
-{
-    this->drakvuf = NULL;
-    this->interrupted = 0;
-    this->timeout = timeout;
-    this->rekall_profile = rekall_profile;
-    this->leave_paused = leave_paused;
+/* ----------------------------------------------------- */
 
-    if (!drakvuf_init(&this->drakvuf, domain, rekall_profile, verbose))
+cpuidmon::cpuidmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
+
+    this->format = output;
+    this->stealth = *(bool *)config;
+    this->drakvuf = drakvuf;
+
+    this->cpuid.cb = cpuid_cb;
+    this->cpuid.data = (void*)this;
+    this->cpuid.type = CPUID;
+
+    if ( !drakvuf_add_trap(drakvuf, &this->cpuid) ) {
+        fprintf(stderr, "Failed to register CPUIDMON plugin\n");
         throw -1;
-
-    g_mutex_init(&this->loop_signal);
-    g_mutex_lock(&this->loop_signal);
-
-    if(timeout > 0)
-        this->timeout_thread = g_thread_new(NULL, timer, (void*)this);
-
-    this->plugins = new drakvuf_plugins(this->drakvuf, output);
+    }
 }
 
-drakvuf_c::~drakvuf_c()
-{
-    if ( !this->interrupted )
-        this->interrupt(-1);
-
-    g_mutex_trylock(&this->loop_signal);
-    g_mutex_unlock(&this->loop_signal);
-    g_mutex_clear(&this->loop_signal);
-
-    if (this->drakvuf)
-        drakvuf_close(this->drakvuf, this->leave_paused);
-
-    if (this->plugins)
-        delete this->plugins;
-
-    if(this->timeout_thread)
-        g_thread_join(this->timeout_thread);
-}
-
-void drakvuf_c::interrupt(int signal)
-{
-    this->interrupted = signal;
-    drakvuf_interrupt(this->drakvuf, signal);
-}
-
-void drakvuf_c::loop()
-{
-    g_mutex_unlock(&this->loop_signal);
-    drakvuf_loop(this->drakvuf);
-}
-
-void drakvuf_c::pause()
-{
-    drakvuf_pause(this->drakvuf);
-}
-
-void drakvuf_c::resume()
-{
-    drakvuf_resume(this->drakvuf);
-}
-
-int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char *inject_cmd)
-{
-    int rc = injector_start_app(this->drakvuf, injection_pid, injection_tid, inject_cmd);
-    if (!rc)
-        fprintf(stderr, "Process startup failed\n");
-    return rc;
-}
+cpuidmon::~cpuidmon(void) {}

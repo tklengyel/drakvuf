@@ -133,6 +133,8 @@ typedef enum drakvuf_plugin {
     PLUGIN_OBJMON,
     PLUGIN_EXMON,
     PLUGIN_SSDTMON,
+    PLUGIN_DEBUGMON,
+    PLUGIN_CPUIDMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -144,6 +146,8 @@ static const char *drakvuf_plugin_names[] = {
     [PLUGIN_OBJMON] = "objmon",
     [PLUGIN_EXMON] = "exmon",
     [PLUGIN_SSDTMON] = "ssdtmon",
+    [PLUGIN_DEBUGMON] = "debugmon",
+    [PLUGIN_CPUIDMON] = "cpuidmon",
 };
 
 class plugin {

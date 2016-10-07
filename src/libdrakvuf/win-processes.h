@@ -109,11 +109,9 @@
 #include "libdrakvuf.h"
 
 char *drakvuf_get_current_process_name(drakvuf_t drakvuf,
-                                       uint64_t vcpu_id,
-                                       const x86_registers_t *regs);
+                                       uint64_t vcpu_id);
 
 int64_t drakvuf_get_current_process_sessionid(drakvuf_t drakvuf,
-                                              uint64_t vcpu_id,
-                                              const x86_registers_t *regs);
+                                              uint64_t vcpu_id);
 
 #endif

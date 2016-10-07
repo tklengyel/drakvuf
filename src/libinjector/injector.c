@@ -630,14 +630,14 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     if (cr3 != injector->target_cr3)
         return 0;
 
-    thread = drakvuf_get_current_thread(drakvuf, info->vcpu, info->regs);
+    thread = drakvuf_get_current_thread(drakvuf, info->vcpu);
     if (!thread) {
         PRINT_DEBUG("cr3_cb: Failed to find current thread\n");
         return 0;
     }
 
     uint32_t threadid = 0;
-    if ( !drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, info->regs, &threadid) || !threadid )
+    if ( !drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, &threadid) || !threadid )
         return 0;
 
     PRINT_DEBUG("Thread @ 0x%lx. ThreadID: %u\n", thread, threadid);
@@ -901,8 +901,8 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
         g_slist_free(loop);
     }
 
+    drakvuf_pause(drakvuf);
     drakvuf_remove_trap(drakvuf, &injector.cr3_event, NULL);
-    vmi_pause_vm(injector.vmi);
 
 done:
     PRINT_DEBUG("Finished with injection. Ret: %i\n", injector.rc);

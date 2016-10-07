@@ -120,11 +120,11 @@
 
 class drakvuf_c {
     private:
+        bool leave_paused;
         drakvuf_t drakvuf;
         drakvuf_plugins* plugins;
         GThread *timeout_thread = NULL;
         const char *rekall_profile;
-        void close();
 
     public:
         int timeout;
@@ -135,7 +135,8 @@ class drakvuf_c {
                   const char *rekall_profile,
                   const output_format_t output,
                   const int timeout,
-                  const bool verbose);
+                  const bool verbose,
+                  const bool leave_paused);
         ~drakvuf_c();
 
         int is_initialized();
@@ -144,7 +145,7 @@ class drakvuf_c {
         void pause();
         void resume();
         int inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char *inject_cmd);
-        int start_plugins(const bool* plugin_list, const char *dump_folder);
+        int start_plugins(const bool* plugin_list, const char *dump_folder, bool cpuid_stealth);
 };
 
 #endif
