@@ -107,12 +107,9 @@
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Installation guide</h3>
+<p><b>UPDATED 10/07/2016</b> Creating Rekall profiles requires a new version of Rekall due to recent changes to Microsoft's Symbol Servers. The required Rekall version is now available as a submodule in DRAKVUF.</p>
 
 <p><b>UPDATED 8/24/2016</b> Please update LibVMI if you are using the latest DRAKVUF master branch, there had been some recent changes that require updating it!</p>
-
-<p><b>UPDATED 6/23/2016</b> If you have a previous version of DRAKVUF installed, pay attention to the updated instructions for Xen 4.7, which requires a fresh pull of LibVMI as well!</p>
-
-<p><b>UPDATED 12/31/2015</b> If you have a previous version of DRAKVUF installed, pay attention to the updated instructions to enable Xen altp2m on your system!</p>
 
 <p>The following packages are normally required to build Xen and DRAKVUF on Debian based Linux distros. The system has been mainly tested on Debian Jessie and Ubuntu 14.04 LTS.</p>
 
@@ -251,11 +248,9 @@ python setup.py build
 sudo python setup.py install
 </code></pre>
 
-Download Rekall and install it:
+Build and install Rekall:
 
-<pre><code>cd ~
-git clone --branch v1.4.1 https://github.com/google/rekall
-cd rekall/rekall-core
+<pre><code>cd ~/drakvuf/rekall/rekall-core
 python setup.py build
 sudo python setup.py install
 </code></pre>
@@ -312,7 +307,7 @@ Kernel filename: ntkrpamp.pdb
 
 Now generate the Rekall profile:
 <pre><code>cd /tmp
-rekall fetch_pdb --pdb_filename ntkrpamp.pdb --guid 684da42a30cc450f81c535b4d18944b12
+rekall fetch_pdb pdb_filename ntkrpamp 684da42a30cc450f81c535b4d18944b12
 rekall parse_pdb ntkrpamp.pdb > windows7-sp1.rekall.json
 sudo mv windows7-sp1.rekall.json /root
 </code></pre>
