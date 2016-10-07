@@ -4,3 +4,6 @@
 [submodule "libvmi"]
 	path = libvmi
 	url = https://github.com/tklengyel/libvmi
+[submodule "rekall"]
+	path = rekall
+	url = https://github.com/google/rekall
