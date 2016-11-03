@@ -142,7 +142,7 @@ int main(int argc, char** argv)
     int rc = 0;
     vmi_pid_t injection_pid = 0;
     uint32_t injection_thread = 0;
-    char c;
+    int c;
     char* rekall_profile = NULL;
     char* domain = NULL;
     char* inject_file = NULL;
