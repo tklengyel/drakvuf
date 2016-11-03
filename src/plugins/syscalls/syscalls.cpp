@@ -496,7 +496,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             trap->cb = linux_cb;
             trap->data = s;
 
-	    if (traptype == PRIVCALL_SPLIT_TLB_BCKP)
+	    if ( traptype == PRIVCALL_SPLIT_TLB_BCKP || traptype == PRIVCALL_DBL_SMC_BCKP )
 		trap->trampoline_va = backup_page_va + j * 8; // every syscall gets 8 bytes in the XPAGE
  
 	    j++;
@@ -625,8 +625,8 @@ syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output
         loop = loop->next;
     }
 
-    if ( c->traptype == PRIVCALL_DBL_SMC )
-    	drakvuf_config_views_for_dbl_smc(vmi, drakvuf, this->traps);
+    if ( c->traptype == PRIVCALL_DBL_SMC || c->traptype == PRIVCALL_DBL_SMC_BCKP )
+    	drakvuf_config_views_for_dbl_smc(vmi, drakvuf, this->traps, c->backup_page_va);
     else if ( c->traptype == PRIVCALL_SPLIT_TLB || c->traptype == PRIVCALL_SPLIT_TLB_BCKP )
     	drakvuf_config_views_for_split_tlb(vmi, drakvuf, this->traps, c->backup_page_va);
 }

@@ -612,6 +612,21 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
 			}
 			return rsp |= VMI_EVENT_RESPONSE_SET_REGISTERS;
 		}
+		else if ( traptype == PRIVCALL_DBL_SMC_BCKP )
+		{
+			PRINT_DEBUG("[DBL_SMC_BCKP] Switching altp2m and to singlestep on vcpu %u - %i SMC executed\n", event->vcpu_id, event->slat_id);
+			if (pa == s->breakpoint.pa) 
+			{
+				PRINT_DEBUG("[DBL_SMC_BCKP] First SMC executed; jumping to 0x%"PRIx64"\n", trap->trampoline_va);
+				event->arm_regs->pc = trap->trampoline_va;
+			}
+			else if (pa == trap->trampoline_pa + 4)
+			{ 
+				PRINT_DEBUG("[DBL_SMC_BCKP] Second SMC executed in backup pagel; jumping to %"PRIx64"\n", trap->breakpoint.addr + 4);
+				event->arm_regs->pc = trap->breakpoint.addr + 4;
+			}
+			return rsp |= VMI_EVENT_RESPONSE_SET_REGISTERS;
+		}
 		else if ( traptype == __INVALID_TRAP_TYPE )
 		{
 			PRINT_DEBUG("Invalid trap type\n");
@@ -914,6 +929,7 @@ void remove_trap(drakvuf_t drakvuf,
         case PRIVCALL_DBL_SMC:
         case PRIVCALL_SPLIT_TLB:
         case PRIVCALL_SPLIT_TLB_BCKP:
+        case PRIVCALL_DBL_SMC_BCKP:
         case BREAKPOINT:
         {
             struct wrapper* container =
@@ -1366,17 +1382,17 @@ bool inject_trap_pa(drakvuf_t drakvuf,
                 goto err_exit;
             }
         }
-	else if ( trap->type == PRIVCALL_SPLIT_TLB_BCKP )
+	else if ( trap->type == PRIVCALL_SPLIT_TLB_BCKP || trap->type == PRIVCALL_DBL_SMC_BCKP )
 	{
             if ( VMI_FAILURE == vmi_write_32_pa(vmi, trap->trampoline_pa, &test) )
             {
-                PRINT_DEBUG("FAILED TO INJECT first instruction in the XPAGE @ 0x%lx !\n", trap->trampoline_pa);
+                PRINT_DEBUG("FAILED TO INJECT first instruction in the backup page @ 0x%lx !\n", trap->trampoline_pa);
                 goto err_exit;
 	    }
             
 	    if ( VMI_FAILURE == vmi_write_32_pa(vmi, trap->trampoline_pa + 4, &sw_trap) )
             {
-                PRINT_DEBUG("FAILED TO INJECT TRAP (second SMC) in the XPAGE @ 0x%lx !\n", container->breakpoint.pa);
+                PRINT_DEBUG("FAILED TO INJECT TRAP (second SMC) in the backup page @ 0x%lx !\n", container->breakpoint.pa);
                 goto err_exit;
 	    }
 	}
@@ -1395,7 +1411,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     g_hash_table_insert(drakvuf->breakpoint_lookup_trap, g_memdup(&trap, sizeof(void*)),
                         container);
 
-	if ( trap->type == PRIVCALL_SPLIT_TLB_BCKP )
+	if ( trap->type == PRIVCALL_SPLIT_TLB_BCKP || trap->type == PRIVCALL_DBL_SMC_BCKP)
 	{
 		trap->trampoline_pa += 4;
 		g_hash_table_insert(drakvuf->breakpoint_lookup_pa, g_memdup(&trap->trampoline_pa, sizeof(addr_t)), container);
@@ -1926,8 +1942,21 @@ void vmi_config_views_for_split_tlb(vmi_instance_t vmi, drakvuf_t drakvuf, GSLis
 	PRINT_DEBUG("Switching to altp2m[%d]. Failed? %d\n", drakvuf->altp2m_idr, rc);
 }
 
-void vmi_config_views_for_dbl_smc(vmi_instance_t vmi, drakvuf_t drakvuf, GSList* traps)
+void vmi_config_views_for_dbl_smc(vmi_instance_t vmi, drakvuf_t drakvuf, GSList* traps, addr_t backup_page_va)
 {
+	if (backup_page_va != 0) // means we're using SPLIT-TLB-SS with the backup page
+	{
+		addr_t backup_page_pa;
+
+		if (VMI_FAILURE == vmi_translate_kv2p(vmi, backup_page_va, &backup_page_pa))
+		{
+			printf("Failed to translate xpage_va\n");
+			return;
+		}
+
+		xc_altp2m_set_mem_access( drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx, backup_page_pa >> 12, XENMEM_access_rwx);
+	}
+
 	GSList* loop = traps;
 	while (loop)
 	{

@@ -194,7 +194,7 @@ int main(int argc, char** argv)
 #ifdef ENABLE_PLUGIN_SYSCALLS
                 "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
                 "\t -b <backup page VA>       The virtual address of a 4096 KB page allocated in the kernel that can be used as a backup page for SMC analysis\n"
-		"\t -a <analysis method>      Option which selects the preffered analysis technique; for x86: BKP (%d); for ARM: HW-SS (%d), DBL-SMC-SS (%d), SPLIT-TLB-SS (%d), SPLIT-TLB-SS-BCKP (%d)\n", BREAKPOINT, PRIVCALL_HW_SS, PRIVCALL_DBL_SMC, PRIVCALL_SPLIT_TLB, PRIVCALL_SPLIT_TLB_BCKP
+		"\t -a <analysis method>      Option which selects the preffered analysis technique; for x86: BKP (%d); for ARM: HW-SS (%d), DBL-SMC-SS (%d), SPLIT-TLB-SS (%d), SPLIT-TLB-SS-BCKP (%d), SPLIT-DBL-SMC-BCKP (%d)\n", BREAKPOINT, PRIVCALL_HW_SS, PRIVCALL_DBL_SMC, PRIVCALL_SPLIT_TLB, PRIVCALL_SPLIT_TLB_BCKP, PRIVCALL_DBL_SMC_BCKP
 #endif
                );
         return rc;
@@ -298,21 +298,21 @@ int main(int argc, char** argv)
 #if defined (I386) || defined(X86_64)
         (traptype != BREAKPOINT)
 #elif defined (ARM64)
-	(traptype != PRIVCALL_HW_SS && traptype != PRIVCALL_DBL_SMC && traptype != PRIVCALL_SPLIT_TLB && traptype != PRIVCALL_SPLIT_TLB_BCKP)
+	(traptype != PRIVCALL_HW_SS && traptype != PRIVCALL_DBL_SMC && traptype != PRIVCALL_SPLIT_TLB && traptype != PRIVCALL_SPLIT_TLB_BCKP && traptype != PRIVCALL_DBL_SMC_BCKP)
 #endif
 	)
     {
-        fprintf(stderr, "Invalid analysis method (-a)!");
+        fprintf(stderr, "Invalid analysis method (-a)! ");
 #if defined (I386) || defined(X86_64)
 	fprintf(stderr, "Available options for x86: BK (%d)\n", BREAKPOINT);
 #elif defined (ARM64)
-	fprintf(stderr, "Available options for ARM: HW-SS (%d), DBL-SMC-SS (%d), SPLIT-TLB-SS (%d), PRIVCALL-SPLIT-TLB-SS-BCKP (%d)\n", PRIVCALL_HW_SS, PRIVCALL_DBL_SMC, PRIVCALL_SPLIT_TLB, PRIVCALL_SPLIT_TLB_BCKP);
+	fprintf(stderr, "Available options for ARM: HW-SS (%d), DBL-SMC-SS (%d), SPLIT-TLB-SS (%d), PRIVCALL-SPLIT-TLB-SS-BCKP (%d), PRIVCALL-DBL-SMC-SS-BCKP (%d)\n", PRIVCALL_HW_SS, PRIVCALL_DBL_SMC, PRIVCALL_SPLIT_TLB, PRIVCALL_SPLIT_TLB_BCKP, PRIVCALL_DBL_SMC_BCKP);
 #endif
         return rc; 
     }
 #endif
 
-    if (traptype == PRIVCALL_SPLIT_TLB_BCKP)
+    if (traptype == PRIVCALL_SPLIT_TLB_BCKP || traptype == PRIVCALL_DBL_SMC_BCKP)
     {
     	if (backup_page_va == 0)
 	{

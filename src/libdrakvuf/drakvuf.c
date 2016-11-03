@@ -285,7 +285,7 @@ bool inject_trap_sw(drakvuf_t drakvuf, drakvuf_trap_t* trap)
                 return 0;
             }
 
-	    if ( trap->type == PRIVCALL_SPLIT_TLB_BCKP )
+	    if ( trap->type == PRIVCALL_SPLIT_TLB_BCKP || trap->type == PRIVCALL_DBL_SMC_BCKP )
 	    {
 		    if ( VMI_FAILURE == vmi_pagetable_lookup(drakvuf->vmi, dtb, trap->trampoline_va, &trap->trampoline_pa) )
 		    {
@@ -391,6 +391,7 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
         case PRIVCALL_DBL_SMC:
         case PRIVCALL_SPLIT_TLB:
         case PRIVCALL_SPLIT_TLB_BCKP:
+        case PRIVCALL_DBL_SMC_BCKP:
             ret = inject_trap_sw(drakvuf, trap);
             break;
         default:
@@ -721,7 +722,7 @@ void drakvuf_config_views_for_split_tlb(vmi_instance_t vmi, drakvuf_t drakvuf, G
     vmi_config_views_for_split_tlb(vmi, drakvuf, traps, backup_page_va);
 }
 
-void drakvuf_config_views_for_dbl_smc(vmi_instance_t vmi, drakvuf_t drakvuf, GSList* traps)
+void drakvuf_config_views_for_dbl_smc(vmi_instance_t vmi, drakvuf_t drakvuf, GSList* traps, addr_t backup_page_va)
 {
-    vmi_config_views_for_dbl_smc(vmi, drakvuf, traps);
+    vmi_config_views_for_dbl_smc(vmi, drakvuf, traps, backup_page_va);
 }

@@ -184,7 +184,8 @@ typedef enum trap_type
     PRIVCALL_HW_SS,
     PRIVCALL_DBL_SMC,
     PRIVCALL_SPLIT_TLB,
-    PRIVCALL_SPLIT_TLB_BCKP
+    PRIVCALL_SPLIT_TLB_BCKP,
+    PRIVCALL_DBL_SMC_BCKP
 } trap_type_t;
 
 typedef enum memaccess_type
@@ -470,7 +471,8 @@ void drakvuf_config_views_for_split_tlb(vmi_instance_t vmi,
 
 void drakvuf_config_views_for_dbl_smc(vmi_instance_t vmi,
                               drakvuf_t drakvuf, 
-                              GSList* traps);
+                              GSList* traps,
+			      addr_t backup_page_va);
 
 #pragma GCC visibility pop
 
