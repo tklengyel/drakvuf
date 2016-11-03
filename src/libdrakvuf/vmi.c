@@ -504,7 +504,7 @@ event_response_t split_tlb_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
 
 
     if ( event->slat_id == drakvuf->altp2m_idr )
-	event->slat_id = drakvuf->altp2m_ids;
+	event->slat_id = drakvuf->altp2m_idx;
     else 
 	event->slat_id = drakvuf->altp2m_idr;
     
@@ -553,11 +553,13 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf->in_callback = 1;
 
     trap_type_t traptype = __INVALID_TRAP_TYPE;
+    drakvuf_trap_t* trap = NULL;
 
-    GSList* loop = s->traps;
+	GSList* loop = s->traps;
     while (loop)
     {
-        drakvuf_trap_t* trap = loop->data;
+		trap = loop->data;
+
         drakvuf_trap_info_t trap_info =
         {
             .trap = trap,
@@ -566,7 +568,7 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
             .vcpu = event->vcpu_id,
         };
 
-	traptype = trap->type;
+		traptype = trap->type;
 
         loop = loop->next;
         rsp |= trap->cb(drakvuf, &trap_info);
@@ -575,7 +577,7 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     process_free_requests(drakvuf);
     // Check if we have traps still active on this breakpoint
-    if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa) )
+    if ( (s = g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa)) )
 	{
 		if ( traptype == PRIVCALL_HW_SS )
 		{
@@ -586,10 +588,29 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
 		else if ( traptype == PRIVCALL_DBL_SMC || traptype == PRIVCALL_SPLIT_TLB )
 		{
 			PRINT_DEBUG("[%s] Switching altp2m and to singlestep on vcpu %u - %i SMC executed\n", traptype == PRIVCALL_DBL_SMC ? "DBL_SMC" : "SPLIT_TLB", event->vcpu_id, event->slat_id);
-			if ( event->slat_id == drakvuf->altp2m_idx )
+			if ( event->slat_id == drakvuf->altp2m_idx || event-> slat_id == drakvuf->altp2m_idr )
 			    event->slat_id = drakvuf->altp2m_ids;
 			else 
 			    event->slat_id = drakvuf->altp2m_idx;
+		}
+		else if ( traptype == PRIVCALL_SPLIT_TLB_BCKP )
+		{
+			PRINT_DEBUG("[SPLIT_TLB_BCKP] Switching altp2m and to singlestep on vcpu %u - %i SMC executed\n", event->vcpu_id, event->slat_id);
+			if (pa == s->breakpoint.pa) 
+			{
+				PRINT_DEBUG("[SPLIT_TLB_BCKP] First SMC executed; jumping to 0x%"PRIx64"\n", trap->trampoline_va);
+				event->arm_regs->pc = trap->trampoline_va;
+			}
+			else if (pa == trap->trampoline_pa + 4)
+			{ 
+				PRINT_DEBUG("[SPLIT_TLB_BCKP] Second SMC executed in backup pagel; jumping to %"PRIx64"\n", trap->breakpoint.addr + 4);
+				event->arm_regs->pc = trap->breakpoint.addr + 4;
+				if (event->slat_id == drakvuf->altp2m_idx) {
+					event->slat_id = drakvuf->altp2m_idr;
+					rsp |= VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+				}
+			}
+			return rsp |= VMI_EVENT_RESPONSE_SET_REGISTERS;
 		}
 		else if ( traptype == __INVALID_TRAP_TYPE )
 		{
@@ -892,6 +913,7 @@ void remove_trap(drakvuf_t drakvuf,
         case PRIVCALL_HW_SS: // intentional fall-through
         case PRIVCALL_DBL_SMC:
         case PRIVCALL_SPLIT_TLB:
+        case PRIVCALL_SPLIT_TLB_BCKP:
         case BREAKPOINT:
         {
             struct wrapper* container =
@@ -1344,6 +1366,20 @@ bool inject_trap_pa(drakvuf_t drakvuf,
                 goto err_exit;
             }
         }
+	else if ( trap->type == PRIVCALL_SPLIT_TLB_BCKP )
+	{
+            if ( VMI_FAILURE == vmi_write_32_pa(vmi, trap->trampoline_pa, &test) )
+            {
+                PRINT_DEBUG("FAILED TO INJECT first instruction in the XPAGE @ 0x%lx !\n", trap->trampoline_pa);
+                goto err_exit;
+	    }
+            
+	    if ( VMI_FAILURE == vmi_write_32_pa(vmi, trap->trampoline_pa + 4, &sw_trap) )
+            {
+                PRINT_DEBUG("FAILED TO INJECT TRAP (second SMC) in the XPAGE @ 0x%lx !\n", container->breakpoint.pa);
+                goto err_exit;
+	    }
+	}
     }
 
     // list of traps on this page
@@ -1358,6 +1394,14 @@ bool inject_trap_pa(drakvuf_t drakvuf,
                         container);
     g_hash_table_insert(drakvuf->breakpoint_lookup_trap, g_memdup(&trap, sizeof(void*)),
                         container);
+
+	if ( trap->type == PRIVCALL_SPLIT_TLB_BCKP )
+	{
+		trap->trampoline_pa += 4;
+		g_hash_table_insert(drakvuf->breakpoint_lookup_pa, g_memdup(&trap->trampoline_pa, sizeof(addr_t)), container);
+		trap->trampoline_pa -= 4;
+	}
+
 
     PRINT_DEBUG("\t\tTrap added @ PA 0x%" PRIx64 " RPA 0x%" PRIx64 " Page %" PRIu64 " for %s. \n",
                 container->breakpoint.pa, rpa, pa >> 12, trap->name);
@@ -1665,13 +1709,9 @@ bool init_vmi(drakvuf_t drakvuf)
     if (rc < 0)
         return 0;
 
-    rc = xc_altp2m_pair_vmid(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr, drakvuf->altp2m_ids);
-    PRINT_DEBUG("Paired VMIDs %d and %d. Failed? %d\n", drakvuf->altp2m_idr, drakvuf->altp2m_ids, rc);
+    rc = xc_altp2m_pair_vmid(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr, drakvuf->altp2m_idx);
+    PRINT_DEBUG("Paired VMIDs %d and %d. Failed? %d\n", drakvuf->altp2m_idx, drakvuf->altp2m_idx, rc);
     
-    /*rc = xc_altp2m_pair_vmid(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr, drakvuf->altp2m_ids);
-    PRINT_DEBUG("Paired VMIDs %d and %d. Failed? %d\n", drakvuf->altp2m_idr, drakvuf->altp2m_ids, rc);*/
-
-
 #if defined(I386) || defined(X86_64)
     SETUP_INTERRUPT_EVENT(&drakvuf->interrupt_event, 0, int3_cb);
     drakvuf->interrupt_event.data = drakvuf;
@@ -1838,7 +1878,7 @@ void close_vmi(drakvuf_t drakvuf)
 
 #define START_PFN (GUEST_RAM0_BASE >> 12)
 
-void vmi_config_views_for_split_tlb(vmi_instance_t vmi, drakvuf_t drakvuf, GSList* traps)
+void vmi_config_views_for_split_tlb(vmi_instance_t vmi, drakvuf_t drakvuf, GSList* traps, addr_t backup_page_va)
 {
 	/*
 	 * Change all gfns in in the execute and step views to RW_
@@ -1848,6 +1888,19 @@ void vmi_config_views_for_split_tlb(vmi_instance_t vmi, drakvuf_t drakvuf, GSLis
 	for (i=START_PFN; i<=drakvuf->max_gpfn; i++) {
 		xc_altp2m_set_mem_access( drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx, i, XENMEM_access_rw);
 		xc_altp2m_set_mem_access( drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_ids, i, XENMEM_access_rw);
+	}
+
+	if (backup_page_va != 0) // means we're using SPLIT-TLB-SS with the backup page
+	{
+		addr_t backup_page_pa;
+
+		if (VMI_FAILURE == vmi_translate_kv2p(vmi, backup_page_va, &backup_page_pa))
+		{
+			printf("Failed to translate xpage_va\n");
+			return;
+		}
+
+		xc_altp2m_set_mem_access( drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx, backup_page_pa >> 12, XENMEM_access_rwx);
 	}
 
 	GSList* loop = traps;

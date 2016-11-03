@@ -134,7 +134,8 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                              bool cpuid_stealth,               // PLUGIN_CPUIDMON
                              const char* tcpip_profile,        // PLUGIN_SOCKETMON
                              const char* syscalls_filter_file, // PLUGIN_SYSCALLS
-			     trap_type_t traptype)
+			     trap_type_t traptype,
+			     addr_t backup_page_va)
 {
     int i, rc;
 
@@ -179,7 +180,8 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     {
                         .rekall_profile = this->rekall_profile,
                         .syscalls_filter_file = syscalls_filter_file,
-			.traptype = traptype
+			.traptype = traptype,
+			.backup_page_va = backup_page_va
                     };
                     rc = this->plugins->start((drakvuf_plugin_t)i, &c);
                     break;

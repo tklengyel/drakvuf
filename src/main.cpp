@@ -150,7 +150,8 @@ int main(int argc, char** argv)
     char const* syscalls_filter_file = NULL;
     bool dump_modified_files = false;
     bool filedelete_use_injector = false;
-    trap_type_t traptype;
+    trap_type_t traptype = __INVALID_TRAP_TYPE;
+    addr_t backup_page_va = 0;
 
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
 
@@ -192,13 +193,14 @@ int main(int argc, char** argv)
 #endif
 #ifdef ENABLE_PLUGIN_SYSCALLS
                 "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
-		"\t -a <analysis method>      Option which selects the preffered analysis technique; for x86: BKP (%d); for ARM: HW-SS (%d), DBL-SMC-SS (%d), SPLIT-TLB-SS (%d)\n", BREAKPOINT, PRIVCALL_HW_SS, PRIVCALL_DBL_SMC, PRIVCALL_SPLIT_TLB
+                "\t -b <backup page VA>       The virtual address of a 4096 KB page allocated in the kernel that can be used as a backup page for SMC analysis\n"
+		"\t -a <analysis method>      Option which selects the preffered analysis technique; for x86: BKP (%d); for ARM: HW-SS (%d), DBL-SMC-SS (%d), SPLIT-TLB-SS (%d), SPLIT-TLB-SS-BCKP (%d)\n", BREAKPOINT, PRIVCALL_HW_SS, PRIVCALL_DBL_SMC, PRIVCALL_SPLIT_TLB, PRIVCALL_SPLIT_TLB_BCKP
 #endif
                );
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:Mc:na:")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:Mc:na:b:")) != -1)
         switch (c)
         {
             case 'r':
@@ -268,6 +270,9 @@ int main(int argc, char** argv)
             case 'n':
                 filedelete_use_injector = true;
                 break;
+            case 'b':
+                backup_page_va = (addr_t)strtoull(optarg, NULL, 16);
+                break;
             case 'a':
                 traptype = (trap_type_t)atoi(optarg);
                 break;
@@ -293,7 +298,7 @@ int main(int argc, char** argv)
 #if defined (I386) || defined(X86_64)
         (traptype != BREAKPOINT)
 #elif defined (ARM64)
-	(traptype != PRIVCALL_HW_SS && traptype != PRIVCALL_DBL_SMC && traptype != PRIVCALL_SPLIT_TLB)
+	(traptype != PRIVCALL_HW_SS && traptype != PRIVCALL_DBL_SMC && traptype != PRIVCALL_SPLIT_TLB && traptype != PRIVCALL_SPLIT_TLB_BCKP)
 #endif
 	)
     {
@@ -301,11 +306,21 @@ int main(int argc, char** argv)
 #if defined (I386) || defined(X86_64)
 	fprintf(stderr, "Available options for x86: BK (%d)\n", BREAKPOINT);
 #elif defined (ARM64)
-	fprintf(stderr, "Available options for ARM: HW-SS (%d), DBL-SMC-SS (%d), SPLIT-TLB-SS (%d)\n", PRIVCALL_HW_SS, PRIVCALL_DBL_SMC, PRIVCALL_SPLIT_TLB);
+	fprintf(stderr, "Available options for ARM: HW-SS (%d), DBL-SMC-SS (%d), SPLIT-TLB-SS (%d), PRIVCALL-SPLIT-TLB-SS-BCKP (%d)\n", PRIVCALL_HW_SS, PRIVCALL_DBL_SMC, PRIVCALL_SPLIT_TLB, PRIVCALL_SPLIT_TLB_BCKP);
 #endif
         return rc; 
     }
 #endif
+
+    if (traptype == PRIVCALL_SPLIT_TLB_BCKP)
+    {
+    	if (backup_page_va == 0)
+	{
+		fprintf(stderr, "Backup page virtual address required (-r)!\n");
+		return rc;
+	}
+    }
+
 
     PRINT_DEBUG("Starting DRAKVUF initialization\n");
 
@@ -346,7 +361,7 @@ int main(int argc, char** argv)
 
     PRINT_DEBUG("Starting plugins\n");
 
-    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, syscalls_filter_file, (trap_type_t)traptype) < 0 )
+    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, syscalls_filter_file, traptype, backup_page_va) < 0 )
         goto exit;
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");

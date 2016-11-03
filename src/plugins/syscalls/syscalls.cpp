@@ -384,7 +384,7 @@ exit:
     return 0;
 }
 
-static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* symbols, const char* rekall_profile, trap_type_t traptype)
+static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* symbols, const char* rekall_profile, trap_type_t traptype, addr_t backup_page_va)
 {
 
     GSList* ret = NULL;
@@ -447,6 +447,8 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
         if ( !drakvuf_get_constant_rva(rekall_profile, "_text", &rva) )
             return NULL;
 
+	j = 0;
+
         addr_t kaslr = drakvuf_get_kernel_base(drakvuf) - rva;
 
         for (i=0; i < symbols->count; i++)
@@ -454,8 +456,8 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             const struct symbol* symbol = &symbols->symbols[i];
 
             /* Looking for system calls */
-            if (strncmp(symbol->name, "sys_", 4))
-                continue;
+	    if (strncmp(symbol->name, "sys_", 4))
+		continue;
 
             /* This is the address of the table itself so skip it */
             if (!strcmp(symbol->name, "sys_call_table"))
@@ -478,21 +480,30 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             if (!strcmp(symbol->name, "sys_reg_genericv8_init"))
                 continue;
 
+	    if (!strcmp(symbol->name, "sys_set_robust_list"))
+		continue;
+    
             PRINT_DEBUG("[SYSCALLS] Adding trap to %s at 0x%lx (kaslr 0x%lx)\n", symbol->name, symbol->rva + kaslr, kaslr);
 
             drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
             trap->breakpoint.lookup_type = LOOKUP_PID;
             trap->breakpoint.pid = 0;
             trap->breakpoint.addr_type = ADDR_VA;
-            trap->breakpoint.addr = symbol->rva + kaslr;
+            trap->breakpoint.addr = symbol->rva + kaslr + 0xffff000000000000;
             trap->breakpoint.module = "linux";
             trap->name = g_strdup(symbol->name);
             trap->type = traptype;
             trap->cb = linux_cb;
             trap->data = s;
 
+	    if (traptype == PRIVCALL_SPLIT_TLB_BCKP)
+		trap->trampoline_va = backup_page_va + j * 8; // every syscall gets 8 bytes in the XPAGE
+ 
+	    j++;
+
             ret = g_slist_prepend(ret, trap);
         }
+	PRINT_DEBUG("Added %lu traps\n", j);
     }
 
     return ret;
@@ -588,7 +599,7 @@ syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output
     }
 
     this->os = drakvuf_get_os_type(drakvuf);
-    this->traps = create_trap_config(drakvuf, this, symbols, c->rekall_profile, c->traptype);
+    this->traps = create_trap_config(drakvuf, this, symbols, c->rekall_profile, c->traptype, c->backup_page_va);
     this->format = output;
 
     if ( !this->traps )
@@ -614,8 +625,8 @@ syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output
         loop = loop->next;
     }
 
-    if (c->traptype == PRIVCALL_SPLIT_TLB)
-        drakvuf_config_views_for_split_tlb(vmi, drakvuf, this->traps);
+    if ( c->traptype == PRIVCALL_SPLIT_TLB || c->traptype == PRIVCALL_SPLIT_TLB_BCKP )
+        drakvuf_config_views_for_split_tlb(vmi, drakvuf, this->traps, c->backup_page_va);
 }
 
 syscalls::~syscalls()

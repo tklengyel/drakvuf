@@ -285,6 +285,15 @@ bool inject_trap_sw(drakvuf_t drakvuf, drakvuf_trap_t* trap)
                 return 0;
             }
 
+	    if ( trap->type == PRIVCALL_SPLIT_TLB_BCKP )
+	    {
+		    if ( VMI_FAILURE == vmi_pagetable_lookup(drakvuf->vmi, dtb, trap->trampoline_va, &trap->trampoline_pa) )
+		    {
+			    PRINT_DEBUG("Failed to find PA for breakpoint VA addr 0x%lx in DTB 0x%lx\n", trap->trampoline_va, trap->breakpoint.dtb);
+			    return 0;
+		    }
+	    }
+
             return inject_trap_pa(drakvuf, trap, trap_pa);
         }
 
@@ -381,6 +390,7 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
         case PRIVCALL_HW_SS:
         case PRIVCALL_DBL_SMC:
         case PRIVCALL_SPLIT_TLB:
+        case PRIVCALL_SPLIT_TLB_BCKP:
             ret = inject_trap_sw(drakvuf, trap);
             break;
         default:
@@ -708,7 +718,8 @@ int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, event_cb_t event_cb, void* d
 
 void drakvuf_config_views_for_split_tlb(vmi_instance_t vmi,
                               drakvuf_t drakvuf, 
-                              GSList* traps)
+                              GSList* traps,
+			      addr_t backup_page_va)
 {
-    vmi_config_views_for_split_tlb(vmi, drakvuf, traps);
+    vmi_config_views_for_split_tlb(vmi, drakvuf, traps, backup_page_va);
 }

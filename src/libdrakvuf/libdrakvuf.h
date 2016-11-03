@@ -183,7 +183,8 @@ typedef enum trap_type
     CPUID,
     PRIVCALL_HW_SS,
     PRIVCALL_DBL_SMC,
-    PRIVCALL_SPLIT_TLB
+    PRIVCALL_SPLIT_TLB,
+    PRIVCALL_SPLIT_TLB_BCKP
 } trap_type_t;
 
 typedef enum memaccess_type
@@ -264,6 +265,9 @@ struct drakvuf_trap
 
         register_t reg;
     };
+
+    addr_t trampoline_va;
+    addr_t trampoline_pa;
 };
 
 
@@ -461,7 +465,8 @@ typedef enum
 
 void drakvuf_config_views_for_split_tlb(vmi_instance_t vmi,
                               drakvuf_t drakvuf, 
-                              GSList* traps);
+                              GSList* traps,
+			      addr_t backup_page_va);
 
 #pragma GCC visibility pop
 
