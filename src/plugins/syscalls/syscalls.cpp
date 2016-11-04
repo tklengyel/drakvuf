@@ -454,8 +454,8 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
         for (i=0; i < symbols->count; i++)
         {
             const struct symbol* symbol = &symbols->symbols[i];
-
-            /* Looking for system calls */
+            
+	    /* Looking for system calls */
 	    if (strncmp(symbol->name, "sys_", 4))
 		continue;
 
@@ -625,8 +625,10 @@ syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output
         loop = loop->next;
     }
 
-    if ( c->traptype == PRIVCALL_SPLIT_TLB || c->traptype == PRIVCALL_SPLIT_TLB_BCKP )
-        drakvuf_config_views_for_split_tlb(vmi, drakvuf, this->traps, c->backup_page_va);
+    if ( c->traptype == PRIVCALL_DBL_SMC )
+    	drakvuf_config_views_for_dbl_smc(vmi, drakvuf, this->traps);
+    else if ( c->traptype == PRIVCALL_SPLIT_TLB || c->traptype == PRIVCALL_SPLIT_TLB_BCKP )
+    	drakvuf_config_views_for_split_tlb(vmi, drakvuf, this->traps, c->backup_page_va);
 }
 
 syscalls::~syscalls()

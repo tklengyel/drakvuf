@@ -1926,3 +1926,22 @@ void vmi_config_views_for_split_tlb(vmi_instance_t vmi, drakvuf_t drakvuf, GSLis
 	PRINT_DEBUG("Switching to altp2m[%d]. Failed? %d\n", drakvuf->altp2m_idr, rc);
 }
 
+void vmi_config_views_for_dbl_smc(vmi_instance_t vmi, drakvuf_t drakvuf, GSList* traps)
+{
+	GSList* loop = traps;
+	while (loop)
+	{
+		drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
+
+		addr_t syscall_pa;
+		if (VMI_FAILURE == vmi_translate_kv2p(vmi, trap->breakpoint.addr, &syscall_pa))
+		{
+			printf("Failed to translate syscall_va\n");
+			return;
+		}
+
+		xc_altp2m_set_mem_access( drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr, syscall_pa >> 12, XENMEM_access_r);
+
+		loop = loop->next;
+	}
+}

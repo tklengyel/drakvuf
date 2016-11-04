@@ -716,10 +716,12 @@ int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, event_cb_t event_cb, void* d
     return 1;
 }
 
-void drakvuf_config_views_for_split_tlb(vmi_instance_t vmi,
-                              drakvuf_t drakvuf, 
-                              GSList* traps,
-			      addr_t backup_page_va)
+void drakvuf_config_views_for_split_tlb(vmi_instance_t vmi, drakvuf_t drakvuf, GSList* traps, addr_t backup_page_va)
 {
     vmi_config_views_for_split_tlb(vmi, drakvuf, traps, backup_page_va);
+}
+
+void drakvuf_config_views_for_dbl_smc(vmi_instance_t vmi, drakvuf_t drakvuf, GSList* traps)
+{
+    vmi_config_views_for_dbl_smc(vmi, drakvuf, traps);
 }

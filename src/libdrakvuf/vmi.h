@@ -156,4 +156,7 @@ void vmi_config_views_for_split_tlb(vmi_instance_t vmi,
                               	    GSList* traps,
 				    addr_t backup_page_va);
 
+void vmi_config_views_for_dbl_smc(vmi_instance_t vmi,
+                              	    drakvuf_t drakvuf,
+                              	    GSList* traps);
 #endif
