@@ -230,12 +230,16 @@ int main(int argc, char** argv) {
         return rc;
     }
 
+    PRINT_DEBUG("Starting DRAKVUF initialization\n");
+
     try {
         drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose, leave_paused);
     } catch(int e) {
         fprintf(stderr, "Failed to initialize DRAKVUF\n");
         return rc;
     }
+
+    PRINT_DEBUG("DRAKVUF initializated\n");
 
     /* for a clean exit */
     act.sa_handler = close_handler;
