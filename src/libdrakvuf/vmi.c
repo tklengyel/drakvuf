@@ -695,7 +695,7 @@ void remove_trap(drakvuf_t drakvuf,
              * This vmi_clear_event will be queued and removed when all events
              * are pulled from the ring.
              */
-            vmi_set_mem_event(vmi, container->memaccess.gfn<<12, VMI_MEMACCESS_N, drakvuf->altp2m_idx);
+            vmi_set_mem_event(vmi, container->memaccess.gfn, VMI_MEMACCESS_N, drakvuf->altp2m_idx);
             g_hash_table_remove(drakvuf->memaccess_lookup_trap, &trap);
             g_hash_table_remove(drakvuf->memaccess_lookup_gfn, &container->memaccess.gfn);
             return;
@@ -713,7 +713,7 @@ void remove_trap(drakvuf_t drakvuf,
             loop=loop->next;
         }
 
-        ret = vmi_set_mem_event(vmi, container->memaccess.gfn<<12, update_access, drakvuf->altp2m_idx);
+        ret = vmi_set_mem_event(vmi, container->memaccess.gfn, update_access, drakvuf->altp2m_idx);
         if(VMI_SUCCESS == ret) {
             PRINT_DEBUG("Successfully set access to %c%c%c on GFN 0x%lx!\n",
                         (update_access & VMI_MEMACCESS_R) ? 'r' : '-',
@@ -773,7 +773,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t *trap, bool guard2) {
         if ( s->memaccess.access != trap->memaccess.access ) {
 
             vmi_mem_access_t update_access = (s->memaccess.access | trap->memaccess.access);
-            status_t ret = vmi_set_mem_event(drakvuf->vmi, trap->memaccess.gfn<<12, update_access, drakvuf->altp2m_idx);
+            status_t ret = vmi_set_mem_event(drakvuf->vmi, trap->memaccess.gfn, update_access, drakvuf->altp2m_idx);
 
             if ( ret == VMI_FAILURE ) {
                 PRINT_DEBUG("*** FAILED TO SET MEMORY TRAP @ PAGE %lu ***\n", trap->memaccess.gfn);
@@ -803,7 +803,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t *trap, bool guard2) {
          */
         s->memaccess.guard2 = guard2;
 
-        ret = vmi_set_mem_event(drakvuf->vmi, trap->memaccess.gfn<<12, trap->memaccess.access, drakvuf->altp2m_idx);
+        ret = vmi_set_mem_event(drakvuf->vmi, trap->memaccess.gfn, trap->memaccess.access, drakvuf->altp2m_idx);
         if ( ret == VMI_FAILURE ) {
             PRINT_DEBUG("*** FAILED TO SET MEMORY TRAP @ PAGE %lu ***\n",
                         trap->memaccess.gfn);
@@ -1301,7 +1301,7 @@ void close_vmi(drakvuf_t drakvuf) {
         struct wrapper *s = NULL;
         ghashtable_foreach(drakvuf->memaccess_lookup_gfn, i, key, s)
         {
-            vmi_set_mem_event(drakvuf->vmi, s->memaccess.gfn<<12, VMI_MEMACCESS_N, drakvuf->altp2m_idx);
+            vmi_set_mem_event(drakvuf->vmi, s->memaccess.gfn, VMI_MEMACCESS_N, drakvuf->altp2m_idx);
             xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx, s->memaccess.gfn, ~0);
             g_slist_free(s->traps);
             s->traps = NULL;
