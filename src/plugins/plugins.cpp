@@ -111,6 +111,8 @@
 #include "objmon/objmon.h"
 #include "exmon/exmon.h"
 #include "ssdtmon/ssdtmon.h"
+#include "debugmon/debugmon.h"
+#include "cpuidmon/cpuidmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output)
 {
@@ -132,6 +134,8 @@ bool drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
          plugin_id < __DRAKVUF_PLUGIN_LIST_MAX)
     {
+        PRINT_DEBUG("Starting plugin %s\n", drakvuf_plugin_names[plugin_id]);
+
         try {
         switch(plugin_id) {
 #ifdef ENABLE_PLUGIN_SYSCALLS
@@ -169,6 +173,16 @@ bool drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
             this->plugins[plugin_id] = new ssdtmon(this->drakvuf, config, this->output);
             break;
 #endif
+#ifdef ENABLE_PLUGIN_DEBUGMON
+        case PLUGIN_DEBUGMON:
+            this->plugins[plugin_id] = new debugmon(this->drakvuf, config, this->output);
+            break;
+#endif
+#ifdef ENABLE_PLUGIN_CPUIDMON
+        case PLUGIN_CPUIDMON:
+            this->plugins[plugin_id] = new cpuidmon(this->drakvuf, config, this->output);
+            break;
+#endif
         default:
             break;
         };
@@ -177,6 +191,7 @@ bool drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
             return 0;
         }
 
+        PRINT_DEBUG("Starting plugin %s finished\n", drakvuf_plugin_names[plugin_id]);
         return 1;
     }
 

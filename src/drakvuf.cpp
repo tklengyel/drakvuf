@@ -125,7 +125,7 @@ static gpointer timer(gpointer data)
     return NULL;
 }
 
-int drakvuf_c::start_plugins(const bool* plugin_list, const char *dump_folder)
+int drakvuf_c::start_plugins(const bool* plugin_list, const char *dump_folder, bool cpuid_stealth)
 {
     int i, rc;
 
@@ -144,6 +144,10 @@ int drakvuf_c::start_plugins(const bool* plugin_list, const char *dump_folder)
                 break;
             }
 
+            case PLUGIN_CPUIDMON:
+                rc = this->plugins->start((drakvuf_plugin_t)i, &cpuid_stealth);
+                break;
+
             default:
                 rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
                 break;
@@ -161,12 +165,14 @@ drakvuf_c::drakvuf_c(const char* domain,
                      const char *rekall_profile,
                      const output_format_t output,
                      const int timeout,
-                     const bool verbose)
+                     const bool verbose,
+                     const bool leave_paused)
 {
     this->drakvuf = NULL;
     this->interrupted = 0;
     this->timeout = timeout;
     this->rekall_profile = rekall_profile;
+    this->leave_paused = leave_paused;
 
     if (!drakvuf_init(&this->drakvuf, domain, rekall_profile, verbose))
         throw -1;
@@ -178,35 +184,25 @@ drakvuf_c::drakvuf_c(const char* domain,
         this->timeout_thread = g_thread_new(NULL, timer, (void*)this);
 
     this->plugins = new drakvuf_plugins(this->drakvuf, output);
-    this->pause();
-}
-
-void drakvuf_c::close()
-{
-    this->interrupted = -1;
-    g_mutex_trylock(&this->loop_signal);
-    g_mutex_unlock(&this->loop_signal);
-    g_mutex_clear(&this->loop_signal);
-
-    if (this->plugins)
-        delete this->plugins;
-
-    if (this->drakvuf)
-    {
-        drakvuf_close(this->drakvuf);
-    }
-
-    if(this->timeout_thread)
-    {
-        this->interrupted = -1;
-        g_thread_join(this->timeout_thread);
-    }
 }
 
 drakvuf_c::~drakvuf_c()
 {
-    this->pause();
-    this->close();
+    if ( !this->interrupted )
+        this->interrupt(-1);
+
+    g_mutex_trylock(&this->loop_signal);
+    g_mutex_unlock(&this->loop_signal);
+    g_mutex_clear(&this->loop_signal);
+
+    if (this->drakvuf)
+        drakvuf_close(this->drakvuf, this->leave_paused);
+
+    if (this->plugins)
+        delete this->plugins;
+
+    if(this->timeout_thread)
+        g_thread_join(this->timeout_thread);
 }
 
 void drakvuf_c::interrupt(int signal)

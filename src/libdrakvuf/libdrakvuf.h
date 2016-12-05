@@ -171,7 +171,9 @@ typedef enum trap_type {
     __INVALID_TRAP_TYPE,
     BREAKPOINT,
     MEMACCESS,
-    REGISTER
+    REGISTER,
+    DEBUG,
+    CPUID
 } trap_type_t;
 
 typedef enum memaccess_type {
@@ -192,6 +194,10 @@ typedef struct drakvuf_trap_info {
     addr_t trap_pa;
     x86_registers_t *regs;
     drakvuf_trap_t *trap;
+    union {
+        const cpuid_event_t *cpuid; /* For CPUID traps */
+        const debug_event_t *debug; /* For DEBUG traps */
+    };
 } drakvuf_trap_info_t;
 
 struct drakvuf_trap {
@@ -258,7 +264,7 @@ bool drakvuf_init (drakvuf_t *drakvuf,
                    const char *domain,
                    const char *rekall_profile,
                    const bool verbose);
-void drakvuf_close (drakvuf_t drakvuf);
+void drakvuf_close (drakvuf_t drakvuf, const bool pause);
 bool drakvuf_add_trap(drakvuf_t drakvuf,
                       drakvuf_trap_t *trap);
 void drakvuf_remove_trap (drakvuf_t drakvuf,
@@ -287,11 +293,9 @@ addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf);
  * on the vcpu id so it's best to specify both.
  */
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
-                                   uint64_t vcpu_id,
-                                   const x86_registers_t *regs);
+                                   uint64_t vcpu_id);
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
-                                   uint64_t vcpu_id,
-                                   const x86_registers_t *regs);
+                                   uint64_t vcpu_id);
 
 /* Caller must free the returned string */
 char *drakvuf_get_process_name(drakvuf_t drakvuf,
@@ -303,7 +307,6 @@ int64_t drakvuf_get_process_sessionid(drakvuf_t drakvuf,
 
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
                                     uint64_t vcpu_id,
-                                    const x86_registers_t *regs,
                                     uint32_t *thread_id);
 
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t eprocess_addr,
@@ -312,7 +315,7 @@ addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t eprocess_addr,
 // Microsoft PreviousMode KTHREAD explanation:
 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff559860(v=vs.85).aspx
 bool drakvuf_get_current_thread_previous_mode(drakvuf_t drakvuf,
-                                              uint64_t vcpu_id, const x86_registers_t *regs,
+                                              uint64_t vcpu_id,
                                               privilege_mode_t *previous_mode);
 
 bool drakvuf_get_thread_previous_mode(drakvuf_t drakvuf,

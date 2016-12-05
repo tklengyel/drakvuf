@@ -172,7 +172,7 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
                                 drakvuf_trap_info_t *info, addr_t handle)
 {
     uint8_t type_index = 0;
-    addr_t process=drakvuf_get_current_process(drakvuf, info->vcpu, info->regs);
+    addr_t process=drakvuf_get_current_process(drakvuf, info->vcpu);
 
     // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
 

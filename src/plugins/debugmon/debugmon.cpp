@@ -102,64 +102,77 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAKVUF_H
-#define DRAKVUF_H
-
 #include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <inttypes.h>
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/prctl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <inttypes.h>
+#include <dirent.h>
 #include <glib.h>
+#include <err.h>
 
-#include <libdrakvuf/libdrakvuf.h>
-#include <plugins/plugins.h>
-#include <libinjector/libinjector.h>
+#include <libvmi/libvmi.h>
+#include "../plugins.h"
+#include "debugmon.h"
 
-#ifdef DRAKVUF_DEBUG
-// This is defined in libdrakvuf
-extern bool verbose;
+# define HVMOP_TRAP_ext_int    0
+# define HVMOP_TRAP_nmi        2
+# define HVMOP_TRAP_hw_exc     3
+# define HVMOP_TRAP_sw_int     4
+# define HVMOP_TRAP_pri_sw_exc 5
+# define HVMOP_TRAP_sw_exc     6
 
-#define PRINT_DEBUG(...) \
-    do { \
-        if(verbose) fprintf (stderr, __VA_ARGS__); \
-    } while (0)
-
-#else
-#define PRINT_DEBUG(...) \
-    do {} while(0)
-#endif
-
-class drakvuf_c {
-    private:
-        bool leave_paused;
-        drakvuf_t drakvuf;
-        drakvuf_plugins* plugins;
-        GThread *timeout_thread = NULL;
-        const char *rekall_profile;
-
-    public:
-        int timeout;
-        int interrupted;
-        GMutex loop_signal;
-
-        drakvuf_c(const char* domain,
-                  const char *rekall_profile,
-                  const output_format_t output,
-                  const int timeout,
-                  const bool verbose,
-                  const bool leave_paused);
-        ~drakvuf_c();
-
-        int is_initialized();
-        void interrupt(int signal);
-        void loop();
-        void pause();
-        void resume();
-        int inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char *inject_cmd);
-        int start_plugins(const bool* plugin_list, const char *dump_folder, bool cpuid_stealth);
+static const char* debug_type[] = {
+    [HVMOP_TRAP_ext_int] = "external interrupt",
+    [HVMOP_TRAP_nmi] = "nmi",
+    [HVMOP_TRAP_hw_exc] = "hardware exception",
+    [HVMOP_TRAP_sw_int] = "software interrupt",
+    [HVMOP_TRAP_pri_sw_exc] = "ICEBP",
+    [HVMOP_TRAP_sw_exc] = "software exception"
 };
 
-#endif
+event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
+
+    debugmon* s = (debugmon*)info->trap->data;
+
+    switch(s->format) {
+    case OUTPUT_CSV:
+        printf("debugmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%" PRIx64 ",%" PRIi32 ",%s\n",
+               info->vcpu, info->regs->cr3, info->procname, info->sessionid,
+               info->regs->rip, info->debug->type, debug_type[info->debug->type]);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[DEBUGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s SessionID:%" PRIi64". "
+               "RIP: 0x%" PRIx64". Debug type: %" PRIi32 ",%s\n",
+               info->vcpu, info->regs->cr3, info->procname, info->sessionid,
+               info->regs->rip, info->debug->type, debug_type[info->debug->type]);
+        break;
+    };
+
+    return 0;
+}
+
+/* ----------------------------------------------------- */
+
+debugmon::debugmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
+
+    this->format = output;
+    this->drakvuf = drakvuf;
+    this->debug.cb = debug_cb;
+    this->debug.data = (void*)this;
+    this->debug.type = DEBUG;
+
+    if ( !drakvuf_add_trap(drakvuf, &this->debug) ) {
+        fprintf(stderr, "Failed to register Debugmon plugin\n");
+        throw -1;
+    }
+}
+
+debugmon::~debugmon(void) {}

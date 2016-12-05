@@ -139,4 +139,7 @@ bool inject_traps_modules(drakvuf_t drakvuf,
 void remove_trap(drakvuf_t drakvuf,
                  const drakvuf_trap_t *trap);
 
+bool control_debug_trap(drakvuf_t drakvuf, bool toggle);
+bool control_cpuid_trap(drakvuf_t drakvuf, bool toggle);
+
 #endif

@@ -152,6 +152,8 @@ struct drakvuf {
     vmi_event_t cr3_event;
     vmi_event_t interrupt_event;
     vmi_event_t mem_event;
+    vmi_event_t debug_event;
+    vmi_event_t cpuid_event;
     vmi_event_t *step_event[16];
 
     size_t *offsets;
@@ -169,6 +171,7 @@ struct drakvuf {
     unsigned int init_memsize;
     unsigned int memsize;
     addr_t kernbase;
+    addr_t kpcr[16]; // vCPU specific kpcr recorded on mov-to-cr3
 
     GHashTable *remapped_gfns; // Key: gfn
                                // val: remapped gfn
@@ -185,7 +188,7 @@ struct drakvuf {
     GHashTable *memaccess_lookup_trap; // key: trap pointer
                                        // val: struct memaccess
 
-    GSList *cr0, *cr3, *cr4;
+    GSList *cr0, *cr3, *cr4, *debug, *cpuid;
 };
 
 struct breakpoint {
@@ -196,7 +199,6 @@ struct breakpoint {
 
 struct memaccess {
     addr_t gfn;
-    addr_t pa;
     bool guard2;
     vmi_mem_access_t access;
 } __attribute__ ((packed));
@@ -226,6 +228,7 @@ struct remapped_gfn {
 struct memcb_pass {
     drakvuf_t drakvuf;
     uint64_t gfn;
+    addr_t pa;
     char *procname;
     int64_t sessionid;
     struct remapped_gfn *remapped_gfn;
