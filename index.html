@@ -107,16 +107,16 @@
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Installation guide</h3>
-<p><b>UPDATED 10/07/2016</b> Creating Rekall profiles requires a new version of Rekall due to recent changes to Microsoft's Symbol Servers. The required Rekall version is now available as a submodule in DRAKVUF.</p>
+<p><b>UPDATED 12/05/2016</b> DRAKVUF now requires Xen 4.8. Please pay attention to the updated installation instructions, specifically for the changed XSM policy user.</p>
 
-<p><b>UPDATED 8/24/2016</b> Please update LibVMI if you are using the latest DRAKVUF master branch, there had been some recent changes that require updating it!</p>
+<p><b>UPDATED 10/07/2016</b> Creating Rekall profiles requires a new version of Rekall due to recent changes to Microsoft's Symbol Servers. The required Rekall version is now available as a submodule in DRAKVUF.</p>
 
 <p>The following packages are normally required to build Xen and DRAKVUF on Debian based Linux distros. The system has been mainly tested on Debian Jessie and Ubuntu 14.04 LTS.</p>
 
 <pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute libcurl3 libcurl4-openssl-dev bzip2 module-init-tools pciutils-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev python python-dev python-twisted python-gevent python-setuptools libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool check libjson-c-dev libfuse-dev libsystemd-daemon-dev checkpolicy
 </code></pre>
 
-We will be installing a slightly modified version of Xen 4.7 that includes critical bugfixes which are not backported.
+We will be installing a slightly modified version of Xen 4.8 that includes a built-in XSM policy required for DRAKVUF.
 
 <pre><code>cd ~
 git clone https://github.com/tklengyel/drakvuf
@@ -143,10 +143,6 @@ echo "xen-privcmd" >> /etc/modules
 update-rc.d xencommons defaults 19 18
 update-rc.d xendomains defaults 21 20
 update-rc.d xen-watchdog defaults 22 23
-</code></pre>
-
-To enable the loading of the Xen XSM module required for DRAKVUF you will need to edit your GRUB Xen discovery rule script, usually found at <b>/etc/grub.d/20_linux_xen</b>, and add the following line <b>after the multiboot</b> entry just after the module specifying the kernel (ie. the policy should be the <b>last module</b> that gets loaded):
-<pre><code>module ${rel_dirname}/xenpolicy-4.7.0
 </code></pre>
 
 Once you are done with these steps, you can finalize your setup:
@@ -178,7 +174,7 @@ Setup an LVM Volume Group to hold your VMs disks, then create a volume:
 Install Windows 7 from your ISO using the following template (tune it as needed):
 <pre><code>arch = 'x86_64'
 name = "windows7-sp1"
-seclabel='normal:vm_r:drakvuf_domU_t'
+seclabel='drakvuf:vm_r:drakvuf_domU_t'
 maxmem = 3000
 memory = 3000
 vcpus = 1
