@@ -107,9 +107,7 @@
 
 #include "libdrakvuf.h"
 #include "private.h"
-#include "win-symbols.h"
-#include "win-exports.h"
-#include "win-offsets.h"
+#include "rekall-profile.h"
 
 #ifdef DRAKVUF_DEBUG
 bool verbose = 0;
@@ -149,6 +147,18 @@ bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_pro
 
     *drakvuf = g_malloc0(sizeof(struct drakvuf));
     (*drakvuf)->rekall_profile = g_strdup(rekall_profile);
+    (*drakvuf)->os = rekall_get_os_type(rekall_profile);
+
+    switch((*drakvuf)->os) {
+    case VMI_OS_WINDOWS:
+        set_os_windows(*drakvuf);
+        break;
+    case VMI_OS_LINUX:
+        break;
+    default:
+        fprintf(stderr, "The Rekall profile describes an unknown operating system kernel!\n");
+        goto err;
+    };
 
     g_mutex_init(&(*drakvuf)->vmi_lock);
 
@@ -159,8 +169,6 @@ bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_pro
     domid_t test = ~0;
     if ( (*drakvuf)->domID == test )
         goto err;
-
-    (*drakvuf)->offsets = g_malloc0(sizeof(addr_t) * OFFSET_MAX);
 
     drakvuf_pause(*drakvuf);
 
@@ -219,10 +227,10 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
                 if( !drakvuf_find_eprocess(drakvuf, pid, name, &process_base) )
                     return 0;
 
-               if(pid == ~0 && VMI_FAILURE == vmi_read_32_va(drakvuf->vmi, process_base + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)&pid))
+                if(pid == ~0 && !drakvuf_get_process_pid(drakvuf, process_base, &pid))
                     return 0;
 
-               if( !drakvuf_get_module_list(drakvuf, process_base, &module_list) )
+                if( !drakvuf_get_module_list(drakvuf, process_base, &module_list) )
                     return 0;
             }
 
@@ -399,68 +407,14 @@ status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
                 NULL);
 }
 
-bool drakvuf_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const char *module_name, addr_t *base_addr_out )
-{
-    addr_t base_addr ;
-    size_t name_len = strlen( module_name );
-    vmi_instance_t vmi = drakvuf->vmi;
-    addr_t next_module = module_list_head;
-
-    while( 1 )
-    {
-        addr_t tmp_next = 0;
-
-        if ( vmi_read_addr_va( vmi, next_module, 4, &tmp_next ) != VMI_SUCCESS )
-            break;
-
-        if ( module_list_head == tmp_next )
-            break;
-
-        base_addr = 0 ;
-
-        if ( vmi_read_addr_va( vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], 4, &base_addr ) != VMI_SUCCESS )
-            break;
-
-        if ( ! base_addr )
-            break;
-
-        unicode_string_t *us = vmi_read_unicode_str_va( vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4 );
-
-        if ( us )
-        {
-            unicode_string_t out = { 0 };
-            if ( vmi_convert_str_encoding( us, &out, "UTF-8" ) == VMI_SUCCESS  )
-            {
-                if ( ! strncasecmp( (char *)out.contents, module_name, name_len ) )
-                {
-                    free( out.contents );
-                    vmi_free_unicode_str( us );
-                    *base_addr_out = base_addr ;
-                    return true ;
-                }
-
-                free( out.contents );
-            }
-            vmi_free_unicode_str( us );
-        }
-
-        next_module = tmp_next ;
-    }
-
-    return false ;
-}
-
-
 const char *drakvuf_get_rekall_profile(drakvuf_t drakvuf) {
     return drakvuf->rekall_profile;
 }
 
-addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t eprocess_addr,
-                               const char *module, const char *sym)
-{
-    return eprocess_sym2va(drakvuf, eprocess_addr, module, sym);
-}
-
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf) {
     return drakvuf->kernbase;
+}
+
+os_t drakvuf_get_os_type(drakvuf_t drakvuf) {
+    return drakvuf->os;
 }

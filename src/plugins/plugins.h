@@ -150,6 +150,18 @@ static const char *drakvuf_plugin_names[] = {
     [PLUGIN_CPUIDMON] = "cpuidmon",
 };
 
+static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] = {
+    [PLUGIN_SYSCALLS]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
+    [PLUGIN_POOLMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_FILETRACER] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_FILEDELETE] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_OBJMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_EXMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_SSDTMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_DEBUGMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
+    [PLUGIN_CPUIDMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
+};
+
 class plugin {
     public:
         virtual ~plugin() {};
@@ -160,12 +172,13 @@ class drakvuf_plugins
     private:
         drakvuf_t drakvuf;
         output_format_t output;
+        os_t os;
         plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = NULL };
 
     public:
-        drakvuf_plugins(drakvuf_t drakvuf, output_format_t output);
+        drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
         ~drakvuf_plugins();
-        bool start(drakvuf_plugin_t plugin, const void* config);
+        int start(drakvuf_plugin_t plugin, const void* config);
 };
 
 /***************************************************************************/

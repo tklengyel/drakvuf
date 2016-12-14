@@ -119,7 +119,7 @@ typedef enum dispatcher_object {
     DISPATCHER_THREAD_OBJECT  = 6
 } dispatcher_object_t ;
 
-addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id){
+addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id){
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t thread;
     addr_t prcb;
@@ -136,10 +136,10 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id){
     return thread;
 }
 
-addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id) {
+addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id) {
     addr_t thread, process;
 
-    thread=drakvuf_get_current_thread(drakvuf,vcpu_id);
+    thread=win_get_current_thread(drakvuf,vcpu_id);
 
     if (thread == 0 || VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_PROCESS], 0, &process)){
         return 0;
@@ -148,15 +148,20 @@ addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id) {
     return process;
 }
 
-char *drakvuf_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base) {
+char *win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base) {
     return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
 }
 
-char *drakvuf_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id) {
-    return drakvuf_get_process_name(drakvuf, drakvuf_get_current_process(drakvuf, vcpu_id));
+bool win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t *pid) {
+    status_t rc = vmi_read_32_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)pid);
+    return (rc == VMI_SUCCESS) ? 1 : 0;
 }
 
-int64_t drakvuf_get_process_sessionid(drakvuf_t drakvuf, addr_t eprocess_base) {
+char *win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id) {
+    return win_get_process_name(drakvuf, win_get_current_process(drakvuf, vcpu_id));
+}
+
+int64_t win_get_process_sessionid(drakvuf_t drakvuf, addr_t eprocess_base) {
 
     addr_t peb, sessionid;
     vmi_instance_t vmi = drakvuf->vmi;
@@ -184,17 +189,17 @@ int64_t drakvuf_get_process_sessionid(drakvuf_t drakvuf, addr_t eprocess_base) {
     return (int64_t)sessionid;
 };
 
-int64_t drakvuf_get_current_process_sessionid(drakvuf_t drakvuf, uint64_t vcpu_id) {
-    return drakvuf_get_process_sessionid(drakvuf, drakvuf_get_current_process(drakvuf, vcpu_id));
+int64_t win_get_current_process_sessionid(drakvuf_t drakvuf, uint64_t vcpu_id) {
+    return win_get_process_sessionid(drakvuf, win_get_current_process(drakvuf, vcpu_id));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 
-bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *thread_id )
+bool win_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *thread_id )
 {
     addr_t p_tid ;
-    addr_t ethread = drakvuf_get_current_thread(drakvuf, vcpu_id);
+    addr_t ethread = win_get_current_thread(drakvuf, vcpu_id);
 
     if ( ethread )
     {
@@ -217,7 +222,7 @@ bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_
 // Microsoft PreviousMode KTHREAD explanation:
 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff559860(v=vs.85).aspx
 
-bool drakvuf_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_mode_t *previous_mode )
+bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_mode_t *previous_mode )
 {
     if ( kthread )
     {
@@ -234,20 +239,20 @@ bool drakvuf_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privil
     return false ;
 }
 
-bool drakvuf_get_current_thread_previous_mode( drakvuf_t drakvuf,
+bool win_get_current_thread_previous_mode( drakvuf_t drakvuf,
                                                uint64_t vcpu_id,
                                                privilege_mode_t *previous_mode )
 {
-    addr_t kthread = drakvuf_get_current_thread( drakvuf, vcpu_id );
+    addr_t kthread = win_get_current_thread( drakvuf, vcpu_id );
 
-    return drakvuf_get_thread_previous_mode( drakvuf, kthread, previous_mode );
+    return win_get_thread_previous_mode( drakvuf, kthread, previous_mode );
 }
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 
-bool drakvuf_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
+bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 {
     dispatcher_object_t dispatcher_type = 0 ;
     access_context_t ctx = {
@@ -271,7 +276,7 @@ bool drakvuf_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 
-bool drakvuf_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
+bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
 {
     dispatcher_object_t dispatcher_type = 0;
     access_context_t ctx = {
@@ -291,7 +296,7 @@ bool drakvuf_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
     return false ;
 }
 
-bool drakvuf_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t *module_list) {
+bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t *module_list) {
 
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t peb=0, ldr=0, modlist=0;
@@ -323,7 +328,7 @@ bool drakvuf_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t *mo
     return true;
 }
 
-bool drakvuf_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_procname, addr_t *eprocess_addr) {
+bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_procname, addr_t *eprocess_addr) {
     addr_t current_process, next_list_entry;
     vmi_instance_t vmi = drakvuf->vmi;
 

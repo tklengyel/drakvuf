@@ -153,7 +153,7 @@ int drakvuf_c::start_plugins(const bool* plugin_list, const char *dump_folder, b
                 break;
             };
 
-            if ( !rc )
+            if ( rc < 0 )
                 return rc;
         }
     }
@@ -177,13 +177,15 @@ drakvuf_c::drakvuf_c(const char* domain,
     if (!drakvuf_init(&this->drakvuf, domain, rekall_profile, verbose))
         throw -1;
 
+    this->os = drakvuf_get_os_type(this->drakvuf);
+
     g_mutex_init(&this->loop_signal);
     g_mutex_lock(&this->loop_signal);
 
     if(timeout > 0)
         this->timeout_thread = g_thread_new(NULL, timer, (void*)this);
 
-    this->plugins = new drakvuf_plugins(this->drakvuf, output);
+    this->plugins = new drakvuf_plugins(this->drakvuf, output, this->os);
 }
 
 drakvuf_c::~drakvuf_c()

@@ -122,10 +122,7 @@
 #include "private.h"
 #include "libdrakvuf.h"
 #include "vmi.h"
-#include "win-symbols.h"
-#include "win-processes.h"
-#include "win-offsets.h"
-#include "win-offsets-map.h"
+#include "rekall-profile.h"
 
 static uint8_t bp = TRAP;
 
@@ -1000,57 +997,6 @@ bool inject_trap(drakvuf_t drakvuf,
     return inject_trap_pa(drakvuf, trap, pa);
 }
 
-bool inject_traps_modules(drakvuf_t drakvuf,
-                          drakvuf_trap_t *trap,
-                          addr_t list_head,
-                          vmi_pid_t pid)
-{
-    vmi_instance_t vmi = drakvuf->vmi;
-    addr_t next_module = list_head;
-    addr_t tmp_next;
-    addr_t dllbase;
-
-    if (!trap)
-        return 0;
-
-    PRINT_DEBUG("Inject traps in module list of PID %u\n", pid);
-
-    while (1) {
-
-        if ( VMI_FAILURE == vmi_read_addr_va(vmi, next_module, pid, &tmp_next) )
-            break;
-
-        if (list_head == tmp_next)
-            break;
-
-        if ( VMI_FAILURE == vmi_read_addr_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid, &dllbase) )
-            break;
-
-        if (!dllbase)
-            break;
-
-        unicode_string_t *us = vmi_read_unicode_str_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
-        unicode_string_t out = { .contents = NULL };
-
-        if (us) {
-            status_t status = vmi_convert_str_encoding(us, &out, "UTF-8");
-            if(VMI_SUCCESS == status)
-                PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", out.contents, dllbase);
-
-            vmi_free_unicode_str(us);
-        }
-
-        if(out.contents && !strcmp((char*)out.contents,trap->breakpoint.module)) {
-            g_free(out.contents);
-            return inject_trap(drakvuf, trap, dllbase, pid);
-        }
-
-        next_module = tmp_next;
-    }
-
-    return 0;
-}
-
 bool control_debug_trap(drakvuf_t drakvuf, bool toggle) {
     drakvuf->debug_event.version = VMI_EVENTS_VERSION;
     drakvuf->debug_event.type = VMI_EVENT_DEBUG_EXCEPTION;
@@ -1123,9 +1069,20 @@ bool init_vmi(drakvuf_t drakvuf) {
     PRINT_DEBUG("Init VMI on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
 
     GHashTable *config = g_hash_table_new(g_str_hash, g_str_equal);
-    g_hash_table_insert(config, "os_type", "Windows");
+
+    switch(drakvuf->os) {
+    case VMI_OS_WINDOWS:
+        g_hash_table_insert(config, "os_type", "Windows");
+        break;
+    case VMI_OS_LINUX:
+        g_hash_table_insert(config, "os_type", "Linux");
+        break;
+    default:
+        break;
+    };
+
     g_hash_table_insert(config, "domid", &drakvuf->domID);
-    g_hash_table_insert(config, "sysmap", drakvuf->rekall_profile);
+    g_hash_table_insert(config, "rekall_profile", drakvuf->rekall_profile);
 
     // Initialize the libvmi library.
     status_t ret = vmi_init_custom(&drakvuf->vmi,
@@ -1143,6 +1100,9 @@ bool init_vmi(drakvuf_t drakvuf) {
     drakvuf->vcpus = vmi_get_num_vcpus(drakvuf->vmi);
     drakvuf->memsize = drakvuf->init_memsize = vmi_get_memsize(drakvuf->vmi);
 
+    // Get the offsets from the Rekall profile
+    fill_offsets_from_rekall(drakvuf);
+
     // Crete tables to lookup breakpoints
     drakvuf->breakpoint_lookup_pa =
         g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free);
@@ -1159,18 +1119,7 @@ bool init_vmi(drakvuf_t drakvuf) {
     drakvuf->remove_traps =
         g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
 
-    // Get the offsets from the Rekall profile
     unsigned int i;
-    for (i = 0; i < OFFSET_MAX; i++) {
-        if (VMI_FAILURE
-                == drakvuf_get_struct_member_rva(
-                        drakvuf->rekall_profile, offset_names[i][0],
-                        offset_names[i][1], &drakvuf->offsets[i])) {
-            PRINT_DEBUG("Failed to find offset for %s:%s\n", offset_names[i][0],
-                    offset_names[i][1]);
-        }
-    }
-
     /*
      * Setup singlestep event handlers but don't turn on MTF.
      * Max 16 CPUs!
@@ -1270,20 +1219,22 @@ bool init_vmi(drakvuf_t drakvuf) {
         return 0;
     }
 
-    addr_t sysproc_rva;
-    addr_t sysproc = vmi_translate_ksym2v(drakvuf->vmi, "PsInitialSystemProcess");
-    if ( !sysproc ) {
-        printf("LibVMI failed to get us the VA of PsInitialSystemProcess!\n");
-        return 0;
-    }
+    if ( drakvuf->os == VMI_OS_WINDOWS ) {
+        addr_t sysproc_rva;
+        addr_t sysproc = vmi_translate_ksym2v(drakvuf->vmi, "PsInitialSystemProcess");
+        if ( !sysproc ) {
+            printf("LibVMI failed to get us the VA of PsInitialSystemProcess!\n");
+            return 0;
+        }
 
-    if ( VMI_FAILURE == drakvuf_get_constant_rva(drakvuf->rekall_profile, "PsInitialSystemProcess", &sysproc_rva) ) {
-        fprintf(stderr, "Failed to get PsInitialSystemProcess RVA from Rekall profile!\n");
-        return 0;
-    }
+        if ( VMI_FAILURE == drakvuf_get_constant_rva(drakvuf->rekall_profile, "PsInitialSystemProcess", &sysproc_rva) ) {
+            fprintf(stderr, "Failed to get PsInitialSystemProcess RVA from Rekall profile!\n");
+            return 0;
+        }
 
-    drakvuf->kernbase = sysproc - sysproc_rva;
-    PRINT_DEBUG("Windows kernel base address is 0x%lx\n", drakvuf->kernbase);
+        drakvuf->kernbase = sysproc - sysproc_rva;
+        PRINT_DEBUG("Windows kernel base address is 0x%lx\n", drakvuf->kernbase);
+    }
 
     return 1;
 }

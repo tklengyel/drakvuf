@@ -102,23 +102,19 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef SYSCALLS_H
-#define SYSCALLS_H
+#ifndef WIN_SYMBOLS_H_
+#define WIN_SYMBOLS_H_
 
-#include <glib.h>
-#include "plugins/plugins.h"
-#include "plugins/private.h"
+#include <libvmi/libvmi.h>
 
-class syscalls: public plugin {
+status_t
+rekall_lookup(
+    const char *rekall_profile,
+    const char *symbol,
+    const char *subsymbol,
+    addr_t *address,
+    addr_t *size);
 
-    private:
-        GSList *traps;
+os_t rekall_get_os_type(const char *rekall_profile);
 
-    public:
-        output_format_t format;
-        os_t os;
-        syscalls(drakvuf_t drakvuf, const void *config, output_format_t output);
-        ~syscalls();
-};
-
-#endif
+#endif /* WIN_SYMBOLS_H_ */
