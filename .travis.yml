@@ -11,6 +11,8 @@ before_install:
   - sudo apt-get build-dep libxen-dev
   - sudo dpkg -i test-packages/xentools_4.7-drakvuf1-1_amd64.deb
   - sudo ln -s /usr/lib/gcc/x86_64-linux-gnu/4.8/libstdc++.so /usr/lib/x86_64-linux-gnu/libstdc++.so
+  - git submodule init
+  - git submodule update libvmi
   - cd libvmi && ./autogen.sh && ./configure --enable-xen --without-xenstore
   - make && sudo make install
   - cd tools/pyvmi && python setup.py build && sudo python setup.py install
@@ -20,6 +22,9 @@ before_install:
   - cd ..
 
 script: "./autogen.sh; ./configure --enable-debug; make clean; make"
+
+git:
+  submodules: false
 
 env:
   global:
