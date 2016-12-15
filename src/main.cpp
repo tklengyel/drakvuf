@@ -257,7 +257,7 @@ int main(int argc, char** argv) {
     }
 
     rc = drakvuf->start_plugins(plugin_list, dump_folder, cpuid_stealth);
-    if (!rc)
+    if ( rc < 0 )
         goto exit;
 
     /* Start the event listener */

@@ -129,43 +129,82 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
 
     GSList *ret = NULL;
     unsigned long i;
-    addr_t module_list, ntoskrnl;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    PRINT_DEBUG("Received %lu symbols\n", symbols->count);
 
-    if(VMI_FAILURE == vmi_read_addr_ksym(vmi, (char *)"PsLoadedModuleList", &module_list))
-        goto done;
+    if ( s->os == VMI_OS_WINDOWS ) {
+        addr_t module_list, ntoskrnl;
 
-    if( !drakvuf_get_module_base_addr(drakvuf, module_list, "ntoskrnl.exe", &ntoskrnl) )
-        goto done;
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    for (i=0; i < symbols->count; i++) {
+        if(VMI_FAILURE == vmi_read_addr_ksym(vmi, (char *)"PsLoadedModuleList", &module_list))
+            goto done;
 
-        const struct symbol *symbol = &symbols->symbols[i];
+        if( !drakvuf_get_module_base_addr(drakvuf, module_list, "ntoskrnl.exe", &ntoskrnl) )
+            goto done;
 
-        if (strncmp(symbol->name, "Nt", 2))
-            continue;
-        //if (strcmp(symbol->name, "NtCallbackReturn"))
-        //    continue;
+        for (i=0; i < symbols->count; i++) {
 
-        PRINT_DEBUG("[SYSCALLS] Adding trap to %s\n", symbol->name);
+            const struct symbol *symbol = &symbols->symbols[i];
 
-        drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
-        trap->breakpoint.lookup_type = LOOKUP_PID;
-        trap->breakpoint.pid = 4;
-        trap->breakpoint.addr_type = ADDR_VA;
-        trap->breakpoint.addr = ntoskrnl + symbol->rva;
-        trap->breakpoint.module = "ntoskrnl.exe";
-        trap->name = g_strdup(symbol->name);
-        trap->type = BREAKPOINT;
-        trap->cb = cb;
-        trap->data = s;
+            if (strncmp(symbol->name, "Nt", 2))
+                continue;
+            //if (strcmp(symbol->name, "NtCallbackReturn"))
+            //    continue;
 
-        ret = g_slist_prepend(ret, trap);
+            PRINT_DEBUG("[SYSCALLS] Adding trap to %s\n", symbol->name);
+
+            drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
+            trap->breakpoint.lookup_type = LOOKUP_PID;
+            trap->breakpoint.pid = 4;
+            trap->breakpoint.addr_type = ADDR_VA;
+            trap->breakpoint.addr = ntoskrnl + symbol->rva;
+            trap->breakpoint.module = "ntoskrnl.exe";
+            trap->name = g_strdup(symbol->name);
+            trap->type = BREAKPOINT;
+            trap->cb = cb;
+            trap->data = s;
+
+            ret = g_slist_prepend(ret, trap);
+        }
+
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    if ( s->os == VMI_OS_LINUX ) {
+        for (i=0; i < symbols->count; i++) {
+
+            const struct symbol *symbol = &symbols->symbols[i];
+
+            /* Looking for system calls */
+            if (strncmp(symbol->name, "sys_", 4) )
+                continue;
+
+            /* This is the address of the table itself so skip it */
+            if (!strcmp(symbol->name, "sys_call_table") )
+                continue;
+
+            //if (strcmp(symbol->name, "sys_gettimeofday"))
+            //    continue;
+
+            PRINT_DEBUG("[SYSCALLS] Adding trap to %s at 0x%lx\n", symbol->name, symbol->rva);
+
+            drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
+            trap->breakpoint.lookup_type = LOOKUP_PID;
+            trap->breakpoint.pid = 0;
+            trap->breakpoint.addr_type = ADDR_VA;
+            trap->breakpoint.addr = symbol->rva;
+            trap->breakpoint.module = "linux";
+            trap->name = g_strdup(symbol->name);
+            trap->type = BREAKPOINT;
+            trap->cb = cb;
+            trap->data = s;
+
+            ret = g_slist_prepend(ret, trap);
+        }
     }
 
 done:
-    drakvuf_release_vmi(drakvuf);
     return ret;
 }
 
@@ -178,6 +217,7 @@ syscalls::syscalls(drakvuf_t drakvuf, const void *config, output_format_t output
         throw -1;
     }
 
+    this->os = drakvuf_get_os_type(drakvuf);
     this->traps = create_trap_config(drakvuf, this, symbols);
     this->format = output;
 

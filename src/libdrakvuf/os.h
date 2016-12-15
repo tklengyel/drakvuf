@@ -102,23 +102,66 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef SYSCALLS_H
-#define SYSCALLS_H
+#ifndef OS_H
+#define OS_H
 
-#include <glib.h>
-#include "plugins/plugins.h"
-#include "plugins/private.h"
+typedef struct os_interface {
+    addr_t (*get_current_thread)
+        (drakvuf_t drakvuf, uint64_t vcpu_id);
 
-class syscalls: public plugin {
+    addr_t (*get_current_process)
+        (drakvuf_t drakvuf, uint64_t vcpu_id);
 
-    private:
-        GSList *traps;
+    char* (*get_process_name)
+        (drakvuf_t drakvuf, addr_t eprocess_base);
 
-    public:
-        output_format_t format;
-        os_t os;
-        syscalls(drakvuf_t drakvuf, const void *config, output_format_t output);
-        ~syscalls();
-};
+    char* (*get_current_process_name)
+        (drakvuf_t drakvuf, uint64_t vcpu_id);
+
+    int64_t (*get_process_sessionid)
+        (drakvuf_t drakvuf, addr_t eprocess_base);
+
+    bool (*get_process_pid)
+        (drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t *pid);
+
+    int64_t (*get_current_process_sessionid)
+        (drakvuf_t drakvuf, uint64_t vcpu_id);
+
+    bool (*get_current_thread_id)
+        (drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *thread_id);
+
+    bool (*get_thread_previous_mode)
+        (drakvuf_t drakvuf, addr_t kthread, privilege_mode_t *previous_mode);
+
+    bool (*get_current_thread_previous_mode)
+        (drakvuf_t drakvuf, uint64_t vcpu_id, privilege_mode_t *previous_mode);
+
+    bool (*is_eprocess)
+        (drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
+
+    bool (*is_ethread)
+        (drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
+
+    bool (*get_module_list)
+        (drakvuf_t drakvuf, addr_t eprocess_base, addr_t *module_list);
+
+    bool (*find_eprocess)
+        (drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_procname, addr_t *eprocess_addr);
+
+    bool (*inject_traps_modules)
+        (drakvuf_t drakvuf, drakvuf_trap_t *trap, addr_t list_head, vmi_pid_t pid);
+
+    bool (*fill_offsets_from_rekall)
+        (drakvuf_t drakvuf);
+
+    bool (*get_module_base_addr)
+        (drakvuf_t drakvuf, addr_t module_list_head, const char *module_name, addr_t *base_addr_out);
+
+    addr_t (*exportsym_to_va)
+        (drakvuf_t drakvuf, addr_t eprocess_addr, const char *module, const char *sym);
+
+} os_interface_t;
+
+void set_os_windows(drakvuf_t drakvuf);
 
 #endif

@@ -109,7 +109,7 @@
  * Easy-to-use structure offsets to be loaded from the Rekall profile.
  * Define actual mapping in win-offsets-map.h
  */
-enum offset {
+enum win_offsets {
     KIINITIALPCR,
 
     EPROCESS_PID,
@@ -173,7 +173,7 @@ enum offset {
 
     DISPATCHER_TYPE,
 
-    OFFSET_MAX
+    __WIN_OFFSETS_MAX
 };
 
 #endif

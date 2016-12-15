@@ -117,6 +117,7 @@
 
 #include "libdrakvuf.h"
 #include "vmi.h"
+#include "os.h"
 #include "../xen_helper/xen_helper.h"
 
 #ifdef DRAKVUF_DEBUG
@@ -139,8 +140,10 @@ struct drakvuf {
     char *dom_name;
     domid_t domID;
     char *rekall_profile;
+    os_t os;
 
     xen_interface_t *xen;
+    os_interface_t osi;
     uint16_t altp2m_idx, altp2m_idr;
 
     xen_pfn_t zero_page_gfn;
@@ -237,5 +240,13 @@ struct memcb_pass {
 };
 
 void drakvuf_force_resume (drakvuf_t drakvuf);
+
+char *drakvuf_get_current_process_name(drakvuf_t drakvuf,
+                                       uint64_t vcpu_id);
+
+int64_t drakvuf_get_current_process_sessionid(drakvuf_t drakvuf,
+                                              uint64_t vcpu_id);
+
+bool fill_offsets_from_rekall(drakvuf_t drakvuf);
 
 #endif

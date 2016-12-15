@@ -283,6 +283,7 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
                                  addr_t process,
                                  uint64_t handle);
 
+os_t drakvuf_get_os_type(drakvuf_t drakvuf);
 const char *drakvuf_get_rekall_profile(drakvuf_t drakvuf);
 
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf);
@@ -300,6 +301,8 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
 /* Caller must free the returned string */
 char *drakvuf_get_process_name(drakvuf_t drakvuf,
                                addr_t eprocess_base);
+
+bool drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t *pid);
 
 /* Process SessionID or -1 on error */
 int64_t drakvuf_get_process_sessionid(drakvuf_t drakvuf,

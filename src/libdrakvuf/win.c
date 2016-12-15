@@ -43,7 +43,7 @@
  *                                                                         *
  * This list is not exclusive, but is meant to clarify our interpretation  *
  * of derived works with some common examples.  Other people may interpret *
- * the plain GPL differently, so we consider this a special exception to   *
+* the plain GPL differently, so we consider this a special exception to   *
  * the GPL that we apply to Covered Software.  Works which meet any of     *
  * these conditions must conform to all of the terms of this license,      *
  * particularly including the GPL Section 3 requirements of providing      *
@@ -102,23 +102,153 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef SYSCALLS_H
-#define SYSCALLS_H
-
+#include <config.h>
+#include <stdlib.h>
+#include <sys/prctl.h>
+#include <string.h>
+#include <strings.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <limits.h>
 #include <glib.h>
-#include "plugins/plugins.h"
-#include "plugins/private.h"
 
-class syscalls: public plugin {
+#include "private.h"
+#include "win.h"
+#include "win-offsets.h"
+#include "win-offsets-map.h"
 
-    private:
-        GSList *traps;
+bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t *trap,
+                              addr_t list_head, vmi_pid_t pid)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t next_module = list_head;
+    addr_t tmp_next;
+    addr_t dllbase;
 
-    public:
-        output_format_t format;
-        os_t os;
-        syscalls(drakvuf_t drakvuf, const void *config, output_format_t output);
-        ~syscalls();
+    while (1) {
+
+        if ( VMI_FAILURE == vmi_read_addr_va(vmi, next_module, pid, &tmp_next) )
+            break;
+
+        if (list_head == tmp_next)
+            break;
+
+        if ( VMI_FAILURE == vmi_read_addr_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid, &dllbase) )
+            break;
+
+        if (!dllbase)
+            break;
+
+        unicode_string_t *us = vmi_read_unicode_str_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
+        unicode_string_t out = { .contents = NULL };
+
+        if (us) {
+            status_t status = vmi_convert_str_encoding(us, &out, "UTF-8");
+            if(VMI_SUCCESS == status)
+                PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", out.contents, dllbase);
+
+            vmi_free_unicode_str(us);
+        }
+
+        if(out.contents && !strcmp((char*)out.contents,trap->breakpoint.module)) {
+            g_free(out.contents);
+            return inject_trap(drakvuf, trap, dllbase, pid);
+        }
+
+        next_module = tmp_next;
+    }
+
+    return 0;
+}
+
+bool win_fill_offsets_from_rekall(drakvuf_t drakvuf) {
+    unsigned int i;
+
+    drakvuf->offsets = g_malloc0(sizeof(addr_t) * __WIN_OFFSETS_MAX);
+    if ( !drakvuf->offsets )
+        return 0;
+
+    for (i = 0; i < __WIN_OFFSETS_MAX; i++) {
+         if (VMI_FAILURE == drakvuf_get_struct_member_rva(
+                     drakvuf->rekall_profile, win_offset_names[i][0],
+                     win_offset_names[i][1], &drakvuf->offsets[i]))
+         {
+             PRINT_DEBUG("Failed to find offset for %s:%s\n",
+                         win_offset_names[i][0], win_offset_names[i][1]);
+         }
+     }
+
+    return 1;
+}
+
+bool win_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const char *module_name, addr_t *base_addr_out ) {
+    addr_t base_addr ;
+    size_t name_len = strlen( module_name );
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t next_module = module_list_head;
+
+    while( 1 )
+    {
+        addr_t tmp_next = 0;
+
+        if ( vmi_read_addr_va( vmi, next_module, 4, &tmp_next ) != VMI_SUCCESS )
+            break;
+
+        if ( module_list_head == tmp_next )
+            break;
+
+        base_addr = 0 ;
+
+        if ( vmi_read_addr_va( vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], 4, &base_addr ) != VMI_SUCCESS )
+            break;
+
+        if ( ! base_addr )
+            break;
+
+        unicode_string_t *us = vmi_read_unicode_str_va( vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4 );
+
+        if ( us )
+        {
+            unicode_string_t out = { 0 };
+            if ( vmi_convert_str_encoding( us, &out, "UTF-8" ) == VMI_SUCCESS  )
+            {
+                if ( ! strncasecmp( (char *)out.contents, module_name, name_len ) )
+                {
+                    free( out.contents );
+                    vmi_free_unicode_str( us );
+                    *base_addr_out = base_addr ;
+                    return true ;
+                }
+
+                free( out.contents );
+            }
+            vmi_free_unicode_str( us );
+        }
+
+        next_module = tmp_next ;
+    }
+
+    return false ;
+}
+
+void set_os_windows(drakvuf_t drakvuf) {
+    drakvuf->osi.get_current_thread = win_get_current_thread;
+    drakvuf->osi.get_current_process = win_get_current_process;
+    drakvuf->osi.get_process_name = win_get_process_name;
+    drakvuf->osi.get_current_process_name = win_get_current_process_name;
+    drakvuf->osi.get_process_sessionid = win_get_process_sessionid;
+    drakvuf->osi.get_current_process_sessionid = win_get_process_sessionid;
+    drakvuf->osi.get_current_thread_id = win_get_current_thread_id;
+    drakvuf->osi.get_thread_previous_mode = win_get_thread_previous_mode;
+    drakvuf->osi.get_current_thread_previous_mode = win_get_current_thread_previous_mode;
+    drakvuf->osi.get_module_base_addr = win_get_module_base_addr;
+    drakvuf->osi.is_eprocess = win_is_eprocess;
+    drakvuf->osi.is_ethread = win_is_ethread;
+    drakvuf->osi.get_module_list = win_get_module_list;
+    drakvuf->osi.find_eprocess = win_find_eprocess;
+    drakvuf->osi.inject_traps_modules = win_inject_traps_modules;
+    drakvuf->osi.fill_offsets_from_rekall = win_fill_offsets_from_rekall;
+    drakvuf->osi.exportsym_to_va = eprocess_sym2va;
 };
-
-#endif
