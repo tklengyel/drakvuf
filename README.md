@@ -14,8 +14,11 @@ DRAKVUF uses hardware virtualization extensions found in Intel CPUs. You will ne
 Supported guests
 ------
 
-DRAKVUF currently supports Windows 7, both 32 and 64-bit versions.
-
+DRAKVUF currently supports:
+ - Windows 7 32-bit 
+ - Windows 7 64-bit
+ - Linux
+ 
 Malware analysis
 ------
 
