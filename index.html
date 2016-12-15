@@ -48,7 +48,13 @@
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Supported guests</h3>
-<p>DRAKVUF currently supports Windows 7, both 32 and 64-bit versions.</p>
+<p>DRAKVUF currently supports monitoring the following operating systems:
+<ul>
+<li>Windows 7 32-bit</li>
+<li>Windows 7 64-bit</li>
+<li>Linux (without KASLR for now)</li>
+</ul>
+</p>
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Can I run DRAKVUF in a nested hypervisor?</h3>
@@ -320,7 +326,7 @@ With this profile ready we can create the LibVMI config:
 printf "windows7-sp1 { \n\
     ostype = \"Windows\"; \n\
     rekall_profile = \"/root/windows7-sp1.rekall.json\"; \n\
-}" > /etc/libvmi.conf
+}" >> /etc/libvmi.conf
 exit
 </code></pre>
 
@@ -356,6 +362,54 @@ Output should be something similar:
 [  248] svchost.exe (struct addr:863ed030)
 [ 1024] svchost.exe (struct addr:86420390)
 [  256] WmiPrvSE.exe (struct addr:854014a0)
+</code></pre>
+
+For Linux you need to build the initial kernel profile in the guest itself.
+<pre><code>ssh root@linux
+apt-get install git zip linux-headers-$(uname -r) build-essential
+git clone --depth=1 https://github.com/google/rekall
+cd rekall/tools/linux
+make
+</code></pre>
+
+This will generate a ZIP file with your kernel-version as filename. For example, 3.16.0-4-amd64.zip. Copy this file to your DRAKVUF host (for example using scp). There we will convert it to the proper JSON Rekall profile.
+<pre><code>rekal convert_profile 3.16.0-4-amd64.zip /root/linux.json
+sudo printf "linux { \n\
+    ostype = \"Linux\"; \n\
+    rekall_profile = \"/root/linux.json\"; \n\
+}" >> /etc/libvmi.conf
+</code></pre>
+
+Now running process-list should show a similar output:
+<pre><code>sudo process-list linux
+Process listing for VM linux (id=29)
+[    0] swapper/0 (struct addr:ffffffff8181a460)
+[    1] systemd (struct addr:ffff88007b3a92b0)
+[    2] kthreadd (struct addr:ffff88007b3a8960)
+[    3] ksoftirqd/0 (struct addr:ffff88007b3a8010)
+[    5] kworker/0:0H (struct addr:ffff88007a8109a0)
+[    6] kworker/u2:0 (struct addr:ffff88007a810050)
+[    7] rcu_sched (struct addr:ffff88007a847330)
+[    8] rcu_bh (struct addr:ffff88007a8469e0)
+[    9] migration/0 (struct addr:ffff88007a846090)
+[   10] watchdog/0 (struct addr:ffff88007a85f370)
+[   11] khelper (struct addr:ffff88007a85ea20)
+[   12] kdevtmpfs (struct addr:ffff88007a85e0d0)
+[   13] netns (struct addr:ffff88007a8d13b0)
+[   14] xenwatch (struct addr:ffff88007a8d0a60)
+[   15] xenbus (struct addr:ffff88007a8d0110)
+[   17] khungtaskd (struct addr:ffff88007a902aa0)
+[   18] writeback (struct addr:ffff88007a902150)
+[   19] ksmd (struct addr:ffff88007a935430)
+[   20] khugepaged (struct addr:ffff88007a934ae0)
+[   21] crypto (struct addr:ffff88007a934190)
+[   22] kintegrityd (struct addr:ffff88007a93f470)
+[   23] bioset (struct addr:ffff88007a93eb20)
+[   24] kblockd (struct addr:ffff88007a93e1d0)
+[   25] kswapd0 (struct addr:ffff8800776d34b0)
+[   26] vmstat (struct addr:ffff8800776d2b60)
+[   27] fsnotify_mark (struct addr:ffff8800776d2210)
+[   33] kthrotld (struct addr:ffff88007770c290)
 </code></pre>
 
 Now we are ready to build and install DRAKVUF:
