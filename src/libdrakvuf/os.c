@@ -219,13 +219,6 @@ bool drakvuf_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *fi
     return 0;
 }
 
-bool fill_offsets_from_rekall(drakvuf_t drakvuf) {
-    if ( drakvuf->osi.fill_offsets_from_rekall )
-        return drakvuf->osi.fill_offsets_from_rekall(drakvuf);
-
-    return 0;
-}
-
 bool inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t *trap, addr_t list_head, vmi_pid_t pid) {
     if ( drakvuf->osi.inject_traps_modules )
         return drakvuf->osi.inject_traps_modules(drakvuf, trap, list_head, pid);

@@ -1100,9 +1100,6 @@ bool init_vmi(drakvuf_t drakvuf) {
     drakvuf->vcpus = vmi_get_num_vcpus(drakvuf->vmi);
     drakvuf->memsize = drakvuf->init_memsize = vmi_get_memsize(drakvuf->vmi);
 
-    // Get the offsets from the Rekall profile
-    fill_offsets_from_rekall(drakvuf);
-
     // Crete tables to lookup breakpoints
     drakvuf->breakpoint_lookup_pa =
         g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free);
@@ -1217,23 +1214,6 @@ bool init_vmi(drakvuf_t drakvuf) {
     if ( rc < 0 ) {
         fprintf(stderr, "Failed to switch to altp2m view %u\n", drakvuf->altp2m_idx);
         return 0;
-    }
-
-    if ( drakvuf->os == VMI_OS_WINDOWS ) {
-        addr_t sysproc_rva;
-        addr_t sysproc = vmi_translate_ksym2v(drakvuf->vmi, "PsInitialSystemProcess");
-        if ( !sysproc ) {
-            printf("LibVMI failed to get us the VA of PsInitialSystemProcess!\n");
-            return 0;
-        }
-
-        if ( VMI_FAILURE == drakvuf_get_constant_rva(drakvuf->rekall_profile, "PsInitialSystemProcess", &sysproc_rva) ) {
-            fprintf(stderr, "Failed to get PsInitialSystemProcess RVA from Rekall profile!\n");
-            return 0;
-        }
-
-        drakvuf->kernbase = sysproc - sysproc_rva;
-        PRINT_DEBUG("Windows kernel base address is 0x%lx\n", drakvuf->kernbase);
     }
 
     return 1;

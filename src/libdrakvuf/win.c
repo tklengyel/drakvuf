@@ -163,26 +163,6 @@ bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t *trap,
     return 0;
 }
 
-bool win_fill_offsets_from_rekall(drakvuf_t drakvuf) {
-    unsigned int i;
-
-    drakvuf->offsets = g_malloc0(sizeof(addr_t) * __WIN_OFFSETS_MAX);
-    if ( !drakvuf->offsets )
-        return 0;
-
-    for (i = 0; i < __WIN_OFFSETS_MAX; i++) {
-         if (VMI_FAILURE == drakvuf_get_struct_member_rva(
-                     drakvuf->rekall_profile, win_offset_names[i][0],
-                     win_offset_names[i][1], &drakvuf->offsets[i]))
-         {
-             PRINT_DEBUG("Failed to find offset for %s:%s\n",
-                         win_offset_names[i][0], win_offset_names[i][1]);
-         }
-     }
-
-    return 1;
-}
-
 bool win_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const char *module_name, addr_t *base_addr_out ) {
     addr_t base_addr ;
     size_t name_len = strlen( module_name );
@@ -233,7 +213,54 @@ bool win_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const
     return false ;
 }
 
-void set_os_windows(drakvuf_t drakvuf) {
+static bool find_kernbase(drakvuf_t drakvuf) {
+    addr_t sysproc_rva;
+    addr_t sysproc = vmi_translate_ksym2v(drakvuf->vmi, "PsInitialSystemProcess");
+    if ( !sysproc ) {
+        printf("LibVMI failed to get us the VA of PsInitialSystemProcess!\n");
+        return 0;
+    }
+
+    if ( VMI_FAILURE == drakvuf_get_constant_rva(drakvuf->rekall_profile, "PsInitialSystemProcess", &sysproc_rva) ) {
+        fprintf(stderr, "Failed to get PsInitialSystemProcess RVA from Rekall profile!\n");
+        return 0;
+    }
+
+    drakvuf->kernbase = sysproc - sysproc_rva;
+    PRINT_DEBUG("Windows kernel base address is 0x%lx\n", drakvuf->kernbase);
+
+    return 1;
+}
+
+static bool fill_offsets_from_rekall(drakvuf_t drakvuf) {
+    unsigned int i;
+
+    drakvuf->offsets = g_malloc0(sizeof(addr_t) * __WIN_OFFSETS_MAX);
+    if ( !drakvuf->offsets )
+        return 0;
+
+    for (i = 0; i < __WIN_OFFSETS_MAX; i++) {
+         if (VMI_FAILURE == drakvuf_get_struct_member_rva(
+                     drakvuf->rekall_profile, win_offset_names[i][0],
+                     win_offset_names[i][1], &drakvuf->offsets[i]))
+         {
+             PRINT_DEBUG("Failed to find offset for %s:%s\n",
+                         win_offset_names[i][0], win_offset_names[i][1]);
+         }
+     }
+
+    return 1;
+}
+
+bool set_os_windows(drakvuf_t drakvuf) {
+
+    if ( !find_kernbase(drakvuf) )
+        return 0;
+
+    // Get the offsets from the Rekall profile
+    if ( !fill_offsets_from_rekall(drakvuf) )
+        return 0;
+
     drakvuf->osi.get_current_thread = win_get_current_thread;
     drakvuf->osi.get_current_process = win_get_current_process;
     drakvuf->osi.get_process_name = win_get_process_name;
@@ -249,6 +276,7 @@ void set_os_windows(drakvuf_t drakvuf) {
     drakvuf->osi.get_module_list = win_get_module_list;
     drakvuf->osi.find_eprocess = win_find_eprocess;
     drakvuf->osi.inject_traps_modules = win_inject_traps_modules;
-    drakvuf->osi.fill_offsets_from_rekall = win_fill_offsets_from_rekall;
     drakvuf->osi.exportsym_to_va = eprocess_sym2va;
+
+    return 1;
 };

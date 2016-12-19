@@ -125,7 +125,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     return 0;
 }
 
-static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *symbols) {
+static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *symbols, const char* rekall_profile) {
 
     GSList *ret = NULL;
     unsigned long i;
@@ -172,6 +172,13 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
     }
 
     if ( s->os == VMI_OS_LINUX ) {
+        addr_t rva = 0;
+
+        if ( VMI_FAILURE == drakvuf_get_constant_rva(rekall_profile, "_text", &rva) )
+            goto done;
+
+        addr_t kaslr = drakvuf_get_kernel_base(drakvuf) - rva;
+
         for (i=0; i < symbols->count; i++) {
 
             const struct symbol *symbol = &symbols->symbols[i];
@@ -187,13 +194,13 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
             //if (strcmp(symbol->name, "sys_gettimeofday"))
             //    continue;
 
-            PRINT_DEBUG("[SYSCALLS] Adding trap to %s at 0x%lx\n", symbol->name, symbol->rva);
+            PRINT_DEBUG("[SYSCALLS] Adding trap to %s at 0x%lx (kaslr 0x%lx)\n", symbol->name, symbol->rva + kaslr, kaslr);
 
             drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
             trap->breakpoint.lookup_type = LOOKUP_PID;
             trap->breakpoint.pid = 0;
             trap->breakpoint.addr_type = ADDR_VA;
-            trap->breakpoint.addr = symbol->rva;
+            trap->breakpoint.addr = symbol->rva + kaslr;
             trap->breakpoint.module = "linux";
             trap->name = g_strdup(symbol->name);
             trap->type = BREAKPOINT;
@@ -218,7 +225,7 @@ syscalls::syscalls(drakvuf_t drakvuf, const void *config, output_format_t output
     }
 
     this->os = drakvuf_get_os_type(drakvuf);
-    this->traps = create_trap_config(drakvuf, this, symbols);
+    this->traps = create_trap_config(drakvuf, this, symbols, rekall_profile);
     this->format = output;
 
     drakvuf_free_symbols(symbols);
