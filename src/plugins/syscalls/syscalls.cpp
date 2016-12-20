@@ -102,6 +102,7 @@
  *                                                                         *
  ***************************************************************************/
 
+#include <config.h>
 #include <glib.h>
 #include <inttypes.h>
 #include "syscalls.h"
