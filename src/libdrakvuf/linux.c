@@ -43,7 +43,7 @@
  *                                                                         *
  * This list is not exclusive, but is meant to clarify our interpretation  *
  * of derived works with some common examples.  Other people may interpret *
- * the plain GPL differently, so we consider this a special exception to   *
+* the plain GPL differently, so we consider this a special exception to   *
  * the GPL that we apply to Covered Software.  Works which meet any of     *
  * these conditions must conform to all of the terms of this license,      *
  * particularly including the GPL Section 3 requirements of providing      *
@@ -102,64 +102,28 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef OS_H
-#define OS_H
+#include <config.h>
+#include <stdlib.h>
+#include <sys/prctl.h>
+#include <string.h>
+#include <strings.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <limits.h>
+#include <glib.h>
 
-typedef struct os_interface {
-    addr_t (*get_current_thread)
-        (drakvuf_t drakvuf, uint64_t vcpu_id);
+#include "private.h"
 
-    addr_t (*get_current_process)
-        (drakvuf_t drakvuf, uint64_t vcpu_id);
+static bool find_kernbase(drakvuf_t drakvuf) {
+    drakvuf->kernbase = vmi_translate_ksym2v(drakvuf->vmi, "_text");
+    return !!drakvuf->kernbase;
+}
 
-    char* (*get_process_name)
-        (drakvuf_t drakvuf, addr_t eprocess_base);
+bool set_os_linux(drakvuf_t drakvuf) {
+    if ( !find_kernbase(drakvuf) )
+        return 0;
 
-    char* (*get_current_process_name)
-        (drakvuf_t drakvuf, uint64_t vcpu_id);
-
-    int64_t (*get_process_sessionid)
-        (drakvuf_t drakvuf, addr_t eprocess_base);
-
-    bool (*get_process_pid)
-        (drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t *pid);
-
-    int64_t (*get_current_process_sessionid)
-        (drakvuf_t drakvuf, uint64_t vcpu_id);
-
-    bool (*get_current_thread_id)
-        (drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *thread_id);
-
-    bool (*get_thread_previous_mode)
-        (drakvuf_t drakvuf, addr_t kthread, privilege_mode_t *previous_mode);
-
-    bool (*get_current_thread_previous_mode)
-        (drakvuf_t drakvuf, uint64_t vcpu_id, privilege_mode_t *previous_mode);
-
-    bool (*is_eprocess)
-        (drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
-
-    bool (*is_ethread)
-        (drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
-
-    bool (*get_module_list)
-        (drakvuf_t drakvuf, addr_t eprocess_base, addr_t *module_list);
-
-    bool (*find_eprocess)
-        (drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_procname, addr_t *eprocess_addr);
-
-    bool (*inject_traps_modules)
-        (drakvuf_t drakvuf, drakvuf_trap_t *trap, addr_t list_head, vmi_pid_t pid);
-
-    bool (*get_module_base_addr)
-        (drakvuf_t drakvuf, addr_t module_list_head, const char *module_name, addr_t *base_addr_out);
-
-    addr_t (*exportsym_to_va)
-        (drakvuf_t drakvuf, addr_t eprocess_addr, const char *module, const char *sym);
-
-} os_interface_t;
-
-bool set_os_windows(drakvuf_t drakvuf);
-bool set_os_linux(drakvuf_t drakvuf);
-
-#endif
+    return 1;
+}

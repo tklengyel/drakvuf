@@ -149,17 +149,6 @@ bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_pro
     (*drakvuf)->rekall_profile = g_strdup(rekall_profile);
     (*drakvuf)->os = rekall_get_os_type(rekall_profile);
 
-    switch((*drakvuf)->os) {
-    case VMI_OS_WINDOWS:
-        set_os_windows(*drakvuf);
-        break;
-    case VMI_OS_LINUX:
-        break;
-    default:
-        fprintf(stderr, "The Rekall profile describes an unknown operating system kernel!\n");
-        goto err;
-    };
-
     g_mutex_init(&(*drakvuf)->vmi_lock);
 
     if ( !xen_init_interface(&(*drakvuf)->xen) )
@@ -176,6 +165,20 @@ bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_pro
         drakvuf_resume(*drakvuf);
         goto err;
     }
+
+    switch((*drakvuf)->os) {
+    case VMI_OS_WINDOWS:
+        if ( !set_os_windows(*drakvuf) )
+            goto err;
+        break;
+    case VMI_OS_LINUX:
+        if ( !set_os_linux(*drakvuf) )
+            goto err;
+        break;
+    default:
+        fprintf(stderr, "The Rekall profile describes an unknown operating system kernel!\n");
+        goto err;
+    };
 
     PRINT_DEBUG("libdrakvuf initialized\n");
 

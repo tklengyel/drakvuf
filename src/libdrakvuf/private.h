@@ -246,7 +246,4 @@ char *drakvuf_get_current_process_name(drakvuf_t drakvuf,
 
 int64_t drakvuf_get_current_process_sessionid(drakvuf_t drakvuf,
                                               uint64_t vcpu_id);
-
-bool fill_offsets_from_rekall(drakvuf_t drakvuf);
-
 #endif
