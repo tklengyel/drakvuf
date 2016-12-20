@@ -199,7 +199,7 @@ gpointer timer_thread(gpointer data) {
 
     struct start_drakvuf *start = (struct start_drakvuf *)data;
 
-    gboolean gotlock;
+    gboolean gotlock = FALSE;
 
     while (start->timer > 0) {
         gotlock = g_mutex_trylock(&start->timer_lock);
