@@ -126,7 +126,7 @@
 
 <p>The following packages are normally required to build Xen and DRAKVUF on Debian based Linux distros. The system has been mainly tested on Debian Jessie and Ubuntu 14.04 LTS.</p>
 
-<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute libcurl3 libcurl4-openssl-dev bzip2 pciutils-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev python python-dev python-twisted python-gevent python-setuptools libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool check libjson-c-dev libfuse-dev checkpolicy liblzma-dev
+<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute libcurl3 libcurl4-openssl-dev bzip2 pciutils-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev python-dev python-pip libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool check libjson-c-dev libfuse-dev checkpolicy liblzma-dev
 </code></pre>
 
 We will be installing a slightly modified version of Xen 4.8 that includes a built-in XSM policy required for DRAKVUF.
@@ -222,11 +222,16 @@ Make sure the output is like the following:
 <pre><code>Feature      | Option                    | Reason
 -------------|---------------------------|----------------------------
 Xen Support  | --enable-xen=yes          | yes
-Xen Events   | --enable-xen-events=yes   | yes
 KVM Support  | --enable-kvm=no           | libvirt missing
 File Support | --enable-file=yes         | yes
 Shm-snapshot | --enable-shm-snapshot=no  | no
 -------------|---------------------------|----------------------------
+
+OS           | Option
+-------------|--------------------------------------------------------
+Windows      | --enable-windows=yes
+Linux        | --enable-linux=yes
+
 
 Tools        | Option                    | Reason
 -------------|---------------------------|----------------------------
@@ -235,8 +240,7 @@ VMIFS        | --enable-vmifs=yes        | yes
 
 Extra features
 ----------------------------------------------------------------------
-Support of Rekall profiles: yes
-</code></pre>
+Support of Rekall profiles: yes</code></pre>
 
 Build and install LibVMI:
 <pre><code>make
@@ -257,9 +261,10 @@ python setup.py build
 sudo python setup.py install
 </code></pre>
 
-Build and install Rekall:
+Build and install Rekall. Note that Rekall doesn't necessarily have to be installed on the same machine where DRAKVUF is as it is not used during runtime. Setup steps:
 
 <pre><code>cd ~/drakvuf/rekall/rekall-core
+sudo pip install setuptools
 python setup.py build
 sudo python setup.py install
 </code></pre>
