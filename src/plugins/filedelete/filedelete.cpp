@@ -270,8 +270,8 @@ static event_response_t setinformation(drakvuf_t drakvuf, drakvuf_trap_info_t *i
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    uint32_t fileinfoclass;
-    reg_t handle, fileinfo;
+    uint32_t fileinfoclass = 0;
+    reg_t handle = 0, fileinfo = 0;
 
     if (f->pm == VMI_PM_IA32E) {
         handle = info->regs->rcx;
@@ -293,7 +293,7 @@ static event_response_t setinformation(drakvuf_t drakvuf, drakvuf_trap_info_t *i
     }
 
     if (fileinfoclass == FILE_DISPOSITION_INFORMATION) {
-        uint8_t del;
+        uint8_t del = 0;
         ctx.addr = fileinfo;
         if ( VMI_FAILURE == vmi_read_8(vmi, &ctx, &del) )
             goto done;
