@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -144,14 +144,15 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
     switch(s->format) {
     case OUTPUT_CSV:
         printf("debugmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%" PRIx64 ",%" PRIi32 ",%s\n",
-               info->vcpu, info->regs->cr3, info->procname, info->sessionid,
+               info->vcpu, info->regs->cr3, info->procname, info->userid,
                info->regs->rip, info->debug->type, debug_type[info->debug->type]);
         break;
     default:
     case OUTPUT_DEFAULT:
-        printf("[DEBUGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s SessionID:%" PRIi64". "
+        printf("[DEBUGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64". "
                "RIP: 0x%" PRIx64". Debug type: %" PRIi32 ",%s\n",
-               info->vcpu, info->regs->cr3, info->procname, info->sessionid,
+               info->vcpu, info->regs->cr3, info->procname,
+               USERIDSTR(drakvuf), info->userid,
                info->regs->rip, info->debug->type, debug_type[info->debug->type]);
         break;
     };

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -113,18 +113,18 @@ typedef struct os_interface {
         (drakvuf_t drakvuf, uint64_t vcpu_id);
 
     char* (*get_process_name)
-        (drakvuf_t drakvuf, addr_t eprocess_base);
+        (drakvuf_t drakvuf, addr_t process_base);
 
     char* (*get_current_process_name)
         (drakvuf_t drakvuf, uint64_t vcpu_id);
 
-    int64_t (*get_process_sessionid)
-        (drakvuf_t drakvuf, addr_t eprocess_base);
+    int64_t (*get_process_userid)
+        (drakvuf_t drakvuf, addr_t process_base);
 
     bool (*get_process_pid)
-        (drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t *pid);
+        (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *pid);
 
-    int64_t (*get_current_process_sessionid)
+    int64_t (*get_current_process_userid)
         (drakvuf_t drakvuf, uint64_t vcpu_id);
 
     bool (*get_current_thread_id)
@@ -136,17 +136,17 @@ typedef struct os_interface {
     bool (*get_current_thread_previous_mode)
         (drakvuf_t drakvuf, uint64_t vcpu_id, privilege_mode_t *previous_mode);
 
-    bool (*is_eprocess)
-        (drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
+    bool (*is_process)
+        (drakvuf_t drakvuf, addr_t dtb, addr_t process_addr);
 
-    bool (*is_ethread)
-        (drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
+    bool (*is_thread)
+        (drakvuf_t drakvuf, addr_t dtb, addr_t thread_addr);
 
     bool (*get_module_list)
-        (drakvuf_t drakvuf, addr_t eprocess_base, addr_t *module_list);
+        (drakvuf_t drakvuf, addr_t process_base, addr_t *module_list);
 
-    bool (*find_eprocess)
-        (drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_procname, addr_t *eprocess_addr);
+    bool (*find_process)
+        (drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_procname, addr_t *process_addr);
 
     bool (*inject_traps_modules)
         (drakvuf_t drakvuf, drakvuf_trap_t *trap, addr_t list_head, vmi_pid_t pid);
@@ -155,11 +155,13 @@ typedef struct os_interface {
         (drakvuf_t drakvuf, addr_t module_list_head, const char *module_name, addr_t *base_addr_out);
 
     addr_t (*exportsym_to_va)
-        (drakvuf_t drakvuf, addr_t eprocess_addr, const char *module, const char *sym);
+        (drakvuf_t drakvuf, addr_t process_addr, const char *module, const char *sym);
 
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);
 bool set_os_linux(drakvuf_t drakvuf);
+
+bool fill_offsets_from_rekall(drakvuf_t drakvuf, size_t size, const char *names [][2]);
 
 #endif

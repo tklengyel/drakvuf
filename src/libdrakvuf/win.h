@@ -119,21 +119,21 @@ bool win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t *pid
 
 char *win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id);
 
-int64_t win_get_process_sessionid(drakvuf_t drakvuf, addr_t eprocess_base);
+int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base);
 
-int64_t win_get_current_process_sessionid(drakvuf_t drakvuf, uint64_t vcpu_id);
+int64_t win_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id);
 
-bool win_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *thread_id );
+bool win_get_current_thread_id(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *thread_id);
 
-bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_mode_t *previous_mode );
+bool win_get_thread_previous_mode(drakvuf_t drakvuf, addr_t kthread, privilege_mode_t *previous_mode);
 
-bool win_get_current_thread_previous_mode( drakvuf_t drakvuf,
-                                               uint64_t vcpu_id,
-                                               privilege_mode_t *previous_mode );
+bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
+                                          uint64_t vcpu_id,
+                                          privilege_mode_t *previous_mode);
 
-bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr );
+bool win_is_ethread(drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
 
-bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr );
+bool win_is_eprocess(drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
 
 bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t *module_list);
 

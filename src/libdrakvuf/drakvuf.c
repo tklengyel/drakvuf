@@ -227,7 +227,7 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
                 if(trap->breakpoint.lookup_type == LOOKUP_NAME)
                     name = trap->breakpoint.proc;
 
-                if( !drakvuf_find_eprocess(drakvuf, pid, name, &process_base) )
+                if( !drakvuf_find_process(drakvuf, pid, name, &process_base) )
                     return 0;
 
                 if(pid == ~0 && !drakvuf_get_process_pid(drakvuf, process_base, &pid))

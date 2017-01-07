@@ -1,6 +1,6 @@
  /*********************IMPORTANT DRAKVUF LICENSE TERMS**********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -873,7 +873,7 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
                 injector.target_cr3, app);
 
     addr_t eprocess_base = 0;
-    if ( !drakvuf_find_eprocess(injector.drakvuf, pid, NULL, &eprocess_base) )
+    if ( !drakvuf_find_process(injector.drakvuf, pid, NULL, &eprocess_base) )
         goto done;
 
     injector.createprocessa = drakvuf_exportsym_to_va(injector.drakvuf, eprocess_base, "kernel32.dll", "CreateProcessA");
