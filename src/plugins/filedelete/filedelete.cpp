@@ -1,6 +1,6 @@
  /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -225,12 +225,13 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
             switch(f->format) {
             case OUTPUT_CSV:
                 printf("filedelete,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",\"%s\"\n",
-                       info->vcpu, info->regs->cr3, info->procname, info->sessionid, str2.contents);
+                       info->vcpu, info->regs->cr3, info->procname, info->userid, str2.contents);
                 break;
             default:
             case OUTPUT_DEFAULT:
-                printf("[FILEDELETE] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s SessionID:%" PRIi64" \"%s\"\n",
-                       info->vcpu, info->regs->cr3, info->procname, info->sessionid, str2.contents);
+                printf("[FILEDELETE] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" \"%s\"\n",
+                       info->vcpu, info->regs->cr3, info->procname,
+                       USERIDSTR(drakvuf), info->userid, str2.contents);
                 break;
             };
 

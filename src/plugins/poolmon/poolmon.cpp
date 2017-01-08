@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -164,7 +164,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     case OUTPUT_CSV:
     {
         printf("poolmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s,%" PRIu64 "",
-               info->vcpu, info->regs->cr3, info->procname, info->sessionid, tag,
+               info->vcpu, info->regs->cr3, info->procname, info->userid, tag,
                pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
         if (s)
             printf(",%s,%s", s->source, s->description);
@@ -172,8 +172,9 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     }
     default:
     case OUTPUT_DEFAULT:
-        printf("[POOLMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s SessionID:%" PRIi64 " %s (type: %s, size: %" PRIu64 ")",
-               info->vcpu, info->regs->cr3, info->procname, info->sessionid, tag,
+        printf("[POOLMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s (type: %s, size: %" PRIu64 ")",
+               info->vcpu, info->regs->cr3, info->procname,
+               USERIDSTR(drakvuf), info->userid, tag,
                pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
         if (s)
             printf(": %s,%s", s->source, s->description);

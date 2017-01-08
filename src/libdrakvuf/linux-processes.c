@@ -102,116 +102,168 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/prctl.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <dirent.h>
-#include <glib.h>
-#include <err.h>
-
 #include <libvmi/libvmi.h>
-#include "../plugins.h"
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <stdio.h>
+#include <glib.h>
+#include <limits.h>
+
 #include "private.h"
-#include "ssdtmon.h"
+#include "linux-offsets.h"
 
-event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
+#define STACK_SIZE_8K  0x1fff
+#define STACK_SIZE_16K 0x3fff
+#define MIN_KERNEL_BOUNDARY 0x80000000
 
-    ssdtmon* s = (ssdtmon*)info->trap->data;
+addr_t linux_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id) {
+    addr_t process = 0;
+    vmi_instance_t vmi = drakvuf->vmi;
 
-    if ( info->trap_pa > s->kiservicetable - 8 && info->trap_pa <= s->kiservicetable + s->ulongs * s->kiservicelimit + s->ulongs - 1 )
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->regs[vcpu_id]->cr3,
+        .addr = drakvuf->regs[vcpu_id]->gs_base + drakvuf->offsets[CURRENT_TASK],
+    };
+
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &process) || process < MIN_KERNEL_BOUNDARY )
     {
-        switch(s->format) {
-        case OUTPUT_CSV:
-            printf("ssdtmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ", %" PRIi64 "\n",
-                info->vcpu, info->regs->cr3, info->procname, info->userid, (info->trap_pa - s->kiservicetable)/s->ulongs);
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SSDTMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" Table index:%" PRIi64 "\n",
-                   info->vcpu, info->regs->cr3, info->procname,
-                   USERIDSTR(drakvuf), info->userid, (info->trap_pa - s->kiservicetable)/s->ulongs);
-            break;
-        };
+        /*
+         * The kernel stack also has a structure called thread_info that points
+         * to a task_struct but it doesn't seem to always agree with current_task.
+         * However, when current_task obviously is wrong (for example during a CPUID)
+         * we can fall back to it to find the correct process.
+         * On most newer kernels the kernel stack size is 16K. This is just a guess
+         * so for older kernels this may not work as well if the VA happens to map
+         * something that resembles a kernel-address.
+         * See https://www.cs.columbia.edu/~smb/classes/s06-4118/l06.pdf for more info.
+         */
+        ctx.addr = drakvuf->kpcr[vcpu_id] & ~STACK_SIZE_16K;
+        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &process) || process < MIN_KERNEL_BOUNDARY )
+        {
+            ctx.addr = drakvuf->kpcr[vcpu_id] & ~STACK_SIZE_8K;
+            vmi_read_addr(vmi, &ctx, &process);
+        }
     }
-    return 0;
+
+    return process;
 }
 
-/* ----------------------------------------------------- */
-
-ssdtmon::ssdtmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
-    const char *rekall_profile = (const char*)config;
-    addr_t kiservicetable_rva = 0, kiservicelimit_rva = 0;
-    addr_t kernbase = 0;
-
-    this->format = output;
-
-    if ( drakvuf_get_constant_rva(rekall_profile, "KiServiceTable", &kiservicetable_rva) == VMI_FAILURE ) {
-        PRINT_DEBUG("SSDT plugin can't find KiServiceTable RVA\n");
-        throw -1;
-    }
-    if ( drakvuf_get_constant_rva(rekall_profile, "KiServiceLimit", &kiservicelimit_rva) == VMI_FAILURE ) {
-        PRINT_DEBUG("SSDT plugin can't find KiServiceLimit RVA\n");
-        throw -1;
-    }
-
-    kernbase = drakvuf_get_kernel_base(drakvuf);
-    if ( !kernbase ) {
-        PRINT_DEBUG("SSDT plugin can't find kernel base address\n");
-        throw -1;
-    }
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    page_mode_t pm = vmi_get_page_mode(vmi);
-    this->kiservicetable = vmi_translate_kv2p(vmi, kernbase + kiservicetable_rva);
-    vmi_read_32_va(vmi, kernbase + kiservicelimit_rva, 0, &this->kiservicelimit);
-    drakvuf_release_vmi(drakvuf);
-
-    if ( !this->kiservicetable ) {
-        PRINT_DEBUG("SSDT plugin can't find the physical address of KiServiceTable\n");
-        throw -1;
-    }
-    if ( !this->kiservicelimit ) {
-        PRINT_DEBUG("SSDT plugin can't read the value of KiServiceLimit\n");
-        throw -1;
-    }
-
-    this->ulongs = (pm == VMI_PM_IA32E) ? 8 : 4;
-
-    PRINT_DEBUG("SSDT is at 0x%lx. Number of syscalls: %u. Size: %lu\n",
-                this->kiservicetable,
-                this->kiservicelimit,
-                this->ulongs*this->kiservicelimit);
-
-    this->ssdtwrite.cb = write_cb;
-    this->ssdtwrite.data = (void*)this;
-    this->ssdtwrite.type = MEMACCESS;
-    this->ssdtwrite.memaccess.gfn = this->kiservicetable >> 12;
-    this->ssdtwrite.memaccess.type = PRE;
-    this->ssdtwrite.memaccess.access = VMI_MEMACCESS_W;
-
-    addr_t ssdtwrite_end = (this->kiservicetable + this->ulongs * this->kiservicelimit) >> 12;
-
-    if ( !drakvuf_add_trap(drakvuf, &this->ssdtwrite) ) {
-        PRINT_DEBUG("SSDT plugin failed to trap on \n");
-        throw -1;
-    }
-
-    if ( ssdtwrite_end != this->ssdtwrite.memaccess.gfn )
-    {
-        this->ssdtwrite2 = this->ssdtwrite;
-        this->ssdtwrite2.memaccess.gfn = ssdtwrite_end;
-
-        if ( !drakvuf_add_trap(drakvuf, &this->ssdtwrite2) )
-            throw -1;
-    }
+/*
+ * Threads are really just processes on Linux.
+ */
+addr_t linux_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id) {
+    return linux_get_current_process(drakvuf, vcpu_id);
 }
 
-ssdtmon::~ssdtmon() {}
+char *linux_get_process_name(drakvuf_t drakvuf, addr_t process_base) {
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]
+    };
+
+    return vmi_read_str(drakvuf->vmi, &ctx);
+}
+
+bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *pid) {
+    /*
+     * On Linux PID is actually a thread ID, while the TGID (Thread Group-ID) is
+     * what getpid() would return. Because THAT makes sense.
+     */
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_TGID]
+    };
+    uint32_t _pid;
+
+    if ( VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &_pid) )
+        return false;
+
+    *pid = (vmi_pid_t)_pid;
+
+    return true;
+}
+
+char *linux_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id) {
+    addr_t process_base = linux_get_current_process(drakvuf, vcpu_id);
+    if ( !process_base )
+        return NULL;
+
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->regs[vcpu_id]->cr3,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]
+    };
+
+    return vmi_read_str(drakvuf->vmi, &ctx);
+}
+
+int64_t linux_get_process_userid(drakvuf_t drakvuf, addr_t process_base) {
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_CRED]
+    };
+
+    addr_t cred;
+    if ( VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &cred) )
+        return -1;
+
+    uint32_t uid;
+    ctx.addr = cred + drakvuf->offsets[CRED_UID];
+    if ( VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &uid) )
+        return -1;
+
+    return uid;
+};
+
+int64_t linux_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id) {
+    addr_t process_base = linux_get_current_process(drakvuf, vcpu_id);
+    if ( !process_base )
+        return -1;
+
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->regs[vcpu_id]->cr3,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_CRED]
+    };
+
+    addr_t cred;
+    if ( VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &cred) )
+        return -1;
+
+    uint32_t uid;
+    ctx.addr = cred + drakvuf->offsets[CRED_UID];
+    if ( VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &uid) )
+        return -1;
+
+    return uid;
+}
+
+bool linux_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *thread_id )
+{
+    /*
+     * On Linux PID is actually the thread ID....... ... ...
+     */
+    addr_t process_base = linux_get_current_process(drakvuf, vcpu_id);
+    if ( !process_base )
+        return false;
+
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->regs[vcpu_id]->cr3,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]
+    };
+    uint32_t _thread_id;
+
+    if ( VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &_thread_id) )
+        return false;
+
+    *thread_id = _thread_id;
+
+    return true;
+}

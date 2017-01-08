@@ -105,6 +105,7 @@
 #ifndef CPUIDMON_H
 #define CPUIDMON_H
 
+#include "plugins/private.h"
 #include "plugins/plugins.h"
 
 class cpuidmon: public plugin {

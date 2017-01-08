@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -174,6 +174,8 @@ struct drakvuf {
     unsigned int init_memsize;
     unsigned int memsize;
     addr_t kernbase;
+
+    x86_registers_t *regs[16]; // vCPU specific registers recorded during the last event
     addr_t kpcr[16]; // vCPU specific kpcr recorded on mov-to-cr3
 
     GHashTable *remapped_gfns; // Key: gfn
@@ -233,7 +235,7 @@ struct memcb_pass {
     uint64_t gfn;
     addr_t pa;
     char *procname;
-    int64_t sessionid;
+    int64_t userid;
     struct remapped_gfn *remapped_gfn;
     vmi_mem_access_t access;
     GSList *traps;
@@ -244,6 +246,6 @@ void drakvuf_force_resume (drakvuf_t drakvuf);
 char *drakvuf_get_current_process_name(drakvuf_t drakvuf,
                                        uint64_t vcpu_id);
 
-int64_t drakvuf_get_current_process_sessionid(drakvuf_t drakvuf,
-                                              uint64_t vcpu_id);
+int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf,
+                                           uint64_t vcpu_id);
 #endif

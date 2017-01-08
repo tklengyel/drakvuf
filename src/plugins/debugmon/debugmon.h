@@ -105,6 +105,7 @@
 #ifndef DEBUGMON_H
 #define DEBUGMON_H
 
+#include "plugins/private.h"
 #include "plugins/plugins.h"
 
 class debugmon: public plugin {

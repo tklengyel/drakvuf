@@ -248,13 +248,13 @@ bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t *info, ad
                 if ( object_type == OBJ_MANAGER_PROCESS_OBJECT )
                 {
                     // Object Body must be an _EPROCESS...
-                    ret = drakvuf_is_eprocess( drakvuf, info->regs->cr3, obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ] );
+                    ret = drakvuf_is_process( drakvuf, info->regs->cr3, obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ] );
                 }
                 else
                 if ( object_type == OBJ_MANAGER_THREAD_OBJECT )
                 {
                     // Object Body must be an _ETHREAD...
-                    ret = drakvuf_is_ethread( drakvuf, info->regs->cr3, obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ] );
+                    ret = drakvuf_is_thread( drakvuf, info->regs->cr3, obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ] );
                 }
                 else // Other object types...
                     ret = true ;

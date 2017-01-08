@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -128,14 +128,15 @@ event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
     switch(s->format) {
     case OUTPUT_CSV:
         printf("cpuidmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 "\n",
-            info->vcpu, info->regs->cr3, info->procname, info->sessionid);
+            info->vcpu, info->regs->cr3, info->procname, info->userid);
         break;
     default:
     case OUTPUT_DEFAULT:
-        printf("[CPUIDMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s SessionID:%" PRIi64". "
+        printf("[CPUIDMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64". "
                "Leaf: 0x%" PRIx32 ". Subleaf: 0x%" PRIx32". "
                "RAX: 0x%" PRIx64 " RBX: 0x%" PRIx64 " RCX: 0x%" PRIx64 " RDX: 0x%" PRIx64 "\n",
-               info->vcpu, info->regs->cr3, info->procname, info->sessionid,
+               info->vcpu, info->regs->cr3, info->procname,
+               USERIDSTR(drakvuf), info->userid,
                info->cpuid->leaf, info->cpuid->subleaf,
                info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx
             );

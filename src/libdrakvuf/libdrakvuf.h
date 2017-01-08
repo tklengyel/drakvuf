@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -190,7 +190,7 @@ typedef struct drakvuf_trap_info {
     unsigned int vcpu;
     uint16_t altp2m_idx;
     const char* procname; /* Currently executing process' name */
-    int64_t sessionid; /* Currently executing process' SessionID */
+    int64_t userid; /* Currently executing process' SessionID/UID */
     addr_t trap_pa;
     x86_registers_t *regs;
     drakvuf_trap_t *trap;
@@ -296,23 +296,23 @@ addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf);
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
                                    uint64_t vcpu_id);
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
-                                   uint64_t vcpu_id);
+                                  uint64_t vcpu_id);
 
 /* Caller must free the returned string */
 char *drakvuf_get_process_name(drakvuf_t drakvuf,
-                               addr_t eprocess_base);
+                               addr_t process_base);
 
-bool drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t *pid);
+bool drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *pid);
 
-/* Process SessionID or -1 on error */
-int64_t drakvuf_get_process_sessionid(drakvuf_t drakvuf,
-                                      addr_t eprocess_base);
+/* Process userid or -1 on error */
+int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
+                                      addr_t process_base);
 
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
-                                    uint64_t vcpu_id,
-                                    uint32_t *thread_id);
+                                   uint64_t vcpu_id,
+                                   uint32_t *thread_id);
 
-addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t eprocess_addr,
+addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
                                const char *module, const char *sym);
 
 // Microsoft PreviousMode KTHREAD explanation:
@@ -325,27 +325,27 @@ bool drakvuf_get_thread_previous_mode(drakvuf_t drakvuf,
                                       addr_t kthread,
                                       privilege_mode_t *previous_mode);
 
-bool drakvuf_is_ethread(drakvuf_t drakvuf,
+bool drakvuf_is_thread(drakvuf_t drakvuf,
                         addr_t dtb,
-                        addr_t ethread_addr);
+                        addr_t thread_addr);
 
-bool drakvuf_is_eprocess(drakvuf_t drakvuf,
+bool drakvuf_is_process(drakvuf_t drakvuf,
                          addr_t dtb,
-                         addr_t eprocess_addr);
+                         addr_t process_addr);
 
-bool drakvuf_find_eprocess(drakvuf_t drakvuf,
+bool drakvuf_find_process(drakvuf_t drakvuf,
                            vmi_pid_t find_pid,
                            const char *find_procname,
-                           addr_t *eprocess_addr);
+                           addr_t *process_addr);
 
 bool drakvuf_get_module_list(drakvuf_t drakvuf,
-                             addr_t eprocess_base,
+                             addr_t process_base,
                              addr_t *module_list);
 
 // ObReferenceObjectByHandle
 bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
                                drakvuf_trap_info_t *info,
-                               addr_t current_eprocess,
+                               addr_t current_process,
                                addr_t handle,
                                object_manager_object_t obj_type_arg,
                                addr_t *obj_body_addr);

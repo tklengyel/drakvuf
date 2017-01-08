@@ -1,6 +1,6 @@
 #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
 #                                                                         #
-# DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  #
+# DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  #
 # Tamas K Lengyel is hereinafter referred to as the author.               #
 # This program is free software; you may redistribute and/or modify it    #
 # under the terms of the GNU General Public License as published by the   #
@@ -105,7 +105,7 @@
 h_sources = libdrakvuf.h
 c_sources = drakvuf.c rekall-profile.c os.c vmi.c \
             win.c win-exports.c win-handles.c win-processes.c \
-            linux.c
+            linux.c linux-processes.c
 
 AM_CFLAGS = -I$(top_srcdir)
 AM_CFLAGS += $(CFLAGS)
@@ -118,8 +118,9 @@ endif
 
 # Note that -pg is incompatible with HARDENING
 if DEBUG
-AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
+AM_CFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -g -ggdb3
 AM_CFLAGS += -Wno-missing-field-initializers
+AM_CFLAGS += -Werror
 if !HARDENING
 AM_CFLAGS += -pg
 endif

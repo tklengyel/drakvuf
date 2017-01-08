@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -161,9 +161,9 @@ char *win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id) {
     return win_get_process_name(drakvuf, win_get_current_process(drakvuf, vcpu_id));
 }
 
-int64_t win_get_process_sessionid(drakvuf_t drakvuf, addr_t eprocess_base) {
+int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base) {
 
-    addr_t peb, sessionid;
+    addr_t peb, userid;
     vmi_instance_t vmi = drakvuf->vmi;
     access_context_t ctx = {.translate_mechanism = VMI_TM_PROCESS_DTB};
 
@@ -177,26 +177,26 @@ int64_t win_get_process_sessionid(drakvuf_t drakvuf, addr_t eprocess_base) {
         return -1;
 
     ctx.addr = peb + drakvuf->offsets[PEB_SESSIONID];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &sessionid) )
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &userid) )
         return -1;
 
 #ifdef DRAKVUF_DEBUG
-    /* It should be safe to stash sessionid into a int64_t as it seldom goes above INT_MAX */
-    if ( sessionid > INT_MAX )
-        PRINT_DEBUG("The process at 0x%" PRIx64 " has a SessionID larger then INT_MAX!\n", eprocess_base);
+    /* It should be safe to stash userid into a int64_t as it seldom goes above INT_MAX */
+    if ( userid > INT_MAX )
+        PRINT_DEBUG("The process at 0x%" PRIx64 " has a userid larger then INT_MAX!\n", eprocess_base);
 #endif
 
-    return (int64_t)sessionid;
+    return (int64_t)userid;
 };
 
-int64_t win_get_current_process_sessionid(drakvuf_t drakvuf, uint64_t vcpu_id) {
-    return win_get_process_sessionid(drakvuf, win_get_current_process(drakvuf, vcpu_id));
+int64_t win_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id) {
+    return win_get_process_userid(drakvuf, win_get_current_process(drakvuf, vcpu_id));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 
-bool win_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *thread_id )
+bool win_get_current_thread_id(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *thread_id)
 {
     addr_t p_tid ;
     addr_t ethread = win_get_current_thread(drakvuf, vcpu_id);
@@ -239,13 +239,13 @@ bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_
     return false ;
 }
 
-bool win_get_current_thread_previous_mode( drakvuf_t drakvuf,
-                                               uint64_t vcpu_id,
-                                               privilege_mode_t *previous_mode )
+bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
+                                          uint64_t vcpu_id,
+                                          privilege_mode_t *previous_mode )
 {
-    addr_t kthread = win_get_current_thread( drakvuf, vcpu_id );
+    addr_t kthread = win_get_current_thread(drakvuf, vcpu_id);
 
-    return win_get_thread_previous_mode( drakvuf, kthread, previous_mode );
+    return win_get_thread_previous_mode(drakvuf, kthread, previous_mode);
 }
 
 

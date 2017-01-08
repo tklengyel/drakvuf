@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -251,18 +251,25 @@ int main(int argc, char** argv) {
     sigaction(SIGALRM, &act, NULL);
 
     if ( injection_pid > 0 && inject_cmd ) {
+        PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_cmd);
         rc = drakvuf->inject_cmd(injection_pid, injection_thread, inject_cmd);
         if (!rc)
             goto exit;
     }
 
+    PRINT_DEBUG("Starting plugins\n");
+
     rc = drakvuf->start_plugins(plugin_list, dump_folder, cpuid_stealth);
     if ( rc < 0 )
         goto exit;
 
+    PRINT_DEBUG("Beginning DRAKVUF loop\n");
+
     /* Start the event listener */
     drakvuf->loop();
     rc = 1;
+
+    PRINT_DEBUG("Finished DRAKVUF loop\n");
 
 exit:
     delete drakvuf;
