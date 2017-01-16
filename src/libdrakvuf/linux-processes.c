@@ -144,7 +144,8 @@ addr_t linux_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id) {
         if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &process) || process < MIN_KERNEL_BOUNDARY )
         {
             ctx.addr = drakvuf->kpcr[vcpu_id] & ~STACK_SIZE_8K;
-            vmi_read_addr(vmi, &ctx, &process);
+            if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &process) || process < MIN_KERNEL_BOUNDARY )
+                process = 0;
         }
     }
 

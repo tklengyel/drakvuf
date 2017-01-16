@@ -293,9 +293,12 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         tag = info->regs->r8;
     } else {
         ctx.addr = info->regs->rsp+8;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&size);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&size) )
+            return 0;
+
         ctx.addr = info->regs->rsp+12;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&tag);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&tag) )
+            return 0;
     }
 
     /*printf("Got a heap alloc request for tag %c%c%c%c!\n",
@@ -309,7 +312,9 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
         addr_t ret, ret_pa;
         ctx.addr = info->regs->rsp;
-        vmi_read_addr(vmi, &ctx, &ret);
+        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ret) )
+            return 0;
+
         ret_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, ret);
 
         struct rettrap_struct *s = (struct rettrap_struct*)g_hash_table_lookup(f->rettraps, &ret_pa);
@@ -330,7 +335,9 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             rettrap->cb = pool_alloc_return;
             rettrap->data = s;
 
-            drakvuf_add_trap(drakvuf, rettrap);
+            if (!drakvuf_add_trap(drakvuf, rettrap))
+                return 0;
+
             g_hash_table_insert(f->rettraps, &rettrap->breakpoint.addr, s);
         }
 
