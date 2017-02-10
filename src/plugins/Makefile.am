@@ -142,6 +142,10 @@ if PLUGIN_CPUIDMON
 sources += cpuidmon/cpuidmon.cpp
 endif
 
+if PLUGIN_SOCKETMON
+sources += socketmon/socketmon.cpp
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h
 
@@ -159,6 +163,7 @@ AM_CPPFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 if DEBUG
 AM_CPPFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
 AM_CPPFLAGS += -Wno-missing-field-initializers -Wno-unused-parameter
+AM_CPPFLAGS += -Wno-initializer-overrides
 if !HARDENING
 AM_CPPFLAGS += -pg
 endif

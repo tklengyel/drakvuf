@@ -147,7 +147,7 @@ struct file_watch {
     addr_t file_name_length;
 };
 
-void free_writetrap(drakvuf_trap_t *trap) {
+static void free_writetrap(drakvuf_trap_t *trap) {
     //printf("Freeing writetrap @ %p\n", trap);
     filetracer *f = (filetracer *)trap->data;
     f->writetraps = g_slist_remove(f->writetraps, trap);

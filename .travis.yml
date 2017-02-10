@@ -13,7 +13,7 @@ before_install:
   - sudo ln -s /usr/lib/gcc/x86_64-linux-gnu/4.8/libstdc++.so /usr/lib/x86_64-linux-gnu/libstdc++.so
   - git submodule init
   - git submodule update libvmi
-  - cd libvmi && ./autogen.sh && ./configure --enable-xen --without-xenstore
+  - cd libvmi && ./autogen.sh && ./configure --enable-xen --disable-kvm --without-xenstore
   - make && sudo make install
   - cd tools/pyvmi && python setup.py build && sudo python setup.py install
   - cd ../../..

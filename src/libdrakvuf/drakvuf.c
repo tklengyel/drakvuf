@@ -243,11 +243,17 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
         if(trap->breakpoint.addr_type == ADDR_VA) {
             addr_t dtb = vmi_pid_to_dtb(drakvuf->vmi, trap->breakpoint.pid);
             if (!dtb)
+            {
+                PRINT_DEBUG("No DTB found for pid %i\n", trap->breakpoint.pid);
                 return 0;
+            }
 
             addr_t trap_pa = vmi_pagetable_lookup(drakvuf->vmi, dtb, trap->breakpoint.addr);
             if (!trap_pa)
+            {
+                PRINT_DEBUG("Failed to find PA for breakpoint VA addr 0x%lx\n", trap->breakpoint.addr);
                 return 0;
+            }
 
             return inject_trap_pa(drakvuf, trap, trap_pa);
         }
