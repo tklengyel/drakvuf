@@ -209,6 +209,16 @@ if test x$plugin_cpuidmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_CPUIDMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_netmon],
+  [AS_HELP_STRING([--disable-plugin-netmon],
+    [Enable the network socket watching plugin @<:@yes@:>@])],
+  [plugin_netmon="$enableval"],
+  [plugin_netmon="yes"])
+AM_CONDITIONAL([PLUGIN_CPUIDMON], [test x$plugin_netmon = xyes])
+if test x$plugin_netmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_NETMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -399,4 +409,5 @@ Exmon:      $plugin_exmon
 SSDTmon:    $plugin_ssdtmon
 CPUIDmon:   $plugin_cpuidmon
 Debugmon:   $plugin_debugmon
+Netmon:     $plugin_netmon
 -------------------------------------------------------------------------------])

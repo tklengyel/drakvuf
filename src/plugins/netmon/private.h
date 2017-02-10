@@ -102,88 +102,142 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAKVUF_PLUGINS_H
-#define DRAKVUF_PLUGINS_H
+#ifndef FILETRACER_PRIVATE_H
+#define FILETRACER_PRIVATE_H
 
-#include <config.h>
-#include <stdlib.h>
-#include <libdrakvuf/libdrakvuf.h>
+struct pool_header_x86 {
+    union {
+        struct {
+            uint16_t previous_size :9;
+            uint16_t pool_index :7;
+            uint16_t block_size :9; // bits 0-9
+            uint16_t pool_type :7; // bits 10-16
+        };
+        uint16_t flags;
+    };
+    uint32_t pool_tag;
+}__attribute__ ((packed));
 
-/***************************************************************************/
+struct pool_header_x64 {
+    union {
+        struct {
+            uint32_t previous_size :8;
+            uint32_t pool_index :8;
+            uint32_t block_size :8;
+            uint32_t pool_type :8;
+        };
+        uint32_t flags;
+    };
+    uint32_t pool_tag;
+    uint64_t process_billed; // _EPROCESS *
+}__attribute__ ((packed));
 
-/* Plugin-specific configuration input */
-struct filedelete_config {
-    const char *rekall_profile;
-    const char *dump_folder;
+/* TcpL */
+struct tcp_listener_x86 {
+    uint8_t _pad1[0x18];
+    uint32_t owner;
+    uint32_t _pad2;
+    uint64_t createtime;
+    uint8_t _pad3[0xc];
+    uint32_t localaddr;
+    uint32_t inetaf;
+    uint8_t _pad4[0x2];
+    uint16_t port;
+}__attribute__ ((packed));
+
+struct tcp_listener_x64 {
+    uint8_t _pad1[0x20];
+    uint64_t createtime;
+    uint64_t owner;
+    uint8_t _pad2[0x28];
+    uint64_t localaddr;
+    uint64_t inetaf;
+    uint8_t _pad3[0x2];
+    uint16_t port;
+}__attribute__ ((packed));
+
+/* TcpE */
+enum tcp_state {
+    CLOSED = 0,
+    LISTENING = 1,
+    SYN_SENT = 2,
+    SYN_RCVD = 3,
+    ESTABLISHED = 4,
+    FIN_WAIT1 = 5,
+    FIN_WAIT2 = 6,
+    CLOSE_WAIT = 7,
+    CLOSING = 8,
+    LIST_ACK = 9,
+    TIME_WAIT = 12,
+    DELETE_TCB = 13
 };
 
-/***************************************************************************/
+struct tcp_endpoint_x86 {
+    uint8_t _pad1[0xc];
+    uint32_t inetaf;
+    uint32_t listentry;
+    uint8_t _pad2[0x1c]
+    uint32_t state;
+    uint16_t localport;
+    uint16_t remoteport;
+    uint8_t _pad3[0x138];
+    uint32_t owner;
+}__attribute__ ((packed));
 
-typedef enum {
-    OUTPUT_DEFAULT,
-    OUTPUT_CSV,
-    __OUTPUT_MAX
-} output_format_t;
+struct tcp_endpoint_x64 {
+    uint8_t _pad1[0x18];
+    uint64_t inetaf;
+    uint64_t addrinfo;
+    uint64_t listentry;
+    uint8_t _pad2[0x38];
+    uint32_t state;
+    uint16_t localport;
+    uint16_t remoteport;
+    uint8_t _pad3[0x1c8];
+    uint64_t owner;
+}__attribute__ ((packed));
 
-typedef enum drakvuf_plugin {
-    PLUGIN_SYSCALLS,
-    PLUGIN_POOLMON,
-    PLUGIN_FILETRACER,
-    PLUGIN_FILEDELETE,
-    PLUGIN_OBJMON,
-    PLUGIN_EXMON,
-    PLUGIN_SSDTMON,
-    PLUGIN_DEBUGMON,
-    PLUGIN_CPUIDMON,
-    PLUGIN_NETMOD,
-    __DRAKVUF_PLUGIN_LIST_MAX
-} drakvuf_plugin_t;
+struct local_address_x86 {
+    uint8_t _pad[0xc];
+    uint32_t pdata;
+}__attribute__ ((packed));
 
-static const char *drakvuf_plugin_names[] = {
-    [PLUGIN_SYSCALLS] = "syscalls",
-    [PLUGIN_POOLMON] = "poolmon",
-    [PLUGIN_FILETRACER] = "filetracer",
-    [PLUGIN_FILEDELETE] = "filedelete",
-    [PLUGIN_OBJMON] = "objmon",
-    [PLUGIN_EXMON] = "exmon",
-    [PLUGIN_SSDTMON] = "ssdtmon",
-    [PLUGIN_DEBUGMON] = "debugmon",
-    [PLUGIN_CPUIDMON] = "cpuidmon",
-    [PLUGIN_NETMON] = "netmon",
-};
+struct local_address_x64 {
+    uint8_t _pad[0x10];
+    uint64_t pdata;
+}__attribute__ ((packed));
 
-static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] = {
-    [PLUGIN_SYSCALLS]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_POOLMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_FILETRACER] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_FILEDELETE] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_OBJMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_EXMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_SSDTMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_DEBUGMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_CPUIDMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_NETMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-};
+struct inetaf_x86 {
+    uint8_t _pad[0xc];
+    uint8_t addressfamily;
+}__attribute__ ((packed));
 
-class plugin {
-    public:
-        virtual ~plugin() {};
-};
+struct inetaf_x64 {
+    uint8_t _pad[0x14];
+    uint8_t addressfamily;
+}__attribute__ ((packed));
 
-class drakvuf_plugins
-{
-    private:
-        drakvuf_t drakvuf;
-        output_format_t output;
-        os_t os;
-        plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = NULL };
+/* UdpA */
+struct udp_endpoint_x86 {
+    uint8_t _pad1[0x14];
+    uint32_t inetaf;
+    uint32_t owner;
+    uint8_t _pad2[0x14];
+    uint64_t createtime;
+    uint32_t localaddr;
+    uint8_t _pad3[0xc];
+    uint16_t port;
+}__attribute__ ((packed));
 
-    public:
-        drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
-        ~drakvuf_plugins();
-        int start(drakvuf_plugin_t plugin, const void* config);
-};
-
-/***************************************************************************/
+struct udp_endpoint_64 {
+    uint8_t _pad1[0x20];
+    uint64_t inetaf;
+    uint64_t owner;
+    uint8_t _pad2[0x28];
+    uint64_t createtime;
+    uint64_t localaddr;
+    uint8_t _pad3[0x18];
+    uint16_t port;
+}__attribute__ ((packed));
 
 #endif

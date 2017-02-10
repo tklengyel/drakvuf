@@ -142,6 +142,10 @@ if PLUGIN_CPUIDMON
 sources += cpuidmon/cpuidmon.cpp
 endif
 
+if PLUGIN_NETMON
+sources += netmon/netmon.cpp
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h
 
