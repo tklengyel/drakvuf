@@ -153,19 +153,30 @@ void free_writetrap(drakvuf_trap_t *trap) {
 
 static inline void tag_test(void *tag, bool *tcpe_alloc, bool *tcpl_alloc, bool *udpa_alloc)
 {
-    if(!memcmp(&ph.pool_tag, &POOLTAG_TCPE, 4))
+    if(!memcmp(tag, &POOLTAG_TCPE, 4))
+    {
         *tcpe_alloc = 1;
-    if(!memcmp(&ph.pool_tag, &POOLTAG_TCPL, 4))
+        return;
+    }
+
+    if(!memcmp(tag, &POOLTAG_TCPL, 4))
+    {
         *tcpl_alloc = 1;
-    if(!memcmp(&ph.pool_tag, &POOLTAG_UDPA, 4))
+        return;
+    }
+
+    if(!memcmp(tag, &POOLTAG_UDPA, 4))
+    {
         *udpa_alloc = 1;
+        return;
+    }
 }
 
 /* This will be hit for all sorts of heap alloc returns */
 static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     struct rettrap_struct *s = (struct rettrap_struct *)info->trap->data;
-    filetracer *f = s->f;
+    netmon *n = s->n;
     addr_t obj_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, info->regs->rax);
     bool tcpe_alloc = 0;
     bool tcpl_alloc = 0;
@@ -173,7 +184,7 @@ static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t
     addr_t ph_base = 0;
     uint32_t block_size = 0;
 
-    if ( f->pm == VMI_PM_IA32E ) {
+    if ( n->pm == VMI_PM_IA32E ) {
         struct pool_header_x64 ph;
         memset(&ph, 0, sizeof(struct pool_header_x64));
         ph_base = obj_pa - sizeof(struct pool_header_x64);
@@ -194,8 +205,10 @@ static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t
         return 0;
     }
 
+    printf("[NETMON] TcpE: %i TcpL: %i UdpA: %i\n", tcpe_alloc, tcpl_alloc, udpa_alloc);
+
     // We will need to catch when the file string buffer pointer is updated
-    addr_t file_base = ph_base + block_size - f->file_object_size; // addr of "_FILE_OBJECT"
+    /*addr_t file_base = ph_base + block_size - f->file_object_size; // addr of "_FILE_OBJECT"
     addr_t file_name = file_base + f->file_name_offset; // addr of "_UNICODE_STRING"
 
     struct file_watch *watch = (struct file_watch *)g_malloc0(sizeof(struct file_watch));
@@ -218,16 +231,7 @@ static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t
     f->writetraps = g_slist_prepend(f->writetraps, writetrap);
 
     if (!drakvuf_add_trap(drakvuf, writetrap))
-        fprintf(stderr, "[FILETRACER] Error: failed to add write memaccess trap!\n");
-
-    s->counter--;
-
-    /*
-    if(s->counter == 0) {
-        drakvuf_remove_trap(drakvuf, info->trap, free);
-        g_hash_table_remove(rettraps, &s->trap->u2.addr);
-        free(s);
-    }*/
+        fprintf(stderr, "[FILETRACER] Error: failed to add write memaccess trap!\n");*/
 
     drakvuf_release_vmi(drakvuf);
     return 0;
@@ -235,15 +239,18 @@ static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t
 
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
-    filetracer *f = (filetracer*)info->trap->data;
+    netmon *n = (netmon*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     reg_t tag = 0, size = 0;
+    bool tcpe_alloc = 0;
+    bool tcpl_alloc = 0;
+    bool udpa_alloc = 0;
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    if (f->pm == VMI_PM_IA32E) {
+    if (n->pm == VMI_PM_IA32E) {
         size = info->regs->rdx;
         tag = info->regs->r8;
     } else {
@@ -256,14 +263,9 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             return 0;
     }
 
-    /*printf("Got a heap alloc request for tag %c%c%c%c!\n",
-           ((uint8_t*)&tag)[0],
-           ((uint8_t*)&tag)[1],
-           ((uint8_t*)&tag)[2],
-           ((uint8_t*)&tag)[3]
-    );*/
+    tag_test(&tag, &tcpe_alloc, &tcpl_alloc, &udpa_alloc);
 
-    if(!memcmp(&tag, &POOLTAG_FILE, 4)) {
+    if(tcpe_alloc || tcpl_alloc || udpa_alloc) {
 
         addr_t ret, ret_pa;
         ctx.addr = info->regs->rsp;
@@ -272,7 +274,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
         ret_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, ret);
 
-        struct rettrap_struct *s = (struct rettrap_struct*)g_hash_table_lookup(f->rettraps, &ret_pa);
+        struct rettrap_struct *s = (struct rettrap_struct*)g_hash_table_lookup(n->rettraps, &ret_pa);
         if (s) {
             s->counter++;
         } else {
@@ -280,7 +282,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             s = (struct rettrap_struct*)g_malloc0(sizeof(struct rettrap_struct));
             s->trap = rettrap;
             s->counter = 1;
-            s->f = f;
+            s->n = n;
 
             rettrap->breakpoint.lookup_type = LOOKUP_NONE;
             rettrap->breakpoint.addr_type = ADDR_PA;
@@ -293,11 +295,8 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             if (!drakvuf_add_trap(drakvuf, rettrap))
                 return 0;
 
-            g_hash_table_insert(f->rettraps, &rettrap->breakpoint.addr, s);
+            g_hash_table_insert(n->rettraps, &rettrap->breakpoint.addr, s);
         }
-
-        //printf("File alloc request on vCPU %u. Ret: 0x%lx. Counter: %lu\n",
-        //         info->vcpu, ret_pa, s->counter);
     }
 
     drakvuf_release_vmi(drakvuf);
@@ -306,7 +305,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
 /* ----------------------------------------------------- */
 
-filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t output) {
+netmon::netmon(drakvuf_t drakvuf, const void* config, output_format_t output) {
     const char *rekall_profile = (const char *)config;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->pm = vmi_get_page_mode(vmi);
@@ -327,16 +326,16 @@ filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t ou
     if (VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag", &this->poolalloc.breakpoint.rva))
         throw -1;
 
-    if (this->pm == VMI_PM_IA32E)
+    /*if (this->pm == VMI_PM_IA32E)
         this->file_object_size += ALIGN_SIZE(16, this->file_object_size);
     else
-        this->file_object_size += ALIGN_SIZE(8, this->file_object_size);
+        this->file_object_size += ALIGN_SIZE(8, this->file_object_size);*/
 
     if ( !drakvuf_add_trap(drakvuf, &this->poolalloc) )
         throw -1;
 }
 
-filetracer::~filetracer() {
+netmon::~netmon() {
 
     GSList *loop = this->writetraps;
     while(loop) {

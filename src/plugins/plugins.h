@@ -135,7 +135,7 @@ typedef enum drakvuf_plugin {
     PLUGIN_SSDTMON,
     PLUGIN_DEBUGMON,
     PLUGIN_CPUIDMON,
-    PLUGIN_NETMOD,
+    PLUGIN_NETMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 

@@ -176,7 +176,7 @@ struct tcp_endpoint_x86 {
     uint8_t _pad1[0xc];
     uint32_t inetaf;
     uint32_t listentry;
-    uint8_t _pad2[0x1c]
+    uint8_t _pad2[0x1c];
     uint32_t state;
     uint16_t localport;
     uint16_t remoteport;

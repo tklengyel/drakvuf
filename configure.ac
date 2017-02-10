@@ -214,7 +214,7 @@ AC_ARG_ENABLE([plugin_netmon],
     [Enable the network socket watching plugin @<:@yes@:>@])],
   [plugin_netmon="$enableval"],
   [plugin_netmon="yes"])
-AM_CONDITIONAL([PLUGIN_CPUIDMON], [test x$plugin_netmon = xyes])
+AM_CONDITIONAL([PLUGIN_NETMON], [test x$plugin_netmon = xyes])
 if test x$plugin_netmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_NETMON, 1, "")
 fi
