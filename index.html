@@ -215,32 +215,29 @@ Enter the LibVMI folder in the drakvuf folder and build it:
 
 <pre><code>cd ~/drakvuf/libvmi
 ./autogen.sh
-./configure
+./configure --disable-kvm
 </code></pre>
 
 Make sure the output is like the following:
-<pre><code>Feature      | Option                    | Reason
--------------|---------------------------|----------------------------
-Xen Support  | --enable-xen=yes          | yes
-KVM Support  | --enable-kvm=no           | libvirt missing
-File Support | --enable-file=yes         | yes
-Shm-snapshot | --enable-shm-snapshot=no  | no
--------------|---------------------------|----------------------------
+<pre><code>Feature         | Option
+----------------|---------------------------
+Xen Support     | --enable-xen=yes
+KVM Support     | --enable-kvm=no
+File Support    | --enable-file=yes
+Shm-snapshot    | --enable-shm-snapshot=no
+Rekall profiles | --enable-rekall-profiles=yes
+----------------|---------------------------
 
-OS           | Option
--------------|--------------------------------------------------------
-Windows      | --enable-windows=yes
-Linux        | --enable-linux=yes
+OS              | Option
+----------------|---------------------------
+Windows         | --enable-windows=yes
+Linux           | --enable-linux=yes
 
 
-Tools        | Option                    | Reason
--------------|---------------------------|----------------------------
-Examples     | --enable-examples=yes     | yes
-VMIFS        | --enable-vmifs=yes        | yes
-
-Extra features
-----------------------------------------------------------------------
-Support of Rekall profiles: yes</code></pre>
+Tools           | Option                    | Reason
+----------------|---------------------------|----------------------------
+Examples        | --enable-examples=yes
+VMIFS           | --enable-vmifs=yes        | yes</code></pre>
 
 Build and install LibVMI:
 <pre><code>make
