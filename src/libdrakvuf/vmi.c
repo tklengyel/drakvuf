@@ -165,6 +165,7 @@ void process_free_requests(drakvuf_t drakvuf) {
 /* Here we are in singlestep mode already and this is a singlstep cb */
 event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
     UNUSED(vmi);
+    event_response_t rsp = 0;
     struct memcb_pass *pass = event->data;
     drakvuf_t drakvuf = pass->drakvuf;
     drakvuf->regs[event->vcpu_id] = event->x86_regs;
@@ -198,7 +199,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
                 .vcpu = event->vcpu_id,
             };
 
-            trap->cb(drakvuf, &trap_info);
+            rsp |= trap->cb(drakvuf, &trap_info);
         }
 
         loop = loop->next;
@@ -276,13 +277,15 @@ done:
     event->slat_id = drakvuf->altp2m_idx;
     drakvuf->step_event[event->vcpu_id]->callback = vmi_reset_trap;
     drakvuf->step_event[event->vcpu_id]->data = drakvuf;
-    return VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Turn off singlestep
+    return rsp |
+           VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Turn off singlestep
            VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
 }
 
 /* This hits on the first access on a page, so not in singlestep yet */
 event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
     UNUSED(vmi);
+    event_response_t rsp = 0;
     drakvuf_t drakvuf = event->data;
     drakvuf->regs[event->vcpu_id] = event->x86_regs;
 
@@ -322,7 +325,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
                 .vcpu = event->vcpu_id,
             };
 
-            trap->cb(drakvuf, &trap_info);
+            rsp |= trap->cb(drakvuf, &trap_info);
         }
 
         loop = loop->next;
@@ -349,7 +352,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
                 };
 
                 loop = loop->next;
-                trap->cb(drakvuf, &trap_info);
+                rsp |= trap->cb(drakvuf, &trap_info);
             }
         }
     }
@@ -394,16 +397,18 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
         drakvuf->step_event[event->vcpu_id]->callback = post_mem_cb;
         drakvuf->step_event[event->vcpu_id]->data = pass;
-        return VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Turn on singlestep
+        return rsp |
+               VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Turn on singlestep
                VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
     }
 
     g_free(procname);
-    return 0;
+    return rsp;
 }
 
 event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     UNUSED(vmi);
+    event_response_t rsp = 0;
     drakvuf_t drakvuf = event->data;
     drakvuf->regs[event->vcpu_id] = event->x86_regs;
 
@@ -464,7 +469,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         };
 
         loop = loop->next;
-        trap->cb(drakvuf, &trap_info);
+        rsp |= trap->cb(drakvuf, &trap_info);
     }
     drakvuf->in_callback = 0;
 
@@ -478,15 +483,17 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         event->slat_id = 0;
         drakvuf->step_event[event->vcpu_id]->callback = vmi_reset_trap;
         drakvuf->step_event[event->vcpu_id]->data = drakvuf;
-        return VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Enable singlestep
+        return rsp |
+               VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Enable singlestep
                VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
     }
 
-    return 0;
+    return rsp;
 }
 
 event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     UNUSED(vmi);
+    event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
     drakvuf->regs[event->vcpu_id] = event->x86_regs;
 
@@ -531,7 +538,7 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         };
 
         loop = loop->next;
-        trap->cb(drakvuf, &trap_info);
+        rsp |= trap->cb(drakvuf, &trap_info);
     }
     drakvuf->in_callback = 0;
 
@@ -539,11 +546,12 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     process_free_requests(drakvuf);
 
-    return 0;
+    return rsp;
 }
 
 event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t *event) {
     UNUSED(vmi);
+    event_response_t rsp = 0;
     addr_t pa = (event->debug_event.gfn << 12) + event->debug_event.offset;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
     drakvuf->regs[event->vcpu_id] = event->x86_regs;
@@ -569,7 +577,7 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t *event) {
         };
 
         loop = loop->next;
-        trap->cb(drakvuf, &trap_info);
+        rsp |= trap->cb(drakvuf, &trap_info);
     }
     drakvuf->in_callback = 0;
 
@@ -579,11 +587,12 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     event->debug_event.reinject = 1;
 
-    return 0;
+    return rsp;
 }
 
 event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t *event) {
     UNUSED(vmi);
+    event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
     drakvuf->regs[event->vcpu_id] = event->x86_regs;
 
@@ -591,6 +600,7 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t *event) {
                 event->vcpu_id, event->slat_id, event->x86_regs->cr3,
                 event->x86_regs->rip, event->cpuid_event.insn_length);
 
+    reg_t rip = event->x86_regs->rip;
     char *procname = drakvuf_get_current_process_name(drakvuf, event->vcpu_id);
     int64_t userid = drakvuf_get_current_process_userid(drakvuf, event->vcpu_id);
 
@@ -608,7 +618,7 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t *event) {
         };
 
         loop = loop->next;
-        trap->cb(drakvuf, &trap_info);
+        rsp |= trap->cb(drakvuf, &trap_info);
     }
     drakvuf->in_callback = 0;
 
@@ -616,9 +626,10 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     process_free_requests(drakvuf);
 
-    event->x86_regs->rip += event->cpuid_event.insn_length;
+    if ( event->x86_regs->rip == rip )
+        event->x86_regs->rip += event->cpuid_event.insn_length;
 
-    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    return rsp | VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
 void remove_trap(drakvuf_t drakvuf,
