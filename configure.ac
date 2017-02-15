@@ -103,7 +103,7 @@
 #*************************************************************************#
 
 AC_PREREQ([2.60])
-AC_INIT([DRAKVUF], [0.4-m4_esyscmd_s([git describe --always])], [tamas@tklengyel.com], [], [http://drakvuf.com])
+AC_INIT([DRAKVUF], [0.5-m4_esyscmd_s([git describe --always])], [tamas@tklengyel.com], [], [https://drakvuf.com])
 AM_INIT_AUTOMAKE([1.10 no-define foreign subdir-objects])
 LT_INIT
 AC_CONFIG_HEADERS([config.h])
@@ -207,6 +207,16 @@ AC_ARG_ENABLE([plugin_cpuidmon],
 AM_CONDITIONAL([PLUGIN_CPUIDMON], [test x$plugin_cpuidmon = xyes])
 if test x$plugin_cpuidmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_CPUIDMON, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_socketmon],
+  [AS_HELP_STRING([--disable-plugin-socketmon],
+    [Enable the network socket watching plugin @<:@yes@:>@])],
+  [plugin_socketmon="$enableval"],
+  [plugin_socketmon="yes"])
+AM_CONDITIONAL([PLUGIN_SOCKETMON], [test x$plugin_socketmon = xyes])
+if test x$plugin_socketmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_SOCKETMON, 1, "")
 fi
 
 #####################################################
@@ -399,4 +409,5 @@ Exmon:      $plugin_exmon
 SSDTmon:    $plugin_ssdtmon
 CPUIDmon:   $plugin_cpuidmon
 Debugmon:   $plugin_debugmon
+Socketmon:  $plugin_socketmon
 -------------------------------------------------------------------------------])

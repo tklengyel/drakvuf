@@ -6,31 +6,17 @@
 *.Po
 
 # Libraries
-*.lib
-*.a
-*.la
-*.lax
-*.lo
-*.Plo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
+**/*.lib
+**/*.a
+**/*.la
+**/*.lax
+**/*.lo
+**/*.Plo
 
 # autoconf/automake
 configure
-Makefile
-Makefile.in
+**/Makefile
+**/Makefile.in
 autom4te.cache/*
 compile
 aclocal.m4
@@ -39,9 +25,10 @@ depcomp
 install-sh
 missing
 stamp-h1
-*.deps
-*.libs
-*.dirstamp
+**/*.deps
+**/*.libs
+**/*.dirstamp
+**/*.save
 
 # drakvuf binaries
 drakvuf
@@ -56,3 +43,5 @@ m4/ltsugar.m4
 m4/ltversion.m4
 m4/lt~obsolete.m4
 src/dirwatch/dirwatch
+test-drive
+ylwrap

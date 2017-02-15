@@ -113,6 +113,7 @@
 #include "ssdtmon/ssdtmon.h"
 #include "debugmon/debugmon.h"
 #include "cpuidmon/cpuidmon.h"
+#include "socketmon/socketmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output, os_t os)
 {
@@ -185,6 +186,11 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #ifdef ENABLE_PLUGIN_CPUIDMON
             case PLUGIN_CPUIDMON:
                 this->plugins[plugin_id] = new cpuidmon(this->drakvuf, config, this->output);
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_SOCKETMON
+            case PLUGIN_SOCKETMON:
+                this->plugins[plugin_id] = new socketmon(this->drakvuf, config, this->output);
                 break;
 #endif
             default:

@@ -343,6 +343,7 @@ bool pass_inputs(struct injector *injector, drakvuf_trap_info_t *info) {
         addr -= len;
         injector->process_info = addr;
         ctx.addr = addr;
+        printf("Process info placed at 0x%lx\n", ctx.addr);
         if(len != vmi_write(vmi, &ctx, &pi, len))
             goto err;
 
@@ -594,7 +595,11 @@ event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         return 0;
     }
 
-    vmi_set_vcpureg(injector->vmi, injector->createprocessa, RIP, info->vcpu);
+    if ( VMI_FAILURE == vmi_set_vcpureg(injector->vmi, injector->createprocessa, RIP, info->vcpu) )
+    {
+        PRINT_DEBUG("Failed to set RIP!\n");
+        return 0;
+    }
 
     injector->bp.type = BREAKPOINT;
     injector->bp.name = "ret";
@@ -760,10 +765,14 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
         drakvuf_pause(drakvuf);
         if ( !pass_inputs(injector, info) ) {
             PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-            return 0;
+            goto done;
         }
 
-        vmi_set_vcpureg(injector->vmi, injector->createprocessa, RIP, info->vcpu);
+        if ( VMI_FAILURE == vmi_set_vcpureg(injector->vmi, injector->createprocessa, RIP, info->vcpu) )
+        {
+            PRINT_DEBUG("Failed to set RIP!\n");
+            goto done;
+        }
 
         drakvuf_resume(drakvuf);
 
@@ -777,10 +786,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
 
     // We are now in the return path from CreateProcessA
 
-    drakvuf_interrupt(drakvuf, -1);
-    drakvuf_remove_trap(drakvuf, &injector->bp, NULL);
-
-    reg_t rax = info->regs->rax;
+    drakvuf_pause(drakvuf);
 
     vmi_set_vcpureg(injector->vmi, injector->saved_rsp, RSP, info->vcpu);
     vmi_set_vcpureg(injector->vmi, injector->saved_rax, RAX, info->vcpu);
@@ -789,6 +795,11 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
     vmi_set_vcpureg(injector->vmi, injector->saved_r8, R8, info->vcpu);
     vmi_set_vcpureg(injector->vmi, injector->saved_r9, R9, info->vcpu);
 
+    drakvuf_interrupt(drakvuf, -1);
+    drakvuf_remove_trap(drakvuf, &injector->bp, NULL);
+
+    reg_t rax = info->regs->rax;
+
     PRINT_DEBUG("RAX: 0x%lx\n", rax);
 
     if (rax) {
@@ -796,26 +807,24 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
 
         if (injector->is32bit) {
             struct process_information_32 pip = { 0 };
-            vmi_read(injector->vmi, &ctx, &pip,
-                     sizeof(struct process_information_32));
-
-            injector->pid = pip.dwProcessId;
-            injector->tid = pip.dwThreadId;
-            injector->hProc = pip.hProcess;
-            injector->hThr = pip.hThread;
-
+            if ( sizeof(struct process_information_32) == vmi_read(injector->vmi, &ctx, &pip, sizeof(struct process_information_32)) )
+            {
+                printf("Process info read from 0x%lx\n", ctx.addr);
+                injector->pid = pip.dwProcessId;
+                injector->tid = pip.dwThreadId;
+                injector->hProc = pip.hProcess;
+                injector->hThr = pip.hThread;
+            }
         } else {
             struct process_information_64 pip = { 0 };
-            vmi_read(injector->vmi, &ctx, &pip,
-                     sizeof(struct process_information_64));
-
-            injector->pid = pip.dwProcessId;
-            injector->tid = pip.dwThreadId;
-            injector->hProc = pip.hProcess;
-            injector->hThr = pip.hThread;
+            if ( sizeof(struct process_information_64) == vmi_read(injector->vmi, &ctx, &pip, sizeof(struct process_information_64)) )
+            {
+                injector->pid = pip.dwProcessId;
+                injector->tid = pip.dwThreadId;
+                injector->hProc = pip.hProcess;
+                injector->hThr = pip.hThread;
+            }
         }
-
-        PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
 
         /*
          * Sometimes injection seem to return 1 in RAX but
@@ -823,6 +832,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
          * the root cause just return 0 for PID >= 5000.
          */
         if (injector->pid < 5000 && injector->tid) {
+            PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
             injector->rc = rax;
             /*injector->cr3 = vmi_pid_to_dtb(vmi, injector->pid);
             injector->cr3_event.callback = waitfor_cr3_callback;
@@ -830,10 +840,13 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
             injector->cr3_event.data = injector;
             vmi_register_event(vmi, &injector->cr3_event);*/
         } else {
+            PRINT_DEBUG("Failed to inject\n");
             injector->rc = 0;
         }
     }
 
+done:
+    drakvuf_resume(drakvuf);
     return 0;
 }
 
@@ -846,6 +859,10 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
         .target_pid = pid,
         .target_tid = tid,
         .target_proc = app,
+        .pid = 0,
+        .tid = 0,
+        .hProc = 0,
+        .hThr = 0,
         .rc = 0
     };
 

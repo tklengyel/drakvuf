@@ -500,7 +500,7 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     event->x86_regs->cr3 = event->reg_event.value;
 
     /* Flush the LibVMI caches */
-    vmi_v2pcache_flush(drakvuf->vmi);
+    vmi_v2pcache_flush(drakvuf->vmi, event->reg_event.previous);
     vmi_pidcache_flush(drakvuf->vmi);
     vmi_rvacache_flush(drakvuf->vmi);
     vmi_symcache_flush(drakvuf->vmi);
@@ -696,15 +696,13 @@ void remove_trap(drakvuf_t drakvuf,
         container->traps = g_slist_remove(container->traps, trap);
 
         if (!container->traps) {
-            PRINT_DEBUG("Removing memtrap for GFN 0x%lx\n", container->memaccess.gfn);
-
-            /*
-             * This vmi_clear_event will be queued and removed when all events
-             * are pulled from the ring.
-             */
-            vmi_set_mem_event(vmi, container->memaccess.gfn, VMI_MEMACCESS_N, drakvuf->altp2m_idx);
-            g_hash_table_remove(drakvuf->memaccess_lookup_trap, &trap);
-            g_hash_table_remove(drakvuf->memaccess_lookup_gfn, &container->memaccess.gfn);
+            if ( VMI_SUCCESS == vmi_set_mem_event(vmi, container->memaccess.gfn, VMI_MEMACCESS_N, drakvuf->altp2m_idx) )
+            {
+                PRINT_DEBUG("Removed memtrap for GFN 0x%lx in altp2m view %u\n",
+                            container->memaccess.gfn, drakvuf->altp2m_idx);
+                g_hash_table_remove(drakvuf->memaccess_lookup_trap, &trap);
+                g_hash_table_remove(drakvuf->memaccess_lookup_gfn, &container->memaccess.gfn);
+            }
             return;
         }
 
