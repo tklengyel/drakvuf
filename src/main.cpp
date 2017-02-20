@@ -150,7 +150,7 @@ int main(int argc, char** argv) {
 
     if (argc < 4) {
         fprintf(stderr, "Required input:\n"
-               "\t -r <rekall profile>       The Rekall profile of the Windows kernel\n"
+               "\t -r <rekall profile>       The Rekall profile of the OS kernel\n"
                "\t -d <domain ID or name>    The domain's ID or name\n"
                "Optional inputs:\n"
                "\t -i <injection pid>        The PID of the process to hijack for injection\n"
