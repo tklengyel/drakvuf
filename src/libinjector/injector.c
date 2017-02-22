@@ -590,6 +590,15 @@ event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         return 0;
     }
 
+    if ( !injector->target_tid )
+    {
+        uint32_t threadid = 0;
+        if ( !drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, &threadid) || !threadid )
+            return 0;
+
+        injector->target_tid = threadid;
+    }
+
     PRINT_DEBUG("Stack setup finished and return trap added @ 0x%" PRIx64 "\n",
                 injector->bp.breakpoint.addr);
 
@@ -712,21 +721,23 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
     struct injector *injector = info->trap->data;
     reg_t cr3 = info->regs->cr3;
 
-    vmi_pid_t pid = vmi_dtb_to_pid(injector->vmi, cr3);
-
     access_context_t ctx = {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = cr3,
     };
 
-    PRINT_DEBUG("INT3 Callback @ 0x%lx. PID %u. CR3 0x%lx.\n",
-                info->regs->rip, pid, cr3);
+    PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx.\n",
+                info->regs->rip, cr3);
 
     if ( cr3 != injector->target_cr3 ) {
         PRINT_DEBUG("INT3 received but CR3 (0x%lx) doesn't match target process (0x%lx)\n",
                     cr3, injector->target_cr3);
         return 0;
     }
+
+    uint32_t threadid = 0;
+    if ( !drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, &threadid) || !threadid )
+        return 0;
 
     if ( !injector->is32bit && !injector->hijacked && info->regs->rip == injector->bp.breakpoint.addr ) {
         /* We just hit the RIP from the trapframe */
@@ -742,10 +753,13 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
 
         injector->hijacked = 1;
 
+        if ( !injector->target_tid )
+            injector->target_tid = threadid;
+
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
-    if ( !injector->hijacked || info->regs->rip != injector->bp.breakpoint.addr )
+    if ( !injector->hijacked || info->regs->rip != injector->bp.breakpoint.addr || threadid != injector->target_tid )
         return 0;
 
     // We are now in the return path from CreateProcessA
