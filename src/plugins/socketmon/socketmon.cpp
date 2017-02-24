@@ -169,7 +169,7 @@ static inline void ipv4_to_str(char **str, uint8_t ipv4[4])
 {
     *str = (char *)g_malloc0(snprintf(NULL, 0, "%u.%u.%u.%u",
                              ipv4[0], ipv4[1], ipv4[2], ipv4[3]) + 1);
-    if ( !str )
+    if ( !(*str) )
         return;
 
     sprintf(*str, "%u.%u.%u.%u", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
@@ -184,7 +184,7 @@ static inline void ipv6_to_str(char **str, uint8_t ipv6[16])
                      ipv6[8], ipv6[9], ipv6[10], ipv6[11],
                      ipv6[12], ipv6[13], ipv6[14], ipv6[15]) + 1);
 
-    if ( !str )
+    if ( !(*str) )
         return;
 
    sprintf(*str,

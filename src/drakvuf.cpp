@@ -171,6 +171,7 @@ drakvuf_c::drakvuf_c(const char* domain,
     this->drakvuf = NULL;
     this->interrupted = 0;
     this->timeout = timeout;
+    this->process_start_timeout = timeout;
     this->rekall_profile = rekall_profile;
     this->leave_paused = leave_paused;
 
@@ -292,7 +293,6 @@ bool drakvuf_c::wait_for_process(const char *processname)
     this->timeout_thread2 = g_thread_new(NULL, timer2, (void*)this);
 
     this->process_start_name = processname;
-    this->process_start_timeout = 30;
 
     g_mutex_unlock(&this->loop_signal2);
     drakvuf_loop(this->drakvuf);
