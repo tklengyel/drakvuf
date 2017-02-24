@@ -188,17 +188,28 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         uint8_t previous_mode;
 
         ctx.addr = info->regs->rsp+4;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&exception_record);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&exception_record) )
+            goto done;
+
         ctx.addr = info->regs->rsp+12;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&ptrap_frame);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&ptrap_frame) )
+            goto done;
+
         ctx.addr = info->regs->rsp+16;
-        vmi_read_8(vmi, &ctx, (uint8_t*)&previous_mode);
+        if ( VMI_FAILURE == vmi_read_8(vmi, &ctx, (uint8_t*)&previous_mode) )
+            goto done;
+
         ctx.addr = info->regs->rsp+20;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&first_chance);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&first_chance) )
+            goto done;
+
         ctx.addr = ptrap_frame;
-        vmi_read(vmi,&ctx, trap_frame, e->ktrap_frame_size);
+        if ( e->ktrap_frame_size != vmi_read(vmi,&ctx, trap_frame, e->ktrap_frame_size) )
+            goto done;
+
         ctx.addr = exception_record;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code) )
+            goto done;
 
         switch(e->format) {
         case OUTPUT_CSV:
@@ -232,8 +243,12 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             if (process){
                 uint32_t pid,ppid;
                 char* name;
-                vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
-                vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PPID], 0, (uint32_t*)&ppid);
+                if ( VMI_FAILURE == vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PID], 0, (uint32_t*)&pid) )
+                    goto done;
+
+                if ( VMI_FAILURE == vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PPID], 0, (uint32_t*)&ppid) )
+                    goto done;
+
                 name = vmi_read_str_va(vmi, process + e->offsets[EPROCESS_NAME], 0);
                 printf(user_format,pid,ppid,name);
                 free(name);
@@ -245,11 +260,16 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         reg_t exception_code;
 
         ctx.addr = info->regs->r8;
-        vmi_read(vmi,&ctx, trap_frame, e->ktrap_frame_size);
+        if ( e->ktrap_frame_size != vmi_read(vmi,&ctx, trap_frame, e->ktrap_frame_size) )
+            goto done;
+
         ctx.addr = info->regs->rcx;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code) )
+            goto done;
+
         ctx.addr = info->regs->rsp+40; // Return address + 32 byte shadow space
-        vmi_read_32(vmi, &ctx, (uint32_t*)&first_chance);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&first_chance) )
+            goto done;
 
         switch(e->format) {
         case OUTPUT_CSV:
@@ -283,8 +303,13 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             if (process){
                 uint32_t pid,ppid;
                 char* name;
-                vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
-                vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PPID], 0, (uint32_t*)&ppid);
+
+                if ( VMI_FAILURE == vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PID], 0, (uint32_t*)&pid) )
+                    goto done;
+
+                if ( VMI_FAILURE == vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PPID], 0, (uint32_t*)&ppid) )
+                    goto done;
+
                 name = vmi_read_str_va(vmi, process + e->offsets[EPROCESS_NAME], 0);
                 printf(user_format,pid,ppid,name);
                 free(name);
@@ -294,7 +319,8 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         }
     }
 
-    free(trap_frame);
+done:
+    g_free(trap_frame);
     drakvuf_release_vmi(drakvuf);
     return 0;
 }
