@@ -225,34 +225,23 @@ gpointer timer_thread(gpointer data) {
     return NULL;
 }
 
-static void prepare(char *sample, struct start_drakvuf *start)
+static struct start_drakvuf* prepare(struct start_drakvuf *start, int _threadid)
 {
-    if ((!sample && !start) || shutting_down)
-        return;
+    if (shutting_down)
+        return NULL;
 
     domid_t cloneID = 0;
     char *clone_name = NULL;
-    int threadid;
-
-    if (!start)
-        threadid = find_thread();
-    else
-        threadid = start->threadid;
-
-    while(threadid<0 && !shutting_down) {
-        //printf("Waiting for a thread to become available..\n");
-        sleep(1);
-        threadid = find_thread();
-    }
+    int threadid = start ? start->threadid : _threadid;
 
     if ( shutting_down )
-        return;
+        return NULL;
 
-    printf("Making clone %i to run %s in thread %u\n", threadid+1, sample ? sample : start->input, threadid);
+    printf("[%i] Making clone\n", threadid);
     make_clone(xen, &cloneID, threadid+1, &clone_name);
 
     while((!clone_name || !cloneID) && !shutting_down) {
-        printf("Clone creation failed, trying again\n");
+        printf("[%i] Clone creation failed, trying again\n", threadid);
         free(clone_name);
         clone_name = NULL;
         cloneID = 0;
@@ -261,14 +250,13 @@ static void prepare(char *sample, struct start_drakvuf *start)
     }
 
     if ( shutting_down )
-        return;
+        return NULL;
 
     //uint64_t shared = xen_memshare(xen, domID, cloneID);
     //printf("Shared %"PRIu64" pages\n", shared);
 
-    if(!start && sample) {
+    if(!start) {
         start = g_malloc0(sizeof(struct start_drakvuf));
-        start->input = sample;
         start->threadid = threadid;
         g_mutex_init(&start->timer_lock);
     }
@@ -277,9 +265,15 @@ static void prepare(char *sample, struct start_drakvuf *start)
     start->clone_name = clone_name;
     start->utime = time(NULL);
 
-    if(sample && !shutting_down) {
-        g_thread_pool_push(pool, start, NULL);
-    }
+    return start;
+}
+
+static inline void start(struct start_drakvuf *start, char *sample) {
+    if ( shutting_down || !start || !sample )
+        return;
+
+    start->input = g_strdup(sample);
+    g_thread_pool_push(pool, start, NULL);
 }
 
 void run_drakvuf(gpointer data, gpointer user_data)
@@ -347,7 +341,7 @@ end:
     if ( !shutting_down )
     {
         printf("[%i] %s failed to execute on %u because of a timeout, creating new clone\n", start->threadid, start->input, start->cloneID);
-        prepare(NULL, start);
+        prepare(start, -1);
         goto restart;
     }
 }
@@ -361,9 +355,9 @@ int main(int argc, char** argv)
     struct sigaction act;
     shutting_down = 0;
 
-    if(argc!=14) {
+    if(argc!=15) {
         printf("Not enough arguments: %i!\n", argc);
-        printf("%s <origin domain name> <domain config> <rekall_profile> <injection pid> <watch folder> <serve folder> <output folder> <max clones> <clone_script> <config_script> <drakvuf_script> <cleanup_script> <tcpdump_script>\n", argv[0]);
+        printf("%s <loop (0) or poll (1)> <origin domain name> <domain config> <rekall_profile> <injection pid> <watch folder> <serve folder> <output folder> <max clones> <clone_script> <config_script> <drakvuf_script> <cleanup_script> <tcpdump_script>\n", argv[0]);
         return 1;
     }
 
@@ -378,26 +372,25 @@ int main(int argc, char** argv)
 
     xen_init_interface(&xen);
 
-    domain_name = argv[1];
-    domain_config = argv[2];
-    rekall_profile = argv[3];
-    injection_pid = atoi(argv[4]);
-    in_folder = argv[5];
-    run_folder = argv[6];
-    out_folder = argv[7];
-    threads = atoi(argv[8]);
-    clone_script = argv[9];
-    config_script = argv[10];
-    drakvuf_script = argv[11];
-    cleanup_script = argv[12];
-    tcpdump_script = argv[13];
+    int do_poll = atoi(argv[1]);
+    domain_name = argv[2];
+    domain_config = argv[3];
+    rekall_profile = argv[4];
+    injection_pid = atoi(argv[5]);
+    in_folder = argv[6];
+    run_folder = argv[7];
+    out_folder = argv[8];
+    threads = atoi(argv[9]);
+    clone_script = argv[10];
+    config_script = argv[11];
+    drakvuf_script = argv[12];
+    cleanup_script = argv[13];
+    tcpdump_script = argv[14];
 
     if (threads > 128) {
         printf("Too many clones requested (max 128 is specified right now)\n");
         return 1;
     }
-
-    bool move_sample = strcmp(in_folder, run_folder);
 
     for(i=0;i<threads;i++)
         g_mutex_init(&locks[i]);
@@ -413,25 +406,31 @@ int main(int argc, char** argv)
         .events = POLLIN
     };
 
-    printf("Starting dirwatch on %s\n", in_folder);
+    int threadid = -1;
 
     do {
         processed = 0;
+
+        while(threadid<0 && !shutting_down) {
+            sleep(1);
+            threadid = find_thread();
+        }
 
         if ((dir = opendir (in_folder)) != NULL) {
             while ((ent = readdir (dir)) != NULL && !shutting_down) {
                 if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
                     continue;
 
-                if ( move_sample ) {
-                    char *command = g_malloc0(snprintf(NULL, 0, "mv %s/%s %s/%s", in_folder, ent->d_name, run_folder, ent->d_name) + 1);
-                    sprintf(command, "mv %s/%s %s/%s", in_folder, ent->d_name, run_folder, ent->d_name);
-                    printf("** MOVING FILE FOR PROCESSING: %s\n", command);
-                    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
-                    g_free(command);
-                }
+                char *command = g_malloc0(snprintf(NULL, 0, "mv %s/%s %s/%s", in_folder, ent->d_name, run_folder, ent->d_name) + 1);
+                sprintf(command, "mv %s/%s %s/%s", in_folder, ent->d_name, run_folder, ent->d_name);
+                printf("** MOVING FILE FOR PROCESSING: %s\n", command);
+                g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
+                g_free(command);
 
-                prepare(g_strdup(ent->d_name), NULL);
+                struct start_drakvuf *_start = prepare(NULL, threadid);
+                start(_start, ent->d_name);
+
+                threadid = -1;
                 processed++;
 
             }
@@ -448,8 +447,8 @@ int main(int argc, char** argv)
 	        printf("Batch processing started %u samples (total %u)\n", processed, total_processed);
         }
 
-        if ( !processed ) {
-            if ( move_sample ) {
+        if ( !processed && !shutting_down ) {
+            if ( do_poll ) {
                 do {
                     int rv = poll (&pollfd, 1, 1000);
                     if ( rv < 0 ) {
@@ -474,6 +473,9 @@ int main(int argc, char** argv)
     close(fd);
 
     g_thread_pool_free(pool, FALSE, TRUE);
+
+    if ( threadid >= 0 )
+        g_mutex_unlock(&locks[threadid]);
 
     for(i=0;i<threads;i++)
         g_mutex_clear(&locks[i]);
