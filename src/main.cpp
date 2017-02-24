@@ -127,11 +127,12 @@ static inline void disable_plugin(char *optarg, bool *plugin_list) {
 }
 
 int main(int argc, char** argv) {
-    int c, rc = 0, timeout = 0;
+    int c, rc = 1, timeout = 0;
     char *inject_cmd = NULL;
     char *domain = NULL;
     char *rekall_profile = NULL;
     char *dump_folder = NULL;
+    char *start_process_name = NULL;
     vmi_pid_t injection_pid = -1;
     uint32_t injection_thread = 0;
     struct sigaction act;
@@ -160,6 +161,7 @@ int main(int argc, char** argv) {
                "\t -o <format>               Output format (default or csv)\n"
                "\t -x <plugin>               Don't activate the specified plugin\n"
                "\t -p                        Leave domain paused after DRAKVUF exits\n"
+               "\t -w <process name>         Wait with plugin start until process name is detected\n"
 #ifdef VOLATILITY
                "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
 #endif
@@ -173,7 +175,7 @@ int main(int argc, char** argv) {
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:t:D:o:vx:sp")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:t:D:o:vx:spw:")) != -1)
     switch (c)
     {
     case 'r':
@@ -209,6 +211,9 @@ int main(int argc, char** argv) {
         break;
     case 'p':
         leave_paused = 1;
+        break;
+    case 'w':
+        start_process_name = optarg;
         break;
 #ifdef DRAKVUF_DEBUG
     case 'v':
@@ -252,22 +257,27 @@ int main(int argc, char** argv) {
 
     if ( injection_pid > 0 && inject_cmd ) {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_cmd);
-        rc = drakvuf->inject_cmd(injection_pid, injection_thread, inject_cmd);
-        if (!rc)
+        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_cmd);
+        if (!ret)
+            goto exit;
+    }
+
+    if ( start_process_name )
+    {
+        if ( !drakvuf->wait_for_process(start_process_name) )
             goto exit;
     }
 
     PRINT_DEBUG("Starting plugins\n");
 
-    rc = drakvuf->start_plugins(plugin_list, dump_folder, cpuid_stealth);
-    if ( rc < 0 )
+    if ( drakvuf->start_plugins(plugin_list, dump_folder, cpuid_stealth) < 0 )
         goto exit;
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");
 
     /* Start the event listener */
     drakvuf->loop();
-    rc = 1;
+    rc = 0;
 
     PRINT_DEBUG("Finished DRAKVUF loop\n");
 

@@ -122,14 +122,15 @@
 // This is defined in libdrakvuf
 extern bool verbose;
 
+#define UNUSED(x) (void)(x)
 #define PRINT_DEBUG(...) \
     do { \
         if(verbose) fprintf (stderr, __VA_ARGS__); \
     } while (0)
 
 #else
-#define PRINT_DEBUG(...) \
-    do {} while(0)
+#define PRINT_DEBUG(...)
+#define UNUSED(...)
 #endif
 
 class drakvuf_c {
@@ -138,6 +139,7 @@ class drakvuf_c {
         drakvuf_t drakvuf;
         drakvuf_plugins* plugins;
         GThread *timeout_thread = NULL;
+        GThread *timeout_thread2 = NULL;
         const char *rekall_profile;
         os_t os;
 
@@ -145,6 +147,11 @@ class drakvuf_c {
         int timeout;
         int interrupted;
         GMutex loop_signal;
+
+        const char *process_start_name;
+        bool process_start_detected;
+        int process_start_timeout;
+        GMutex loop_signal2;
 
         drakvuf_c(const char* domain,
                   const char *rekall_profile,
@@ -161,6 +168,8 @@ class drakvuf_c {
         void resume();
         int inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char *inject_cmd);
         int start_plugins(const bool* plugin_list, const char *dump_folder, bool cpuid_stealth);
+        bool wait_for_process(const char *processname);
+
 };
 
 #endif
