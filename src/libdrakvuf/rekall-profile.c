@@ -114,14 +114,14 @@
 #include "libdrakvuf.h"
 #include "private.h"
 
-status_t rekall_lookup(
+bool rekall_lookup(
         const char *rekall_profile,
         const char *symbol,
         const char *subsymbol,
         addr_t *rva,
         addr_t *size)
 {
-    status_t ret = VMI_FAILURE;
+    bool ret = false;
     if(!rekall_profile || !symbol) {
         return ret;
     }
@@ -146,7 +146,7 @@ status_t rekall_lookup(
 
         *rva = json_object_get_int64(jsymbol);
 
-        ret = VMI_SUCCESS;
+        ret = true;
     } else {
         json_object *structs = NULL, *jstruct = NULL, *jstruct2 = NULL, *jmember = NULL, *jvalue = NULL;
         if (!json_object_object_get_ex(root, "$STRUCTS", &structs)) {
@@ -162,7 +162,7 @@ status_t rekall_lookup(
             json_object *jsize = json_object_array_get_idx(jstruct, 0);
             *size = json_object_get_int64(jsize);
 
-            ret = VMI_SUCCESS;
+            ret = true;
             goto exit;
         }
 
@@ -185,7 +185,7 @@ status_t rekall_lookup(
 
         *rva = json_object_get_int64(jvalue);
 
-        ret = VMI_SUCCESS;
+        ret = true;
     }
 
 exit:
@@ -281,7 +281,7 @@ err_exit:
     return ret;
 }
 
-status_t drakvuf_get_function_rva(const char *rekall_profile, const char *function, addr_t *rva)
+bool drakvuf_get_function_rva(const char *rekall_profile, const char *function, addr_t *rva)
 {
 
     json_object *root = json_object_from_file(rekall_profile);
@@ -303,16 +303,16 @@ status_t drakvuf_get_function_rva(const char *rekall_profile, const char *functi
 
     *rva = json_object_get_int64(jsymbol);
     json_object_put(root);
-    return VMI_SUCCESS;
+    return true;
 
 err_exit:
     if ( root )
         json_object_put(root);
 
-    return VMI_FAILURE;
+    return false;
 }
 
-status_t drakvuf_get_constant_rva(const char *rekall_profile, const char *constant, addr_t *rva)
+bool drakvuf_get_constant_rva(const char *rekall_profile, const char *constant, addr_t *rva)
 {
 
     json_object *root = json_object_from_file(rekall_profile);
@@ -334,13 +334,13 @@ status_t drakvuf_get_constant_rva(const char *rekall_profile, const char *consta
 
     *rva = json_object_get_int64(jsymbol);
     json_object_put(root);
-    return VMI_SUCCESS;
+    return true;
 
 err_exit:
     if ( root )
         json_object_put(root);
 
-    return VMI_FAILURE;
+    return false;
 }
 
 void drakvuf_free_symbols(symbols_t *symbols) {

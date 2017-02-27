@@ -168,8 +168,9 @@ bool win_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const
     size_t name_len = strlen( module_name );
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t next_module = module_list_head;
+    int limit = 100, counter = 0;
 
-    while( 1 )
+    while( counter < limit )
     {
         addr_t tmp_next = 0;
 
@@ -192,24 +193,29 @@ bool win_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const
         if ( us )
         {
             unicode_string_t out = { 0 };
-            if ( vmi_convert_str_encoding( us, &out, "UTF-8" ) == VMI_SUCCESS  )
+            if ( VMI_FAILURE == vmi_convert_str_encoding( us, &out, "UTF-8" ) )
             {
-                if ( ! strncasecmp( (char *)out.contents, module_name, name_len ) )
-                {
-                    free( out.contents );
-                    vmi_free_unicode_str( us );
-                    *base_addr_out = base_addr ;
-                    return true ;
-                }
-
-                free( out.contents );
+                vmi_free_unicode_str(us);
+                break;
             }
+
+            if ( ! strncasecmp( (char *)out.contents, module_name, name_len ) )
+            {
+                free( out.contents );
+                vmi_free_unicode_str( us );
+                *base_addr_out = base_addr ;
+                return true ;
+            }
+
+            free( out.contents );
             vmi_free_unicode_str( us );
         }
 
-        next_module = tmp_next ;
+        next_module = tmp_next;
+        counter++;
     }
 
+    PRINT_DEBUG("Failed to find %s in list starting at 0x%lx\n", module_name, module_list_head);
     return false ;
 }
 
@@ -221,7 +227,7 @@ static bool find_kernbase(drakvuf_t drakvuf) {
         return 0;
     }
 
-    if ( VMI_FAILURE == drakvuf_get_constant_rva(drakvuf->rekall_profile, "PsInitialSystemProcess", &sysproc_rva) ) {
+    if ( !drakvuf_get_constant_rva(drakvuf->rekall_profile, "PsInitialSystemProcess", &sysproc_rva) ) {
         fprintf(stderr, "Failed to get PsInitialSystemProcess RVA from Rekall profile!\n");
         return 0;
     }

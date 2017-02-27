@@ -391,9 +391,9 @@ void drakvuf_force_resume (drakvuf_t drakvuf) {
     xen_force_resume(drakvuf->xen, drakvuf->domID);
 }
 
-status_t drakvuf_get_struct_size(const char *rekall_profile,
-                                 const char *struct_name,
-                                 size_t *size)
+bool drakvuf_get_struct_size(const char *rekall_profile,
+                             const char *struct_name,
+                             size_t *size)
 {
     return rekall_lookup(
                 rekall_profile,
@@ -403,10 +403,10 @@ status_t drakvuf_get_struct_size(const char *rekall_profile,
                 size);
 }
 
-status_t drakvuf_get_struct_member_rva(const char *rekall_profile,
-                                       const char *struct_name,
-                                       const char *symbol,
-                                       addr_t *rva)
+bool drakvuf_get_struct_member_rva(const char *rekall_profile,
+                                   const char *struct_name,
+                                   const char *symbol,
+                                   addr_t *rva)
 {
     return rekall_lookup(
                 rekall_profile,

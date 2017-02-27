@@ -842,12 +842,10 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
     // Get the offsets from the Rekall profile
     unsigned int i;
     for (i = 0; i < OFFSET_MAX; i++) {
-        if (VMI_FAILURE
-                == drakvuf_get_struct_member_rva(
-                        injector.rekall_profile, offset_names[i][0],
-                        offset_names[i][1], &injector.offsets[i])) {
+        if ( !drakvuf_get_struct_member_rva(injector.rekall_profile, offset_names[i][0], offset_names[i][1], &injector.offsets[i]))
+        {
             PRINT_DEBUG("Failed to find offset for %s:%s\n", offset_names[i][0],
-                    offset_names[i][1]);
+                        offset_names[i][1]);
         }
     }
 
