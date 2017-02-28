@@ -154,9 +154,9 @@ char *drakvuf_get_process_name(drakvuf_t drakvuf, addr_t process_base) {
     return NULL;
 }
 
-bool drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *pid) {
+vmi_pid_t drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base) {
     if ( drakvuf->osi.get_process_pid )
-        return drakvuf->osi.get_process_pid(drakvuf, process_base, pid);
+        return drakvuf->osi.get_process_pid(drakvuf, process_base);
 
     return 0;
 }

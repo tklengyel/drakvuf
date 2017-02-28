@@ -152,9 +152,13 @@ char *win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base) {
     return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
 }
 
-bool win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t *pid) {
-    status_t rc = vmi_read_32_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)pid);
-    return (rc == VMI_SUCCESS) ? 1 : 0;
+vmi_pid_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base) {
+    uint32_t pid;
+
+    if ( VMI_FAILURE == vmi_read_32_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PID], 0, &pid) )
+        return -1;
+
+    return pid;
 }
 
 char *win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id) {

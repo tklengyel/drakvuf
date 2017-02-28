@@ -206,7 +206,7 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
     if(trap->breakpoint.lookup_type == LOOKUP_PID || trap->breakpoint.lookup_type == LOOKUP_NAME) {
         if (trap->breakpoint.addr_type == ADDR_RVA && trap->breakpoint.module) {
 
-            vmi_pid_t pid = ~0;
+            vmi_pid_t pid = -1;
             const char *name = NULL;
             addr_t module_list = 0;
 
@@ -230,8 +230,12 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
                 if( !drakvuf_find_process(drakvuf, pid, name, &process_base) )
                     return 0;
 
-                if(pid == ~0 && !drakvuf_get_process_pid(drakvuf, process_base, &pid))
-                    return 0;
+                if (pid == -1)
+                {
+                    pid = drakvuf_get_process_pid(drakvuf, process_base);
+                    if (pid == -1)
+                        return 0;
+                }
 
                 if( !drakvuf_get_module_list(drakvuf, process_base, &module_list) )
                     return 0;
