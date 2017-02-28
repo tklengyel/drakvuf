@@ -153,11 +153,11 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const void *config, output_format_t output) 
 
     this->format = output;
 
-    if ( drakvuf_get_constant_rva(rekall_profile, "KiServiceTable", &kiservicetable_rva) == VMI_FAILURE ) {
+    if ( !drakvuf_get_constant_rva(rekall_profile, "KiServiceTable", &kiservicetable_rva) ) {
         PRINT_DEBUG("SSDT plugin can't find KiServiceTable RVA\n");
         throw -1;
     }
-    if ( drakvuf_get_constant_rva(rekall_profile, "KiServiceLimit", &kiservicelimit_rva) == VMI_FAILURE ) {
+    if ( !drakvuf_get_constant_rva(rekall_profile, "KiServiceLimit", &kiservicelimit_rva) ) {
         PRINT_DEBUG("SSDT plugin can't find KiServiceLimit RVA\n");
         throw -1;
     }

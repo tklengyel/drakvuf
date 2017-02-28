@@ -1070,7 +1070,7 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
     this->poolalloc.cb = cb;
     this->poolalloc.data = (void*)this;
 
-    if (VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag", &this->poolalloc.breakpoint.rva))
+    if ( !drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag", &this->poolalloc.breakpoint.rva) )
         throw -1;
 
     if ( !drakvuf_add_trap(drakvuf, &this->poolalloc) )

@@ -328,7 +328,7 @@ done:
 exmon::exmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
     const char *rekall_profile =(const char *)config;
 
-    if(VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "KiDispatchException", &this->trap.breakpoint.rva))
+    if( !drakvuf_get_function_rva(rekall_profile, "KiDispatchException", &this->trap.breakpoint.rva) )
         throw -1;
 
     this->trap.cb = cb;
@@ -344,7 +344,7 @@ exmon::exmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
     for(i=0;i<__OFFSET_MAX;i++)
         drakvuf_get_struct_member_rva(rekall_profile, offset_names[i][0], offset_names[i][1], &this->offsets[i]);
 
-    if(VMI_FAILURE == drakvuf_get_struct_size(rekall_profile, "_KTRAP_FRAME", &this->ktrap_frame_size)) {
+    if( !drakvuf_get_struct_size(rekall_profile, "_KTRAP_FRAME", &this->ktrap_frame_size) ) {
         g_free(this->offsets);
         throw -1;
     }

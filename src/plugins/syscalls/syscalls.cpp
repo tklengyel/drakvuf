@@ -136,15 +136,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
     PRINT_DEBUG("Received %lu symbols\n", symbols->count);
 
     if ( s->os == VMI_OS_WINDOWS ) {
-        addr_t module_list, ntoskrnl;
-
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-        if(VMI_FAILURE == vmi_read_addr_ksym(vmi, (char *)"PsLoadedModuleList", &module_list))
-            goto done;
-
-        if( !drakvuf_get_module_base_addr(drakvuf, module_list, "ntoskrnl.exe", &ntoskrnl) )
-            goto done;
+        addr_t ntoskrnl = drakvuf_get_kernel_base(drakvuf);
 
         for (i=0; i < symbols->count; i++) {
 
@@ -170,15 +162,13 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
 
             ret = g_slist_prepend(ret, trap);
         }
-
-        drakvuf_release_vmi(drakvuf);
     }
 
     if ( s->os == VMI_OS_LINUX ) {
         addr_t rva = 0;
 
-        if ( VMI_FAILURE == drakvuf_get_constant_rva(rekall_profile, "_text", &rva) )
-            goto done;
+        if ( !drakvuf_get_constant_rva(rekall_profile, "_text", &rva) )
+            return NULL;
 
         addr_t kaslr = drakvuf_get_kernel_base(drakvuf) - rva;
 
@@ -214,7 +204,6 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
         }
     }
 
-done:
     return ret;
 }
 

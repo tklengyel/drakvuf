@@ -369,15 +369,15 @@ filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t ou
     this->poolalloc.cb = cb;
     this->poolalloc.data = (void*)this;
 
-    if (VMI_FAILURE == drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag", &this->poolalloc.breakpoint.rva))
+    if ( !drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag", &this->poolalloc.breakpoint.rva) )
         throw -1;
-    if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_FILE_OBJECT", "FileName", &this->file_name_offset))
+    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_OBJECT", "FileName", &this->file_name_offset) )
         throw -1;
-    if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_UNICODE_STRING", "Buffer", &this->string_buffer_offset))
+    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_UNICODE_STRING", "Buffer", &this->string_buffer_offset) )
         throw -1;
-    if (VMI_FAILURE == drakvuf_get_struct_member_rva(rekall_profile, "_UNICODE_STRING", "Length", &this->string_length_offset))
+    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_UNICODE_STRING", "Length", &this->string_length_offset) )
         throw -1;
-    if (VMI_FAILURE == drakvuf_get_struct_size(rekall_profile, "_FILE_OBJECT", &this->file_object_size))
+    if ( !drakvuf_get_struct_size(rekall_profile, "_FILE_OBJECT", &this->file_object_size) )
         throw -1;
 
     if (this->pm == VMI_PM_IA32E)
