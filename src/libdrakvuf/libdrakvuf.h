@@ -302,7 +302,8 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
 char *drakvuf_get_process_name(drakvuf_t drakvuf,
                                addr_t process_base);
 
-bool drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *pid);
+vmi_pid_t drakvuf_get_process_pid(drakvuf_t drakvuf,
+                                  addr_t process_base);
 
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,

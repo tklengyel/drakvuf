@@ -169,7 +169,7 @@ char *linux_get_process_name(drakvuf_t drakvuf, addr_t process_base) {
     return vmi_read_str(drakvuf->vmi, &ctx);
 }
 
-bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *pid) {
+vmi_pid_t linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base) {
     /*
      * On Linux PID is actually a thread ID, while the TGID (Thread Group-ID) is
      * what getpid() would return. Because THAT makes sense.
@@ -179,14 +179,13 @@ bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *pi
         .pid = 0,
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_TGID]
     };
-    uint32_t _pid;
 
-    if ( VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &_pid) )
-        return false;
+    uint32_t pid;
 
-    *pid = (vmi_pid_t)_pid;
+    if ( VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &pid) )
+        return -1;
 
-    return true;
+    return pid;
 }
 
 char *linux_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id) {
