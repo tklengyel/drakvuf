@@ -142,7 +142,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     ctx.dtb = info->regs->cr3;
     ctx.addr = info->regs->rsp+4;  // jump over base pointer
 
-    int nargs = syscall_struct[wrapper->syscall_index].num_args;
+    int nargs = win_syscall_struct[wrapper->syscall_index].num_args;
 
     // multiply num args by 4 for 32 bit systems to get the number of bytes we need
     // to read from the stack (only valid for 32 bit systems, 64 bit systems have
@@ -152,12 +152,24 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     
     unsigned char buf[size];
 
-    vmi_read(vmi, &ctx, buf, size);
+    if(size != vmi_read(vmi, &ctx, buf, size)){
+      return 0;
+    }
 
       switch(s->format) {
       case OUTPUT_CSV:
-        printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s\n",
+        printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s,",
                info->vcpu, info->regs->cr3, info->procname, info->userid, info->trap->breakpoint.module, info->trap->name);
+        for(i=0;i<nargs;i++) {
+          printf("%s,0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
+          for(j=3;j>=0;--j) { // j must be signed
+            printf("%02X", buf[i*4+j]);
+          }
+          if(i<nargs) { 
+            printf(",");
+          }
+        }
+        printf("\n");
         break;
       default:
       case OUTPUT_DEFAULT:
@@ -166,7 +178,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                USERIDSTR(drakvuf), info->userid,
                info->trap->breakpoint.module, info->trap->name, nargs);
         for(i=0;i<nargs;i++) {
-          printf("\t%s %s %s:0x",syscall_struct[wrapper->syscall_index].args[i].dir,syscall_struct[wrapper->syscall_index].args[i].type,syscall_struct[wrapper->syscall_index].args[i].name);
+          printf("\t%s:0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
           for(j=3;j>=0;--j) { // j must be signed
             printf("%02X", buf[i*4+j]);
           }
@@ -202,10 +214,12 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
             syscall_wrapper_t *wrapper = (syscall_wrapper_t *)g_malloc(sizeof(syscall_wrapper_t));
 
             for (j=0; j<NUM_SYSCALLS; j++) {
-              if(strcmp(symbol->name,syscall_struct[j].name)==0) {
+              if(strcmp(symbol->name,win_syscall_struct[j].name)==0) {
                 wrapper->sc=s;
                 wrapper->syscall_index=j;
               }
+              // exit if syscall is not found
+              // return NULL;
             }            
             
             drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));

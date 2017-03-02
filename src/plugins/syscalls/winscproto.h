@@ -113,14 +113,16 @@ typedef struct
   const char* dir;
   const char* dir_opt;
   const char* type;
-} ARG;
+} win_arg_t;
 
-struct syscall
+struct win_syscall
 {
   const char* name;
   int num_args;
-  ARG args[20];
+  win_arg_t args[20];
 };
+
+typedef struct win_syscall win_syscall_t;
 
 struct syscall_wrapper {
  syscalls *sc;
@@ -131,7 +133,7 @@ typedef struct syscall_wrapper syscall_wrapper_t;
 
 #define NUM_SYSCALLS 401
 
-static const struct syscall syscall_struct[] = {
+static const struct win_syscall win_syscall_struct[] = {
   { .name = "NtAcceptConnectPort", .num_args = 6, .args = 
     {
       {.name = "PortHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
