@@ -106,13 +106,33 @@
 #include <glib.h>
 #include <inttypes.h>
 #include "syscalls.h"
-#include "scproto.h"
+#include "winscproto.h"
 
-static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+
+    syscalls *s = (syscalls*)info->trap->data;
+
+    switch(s->format) {
+    case OUTPUT_CSV:
+        printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s\n",
+               info->vcpu, info->regs->cr3, info->procname, info->userid, info->trap->breakpoint.module, info->trap->name);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[SYSCALL] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" %s!%s\n",
+               info->vcpu, info->regs->cr3, info->procname,
+               USERIDSTR(drakvuf), info->userid,
+               info->trap->breakpoint.module, info->trap->name);
+        break;
+    }
+
+    return 0;
+}
+
+static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     int i,j;
 
-    syscall_wrapper_t *wrapper = (syscall_wrapper_t *)g_malloc(sizeof(syscall_wrapper_t));
-    wrapper = (syscall_wrapper*)info->trap->data;
+    syscall_wrapper_t *wrapper = (syscall_wrapper_t*)info->trap->data;
     syscalls *s = wrapper->sc;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -128,7 +148,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     // to read from the stack (only valid for 32 bit systems, 64 bit systems have
     // some arguments on cx, dx, r8, r9, and the stack).  assumes standard calling
     // convention (cdecl) for the visual studio compile.
-    unsigned int size = 4 * nargs; 
+    int size = 4 * nargs; 
     
     unsigned char buf[size];
 
@@ -155,7 +175,6 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         break;
       }
     drakvuf_release_vmi(drakvuf);
-//    g_free(wrapper); // segfaults. why?
     return 0;
 }   
 
@@ -197,7 +216,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
             trap->breakpoint.module = "ntoskrnl.exe";
             trap->name = g_strdup(symbol->name);
             trap->type = BREAKPOINT;
-            trap->cb = cb;
+            trap->cb = win_cb;
             trap->data = wrapper;
 
             ret = g_slist_prepend(ret, trap);
@@ -237,7 +256,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
             trap->breakpoint.module = "linux";
             trap->name = g_strdup(symbol->name);
             trap->type = BREAKPOINT;
-            trap->cb = cb;
+            trap->cb = linux_cb;
             trap->data = s;
 
             ret = g_slist_prepend(ret, trap);
@@ -278,7 +297,6 @@ syscalls::~syscalls() {
     while(loop) {
         drakvuf_trap_t *trap = (drakvuf_trap_t *)loop->data;
         g_free((char*)trap->name);
-        // need to free wrapper?
         g_free(trap->data);        
         g_free(loop->data);
         loop = loop->next;
