@@ -105,414 +105,2979 @@
 /*
  * From http://laredo-13.mit.edu/~brendan/scproto.txt
  *
- * TODO Integrate argument extraction into syscall monitoring
  */
 
-#ifndef SYSCALLS_PROTOTYPES_H
-#define SYSCALLS_PROTOTYPES_H
+typedef struct
+{
+  const char* name;
+  const char* dir;
+  const char* dir_opt;
+  const char* type;
+} ARG;
 
-/*
-NTSTATUS NtAcceptConnectPort (__out PHANDLE PortHandle, __in_opt PVOID PortContext, __in PPORT_MESSAGE ConnectionRequest, __in BOOLEAN AcceptConnection, __inout_opt PPORT_VIEW ServerView, __out_opt PREMOTE_PORT_VIEW ClientView)
-NTSTATUS NtAccessCheckAndAuditAlarm (__in PUNICODE_STRING SubsystemName, __in_opt PVOID HandleId, __in PUNICODE_STRING ObjectTypeName, __in PUNICODE_STRING ObjectName, __in PSECURITY_DESCRIPTOR SecurityDescriptor, __in ACCESS_MASK DesiredAccess, __in PGENERIC_MAPPING GenericMapping, __in BOOLEAN ObjectCreation, __out PACCESS_MASK GrantedAccess, __out PNTSTATUS AccessStatus, __out PBOOLEAN GenerateOnClose)
-NTSTATUS NtAccessCheckByTypeAndAuditAlarm (__in PUNICODE_STRING SubsystemName, __in_opt PVOID HandleId, __in PUNICODE_STRING ObjectTypeName, __in PUNICODE_STRING ObjectName, __in PSECURITY_DESCRIPTOR SecurityDescriptor, __in_opt PSID PrincipalSelfSid, __in ACCESS_MASK DesiredAccess, __in AUDIT_EVENT_TYPE AuditType, __in ULONG Flags, __in_ecount_opt(ObjectTypeListLength) POBJECT_TYPE_LIST ObjectTypeList, __in ULONG ObjectTypeListLength, __in PGENERIC_MAPPING GenericMapping, __in BOOLEAN ObjectCreation, __out PACCESS_MASK GrantedAccess, __out PNTSTATUS AccessStatus, __out PBOOLEAN GenerateOnClose)
-NTSTATUS NtAccessCheckByType (__in PSECURITY_DESCRIPTOR SecurityDescriptor, __in_opt PSID PrincipalSelfSid, __in HANDLE ClientToken, __in ACCESS_MASK DesiredAccess, __in_ecount(ObjectTypeListLength) POBJECT_TYPE_LIST ObjectTypeList, __in ULONG ObjectTypeListLength, __in PGENERIC_MAPPING GenericMapping, __out_bcount(*PrivilegeSetLength) PPRIVILEGE_SET PrivilegeSet, __inout PULONG PrivilegeSetLength, __out PACCESS_MASK GrantedAccess, __out PNTSTATUS AccessStatus)
-NTSTATUS NtAccessCheckByTypeResultListAndAuditAlarmByHandle (__in PUNICODE_STRING SubsystemName, __in_opt PVOID HandleId, __in HANDLE ClientToken, __in PUNICODE_STRING ObjectTypeName, __in PUNICODE_STRING ObjectName, __in PSECURITY_DESCRIPTOR SecurityDescriptor, __in_opt PSID PrincipalSelfSid, __in ACCESS_MASK DesiredAccess, __in AUDIT_EVENT_TYPE AuditType, __in ULONG Flags, __in_ecount_opt(ObjectTypeListLength) POBJECT_TYPE_LIST ObjectTypeList, __in ULONG ObjectTypeListLength, __in PGENERIC_MAPPING GenericMapping, __in BOOLEAN ObjectCreation, __out_ecount(ObjectTypeListLength) PACCESS_MASK GrantedAccess, __out_ecount(ObjectTypeListLength) PNTSTATUS AccessStatus, __out PBOOLEAN GenerateOnClose)
-NTSTATUS NtAccessCheckByTypeResultListAndAuditAlarm (__in PUNICODE_STRING SubsystemName, __in_opt PVOID HandleId, __in PUNICODE_STRING ObjectTypeName, __in PUNICODE_STRING ObjectName, __in PSECURITY_DESCRIPTOR SecurityDescriptor, __in_opt PSID PrincipalSelfSid, __in ACCESS_MASK DesiredAccess, __in AUDIT_EVENT_TYPE AuditType, __in ULONG Flags, __in_ecount_opt(ObjectTypeListLength) POBJECT_TYPE_LIST ObjectTypeList, __in ULONG ObjectTypeListLength, __in PGENERIC_MAPPING GenericMapping, __in BOOLEAN ObjectCreation, __out_ecount(ObjectTypeListLength) PACCESS_MASK GrantedAccess, __out_ecount(ObjectTypeListLength) PNTSTATUS AccessStatus, __out PBOOLEAN GenerateOnClose)
-NTSTATUS NtAccessCheckByTypeResultList (__in PSECURITY_DESCRIPTOR SecurityDescriptor, __in_opt PSID PrincipalSelfSid, __in HANDLE ClientToken, __in ACCESS_MASK DesiredAccess, __in_ecount(ObjectTypeListLength) POBJECT_TYPE_LIST ObjectTypeList, __in ULONG ObjectTypeListLength, __in PGENERIC_MAPPING GenericMapping, __out_bcount(*PrivilegeSetLength) PPRIVILEGE_SET PrivilegeSet, __inout PULONG PrivilegeSetLength, __out_ecount(ObjectTypeListLength) PACCESS_MASK GrantedAccess, __out_ecount(ObjectTypeListLength) PNTSTATUS AccessStatus)
-NTSTATUS NtAccessCheck (__in PSECURITY_DESCRIPTOR SecurityDescriptor, __in HANDLE ClientToken, __in ACCESS_MASK DesiredAccess, __in PGENERIC_MAPPING GenericMapping, __out_bcount(*PrivilegeSetLength) PPRIVILEGE_SET PrivilegeSet, __inout PULONG PrivilegeSetLength, __out PACCESS_MASK GrantedAccess, __out PNTSTATUS AccessStatus)
-NTSTATUS NtAddAtom (__in_bcount_opt(Length) PWSTR AtomName, __in ULONG Length, __out_opt PRTL_ATOM Atom)
-NTSTATUS NtAddBootEntry (__in PBOOT_ENTRY BootEntry, __out_opt PULONG Id)
-NTSTATUS NtAddDriverEntry (__in PEFI_DRIVER_ENTRY DriverEntry, __out_opt PULONG Id)
-NTSTATUS NtAdjustGroupsToken (__in HANDLE TokenHandle, __in BOOLEAN ResetToDefault, __in PTOKEN_GROUPS NewState, __in ULONG BufferLength, __out_bcount_part_opt(BufferLength,*ReturnLength) PTOKEN_GROUPS PreviousState, __out PULONG ReturnLength)
-NTSTATUS NtAdjustPrivilegesToken (__in HANDLE TokenHandle, __in BOOLEAN DisableAllPrivileges, __in_opt PTOKEN_PRIVILEGES NewState, __in ULONG BufferLength, __out_bcount_part_opt(BufferLength,*ReturnLength) PTOKEN_PRIVILEGES PreviousState, __out_opt PULONG ReturnLength)
-NTSTATUS NtAlertResumeThread (__in HANDLE ThreadHandle, __out_opt PULONG PreviousSuspendCount)
-NTSTATUS NtAlertThread (__in HANDLE ThreadHandle)
-NTSTATUS NtAllocateLocallyUniqueId (__out PLUID Luid)
-NTSTATUS NtAllocateReserveObject (__out PHANDLE MemoryReserveHandle, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in MEMORY_RESERVE_TYPE Type)
-NTSTATUS NtAllocateUserPhysicalPages (__in HANDLE ProcessHandle, __inout PULONG_PTR NumberOfPages, __out_ecount(*NumberOfPages) PULONG_PTR UserPfnArray)
-NTSTATUS NtAllocateUuids (__out PULARGE_INTEGER Time, __out PULONG Range, __out PULONG Sequence, __out PCHAR Seed)
-NTSTATUS NtAllocateVirtualMemory (__in HANDLE ProcessHandle, __inout PVOID *BaseAddress, __in ULONG_PTR ZeroBits, __inout PSIZE_T RegionSize, __in ULONG AllocationType, __in ULONG Protect)
-NTSTATUS NtAlpcAcceptConnectPort (__out PHANDLE PortHandle, __in HANDLE ConnectionPortHandle, __in ULONG Flags, __in POBJECT_ATTRIBUTES ObjectAttributes, __in PALPC_PORT_ATTRIBUTES PortAttributes, __in_opt PVOID PortContext, __in PPORT_MESSAGE ConnectionRequest, __inout_opt PALPC_MESSAGE_ATTRIBUTES ConnectionMessageAttributes, __in BOOLEAN AcceptConnection)
-NTSTATUS NtAlpcCancelMessage (__in HANDLE PortHandle, __in ULONG Flags, __in PALPC_CONTEXT_ATTR MessageContext)
-NTSTATUS NtAlpcConnectPort (__out PHANDLE PortHandle, __in PUNICODE_STRING PortName, __in POBJECT_ATTRIBUTES ObjectAttributes, __in_opt PALPC_PORT_ATTRIBUTES PortAttributes, __in ULONG Flags, __in_opt PSID RequiredServerSid, __inout PPORT_MESSAGE ConnectionMessage, __inout_opt PULONG BufferLength, __inout_opt PALPC_MESSAGE_ATTRIBUTES OutMessageAttributes, __inout_opt PALPC_MESSAGE_ATTRIBUTES InMessageAttributes, __in_opt PLARGE_INTEGER Timeout)
-NTSTATUS NtAlpcCreatePort (__out PHANDLE PortHandle, __in POBJECT_ATTRIBUTES ObjectAttributes, __in_opt PALPC_PORT_ATTRIBUTES PortAttributes)
-NTSTATUS NtAlpcCreatePortSection (__in HANDLE PortHandle, __in ULONG Flags, __in_opt HANDLE SectionHandle, __in SIZE_T SectionSize, __out PALPC_HANDLE AlpcSectionHandle, __out PSIZE_T ActualSectionSize)
-NTSTATUS NtAlpcCreateResourceReserve (__in HANDLE PortHandle, __reserved ULONG Flags, __in SIZE_T MessageSize, __out PALPC_HANDLE ResourceId)
-NTSTATUS NtAlpcCreateSectionView (__in HANDLE PortHandle, __reserved ULONG Flags, __inout PALPC_DATA_VIEW_ATTR ViewAttributes)
-NTSTATUS NtAlpcCreateSecurityContext (__in HANDLE PortHandle, __reserved ULONG Flags, __inout PALPC_SECURITY_ATTR SecurityAttribute)
-NTSTATUS NtAlpcDeletePortSection (__in HANDLE PortHandle, __reserved ULONG Flags, __in ALPC_HANDLE SectionHandle)
-NTSTATUS NtAlpcDeleteResourceReserve (__in HANDLE PortHandle, __reserved ULONG Flags, __in ALPC_HANDLE ResourceId)
-NTSTATUS NtAlpcDeleteSectionView (__in HANDLE PortHandle, __reserved ULONG Flags, __in PVOID ViewBase)
-NTSTATUS NtAlpcDeleteSecurityContext (__in HANDLE PortHandle, __reserved ULONG Flags, __in ALPC_HANDLE ContextHandle)
-NTSTATUS NtAlpcDisconnectPort (__in HANDLE PortHandle, __in ULONG Flags)
-NTSTATUS NtAlpcImpersonateClientOfPort (__in HANDLE PortHandle, __in PPORT_MESSAGE PortMessage, __reserved PVOID Reserved)
-NTSTATUS NtAlpcOpenSenderProcess (__out PHANDLE ProcessHandle, __in HANDLE PortHandle, __in PPORT_MESSAGE PortMessage, __reserved ULONG Flags, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtAlpcOpenSenderThread (__out PHANDLE ThreadHandle, __in HANDLE PortHandle, __in PPORT_MESSAGE PortMessage, __reserved ULONG Flags, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtAlpcQueryInformation (__in HANDLE PortHandle, __in ALPC_PORT_INFORMATION_CLASS PortInformationClass, __out_bcount(Length) PVOID PortInformation, __in ULONG Length, __out_opt PULONG ReturnLength)
-NTSTATUS NtAlpcQueryInformationMessage (__in HANDLE PortHandle, __in PPORT_MESSAGE PortMessage, __in ALPC_MESSAGE_INFORMATION_CLASS MessageInformationClass, __out_bcount(Length) PVOID MessageInformation, __in ULONG Length, __out_opt PULONG ReturnLength)
-NTSTATUS NtAlpcRevokeSecurityContext (__in HANDLE PortHandle, __reserved ULONG Flags, __in ALPC_HANDLE ContextHandle)
-NTSTATUS NtAlpcSendWaitReceivePort (__in HANDLE PortHandle, __in ULONG Flags, __in_opt PPORT_MESSAGE SendMessage, __in_opt PALPC_MESSAGE_ATTRIBUTES SendMessageAttributes, __inout_opt PPORT_MESSAGE ReceiveMessage, __inout_opt PULONG BufferLength, __inout_opt PALPC_MESSAGE_ATTRIBUTES ReceiveMessageAttributes, __in_opt PLARGE_INTEGER Timeout)
-NTSTATUS NtAlpcSetInformation (__in HANDLE PortHandle, __in ALPC_PORT_INFORMATION_CLASS PortInformationClass, __in_bcount(Length) PVOID PortInformation, __in ULONG Length)
-NTSTATUS NtApphelpCacheControl (__in APPHELPCOMMAND type, __in PVOID buf)
-NTSTATUS NtAreMappedFilesTheSame (__in PVOID File1MappedAsAnImage, __in PVOID File2MappedAsFile)
-NTSTATUS NtAssignProcessToJobObject (__in HANDLE JobHandle, __in HANDLE ProcessHandle)
-NTSTATUS NtCallbackReturn (__in_opt PVOID OutputBuffer, __in ULONG OutputLength, __in NTSTATUS Status)
-NTSTATUS NtCancelIoFileEx (__in HANDLE FileHandle, __in_opt PIO_STATUS_BLOCK IoRequestToCancel, __out PIO_STATUS_BLOCK IoStatusBlock)
-NTSTATUS NtCancelIoFile (__in HANDLE FileHandle, __out PIO_STATUS_BLOCK IoStatusBlock)
-NTSTATUS NtCancelSynchronousIoFile (__in HANDLE ThreadHandle, __in_opt PIO_STATUS_BLOCK IoRequestToCancel, __out PIO_STATUS_BLOCK IoStatusBlock)
-NTSTATUS NtCancelTimer (__in HANDLE TimerHandle, __out_opt PBOOLEAN CurrentState)
-NTSTATUS NtClearEvent (__in HANDLE EventHandle)
-NTSTATUS NtClose (__in HANDLE Handle)
-NTSTATUS NtCloseObjectAuditAlarm (__in PUNICODE_STRING SubsystemName, __in_opt PVOID HandleId, __in BOOLEAN GenerateOnClose)
-NTSTATUS NtCommitComplete (__in HANDLE EnlistmentHandle, __in_opt PLARGE_INTEGER TmVirtualClock)
-NTSTATUS NtCommitEnlistment (__in HANDLE EnlistmentHandle, __in_opt PLARGE_INTEGER TmVirtualClock)
-NTSTATUS NtCommitTransaction (__in HANDLE TransactionHandle, __in BOOLEAN Wait)
-NTSTATUS NtCompactKeys (__in ULONG Count, __in_ecount(Count) HANDLE KeyArray[])
-NTSTATUS NtCompareTokens (__in HANDLE FirstTokenHandle, __in HANDLE SecondTokenHandle, __out PBOOLEAN Equal)
-NTSTATUS NtCompleteConnectPort (__in HANDLE PortHandle)
-NTSTATUS NtCompressKey (__in HANDLE Key)
-NTSTATUS NtConnectPort (__out PHANDLE PortHandle, __in PUNICODE_STRING PortName, __in PSECURITY_QUALITY_OF_SERVICE SecurityQos, __inout_opt PPORT_VIEW ClientView, __inout_opt PREMOTE_PORT_VIEW ServerView, __out_opt PULONG MaxMessageLength, __inout_opt PVOID ConnectionInformation, __inout_opt PULONG ConnectionInformationLength)
-NTSTATUS NtContinue (__out PCONTEXT ContextRecord, __out BOOLEAN TestAlert)
-NTSTATUS NtCreateDebugObject (__out PHANDLE DebugObjectHandle, __out ACCESS_MASK DesiredAccess, __out POBJECT_ATTRIBUTES ObjectAttributes, __out ULONG Flags)
-NTSTATUS NtCreateDirectoryObject (__out PHANDLE DirectoryHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtCreateEnlistment (__out PHANDLE EnlistmentHandle, __in ACCESS_MASK DesiredAccess, __in HANDLE ResourceManagerHandle, __in HANDLE TransactionHandle, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in_opt ULONG CreateOptions, __in NOTIFICATION_MASK NotificationMask, __in_opt PVOID EnlistmentKey)
-NTSTATUS NtCreateEvent (__out PHANDLE EventHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in EVENT_TYPE EventType, __in BOOLEAN InitialState)
-NTSTATUS NtCreateEventPair (__out PHANDLE EventPairHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtCreateFile (__out PHANDLE FileHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __out PIO_STATUS_BLOCK IoStatusBlock, __in_opt PLARGE_INTEGER AllocationSize, __in ULONG FileAttributes, __in ULONG ShareAccess, __in ULONG CreateDisposition, __in ULONG CreateOptions, __in_bcount_opt(EaLength) PVOID EaBuffer, __in ULONG EaLength)
-NTSTATUS NtCreateIoCompletion (__out PHANDLE IoCompletionHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in ULONG Count OPTIONAL)
-NTSTATUS NtCreateJobObject (__out PHANDLE JobHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtCreateJobSet (__in ULONG NumJob, __in_ecount(NumJob) PJOB_SET_ARRAY UserJobSet, __in ULONG Flags)
-NTSTATUS NtCreateKeyedEvent (__out PHANDLE KeyedEventHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in ULONG Flags)
-NTSTATUS NtCreateKey (__out PHANDLE KeyHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __reserved ULONG TitleIndex, __in_opt PUNICODE_STRING Class, __in ULONG CreateOptions, __out_opt PULONG Disposition)
-NTSTATUS NtCreateKeyTransacted (__out PHANDLE KeyHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __reserved ULONG TitleIndex, __in_opt PUNICODE_STRING Class, __in ULONG CreateOptions, __in HANDLE TransactionHandle, __out_opt PULONG Disposition)
-NTSTATUS NtCreateMailslotFile (__out PHANDLE FileHandle, __in ULONG DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __out PIO_STATUS_BLOCK IoStatusBlock, __in ULONG CreateOptions, __in ULONG MailslotQuota, __in ULONG MaximumMessageSize, __in PLARGE_INTEGER ReadTimeout)
-NTSTATUS NtCreateMutant (__out PHANDLE MutantHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in BOOLEAN InitialOwner)
-NTSTATUS NtCreateNamedPipeFile (__out PHANDLE FileHandle, __in ULONG DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __out PIO_STATUS_BLOCK IoStatusBlock, __in ULONG ShareAccess, __in ULONG CreateDisposition, __in ULONG CreateOptions, __in ULONG NamedPipeType, __in ULONG ReadMode, __in ULONG CompletionMode, __in ULONG MaximumInstances, __in ULONG InboundQuota, __in ULONG OutboundQuota, __in_opt PLARGE_INTEGER DefaultTimeout)
-NTSTATUS NtCreatePagingFile (__in PUNICODE_STRING PageFileName, __in PLARGE_INTEGER MinimumSize, __in PLARGE_INTEGER MaximumSize, __in ULONG Priority)
-NTSTATUS NtCreatePort (__out PHANDLE PortHandle, __in POBJECT_ATTRIBUTES ObjectAttributes, __in ULONG MaxConnectionInfoLength, __in ULONG MaxMessageLength, __in_opt ULONG MaxPoolUsage)
-NTSTATUS NtCreatePrivateNamespace (__out PHANDLE NamespaceHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in PVOID BoundaryDescriptor)
-NTSTATUS NtCreateProcessEx (__out PHANDLE ProcessHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in HANDLE ParentProcess, __in ULONG Flags, __in_opt HANDLE SectionHandle, __in_opt HANDLE DebugPort, __in_opt HANDLE ExceptionPort, __in ULONG JobMemberLevel)
-NTSTATUS NtCreateProcess (__out PHANDLE ProcessHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in HANDLE ParentProcess, __in BOOLEAN InheritObjectTable, __in_opt HANDLE SectionHandle, __in_opt HANDLE DebugPort, __in_opt HANDLE ExceptionPort)
-NTSTATUS NtCreateProfileEx (__out PHANDLE ProfileHandle, __in_opt HANDLE Process, __in PVOID ProfileBase, __in SIZE_T ProfileSize, __in ULONG BucketSize, __in PULONG Buffer, __in ULONG BufferSize, __in KPROFILE_SOURCE ProfileSource, __in ULONG GroupAffinityCount, __in_opt PGROUP_AFFINITY GroupAffinity)
-NTSTATUS NtCreateProfile (__out PHANDLE ProfileHandle, __in HANDLE Process OPTIONAL, __in PVOID RangeBase, __in SIZE_T RangeSize, __in ULONG BucketSize, __in PULONG Buffer, __in ULONG BufferSize, __in KPROFILE_SOURCE ProfileSource, __in KAFFINITY Affinity)
-NTSTATUS NtCreateResourceManager (__out PHANDLE ResourceManagerHandle, __in ACCESS_MASK DesiredAccess, __in HANDLE TmHandle, __in LPGUID RmGuid, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in_opt ULONG CreateOptions, __in_opt PUNICODE_STRING Description)
-NTSTATUS NtCreateSection (__out PHANDLE SectionHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in_opt PLARGE_INTEGER MaximumSize, __in ULONG SectionPageProtection, __in ULONG AllocationAttributes, __in_opt HANDLE FileHandle)
-NTSTATUS NtCreateSemaphore (__out PHANDLE SemaphoreHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in LONG InitialCount, __in LONG MaximumCount)
-NTSTATUS NtCreateSymbolicLinkObject (__out PHANDLE LinkHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __in PUNICODE_STRING LinkTarget)
-NTSTATUS NtCreateThreadEx (__out PHANDLE ThreadHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in HANDLE ProcessHandle, __in PVOID StartRoutine, __in_opt PVOID Argument, __in ULONG CreateFlags, __in_opt ULONG_PTR ZeroBits, __in_opt SIZE_T StackSize, __in_opt SIZE_T MaximumStackSize, __in_opt PPS_ATTRIBUTE_LIST AttributeList)
-NTSTATUS NtCreateThread (__out PHANDLE ThreadHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in HANDLE ProcessHandle, __out PCLIENT_ID ClientId, __in PCONTEXT ThreadContext, __in PINITIAL_TEB InitialTeb, __in BOOLEAN CreateSuspended)
-NTSTATUS NtCreateTimer (__out PHANDLE TimerHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in TIMER_TYPE TimerType)
-NTSTATUS NtCreateToken (__out PHANDLE TokenHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in TOKEN_TYPE TokenType, __in PLUID AuthenticationId, __in PLARGE_INTEGER ExpirationTime, __in PTOKEN_USER User, __in PTOKEN_GROUPS Groups, __in PTOKEN_PRIVILEGES Privileges, __in_opt PTOKEN_OWNER Owner, __in PTOKEN_PRIMARY_GROUP PrimaryGroup, __in_opt PTOKEN_DEFAULT_DACL DefaultDacl, __in PTOKEN_SOURCE TokenSource)
-NTSTATUS NtCreateTransactionManager (__out PHANDLE TmHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in_opt PUNICODE_STRING LogFileName, __in_opt ULONG CreateOptions, __in_opt ULONG CommitStrength)
-NTSTATUS NtCreateTransaction (__out PHANDLE TransactionHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in_opt LPGUID Uow, __in_opt HANDLE TmHandle, __in_opt ULONG CreateOptions, __in_opt ULONG IsolationLevel, __in_opt ULONG IsolationFlags, __in_opt PLARGE_INTEGER Timeout, __in_opt PUNICODE_STRING Description)
-NTSTATUS NtCreateUserProcess (__out PHANDLE ProcessHandle, __out PHANDLE ThreadHandle, __in ACCESS_MASK ProcessDesiredAccess, __in ACCESS_MASK ThreadDesiredAccess, __in_opt POBJECT_ATTRIBUTES ProcessObjectAttributes, __in_opt POBJECT_ATTRIBUTES ThreadObjectAttributes, __in ULONG ProcessFlags, __in ULONG ThreadFlags, __in_opt PRTL_USER_PROCESS_PARAMETERS ProcessParameters, __in_opt PPROCESS_CREATE_INFO CreateInfo, __in_opt PPROCESS_ATTRIBUTE_LIST AttributeList)
-NTSTATUS NtCreateWaitablePort (__out PHANDLE PortHandle, __in POBJECT_ATTRIBUTES ObjectAttributes, __in ULONG MaxConnectionInfoLength, __in ULONG MaxMessageLength, __in_opt ULONG MaxPoolUsage)
-NTSTATUS NtCreateWorkerFactory (__out PHANDLE WorkerFactoryHandleReturn, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in HANDLE CompletionPortHandle, __in HANDLE WorkerProcessHandle, __in PVOID StartRoutine, __in_opt PVOID StartParameter, __in_opt ULONG MaxThreadCount, __in_opt SIZE_T StackReserve, __in_opt SIZE_T StackCommit)
-NTSTATUS NtDebugActiveProcess (__out HANDLE ProcessHandle, __out HANDLE DebugObjectHandle)
-NTSTATUS NtDebugContinue (__out HANDLE DebugObjectHandle, __out PCLIENT_ID ClientId, __out NTSTATUS ContinueStatus)
-NTSTATUS NtDelayExecution (__in BOOLEAN Alertable, __in PLARGE_INTEGER DelayInterval)
-NTSTATUS NtDeleteAtom (__in RTL_ATOM Atom)
-NTSTATUS NtDeleteBootEntry (__in ULONG Id)
-NTSTATUS NtDeleteDriverEntry (__in ULONG Id)
-NTSTATUS NtDeleteFile (__in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtDeleteKey (__in HANDLE KeyHandle)
-NTSTATUS NtDeleteObjectAuditAlarm (__in PUNICODE_STRING SubsystemName, __in_opt PVOID HandleId, __in BOOLEAN GenerateOnClose)
-NTSTATUS NtDeletePrivateNamespace (__in HANDLE NamespaceHandle)
-NTSTATUS NtDeleteValueKey (__in HANDLE KeyHandle, __in PUNICODE_STRING ValueName)
-NTSTATUS NtDeviceIoControlFile (__in HANDLE FileHandle, __in_opt HANDLE Event, __in_opt PIO_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcContext, __out PIO_STATUS_BLOCK IoStatusBlock, __in ULONG IoControlCode, __in_bcount_opt(InputBufferLength) PVOID InputBuffer, __in ULONG InputBufferLength, __out_bcount_opt(OutputBufferLength) PVOID OutputBuffer, __in ULONG OutputBufferLength)
-NTSTATUS NtDisableLastKnownGood (VOID)
-NTSTATUS NtDisplayString (__in PUNICODE_STRING String)
-NTSTATUS NtDrawText (__in PUNICODE_STRING Text)
-NTSTATUS NtDuplicateObject (__in HANDLE SourceProcessHandle, __in HANDLE SourceHandle, __in_opt HANDLE TargetProcessHandle, __out_opt PHANDLE TargetHandle, __in ACCESS_MASK DesiredAccess, __in ULONG HandleAttributes, __in ULONG Options)
-NTSTATUS NtDuplicateToken (__in HANDLE ExistingTokenHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __in BOOLEAN EffectiveOnly, __in TOKEN_TYPE TokenType, __out PHANDLE NewTokenHandle)
-NTSTATUS NtEnableLastKnownGood (VOID)
-NTSTATUS NtEnumerateBootEntries (__out_bcount_opt(*BufferLength) PVOID Buffer, __inout PULONG BufferLength)
-NTSTATUS NtEnumerateDriverEntries (__out_bcount(*BufferLength) PVOID Buffer, __inout PULONG BufferLength)
-NTSTATUS NtEnumerateKey (__in HANDLE KeyHandle, __in ULONG Index, __in KEY_INFORMATION_CLASS KeyInformationClass, __out_bcount_opt(Length) PVOID KeyInformation, __in ULONG Length, __out PULONG ResultLength)
-NTSTATUS NtEnumerateSystemEnvironmentValuesEx (__in ULONG InformationClass, __out PVOID Buffer, __inout PULONG BufferLength)
-NTSTATUS NtEnumerateTransactionObject (__in_opt HANDLE RootObjectHandle, __in KTMOBJECT_TYPE QueryType, __inout_bcount(ObjectCursorLength) PKTMOBJECT_CURSOR ObjectCursor, __in ULONG ObjectCursorLength, __out PULONG ReturnLength)
-NTSTATUS NtEnumerateValueKey (__in HANDLE KeyHandle, __in ULONG Index, __in KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass, __out_bcount_opt(Length) PVOID KeyValueInformation, __in ULONG Length, __out PULONG ResultLength)
-NTSTATUS NtExtendSection (__in HANDLE SectionHandle, __inout PLARGE_INTEGER NewSectionSize)
-NTSTATUS NtFilterToken (__in HANDLE ExistingTokenHandle, __in ULONG Flags, __in_opt PTOKEN_GROUPS SidsToDisable, __in_opt PTOKEN_PRIVILEGES PrivilegesToDelete, __in_opt PTOKEN_GROUPS RestrictedSids, __out PHANDLE NewTokenHandle)
-NTSTATUS NtFindAtom (__in_bcount_opt(Length) PWSTR AtomName, __in ULONG Length, __out_opt PRTL_ATOM Atom)
-NTSTATUS NtFlushBuffersFile (__in HANDLE FileHandle, __out PIO_STATUS_BLOCK IoStatusBlock)
-NTSTATUS NtFlushInstallUILanguage (__in LANGID InstallUILanguage, __in ULONG SetComittedFlag)
-NTSTATUS NtFlushInstructionCache (__in HANDLE ProcessHandle, __in_opt PVOID BaseAddress, __in SIZE_T Length)
-NTSTATUS NtFlushKey (__in HANDLE KeyHandle)
-VOID NtFlushProcessWriteBuffers (VOID)
-NTSTATUS NtFlushVirtualMemory (__in HANDLE ProcessHandle, __inout PVOID *BaseAddress, __inout PSIZE_T RegionSize, __out PIO_STATUS_BLOCK IoStatus)
-NTSTATUS NtFlushWriteBuffer (VOID)
-NTSTATUS NtFreeUserPhysicalPages (__in HANDLE ProcessHandle, __inout PULONG_PTR NumberOfPages, __in_ecount(*NumberOfPages) PULONG_PTR UserPfnArray)
-NTSTATUS NtFreeVirtualMemory (__in HANDLE ProcessHandle, __inout PVOID *BaseAddress, __inout PSIZE_T RegionSize, __in ULONG FreeType)
-NTSTATUS NtFreezeRegistry (__in ULONG TimeOutInSeconds)
-NTSTATUS NtFreezeTransactions (__in PLARGE_INTEGER FreezeTimeout, __in PLARGE_INTEGER ThawTimeout)
-NTSTATUS NtFsControlFile (__in HANDLE FileHandle, __in_opt HANDLE Event, __in_opt PIO_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcContext, __out PIO_STATUS_BLOCK IoStatusBlock, __in ULONG IoControlCode, __in_bcount_opt(InputBufferLength) PVOID InputBuffer, __in ULONG InputBufferLength, __out_bcount_opt(OutputBufferLength) PVOID OutputBuffer, __in ULONG OutputBufferLength)
-NTSTATUS NtGetContextThread (__in HANDLE ThreadHandle, __inout PCONTEXT ThreadContext)
-ULONG NtGetCurrentProcessorNumber (VOID)
-NTSTATUS NtGetDevicePowerState (__in HANDLE Device, __out DEVICE_POWER_STATE *State)
-NTSTATUS NtGetMUIRegistryInfo (__in ULONG Flags, __inout PULONG DataSize, __out PVOID Data)
-NTSTATUS NtGetNextProcess (__in HANDLE ProcessHandle, __in ACCESS_MASK DesiredAccess, __in ULONG HandleAttributes, __in ULONG Flags, __out PHANDLE NewProcessHandle)
-NTSTATUS NtGetNextThread (__in HANDLE ProcessHandle, __in HANDLE ThreadHandle, __in ACCESS_MASK DesiredAccess, __in ULONG HandleAttributes, __in ULONG Flags, __out PHANDLE NewThreadHandle)
-NTSTATUS NtGetNlsSectionPtr (__in ULONG SectionType, __in ULONG SectionData, __in PVOID ContextData, __out PVOID *SectionPointer, __out PULONG SectionSize)
-NTSTATUS NtGetNotificationResourceManager (__in HANDLE ResourceManagerHandle, __out PTRANSACTION_NOTIFICATION TransactionNotification, __in ULONG NotificationLength, __in_opt PLARGE_INTEGER Timeout, __out_opt PULONG ReturnLength, __in ULONG Asynchronous, __in_opt ULONG_PTR AsynchronousContext)
-NTSTATUS NtGetPlugPlayEvent (__in HANDLE EventHandle, __in_opt PVOID Context, __out_bcount(EventBufferSize) PPLUGPLAY_EVENT_BLOCK EventBlock, __in ULONG EventBufferSize)
-NTSTATUS NtGetWriteWatch (__in HANDLE ProcessHandle, __in ULONG Flags, __in PVOID BaseAddress, __in SIZE_T RegionSize, __out_ecount(*EntriesInUserAddressArray) PVOID *UserAddressArray, __inout PULONG_PTR EntriesInUserAddressArray, __out PULONG Granularity)
-NTSTATUS NtImpersonateAnonymousToken (__in HANDLE ThreadHandle)
-NTSTATUS NtImpersonateClientOfPort (__in HANDLE PortHandle, __in PPORT_MESSAGE Message)
-NTSTATUS NtImpersonateThread (__in HANDLE ServerThreadHandle, __in HANDLE ClientThreadHandle, __in PSECURITY_QUALITY_OF_SERVICE SecurityQos)
-NTSTATUS NtInitializeNlsFiles (__out PVOID *BaseAddress, __out PLCID DefaultLocaleId, __out PLARGE_INTEGER DefaultCasingTableSize)
-NTSTATUS NtInitializeRegistry (__in USHORT BootCondition)
-NTSTATUS NtInitiatePowerAction (__in POWER_ACTION SystemAction, __in SYSTEM_POWER_STATE MinSystemState, __in ULONG Flags, __in BOOLEAN Asynchronous)
-NTSTATUS NtIsProcessInJob (__in HANDLE ProcessHandle, __in_opt HANDLE JobHandle)
-BOOLEAN NtIsSystemResumeAutomatic (VOID)
-NTSTATUS NtIsUILanguageComitted (VOID)
-NTSTATUS NtListenPort (__in HANDLE PortHandle, __out PPORT_MESSAGE ConnectionRequest)
-NTSTATUS NtLoadDriver (__in PUNICODE_STRING DriverServiceName)
-NTSTATUS NtLoadKey2 (__in POBJECT_ATTRIBUTES TargetKey, __in POBJECT_ATTRIBUTES SourceFile, __in ULONG Flags)
-NTSTATUS NtLoadKeyEx (__in POBJECT_ATTRIBUTES TargetKey, __in POBJECT_ATTRIBUTES SourceFile, __in ULONG Flags, __in_opt HANDLE TrustClassKey )
-NTSTATUS NtLoadKey (__in POBJECT_ATTRIBUTES TargetKey, __in POBJECT_ATTRIBUTES SourceFile)
-NTSTATUS NtLockFile (__in HANDLE FileHandle, __in_opt HANDLE Event, __in_opt PIO_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcContext, __out PIO_STATUS_BLOCK IoStatusBlock, __in PLARGE_INTEGER ByteOffset, __in PLARGE_INTEGER Length, __in ULONG Key, __in BOOLEAN FailImmediately, __in BOOLEAN ExclusiveLock)
-NTSTATUS NtLockProductActivationKeys (__inout_opt ULONG *pPrivateVer, __out_opt ULONG *pSafeMode)
-NTSTATUS NtLockRegistryKey (__in HANDLE KeyHandle)
-NTSTATUS NtLockVirtualMemory (__in HANDLE ProcessHandle, __inout PVOID *BaseAddress, __inout PSIZE_T RegionSize, __in ULONG MapType)
-NTSTATUS NtMakePermanentObject (__in HANDLE Handle)
-NTSTATUS NtMakeTemporaryObject (__in HANDLE Handle)
-NTSTATUS NtMapCMFModule (__in ULONG What, __in ULONG Index, __out_opt PULONG CacheIndexOut, __out_opt PULONG CacheFlagsOut, __out_opt PULONG ViewSizeOut, __out_opt PVOID *BaseAddress)
-NTSTATUS NtMapUserPhysicalPages (__in PVOID VirtualAddress, __in ULONG_PTR NumberOfPages, __in_ecount_opt(NumberOfPages) PULONG_PTR UserPfnArray)
-NTSTATUS NtMapUserPhysicalPagesScatter (__in_ecount(NumberOfPages) PVOID *VirtualAddresses, __in ULONG_PTR NumberOfPages, __in_ecount_opt(NumberOfPages) PULONG_PTR UserPfnArray)
-NTSTATUS NtMapViewOfSection (__in HANDLE SectionHandle, __in HANDLE ProcessHandle, __inout PVOID *BaseAddress, __in ULONG_PTR ZeroBits, __in SIZE_T CommitSize, __inout_opt PLARGE_INTEGER SectionOffset, __inout PSIZE_T ViewSize, __in SECTION_INHERIT InheritDisposition, __in ULONG AllocationType, __in WIN32_PROTECTION_MASK Win32Protect)
-NTSTATUS NtModifyBootEntry (__in PBOOT_ENTRY BootEntry)
-NTSTATUS NtModifyDriverEntry (__in PEFI_DRIVER_ENTRY DriverEntry)
-NTSTATUS NtNotifyChangeDirectoryFile (__in HANDLE FileHandle, __in_opt HANDLE Event, __in_opt PIO_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcContext, __out PIO_STATUS_BLOCK IoStatusBlock, __out_bcount(Length) PVOID Buffer, __in ULONG Length, __in ULONG CompletionFilter, __in BOOLEAN WatchTree)
-NTSTATUS NtNotifyChangeKey (__in HANDLE KeyHandle, __in_opt HANDLE Event, __in_opt PIO_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcContext, __out PIO_STATUS_BLOCK IoStatusBlock, __in ULONG CompletionFilter, __in BOOLEAN WatchTree, __out_bcount_opt(BufferSize) PVOID Buffer, __in ULONG BufferSize, __in BOOLEAN Asynchronous)
-NTSTATUS NtNotifyChangeMultipleKeys (__in HANDLE MasterKeyHandle, __in_opt ULONG Count, __in_ecount_opt(Count) OBJECT_ATTRIBUTES SlaveObjects[], __in_opt HANDLE Event, __in_opt PIO_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcContext, __out PIO_STATUS_BLOCK IoStatusBlock, __in ULONG CompletionFilter, __in BOOLEAN WatchTree, __out_bcount_opt(BufferSize) PVOID Buffer, __in ULONG BufferSize, __in BOOLEAN Asynchronous)
-NTSTATUS NtNotifyChangeSession (__in HANDLE Session, __in ULONG IoStateSequence, __in PVOID Reserved, __in ULONG Action, __in IO_SESSION_STATE IoState, __in IO_SESSION_STATE IoState2, __in PVOID Buffer, __in ULONG BufferSize)
-NTSTATUS NtOpenDirectoryObject (__out PHANDLE DirectoryHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenEnlistment (__out PHANDLE EnlistmentHandle, __in ACCESS_MASK DesiredAccess, __in HANDLE ResourceManagerHandle, __in LPGUID EnlistmentGuid, __in_opt POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenEvent (__out PHANDLE EventHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenEventPair (__out PHANDLE EventPairHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenFile (__out PHANDLE FileHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __out PIO_STATUS_BLOCK IoStatusBlock, __in ULONG ShareAccess, __in ULONG OpenOptions)
-NTSTATUS NtOpenIoCompletion (__out PHANDLE IoCompletionHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenJobObject (__out PHANDLE JobHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenKeyedEvent (__out PHANDLE KeyedEventHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenKeyEx (__out PHANDLE KeyHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __in ULONG OpenOptions)
-NTSTATUS NtOpenKey (__out PHANDLE KeyHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenKeyTransactedEx (__out PHANDLE KeyHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __in ULONG OpenOptions, __in HANDLE TransactionHandle)
-NTSTATUS NtOpenKeyTransacted (__out PHANDLE KeyHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __in HANDLE TransactionHandle)
-NTSTATUS NtOpenMutant (__out PHANDLE MutantHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenObjectAuditAlarm (__in PUNICODE_STRING SubsystemName, __in_opt PVOID HandleId, __in PUNICODE_STRING ObjectTypeName, __in PUNICODE_STRING ObjectName, __in_opt PSECURITY_DESCRIPTOR SecurityDescriptor, __in HANDLE ClientToken, __in ACCESS_MASK DesiredAccess, __in ACCESS_MASK GrantedAccess, __in_opt PPRIVILEGE_SET Privileges, __in BOOLEAN ObjectCreation, __in BOOLEAN AccessGranted, __out PBOOLEAN GenerateOnClose)
-NTSTATUS NtOpenPrivateNamespace (__out PHANDLE NamespaceHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in PVOID BoundaryDescriptor)
-NTSTATUS NtOpenProcess (__out PHANDLE ProcessHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __in_opt PCLIENT_ID ClientId)
-NTSTATUS NtOpenProcessTokenEx (__in HANDLE ProcessHandle, __in ACCESS_MASK DesiredAccess, __in ULONG HandleAttributes, __out PHANDLE TokenHandle)
-NTSTATUS NtOpenProcessToken (__in HANDLE ProcessHandle, __in ACCESS_MASK DesiredAccess, __out PHANDLE TokenHandle)
-NTSTATUS NtOpenResourceManager (__out PHANDLE ResourceManagerHandle, __in ACCESS_MASK DesiredAccess, __in HANDLE TmHandle, __in_opt LPGUID ResourceManagerGuid, __in_opt POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenSection (__out PHANDLE SectionHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenSemaphore (__out PHANDLE SemaphoreHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenSession (__out PHANDLE SessionHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenSymbolicLinkObject (__out PHANDLE LinkHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenThread (__out PHANDLE ThreadHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __in_opt PCLIENT_ID ClientId)
-NTSTATUS NtOpenThreadTokenEx (__in HANDLE ThreadHandle, __in ACCESS_MASK DesiredAccess, __in BOOLEAN OpenAsSelf, __in ULONG HandleAttributes, __out PHANDLE TokenHandle)
-NTSTATUS NtOpenThreadToken (__in HANDLE ThreadHandle, __in ACCESS_MASK DesiredAccess, __in BOOLEAN OpenAsSelf, __out PHANDLE TokenHandle)
-NTSTATUS NtOpenTimer (__out PHANDLE TimerHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes)
-NTSTATUS NtOpenTransactionManager (__out PHANDLE TmHandle, __in ACCESS_MASK DesiredAccess, __in_opt POBJECT_ATTRIBUTES ObjectAttributes, __in_opt PUNICODE_STRING LogFileName, __in_opt LPGUID TmIdentity, __in_opt ULONG OpenOptions)
-NTSTATUS NtOpenTransaction (__out PHANDLE TransactionHandle, __in ACCESS_MASK DesiredAccess, __in POBJECT_ATTRIBUTES ObjectAttributes, __in LPGUID Uow, __in_opt HANDLE TmHandle)
-NTSTATUS NtPlugPlayControl (__in PLUGPLAY_CONTROL_CLASS PnPControlClass, __inout_bcount(PnPControlDataLength) PVOID PnPControlData, __in ULONG PnPControlDataLength)
-NTSTATUS NtPowerInformation (__in POWER_INFORMATION_LEVEL InformationLevel, __in_bcount_opt(InputBufferLength) PVOID InputBuffer, __in ULONG InputBufferLength, __out_bcount_opt(OutputBufferLength) PVOID OutputBuffer, __in ULONG OutputBufferLength)
-NTSTATUS NtPrepareComplete (__in HANDLE EnlistmentHandle, __in_opt PLARGE_INTEGER TmVirtualClock)
-NTSTATUS NtPrepareEnlistment (__in HANDLE EnlistmentHandle, __in_opt PLARGE_INTEGER TmVirtualClock)
-NTSTATUS NtPrePrepareComplete (__in HANDLE EnlistmentHandle, __in_opt PLARGE_INTEGER TmVirtualClock)
-NTSTATUS NtPrePrepareEnlistment (__in HANDLE EnlistmentHandle, __in_opt PLARGE_INTEGER TmVirtualClock)
-NTSTATUS NtPrivilegeCheck (__in HANDLE ClientToken, __inout PPRIVILEGE_SET RequiredPrivileges, __out PBOOLEAN Result)
-NTSTATUS NtPrivilegedServiceAuditAlarm (__in PUNICODE_STRING SubsystemName, __in PUNICODE_STRING ServiceName, __in HANDLE ClientToken, __in PPRIVILEGE_SET Privileges, __in BOOLEAN AccessGranted)
-NTSTATUS NtPrivilegeObjectAuditAlarm (__in PUNICODE_STRING SubsystemName, __in_opt PVOID HandleId, __in HANDLE ClientToken, __in ACCESS_MASK DesiredAccess, __in PPRIVILEGE_SET Privileges, __in BOOLEAN AccessGranted)
-NTSTATUS NtPropagationComplete (__in HANDLE ResourceManagerHandle, __in ULONG RequestCookie, __in ULONG BufferLength, __in PVOID Buffer)
-NTSTATUS NtPropagationFailed (__in HANDLE ResourceManagerHandle, __in ULONG RequestCookie, __in NTSTATUS PropStatus)
-NTSTATUS NtProtectVirtualMemory (__in HANDLE ProcessHandle, __inout PVOID *BaseAddress, __inout PSIZE_T RegionSize, __in WIN32_PROTECTION_MASK NewProtectWin32, __out PULONG OldProtect)
-NTSTATUS NtPulseEvent (__in HANDLE EventHandle, __out_opt PLONG PreviousState)
-NTSTATUS NtQueryAttributesFile (__in POBJECT_ATTRIBUTES ObjectAttributes, __out PFILE_BASIC_INFORMATION FileInformation)
-NTSTATUS NtQueryBootEntryOrder (__out_ecount_opt(*Count) PULONG Ids, __inout PULONG Count)
-NTSTATUS NtQueryBootOptions (__out_bcount_opt(*BootOptionsLength) PBOOT_OPTIONS BootOptions, __inout PULONG BootOptionsLength)
-NTSTATUS NtQueryDebugFilterState (__in ULONG ComponentId, __in ULONG Level)
-NTSTATUS NtQueryDefaultLocale (__in BOOLEAN UserProfile, __out PLCID DefaultLocaleId)
-NTSTATUS NtQueryDefaultUILanguage (__out LANGID *DefaultUILanguageId)
-NTSTATUS NtQueryDirectoryFile (__in HANDLE FileHandle, __in_opt HANDLE Event, __in_opt PIO_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcContext, __out PIO_STATUS_BLOCK IoStatusBlock, __out_bcount(Length) PVOID FileInformation, __in ULONG Length, __in FILE_INFORMATION_CLASS FileInformationClass, __in BOOLEAN ReturnSingleEntry, __in PUNICODE_STRING FileName OPTIONAL, __in BOOLEAN RestartScan)
-NTSTATUS NtQueryDirectoryObject (__in HANDLE DirectoryHandle, __out_bcount_opt(Length) PVOID Buffer, __in ULONG Length, __in BOOLEAN ReturnSingleEntry, __in BOOLEAN RestartScan, __inout PULONG Context, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryDriverEntryOrder (__out_ecount(*Count) PULONG Ids, __inout PULONG Count)
-NTSTATUS NtQueryEaFile (__in HANDLE FileHandle, __out PIO_STATUS_BLOCK IoStatusBlock, __out_bcount(Length) PVOID Buffer, __in ULONG Length, __in BOOLEAN ReturnSingleEntry, __in_bcount_opt(EaListLength) PVOID EaList, __in ULONG EaListLength, __in_opt PULONG EaIndex, __in BOOLEAN RestartScan)
-NTSTATUS NtQueryEvent (__in HANDLE EventHandle, __in EVENT_INFORMATION_CLASS EventInformationClass, __out_bcount(EventInformationLength) PVOID EventInformation, __in ULONG EventInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryFullAttributesFile (__in POBJECT_ATTRIBUTES ObjectAttributes, __out PFILE_NETWORK_OPEN_INFORMATION FileInformation)
-NTSTATUS NtQueryInformationAtom (__in RTL_ATOM Atom, __in ATOM_INFORMATION_CLASS InformationClass, __out_bcount(AtomInformationLength) PVOID AtomInformation, __in ULONG AtomInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryInformationEnlistment (__in HANDLE EnlistmentHandle, __in ENLISTMENT_INFORMATION_CLASS EnlistmentInformationClass, __out_bcount(EnlistmentInformationLength) PVOID EnlistmentInformation, __in ULONG EnlistmentInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryInformationFile (__in HANDLE FileHandle, __out PIO_STATUS_BLOCK IoStatusBlock, __out_bcount(Length) PVOID FileInformation, __in ULONG Length, __in FILE_INFORMATION_CLASS FileInformationClass)
-NTSTATUS NtQueryInformationJobObject (__in_opt HANDLE JobHandle, __in JOBOBJECTINFOCLASS JobObjectInformationClass, __out_bcount(JobObjectInformationLength) PVOID JobObjectInformation, __in ULONG JobObjectInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryInformationPort (__in HANDLE PortHandle, __in PORT_INFORMATION_CLASS PortInformationClass, __out_bcount(Length) PVOID PortInformation, __in ULONG Length, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryInformationProcess (__in HANDLE ProcessHandle, __in PROCESSINFOCLASS ProcessInformationClass, __out_bcount(ProcessInformationLength) PVOID ProcessInformation, __in ULONG ProcessInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryInformationResourceManager (__in HANDLE ResourceManagerHandle, __in RESOURCEMANAGER_INFORMATION_CLASS ResourceManagerInformationClass, __out_bcount(ResourceManagerInformationLength) PVOID ResourceManagerInformation, __in ULONG ResourceManagerInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryInformationThread (__in HANDLE ThreadHandle, __in THREADINFOCLASS ThreadInformationClass, __out_bcount(ThreadInformationLength) PVOID ThreadInformation, __in ULONG ThreadInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryInformationToken (__in HANDLE TokenHandle, __in TOKEN_INFORMATION_CLASS TokenInformationClass, __out_bcount_part_opt(TokenInformationLength,*ReturnLength) PVOID TokenInformation, __in ULONG TokenInformationLength, __out PULONG ReturnLength)
-NTSTATUS NtQueryInformationTransaction (__in HANDLE TransactionHandle, __in TRANSACTION_INFORMATION_CLASS TransactionInformationClass, __out_bcount(TransactionInformationLength) PVOID TransactionInformation, __in ULONG TransactionInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryInformationTransactionManager (__in HANDLE TransactionManagerHandle, __in TRANSACTIONMANAGER_INFORMATION_CLASS TransactionManagerInformationClass, __out_bcount(TransactionManagerInformationLength) PVOID TransactionManagerInformation, __in ULONG TransactionManagerInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryInformationWorkerFactory (__in HANDLE WorkerFactoryHandle, __in WORKERFACTORYINFOCLASS WorkerFactoryInformationClass, __out_bcount(WorkerFactoryInformationLength) PVOID WorkerFactoryInformation, __in ULONG WorkerFactoryInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryInstallUILanguage (__out LANGID *InstallUILanguageId)
-NTSTATUS NtQueryIntervalProfile (__in KPROFILE_SOURCE ProfileSource, __out PULONG Interval)
-NTSTATUS NtQueryIoCompletion (__in HANDLE IoCompletionHandle, __in IO_COMPLETION_INFORMATION_CLASS IoCompletionInformationClass, __out_bcount(IoCompletionInformationLength) PVOID IoCompletionInformation, __in ULONG IoCompletionInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryKey (__in HANDLE KeyHandle, __in KEY_INFORMATION_CLASS KeyInformationClass, __out_bcount_opt(Length) PVOID KeyInformation, __in ULONG Length, __out PULONG ResultLength)
-NTSTATUS NtQueryLicenseValue (__in PUNICODE_STRING Name, __out_opt PULONG Type, __out_bcount(ReturnedLength) PVOID Buffer, __in ULONG Length, __out PULONG ReturnedLength)
-NTSTATUS NtQueryMultipleValueKey (__in HANDLE KeyHandle, __inout_ecount(EntryCount) PKEY_VALUE_ENTRY ValueEntries, __in ULONG EntryCount, __out_bcount(*BufferLength) PVOID ValueBuffer, __inout PULONG BufferLength, __out_opt PULONG RequiredBufferLength)
-NTSTATUS NtQueryMutant (__in HANDLE MutantHandle, __in MUTANT_INFORMATION_CLASS MutantInformationClass, __out_bcount(MutantInformationLength) PVOID MutantInformation, __in ULONG MutantInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryObject (__in HANDLE Handle, __in OBJECT_INFORMATION_CLASS ObjectInformationClass, __out_bcount_opt(ObjectInformationLength) PVOID ObjectInformation, __in ULONG ObjectInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryOpenSubKeysEx (__in POBJECT_ATTRIBUTES TargetKey, __in ULONG BufferLength, __out_bcount(BufferLength) PVOID Buffer, __out PULONG RequiredSize)
-NTSTATUS NtQueryOpenSubKeys (__in POBJECT_ATTRIBUTES TargetKey, __out PULONG HandleCount)
-NTSTATUS NtQueryPerformanceCounter (__out PLARGE_INTEGER PerformanceCounter, __out_opt PLARGE_INTEGER PerformanceFrequency)
-NTSTATUS NtQueryPortInformationProcess (VOID)
-NTSTATUS NtQueryQuotaInformationFile (__in HANDLE FileHandle, __out PIO_STATUS_BLOCK IoStatusBlock, __out_bcount(Length) PVOID Buffer, __in ULONG Length, __in BOOLEAN ReturnSingleEntry, __in_bcount_opt(SidListLength) PVOID SidList, __in ULONG SidListLength, __in_opt PULONG StartSid, __in BOOLEAN RestartScan)
-NTSTATUS NtQuerySection (__in HANDLE SectionHandle, __in SECTION_INFORMATION_CLASS SectionInformationClass, __out_bcount(SectionInformationLength) PVOID SectionInformation, __in SIZE_T SectionInformationLength, __out_opt PSIZE_T ReturnLength)
-NTSTATUS NtQuerySecurityAttributesToken (__in HANDLE TokenHandle, __in_ecount_opt(NumberOfAttributes) PUNICODE_STRING Attributes, __in ULONG NumberOfAttributes, __out_bcount(Length) PVOID Buffer, __in ULONG Length, __out PULONG ReturnLength)
-NTSTATUS NtQuerySecurityObject (__in HANDLE Handle, __in SECURITY_INFORMATION SecurityInformation, __out_bcount_opt(Length) PSECURITY_DESCRIPTOR SecurityDescriptor, __in ULONG Length, __out PULONG LengthNeeded)
-NTSTATUS NtQuerySemaphore (__in HANDLE SemaphoreHandle, __in SEMAPHORE_INFORMATION_CLASS SemaphoreInformationClass, __out_bcount(SemaphoreInformationLength) PVOID SemaphoreInformation, __in ULONG SemaphoreInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQuerySymbolicLinkObject (__in HANDLE LinkHandle, __inout PUNICODE_STRING LinkTarget, __out_opt PULONG ReturnedLength)
-NTSTATUS NtQuerySystemEnvironmentValueEx (__in PUNICODE_STRING VariableName, __in LPGUID VendorGuid, __out_bcount_opt(*ValueLength) PVOID Value, __inout PULONG ValueLength, __out_opt PULONG Attributes)
-NTSTATUS NtQuerySystemEnvironmentValue (__in PUNICODE_STRING VariableName, __out_bcount(ValueLength) PWSTR VariableValue, __in USHORT ValueLength, __out_opt PUSHORT ReturnLength)
-NTSTATUS NtQuerySystemInformationEx (__in SYSTEM_INFORMATION_CLASS SystemInformationClass, __in_bcount(QueryInformationLength) PVOID QueryInformation, __in ULONG QueryInformationLength, __out_bcount_opt(SystemInformationLength) PVOID SystemInformation, __in ULONG SystemInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQuerySystemInformation (__in SYSTEM_INFORMATION_CLASS SystemInformationClass, __out_bcount_opt(SystemInformationLength) PVOID SystemInformation, __in ULONG SystemInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQuerySystemTime (__out PLARGE_INTEGER SystemTime)
-NTSTATUS NtQueryTimer (__in HANDLE TimerHandle, __in TIMER_INFORMATION_CLASS TimerInformationClass, __out_bcount(TimerInformationLength) PVOID TimerInformation, __in ULONG TimerInformationLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtQueryTimerResolution (__out PULONG MaximumTime, __out PULONG MinimumTime, __out PULONG CurrentTime)
-NTSTATUS NtQueryValueKey (__in HANDLE KeyHandle, __in PUNICODE_STRING ValueName, __in KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass, __out_bcount_opt(Length) PVOID KeyValueInformation, __in ULONG Length, __out PULONG ResultLength)
-NTSTATUS NtQueryVirtualMemory (__in HANDLE ProcessHandle, __in PVOID BaseAddress, __in MEMORY_INFORMATION_CLASS MemoryInformationClass, __out_bcount(MemoryInformationLength) PVOID MemoryInformation, __in SIZE_T MemoryInformationLength, __out_opt PSIZE_T ReturnLength)
-NTSTATUS NtQueryVolumeInformationFile (__in HANDLE FileHandle, __out PIO_STATUS_BLOCK IoStatusBlock, __out_bcount(Length) PVOID FsInformation, __in ULONG Length, __in FS_INFORMATION_CLASS FsInformationClass)
-NTSTATUS NtQueueApcThreadEx (__in HANDLE ThreadHandle, __in_opt HANDLE UserApcReserveHandle, __in PPS_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcArgument1, __in_opt PVOID ApcArgument2, __in_opt PVOID ApcArgument3)
-NTSTATUS NtQueueApcThread (__in HANDLE ThreadHandle, __in PPS_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcArgument1, __in_opt PVOID ApcArgument2, __in_opt PVOID ApcArgument3)
-NTSTATUS NtRaiseException (__out PEXCEPTION_RECORD ExceptionRecord, __out PCONTEXT ContextRecord, __out BOOLEAN FirstChance)
-NTSTATUS NtRaiseHardError (__in NTSTATUS ErrorStatus, __in ULONG NumberOfParameters, __in ULONG UnicodeStringParameterMask, __in_ecount(NumberOfParameters) PULONG_PTR Parameters, __in ULONG ValidResponseOptions, __out PULONG Response)
-NTSTATUS NtReadFile (__in HANDLE FileHandle, __in_opt HANDLE Event, __in_opt PIO_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcContext, __out PIO_STATUS_BLOCK IoStatusBlock, __out_bcount(Length) PVOID Buffer, __in ULONG Length, __in_opt PLARGE_INTEGER ByteOffset, __in_opt PULONG Key)
-NTSTATUS NtReadFileScatter (__in HANDLE FileHandle, __in_opt HANDLE Event, __in_opt PIO_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcContext, __out PIO_STATUS_BLOCK IoStatusBlock, __in PFILE_SEGMENT_ELEMENT SegmentArray, __in ULONG Length, __in_opt PLARGE_INTEGER ByteOffset, __in_opt PULONG Key)
-NTSTATUS NtReadOnlyEnlistment (__in HANDLE EnlistmentHandle, __in_opt PLARGE_INTEGER TmVirtualClock)
-NTSTATUS NtReadRequestData (__in HANDLE PortHandle, __in PPORT_MESSAGE Message, __in ULONG DataEntryIndex, __out_bcount(BufferSize) PVOID Buffer, __in SIZE_T BufferSize, __out_opt PSIZE_T NumberOfBytesRead)
-NTSTATUS NtReadVirtualMemory (__in HANDLE ProcessHandle, __in_opt PVOID BaseAddress, __out_bcount(BufferSize) PVOID Buffer, __in SIZE_T BufferSize, __out_opt PSIZE_T NumberOfBytesRead)
-NTSTATUS NtRecoverEnlistment (__in HANDLE EnlistmentHandle, __in_opt PVOID EnlistmentKey)
-NTSTATUS NtRecoverResourceManager (__in HANDLE ResourceManagerHandle)
-NTSTATUS NtRecoverTransactionManager (__in HANDLE TransactionManagerHandle)
-NTSTATUS NtRegisterProtocolAddressInformation (__in HANDLE ResourceManager, __in PCRM_PROTOCOL_ID ProtocolId, __in ULONG ProtocolInformationSize, __in PVOID ProtocolInformation, __in_opt ULONG CreateOptions)
-NTSTATUS NtRegisterThreadTerminatePort (__in HANDLE PortHandle)
-NTSTATUS NtReleaseKeyedEvent (__in HANDLE KeyedEventHandle, __in PVOID KeyValue, __in BOOLEAN Alertable, __in_opt PLARGE_INTEGER Timeout)
-NTSTATUS NtReleaseMutant (__in HANDLE MutantHandle, __out_opt PLONG PreviousCount)
-NTSTATUS NtReleaseSemaphore (__in HANDLE SemaphoreHandle, __in LONG ReleaseCount, __out_opt PLONG PreviousCount)
-NTSTATUS NtReleaseWorkerFactoryWorker (__in HANDLE WorkerFactoryHandle)
-NTSTATUS NtRemoveIoCompletionEx (__in HANDLE IoCompletionHandle, __out_ecount(Count) PFILE_IO_COMPLETION_INFORMATION IoCompletionInformation, __in ULONG Count, __out PULONG NumEntriesRemoved, __in_opt PLARGE_INTEGER Timeout, __in BOOLEAN Alertable)
-NTSTATUS NtRemoveIoCompletion (__in HANDLE IoCompletionHandle, __out PVOID *KeyContext, __out PVOID *ApcContext, __out PIO_STATUS_BLOCK IoStatusBlock, __in_opt PLARGE_INTEGER Timeout)
-NTSTATUS NtRemoveProcessDebug (__out HANDLE ProcessHandle, __out HANDLE DebugObjectHandle)
-NTSTATUS NtRenameKey (__in HANDLE KeyHandle, __in PUNICODE_STRING NewName)
-NTSTATUS NtRenameTransactionManager (__in PUNICODE_STRING LogFileName, __in LPGUID ExistingTransactionManagerGuid)
-NTSTATUS NtReplaceKey (__in POBJECT_ATTRIBUTES NewFile, __in HANDLE TargetHandle, __in POBJECT_ATTRIBUTES OldFile)
-NTSTATUS NtReplacePartitionUnit (__in PUNICODE_STRING TargetInstancePath, __in PUNICODE_STRING SpareInstancePath, __in ULONG Flags)
-NTSTATUS NtReplyPort (__in HANDLE PortHandle, __in PPORT_MESSAGE ReplyMessage)
-NTSTATUS NtReplyWaitReceivePortEx (__in HANDLE PortHandle, __out_opt PVOID *PortContext, __in_opt PPORT_MESSAGE ReplyMessage, __out PPORT_MESSAGE ReceiveMessage, __in_opt PLARGE_INTEGER Timeout)
-NTSTATUS NtReplyWaitReceivePort (__in HANDLE PortHandle, __out_opt PVOID *PortContext , __in_opt PPORT_MESSAGE ReplyMessage, __out PPORT_MESSAGE ReceiveMessage)
-NTSTATUS NtReplyWaitReplyPort (__in HANDLE PortHandle, __inout PPORT_MESSAGE ReplyMessage)
-NTSTATUS NtRequestPort (__in HANDLE PortHandle, __in PPORT_MESSAGE RequestMessage)
-NTSTATUS NtRequestWaitReplyPort (__in HANDLE PortHandle, __in PPORT_MESSAGE RequestMessage, __out PPORT_MESSAGE ReplyMessage)
-NTSTATUS NtResetEvent (__in HANDLE EventHandle, __out_opt PLONG PreviousState)
-NTSTATUS NtResetWriteWatch (__in HANDLE ProcessHandle, __in PVOID BaseAddress, __in SIZE_T RegionSize)
-NTSTATUS NtRestoreKey (__in HANDLE KeyHandle, __in HANDLE FileHandle, __in ULONG Flags)
-NTSTATUS NtResumeProcess (__in HANDLE ProcessHandle)
-NTSTATUS NtResumeThread (__in HANDLE ThreadHandle, __out_opt PULONG PreviousSuspendCount)
-NTSTATUS NtRollbackComplete (__in HANDLE EnlistmentHandle, __in_opt PLARGE_INTEGER TmVirtualClock)
-NTSTATUS NtRollbackEnlistment (__in HANDLE EnlistmentHandle, __in_opt PLARGE_INTEGER TmVirtualClock)
-NTSTATUS NtRollbackTransaction (__in HANDLE TransactionHandle, __in BOOLEAN Wait)
-NTSTATUS NtRollforwardTransactionManager (__in HANDLE TransactionManagerHandle, __in_opt PLARGE_INTEGER TmVirtualClock)
-NTSTATUS NtSaveKeyEx (__in HANDLE KeyHandle, __in HANDLE FileHandle, __in ULONG Format)
-NTSTATUS NtSaveKey (__in HANDLE KeyHandle, __in HANDLE FileHandle)
-NTSTATUS NtSaveMergedKeys (__in HANDLE HighPrecedenceKeyHandle, __in HANDLE LowPrecedenceKeyHandle, __in HANDLE FileHandle)
-NTSTATUS NtSecureConnectPort (__out PHANDLE PortHandle, __in PUNICODE_STRING PortName, __in PSECURITY_QUALITY_OF_SERVICE SecurityQos, __inout_opt PPORT_VIEW ClientView, __in_opt PSID RequiredServerSid, __inout_opt PREMOTE_PORT_VIEW ServerView, __out_opt PULONG MaxMessageLength, __inout_opt PVOID ConnectionInformation, __inout_opt PULONG ConnectionInformationLength)
-NTSTATUS NtSerializeBoot (VOID)
-NTSTATUS NtSetBootEntryOrder (__in_ecount(Count) PULONG Ids, __in ULONG Count)
-NTSTATUS NtSetBootOptions (__in PBOOT_OPTIONS BootOptions, __in ULONG FieldsToChange)
-NTSTATUS NtSetContextThread (__in HANDLE ThreadHandle, __in PCONTEXT ThreadContext)
-NTSTATUS NtSetDebugFilterState (__in ULONG ComponentId, __in ULONG Level, __in BOOLEAN State)
-NTSTATUS NtSetDefaultHardErrorPort (__in HANDLE DefaultHardErrorPort)
-NTSTATUS NtSetDefaultLocale (__in BOOLEAN UserProfile, __in LCID DefaultLocaleId)
-NTSTATUS NtSetDefaultUILanguage (__in LANGID DefaultUILanguageId)
-NTSTATUS NtSetDriverEntryOrder (__in_ecount(Count) PULONG Ids, __in ULONG Count)
-NTSTATUS NtSetEaFile (__in HANDLE FileHandle, __out PIO_STATUS_BLOCK IoStatusBlock, __in_bcount(Length) PVOID Buffer, __in ULONG Length)
-NTSTATUS NtSetEventBoostPriority (__in HANDLE EventHandle)
-NTSTATUS NtSetEvent (__in HANDLE EventHandle, __out_opt PLONG PreviousState)
-NTSTATUS NtSetHighEventPair (__in HANDLE EventPairHandle)
-NTSTATUS NtSetHighWaitLowEventPair (__in HANDLE EventPairHandle)
-NTSTATUS NtSetInformationDebugObject (__out HANDLE DebugObjectHandle, __out DEBUGOBJECTINFOCLASS DebugObjectInformationClass, __out PVOID DebugInformation, __out ULONG DebugInformationLength, __out PULONG ReturnLength OPTIONAL)
-NTSTATUS NtSetInformationEnlistment (__in_opt HANDLE EnlistmentHandle, __in ENLISTMENT_INFORMATION_CLASS EnlistmentInformationClass, __in_bcount(EnlistmentInformationLength) PVOID EnlistmentInformation, __in ULONG EnlistmentInformationLength)
-NTSTATUS NtSetInformationFile (__in HANDLE FileHandle, __out PIO_STATUS_BLOCK IoStatusBlock, __in_bcount(Length) PVOID FileInformation, __in ULONG Length, __in FILE_INFORMATION_CLASS FileInformationClass)
-NTSTATUS NtSetInformationJobObject (__in HANDLE JobHandle, __in JOBOBJECTINFOCLASS JobObjectInformationClass, __in_bcount(JobObjectInformationLength) PVOID JobObjectInformation, __in ULONG JobObjectInformationLength)
-NTSTATUS NtSetInformationKey (__in HANDLE KeyHandle, __in KEY_SET_INFORMATION_CLASS KeySetInformationClass, __in_bcount(KeySetInformationLength) PVOID KeySetInformation, __in ULONG KeySetInformationLength)
-NTSTATUS NtSetInformationObject (__in HANDLE Handle, __in OBJECT_INFORMATION_CLASS ObjectInformationClass, __in_bcount(ObjectInformationLength) PVOID ObjectInformation, __in ULONG ObjectInformationLength)
-NTSTATUS NtSetInformationProcess (__in HANDLE ProcessHandle, __in PROCESSINFOCLASS ProcessInformationClass, __in_bcount(ProcessInformationLength) PVOID ProcessInformation, __in ULONG ProcessInformationLength)
-NTSTATUS NtSetInformationResourceManager (__in HANDLE ResourceManagerHandle, __in RESOURCEMANAGER_INFORMATION_CLASS ResourceManagerInformationClass, __in_bcount(ResourceManagerInformationLength) PVOID ResourceManagerInformation, __in ULONG ResourceManagerInformationLength)
-NTSTATUS NtSetInformationThread (__in HANDLE ThreadHandle, __in THREADINFOCLASS ThreadInformationClass, __in_bcount(ThreadInformationLength) PVOID ThreadInformation, __in ULONG ThreadInformationLength)
-NTSTATUS NtSetInformationToken (__in HANDLE TokenHandle, __in TOKEN_INFORMATION_CLASS TokenInformationClass, __in_bcount(TokenInformationLength) PVOID TokenInformation, __in ULONG TokenInformationLength)
-NTSTATUS NtSetInformationTransaction (__in HANDLE TransactionHandle, __in TRANSACTION_INFORMATION_CLASS TransactionInformationClass, __in_bcount(TransactionInformationLength) PVOID TransactionInformation, __in ULONG TransactionInformationLength)
-NTSTATUS NtSetInformationTransactionManager (__in_opt HANDLE TmHandle, __in TRANSACTIONMANAGER_INFORMATION_CLASS TransactionManagerInformationClass, __in_bcount(TransactionManagerInformationLength) PVOID TransactionManagerInformation, __in ULONG TransactionManagerInformationLength)
-NTSTATUS NtSetInformationWorkerFactory (__in HANDLE WorkerFactoryHandle, __in WORKERFACTORYINFOCLASS WorkerFactoryInformationClass, __in_bcount(WorkerFactoryInformationLength) PVOID WorkerFactoryInformation, __in ULONG WorkerFactoryInformationLength)
-NTSTATUS NtSetIntervalProfile (__in ULONG Interval, __in KPROFILE_SOURCE Source)
-NTSTATUS NtSetIoCompletionEx (__in HANDLE IoCompletionHandle, __in HANDLE IoCompletionReserveHandle, __in PVOID KeyContext, __in_opt PVOID ApcContext, __in NTSTATUS IoStatus, __in ULONG_PTR IoStatusInformation)
-NTSTATUS NtSetIoCompletion (__in HANDLE IoCompletionHandle, __in PVOID KeyContext, __in_opt PVOID ApcContext, __in NTSTATUS IoStatus, __in ULONG_PTR IoStatusInformation)
-NTSTATUS NtSetLdtEntries (__in ULONG Selector0, __in ULONG Entry0Low, __in ULONG Entry0Hi, __in ULONG Selector1, __in ULONG Entry1Low, __in ULONG Entry1Hi)
-NTSTATUS NtSetLowEventPair (__in HANDLE EventPairHandle)
-NTSTATUS NtSetLowWaitHighEventPair (__in HANDLE EventPairHandle)
-NTSTATUS NtSetQuotaInformationFile (__in HANDLE FileHandle, __out PIO_STATUS_BLOCK IoStatusBlock, __in_bcount(Length) PVOID Buffer, __in ULONG Length)
-NTSTATUS NtSetSecurityObject (__in HANDLE Handle, __in SECURITY_INFORMATION SecurityInformation, __in PSECURITY_DESCRIPTOR SecurityDescriptor)
-NTSTATUS NtSetSystemEnvironmentValueEx (__in PUNICODE_STRING VariableName, __in LPGUID VendorGuid, __in_bcount_opt(ValueLength) PVOID Value, __in ULONG ValueLength, __in ULONG Attributes)
-NTSTATUS NtSetSystemEnvironmentValue (__in PUNICODE_STRING VariableName, __in PUNICODE_STRING VariableValue)
-NTSTATUS NtSetSystemInformation (__in SYSTEM_INFORMATION_CLASS SystemInformationClass, __in_bcount_opt(SystemInformationLength) PVOID SystemInformation, __in ULONG SystemInformationLength)
-NTSTATUS NtSetSystemPowerState (__in POWER_ACTION SystemAction, __in SYSTEM_POWER_STATE MinSystemState, __in ULONG Flags)
-NTSTATUS NtSetSystemTime (__in_opt PLARGE_INTEGER SystemTime, __out_opt PLARGE_INTEGER PreviousTime)
-NTSTATUS NtSetThreadExecutionState (__in EXECUTION_STATE esFlags, __out EXECUTION_STATE *PreviousFlags)
-NTSTATUS NtSetTimerEx (__in HANDLE TimerHandle, __in TIMER_SET_INFORMATION_CLASS TimerSetInformationClass, __inout_bcount(TimerSetInformationLength) PVOID TimerSetInformation, __in ULONG TimerSetInformationLength)
-NTSTATUS NtSetTimer (__in HANDLE TimerHandle, __in PLARGE_INTEGER DueTime, __in_opt PTIMER_APC_ROUTINE TimerApcRoutine, __in_opt PVOID TimerContext, __in BOOLEAN WakeTimer, __in_opt LONG Period, __out_opt PBOOLEAN PreviousState)
-NTSTATUS NtSetTimerResolution (__in ULONG DesiredTime, __in BOOLEAN SetResolution, __out PULONG ActualTime)
-NTSTATUS NtSetUuidSeed (__in PCHAR Seed)
-NTSTATUS NtSetValueKey (__in HANDLE KeyHandle, __in PUNICODE_STRING ValueName, __in_opt ULONG TitleIndex, __in ULONG Type, __in_bcount_opt(DataSize) PVOID Data, __in ULONG DataSize)
-NTSTATUS NtSetVolumeInformationFile (__in HANDLE FileHandle, __out PIO_STATUS_BLOCK IoStatusBlock, __in_bcount(Length) PVOID FsInformation, __in ULONG Length, __in FS_INFORMATION_CLASS FsInformationClass)
-NTSTATUS NtShutdownSystem (__in SHUTDOWN_ACTION Action)
-NTSTATUS NtShutdownWorkerFactory (__in HANDLE WorkerFactoryHandle, __inout LONG *PendingWorkerCount)
-NTSTATUS NtSignalAndWaitForSingleObject (__in HANDLE SignalHandle, __in HANDLE WaitHandle, __in BOOLEAN Alertable, __in_opt PLARGE_INTEGER Timeout)
-NTSTATUS NtSinglePhaseReject (__in HANDLE EnlistmentHandle, __in_opt PLARGE_INTEGER TmVirtualClock)
-NTSTATUS NtStartProfile (__in HANDLE ProfileHandle)
-NTSTATUS NtStopProfile (__in HANDLE ProfileHandle)
-NTSTATUS NtSuspendProcess (__in HANDLE ProcessHandle)
-NTSTATUS NtSuspendThread (__in HANDLE ThreadHandle, __out_opt PULONG PreviousSuspendCount)
-NTSTATUS NtSystemDebugControl (__in SYSDBG_COMMAND Command, __inout_bcount_opt(InputBufferLength) PVOID InputBuffer, __in ULONG InputBufferLength, __out_bcount_opt(OutputBufferLength) PVOID OutputBuffer, __in ULONG OutputBufferLength, __out_opt PULONG ReturnLength)
-NTSTATUS NtTerminateJobObject (__in HANDLE JobHandle, __in NTSTATUS ExitStatus)
-NTSTATUS NtTerminateProcess (__in_opt HANDLE ProcessHandle, __in NTSTATUS ExitStatus)
-NTSTATUS NtTerminateThread (__in_opt HANDLE ThreadHandle, __in NTSTATUS ExitStatus)
-NTSTATUS NtTestAlert (VOID)
-NTSTATUS NtThawRegistry (VOID)
-NTSTATUS NtThawTransactions (VOID)
-NTSTATUS NtTraceControl (__in ULONG FunctionCode, __in_bcount_opt(InBufferLen) PVOID InBuffer, __in ULONG InBufferLen, __out_bcount_opt(OutBufferLen) PVOID OutBuffer, __in ULONG OutBufferLen, __out PULONG ReturnLength)
-NTSTATUS NtTraceEvent (__in HANDLE TraceHandle, __in ULONG Flags, __in ULONG FieldSize, __in PVOID Fields)
-NTSTATUS NtTranslateFilePath (__in PFILE_PATH InputFilePath, __in ULONG OutputType, __out_bcount_opt(*OutputFilePathLength) PFILE_PATH OutputFilePath, __inout_opt PULONG OutputFilePathLength)
-NTSTATUS NtUmsThreadYield (__in PVOID SchedulerParam)
-NTSTATUS NtUnloadDriver (__in PUNICODE_STRING DriverServiceName)
-NTSTATUS NtUnloadKey2 (__in POBJECT_ATTRIBUTES TargetKey, __in ULONG Flags)
-NTSTATUS NtUnloadKeyEx (__in POBJECT_ATTRIBUTES TargetKey, __in_opt HANDLE Event)
-NTSTATUS NtUnloadKey (__in POBJECT_ATTRIBUTES TargetKey)
-NTSTATUS NtUnlockFile (__in HANDLE FileHandle, __out PIO_STATUS_BLOCK IoStatusBlock, __in PLARGE_INTEGER ByteOffset, __in PLARGE_INTEGER Length, __in ULONG Key)
-NTSTATUS NtUnlockVirtualMemory (__in HANDLE ProcessHandle, __inout PVOID *BaseAddress, __inout PSIZE_T RegionSize, __in ULONG MapType)
-NTSTATUS NtUnmapViewOfSection (__in HANDLE ProcessHandle, __in PVOID BaseAddress)
-NTSTATUS NtVdmControl (__in VDMSERVICECLASS Service, __inout PVOID ServiceData)
-NTSTATUS NtWaitForDebugEvent (__out HANDLE DebugObjectHandle, __out BOOLEAN Alertable, __out PLARGE_INTEGER Timeout OPTIONAL, __out PDBGUI_WAIT_STATE_CHANGE WaitStateChange)
-NTSTATUS NtWaitForKeyedEvent (__in HANDLE KeyedEventHandle, __in PVOID KeyValue, __in BOOLEAN Alertable, __in_opt PLARGE_INTEGER Timeout)
-NTSTATUS NtWaitForMultipleObjects32 (__in ULONG Count, __in_ecount(Count) LONG Handles[], __in WAIT_TYPE WaitType, __in BOOLEAN Alertable, __in_opt PLARGE_INTEGER Timeout)
-NTSTATUS NtWaitForMultipleObjects (__in ULONG Count, __in_ecount(Count) HANDLE Handles[], __in WAIT_TYPE WaitType, __in BOOLEAN Alertable, __in_opt PLARGE_INTEGER Timeout)
-NTSTATUS NtWaitForSingleObject (__in HANDLE Handle, __in BOOLEAN Alertable, __in_opt PLARGE_INTEGER Timeout)
-NTSTATUS NtWaitForWorkViaWorkerFactory (__in HANDLE WorkerFactoryHandle, __out PFILE_IO_COMPLETION_INFORMATION MiniPacket)
-NTSTATUS NtWaitHighEventPair (__in HANDLE EventPairHandle)
-NTSTATUS NtWaitLowEventPair (__in HANDLE EventPairHandle)
-NTSTATUS NtWorkerFactoryWorkerReady (__in HANDLE WorkerFactoryHandle)
-NTSTATUS NtWriteFileGather (__in HANDLE FileHandle, __in_opt HANDLE Event, __in_opt PIO_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcContext, __out PIO_STATUS_BLOCK IoStatusBlock, __in PFILE_SEGMENT_ELEMENT SegmentArray, __in ULONG Length, __in_opt PLARGE_INTEGER ByteOffset, __in_opt PULONG Key)
-NTSTATUS NtWriteFile (__in HANDLE FileHandle, __in_opt HANDLE Event, __in_opt PIO_APC_ROUTINE ApcRoutine, __in_opt PVOID ApcContext, __out PIO_STATUS_BLOCK IoStatusBlock, __in_bcount(Length) PVOID Buffer, __in ULONG Length, __in_opt PLARGE_INTEGER ByteOffset, __in_opt PULONG Key)
-NTSTATUS NtWriteRequestData (__in HANDLE PortHandle, __in PPORT_MESSAGE Message, __in ULONG DataEntryIndex, __in_bcount(BufferSize) PVOID Buffer, __in SIZE_T BufferSize, __out_opt PSIZE_T NumberOfBytesWritten)
-NTSTATUS NtWriteVirtualMemory (__in HANDLE ProcessHandle, __in_opt PVOID BaseAddress, __in_bcount(BufferSize) PVOID Buffer, __in SIZE_T BufferSize, __out_opt PSIZE_T NumberOfBytesWritten)
-NTSTATUS NtYieldExecution (VOID)
-*/
+struct syscall
+{
+  const char* name;
+  int num_args;
+  ARG args[20];
+};
 
-#endif
+struct syscall_wrapper {
+ syscalls *sc;
+ unsigned int syscall_index;
+};
+
+typedef struct syscall_wrapper syscall_wrapper_t;
+
+#define NUM_SYSCALLS 401
+
+static const struct syscall syscall_struct[] = {
+  { .name = "NtAcceptConnectPort", .num_args = 6, .args = 
+    {
+      {.name = "PortHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "PortContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ConnectionRequest", .dir = "in", .dir_opt = "", .type = "PPORT_MESSAGE"},
+      {.name = "AcceptConnection", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "ServerView", .dir = "inout", .dir_opt = "opt", .type = "PPORT_VIEW"},
+      {.name = "ClientView", .dir = "out", .dir_opt = "opt", .type = "PREMOTE_PORT_VIEW"}
+    }
+  },
+  { .name = "NtAccessCheckAndAuditAlarm", .num_args = 11, .args = 
+    {
+      {.name = "SubsystemName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "HandleId", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ObjectTypeName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "ObjectName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "SecurityDescriptor", .dir = "in", .dir_opt = "", .type = "PSECURITY_DESCRIPTOR"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "GenericMapping", .dir = "in", .dir_opt = "", .type = "PGENERIC_MAPPING"},
+      {.name = "ObjectCreation", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "GrantedAccess", .dir = "out", .dir_opt = "", .type = "PACCESS_MASK"},
+      {.name = "AccessStatus", .dir = "out", .dir_opt = "", .type = "PNTSTATUS"},
+      {.name = "GenerateOnClose", .dir = "out", .dir_opt = "", .type = "PBOOLEAN"}
+    }
+  },
+  { .name = "NtAccessCheckByTypeAndAuditAlarm", .num_args = 16, .args = 
+    {
+      {.name = "SubsystemName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "HandleId", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ObjectTypeName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "ObjectName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "SecurityDescriptor", .dir = "in", .dir_opt = "", .type = "PSECURITY_DESCRIPTOR"},
+      {.name = "PrincipalSelfSid", .dir = "in", .dir_opt = "opt", .type = "PSID"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "AuditType", .dir = "in", .dir_opt = "", .type = "AUDIT_EVENT_TYPE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ObjectTypeList", .dir = "in", .dir_opt = "ecount_opt(ObjectTypeListLength)", .type = "POBJECT_TYPE_LIST"},
+      {.name = "ObjectTypeListLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "GenericMapping", .dir = "in", .dir_opt = "", .type = "PGENERIC_MAPPING"},
+      {.name = "ObjectCreation", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "GrantedAccess", .dir = "out", .dir_opt = "", .type = "PACCESS_MASK"},
+      {.name = "AccessStatus", .dir = "out", .dir_opt = "", .type = "PNTSTATUS"},
+      {.name = "GenerateOnClose", .dir = "out", .dir_opt = "", .type = "PBOOLEAN"}
+    }
+  },
+  { .name = "NtAccessCheckByType", .num_args = 11, .args = 
+    {
+      {.name = "SecurityDescriptor", .dir = "in", .dir_opt = "", .type = "PSECURITY_DESCRIPTOR"},
+      {.name = "PrincipalSelfSid", .dir = "in", .dir_opt = "opt", .type = "PSID"},
+      {.name = "ClientToken", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectTypeList", .dir = "in", .dir_opt = "ecount(ObjectTypeListLength)", .type = "POBJECT_TYPE_LIST"},
+      {.name = "ObjectTypeListLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "GenericMapping", .dir = "in", .dir_opt = "", .type = "PGENERIC_MAPPING"},
+      {.name = "PrivilegeSet", .dir = "out", .dir_opt = "bcount(*PrivilegeSetLength)", .type = "PPRIVILEGE_SET"},
+      {.name = "PrivilegeSetLength", .dir = "inout", .dir_opt = "", .type = "PULONG"},
+      {.name = "GrantedAccess", .dir = "out", .dir_opt = "", .type = "PACCESS_MASK"},
+      {.name = "AccessStatus", .dir = "out", .dir_opt = "", .type = "PNTSTATUS"}
+    }
+  },
+  { .name = "NtAccessCheckByTypeResultListAndAuditAlarmByHandle", .num_args = 17, .args = 
+    {
+      {.name = "SubsystemName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "HandleId", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ClientToken", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ObjectTypeName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "ObjectName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "SecurityDescriptor", .dir = "in", .dir_opt = "", .type = "PSECURITY_DESCRIPTOR"},
+      {.name = "PrincipalSelfSid", .dir = "in", .dir_opt = "opt", .type = "PSID"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "AuditType", .dir = "in", .dir_opt = "", .type = "AUDIT_EVENT_TYPE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ObjectTypeList", .dir = "in", .dir_opt = "ecount_opt(ObjectTypeListLength)", .type = "POBJECT_TYPE_LIST"},
+      {.name = "ObjectTypeListLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "GenericMapping", .dir = "in", .dir_opt = "", .type = "PGENERIC_MAPPING"},
+      {.name = "ObjectCreation", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "GrantedAccess", .dir = "out", .dir_opt = "ecount(ObjectTypeListLength)", .type = "PACCESS_MASK"},
+      {.name = "AccessStatus", .dir = "out", .dir_opt = "ecount(ObjectTypeListLength)", .type = "PNTSTATUS"},
+      {.name = "GenerateOnClose", .dir = "out", .dir_opt = "", .type = "PBOOLEAN"}
+    }
+  },
+  { .name = "NtAccessCheckByTypeResultListAndAuditAlarm", .num_args = 16, .args = 
+    {
+      {.name = "SubsystemName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "HandleId", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ObjectTypeName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "ObjectName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "SecurityDescriptor", .dir = "in", .dir_opt = "", .type = "PSECURITY_DESCRIPTOR"},
+      {.name = "PrincipalSelfSid", .dir = "in", .dir_opt = "opt", .type = "PSID"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "AuditType", .dir = "in", .dir_opt = "", .type = "AUDIT_EVENT_TYPE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ObjectTypeList", .dir = "in", .dir_opt = "ecount_opt(ObjectTypeListLength)", .type = "POBJECT_TYPE_LIST"},
+      {.name = "ObjectTypeListLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "GenericMapping", .dir = "in", .dir_opt = "", .type = "PGENERIC_MAPPING"},
+      {.name = "ObjectCreation", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "GrantedAccess", .dir = "out", .dir_opt = "ecount(ObjectTypeListLength)", .type = "PACCESS_MASK"},
+      {.name = "AccessStatus", .dir = "out", .dir_opt = "ecount(ObjectTypeListLength)", .type = "PNTSTATUS"},
+      {.name = "GenerateOnClose", .dir = "out", .dir_opt = "", .type = "PBOOLEAN"}
+    }
+  },
+  { .name = "NtAccessCheckByTypeResultList", .num_args = 11, .args = 
+    {
+      {.name = "SecurityDescriptor", .dir = "in", .dir_opt = "", .type = "PSECURITY_DESCRIPTOR"},
+      {.name = "PrincipalSelfSid", .dir = "in", .dir_opt = "opt", .type = "PSID"},
+      {.name = "ClientToken", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectTypeList", .dir = "in", .dir_opt = "ecount(ObjectTypeListLength)", .type = "POBJECT_TYPE_LIST"},
+      {.name = "ObjectTypeListLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "GenericMapping", .dir = "in", .dir_opt = "", .type = "PGENERIC_MAPPING"},
+      {.name = "PrivilegeSet", .dir = "out", .dir_opt = "bcount(*PrivilegeSetLength)", .type = "PPRIVILEGE_SET"},
+      {.name = "PrivilegeSetLength", .dir = "inout", .dir_opt = "", .type = "PULONG"},
+      {.name = "GrantedAccess", .dir = "out", .dir_opt = "ecount(ObjectTypeListLength)", .type = "PACCESS_MASK"},
+      {.name = "AccessStatus", .dir = "out", .dir_opt = "ecount(ObjectTypeListLength)", .type = "PNTSTATUS"}
+    }
+  },
+  { .name = "NtAccessCheck", .num_args = 8, .args = 
+    {
+      {.name = "SecurityDescriptor", .dir = "in", .dir_opt = "", .type = "PSECURITY_DESCRIPTOR"},
+      {.name = "ClientToken", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "GenericMapping", .dir = "in", .dir_opt = "", .type = "PGENERIC_MAPPING"},
+      {.name = "PrivilegeSet", .dir = "out", .dir_opt = "bcount(*PrivilegeSetLength)", .type = "PPRIVILEGE_SET"},
+      {.name = "PrivilegeSetLength", .dir = "inout", .dir_opt = "", .type = "PULONG"},
+      {.name = "GrantedAccess", .dir = "out", .dir_opt = "", .type = "PACCESS_MASK"},
+      {.name = "AccessStatus", .dir = "out", .dir_opt = "", .type = "PNTSTATUS"}
+    }
+  },
+  { .name = "NtAddAtom", .num_args = 3, .args = 
+    {
+      {.name = "AtomName", .dir = "in", .dir_opt = "bcount_opt(Length)", .type = "PWSTR"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Atom", .dir = "out", .dir_opt = "opt", .type = "PRTL_ATOM"}
+    }
+  },
+  { .name = "NtAddBootEntry", .num_args = 2, .args = 
+    {
+      {.name = "BootEntry", .dir = "in", .dir_opt = "", .type = "PBOOT_ENTRY"},
+      {.name = "Id", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtAddDriverEntry", .num_args = 2, .args = 
+    {
+      {.name = "DriverEntry", .dir = "in", .dir_opt = "", .type = "PEFI_DRIVER_ENTRY"},
+      {.name = "Id", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtAdjustGroupsToken", .num_args = 6, .args = 
+    {
+      {.name = "TokenHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ResetToDefault", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "NewState", .dir = "in", .dir_opt = "", .type = "PTOKEN_GROUPS"},
+      {.name = "BufferLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "PreviousState", .dir = "out", .dir_opt = "bcount_part_opt(BufferLength,*ReturnLength)", .type = "PTOKEN_GROUPS"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtAdjustPrivilegesToken", .num_args = 6, .args = 
+    {
+      {.name = "TokenHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DisableAllPrivileges", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "NewState", .dir = "in", .dir_opt = "opt", .type = "PTOKEN_PRIVILEGES"},
+      {.name = "BufferLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "PreviousState", .dir = "out", .dir_opt = "bcount_part_opt(BufferLength,*ReturnLength)", .type = "PTOKEN_PRIVILEGES"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtAlertResumeThread", .num_args = 2, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PreviousSuspendCount", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtAlertThread", .num_args = 0  },
+  { .name = "NtAllocateLocallyUniqueId", .num_args = 0  },
+  { .name = "NtAllocateReserveObject", .num_args = 3, .args = 
+    {
+      {.name = "MemoryReserveHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "Type", .dir = "in", .dir_opt = "", .type = "MEMORY_RESERVE_TYPE"}
+    }
+  },
+  { .name = "NtAllocateUserPhysicalPages", .num_args = 3, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "NumberOfPages", .dir = "inout", .dir_opt = "", .type = "PULONG_PTR"},
+      {.name = "UserPfnArra;", .dir = "out", .dir_opt = "ecount(*NumberOfPages)", .type = "PULONG_PTR"}
+    }
+  },
+  { .name = "NtAllocateUuids", .num_args = 4, .args = 
+    {
+      {.name = "Time", .dir = "out", .dir_opt = "", .type = "PULARGE_INTEGER"},
+      {.name = "Range", .dir = "out", .dir_opt = "", .type = "PULONG"},
+      {.name = "Sequence", .dir = "out", .dir_opt = "", .type = "PULONG"},
+      {.name = "Seed", .dir = "out", .dir_opt = "", .type = "PCHAR"}
+    }
+  },
+  { .name = "NtAllocateVirtualMemory", .num_args = 6, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "*BaseAddress", .dir = "inout", .dir_opt = "", .type = "PVOID"},
+      {.name = "ZeroBits", .dir = "in", .dir_opt = "", .type = "ULONG_PTR"},
+      {.name = "RegionSize", .dir = "inout", .dir_opt = "", .type = "PSIZE_T"},
+      {.name = "AllocationType", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Protect", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtAlpcAcceptConnectPort", .num_args = 9, .args = 
+    {
+      {.name = "PortHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "ConnectionPortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "PortAttributes", .dir = "in", .dir_opt = "", .type = "PALPC_PORT_ATTRIBUTES"},
+      {.name = "PortContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ConnectionRequest", .dir = "in", .dir_opt = "", .type = "PPORT_MESSAGE"},
+      {.name = "ConnectionMessageAttributes", .dir = "inout", .dir_opt = "opt", .type = "PALPC_MESSAGE_ATTRIBUTES"},
+      {.name = "AcceptConnection", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtAlpcCancelMessage", .num_args = 3, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "MessageContext", .dir = "in", .dir_opt = "", .type = "PALPC_CONTEXT_ATTR"}
+    }
+  },
+  { .name = "NtAlpcConnectPort", .num_args = 11, .args = 
+    {
+      {.name = "PortHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "PortName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "PortAttributes", .dir = "in", .dir_opt = "opt", .type = "PALPC_PORT_ATTRIBUTES"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "RequiredServerSid", .dir = "in", .dir_opt = "opt", .type = "PSID"},
+      {.name = "ConnectionMessage", .dir = "inout", .dir_opt = "", .type = "PPORT_MESSAGE"},
+      {.name = "BufferLength", .dir = "inout", .dir_opt = "opt", .type = "PULONG"},
+      {.name = "OutMessageAttributes", .dir = "inout", .dir_opt = "opt", .type = "PALPC_MESSAGE_ATTRIBUTES"},
+      {.name = "InMessageAttributes", .dir = "inout", .dir_opt = "opt", .type = "PALPC_MESSAGE_ATTRIBUTES"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtAlpcCreatePort", .num_args = 3, .args = 
+    {
+      {.name = "PortHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "PortAttributes", .dir = "in", .dir_opt = "opt", .type = "PALPC_PORT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtAlpcCreatePortSection", .num_args = 6, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "SectionHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "SectionSize", .dir = "in", .dir_opt = "", .type = "SIZE_T"},
+      {.name = "AlpcSectionHandle", .dir = "out", .dir_opt = "", .type = "PALPC_HANDLE"},
+      {.name = "ActualSectionSize", .dir = "out", .dir_opt = "", .type = "PSIZE_T"}
+    }
+  },
+  { .name = "NtAlpcCreateResourceReserve", .num_args = 4, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "reserved", .dir_opt = "", .type = "ULONG"},
+      {.name = "MessageSize", .dir = "in", .dir_opt = "", .type = "SIZE_T"},
+      {.name = "ResourceId", .dir = "out", .dir_opt = "", .type = "PALPC_HANDLE"}
+    }
+  },
+  { .name = "NtAlpcCreateSectionView", .num_args = 3, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "reserved", .dir_opt = "", .type = "ULONG"},
+      {.name = "ViewAttributes", .dir = "inout", .dir_opt = "", .type = "PALPC_DATA_VIEW_ATTR"}
+    }
+  },
+  { .name = "NtAlpcCreateSecurityContext", .num_args = 3, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "reserved", .dir_opt = "", .type = "ULONG"},
+      {.name = "SecurityAttribute", .dir = "inout", .dir_opt = "", .type = "PALPC_SECURITY_ATTR"}
+    }
+  },
+  { .name = "NtAlpcDeletePortSection", .num_args = 3, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "reserved", .dir_opt = "", .type = "ULONG"},
+      {.name = "SectionHandle", .dir = "in", .dir_opt = "", .type = "ALPC_HANDLE"}
+    }
+  },
+  { .name = "NtAlpcDeleteResourceReserve", .num_args = 3, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "reserved", .dir_opt = "", .type = "ULONG"},
+      {.name = "ResourceId", .dir = "in", .dir_opt = "", .type = "ALPC_HANDLE"}
+    }
+  },
+  { .name = "NtAlpcDeleteSectionView", .num_args = 3, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "reserved", .dir_opt = "", .type = "ULONG"},
+      {.name = "ViewBase", .dir = "in", .dir_opt = "", .type = "PVOID"}
+    }
+  },
+  { .name = "NtAlpcDeleteSecurityContext", .num_args = 3, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "reserved", .dir_opt = "", .type = "ULONG"},
+      {.name = "ContextHandle", .dir = "in", .dir_opt = "", .type = "ALPC_HANDLE"}
+    }
+  },
+  { .name = "NtAlpcDisconnectPort", .num_args = 2, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtAlpcImpersonateClientOfPort", .num_args = 3, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PortMessage", .dir = "in", .dir_opt = "", .type = "PPORT_MESSAGE"},
+      {.name = "Reserved", .dir = "reserved", .dir_opt = "", .type = "PVOID"}
+    }
+  },
+  { .name = "NtAlpcOpenSenderProcess", .num_args = 6, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PortMessage", .dir = "in", .dir_opt = "", .type = "PPORT_MESSAGE"},
+      {.name = "Flags", .dir = "reserved", .dir_opt = "", .type = "ULONG"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtAlpcOpenSenderThread", .num_args = 6, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PortMessage", .dir = "in", .dir_opt = "", .type = "PPORT_MESSAGE"},
+      {.name = "Flags", .dir = "reserved", .dir_opt = "", .type = "ULONG"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtAlpcQueryInformation", .num_args = 5, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PortInformationClass", .dir = "in", .dir_opt = "", .type = "ALPC_PORT_INFORMATION_CLASS"},
+      {.name = "PortInformation", .dir = "out", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtAlpcQueryInformationMessage", .num_args = 6, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PortMessage", .dir = "in", .dir_opt = "", .type = "PPORT_MESSAGE"},
+      {.name = "MessageInformationClass", .dir = "in", .dir_opt = "", .type = "ALPC_MESSAGE_INFORMATION_CLASS"},
+      {.name = "MessageInformation", .dir = "out", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtAlpcRevokeSecurityContext", .num_args = 3, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "reserved", .dir_opt = "", .type = "ULONG"},
+      {.name = "ContextHandle", .dir = "in", .dir_opt = "", .type = "ALPC_HANDLE"}
+    }
+  },
+  { .name = "NtAlpcSendWaitReceivePort", .num_args = 8, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "SendMessage", .dir = "in", .dir_opt = "opt", .type = "PPORT_MESSAGE"},
+      {.name = "SendMessageAttributes", .dir = "in", .dir_opt = "opt", .type = "PALPC_MESSAGE_ATTRIBUTES"},
+      {.name = "ReceiveMessage", .dir = "inout", .dir_opt = "opt", .type = "PPORT_MESSAGE"},
+      {.name = "BufferLength", .dir = "inout", .dir_opt = "opt", .type = "PULONG"},
+      {.name = "ReceiveMessageAttributes", .dir = "inout", .dir_opt = "opt", .type = "PALPC_MESSAGE_ATTRIBUTES"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtAlpcSetInformation", .num_args = 4, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PortInformationClass", .dir = "in", .dir_opt = "", .type = "ALPC_PORT_INFORMATION_CLASS"},
+      {.name = "PortInformation", .dir = "in", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtApphelpCacheControl", .num_args = 2, .args = 
+    {
+      {.name = "type", .dir = "in", .dir_opt = "", .type = "APPHELPCOMMAND"},
+      {.name = "buf", .dir = "in", .dir_opt = "", .type = "PVOID"}
+    }
+  },
+  { .name = "NtAreMappedFilesTheSame", .num_args = 2, .args = 
+    {
+      {.name = "File1MappedAsAnImage", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "File2MappedAsFile", .dir = "in", .dir_opt = "", .type = "PVOID"}
+    }
+  },
+  { .name = "NtAssignProcessToJobObject", .num_args = 2, .args = 
+    {
+      {.name = "JobHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtCallbackReturn", .num_args = 3, .args = 
+    {
+      {.name = "OutputBuffer", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "OutputLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Status", .dir = "in", .dir_opt = "", .type = "NTSTATUS"}
+    }
+  },
+  { .name = "NtCancelIoFileEx", .num_args = 3, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoRequestToCancel", .dir = "in", .dir_opt = "opt", .type = "PIO_STATUS_BLOCK"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"}
+    }
+  },
+  { .name = "NtCancelIoFile", .num_args = 2, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"}
+    }
+  },
+  { .name = "NtCancelSynchronousIoFile", .num_args = 3, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoRequestToCancel", .dir = "in", .dir_opt = "opt", .type = "PIO_STATUS_BLOCK"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"}
+    }
+  },
+  { .name = "NtCancelTimer", .num_args = 2, .args = 
+    {
+      {.name = "TimerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "CurrentState", .dir = "out", .dir_opt = "opt", .type = "PBOOLEAN"}
+    }
+  },
+  { .name = "NtClearEvent", .num_args = 0  },
+  { .name = "NtClose", .num_args = 0  },
+  { .name = "NtCloseObjectAuditAlarm", .num_args = 3, .args = 
+    {
+      {.name = "SubsystemName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "HandleId", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "GenerateOnClose", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtCommitComplete", .num_args = 2, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TmVirtualClock", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtCommitEnlistment", .num_args = 2, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TmVirtualClock", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtCommitTransaction", .num_args = 2, .args = 
+    {
+      {.name = "TransactionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Wait", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtCompactKeys", .num_args = 2, .args = 
+    {
+      {.name = "Count", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "KeyArray[;", .dir = "in", .dir_opt = "ecount(Count)", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtCompareTokens", .num_args = 3, .args = 
+    {
+      {.name = "FirstTokenHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "SecondTokenHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Equal", .dir = "out", .dir_opt = "", .type = "PBOOLEAN"}
+    }
+  },
+  { .name = "NtCompleteConnectPort", .num_args = 0  },
+  { .name = "NtCompressKey", .num_args = 0  },
+  { .name = "NtConnectPort", .num_args = 8, .args = 
+    {
+      {.name = "PortHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "PortName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "SecurityQos", .dir = "in", .dir_opt = "", .type = "PSECURITY_QUALITY_OF_SERVICE"},
+      {.name = "ClientView", .dir = "inout", .dir_opt = "opt", .type = "PPORT_VIEW"},
+      {.name = "ServerView", .dir = "inout", .dir_opt = "opt", .type = "PREMOTE_PORT_VIEW"},
+      {.name = "MaxMessageLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"},
+      {.name = "ConnectionInformation", .dir = "inout", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ConnectionInformationLength", .dir = "inout", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtContinue", .num_args = 2, .args = 
+    {
+      {.name = "ContextRecord", .dir = "out", .dir_opt = "", .type = "PCONTEXT"},
+      {.name = "TestAlert", .dir = "out", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtCreateDebugObject", .num_args = 4, .args = 
+    {
+      {.name = "DebugObjectHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "out", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "out", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "Flags", .dir = "out", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtCreateDirectoryObject", .num_args = 3, .args = 
+    {
+      {.name = "DirectoryHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtCreateEnlistment", .num_args = 8, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ResourceManagerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TransactionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "CreateOptions", .dir = "in", .dir_opt = "opt", .type = "ULONG"},
+      {.name = "NotificationMask", .dir = "in", .dir_opt = "", .type = "NOTIFICATION_MASK"},
+      {.name = "EnlistmentKey", .dir = "in", .dir_opt = "opt", .type = "PVOID"}
+    }
+  },
+  { .name = "NtCreateEvent", .num_args = 5, .args = 
+    {
+      {.name = "EventHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "EventType", .dir = "in", .dir_opt = "", .type = "EVENT_TYPE"},
+      {.name = "InitialState", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtCreateEventPair", .num_args = 3, .args = 
+    {
+      {.name = "EventPairHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtCreateFile", .num_args = 11, .args = 
+    {
+      {.name = "FileHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "AllocationSize", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"},
+      {.name = "FileAttributes", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ShareAccess", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "CreateDisposition", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "CreateOptions", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "EaBuffer", .dir = "in", .dir_opt = "bcount_opt(EaLength)", .type = "PVOID"},
+      {.name = "EaLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtCreateIoCompletion", .num_args = 4, .args = 
+    {
+      {.name = "IoCompletionHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "Count", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtCreateJobObject", .num_args = 3, .args = 
+    {
+      {.name = "JobHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtCreateJobSet", .num_args = 3, .args = 
+    {
+      {.name = "NumJob", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "UserJobSet", .dir = "in", .dir_opt = "ecount(NumJob)", .type = "PJOB_SET_ARRAY"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtCreateKeyedEvent", .num_args = 4, .args = 
+    {
+      {.name = "KeyedEventHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtCreateKey", .num_args = 7, .args = 
+    {
+      {.name = "KeyHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "TitleIndex", .dir = "reserved", .dir_opt = "", .type = "ULONG"},
+      {.name = "Class", .dir = "in", .dir_opt = "opt", .type = "PUNICODE_STRING"},
+      {.name = "CreateOptions", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Disposition", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtCreateKeyTransacted", .num_args = 8, .args = 
+    {
+      {.name = "KeyHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "TitleIndex", .dir = "reserved", .dir_opt = "", .type = "ULONG"},
+      {.name = "Class", .dir = "in", .dir_opt = "opt", .type = "PUNICODE_STRING"},
+      {.name = "CreateOptions", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "TransactionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Disposition", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtCreateMailslotFile", .num_args = 8, .args = 
+    {
+      {.name = "FileHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "CreateOptions", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "MailslotQuota", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "MaximumMessageSize", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReadTimeout", .dir = "in", .dir_opt = "", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtCreateMutant", .num_args = 4, .args = 
+    {
+      {.name = "MutantHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "InitialOwner", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtCreateNamedPipeFile", .num_args = 14, .args = 
+    {
+      {.name = "FileHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "ShareAccess", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "CreateDisposition", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "CreateOptions", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "NamedPipeType", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReadMode", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "CompletionMode", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "MaximumInstances", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "InboundQuota", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "OutboundQuota", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "DefaultTimeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtCreatePagingFile", .num_args = 4, .args = 
+    {
+      {.name = "PageFileName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "MinimumSize", .dir = "in", .dir_opt = "", .type = "PLARGE_INTEGER"},
+      {.name = "MaximumSize", .dir = "in", .dir_opt = "", .type = "PLARGE_INTEGER"},
+      {.name = "Priority", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtCreatePort", .num_args = 5, .args = 
+    {
+      {.name = "PortHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "MaxConnectionInfoLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "MaxMessageLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "MaxPoolUsage", .dir = "in", .dir_opt = "opt", .type = "ULONG"}
+    }
+  },
+  { .name = "NtCreatePrivateNamespace", .num_args = 4, .args = 
+    {
+      {.name = "NamespaceHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "BoundaryDescriptor", .dir = "in", .dir_opt = "", .type = "PVOID"}
+    }
+  },
+  { .name = "NtCreateProcessEx", .num_args = 9, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "ParentProcess", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "SectionHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "DebugPort", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ExceptionPort", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "JobMemberLevel", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtCreateProcess", .num_args = 8, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "ParentProcess", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "InheritObjectTable", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "SectionHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "DebugPort", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ExceptionPort", .dir = "in", .dir_opt = "opt", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtCreateProfileEx", .num_args = 10, .args = 
+    {
+      {.name = "ProfileHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "Process", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ProfileBase", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "ProfileSize", .dir = "in", .dir_opt = "", .type = "SIZE_T"},
+      {.name = "BucketSize", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Buffer", .dir = "in", .dir_opt = "", .type = "PULONG"},
+      {.name = "BufferSize", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ProfileSource", .dir = "in", .dir_opt = "", .type = "KPROFILE_SOURCE"},
+      {.name = "GroupAffinityCount", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "GroupAffinity", .dir = "in", .dir_opt = "opt", .type = "PGROUP_AFFINITY"}
+    }
+  },
+  { .name = "NtCreateProfile", .num_args = 9, .args = 
+    {
+      {.name = "ProfileHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "Process", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "RangeBase", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "RangeSize", .dir = "in", .dir_opt = "", .type = "SIZE_T"},
+      {.name = "BucketSize", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Buffer", .dir = "in", .dir_opt = "", .type = "PULONG"},
+      {.name = "BufferSize", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ProfileSource", .dir = "in", .dir_opt = "", .type = "KPROFILE_SOURCE"},
+      {.name = "Affinity", .dir = "in", .dir_opt = "", .type = "KAFFINITY"}
+    }
+  },
+  { .name = "NtCreateResourceManager", .num_args = 7, .args = 
+    {
+      {.name = "ResourceManagerHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "TmHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "RmGuid", .dir = "in", .dir_opt = "", .type = "LPGUID"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "CreateOptions", .dir = "in", .dir_opt = "opt", .type = "ULONG"},
+      {.name = "Description", .dir = "in", .dir_opt = "opt", .type = "PUNICODE_STRING"}
+    }
+  },
+  { .name = "NtCreateSection", .num_args = 7, .args = 
+    {
+      {.name = "SectionHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "MaximumSize", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"},
+      {.name = "SectionPageProtection", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "AllocationAttributes", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "FileHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtCreateSemaphore", .num_args = 5, .args = 
+    {
+      {.name = "SemaphoreHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "InitialCount", .dir = "in", .dir_opt = "", .type = "LONG"},
+      {.name = "MaximumCount", .dir = "in", .dir_opt = "", .type = "LONG"}
+    }
+  },
+  { .name = "NtCreateSymbolicLinkObject", .num_args = 4, .args = 
+    {
+      {.name = "LinkHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "LinkTarget", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"}
+    }
+  },
+  { .name = "NtCreateThreadEx", .num_args = 11, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "StartRoutine", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "Argument", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "CreateFlags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ZeroBits", .dir = "in", .dir_opt = "opt", .type = "ULONG_PTR"},
+      {.name = "StackSize", .dir = "in", .dir_opt = "opt", .type = "SIZE_T"},
+      {.name = "MaximumStackSize", .dir = "in", .dir_opt = "opt", .type = "SIZE_T"},
+      {.name = "AttributeList", .dir = "in", .dir_opt = "opt", .type = "PPS_ATTRIBUTE_LIST"}
+    }
+  },
+  { .name = "NtCreateThread", .num_args = 8, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ClientId", .dir = "out", .dir_opt = "", .type = "PCLIENT_ID"},
+      {.name = "ThreadContext", .dir = "in", .dir_opt = "", .type = "PCONTEXT"},
+      {.name = "InitialTeb", .dir = "in", .dir_opt = "", .type = "PINITIAL_TEB"},
+      {.name = "CreateSuspended", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtCreateTimer", .num_args = 4, .args = 
+    {
+      {.name = "TimerHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "TimerType", .dir = "in", .dir_opt = "", .type = "TIMER_TYPE"}
+    }
+  },
+  { .name = "NtCreateToken", .num_args = 13, .args = 
+    {
+      {.name = "TokenHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "TokenType", .dir = "in", .dir_opt = "", .type = "TOKEN_TYPE"},
+      {.name = "AuthenticationId", .dir = "in", .dir_opt = "", .type = "PLUID"},
+      {.name = "ExpirationTime", .dir = "in", .dir_opt = "", .type = "PLARGE_INTEGER"},
+      {.name = "User", .dir = "in", .dir_opt = "", .type = "PTOKEN_USER"},
+      {.name = "Groups", .dir = "in", .dir_opt = "", .type = "PTOKEN_GROUPS"},
+      {.name = "Privileges", .dir = "in", .dir_opt = "", .type = "PTOKEN_PRIVILEGES"},
+      {.name = "Owner", .dir = "in", .dir_opt = "opt", .type = "PTOKEN_OWNER"},
+      {.name = "PrimaryGroup", .dir = "in", .dir_opt = "", .type = "PTOKEN_PRIMARY_GROUP"},
+      {.name = "DefaultDacl", .dir = "in", .dir_opt = "opt", .type = "PTOKEN_DEFAULT_DACL"},
+      {.name = "TokenSource", .dir = "in", .dir_opt = "", .type = "PTOKEN_SOURCE"}
+    }
+  },
+  { .name = "NtCreateTransactionManager", .num_args = 6, .args = 
+    {
+      {.name = "TmHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "LogFileName", .dir = "in", .dir_opt = "opt", .type = "PUNICODE_STRING"},
+      {.name = "CreateOptions", .dir = "in", .dir_opt = "opt", .type = "ULONG"},
+      {.name = "CommitStrength", .dir = "in", .dir_opt = "opt", .type = "ULONG"}
+    }
+  },
+  { .name = "NtCreateTransaction", .num_args = 10, .args = 
+    {
+      {.name = "TransactionHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "Uow", .dir = "in", .dir_opt = "opt", .type = "LPGUID"},
+      {.name = "TmHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "CreateOptions", .dir = "in", .dir_opt = "opt", .type = "ULONG"},
+      {.name = "IsolationLevel", .dir = "in", .dir_opt = "opt", .type = "ULONG"},
+      {.name = "IsolationFlags", .dir = "in", .dir_opt = "opt", .type = "ULONG"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"},
+      {.name = "Description", .dir = "in", .dir_opt = "opt", .type = "PUNICODE_STRING"}
+    }
+  },
+  { .name = "NtCreateUserProcess", .num_args = 11, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "ThreadHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "ProcessDesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ThreadDesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ProcessObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "ThreadObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "ProcessFlags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ThreadFlags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ProcessParameters", .dir = "in", .dir_opt = "opt", .type = "PRTL_USER_PROCESS_PARAMETERS"},
+      {.name = "CreateInfo", .dir = "in", .dir_opt = "opt", .type = "PPROCESS_CREATE_INFO"},
+      {.name = "AttributeList", .dir = "in", .dir_opt = "opt", .type = "PPROCESS_ATTRIBUTE_LIST"}
+    }
+  },
+  { .name = "NtCreateWaitablePort", .num_args = 5, .args = 
+    {
+      {.name = "PortHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "MaxConnectionInfoLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "MaxMessageLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "MaxPoolUsage", .dir = "in", .dir_opt = "opt", .type = "ULONG"}
+    }
+  },
+  { .name = "NtCreateWorkerFactory", .num_args = 10, .args = 
+    {
+      {.name = "WorkerFactoryHandleReturn", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "CompletionPortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "WorkerProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "StartRoutine", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "StartParameter", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "MaxThreadCount", .dir = "in", .dir_opt = "opt", .type = "ULONG"},
+      {.name = "StackReserve", .dir = "in", .dir_opt = "opt", .type = "SIZE_T"},
+      {.name = "StackCommit", .dir = "in", .dir_opt = "opt", .type = "SIZE_T"}
+    }
+  },
+  { .name = "NtDebugActiveProcess", .num_args = 2, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "out", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DebugObjectHandle", .dir = "out", .dir_opt = "", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtDebugContinue", .num_args = 3, .args = 
+    {
+      {.name = "DebugObjectHandle", .dir = "out", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ClientId", .dir = "out", .dir_opt = "", .type = "PCLIENT_ID"},
+      {.name = "ContinueStatus", .dir = "out", .dir_opt = "", .type = "NTSTATUS"}
+    }
+  },
+  { .name = "NtDelayExecution", .num_args = 2, .args = 
+    {
+      {.name = "Alertable", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "DelayInterval", .dir = "in", .dir_opt = "", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtDeleteAtom", .num_args = 0  },
+  { .name = "NtDeleteBootEntry", .num_args = 0  },
+  { .name = "NtDeleteDriverEntry", .num_args = 0  },
+  { .name = "NtDeleteFile", .num_args = 0  },
+  { .name = "NtDeleteKey", .num_args = 0  },
+  { .name = "NtDeleteObjectAuditAlarm", .num_args = 3, .args = 
+    {
+      {.name = "SubsystemName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "HandleId", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "GenerateOnClose", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtDeletePrivateNamespace", .num_args = 0  },
+  { .name = "NtDeleteValueKey", .num_args = 2, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ValueName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"}
+    }
+  },
+  { .name = "NtDeviceIoControlFile", .num_args = 10, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Event", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "opt", .type = "PIO_APC_ROUTINE"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "IoControlCode", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "InputBuffer", .dir = "in", .dir_opt = "bcount_opt(InputBufferLength)", .type = "PVOID"},
+      {.name = "InputBufferLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "OutputBuffer", .dir = "out", .dir_opt = "bcount_opt(OutputBufferLength)", .type = "PVOID"},
+      {.name = "OutputBufferLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtDisableLastKnownGood", .num_args = 0  },
+  { .name = "NtDisplayString", .num_args = 0  },
+  { .name = "NtDrawText", .num_args = 0  },
+  { .name = "NtDuplicateObject", .num_args = 7, .args = 
+    {
+      {.name = "SourceProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "SourceHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TargetProcessHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "TargetHandle", .dir = "out", .dir_opt = "opt", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "HandleAttributes", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Options", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtDuplicateToken", .num_args = 6, .args = 
+    {
+      {.name = "ExistingTokenHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "EffectiveOnly", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "TokenType", .dir = "in", .dir_opt = "", .type = "TOKEN_TYPE"},
+      {.name = "NewTokenHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"}
+    }
+  },
+  { .name = "NtEnableLastKnownGood", .num_args = 0  },
+  { .name = "NtEnumerateBootEntries", .num_args = 2, .args = 
+    {
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount_opt(*BufferLength)", .type = "PVOID"},
+      {.name = "BufferLength", .dir = "inout", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtEnumerateDriverEntries", .num_args = 2, .args = 
+    {
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount(*BufferLength)", .type = "PVOID"},
+      {.name = "BufferLength", .dir = "inout", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtEnumerateKey", .num_args = 6, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Index", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "KeyInformationClass", .dir = "in", .dir_opt = "", .type = "KEY_INFORMATION_CLASS"},
+      {.name = "KeyInformation", .dir = "out", .dir_opt = "bcount_opt(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ResultLength", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtEnumerateSystemEnvironmentValuesEx", .num_args = 3, .args = 
+    {
+      {.name = "InformationClass", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "", .type = "PVOID"},
+      {.name = "BufferLength", .dir = "inout", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtEnumerateTransactionObject", .num_args = 5, .args = 
+    {
+      {.name = "RootObjectHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "QueryType", .dir = "in", .dir_opt = "", .type = "KTMOBJECT_TYPE"},
+      {.name = "ObjectCursor", .dir = "inout", .dir_opt = "bcount(ObjectCursorLength)", .type = "PKTMOBJECT_CURSOR"},
+      {.name = "ObjectCursorLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtEnumerateValueKey", .num_args = 6, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Index", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "KeyValueInformationClass", .dir = "in", .dir_opt = "", .type = "KEY_VALUE_INFORMATION_CLASS"},
+      {.name = "KeyValueInformation", .dir = "out", .dir_opt = "bcount_opt(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ResultLength", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtExtendSection", .num_args = 2, .args = 
+    {
+      {.name = "SectionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "NewSectionSize", .dir = "inout", .dir_opt = "", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtFilterToken", .num_args = 6, .args = 
+    {
+      {.name = "ExistingTokenHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "SidsToDisable", .dir = "in", .dir_opt = "opt", .type = "PTOKEN_GROUPS"},
+      {.name = "PrivilegesToDelete", .dir = "in", .dir_opt = "opt", .type = "PTOKEN_PRIVILEGES"},
+      {.name = "RestrictedSids", .dir = "in", .dir_opt = "opt", .type = "PTOKEN_GROUPS"},
+      {.name = "NewTokenHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"}
+    }
+  },
+  { .name = "NtFindAtom", .num_args = 3, .args = 
+    {
+      {.name = "AtomName", .dir = "in", .dir_opt = "bcount_opt(Length)", .type = "PWSTR"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Atom", .dir = "out", .dir_opt = "opt", .type = "PRTL_ATOM"}
+    }
+  },
+  { .name = "NtFlushBuffersFile", .num_args = 2, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"}
+    }
+  },
+  { .name = "NtFlushInstallUILanguage", .num_args = 2, .args = 
+    {
+      {.name = "InstallUILanguage", .dir = "in", .dir_opt = "", .type = "LANGID"},
+      {.name = "SetComittedFlag", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtFlushInstructionCache", .num_args = 3, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "BaseAddress", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "SIZE_T"}
+    }
+  },
+  { .name = "NtFlushKey", .num_args = 0  },
+  { .name = "", .num_args = 0  },
+  { .name = "NtFlushVirtualMemory", .num_args = 4, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "*BaseAddress", .dir = "inout", .dir_opt = "", .type = "PVOID"},
+      {.name = "RegionSize", .dir = "inout", .dir_opt = "", .type = "PSIZE_T"},
+      {.name = "IoStatus", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"}
+    }
+  },
+  { .name = "NtFlushWriteBuffer", .num_args = 0  },
+  { .name = "NtFreeUserPhysicalPages", .num_args = 3, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "NumberOfPages", .dir = "inout", .dir_opt = "", .type = "PULONG_PTR"},
+      {.name = "UserPfnArra;", .dir = "in", .dir_opt = "ecount(*NumberOfPages)", .type = "PULONG_PTR"}
+    }
+  },
+  { .name = "NtFreeVirtualMemory", .num_args = 4, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "*BaseAddress", .dir = "inout", .dir_opt = "", .type = "PVOID"},
+      {.name = "RegionSize", .dir = "inout", .dir_opt = "", .type = "PSIZE_T"},
+      {.name = "FreeType", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtFreezeRegistry", .num_args = 0  },
+  { .name = "NtFreezeTransactions", .num_args = 2, .args = 
+    {
+      {.name = "FreezeTimeout", .dir = "in", .dir_opt = "", .type = "PLARGE_INTEGER"},
+      {.name = "ThawTimeout", .dir = "in", .dir_opt = "", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtFsControlFile", .num_args = 10, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Event", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "opt", .type = "PIO_APC_ROUTINE"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "IoControlCode", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "InputBuffer", .dir = "in", .dir_opt = "bcount_opt(InputBufferLength)", .type = "PVOID"},
+      {.name = "InputBufferLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "OutputBuffer", .dir = "out", .dir_opt = "bcount_opt(OutputBufferLength)", .type = "PVOID"},
+      {.name = "OutputBufferLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtGetContextThread", .num_args = 2, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ThreadContext", .dir = "inout", .dir_opt = "", .type = "PCONTEXT"}
+    }
+  },
+  { .name = "", .num_args = 0  },
+  { .name = "NtGetDevicePowerState", .num_args = 2, .args = 
+    {
+      {.name = "Device", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "*State", .dir = "out", .dir_opt = "", .type = "DEVICE_POWER_STATE"}
+    }
+  },
+  { .name = "NtGetMUIRegistryInfo", .num_args = 3, .args = 
+    {
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "DataSize", .dir = "inout", .dir_opt = "", .type = "PULONG"},
+      {.name = "Data", .dir = "out", .dir_opt = "", .type = "PVOID"}
+    }
+  },
+  { .name = "NtGetNextProcess", .num_args = 5, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "HandleAttributes", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "NewProcessHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"}
+    }
+  },
+  { .name = "NtGetNextThread", .num_args = 6, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "HandleAttributes", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "NewThreadHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"}
+    }
+  },
+  { .name = "NtGetNlsSectionPtr", .num_args = 5, .args = 
+    {
+      {.name = "SectionType", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "SectionData", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ContextData", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "*SectionPointer", .dir = "out", .dir_opt = "", .type = "PVOID"},
+      {.name = "SectionSize", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtGetNotificationResourceManager", .num_args = 7, .args = 
+    {
+      {.name = "ResourceManagerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TransactionNotification", .dir = "out", .dir_opt = "", .type = "PTRANSACTION_NOTIFICATION"},
+      {.name = "NotificationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"},
+      {.name = "Asynchronous", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "AsynchronousContext", .dir = "in", .dir_opt = "opt", .type = "ULONG_PTR"}
+    }
+  },
+  { .name = "NtGetPlugPlayEvent", .num_args = 4, .args = 
+    {
+      {.name = "EventHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Context", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "EventBlock", .dir = "out", .dir_opt = "bcount(EventBufferSize)", .type = "PPLUGPLAY_EVENT_BLOCK"},
+      {.name = "EventBufferSize", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtGetWriteWatch", .num_args = 7, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "BaseAddress", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "RegionSize", .dir = "in", .dir_opt = "", .type = "SIZE_T"},
+      {.name = "*UserAddressArray", .dir = "out", .dir_opt = "ecount(*EntriesInUserAddressArray)", .type = "PVOID"},
+      {.name = "EntriesInUserAddressArray", .dir = "inout", .dir_opt = "", .type = "PULONG_PTR"},
+      {.name = "Granularity", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtImpersonateAnonymousToken", .num_args = 0  },
+  { .name = "NtImpersonateClientOfPort", .num_args = 2, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Message", .dir = "in", .dir_opt = "", .type = "PPORT_MESSAGE"}
+    }
+  },
+  { .name = "NtImpersonateThread", .num_args = 3, .args = 
+    {
+      {.name = "ServerThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ClientThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "SecurityQos", .dir = "in", .dir_opt = "", .type = "PSECURITY_QUALITY_OF_SERVICE"}
+    }
+  },
+  { .name = "NtInitializeNlsFiles", .num_args = 3, .args = 
+    {
+      {.name = "*BaseAddress", .dir = "out", .dir_opt = "", .type = "PVOID"},
+      {.name = "DefaultLocaleId", .dir = "out", .dir_opt = "", .type = "PLCID"},
+      {.name = "DefaultCasingTableSize", .dir = "out", .dir_opt = "", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtInitializeRegistry", .num_args = 0  },
+  { .name = "NtInitiatePowerAction", .num_args = 4, .args = 
+    {
+      {.name = "SystemAction", .dir = "in", .dir_opt = "", .type = "POWER_ACTION"},
+      {.name = "MinSystemState", .dir = "in", .dir_opt = "", .type = "SYSTEM_POWER_STATE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Asynchronous", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtIsProcessInJob", .num_args = 2, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "JobHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"}
+    }
+  },
+  { .name = "", .num_args = 0  },
+  { .name = "NtIsUILanguageComitted", .num_args = 0  },
+  { .name = "NtListenPort", .num_args = 2, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ConnectionRequest", .dir = "out", .dir_opt = "", .type = "PPORT_MESSAGE"}
+    }
+  },
+  { .name = "NtLoadDriver", .num_args = 0  },
+  { .name = "NtLoadKey2", .num_args = 3, .args = 
+    {
+      {.name = "TargetKey", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "SourceFile", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtLoadKeyEx", .num_args = 4, .args = 
+    {
+      {.name = "TargetKey", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "SourceFile", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "TrustClassKey", .dir = "in", .dir_opt = "opt", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtLoadKey", .num_args = 2, .args = 
+    {
+      {.name = "TargetKey", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "SourceFile", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtLockFile", .num_args = 10, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Event", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "opt", .type = "PIO_APC_ROUTINE"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "ByteOffset", .dir = "in", .dir_opt = "", .type = "PLARGE_INTEGER"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "PLARGE_INTEGER"},
+      {.name = "Key", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "FailImmediately", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "ExclusiveLock", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtLockProductActivationKeys", .num_args = 2, .args = 
+    {
+      {.name = "*pPrivateVer", .dir = "inout", .dir_opt = "opt", .type = "ULONG"},
+      {.name = "*pSafeMode", .dir = "out", .dir_opt = "opt", .type = "ULONG"}
+    }
+  },
+  { .name = "NtLockRegistryKey", .num_args = 0  },
+  { .name = "NtLockVirtualMemory", .num_args = 4, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "*BaseAddress", .dir = "inout", .dir_opt = "", .type = "PVOID"},
+      {.name = "RegionSize", .dir = "inout", .dir_opt = "", .type = "PSIZE_T"},
+      {.name = "MapType", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtMakePermanentObject", .num_args = 0  },
+  { .name = "NtMakeTemporaryObject", .num_args = 0  },
+  { .name = "NtMapCMFModule", .num_args = 6, .args = 
+    {
+      {.name = "What", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Index", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "CacheIndexOut", .dir = "out", .dir_opt = "opt", .type = "PULONG"},
+      {.name = "CacheFlagsOut", .dir = "out", .dir_opt = "opt", .type = "PULONG"},
+      {.name = "ViewSizeOut", .dir = "out", .dir_opt = "opt", .type = "PULONG"},
+      {.name = "*BaseAddress", .dir = "out", .dir_opt = "opt", .type = "PVOID"}
+    }
+  },
+  { .name = "NtMapUserPhysicalPages", .num_args = 3, .args = 
+    {
+      {.name = "VirtualAddress", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "NumberOfPages", .dir = "in", .dir_opt = "", .type = "ULONG_PTR"},
+      {.name = "UserPfnArra;", .dir = "in", .dir_opt = "ecount_opt(NumberOfPages)", .type = "PULONG_PTR"}
+    }
+  },
+  { .name = "NtMapUserPhysicalPagesScatter", .num_args = 3, .args = 
+    {
+      {.name = "*VirtualAddresses", .dir = "in", .dir_opt = "ecount(NumberOfPages)", .type = "PVOID"},
+      {.name = "NumberOfPages", .dir = "in", .dir_opt = "", .type = "ULONG_PTR"},
+      {.name = "UserPfnArray", .dir = "in", .dir_opt = "ecount_opt(NumberOfPages)", .type = "PULONG_PTR"}
+    }
+  },
+  { .name = "NtMapViewOfSection", .num_args = 10, .args = 
+    {
+      {.name = "SectionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "*BaseAddress", .dir = "inout", .dir_opt = "", .type = "PVOID"},
+      {.name = "ZeroBits", .dir = "in", .dir_opt = "", .type = "ULONG_PTR"},
+      {.name = "CommitSize", .dir = "in", .dir_opt = "", .type = "SIZE_T"},
+      {.name = "SectionOffset", .dir = "inout", .dir_opt = "opt", .type = "PLARGE_INTEGER"},
+      {.name = "ViewSize", .dir = "inout", .dir_opt = "", .type = "PSIZE_T"},
+      {.name = "InheritDisposition", .dir = "in", .dir_opt = "", .type = "SECTION_INHERIT"},
+      {.name = "AllocationType", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Win32Protect", .dir = "in", .dir_opt = "", .type = "WIN32_PROTECTION_MASK"}
+    }
+  },
+  { .name = "NtModifyBootEntry", .num_args = 0  },
+  { .name = "NtModifyDriverEntry", .num_args = 0  },
+  { .name = "NtNotifyChangeDirectoryFile", .num_args = 9, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Event", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "opt", .type = "PIO_APC_ROUTINE"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "CompletionFilter", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "WatchTree", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtNotifyChangeKey", .num_args = 10, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Event", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "opt", .type = "PIO_APC_ROUTINE"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "CompletionFilter", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "WatchTree", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount_opt(BufferSize)", .type = "PVOID"},
+      {.name = "BufferSize", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Asynchronous", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtNotifyChangeMultipleKeys", .num_args = 12, .args = 
+    {
+      {.name = "MasterKeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Count", .dir = "in", .dir_opt = "opt", .type = "ULONG"},
+      {.name = "SlaveObjects[]", .dir = "in", .dir_opt = "ecount_opt(Count)", .type = "OBJECT_ATTRIBUTES"},
+      {.name = "Event", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "opt", .type = "PIO_APC_ROUTINE"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "CompletionFilter", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "WatchTree", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount_opt(BufferSize)", .type = "PVOID"},
+      {.name = "BufferSize", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Asynchronous", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtNotifyChangeSession", .num_args = 8, .args = 
+    {
+      {.name = "Session", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoStateSequence", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Reserved", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "Action", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "IoState", .dir = "in", .dir_opt = "", .type = "IO_SESSION_STATE"},
+      {.name = "IoState2", .dir = "in", .dir_opt = "", .type = "IO_SESSION_STATE"},
+      {.name = "Buffer", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "BufferSize", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtOpenDirectoryObject", .num_args = 3, .args = 
+    {
+      {.name = "DirectoryHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenEnlistment", .num_args = 5, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ResourceManagerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "EnlistmentGuid", .dir = "in", .dir_opt = "", .type = "LPGUID"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenEvent", .num_args = 3, .args = 
+    {
+      {.name = "EventHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenEventPair", .num_args = 3, .args = 
+    {
+      {.name = "EventPairHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenFile", .num_args = 6, .args = 
+    {
+      {.name = "FileHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "ShareAccess", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "OpenOptions", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtOpenIoCompletion", .num_args = 3, .args = 
+    {
+      {.name = "IoCompletionHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenJobObject", .num_args = 3, .args = 
+    {
+      {.name = "JobHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenKeyedEvent", .num_args = 3, .args = 
+    {
+      {.name = "KeyedEventHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenKeyEx", .num_args = 4, .args = 
+    {
+      {.name = "KeyHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "OpenOptions", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtOpenKey", .num_args = 3, .args = 
+    {
+      {.name = "KeyHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenKeyTransactedEx", .num_args = 5, .args = 
+    {
+      {.name = "KeyHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "OpenOptions", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "TransactionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtOpenKeyTransacted", .num_args = 4, .args = 
+    {
+      {.name = "KeyHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "TransactionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtOpenMutant", .num_args = 3, .args = 
+    {
+      {.name = "MutantHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenObjectAuditAlarm", .num_args = 12, .args = 
+    {
+      {.name = "SubsystemName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "HandleId", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ObjectTypeName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "ObjectName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "SecurityDescriptor", .dir = "in", .dir_opt = "opt", .type = "PSECURITY_DESCRIPTOR"},
+      {.name = "ClientToken", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "GrantedAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "Privileges", .dir = "in", .dir_opt = "opt", .type = "PPRIVILEGE_SET"},
+      {.name = "ObjectCreation", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "AccessGranted", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "GenerateOnClose", .dir = "out", .dir_opt = "", .type = "PBOOLEAN"}
+    }
+  },
+  { .name = "NtOpenPrivateNamespace", .num_args = 4, .args = 
+    {
+      {.name = "NamespaceHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "BoundaryDescriptor", .dir = "in", .dir_opt = "", .type = "PVOID"}
+    }
+  },
+  { .name = "NtOpenProcess", .num_args = 4, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "ClientId", .dir = "in", .dir_opt = "opt", .type = "PCLIENT_ID"}
+    }
+  },
+  { .name = "NtOpenProcessTokenEx", .num_args = 4, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "HandleAttributes", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "TokenHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"}
+    }
+  },
+  { .name = "NtOpenProcessToken", .num_args = 3, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "TokenHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"}
+    }
+  },
+  { .name = "NtOpenResourceManager", .num_args = 5, .args = 
+    {
+      {.name = "ResourceManagerHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "TmHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ResourceManagerGuid", .dir = "in", .dir_opt = "opt", .type = "LPGUID"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenSection", .num_args = 3, .args = 
+    {
+      {.name = "SectionHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenSemaphore", .num_args = 3, .args = 
+    {
+      {.name = "SemaphoreHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenSession", .num_args = 3, .args = 
+    {
+      {.name = "SessionHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenSymbolicLinkObject", .num_args = 3, .args = 
+    {
+      {.name = "LinkHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenThread", .num_args = 4, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "ClientId", .dir = "in", .dir_opt = "opt", .type = "PCLIENT_ID"}
+    }
+  },
+  { .name = "NtOpenThreadTokenEx", .num_args = 5, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "OpenAsSelf", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "HandleAttributes", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "TokenHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"}
+    }
+  },
+  { .name = "NtOpenThreadToken", .num_args = 4, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "OpenAsSelf", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "TokenHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"}
+    }
+  },
+  { .name = "NtOpenTimer", .num_args = 3, .args = 
+    {
+      {.name = "TimerHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtOpenTransactionManager", .num_args = 6, .args = 
+    {
+      {.name = "TmHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "opt", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "LogFileName", .dir = "in", .dir_opt = "opt", .type = "PUNICODE_STRING"},
+      {.name = "TmIdentity", .dir = "in", .dir_opt = "opt", .type = "LPGUID"},
+      {.name = "OpenOptions", .dir = "in", .dir_opt = "opt", .type = "ULONG"}
+    }
+  },
+  { .name = "NtOpenTransaction", .num_args = 5, .args = 
+    {
+      {.name = "TransactionHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "Uow", .dir = "in", .dir_opt = "", .type = "LPGUID"},
+      {.name = "TmHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtPlugPlayControl", .num_args = 3, .args = 
+    {
+      {.name = "PnPControlClass", .dir = "in", .dir_opt = "", .type = "PLUGPLAY_CONTROL_CLASS"},
+      {.name = "PnPControlData", .dir = "inout", .dir_opt = "bcount(PnPControlDataLength)", .type = "PVOID"},
+      {.name = "PnPControlDataLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtPowerInformation", .num_args = 5, .args = 
+    {
+      {.name = "InformationLevel", .dir = "in", .dir_opt = "", .type = "POWER_INFORMATION_LEVEL"},
+      {.name = "InputBuffer", .dir = "in", .dir_opt = "bcount_opt(InputBufferLength)", .type = "PVOID"},
+      {.name = "InputBufferLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "OutputBuffer", .dir = "out", .dir_opt = "bcount_opt(OutputBufferLength)", .type = "PVOID"},
+      {.name = "OutputBufferLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtPrepareComplete", .num_args = 2, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TmVirtualClock", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtPrepareEnlistment", .num_args = 2, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TmVirtualClock", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtPrePrepareComplete", .num_args = 2, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TmVirtualClock", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtPrePrepareEnlistment", .num_args = 2, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TmVirtualClock", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtPrivilegeCheck", .num_args = 3, .args = 
+    {
+      {.name = "ClientToken", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "RequiredPrivileges", .dir = "inout", .dir_opt = "", .type = "PPRIVILEGE_SET"},
+      {.name = "Result", .dir = "out", .dir_opt = "", .type = "PBOOLEAN"}
+    }
+  },
+  { .name = "NtPrivilegedServiceAuditAlarm", .num_args = 5, .args = 
+    {
+      {.name = "SubsystemName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "ServiceName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "ClientToken", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Privileges", .dir = "in", .dir_opt = "", .type = "PPRIVILEGE_SET"},
+      {.name = "AccessGranted", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtPrivilegeObjectAuditAlarm", .num_args = 6, .args = 
+    {
+      {.name = "SubsystemName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "HandleId", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ClientToken", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DesiredAccess", .dir = "in", .dir_opt = "", .type = "ACCESS_MASK"},
+      {.name = "Privileges", .dir = "in", .dir_opt = "", .type = "PPRIVILEGE_SET"},
+      {.name = "AccessGranted", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtPropagationComplete", .num_args = 4, .args = 
+    {
+      {.name = "ResourceManagerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "RequestCookie", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "BufferLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Buffer", .dir = "in", .dir_opt = "", .type = "PVOID"}
+    }
+  },
+  { .name = "NtPropagationFailed", .num_args = 3, .args = 
+    {
+      {.name = "ResourceManagerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "RequestCookie", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "PropStatus", .dir = "in", .dir_opt = "", .type = "NTSTATUS"}
+    }
+  },
+  { .name = "NtProtectVirtualMemory", .num_args = 5, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "*BaseAddress", .dir = "inout", .dir_opt = "", .type = "PVOID"},
+      {.name = "RegionSize", .dir = "inout", .dir_opt = "", .type = "PSIZE_T"},
+      {.name = "NewProtectWin32", .dir = "in", .dir_opt = "", .type = "WIN32_PROTECTION_MASK"},
+      {.name = "OldProtect", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtPulseEvent", .num_args = 2, .args = 
+    {
+      {.name = "EventHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PreviousState", .dir = "out", .dir_opt = "opt", .type = "PLONG"}
+    }
+  },
+  { .name = "NtQueryAttributesFile", .num_args = 2, .args = 
+    {
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "FileInformation", .dir = "out", .dir_opt = "", .type = "PFILE_BASIC_INFORMATION"}
+    }
+  },
+  { .name = "NtQueryBootEntryOrder", .num_args = 2, .args = 
+    {
+      {.name = "Ids", .dir = "out", .dir_opt = "ecount_opt(*Count)", .type = "PULONG"},
+      {.name = "Count", .dir = "inout", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryBootOptions", .num_args = 2, .args = 
+    {
+      {.name = "BootOptions", .dir = "out", .dir_opt = "bcount_opt(*BootOptionsLength)", .type = "PBOOT_OPTIONS"},
+      {.name = "BootOptionsLength", .dir = "inout", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryDebugFilterState", .num_args = 2, .args = 
+    {
+      {.name = "ComponentId", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Level", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtQueryDefaultLocale", .num_args = 2, .args = 
+    {
+      {.name = "UserProfile", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "DefaultLocaleId", .dir = "out", .dir_opt = "", .type = "PLCID"}
+    }
+  },
+  { .name = "NtQueryDefaultUILanguage", .num_args = 0  },
+  { .name = "NtQueryDirectoryFile", .num_args = 11, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Event", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "opt", .type = "PIO_APC_ROUTINE"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "FileInformation", .dir = "out", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "FileInformationClass", .dir = "in", .dir_opt = "", .type = "FILE_INFORMATION_CLASS"},
+      {.name = "ReturnSingleEntry", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "FileName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "RestartScan", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtQueryDirectoryObject", .num_args = 7, .args = 
+    {
+      {.name = "DirectoryHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount_opt(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnSingleEntry", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "RestartScan", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "Context", .dir = "inout", .dir_opt = "", .type = "PULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryDriverEntryOrder", .num_args = 2, .args = 
+    {
+      {.name = "Ids", .dir = "out", .dir_opt = "ecount(*Count)", .type = "PULONG"},
+      {.name = "Count", .dir = "inout", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryEaFile", .num_args = 9, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnSingleEntry", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "EaList", .dir = "in", .dir_opt = "bcount_opt(EaListLength)", .type = "PVOID"},
+      {.name = "EaListLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "EaIndex", .dir = "in", .dir_opt = "opt", .type = "PULONG"},
+      {.name = "RestartScan", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtQueryEvent", .num_args = 5, .args = 
+    {
+      {.name = "EventHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "EventInformationClass", .dir = "in", .dir_opt = "", .type = "EVENT_INFORMATION_CLASS"},
+      {.name = "EventInformation", .dir = "out", .dir_opt = "bcount(EventInformationLength)", .type = "PVOID"},
+      {.name = "EventInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryFullAttributesFile", .num_args = 2, .args = 
+    {
+      {.name = "ObjectAttributes", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "FileInformation", .dir = "out", .dir_opt = "", .type = "PFILE_NETWORK_OPEN_INFORMATION"}
+    }
+  },
+  { .name = "NtQueryInformationAtom", .num_args = 5, .args = 
+    {
+      {.name = "Atom", .dir = "in", .dir_opt = "", .type = "RTL_ATOM"},
+      {.name = "InformationClass", .dir = "in", .dir_opt = "", .type = "ATOM_INFORMATION_CLASS"},
+      {.name = "AtomInformation", .dir = "out", .dir_opt = "bcount(AtomInformationLength)", .type = "PVOID"},
+      {.name = "AtomInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryInformationEnlistment", .num_args = 5, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "EnlistmentInformationClass", .dir = "in", .dir_opt = "", .type = "ENLISTMENT_INFORMATION_CLASS"},
+      {.name = "EnlistmentInformation", .dir = "out", .dir_opt = "bcount(EnlistmentInformationLength)", .type = "PVOID"},
+      {.name = "EnlistmentInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryInformationFile", .num_args = 5, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "FileInformation", .dir = "out", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "FileInformationClass", .dir = "in", .dir_opt = "", .type = "FILE_INFORMATION_CLASS"}
+    }
+  },
+  { .name = "NtQueryInformationJobObject", .num_args = 5, .args = 
+    {
+      {.name = "JobHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "JobObjectInformationClass", .dir = "in", .dir_opt = "", .type = "JOBOBJECTINFOCLASS"},
+      {.name = "JobObjectInformation", .dir = "out", .dir_opt = "bcount(JobObjectInformationLength)", .type = "PVOID"},
+      {.name = "JobObjectInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryInformationPort", .num_args = 5, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PortInformationClass", .dir = "in", .dir_opt = "", .type = "PORT_INFORMATION_CLASS"},
+      {.name = "PortInformation", .dir = "out", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryInformationProcess", .num_args = 5, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ProcessInformationClass", .dir = "in", .dir_opt = "", .type = "PROCESSINFOCLASS"},
+      {.name = "ProcessInformation", .dir = "out", .dir_opt = "bcount(ProcessInformationLength)", .type = "PVOID"},
+      {.name = "ProcessInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryInformationResourceManager", .num_args = 5, .args = 
+    {
+      {.name = "ResourceManagerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ResourceManagerInformationClass", .dir = "in", .dir_opt = "", .type = "RESOURCEMANAGER_INFORMATION_CLASS"},
+      {.name = "ResourceManagerInformation", .dir = "out", .dir_opt = "bcount(ResourceManagerInformationLength)", .type = "PVOID"},
+      {.name = "ResourceManagerInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryInformationThread", .num_args = 5, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ThreadInformationClass", .dir = "in", .dir_opt = "", .type = "THREADINFOCLASS"},
+      {.name = "ThreadInformation", .dir = "out", .dir_opt = "bcount(ThreadInformationLength)", .type = "PVOID"},
+      {.name = "ThreadInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryInformationToken", .num_args = 5, .args = 
+    {
+      {.name = "TokenHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TokenInformationClass", .dir = "in", .dir_opt = "", .type = "TOKEN_INFORMATION_CLASS"},
+      {.name = "TokenInformation", .dir = "out", .dir_opt = "bcount_part_opt(TokenInformationLength,*ReturnLength)", .type = "PVOID"},
+      {.name = "TokenInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryInformationTransaction", .num_args = 5, .args = 
+    {
+      {.name = "TransactionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TransactionInformationClass", .dir = "in", .dir_opt = "", .type = "TRANSACTION_INFORMATION_CLASS"},
+      {.name = "TransactionInformation", .dir = "out", .dir_opt = "bcount(TransactionInformationLength)", .type = "PVOID"},
+      {.name = "TransactionInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryInformationTransactionManager", .num_args = 5, .args = 
+    {
+      {.name = "TransactionManagerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TransactionManagerInformationClass", .dir = "in", .dir_opt = "", .type = "TRANSACTIONMANAGER_INFORMATION_CLASS"},
+      {.name = "TransactionManagerInformation", .dir = "out", .dir_opt = "bcount(TransactionManagerInformationLength)", .type = "PVOID"},
+      {.name = "TransactionManagerInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryInformationWorkerFactory", .num_args = 5, .args = 
+    {
+      {.name = "WorkerFactoryHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "WorkerFactoryInformationClass", .dir = "in", .dir_opt = "", .type = "WORKERFACTORYINFOCLASS"},
+      {.name = "WorkerFactoryInformation", .dir = "out", .dir_opt = "bcount(WorkerFactoryInformationLength)", .type = "PVOID"},
+      {.name = "WorkerFactoryInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryInstallUILanguage", .num_args = 0  },
+  { .name = "NtQueryIntervalProfile", .num_args = 2, .args = 
+    {
+      {.name = "ProfileSource", .dir = "in", .dir_opt = "", .type = "KPROFILE_SOURCE"},
+      {.name = "Interval", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryIoCompletion", .num_args = 5, .args = 
+    {
+      {.name = "IoCompletionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoCompletionInformationClass", .dir = "in", .dir_opt = "", .type = "IO_COMPLETION_INFORMATION_CLASS"},
+      {.name = "IoCompletionInformation", .dir = "out", .dir_opt = "bcount(IoCompletionInformationLength)", .type = "PVOID"},
+      {.name = "IoCompletionInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryKey", .num_args = 5, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "KeyInformationClass", .dir = "in", .dir_opt = "", .type = "KEY_INFORMATION_CLASS"},
+      {.name = "KeyInformation", .dir = "out", .dir_opt = "bcount_opt(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ResultLength", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryLicenseValue", .num_args = 5, .args = 
+    {
+      {.name = "Name", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "Type", .dir = "out", .dir_opt = "opt", .type = "PULONG"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount(ReturnedLength)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnedLength", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryMultipleValueKey", .num_args = 6, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ValueEntries", .dir = "inout", .dir_opt = "ecount(EntryCount)", .type = "PKEY_VALUE_ENTRY"},
+      {.name = "EntryCount", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ValueBuffer", .dir = "out", .dir_opt = "bcount(*BufferLength)", .type = "PVOID"},
+      {.name = "BufferLength", .dir = "inout", .dir_opt = "", .type = "PULONG"},
+      {.name = "RequiredBufferLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryMutant", .num_args = 5, .args = 
+    {
+      {.name = "MutantHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "MutantInformationClass", .dir = "in", .dir_opt = "", .type = "MUTANT_INFORMATION_CLASS"},
+      {.name = "MutantInformation", .dir = "out", .dir_opt = "bcount(MutantInformationLength)", .type = "PVOID"},
+      {.name = "MutantInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryObject", .num_args = 5, .args = 
+    {
+      {.name = "Handle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ObjectInformationClass", .dir = "in", .dir_opt = "", .type = "OBJECT_INFORMATION_CLASS"},
+      {.name = "ObjectInformation", .dir = "out", .dir_opt = "bcount_opt(ObjectInformationLength)", .type = "PVOID"},
+      {.name = "ObjectInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryOpenSubKeysEx", .num_args = 4, .args = 
+    {
+      {.name = "TargetKey", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "BufferLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount(BufferLength)", .type = "PVOID"},
+      {.name = "RequiredSize", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryOpenSubKeys", .num_args = 2, .args = 
+    {
+      {.name = "TargetKey", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "HandleCount", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryPerformanceCounter", .num_args = 2, .args = 
+    {
+      {.name = "PerformanceCounter", .dir = "out", .dir_opt = "", .type = "PLARGE_INTEGER"},
+      {.name = "PerformanceFrequency", .dir = "out", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtQueryPortInformationProcess", .num_args = 0  },
+  { .name = "NtQueryQuotaInformationFile", .num_args = 9, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnSingleEntry", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "SidList", .dir = "in", .dir_opt = "bcount_opt(SidListLength)", .type = "PVOID"},
+      {.name = "SidListLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "StartSid", .dir = "in", .dir_opt = "opt", .type = "PULONG"},
+      {.name = "RestartScan", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtQuerySection", .num_args = 5, .args = 
+    {
+      {.name = "SectionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "SectionInformationClass", .dir = "in", .dir_opt = "", .type = "SECTION_INFORMATION_CLASS"},
+      {.name = "SectionInformation", .dir = "out", .dir_opt = "bcount(SectionInformationLength)", .type = "PVOID"},
+      {.name = "SectionInformationLength", .dir = "in", .dir_opt = "", .type = "SIZE_T"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PSIZE_T"}
+    }
+  },
+  { .name = "NtQuerySecurityAttributesToken", .num_args = 6, .args = 
+    {
+      {.name = "TokenHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Attributes", .dir = "in", .dir_opt = "ecount_opt(NumberOfAttributes)", .type = "PUNICODE_STRING"},
+      {.name = "NumberOfAttributes", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQuerySecurityObject", .num_args = 5, .args = 
+    {
+      {.name = "Handle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "SecurityInformation", .dir = "in", .dir_opt = "", .type = "SECURITY_INFORMATION"},
+      {.name = "SecurityDescriptor", .dir = "out", .dir_opt = "bcount_opt(Length)", .type = "PSECURITY_DESCRIPTOR"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "LengthNeeded", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQuerySemaphore", .num_args = 5, .args = 
+    {
+      {.name = "SemaphoreHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "SemaphoreInformationClass", .dir = "in", .dir_opt = "", .type = "SEMAPHORE_INFORMATION_CLASS"},
+      {.name = "SemaphoreInformation", .dir = "out", .dir_opt = "bcount(SemaphoreInformationLength)", .type = "PVOID"},
+      {.name = "SemaphoreInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQuerySymbolicLinkObject", .num_args = 3, .args = 
+    {
+      {.name = "LinkHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "LinkTarget", .dir = "inout", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "ReturnedLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQuerySystemEnvironmentValueEx", .num_args = 5, .args = 
+    {
+      {.name = "VariableName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "VendorGuid", .dir = "in", .dir_opt = "", .type = "LPGUID"},
+      {.name = "Value", .dir = "out", .dir_opt = "bcount_opt(*ValueLength)", .type = "PVOID"},
+      {.name = "ValueLength", .dir = "inout", .dir_opt = "", .type = "PULONG"},
+      {.name = "Attributes", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQuerySystemEnvironmentValue", .num_args = 4, .args = 
+    {
+      {.name = "VariableName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "VariableValue", .dir = "out", .dir_opt = "bcount(ValueLength)", .type = "PWSTR"},
+      {.name = "ValueLength", .dir = "in", .dir_opt = "", .type = "USHORT"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PUSHORT"}
+    }
+  },
+  { .name = "NtQuerySystemInformationEx", .num_args = 6, .args = 
+    {
+      {.name = "SystemInformationClass", .dir = "in", .dir_opt = "", .type = "SYSTEM_INFORMATION_CLASS"},
+      {.name = "QueryInformation", .dir = "in", .dir_opt = "bcount(QueryInformationLength)", .type = "PVOID"},
+      {.name = "QueryInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "SystemInformation", .dir = "out", .dir_opt = "bcount_opt(SystemInformationLength)", .type = "PVOID"},
+      {.name = "SystemInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQuerySystemInformation", .num_args = 4, .args = 
+    {
+      {.name = "SystemInformationClass", .dir = "in", .dir_opt = "", .type = "SYSTEM_INFORMATION_CLASS"},
+      {.name = "SystemInformation", .dir = "out", .dir_opt = "bcount_opt(SystemInformationLength)", .type = "PVOID"},
+      {.name = "SystemInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQuerySystemTime", .num_args = 0  },
+  { .name = "NtQueryTimer", .num_args = 5, .args = 
+    {
+      {.name = "TimerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TimerInformationClass", .dir = "in", .dir_opt = "", .type = "TIMER_INFORMATION_CLASS"},
+      {.name = "TimerInformation", .dir = "out", .dir_opt = "bcount(TimerInformationLength)", .type = "PVOID"},
+      {.name = "TimerInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryTimerResolution", .num_args = 3, .args = 
+    {
+      {.name = "MaximumTime", .dir = "out", .dir_opt = "", .type = "PULONG"},
+      {.name = "MinimumTime", .dir = "out", .dir_opt = "", .type = "PULONG"},
+      {.name = "CurrentTime", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryValueKey", .num_args = 6, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ValueName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "KeyValueInformationClass", .dir = "in", .dir_opt = "", .type = "KEY_VALUE_INFORMATION_CLASS"},
+      {.name = "KeyValueInformation", .dir = "out", .dir_opt = "bcount_opt(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ResultLength", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtQueryVirtualMemory", .num_args = 6, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "BaseAddress", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "MemoryInformationClass", .dir = "in", .dir_opt = "", .type = "MEMORY_INFORMATION_CLASS"},
+      {.name = "MemoryInformation", .dir = "out", .dir_opt = "bcount(MemoryInformationLength)", .type = "PVOID"},
+      {.name = "MemoryInformationLength", .dir = "in", .dir_opt = "", .type = "SIZE_T"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PSIZE_T"}
+    }
+  },
+  { .name = "NtQueryVolumeInformationFile", .num_args = 5, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "FsInformation", .dir = "out", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "FsInformationClass", .dir = "in", .dir_opt = "", .type = "FS_INFORMATION_CLASS"}
+    }
+  },
+  { .name = "NtQueueApcThreadEx", .num_args = 6, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "UserApcReserveHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "", .type = "PPS_APC_ROUTINE"},
+      {.name = "ApcArgument1", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ApcArgument2", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ApcArgument3", .dir = "in", .dir_opt = "opt", .type = "PVOID"}
+    }
+  },
+  { .name = "NtQueueApcThread", .num_args = 5, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "", .type = "PPS_APC_ROUTINE"},
+      {.name = "ApcArgument1", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ApcArgument2", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ApcArgument3", .dir = "in", .dir_opt = "opt", .type = "PVOID"}
+    }
+  },
+  { .name = "NtRaiseException", .num_args = 3, .args = 
+    {
+      {.name = "ExceptionRecord", .dir = "out", .dir_opt = "", .type = "PEXCEPTION_RECORD"},
+      {.name = "ContextRecord", .dir = "out", .dir_opt = "", .type = "PCONTEXT"},
+      {.name = "FirstChance", .dir = "out", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtRaiseHardError", .num_args = 6, .args = 
+    {
+      {.name = "ErrorStatus", .dir = "in", .dir_opt = "", .type = "NTSTATUS"},
+      {.name = "NumberOfParameters", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "UnicodeStringParameterMask", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Parameters", .dir = "in", .dir_opt = "ecount(NumberOfParameters)", .type = "PULONG_PTR"},
+      {.name = "ValidResponseOptions", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Response", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtReadFile", .num_args = 9, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Event", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "opt", .type = "PIO_APC_ROUTINE"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ByteOffset", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"},
+      {.name = "Key", .dir = "in", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtReadFileScatter", .num_args = 9, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Event", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "opt", .type = "PIO_APC_ROUTINE"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "SegmentArray", .dir = "in", .dir_opt = "", .type = "PFILE_SEGMENT_ELEMENT"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ByteOffset", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"},
+      {.name = "Key", .dir = "in", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtReadOnlyEnlistment", .num_args = 2, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TmVirtualClock", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtReadRequestData", .num_args = 6, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Message", .dir = "in", .dir_opt = "", .type = "PPORT_MESSAGE"},
+      {.name = "DataEntryIndex", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount(BufferSize)", .type = "PVOID"},
+      {.name = "BufferSize", .dir = "in", .dir_opt = "", .type = "SIZE_T"},
+      {.name = "NumberOfBytesRead", .dir = "out", .dir_opt = "opt", .type = "PSIZE_T"}
+    }
+  },
+  { .name = "NtReadVirtualMemory", .num_args = 5, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "BaseAddress", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "Buffer", .dir = "out", .dir_opt = "bcount(BufferSize)", .type = "PVOID"},
+      {.name = "BufferSize", .dir = "in", .dir_opt = "", .type = "SIZE_T"},
+      {.name = "NumberOfBytesRead", .dir = "out", .dir_opt = "opt", .type = "PSIZE_T"}
+    }
+  },
+  { .name = "NtRecoverEnlistment", .num_args = 2, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "EnlistmentKey", .dir = "in", .dir_opt = "opt", .type = "PVOID"}
+    }
+  },
+  { .name = "NtRecoverResourceManager", .num_args = 0  },
+  { .name = "NtRecoverTransactionManager", .num_args = 0  },
+  { .name = "NtRegisterProtocolAddressInformation", .num_args = 5, .args = 
+    {
+      {.name = "ResourceManager", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ProtocolId", .dir = "in", .dir_opt = "", .type = "PCRM_PROTOCOL_ID"},
+      {.name = "ProtocolInformationSize", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ProtocolInformation", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "CreateOptions", .dir = "in", .dir_opt = "opt", .type = "ULONG"}
+    }
+  },
+  { .name = "NtRegisterThreadTerminatePort", .num_args = 0  },
+  { .name = "NtReleaseKeyedEvent", .num_args = 4, .args = 
+    {
+      {.name = "KeyedEventHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "KeyValue", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "Alertable", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtReleaseMutant", .num_args = 2, .args = 
+    {
+      {.name = "MutantHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PreviousCount", .dir = "out", .dir_opt = "opt", .type = "PLONG"}
+    }
+  },
+  { .name = "NtReleaseSemaphore", .num_args = 3, .args = 
+    {
+      {.name = "SemaphoreHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ReleaseCount", .dir = "in", .dir_opt = "", .type = "LONG"},
+      {.name = "PreviousCount", .dir = "out", .dir_opt = "opt", .type = "PLONG"}
+    }
+  },
+  { .name = "NtReleaseWorkerFactoryWorker", .num_args = 0  },
+  { .name = "NtRemoveIoCompletionEx", .num_args = 6, .args = 
+    {
+      {.name = "IoCompletionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoCompletionInformation", .dir = "out", .dir_opt = "ecount(Count)", .type = "PFILE_IO_COMPLETION_INFORMATION"},
+      {.name = "Count", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "NumEntriesRemoved", .dir = "out", .dir_opt = "", .type = "PULONG"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"},
+      {.name = "Alertable", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtRemoveIoCompletion", .num_args = 5, .args = 
+    {
+      {.name = "IoCompletionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "*KeyContext", .dir = "out", .dir_opt = "", .type = "PVOID"},
+      {.name = "*ApcContext", .dir = "out", .dir_opt = "", .type = "PVOID"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtRemoveProcessDebug", .num_args = 2, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "out", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DebugObjectHandle", .dir = "out", .dir_opt = "", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtRenameKey", .num_args = 2, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "NewName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"}
+    }
+  },
+  { .name = "NtRenameTransactionManager", .num_args = 2, .args = 
+    {
+      {.name = "LogFileName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "ExistingTransactionManagerGuid", .dir = "in", .dir_opt = "", .type = "LPGUID"}
+    }
+  },
+  { .name = "NtReplaceKey", .num_args = 3, .args = 
+    {
+      {.name = "NewFile", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "TargetHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "OldFile", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"}
+    }
+  },
+  { .name = "NtReplacePartitionUnit", .num_args = 3, .args = 
+    {
+      {.name = "TargetInstancePath", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "SpareInstancePath", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtReplyPort", .num_args = 2, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ReplyMessage", .dir = "in", .dir_opt = "", .type = "PPORT_MESSAGE"}
+    }
+  },
+  { .name = "NtReplyWaitReceivePortEx", .num_args = 5, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "*PortContext", .dir = "out", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ReplyMessage", .dir = "in", .dir_opt = "opt", .type = "PPORT_MESSAGE"},
+      {.name = "ReceiveMessage", .dir = "out", .dir_opt = "", .type = "PPORT_MESSAGE"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtReplyWaitReceivePort", .num_args = 4, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "*PortContext", .dir = "out", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ReplyMessage", .dir = "in", .dir_opt = "opt", .type = "PPORT_MESSAGE"},
+      {.name = "ReceiveMessage", .dir = "out", .dir_opt = "", .type = "PPORT_MESSAGE"}
+    }
+  },
+  { .name = "NtReplyWaitReplyPort", .num_args = 2, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ReplyMessage", .dir = "inout", .dir_opt = "", .type = "PPORT_MESSAGE"}
+    }
+  },
+  { .name = "NtRequestPort", .num_args = 2, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "RequestMessage", .dir = "in", .dir_opt = "", .type = "PPORT_MESSAGE"}
+    }
+  },
+  { .name = "NtRequestWaitReplyPort", .num_args = 3, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "RequestMessage", .dir = "in", .dir_opt = "", .type = "PPORT_MESSAGE"},
+      {.name = "ReplyMessage", .dir = "out", .dir_opt = "", .type = "PPORT_MESSAGE"}
+    }
+  },
+  { .name = "NtResetEvent", .num_args = 2, .args = 
+    {
+      {.name = "EventHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PreviousState", .dir = "out", .dir_opt = "opt", .type = "PLONG"}
+    }
+  },
+  { .name = "NtResetWriteWatch", .num_args = 3, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "BaseAddress", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "RegionSize", .dir = "in", .dir_opt = "", .type = "SIZE_T"}
+    }
+  },
+  { .name = "NtRestoreKey", .num_args = 3, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtResumeProcess", .num_args = 0  },
+  { .name = "NtResumeThread", .num_args = 2, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PreviousSuspendCount", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtRollbackComplete", .num_args = 2, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TmVirtualClock", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtRollbackEnlistment", .num_args = 2, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TmVirtualClock", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtRollbackTransaction", .num_args = 2, .args = 
+    {
+      {.name = "TransactionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Wait", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtRollforwardTransactionManager", .num_args = 2, .args = 
+    {
+      {.name = "TransactionManagerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TmVirtualClock", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtSaveKeyEx", .num_args = 3, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Format", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSaveKey", .num_args = 2, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtSaveMergedKeys", .num_args = 3, .args = 
+    {
+      {.name = "HighPrecedenceKeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "LowPrecedenceKeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtSecureConnectPort", .num_args = 9, .args = 
+    {
+      {.name = "PortHandle", .dir = "out", .dir_opt = "", .type = "PHANDLE"},
+      {.name = "PortName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "SecurityQos", .dir = "in", .dir_opt = "", .type = "PSECURITY_QUALITY_OF_SERVICE"},
+      {.name = "ClientView", .dir = "inout", .dir_opt = "opt", .type = "PPORT_VIEW"},
+      {.name = "RequiredServerSid", .dir = "in", .dir_opt = "opt", .type = "PSID"},
+      {.name = "ServerView", .dir = "inout", .dir_opt = "opt", .type = "PREMOTE_PORT_VIEW"},
+      {.name = "MaxMessageLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"},
+      {.name = "ConnectionInformation", .dir = "inout", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "ConnectionInformationLength", .dir = "inout", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtSerializeBoot", .num_args = 0  },
+  { .name = "NtSetBootEntryOrder", .num_args = 2, .args = 
+    {
+      {.name = "Ids", .dir = "in", .dir_opt = "ecount(Count)", .type = "PULONG"},
+      {.name = "Count", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetBootOptions", .num_args = 2, .args = 
+    {
+      {.name = "BootOptions", .dir = "in", .dir_opt = "", .type = "PBOOT_OPTIONS"},
+      {.name = "FieldsToChange", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetContextThread", .num_args = 2, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ThreadContext", .dir = "in", .dir_opt = "", .type = "PCONTEXT"}
+    }
+  },
+  { .name = "NtSetDebugFilterState", .num_args = 3, .args = 
+    {
+      {.name = "ComponentId", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Level", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "State", .dir = "in", .dir_opt = "", .type = "BOOLEAN"}
+    }
+  },
+  { .name = "NtSetDefaultHardErrorPort", .num_args = 0  },
+  { .name = "NtSetDefaultLocale", .num_args = 2, .args = 
+    {
+      {.name = "UserProfile", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "DefaultLocaleId", .dir = "in", .dir_opt = "", .type = "LCID"}
+    }
+  },
+  { .name = "NtSetDefaultUILanguage", .num_args = 0  },
+  { .name = "NtSetDriverEntryOrder", .num_args = 2, .args = 
+    {
+      {.name = "Ids", .dir = "in", .dir_opt = "ecount(Count)", .type = "PULONG"},
+      {.name = "Count", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetEaFile", .num_args = 4, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "Buffer", .dir = "in", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetEventBoostPriority", .num_args = 0  },
+  { .name = "NtSetEvent", .num_args = 2, .args = 
+    {
+      {.name = "EventHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PreviousState", .dir = "out", .dir_opt = "opt", .type = "PLONG"}
+    }
+  },
+  { .name = "NtSetHighEventPair", .num_args = 0  },
+  { .name = "NtSetHighWaitLowEventPair", .num_args = 0  },
+  { .name = "NtSetInformationDebugObject", .num_args = 5, .args = 
+    {
+      {.name = "DebugObjectHandle", .dir = "out", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DebugObjectInformationClass", .dir = "out", .dir_opt = "", .type = "DEBUGOBJECTINFOCLASS"},
+      {.name = "DebugInformation", .dir = "out", .dir_opt = "", .type = "PVOID"},
+      {.name = "DebugInformationLength", .dir = "out", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtSetInformationEnlistment", .num_args = 4, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "EnlistmentInformationClass", .dir = "in", .dir_opt = "", .type = "ENLISTMENT_INFORMATION_CLASS"},
+      {.name = "EnlistmentInformation", .dir = "in", .dir_opt = "bcount(EnlistmentInformationLength)", .type = "PVOID"},
+      {.name = "EnlistmentInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetInformationFile", .num_args = 5, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "FileInformation", .dir = "in", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "FileInformationClass", .dir = "in", .dir_opt = "", .type = "FILE_INFORMATION_CLASS"}
+    }
+  },
+  { .name = "NtSetInformationJobObject", .num_args = 4, .args = 
+    {
+      {.name = "JobHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "JobObjectInformationClass", .dir = "in", .dir_opt = "", .type = "JOBOBJECTINFOCLASS"},
+      {.name = "JobObjectInformation", .dir = "in", .dir_opt = "bcount(JobObjectInformationLength)", .type = "PVOID"},
+      {.name = "JobObjectInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetInformationKey", .num_args = 4, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "KeySetInformationClass", .dir = "in", .dir_opt = "", .type = "KEY_SET_INFORMATION_CLASS"},
+      {.name = "KeySetInformation", .dir = "in", .dir_opt = "bcount(KeySetInformationLength)", .type = "PVOID"},
+      {.name = "KeySetInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetInformationObject", .num_args = 4, .args = 
+    {
+      {.name = "Handle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ObjectInformationClass", .dir = "in", .dir_opt = "", .type = "OBJECT_INFORMATION_CLASS"},
+      {.name = "ObjectInformation", .dir = "in", .dir_opt = "bcount(ObjectInformationLength)", .type = "PVOID"},
+      {.name = "ObjectInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetInformationProcess", .num_args = 4, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ProcessInformationClass", .dir = "in", .dir_opt = "", .type = "PROCESSINFOCLASS"},
+      {.name = "ProcessInformation", .dir = "in", .dir_opt = "bcount(ProcessInformationLength)", .type = "PVOID"},
+      {.name = "ProcessInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetInformationResourceManager", .num_args = 4, .args = 
+    {
+      {.name = "ResourceManagerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ResourceManagerInformationClass", .dir = "in", .dir_opt = "", .type = "RESOURCEMANAGER_INFORMATION_CLASS"},
+      {.name = "ResourceManagerInformation", .dir = "in", .dir_opt = "bcount(ResourceManagerInformationLength)", .type = "PVOID"},
+      {.name = "ResourceManagerInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetInformationThread", .num_args = 4, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ThreadInformationClass", .dir = "in", .dir_opt = "", .type = "THREADINFOCLASS"},
+      {.name = "ThreadInformation", .dir = "in", .dir_opt = "bcount(ThreadInformationLength)", .type = "PVOID"},
+      {.name = "ThreadInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetInformationToken", .num_args = 4, .args = 
+    {
+      {.name = "TokenHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TokenInformationClass", .dir = "in", .dir_opt = "", .type = "TOKEN_INFORMATION_CLASS"},
+      {.name = "TokenInformation", .dir = "in", .dir_opt = "bcount(TokenInformationLength)", .type = "PVOID"},
+      {.name = "TokenInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetInformationTransaction", .num_args = 4, .args = 
+    {
+      {.name = "TransactionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TransactionInformationClass", .dir = "in", .dir_opt = "", .type = "TRANSACTION_INFORMATION_CLASS"},
+      {.name = "TransactionInformation", .dir = "in", .dir_opt = "bcount(TransactionInformationLength)", .type = "PVOID"},
+      {.name = "TransactionInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetInformationTransactionManager", .num_args = 4, .args = 
+    {
+      {.name = "TmHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "TransactionManagerInformationClass", .dir = "in", .dir_opt = "", .type = "TRANSACTIONMANAGER_INFORMATION_CLASS"},
+      {.name = "TransactionManagerInformation", .dir = "in", .dir_opt = "bcount(TransactionManagerInformationLength)", .type = "PVOID"},
+      {.name = "TransactionManagerInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetInformationWorkerFactory", .num_args = 4, .args = 
+    {
+      {.name = "WorkerFactoryHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "WorkerFactoryInformationClass", .dir = "in", .dir_opt = "", .type = "WORKERFACTORYINFOCLASS"},
+      {.name = "WorkerFactoryInformation", .dir = "in", .dir_opt = "bcount(WorkerFactoryInformationLength)", .type = "PVOID"},
+      {.name = "WorkerFactoryInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetIntervalProfile", .num_args = 2, .args = 
+    {
+      {.name = "Interval", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Source", .dir = "in", .dir_opt = "", .type = "KPROFILE_SOURCE"}
+    }
+  },
+  { .name = "NtSetIoCompletionEx", .num_args = 6, .args = 
+    {
+      {.name = "IoCompletionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoCompletionReserveHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "KeyContext", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatus", .dir = "in", .dir_opt = "", .type = "NTSTATUS"},
+      {.name = "IoStatusInformation", .dir = "in", .dir_opt = "", .type = "ULONG_PTR"}
+    }
+  },
+  { .name = "NtSetIoCompletion", .num_args = 5, .args = 
+    {
+      {.name = "IoCompletionHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "KeyContext", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatus", .dir = "in", .dir_opt = "", .type = "NTSTATUS"},
+      {.name = "IoStatusInformation", .dir = "in", .dir_opt = "", .type = "ULONG_PTR"}
+    }
+  },
+  { .name = "NtSetLdtEntries", .num_args = 6, .args = 
+    {
+      {.name = "Selector0", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Entry0Low", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Entry0Hi", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Selector1", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Entry1Low", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Entry1Hi", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetLowEventPair", .num_args = 0  },
+  { .name = "NtSetLowWaitHighEventPair", .num_args = 0  },
+  { .name = "NtSetQuotaInformationFile", .num_args = 4, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "Buffer", .dir = "in", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetSecurityObject", .num_args = 3, .args = 
+    {
+      {.name = "Handle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "SecurityInformation", .dir = "in", .dir_opt = "", .type = "SECURITY_INFORMATION"},
+      {.name = "SecurityDescriptor", .dir = "in", .dir_opt = "", .type = "PSECURITY_DESCRIPTOR"}
+    }
+  },
+  { .name = "NtSetSystemEnvironmentValueEx", .num_args = 5, .args = 
+    {
+      {.name = "VariableName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "VendorGuid", .dir = "in", .dir_opt = "", .type = "LPGUID"},
+      {.name = "Value", .dir = "in", .dir_opt = "bcount_opt(ValueLength)", .type = "PVOID"},
+      {.name = "ValueLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Attributes", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetSystemEnvironmentValue", .num_args = 2, .args = 
+    {
+      {.name = "VariableName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "VariableValue", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"}
+    }
+  },
+  { .name = "NtSetSystemInformation", .num_args = 3, .args = 
+    {
+      {.name = "SystemInformationClass", .dir = "in", .dir_opt = "", .type = "SYSTEM_INFORMATION_CLASS"},
+      {.name = "SystemInformation", .dir = "in", .dir_opt = "bcount_opt(SystemInformationLength)", .type = "PVOID"},
+      {.name = "SystemInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetSystemPowerState", .num_args = 3, .args = 
+    {
+      {.name = "SystemAction", .dir = "in", .dir_opt = "", .type = "POWER_ACTION"},
+      {.name = "MinSystemState", .dir = "in", .dir_opt = "", .type = "SYSTEM_POWER_STATE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetSystemTime", .num_args = 2, .args = 
+    {
+      {.name = "SystemTime", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"},
+      {.name = "PreviousTime", .dir = "out", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtSetThreadExecutionState", .num_args = 2, .args = 
+    {
+      {.name = "esFlags", .dir = "in", .dir_opt = "", .type = "EXECUTION_STATE"},
+      {.name = "*PreviousFlags", .dir = "out", .dir_opt = "", .type = "EXECUTION_STATE"}
+    }
+  },
+  { .name = "NtSetTimerEx", .num_args = 4, .args = 
+    {
+      {.name = "TimerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TimerSetInformationClass", .dir = "in", .dir_opt = "", .type = "TIMER_SET_INFORMATION_CLASS"},
+      {.name = "TimerSetInformation", .dir = "inout", .dir_opt = "bcount(TimerSetInformationLength)", .type = "PVOID"},
+      {.name = "TimerSetInformationLength", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetTimer", .num_args = 7, .args = 
+    {
+      {.name = "TimerHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "DueTime", .dir = "in", .dir_opt = "", .type = "PLARGE_INTEGER"},
+      {.name = "TimerApcRoutine", .dir = "in", .dir_opt = "opt", .type = "PTIMER_APC_ROUTINE"},
+      {.name = "TimerContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "WakeTimer", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "Period", .dir = "in", .dir_opt = "opt", .type = "LONG"},
+      {.name = "PreviousState", .dir = "out", .dir_opt = "opt", .type = "PBOOLEAN"}
+    }
+  },
+  { .name = "NtSetTimerResolution", .num_args = 3, .args = 
+    {
+      {.name = "DesiredTime", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "SetResolution", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "ActualTime", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtSetUuidSeed", .num_args = 0  },
+  { .name = "NtSetValueKey", .num_args = 6, .args = 
+    {
+      {.name = "KeyHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ValueName", .dir = "in", .dir_opt = "", .type = "PUNICODE_STRING"},
+      {.name = "TitleIndex", .dir = "in", .dir_opt = "opt", .type = "ULONG"},
+      {.name = "Type", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Data", .dir = "in", .dir_opt = "bcount_opt(DataSize)", .type = "PVOID"},
+      {.name = "DataSize", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtSetVolumeInformationFile", .num_args = 5, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "FsInformation", .dir = "in", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "FsInformationClass", .dir = "in", .dir_opt = "", .type = "FS_INFORMATION_CLASS"}
+    }
+  },
+  { .name = "NtShutdownSystem", .num_args = 0  },
+  { .name = "NtShutdownWorkerFactory", .num_args = 2, .args = 
+    {
+      {.name = "WorkerFactoryHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "*PendingWorkerCount", .dir = "inout", .dir_opt = "", .type = "LONG"}
+    }
+  },
+  { .name = "NtSignalAndWaitForSingleObject", .num_args = 4, .args = 
+    {
+      {.name = "SignalHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "WaitHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Alertable", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtSinglePhaseReject", .num_args = 2, .args = 
+    {
+      {.name = "EnlistmentHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "TmVirtualClock", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtStartProfile", .num_args = 0  },
+  { .name = "NtStopProfile", .num_args = 0  },
+  { .name = "NtSuspendProcess", .num_args = 0  },
+  { .name = "NtSuspendThread", .num_args = 2, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "PreviousSuspendCount", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtSystemDebugControl", .num_args = 6, .args = 
+    {
+      {.name = "Command", .dir = "in", .dir_opt = "", .type = "SYSDBG_COMMAND"},
+      {.name = "InputBuffer", .dir = "inout", .dir_opt = "bcount_opt(InputBufferLength)", .type = "PVOID"},
+      {.name = "InputBufferLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "OutputBuffer", .dir = "out", .dir_opt = "bcount_opt(OutputBufferLength)", .type = "PVOID"},
+      {.name = "OutputBufferLength", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtTerminateJobObject", .num_args = 2, .args = 
+    {
+      {.name = "JobHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "ExitStatus", .dir = "in", .dir_opt = "", .type = "NTSTATUS"}
+    }
+  },
+  { .name = "NtTerminateProcess", .num_args = 2, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ExitStatus", .dir = "in", .dir_opt = "", .type = "NTSTATUS"}
+    }
+  },
+  { .name = "NtTerminateThread", .num_args = 2, .args = 
+    {
+      {.name = "ThreadHandle", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ExitStatus", .dir = "in", .dir_opt = "", .type = "NTSTATUS"}
+    }
+  },
+  { .name = "NtTestAlert", .num_args = 0  },
+  { .name = "NtThawRegistry", .num_args = 0  },
+  { .name = "NtThawTransactions", .num_args = 0  },
+  { .name = "NtTraceControl", .num_args = 6, .args = 
+    {
+      {.name = "FunctionCode", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "InBuffer", .dir = "in", .dir_opt = "bcount_opt(InBufferLen)", .type = "PVOID"},
+      {.name = "InBufferLen", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "OutBuffer", .dir = "out", .dir_opt = "bcount_opt(OutBufferLen)", .type = "PVOID"},
+      {.name = "OutBufferLen", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ReturnLength", .dir = "out", .dir_opt = "", .type = "PULONG"}
+    }
+  },
+  { .name = "NtTraceEvent", .num_args = 4, .args = 
+    {
+      {.name = "TraceHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "FieldSize", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Fields", .dir = "in", .dir_opt = "", .type = "PVOID"}
+    }
+  },
+  { .name = "NtTranslateFilePath", .num_args = 4, .args = 
+    {
+      {.name = "InputFilePath", .dir = "in", .dir_opt = "", .type = "PFILE_PATH"},
+      {.name = "OutputType", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "OutputFilePath", .dir = "out", .dir_opt = "bcount_opt(*OutputFilePathLength)", .type = "PFILE_PATH"},
+      {.name = "OutputFilePathLength", .dir = "inout", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtUmsThreadYield", .num_args = 0  },
+  { .name = "NtUnloadDriver", .num_args = 0  },
+  { .name = "NtUnloadKey2", .num_args = 2, .args = 
+    {
+      {.name = "TargetKey", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "Flags", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtUnloadKeyEx", .num_args = 2, .args = 
+    {
+      {.name = "TargetKey", .dir = "in", .dir_opt = "", .type = "POBJECT_ATTRIBUTES"},
+      {.name = "Event", .dir = "in", .dir_opt = "opt", .type = "HANDLE"}
+    }
+  },
+  { .name = "NtUnloadKey", .num_args = 0  },
+  { .name = "NtUnlockFile", .num_args = 5, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "ByteOffset", .dir = "in", .dir_opt = "", .type = "PLARGE_INTEGER"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "PLARGE_INTEGER"},
+      {.name = "Key", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtUnlockVirtualMemory", .num_args = 4, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "*BaseAddress", .dir = "inout", .dir_opt = "", .type = "PVOID"},
+      {.name = "RegionSize", .dir = "inout", .dir_opt = "", .type = "PSIZE_T"},
+      {.name = "MapType", .dir = "in", .dir_opt = "", .type = "ULONG"}
+    }
+  },
+  { .name = "NtUnmapViewOfSection", .num_args = 2, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "BaseAddress", .dir = "in", .dir_opt = "", .type = "PVOID"}
+    }
+  },
+  { .name = "NtVdmControl", .num_args = 2, .args = 
+    {
+      {.name = "Service", .dir = "in", .dir_opt = "", .type = "VDMSERVICECLASS"},
+      {.name = "ServiceData", .dir = "inout", .dir_opt = "", .type = "PVOID"}
+    }
+  },
+  { .name = "NtWaitForDebugEvent", .num_args = 4, .args = 
+    {
+      {.name = "DebugObjectHandle", .dir = "out", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Alertable", .dir = "out", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "Timeout", .dir = "out", .dir_opt = "", .type = "PLARGE_INTEGER"},
+      {.name = "WaitStateChange", .dir = "out", .dir_opt = "", .type = "PDBGUI_WAIT_STATE_CHANGE"}
+    }
+  },
+  { .name = "NtWaitForKeyedEvent", .num_args = 4, .args = 
+    {
+      {.name = "KeyedEventHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "KeyValue", .dir = "in", .dir_opt = "", .type = "PVOID"},
+      {.name = "Alertable", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtWaitForMultipleObjects32", .num_args = 5, .args = 
+    {
+      {.name = "Count", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Handles[]", .dir = "in", .dir_opt = "ecount(Count)", .type = "LONG"},
+      {.name = "WaitType", .dir = "in", .dir_opt = "", .type = "WAIT_TYPE"},
+      {.name = "Alertable", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtWaitForMultipleObjects", .num_args = 5, .args = 
+    {
+      {.name = "Count", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Handles[]", .dir = "in", .dir_opt = "ecount(Count)", .type = "HANDLE"},
+      {.name = "WaitType", .dir = "in", .dir_opt = "", .type = "WAIT_TYPE"},
+      {.name = "Alertable", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtWaitForSingleObject", .num_args = 3, .args = 
+    {
+      {.name = "Handle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Alertable", .dir = "in", .dir_opt = "", .type = "BOOLEAN"},
+      {.name = "Timeout", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"}
+    }
+  },
+  { .name = "NtWaitForWorkViaWorkerFactory", .num_args = 2, .args = 
+    {
+      {.name = "WorkerFactoryHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "MiniPacket", .dir = "out", .dir_opt = "", .type = "PFILE_IO_COMPLETION_INFORMATION"}
+    }
+  },
+  { .name = "NtWaitHighEventPair", .num_args = 0  },
+  { .name = "NtWaitLowEventPair", .num_args = 0  },
+  { .name = "NtWorkerFactoryWorkerReady", .num_args = 0  },
+  { .name = "NtWriteFileGather", .num_args = 9, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Event", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "opt", .type = "PIO_APC_ROUTINE"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "SegmentArray", .dir = "in", .dir_opt = "", .type = "PFILE_SEGMENT_ELEMENT"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ByteOffset", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"},
+      {.name = "Key", .dir = "in", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtWriteFile", .num_args = 9, .args = 
+    {
+      {.name = "FileHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Event", .dir = "in", .dir_opt = "opt", .type = "HANDLE"},
+      {.name = "ApcRoutine", .dir = "in", .dir_opt = "opt", .type = "PIO_APC_ROUTINE"},
+      {.name = "ApcContext", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "IoStatusBlock", .dir = "out", .dir_opt = "", .type = "PIO_STATUS_BLOCK"},
+      {.name = "Buffer", .dir = "in", .dir_opt = "bcount(Length)", .type = "PVOID"},
+      {.name = "Length", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "ByteOffset", .dir = "in", .dir_opt = "opt", .type = "PLARGE_INTEGER"},
+      {.name = "Key", .dir = "in", .dir_opt = "opt", .type = "PULONG"}
+    }
+  },
+  { .name = "NtWriteRequestData", .num_args = 6, .args = 
+    {
+      {.name = "PortHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "Message", .dir = "in", .dir_opt = "", .type = "PPORT_MESSAGE"},
+      {.name = "DataEntryIndex", .dir = "in", .dir_opt = "", .type = "ULONG"},
+      {.name = "Buffer", .dir = "in", .dir_opt = "bcount(BufferSize)", .type = "PVOID"},
+      {.name = "BufferSize", .dir = "in", .dir_opt = "", .type = "SIZE_T"},
+      {.name = "NumberOfBytesWritten", .dir = "out", .dir_opt = "opt", .type = "PSIZE_T"}
+    }
+  },
+  { .name = "NtWriteVirtualMemory", .num_args = 5, .args = 
+    {
+      {.name = "ProcessHandle", .dir = "in", .dir_opt = "", .type = "HANDLE"},
+      {.name = "BaseAddress", .dir = "in", .dir_opt = "opt", .type = "PVOID"},
+      {.name = "Buffer", .dir = "in", .dir_opt = "bcount(BufferSize)", .type = "PVOID"},
+      {.name = "BufferSize", .dir = "in", .dir_opt = "", .type = "SIZE_T"},
+      {.name = "NumberOfBytesWritten", .dir = "out", .dir_opt = "opt", .type = "PSIZE_T"}
+    }
+  },
+  { .name = "NtYieldExecution", .num_args = 0 }
+};
+
+
