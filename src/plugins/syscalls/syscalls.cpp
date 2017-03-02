@@ -122,7 +122,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     ctx.dtb = info->regs->cr3;
     ctx.addr = info->regs->rsp+4;  // jump over base pointer
 
-    unsigned int nargs = syscall_struct[wrapper->syscall_index].num_args;
+    int nargs = syscall_struct[wrapper->syscall_index].num_args;
 
     // multiply num args by 4 for 32 bit systems to get the number of bytes we need
     // to read from the stack (only valid for 32 bit systems, 64 bit systems have
