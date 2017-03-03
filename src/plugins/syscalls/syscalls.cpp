@@ -138,65 +138,52 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    uint8_t reg_size = vmi_get_address_width(vmi);
-    int nargs = win_syscall_struct[wrapper->syscall_index].num_args;
+    unsigned int nargs = win_syscall_struct[wrapper->syscall_index].num_args;
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    int size = reg_size * nargs;
+    unsigned long size = s->reg_size * nargs;
     unsigned char buf[size];
 
-    if(reg_size==4){ // 32 bit os
+    if(s->reg_size==4){ // 32 bit os
 
-      ctx.addr = info->regs->rsp+reg_size;  // jump over base pointer
+        ctx.addr = info->regs->rsp + s->reg_size;  // jump over base pointer
 
-      // multiply num args by 4 for 32 bit systems to get the number of bytes we need
-      // to read from the stack.  assumes standard calling convention (cdecl) for the
-      // visual studio compile.
-      if((size_t)size != vmi_read(vmi, &ctx, buf, size)){
-        return 0;
-      }
+        // multiply num args by 4 for 32 bit systems to get the number of bytes we need
+        // to read from the stack.  assumes standard calling convention (cdecl) for the
+        // visual studio compile.
+        if((size_t)size != vmi_read(vmi, &ctx, buf, size)){
+            return 0;
+        }
     }
     else { // 64 bit os - ************** UNTESTED *******************!
-      ctx.addr = info->regs->rcx;
-      if(VMI_FAILURE == vmi_read_64(vmi, &ctx, (uint64_t *)&buf)){
-          return 0;
-      }
-      ctx.addr = info->regs->rdx;
-      if(VMI_FAILURE == vmi_read_64(vmi, &ctx, (uint64_t *)&buf[reg_size])){
-          return 0;
-      }
-      ctx.addr = info->regs->r8;
-      if(VMI_FAILURE == vmi_read_64(vmi, &ctx, (uint64_t *)&buf[reg_size*2])){
-          return 0;
-      }
-      ctx.addr = info->regs->r9;
-      if(VMI_FAILURE == vmi_read_64(vmi, &ctx, (uint64_t *)&buf[reg_size*3])){
-          return 0;
-      }
+        buf[0] = info->regs->rcx;
+        buf[s->reg_size] = info->regs->rdx;
+        buf[s->reg_size*2] = info->regs->r8;
+        buf[s->reg_size*3] = info->regs->r9;
 
-      if(nargs>4) { // first 4 agrs passed via rcx, rdx, r8, and r9
-        ctx.addr = info->regs->rsp+0x20;  // jump over homing space
-        int sp_size = reg_size * (nargs-4);
-        if((size_t)sp_size != vmi_read(vmi, &ctx, &buf[reg_size*4], sp_size)){
-          return 0;
-        }
-     }
+        if(nargs>4) { // first 4 agrs passed via rcx, rdx, r8, and r9
+            ctx.addr = info->regs->rsp+0x20;  // jump over homing space
+            unsigned long sp_size = s->reg_size * (nargs-4);
+            if((size_t)sp_size != vmi_read(vmi, &ctx, &buf[s->reg_size*4], sp_size)){
+                return 0;
+            }
+       }
     }
-      switch(s->format) {
-      case OUTPUT_CSV:
+    switch(s->format) {
+    case OUTPUT_CSV:
         printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s,Arguments:%d",
                info->vcpu, info->regs->cr3, info->procname, info->userid, info->trap->breakpoint.module, info->trap->name,nargs);
         for(i=0;i<nargs;i++) {
-          printf("%s,0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
-          for(j=reg_size-1;j>=0;--j) { // j must be signed
-            printf("%02X", buf[i*reg_size+j]);  // bytes stored in reverse order, switch them here
-          }
-          if(i<nargs-1) { 
-            printf(",");
-          }
+            printf("%s,0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
+            for(j=s->reg_size-1;j>=0;--j) { // j must be signed
+                printf("%02X", buf[i*s->reg_size+j]);  // bytes stored in reverse order, switch them here
+            }
+            if(i<nargs-1) { 
+                printf(",");
+            }
         }
         printf("\n");
         break;
@@ -207,14 +194,14 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                USERIDSTR(drakvuf), info->userid,
                info->trap->breakpoint.module, info->trap->name, nargs);
         for(i=0;i<nargs;i++) {
-          printf("\t%s:0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
-          for(j=reg_size-1;j>=0;--j) { // j must be signed
-            printf("%02X", buf[i*reg_size+j]);
-          }
-          printf("\n");
+            printf("\t%s:0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
+            for(j=s->reg_size-1;j>=0;--j) { // j must be signed
+                printf("%02X", buf[i*s->reg_size+j]);
+            }
+            printf("\n");
         }
         break;
-      }
+    }
     drakvuf_release_vmi(drakvuf);
     return 0;
 }   
@@ -252,10 +239,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
             }
 
             // These functions are not found:
-            // ERROR: NtFlushProcessWriteBuffers not found
-            // ERROR: NtGetCurrentProcessorNumber not found
             // ERROR: NtGetEnvironmentVariableEx not found
-            // ERROR: NtIsSystemResumeAutomatic not found
             // ERROR: NtQueryEnvironmentVariableInfoEx not found
             if(wrapper->syscall_index==-1) {
               printf("ERROR: %s not found\n",symbol->name);
@@ -334,6 +318,10 @@ syscalls::syscalls(drakvuf_t drakvuf, const void *config, output_format_t output
     this->os = drakvuf_get_os_type(drakvuf);
     this->traps = create_trap_config(drakvuf, this, symbols, rekall_profile);
     this->format = output;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    this->reg_size = vmi_get_address_width(vmi); // 32 or 64 
+    drakvuf_release_vmi(drakvuf);
 
     drakvuf_free_symbols(symbols);
 

@@ -107,7 +107,7 @@
  *
  */
 
-#define NUM_SYSCALLS 401
+#define NUM_SYSCALLS 404
 
 typedef struct
 {
@@ -274,6 +274,10 @@ enum {
   WORKERFACTORYINFOCLASS } types;
 
 static const struct win_syscall win_syscall_struct[] = {
+  { .name = "NtIsSystemResumeAutomatic", .num_args = 0 },
+  { .name = "NtFlushProcessWriteBuffers", .num_args = 0 },
+  { .name = "NtGetCurrentProcessorNumber", .num_args = 0 },
+
   { .name = "NtAcceptConnectPort", .num_args = 6, .args =
     {
       {.name = "PortHandle", .dir = out, .dir_opt = "", .type = PHANDLE},

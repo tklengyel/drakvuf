@@ -115,6 +115,7 @@ class syscalls: public plugin {
         GSList *traps;
 
     public:
+        uint8_t reg_size;
         output_format_t format;
         os_t os;
         syscalls(drakvuf_t drakvuf, const void *config, output_format_t output);
