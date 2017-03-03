@@ -145,17 +145,17 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    int size = reg_size * nargs; 
+    int size = reg_size * nargs;
     unsigned char buf[size];
 
     if(reg_size==4){ // 32 bit os
-    
+
       ctx.addr = info->regs->rsp+reg_size;  // jump over base pointer
 
       // multiply num args by 4 for 32 bit systems to get the number of bytes we need
-      // to read from the stack.  assumes standard calling convention (cdecl) for the 
+      // to read from the stack.  assumes standard calling convention (cdecl) for the
       // visual studio compile.
-      if(size != vmi_read(vmi, &ctx, buf, size)){
+      if((size_t)size != vmi_read(vmi, &ctx, buf, size)){
         return 0;
       }
     }
@@ -180,7 +180,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
       if(nargs>4) { // first 4 agrs passed via rcx, rdx, r8, and r9
         ctx.addr = info->regs->rsp+0x20;  // jump over homing space
         int sp_size = reg_size * (nargs-4);
-        if(sp_size != vmi_read(vmi, &ctx, &buf[reg_size*4], sp_size)){
+        if((size_t)sp_size != vmi_read(vmi, &ctx, &buf[reg_size*4], sp_size)){
           return 0;
         }
      }
