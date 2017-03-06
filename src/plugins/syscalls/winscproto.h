@@ -125,7 +125,7 @@ struct win_syscall{
 
 struct syscall_wrapper{
   syscalls *sc;
-  unsigned int syscall_index;
+  int syscall_index;
 };
 
 typedef struct syscall_wrapper syscall_wrapper_t;
