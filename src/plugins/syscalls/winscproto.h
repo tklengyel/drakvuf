@@ -276,7 +276,7 @@ enum {
   WORKERFACTORYINFOCLASS } types; 
 
 static const struct win_syscall win_syscall_struct[] = {
-  { .name = "NtFlushProcessWriteBuffers", .return_value = NTAPI, .num_args = 0  },
+  { .name = "NtFlushProcessWriteBuffers", .return_value = VOID, .num_args = 0  },
   { .name = "NtGetCurrentProcessorNumber", .return_value = WINAPI, .num_args = 0  },
   { .name = "NtGetEnvironmentVariableEx", .return_value = MISSING, .num_args = 1, .args = 
     {
