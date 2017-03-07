@@ -147,7 +147,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         nargs = win_syscall_struct[wrapper->syscall_index].num_args;
 
         unsigned long size = s->reg_size * nargs;
-        unsigned char buf[size];
+        buf = (unsigned char *)g_malloc(sizeof(char)*size);
 
         if(s->reg_size==4){ // 32 bit os
 
@@ -216,6 +216,9 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         break;
     }
 exit:
+    if(wrapper->syscall_index>-1) {
+        g_free(buf);
+    }
     drakvuf_release_vmi(drakvuf);
     return 0;
 }   
