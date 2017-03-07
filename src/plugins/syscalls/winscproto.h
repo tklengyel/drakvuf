@@ -109,30 +109,9 @@
  
 #define NUM_SYSCALLS 406
 
-typedef struct{
-  const char* name;
-  int dir;
-  const char* dir_opt;
-  int type;
-} win_arg_t;
+typedef enum { in, out, inout, reserved, missing } direction_t;
 
-struct win_syscall{
-  const char* name;
-  int return_value;
-  unsigned int num_args;
-  win_arg_t args[20];
-};
-
-struct syscall_wrapper{
-  syscalls *sc;
-  int syscall_index;
-};
-
-typedef struct syscall_wrapper syscall_wrapper_t;
-
-enum { in, out, inout, reserved, missing } direction;
-
-enum {
+typedef enum {
   ACCESS_MASK,
   ALPC_HANDLE,
   ALPC_MESSAGE_INFORMATION_CLASS,
@@ -273,11 +252,32 @@ enum {
   WAIT_TYPE,
   WIN32_PROTECTION_MASK,
   WINAPI,
-  WORKERFACTORYINFOCLASS } types; 
+  WORKERFACTORYINFOCLASS } types_t; 
+
+typedef struct{
+  const char* name;
+  direction_t dir;
+  const char* dir_opt;
+  types_t type;
+} win_arg_t;
+
+struct win_syscall{
+  const char* name;
+  int return_value;
+  unsigned int num_args;
+  win_arg_t args[20];
+};
+
+struct syscall_wrapper{
+  syscalls *sc;
+  int syscall_index;
+};
+
+typedef struct syscall_wrapper syscall_wrapper_t;
 
 static const struct win_syscall win_syscall_struct[] = {
   { .name = "NtFlushProcessWriteBuffers", .return_value = VOID, .num_args = 0  },
-  { .name = "NtGetCurrentProcessorNumber", .return_value = WINAPI, .num_args = 0  },
+  { .name = "NtGetCurrentProcessorNumber", .return_value = ULONG, .num_args = 0  },
   { .name = "NtGetEnvironmentVariableEx", .return_value = MISSING, .num_args = 1, .args = 
     {
       {.name = "Missing", .dir = missing, .dir_opt = "", .type = MISSING}

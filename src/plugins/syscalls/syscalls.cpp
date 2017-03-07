@@ -131,77 +131,91 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 }
 
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    int i,j;
+    int i,j,nargs;
+    unsigned char* buf;
 
     syscall_wrapper_t *wrapper = (syscall_wrapper_t*)info->trap->data;
     syscalls *s = wrapper->sc;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    int nargs = win_syscall_struct[wrapper->syscall_index].num_args;
-
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    unsigned long size = s->reg_size * nargs;
-    unsigned char buf[size];
+    if(wrapper->syscall_index>-1) {
+        nargs = win_syscall_struct[wrapper->syscall_index].num_args;
 
-    if(s->reg_size==4){ // 32 bit os
+        unsigned long size = s->reg_size * nargs;
+        unsigned char buf[size];
 
-        ctx.addr = info->regs->rsp + s->reg_size;  // jump over base pointer
+        if(s->reg_size==4){ // 32 bit os
 
-        // multiply num args by 4 for 32 bit systems to get the number of bytes we need
-        // to read from the stack.  assumes standard calling convention (cdecl) for the
-        // visual studio compile.
-        if((size_t)size != vmi_read(vmi, &ctx, buf, size)){
-            return 0;
+            ctx.addr = info->regs->rsp + s->reg_size;  // jump over base pointer
+
+            // multiply num args by 4 for 32 bit systems to get the number of bytes we need
+            // to read from the stack.  assumes standard calling convention (cdecl) for the
+            // visual studio compile.
+            if((size_t)size != vmi_read(vmi, &ctx, buf, size)){
+                goto exit;
+            }
+        }
+        else { // 64 bit os - ************** UNTESTED *******************!
+            buf[0] = info->regs->rcx;
+            buf[s->reg_size] = info->regs->rdx;
+            buf[s->reg_size*2] = info->regs->r8;
+            buf[s->reg_size*3] = info->regs->r9;
+
+            if(nargs>4) { // first 4 agrs passed via rcx, rdx, r8, and r9
+                ctx.addr = info->regs->rsp+0x20;  // jump over homing space
+                unsigned long sp_size = s->reg_size * (nargs-4);
+                if((size_t)sp_size != vmi_read(vmi, &ctx, &buf[s->reg_size*4], sp_size)){
+                    goto exit;
+                }
+           }
         }
     }
-    else { // 64 bit os - ************** UNTESTED *******************!
-        buf[0] = info->regs->rcx;
-        buf[s->reg_size] = info->regs->rdx;
-        buf[s->reg_size*2] = info->regs->r8;
-        buf[s->reg_size*3] = info->regs->r9;
 
-        if(nargs>4) { // first 4 agrs passed via rcx, rdx, r8, and r9
-            ctx.addr = info->regs->rsp+0x20;  // jump over homing space
-            unsigned long sp_size = s->reg_size * (nargs-4);
-            if((size_t)sp_size != vmi_read(vmi, &ctx, &buf[s->reg_size*4], sp_size)){
-                return 0;
-            }
-       }
-    }
     switch(s->format) {
     case OUTPUT_CSV:
-        printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s,Arguments:%d",
-               info->vcpu, info->regs->cr3, info->procname, info->userid, info->trap->breakpoint.module, info->trap->name,nargs);
-        for(i=0;i<nargs;i++) {
-            printf("%s,0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
-            for(j=s->reg_size-1;j>=0;--j) { // j must be signed
-                printf("%02X", buf[i*s->reg_size+j]);  // bytes stored in reverse order, switch them here
-            }
-            if(i<nargs-1) { 
-                printf(",");
-            }
-        }
-        printf("\n");
-        break;
-      default:
-      case OUTPUT_DEFAULT:
-        printf("[SYSCALL] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" %s!%s,Arguments:%d\n",
-               info->vcpu, info->regs->cr3, info->procname,
-               USERIDSTR(drakvuf), info->userid,
-               info->trap->breakpoint.module, info->trap->name, nargs);
-        for(i=0;i<nargs;i++) {
-            printf("\t%s:0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
-            for(j=s->reg_size-1;j>=0;--j) { // j must be signed
-                printf("%02X", buf[i*s->reg_size+j]);
+        printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s",
+               info->vcpu, info->regs->cr3, info->procname, info->userid, info->trap->breakpoint.module, info->trap->name);
+        if(wrapper->syscall_index>-1) {
+            printf(",Arguments:%d,",nargs);
+            for(i=0;i<nargs;i++) {
+                printf("%s,0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
+                for(j=s->reg_size-1;j>=0;--j) { // j must be signed
+                    printf("%02X", buf[i*s->reg_size+j]);  // bytes stored in reverse order, switch them here
+                }
+                if(i<nargs-1) { 
+                    printf(",");
+                }
             }
             printf("\n");
         }
         break;
+      default:
+      case OUTPUT_DEFAULT:
+        printf("[SYSCALL] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" %s!%s",
+               info->vcpu, info->regs->cr3, info->procname,
+               USERIDSTR(drakvuf), info->userid,
+               info->trap->breakpoint.module, info->trap->name);
+        if(wrapper->syscall_index>-1) {
+            printf(",Arguments:%d\n",nargs);
+            for(i=0;i<nargs;i++) {
+                printf("\t%s:0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
+                for(j=s->reg_size-1;j>=0;--j) { // j must be signed
+                    printf("%02X", buf[i*s->reg_size+j]);
+                }
+                printf("\n");
+            }
+        }
+        else {
+            printf("\n");
+        }
+        break;
     }
+exit:
     drakvuf_release_vmi(drakvuf);
     return 0;
 }   
@@ -238,14 +252,8 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
               }
             }
 
-            // These functions are not found:
-            // ERROR: NtGetEnvironmentVariableEx not found
-            // ERROR: NtQueryEnvironmentVariableInfoEx not found
             if(wrapper->syscall_index==-1) {
               printf("ERROR: %s not found\n",symbol->name);
-
-              wrapper->sc=s;
-              wrapper->syscall_index=0; //we'll just return garbage so at least we won't crash
             }
 
             drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
