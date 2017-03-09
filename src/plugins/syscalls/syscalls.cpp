@@ -145,12 +145,12 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     if(wrapper->syscall_index>-1) { // get arguments only if we know how many to get
         nargs = win_syscall_struct[wrapper->syscall_index].num_args;
-
         unsigned long size = s->reg_size * nargs;
+
         buf = (unsigned char *)g_malloc(sizeof(char)*size);
 
         if(s->reg_size==4){ // 32 bit os
-
+            uint32_t *buf32 = (uint32_t *)buf;
             ctx.addr = info->regs->rsp + s->reg_size;  // jump over base pointer
 
             // multiply num args by 4 for 32 bit systems to get the number of bytes we need
@@ -161,15 +161,23 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             }
         }
         else { // 64 bit os - ************** UNTESTED *******************!
-            buf[0] = info->regs->rcx;
-            buf[s->reg_size] = info->regs->rdx;
-            buf[s->reg_size*2] = info->regs->r8;
-            buf[s->reg_size*3] = info->regs->r9;
-
+	    uint64_t *buf64 = (uint64_t *)buf;
+            if(nargs > 0) {
+                buf64[0] = info->regs->rcx;
+            }
+            if(nargs > 1) {
+                buf64[1] = info->regs->rdx;
+            }
+            if(nargs > 2) {
+                buf64[2] = info->regs->r8;
+            }
+            if(nargs > 3) {
+                buf64[3] = info->regs->r9;
+            }
             if(nargs>4) { // first 4 agrs passed via rcx, rdx, r8, and r9
                 ctx.addr = info->regs->rsp+0x20;  // jump over homing space
                 unsigned long sp_size = s->reg_size * (nargs-4);
-                if((size_t)sp_size != vmi_read(vmi, &ctx, &buf[s->reg_size*4], sp_size)){
+                if((size_t)sp_size != vmi_read(vmi, &ctx, &(buf64[4]), sp_size)){
                     goto exit;
                 }
            }
