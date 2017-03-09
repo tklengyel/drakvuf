@@ -132,7 +132,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     int i,j,nargs;
-    unsigned char* buf;
+    unsigned char* buf; // pointer to buffer to hold argument values
 
     syscall_wrapper_t *wrapper = (syscall_wrapper_t*)info->trap->data;
     syscalls *s = wrapper->sc;
@@ -143,7 +143,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    if(wrapper->syscall_index>-1) {
+    if(wrapper->syscall_index>-1) { // get arguments only if we know how many to get
         nargs = win_syscall_struct[wrapper->syscall_index].num_args;
 
         unsigned long size = s->reg_size * nargs;
@@ -180,7 +180,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     case OUTPUT_CSV:
         printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s",
                info->vcpu, info->regs->cr3, info->procname, info->userid, info->trap->breakpoint.module, info->trap->name);
-        if(wrapper->syscall_index>-1) {
+        if(wrapper->syscall_index>-1) { // only print arguments if we got them
             printf(",Arguments:%d,",nargs);
             for(i=0;i<nargs;i++) {
                 printf("%s,0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
@@ -247,11 +247,12 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
             syscall_wrapper_t *wrapper = (syscall_wrapper_t *)g_malloc(sizeof(syscall_wrapper_t));
 
             wrapper->syscall_index = -1;
+            wrapper->sc=s;
 
             for (j=0; j<NUM_SYSCALLS; j++) {
               if(strcmp(symbol->name,win_syscall_struct[j].name)==0) {
-                wrapper->sc=s;
                 wrapper->syscall_index=j;
+                break;
               }
             }
 
@@ -352,7 +353,9 @@ syscalls::~syscalls() {
     while(loop) {
         drakvuf_trap_t *trap = (drakvuf_trap_t *)loop->data;
         g_free((char*)trap->name);
-        g_free(trap->data);        
+        if (trap->data != (void*)this) {
+            g_free(trap->data);
+        }
         g_free(loop->data);
         loop = loop->next;
     }
