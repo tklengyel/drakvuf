@@ -150,7 +150,6 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         buf = (unsigned char *)g_malloc(sizeof(char)*size);
 
         if(s->reg_size==4){ // 32 bit os
-            uint32_t *buf32 = (uint32_t *)buf;
             ctx.addr = info->regs->rsp + s->reg_size;  // jump over base pointer
 
             // multiply num args by 4 for 32 bit systems to get the number of bytes we need
