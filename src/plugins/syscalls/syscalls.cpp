@@ -133,7 +133,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     int i, nargs;
     unsigned long size;
-    unsigned char* buf; // pointer to buffer to hold argument values
+    unsigned char* buf = NULL; // pointer to buffer to hold argument values
 
     syscall_wrapper_t *wrapper = (syscall_wrapper_t*)info->trap->data;
     syscalls *s = wrapper->sc;
