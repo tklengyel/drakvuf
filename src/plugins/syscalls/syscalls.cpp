@@ -131,20 +131,23 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 }
 
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    int i, nargs;
-    unsigned long size;
+    int i = 0, nargs = 0;
+    size_t size = 0;
     unsigned char* buf = NULL; // pointer to buffer to hold argument values
 
     syscall_wrapper_t *wrapper = (syscall_wrapper_t*)info->trap->data;
     syscalls *s = wrapper->sc;
+    const win_syscall_t *wsc = NULL;
 
-    if(wrapper->syscall_index>-1) { // need to malloc buf before setting type of each array cell
-        nargs = win_syscall_struct[wrapper->syscall_index].num_args;
+    if (wrapper->syscall_index>-1 )
+    {
+        // need to malloc buf before setting type of each array cell
+        wsc = &win_syscalls[wrapper->syscall_index];
+        nargs = wsc->num_args;
         size = s->reg_size * nargs;
         buf = (unsigned char *)g_malloc(sizeof(char)*size);
     }
 
-    // wrapping this in an if statement causes compiler error (goes out of global scope of function)
     uint32_t *buf32 = (uint32_t *)buf;
     uint64_t *buf64 = (uint64_t *)buf;
 
@@ -154,37 +157,39 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    if(wrapper->syscall_index>-1) { // get arguments only if we know how many to get
+    if ( nargs )
+    {
+        // get arguments only if we know how many to get
 
-        if(s->reg_size==4){ // 32 bit os
+        if ( 4 == s->reg_size )
+        {
+            // 32 bit os
             ctx.addr = info->regs->rsp + s->reg_size;  // jump over base pointer
 
             // multiply num args by 4 for 32 bit systems to get the number of bytes we need
             // to read from the stack.  assumes standard calling convention (cdecl) for the
             // visual studio compile.
-            if((size_t)size != vmi_read(vmi, &ctx, buf, size)){
+            if ( size != vmi_read(vmi, &ctx, buf, size) )
                 goto exit;
-            }
         }
-        else { // 64 bit os - ************** UNTESTED *******************!
-            if(nargs > 0) {
+
+        if ( 8 == s->reg_size )
+        {
+            if ( nargs > 0 )
                 buf64[0] = info->regs->rcx;
-            }
-            if(nargs > 1) {
+            if ( nargs > 1 )
                 buf64[1] = info->regs->rdx;
-            }
-            if(nargs > 2) {
+            if ( nargs > 2 )
                 buf64[2] = info->regs->r8;
-            }
-            if(nargs > 3) {
+            if ( nargs > 3 )
                 buf64[3] = info->regs->r9;
-            }
-            if(nargs>4) { // first 4 agrs passed via rcx, rdx, r8, and r9
-                ctx.addr = info->regs->rsp+0x20;  // jump over homing space
-                unsigned long sp_size = s->reg_size * (nargs-4);
-                if((size_t)sp_size != vmi_read(vmi, &ctx, &(buf64[4]), sp_size)){
+            if ( nargs > 4 )
+            {
+                // first 4 agrs passed via rcx, rdx, r8, and r9
+                ctx.addr = info->regs->rsp+0x28;  // jump over homing space + base pointer
+                size_t sp_size = s->reg_size * (nargs-4);
+                if ( sp_size != vmi_read(vmi, &ctx, &(buf64[4]), sp_size) )
                     goto exit;
-                }
            }
         }
     }
@@ -193,27 +198,28 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     case OUTPUT_CSV:
         printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s",
                info->vcpu, info->regs->cr3, info->procname, info->userid, info->trap->breakpoint.module, info->trap->name);
-        if(wrapper->syscall_index>-1) { // only print arguments if we got them
-            printf(",Arguments:%d,",nargs);
-            for(i=0;i<nargs;i++) {
-                printf("%s,",win_syscall_struct[wrapper->syscall_index].args[i].name);
-                if(win_syscall_struct[wrapper->syscall_index].args[i].dir==in) { // only print input argument
-                    if(s->reg_size==4){ // 32 bit os
+
+        if ( nargs )
+        {
+            printf(",%" PRIu32,nargs);
+
+            for ( i=0; i<nargs; i++ )
+            {
+                printf(",%s,",wsc->args[i].name);
+
+                if ( wsc->args[i].dir == DIR_IN || wsc->args[i].dir == DIR_INOUT )
+                {
+                    if ( 4 == s->reg_size )
                         printf("0x%" PRIx32, buf32[i]);
-                    }
-                    else {
-                        printf("0x%" PRIx64,buf64[i]);
-                    }
+                    else
+                        printf("0x%" PRIx64, buf64[i]);
                 }
-                else {
-                    printf(" not an input argument");
-                }
-                if(i<nargs-1) { 
-                    printf(",");
-                }
+                else
+                    printf("-");
             }
-            printf("\n");
         }
+
+        printf("\n");
         break;
       default:
       case OUTPUT_DEFAULT:
@@ -221,36 +227,35 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                info->vcpu, info->regs->cr3, info->procname,
                USERIDSTR(drakvuf), info->userid,
                info->trap->breakpoint.module, info->trap->name);
-        if(wrapper->syscall_index>-1) {
-            printf(",Arguments:%d\n",nargs);
-            for(i=0;i<nargs;i++) {
-                printf("\t%s:",win_syscall_struct[wrapper->syscall_index].args[i].name);
-                if(win_syscall_struct[wrapper->syscall_index].args[i].dir==in) { // only print input argument
-                    if(s->reg_size==4){ // 32 bit os
-                        printf("0x%" PRIx32,buf32[i]);
-                    }
-                    else {
-                        printf("0x%" PRIx64,buf64[i]);
-                    }
-                    printf("\n");
+
+        if ( nargs )
+        {
+            printf(" Arguments: %" PRIu32 "\n",nargs);
+
+            for( i =0; i<nargs; i++ )
+            {
+                printf("\t%s: ", wsc->args[i].name);
+                if ( wsc->args[i].dir == DIR_IN || wsc->args[i].dir == DIR_INOUT )
+                {
+                    if ( 4 == s->reg_size )
+                        printf("0x%" PRIx32, buf32[i]);
+                    else
+                        printf("0x%" PRIx64, buf64[i]);
                 }
-                else {
-                    printf(" not an input argument\n");
-                }
+                else
+                    printf("-");
+
+                printf("\n");
             }
-        }
-        else {
+        } else
             printf("\n");
-        }
         break;
     }
 exit:
-    if(wrapper->syscall_index>-1) {
-        g_free(buf);
-    }
+    g_free(buf);
     drakvuf_release_vmi(drakvuf);
     return 0;
-}   
+}
 
 static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *symbols, const char* rekall_profile) {
 
@@ -259,11 +264,12 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
 
     PRINT_DEBUG("Received %lu symbols\n", symbols->count);
 
-    if ( s->os == VMI_OS_WINDOWS ) {
+    if ( s->os == VMI_OS_WINDOWS )
+    {
         addr_t ntoskrnl = drakvuf_get_kernel_base(drakvuf);
 
-        for (i=0; i < symbols->count; i++) {
-
+        for (i=0; i < symbols->count; i++)
+        {
             const struct symbol *symbol = &symbols->symbols[i];
 
             if (strncmp(symbol->name, "Nt", 2))
@@ -278,16 +284,17 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
             wrapper->syscall_index = -1;
             wrapper->sc=s;
 
-            for (j=0; j<NUM_SYSCALLS; j++) {
-              if(strcmp(symbol->name,win_syscall_struct[j].name)==0) {
-                wrapper->syscall_index=j;
-                break;
-              }
+            for (j=0; j<NUM_SYSCALLS; j++)
+            {
+                if ( !strcmp(symbol->name,win_syscalls[j].name) )
+                {
+                    wrapper->syscall_index=j;
+                    break;
+                }
             }
 
-            if(wrapper->syscall_index==-1) {
-              printf("ERROR: %s not found\n",symbol->name);
-            }
+            if ( wrapper->syscall_index==-1 )
+                PRINT_DEBUG("[SYSCALLS]: %s not found in argument list\n", symbol->name);
 
             drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
             trap->breakpoint.lookup_type = LOOKUP_PID;
@@ -304,7 +311,8 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
         }
     }
 
-    if ( s->os == VMI_OS_LINUX ) {
+    if ( s->os == VMI_OS_LINUX )
+    {
         addr_t rva = 0;
 
         if ( !drakvuf_get_constant_rva(rekall_profile, "_text", &rva) )
@@ -312,8 +320,8 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
 
         addr_t kaslr = drakvuf_get_kernel_base(drakvuf) - rva;
 
-        for (i=0; i < symbols->count; i++) {
-
+        for (i=0; i < symbols->count; i++)
+        {
             const struct symbol *symbol = &symbols->symbols[i];
 
             /* Looking for system calls */
@@ -361,7 +369,7 @@ syscalls::syscalls(drakvuf_t drakvuf, const void *config, output_format_t output
     this->format = output;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->reg_size = vmi_get_address_width(vmi); // 32 or 64 
+    this->reg_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
     drakvuf_release_vmi(drakvuf);
 
     drakvuf_free_symbols(symbols);
