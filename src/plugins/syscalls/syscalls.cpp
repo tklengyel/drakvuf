@@ -131,11 +131,22 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 }
 
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    int i,j,nargs;
+    int i, nargs;
+    unsigned long size;
     unsigned char* buf; // pointer to buffer to hold argument values
 
     syscall_wrapper_t *wrapper = (syscall_wrapper_t*)info->trap->data;
     syscalls *s = wrapper->sc;
+
+    if(wrapper->syscall_index>-1) { // need to malloc buf before setting type of each array cell
+        nargs = win_syscall_struct[wrapper->syscall_index].num_args;
+        size = s->reg_size * nargs;
+        buf = (unsigned char *)g_malloc(sizeof(char)*size);
+    }
+
+    // wrapping this in an if statement causes compiler error (goes out of global scope of function)
+    uint32_t *buf32 = (uint32_t *)buf;
+    uint64_t *buf64 = (uint64_t *)buf;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -144,10 +155,6 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     ctx.dtb = info->regs->cr3;
 
     if(wrapper->syscall_index>-1) { // get arguments only if we know how many to get
-        nargs = win_syscall_struct[wrapper->syscall_index].num_args;
-        unsigned long size = s->reg_size * nargs;
-
-        buf = (unsigned char *)g_malloc(sizeof(char)*size);
 
         if(s->reg_size==4){ // 32 bit os
             ctx.addr = info->regs->rsp + s->reg_size;  // jump over base pointer
@@ -160,7 +167,6 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             }
         }
         else { // 64 bit os - ************** UNTESTED *******************!
-	    uint64_t *buf64 = (uint64_t *)buf;
             if(nargs > 0) {
                 buf64[0] = info->regs->rcx;
             }
@@ -190,9 +196,17 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         if(wrapper->syscall_index>-1) { // only print arguments if we got them
             printf(",Arguments:%d,",nargs);
             for(i=0;i<nargs;i++) {
-                printf("%s,0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
-                for(j=s->reg_size-1;j>=0;--j) { // j must be signed
-                    printf("%02X", buf[i*s->reg_size+j]);  // bytes stored in reverse order, switch them here
+                printf("%s,",win_syscall_struct[wrapper->syscall_index].args[i].name);
+                if(win_syscall_struct[wrapper->syscall_index].args[i].dir==in) { // only print input argument
+                    if(s->reg_size==4){ // 32 bit os
+                        printf("0x%.*X", 2*s->reg_size,buf32[i]);
+                    }
+                    else {
+                        printf("0x%.*X", 2*s->reg_size,buf64[i]);
+                    }
+                }
+                else {
+                    printf("not an input argument");
                 }
                 if(i<nargs-1) { 
                     printf(",");
@@ -210,11 +224,19 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         if(wrapper->syscall_index>-1) {
             printf(",Arguments:%d\n",nargs);
             for(i=0;i<nargs;i++) {
-                printf("\t%s:0x",win_syscall_struct[wrapper->syscall_index].args[i].name);
-                for(j=s->reg_size-1;j>=0;--j) { // j must be signed
-                    printf("%02X", buf[i*s->reg_size+j]);
+                printf("\t%s:",win_syscall_struct[wrapper->syscall_index].args[i].name);
+                if(win_syscall_struct[wrapper->syscall_index].args[i].dir==in) { // only print input argument
+                    if(s->reg_size==4){ // 32 bit os
+                        printf("0x%.*X", 2*s->reg_size,buf32[i]);
+                    }
+                    else {
+                        printf("0x%.*X", 2*s->reg_size,buf64[i]);
+                    }
+                    printf("\n");
                 }
-                printf("\n");
+                else {
+                    printf("not an input argument\n");
+                }
             }
         }
         else {
