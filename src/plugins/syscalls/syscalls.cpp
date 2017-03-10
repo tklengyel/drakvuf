@@ -199,14 +199,14 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                 printf("%s,",win_syscall_struct[wrapper->syscall_index].args[i].name);
                 if(win_syscall_struct[wrapper->syscall_index].args[i].dir==in) { // only print input argument
                     if(s->reg_size==4){ // 32 bit os
-                        printf("0x%.*X", 2*s->reg_size,buf32[i]);
+                        printf("0x%" PRIx32, buf32[i]);
                     }
                     else {
-                        printf("0x%.*X", 2*s->reg_size,buf64[i]);
+                        printf("0x%" PRIx64,buf64[i]);
                     }
                 }
                 else {
-                    printf("not an input argument");
+                    printf(" not an input argument");
                 }
                 if(i<nargs-1) { 
                     printf(",");
@@ -227,15 +227,15 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                 printf("\t%s:",win_syscall_struct[wrapper->syscall_index].args[i].name);
                 if(win_syscall_struct[wrapper->syscall_index].args[i].dir==in) { // only print input argument
                     if(s->reg_size==4){ // 32 bit os
-                        printf("0x%.*X", 2*s->reg_size,buf32[i]);
+                        printf("0x%" PRIx32,buf32[i]);
                     }
                     else {
-                        printf("0x%.*X", 2*s->reg_size,buf64[i]);
+                        printf("0x%" PRIx64,buf64[i]);
                     }
                     printf("\n");
                 }
                 else {
-                    printf("not an input argument\n");
+                    printf(" not an input argument\n");
                 }
             }
         }
