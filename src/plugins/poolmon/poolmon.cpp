@@ -137,7 +137,7 @@ static GTree* pooltag_build_tree() {
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     poolmon *p = (poolmon*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    page_mode_t pm = vmi_get_page_mode(vmi);
+    page_mode_t pm = vmi_get_page_mode(vmi, 0);
     reg_t pool_type, size;
     char tag[5] = { [0 ... 4] = '\0' };
 

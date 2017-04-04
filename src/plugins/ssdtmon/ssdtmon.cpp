@@ -169,7 +169,7 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const void *config, output_format_t output) 
     }
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    page_mode_t pm = vmi_get_page_mode(vmi);
+    page_mode_t pm = vmi_get_page_mode(vmi, 0);
     this->kiservicetable = vmi_translate_kv2p(vmi, kernbase + kiservicetable_rva);
     vmi_read_32_va(vmi, kernbase + kiservicelimit_rva, 0, &this->kiservicelimit);
     drakvuf_release_vmi(drakvuf);

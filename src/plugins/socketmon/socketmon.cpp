@@ -1055,7 +1055,7 @@ done:
 socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t output) {
     const char *rekall_profile = (const char *)config;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->pm = vmi_get_page_mode(vmi);
+    this->pm = vmi_get_page_mode(vmi, 0);
     drakvuf_release_vmi(drakvuf);
     this->rettraps = g_hash_table_new(g_int64_hash, g_int64_equal);
     this->format = output;

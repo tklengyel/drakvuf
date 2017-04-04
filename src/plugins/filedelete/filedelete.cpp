@@ -312,7 +312,7 @@ filedelete::filedelete(drakvuf_t drakvuf, const void *config, output_format_t ou
 {
     const struct filedelete_config *c = (const struct filedelete_config *)config;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->pm = vmi_get_page_mode(vmi);
+    this->pm = vmi_get_page_mode(vmi, 0);
     this->domid = vmi_get_vmid(vmi);
     drakvuf_release_vmi(drakvuf);
 

@@ -817,21 +817,15 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
 
 int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char *app) {
 
-    struct injector injector = {
-        .drakvuf = drakvuf,
-        .vmi = drakvuf_lock_and_get_vmi(drakvuf),
-        .rekall_profile = drakvuf_get_rekall_profile(drakvuf),
-        .target_pid = pid,
-        .target_tid = tid,
-        .target_proc = app,
-        .pid = 0,
-        .tid = 0,
-        .hProc = 0,
-        .hThr = 0,
-        .rc = 0
-    };
+    struct injector injector = { 0 };
+    injector.drakvuf = drakvuf;
+    injector.vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    injector.rekall_profile = drakvuf_get_rekall_profile(drakvuf);
+    injector.target_pid = pid;
+    injector.target_tid = tid;
+    injector.target_proc = app;
 
-    injector.is32bit = (vmi_get_page_mode(injector.vmi) == VMI_PM_IA32E) ? 0 : 1,
+    injector.is32bit = (vmi_get_page_mode(injector.vmi, 0) == VMI_PM_IA32E) ? 0 : 1,
     injector.target_cr3 = vmi_pid_to_dtb(injector.vmi, pid);
     if (!injector.target_cr3)
     {

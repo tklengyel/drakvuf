@@ -1085,13 +1085,23 @@ void drakvuf_loop(drakvuf_t drakvuf) {
 bool init_vmi(drakvuf_t drakvuf) {
 
     int rc;
+    uint64_t flags = 0;
+
     PRINT_DEBUG("Init VMI on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
 
+    /* initialize the libvmi library */
+    if (VMI_FAILURE == vmi_init(&drakvuf->vmi, VMI_XEN, &drakvuf->domID, VMI_INIT_DOMAINID | VMI_INIT_EVENTS, NULL, NULL)) {
+        printf("Failed to init LibVMI library.\n");
+        return 1;
+    }
+
     GHashTable *config = g_hash_table_new(g_str_hash, g_str_equal);
+    g_hash_table_insert(config, "rekall_profile", drakvuf->rekall_profile);
 
     switch(drakvuf->os) {
     case VMI_OS_WINDOWS:
         g_hash_table_insert(config, "os_type", "Windows");
+        flags = VMI_PM_INITFLAG_TRANSITION_PAGES;
         break;
     case VMI_OS_LINUX:
         g_hash_table_insert(config, "os_type", "Linux");
@@ -1100,22 +1110,23 @@ bool init_vmi(drakvuf_t drakvuf) {
         break;
     };
 
-    g_hash_table_insert(config, "domid", &drakvuf->domID);
-    g_hash_table_insert(config, "rekall_profile", drakvuf->rekall_profile);
+    if (VMI_PM_UNKNOWN == vmi_init_paging(drakvuf->vmi, flags) ) {
+        printf("Failed to init LibVMI paging.\n");
+        g_hash_table_destroy(config);
+        return 1;
+    }
 
-    // Initialize the libvmi library.
-    status_t ret = vmi_init_custom(&drakvuf->vmi,
-                                   VMI_XEN | VMI_INIT_COMPLETE | VMI_INIT_EVENTS | VMI_CONFIG_GHASHTABLE,
-                                   (vmi_config_t) config);
+    os_t os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GHASHTABLE, config, NULL);
+
     g_hash_table_destroy(config);
 
-    if ( VMI_FAILURE == ret) {
+    if ( os != drakvuf->os ) {
         PRINT_DEBUG("Failed to init LibVMI library.\n");
         drakvuf->vmi = NULL;
         return 0;
     }
 
-    drakvuf->pm = vmi_get_page_mode(drakvuf->vmi);
+    drakvuf->pm = vmi_get_page_mode(drakvuf->vmi, 0);
     drakvuf->vcpus = vmi_get_num_vcpus(drakvuf->vmi);
     drakvuf->memsize = drakvuf->init_memsize = vmi_get_memsize(drakvuf->vmi);
 
@@ -1308,7 +1319,7 @@ void close_vmi(drakvuf_t drakvuf) {
 
     unsigned int i;
     for (i = 0; i < drakvuf->vcpus; i++) {
-        if ( drakvuf->step_event[i]->data != drakvuf )
+        if ( drakvuf->step_event[i] && drakvuf->step_event[i]->data != drakvuf )
             g_free(drakvuf->step_event[i]->data);
         g_free(drakvuf->step_event[i]);
     }
