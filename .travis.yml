@@ -15,11 +15,6 @@ before_install:
   - git submodule update libvmi
   - cd libvmi && ./autogen.sh && ./configure --enable-xen --disable-kvm --without-xenstore
   - make && sudo make install
-  - cd tools/pyvmi && python setup.py build && sudo python setup.py install
-  - cd ../../..
-  - git clone https://github.com/volatilityfoundation/volatility
-  - cd volatility && python setup.py build && sudo python setup.py install
-  - cd ..
 
 script: "./autogen.sh; ./configure --enable-debug; make clean; make"
 
