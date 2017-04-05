@@ -162,9 +162,7 @@ int main(int argc, char** argv) {
                "\t -x <plugin>               Don't activate the specified plugin\n"
                "\t -p                        Leave domain paused after DRAKVUF exits\n"
                "\t -w <process name>         Wait with plugin start until process name is detected\n"
-#ifdef VOLATILITY
                "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
-#endif
 #ifdef ENABLE_PLUGIN_CPUIDMON
                "\t -s                        Hide Hypervisor bits and signature in CPUID\n"
 #endif

@@ -105,6 +105,8 @@
 #include <glib.h>
 #include <config.h>
 #include <inttypes.h>
+#include <libvmi/x86.h>
+
 #include "../plugins.h"
 #include "filedelete.h"
 
@@ -113,6 +115,20 @@
 
 enum offset {
     FILE_OBJECT_FILENAME,
+    FILE_OBJECT_SIZE,
+    FILE_OBJECT_SECTIONOBJECTPOINTER,
+    SECTIONOBJECTPOINTER_DATASECTIONOBJECT,
+    SECTIONOBJECTPOINTER_SHAREDCACHEMAP,
+    SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT,
+    CONTROL_AREA_SEGMENT,
+    SEGMENT_CONTROLAREA,
+    SEGMENT_SIZEOFSEGMENT,
+    SEGMENT_TOTALNUMBEROFPTES,
+    SUBSECTION_NEXTSUBSECTION,
+    SUBSECTION_SUBSECTIONBASE,
+    SUBSECTION_PTESINSUBSECTION,
+    SUBSECTION_CONTROLAREA,
+    SUBSECTION_STARTINGSECTOR,
     HANDLE_TABLE_HANDLECOUNT,
     OBJECT_HEADER_TYPEINDEX,
     OBJECT_HEADER_BODY,
@@ -123,6 +139,20 @@ enum offset {
 
 static const char *offset_names[__OFFSET_MAX][2] = {
     [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
+    [FILE_OBJECT_SIZE] = {"_FILE_OBJECT", "Size"},
+    [FILE_OBJECT_SECTIONOBJECTPOINTER] = {"_FILE_OBJECT", "SectionObjectPointer"},
+    [SECTIONOBJECTPOINTER_DATASECTIONOBJECT] = {"_SECTION_OBJECT_POINTERS", "DataSectionObject"},
+    [SECTIONOBJECTPOINTER_SHAREDCACHEMAP] = {"_SECTION_OBJECT_POINTERS", "SharedCacheMap"},
+    [SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT] = {"_SECTION_OBJECT_POINTERS", "ImageSectionObject"},
+    [CONTROL_AREA_SEGMENT] = {"_CONTROL_AREA", "Segment"},
+    [SEGMENT_CONTROLAREA] = {"_SEGMENT", "ControlArea"},
+    [SEGMENT_SIZEOFSEGMENT] = {"_SEGMENT", "SizeOfSegment"},
+    [SEGMENT_TOTALNUMBEROFPTES] = {"_SEGMENT", "TotalNumberOfPtes"},
+    [SUBSECTION_NEXTSUBSECTION] = {"_SUBSECTION", "NextSubsection"},
+    [SUBSECTION_SUBSECTIONBASE] = {"_SUBSECTION", "SubsectionBase"},
+    [SUBSECTION_PTESINSUBSECTION] = {"_SUBSECTION", "PtesInSubsection"},
+    [SUBSECTION_CONTROLAREA] = {"_SUBSECTION", "ControlArea"},
+    [SUBSECTION_STARTINGSECTOR] = {"_SUBSECTION", "StartingSector"},
     [HANDLE_TABLE_HANDLECOUNT] = {"_HANDLE_TABLE", "HandleCount" },
     [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
@@ -130,30 +160,132 @@ static const char *offset_names[__OFFSET_MAX][2] = {
     [UNICODE_STRING_BUFFER] = {"_UNICODE_STRING", "Buffer" },
 };
 
-#ifdef VOLATILITY
-#define VOL_DUMPFILES "%s %s -l vmi://domid/%u --profile=%s -Q 0x%lx -D %s -n dumpfiles 2>&1"
-#define PROFILE32 "Win7SP1x86"
-#define PROFILE64 "Win7SP1x64"
+static void extract_ca_file(filedelete *f, drakvuf_t drakvuf, vmi_instance_t vmi, addr_t control_area, access_context_t *ctx)
+{
+    addr_t subsection = control_area + f->control_area_size;
+    addr_t segment = 0, test = 0, test2 = 0;
 
-void volatility_extract_file(filedelete *f, addr_t file_object) {
+    /* Check whether subsection points back to the control area */
+    ctx->addr = control_area + f->offsets[CONTROL_AREA_SEGMENT];
+    if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &segment) )
+        return;
 
-    const char* profile = NULL;
-    if (f->pm == VMI_PM_IA32E)
-        profile = PROFILE64;
-    else
-        profile = PROFILE32;
+    ctx->addr = segment + f->offsets[SEGMENT_CONTROLAREA];
+    if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &test) || test != control_area )
+        return;
 
-    char *command = (char *)g_malloc0(
-            snprintf(NULL, 0, VOL_DUMPFILES, PYTHON, VOLATILITY, f->domid,
-                     profile, file_object, f->dump_folder
-                    )+ 1);
-    sprintf(command, VOL_DUMPFILES, PYTHON, VOLATILITY, f->domid, profile,
-            file_object, f->dump_folder);
+    ctx->addr = segment + f->offsets[SEGMENT_SIZEOFSEGMENT];
+    if ( VMI_FAILURE == vmi_read_64(vmi, ctx, &test) )
+        return;
 
-    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
-    g_free(command);
+    ctx->addr = segment + f->offsets[SEGMENT_TOTALNUMBEROFPTES];
+    if ( VMI_FAILURE == vmi_read_32(vmi, ctx, (uint32_t*)&test2) )
+        return;
+
+    if ( test != (test2 * 4096) )
+        return;
+
+    char *file = NULL;
+    if ( asprintf(&file, "%s/file.0x%lx.mm", f->dump_folder, control_area) < 0 )
+        return;
+
+    FILE *fp = fopen(file, "w");
+
+    while(subsection)
+    {
+        /* Check whether subsection points back to the control area */
+        ctx->addr = subsection + f->offsets[SUBSECTION_CONTROLAREA];
+        if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &test) || test != control_area )
+            break;
+
+        addr_t base;
+        uint32_t ptes, start;
+
+        ctx->addr = subsection + f->offsets[SUBSECTION_SUBSECTIONBASE];
+        if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &base) )
+            break;
+
+        if ( !(base & VMI_BIT_MASK(0,11)) )
+            break;
+
+        ctx->addr = subsection + f->offsets[SUBSECTION_PTESINSUBSECTION];
+        if ( VMI_FAILURE == vmi_read_32(vmi, ctx, &ptes) )
+            break;
+
+        ctx->addr = subsection + f->offsets[SUBSECTION_STARTINGSECTOR];
+        if ( VMI_FAILURE == vmi_read_32(vmi, ctx, &start) )
+            break;
+
+        /*
+         * The offset into the file is stored implicitely
+         * based on the PTE's location within the Subsection.
+         */
+        addr_t subsection_offset = start * 0x200;
+        addr_t ptecount;
+        for (ptecount=0; ptecount < ptes; ptecount++)
+        {
+            addr_t pteoffset = base + f->mmpte_size * ptecount;
+            addr_t fileoffset = subsection_offset + ptecount * 0x1000;
+
+            addr_t pte = 0;
+            ctx->addr = pteoffset;
+            if ( f->mmpte_size != vmi_read(vmi, ctx, &pte, f->mmpte_size) )
+                break;
+
+            if ( ENTRY_PRESENT(1, pte) )
+            {
+                uint8_t page[4096];
+
+                if ( 4096 != vmi_read_pa(vmi, VMI_BIT_MASK(12,48) & pte, page, 4096) )
+                    continue;
+
+                fseek ( fp , fileoffset , SEEK_SET );
+                fwrite(page, 4096, 1, fp);
+            }
+        }
+
+        ctx->addr = subsection + f->offsets[SUBSECTION_NEXTSUBSECTION];
+        if ( !vmi_read_addr(vmi, ctx, &subsection) )
+            break;
+    };
+
+    fclose(fp);
+    free(file);
 }
-#endif
+
+static void extract_file(filedelete *f,
+                         drakvuf_t drakvuf,
+                         vmi_instance_t vmi,
+                         addr_t file_pa,
+                         access_context_t *ctx)
+{
+    addr_t sop = 0;
+    addr_t datasection = 0, sharedcachemap = 0, imagesection = 0;
+
+    ctx->addr = file_pa + f->offsets[FILE_OBJECT_SECTIONOBJECTPOINTER];
+    if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &sop) )
+        return;
+
+    ctx->addr = sop + f->offsets[SECTIONOBJECTPOINTER_DATASECTIONOBJECT];
+    if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &datasection) )
+        return;
+
+    if ( datasection )
+        extract_ca_file(f, drakvuf, vmi, datasection, ctx);
+
+    ctx->addr = sop + f->offsets[SECTIONOBJECTPOINTER_SHAREDCACHEMAP];
+    if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &sharedcachemap) )
+        return;
+
+    // TODO: extraction from sharedcachemap
+
+    ctx->addr = sop + f->offsets[SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT];
+    if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &imagesection) )
+        return;
+
+    if ( imagesection != datasection )
+        extract_ca_file(f, drakvuf, vmi, imagesection, ctx);
+}
 
 /*
  * The approach where the system process list es enumerated looking for
@@ -198,8 +330,12 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
     addr_t file = obj + f->offsets[OBJECT_HEADER_BODY];
     addr_t filename = file + f->offsets[FILE_OBJECT_FILENAME];
 
-    uint16_t length = 0;
+    uint16_t length = 0, size = 0;
     addr_t buffer = 0;
+
+    ctx.addr = filename + f->offsets[FILE_OBJECT_SIZE];
+    if ( VMI_FAILURE == vmi_read_16(vmi, &ctx, &size) )
+        return;
 
     ctx.addr = filename + f->offsets[UNICODE_STRING_BUFFER];
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &buffer) )
@@ -235,12 +371,8 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
                 break;
             };
 
-#ifdef VOLATILITY
-            if (f->dump_folder) {
-                addr_t file_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, file);
-                volatility_extract_file(f, file_pa);
-            }
-#endif
+            if (f->dump_folder)
+                extract_file(f, drakvuf, vmi, file, &ctx);
 
             free(str2.contents);
         }
@@ -341,6 +473,14 @@ filedelete::filedelete(drakvuf_t drakvuf, const void *config, output_format_t ou
         if( !drakvuf_get_struct_member_rva(c->rekall_profile, offset_names[i][0], offset_names[i][1], &this->offsets[i]))
             throw -1;
     }
+
+    if ( !drakvuf_get_struct_size(c->rekall_profile, "_CONTROL_AREA", &this->control_area_size) )
+        throw -1;
+
+    if ( VMI_PM_LEGACY == this->pm )
+        this->mmpte_size = 4;
+    else
+        this->mmpte_size = 8;
 
     if ( !drakvuf_add_trap(drakvuf, &traps[0]) )
         throw -1;

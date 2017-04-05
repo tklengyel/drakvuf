@@ -121,6 +121,7 @@ class filedelete: public plugin {
             }
         };
         size_t* offsets;
+        size_t control_area_size, mmpte_size;
 
         const char *dump_folder;
         page_mode_t pm;
