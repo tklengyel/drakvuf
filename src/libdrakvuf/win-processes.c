@@ -124,7 +124,7 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id){
     addr_t thread;
     addr_t prcb;
 
-    if(vmi_get_page_mode(vmi) == VMI_PM_IA32E)
+    if(drakvuf->pm == VMI_PM_IA32E)
         prcb=drakvuf->offsets[KPCR_PRCB];
     else
         prcb=drakvuf->offsets[KPCR_PRCBDATA];

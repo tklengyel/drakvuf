@@ -337,7 +337,7 @@ exmon::exmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
     this->ktrap_frame_size = 0;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->pm = vmi_get_page_mode(vmi);
+    this->pm = vmi_get_page_mode(vmi, 0);
     drakvuf_release_vmi(drakvuf);
 
     int i;
