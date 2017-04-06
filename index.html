@@ -243,19 +243,6 @@ Build and install LibVMI:
 <pre><code>make
 sudo make install
 sudo echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
-cd tools/pyvmi
-python setup.py build
-sudo python setup.py install
-</code></pre>
-
-Download Volatility:
-
-<pre><code>cd ~
-git clone https://github.com/volatilityfoundation/volatility
-cd volatility
-cp ~/drakvuf/libvmi/tools/pyvmi/pyvmiaddressspace.py volatility/plugins/addrspaces
-python setup.py build
-sudo python setup.py install
 </code></pre>
 
 Build and install Rekall. Note that Rekall doesn't necessarily have to be installed on the same machine where DRAKVUF is as it is not used during runtime. Setup steps:
