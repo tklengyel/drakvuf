@@ -792,19 +792,9 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
             }
         }
 
-        /*
-         * Sometimes injection seem to return 1 in RAX but
-         * the host process actually crashed. While investigating
-         * the root cause just return 0 for PID >= 5000.
-         */
-        if (injector->pid < 5000 && injector->tid) {
+        if (injector->pid && injector->tid) {
             PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
             injector->rc = info->regs->rax;
-            /*injector->cr3 = vmi_pid_to_dtb(vmi, injector->pid);
-            injector->cr3_event.callback = waitfor_cr3_callback;
-            injector->cr3_event.reg_event.equal = injector->cr3;
-            injector->cr3_event.data = injector;
-            vmi_register_event(vmi, &injector->cr3_event);*/
         } else {
             PRINT_DEBUG("Failed to inject\n");
             injector->rc = 0;
