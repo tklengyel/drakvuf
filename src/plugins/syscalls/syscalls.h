@@ -111,10 +111,8 @@
 
 class syscalls: public plugin {
 
-    private:
-        GSList *traps;
-
     public:
+        GSList *traps;
         uint8_t reg_size;
         output_format_t format;
         os_t os;
