@@ -130,6 +130,30 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     return 0;
 }
 
+static event_response_t win_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+
+    syscall_wrapper_t *wrapper = (syscall_wrapper_t*)info->trap->data;
+    syscalls *s = wrapper->sc;
+
+    switch(s->format) {
+    case OUTPUT_CSV:
+        printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s,ReturnValue,0x%lx\n",
+               info->vcpu, info->regs->cr3, info->procname, info->userid, info->trap->breakpoint.module, info->trap->name, info->regs->rax);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[SYSCALL] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" %s!%s\n",
+               info->vcpu, info->regs->cr3, info->procname,
+               USERIDSTR(drakvuf), info->userid,
+               info->trap->breakpoint.module, info->trap->name);
+        printf("\tReturn Value: 0x%lx\n", info->regs->rax);
+        break;
+    }
+
+    return 0;
+}
+
+
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     int i = 0, nargs = 0;
     size_t size = 0;
@@ -205,7 +229,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         access_context_t ctx;
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
         ctx.dtb = info->regs->cr3;
-        ctx.pid = info->trap->breakpoint.pid;
+//        ctx.pid = info->trap->breakpoint.pid;
         ctx.addr = info->regs->rsp;
         vmi_read(vmi,&ctx,&ret_addr,s->reg_size);
 
@@ -224,7 +248,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         trap->name = g_strdup(ret_str);
 
         trap->type = BREAKPOINT;
-        trap->cb = win_cb;
+        trap->cb = win_ret_cb;
         trap->data = wrapper;
         s->traps = g_slist_prepend(s->traps, trap);
         if(!drakvuf_add_trap(drakvuf,trap))
@@ -254,9 +278,6 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                 else
                     printf("-");
             }
-        }
-        if(strstr(info->trap->name,"_Return")!=NULL) {
-            printf(",ReturnValue,0x%lx", info->regs->rax);
         }
         printf("\n");
         break;
@@ -288,9 +309,6 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             }
         }  else
             printf("\n");
-        if(strstr(info->trap->name,"_Return")!=NULL) {
-            printf("\tReturn Value: 0x%lx\n", info->regs->rax);
-        }
         break;
     }
 
