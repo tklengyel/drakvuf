@@ -180,7 +180,7 @@ objmon::objmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
 
     if( !drakvuf_get_function_rva(rekall_profile, "ObCreateObject", &this->trap.breakpoint.rva) )
         throw -1;
-    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "TypeIndex", &this->typeindex_offset) )
+    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_TYPE", "Index", &this->typeindex_offset) )
         throw -1;
 
     this->trap.cb = cb;
