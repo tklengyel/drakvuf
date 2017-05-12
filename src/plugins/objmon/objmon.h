@@ -120,7 +120,7 @@ class objmon: public plugin {
             .type = BREAKPOINT,
             .data = (void*)this,
         };
-        addr_t typeindex_offset;
+        addr_t key_offset;
 
         objmon(drakvuf_t drakvuf, const void *config, output_format_t output);
         ~objmon();

@@ -118,7 +118,6 @@
 #include <err.h>
 
 #include <libvmi/libvmi.h>
-#include "private.h"
 #include "objmon.h"
 
 /*
@@ -136,38 +135,45 @@
  OUT PVOID *Object
  );
  */
+
+struct ckey {
+    union   {
+        uint32_t key;
+        char _key[4];
+    };
+};
+
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     objmon *o = (objmon *)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    uint8_t index = ~0;
+    struct ckey ckey = {};
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
-    ctx.addr = info->regs->rdx + o->typeindex_offset;
+    ctx.addr = info->regs->rdx + o->key_offset;
 
-    vmi_read_8(vmi, &ctx, &index);
+    vmi_read_32(vmi, &ctx, &ckey.key);
 
-    if(index < WIN7_TYPEINDEX_LAST)
+    switch(o->format) {
+    case OUTPUT_CSV:
     {
-        switch(o->format) {
-        case OUTPUT_CSV:
-        {
-            printf("objmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s",
-                   info->vcpu, info->regs->cr3, info->procname, info->userid, win7_typeindex[index]);
-            break;
-        }
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[OBJMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" %s",
-                   info->vcpu, info->regs->cr3, info->procname,
-                   USERIDSTR(drakvuf), info->userid, win7_typeindex[index]);
-            break;
-        };
-
-        printf("\n");
+        printf("objmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%c%c%c%c",
+               info->vcpu, info->regs->cr3, info->procname, info->userid,
+               ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
+        break;
     }
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[OBJMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" '%c%c%c%c'",
+               info->vcpu, info->regs->cr3, info->procname,
+               USERIDSTR(drakvuf), info->userid,
+               ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
+        break;
+    };
+
+    printf("\n");
 
     drakvuf_release_vmi(drakvuf);
     return 0;
@@ -180,7 +186,7 @@ objmon::objmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
 
     if( !drakvuf_get_function_rva(rekall_profile, "ObCreateObject", &this->trap.breakpoint.rva) )
         throw -1;
-    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_TYPE", "Index", &this->typeindex_offset) )
+    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_TYPE", "Key", &this->key_offset) )
         throw -1;
 
     this->trap.cb = cb;
