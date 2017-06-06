@@ -135,6 +135,9 @@ static event_response_t win_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
     syscall_wrapper_t *wrapper = (syscall_wrapper_t*)info->trap->data;
     syscalls *s = wrapper->sc;
 
+    s->traps = g_slist_remove(s->traps,info->trap);
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+
     switch(s->format) {
     case OUTPUT_CSV:
         printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s,ReturnValue,0x%lx\n",
@@ -223,17 +226,14 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         }
     }
 
-    if(!wrapper->ret_trap_set && wsc->ret != VOID){
+    if(wsc->ret != VOID){
         addr_t ret_addr;
 
         access_context_t ctx;
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
         ctx.dtb = info->regs->cr3;
-//        ctx.pid = info->trap->breakpoint.pid;
         ctx.addr = info->regs->rsp;
         vmi_read(vmi,&ctx,&ret_addr,s->reg_size);
-
-        wrapper->ret_trap_set = 1;
 
         drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
         trap->breakpoint.lookup_type = LOOKUP_PID;
@@ -344,7 +344,6 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
             syscall_wrapper_t *wrapper = (syscall_wrapper_t *)g_malloc(sizeof(syscall_wrapper_t));
 
             wrapper->syscall_index = -1;
-            wrapper->ret_trap_set = 0;
             wrapper->sc=s;
 
             for (j=0; j<NUM_SYSCALLS; j++)

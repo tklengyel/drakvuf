@@ -277,7 +277,6 @@ typedef struct {
 
 typedef struct {
     syscalls *sc;
-    bool ret_trap_set;
     int syscall_index;
 } syscall_wrapper_t;
 
