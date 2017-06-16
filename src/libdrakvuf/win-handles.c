@@ -114,108 +114,81 @@
 #include "win-offsets.h"
 
 /* this should work for both 32 and 64bit */
-#define EX_FAST_REF_MASK    7
+#define HANDLE_MASK         3
 #define HANDLE_MULTIPLIER   4
-
-// TODO: This is a very slow PoC.. could be optimized
-addr_t handle_table_get_entry(uint32_t bit, vmi_instance_t vmi,
-        addr_t table_base, uint32_t level, uint32_t depth,
-        uint32_t *handle_count, uint64_t handle) {
-
-    uint32_t count;
-    uint32_t table_entry_size = 0;
-
-    if (level > 0) {
-        if (bit == BIT32)
-            table_entry_size = 0x4;
-        else
-            table_entry_size = 0x8;
-    } else if (level == 0) {
-        if (bit == BIT32)
-            table_entry_size = 0x8;
-        else
-            table_entry_size = 0x10;
-    };
-
-    count = VMI_PS_4KB / table_entry_size;
-
-    PRINT_DEBUG("\tHandle table array size: %u at 0x%lx. "
-                "Table entry size is %u. Handle count remaining: %u\n",
-                count, table_base, table_entry_size, *handle_count);
-
-    uint32_t i;
-    for (i = 0; i < count; i++) {
-
-        // Only read the already known number of entries
-        if (*handle_count == 0)
-            break;
-
-        addr_t table_entry_addr;
-        if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + i * table_entry_size, 0, &table_entry_addr) )
-            continue;
-
-        // skip entries that point nowhere
-        if (!table_entry_addr)
-            continue;
-
-        // real entries are further down the chain
-        if (level > 0) {
-            addr_t next_level;
-            if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + i * table_entry_size, 0, &next_level) )
-                continue;
-
-            addr_t test = handle_table_get_entry(bit, vmi, next_level, level - 1,
-                                                 depth, handle_count, handle);
-            if (test)
-                return test;
-
-            depth++;
-            continue;
-        }
-
-        // At this point each (table_base + i*entry) is a _HANDLE_TABLE_ENTRY
-
-        uint32_t level_base = depth * count * HANDLE_MULTIPLIER;
-        uint32_t handle_value = (i * table_entry_size * HANDLE_MULTIPLIER)
-                / table_entry_size + level_base;
-
-        PRINT_DEBUG("\t\tHandle #: %u. Addr: 0x%lx. Value: 0x%x\n",
-                    *handle_count, table_entry_addr & ~EX_FAST_REF_MASK, handle_value);
-
-        if (handle_value == handle)
-            return table_entry_addr & ~EX_FAST_REF_MASK;
-
-        // decrement the handle counter because we found one here
-        --(*handle_count);
-    }
-    return 0;
-}
+#define EX_FAST_REF_MASK    7
 
 addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t handle) {
 
     vmi_instance_t vmi = drakvuf->vmi;
-    addr_t handletable, tablecode;
-    uint32_t handlecount;
+    addr_t handletable = 0, tablecode = 0, obj = 0;
 
     if ( VMI_FAILURE == vmi_read_addr_va(vmi, process + drakvuf->offsets[EPROCESS_OBJECTTABLE], 0, &handletable) )
         return 0;
 
-    if ( VMI_FAILURE == vmi_read_addr_va(vmi, handletable, 0, &tablecode) )
-        return 0;
-
-    if ( VMI_FAILURE == vmi_read_32_va(vmi, handletable + drakvuf->offsets[HANDLE_TABLE_HANDLECOUNT], 0, &handlecount) )
+    if ( VMI_FAILURE == vmi_read_addr_va(vmi, handletable + drakvuf->offsets[HANDLE_TABLE_TABLECODE], 0, &tablecode) )
         return 0;
 
     // _EX_FAST_REF-style pointer, last three bits are used for storing the number of levels
-    addr_t table_base = tablecode & ~EX_FAST_REF_MASK;
-    uint32_t table_levels = tablecode & EX_FAST_REF_MASK;
-    uint32_t table_depth = 0;
+    addr_t table_base = tablecode & ~HANDLE_MASK;
+    uint32_t table_levels = tablecode & HANDLE_MASK;
 
-    PRINT_DEBUG("Handle table @ 0x%lx. Handle count %u. Looking for handle: 0x%lx\n",
-                table_base, handlecount, handle);
+    switch(table_levels) {
+        case 0:
+            vmi_read_addr_va(vmi, table_base + handle * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj);
+            break;
+        case 1:
+        {
+            addr_t table = 0;
+            size_t psize = (drakvuf->pm == VMI_PM_IA32E) ? 8 : 4;
+            uint32_t low_count = VMI_PS_4KB / drakvuf->sizes[HANDLE_TABLE_ENTRY];
+            uint32_t j, i = handle % (low_count * HANDLE_MULTIPLIER);
 
-    return handle_table_get_entry(PM2BIT(drakvuf->pm), vmi, table_base,
-                                  table_levels, table_depth, &handlecount, handle);
+            handle -= i;
+            j = handle / ((low_count * HANDLE_MULTIPLIER) / psize);
+
+            if ( VMI_SUCCESS == vmi_read_addr_va(vmi, table_base + j, 0, &table) ) {
+                vmi_read_addr_va(vmi, table + i * (drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER), 0, &obj);
+            }
+            break;
+        }
+        case 2:
+        {
+            addr_t table = 0, table2 = 0;
+            size_t psize = (drakvuf->pm == VMI_PM_IA32E) ? 8 : 4;
+            uint32_t low_count = VMI_PS_4KB / drakvuf->sizes[HANDLE_TABLE_ENTRY];
+            uint32_t mid_count = VMI_PS_4KB / psize;
+            uint32_t k, j, i = handle % (low_count * HANDLE_MULTIPLIER);
+
+            handle -= i;
+            j = handle / (low_count * HANDLE_MULTIPLIER / psize);
+            k = j % (mid_count * psize);
+            j = (j-k)/mid_count;
+
+            if ( VMI_SUCCESS == vmi_read_addr_va(vmi, table_base + j, 0, &table) &&
+                 VMI_SUCCESS == vmi_read_addr_va(vmi, table + k, 0, &table2) )
+                vmi_read_addr_va(vmi, table2 + i * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj);
+            break;
+        }
+    };
+
+    switch(vmi_get_winver(vmi))
+    {
+    case VMI_OS_WINDOWS_7:
+        return obj & ~EX_FAST_REF_MASK;
+    case VMI_OS_WINDOWS_8:
+        if ( drakvuf->pm == VMI_PM_IA32E )
+            return ((obj & VMI_BIT_MASK(19,63)) >> 16) | 0xFFFFE00000000000;
+        else
+            return (obj & VMI_BIT_MASK(2,31));
+    default:
+    // We set Win10 as the default case as vmi_get_winver may not pinpoint it as VMI_OS_WINDOWS_10 if the buildid is not known
+    case VMI_OS_WINDOWS_10:
+        if ( drakvuf->pm == VMI_PM_IA32E )
+            return ((obj & VMI_BIT_MASK(19,63)) >> 16) | 0xFFFF000000000000;
+        else
+            return (obj & VMI_BIT_MASK(2,31));
+    };
 }
 
 

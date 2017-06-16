@@ -130,6 +130,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause) {
     }
 
     g_free(drakvuf->offsets);
+    g_free(drakvuf->sizes);
     g_mutex_clear(&drakvuf->vmi_lock);
     g_free(drakvuf->dom_name);
     g_free(drakvuf->rekall_profile);
