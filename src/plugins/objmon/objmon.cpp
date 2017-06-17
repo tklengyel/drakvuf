@@ -152,7 +152,15 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
-    ctx.addr = info->regs->rdx + o->key_offset;
+
+    if ( o->pm == VMI_PM_IA32E ) {
+        ctx.addr = info->regs->rdx;
+    } else {
+        ctx.addr = info->regs->rsp + sizeof(uint32_t)*2;
+        vmi_read_32(vmi, &ctx, (uint32_t*)&ctx.addr);
+    }
+
+    ctx.addr += o->key_offset;
 
     vmi_read_32(vmi, &ctx, &ckey.key);
 
@@ -190,6 +198,9 @@ objmon::objmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
         throw -1;
 
     this->trap.cb = cb;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    this->pm = vmi_get_page_mode(vmi, 0);
+    drakvuf_release_vmi(drakvuf);
 
     this->format = output;
     if ( !drakvuf_add_trap(drakvuf, &this->trap) )
