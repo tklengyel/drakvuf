@@ -112,11 +112,20 @@ class filetracer: public plugin {
     public:
         page_mode_t pm;
         output_format_t format;
-        drakvuf_trap_t poolalloc;
-        GSList *writetraps;
-        GHashTable *rettraps;
-        addr_t file_object_size, file_name_offset,
-              string_buffer_offset, string_length_offset;
+
+        addr_t objattr_name;
+        addr_t unicode_buf;
+
+        drakvuf_trap_t trap[8] = {
+            [0 ... 7] = {
+                .breakpoint.lookup_type = LOOKUP_PID,
+                .breakpoint.pid = 4,
+                .breakpoint.addr_type = ADDR_RVA,
+                .breakpoint.module = "ntoskrnl.exe",
+                .type = BREAKPOINT,
+                .data = (void*)this
+             }
+        };
 
         filetracer(drakvuf_t drakvuf, const void *config, output_format_t output);
         ~filetracer();
