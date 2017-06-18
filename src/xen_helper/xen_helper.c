@@ -198,6 +198,15 @@ int get_dom_info(xen_interface_t *xen, const char *input, domid_t *domID,
     return 1;
 }
 
+uint64_t xen_get_maxmemkb(xen_interface_t *xen, domid_t domID) {
+    xc_dominfo_t info = { 0 };
+
+    if ( 1 == xc_domain_getinfo(xen->xc, domID, 1, &info) && info.domid == domID)
+        return info.max_memkb;
+
+    return 0;
+}
+
 uint64_t xen_memshare(xen_interface_t *xen, domid_t domID, domid_t cloneID) {
 
     uint64_t shared = 0;
