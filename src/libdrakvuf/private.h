@@ -160,6 +160,7 @@ struct drakvuf {
     vmi_event_t *step_event[16];
 
     size_t *offsets;
+    size_t *sizes;
 
     // Processing trap removals in trap callbacks
     // is problematic so we save all such requests

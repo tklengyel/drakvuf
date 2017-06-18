@@ -132,7 +132,7 @@ enum win_offsets {
     LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
     LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
 
-    HANDLE_TABLE_HANDLECOUNT,
+    HANDLE_TABLE_TABLECODE,
 
     KPCR_PRCB,
     KPCR_PRCBDATA,
@@ -159,6 +159,12 @@ enum win_offsets {
     DISPATCHER_TYPE,
 
     __WIN_OFFSETS_MAX
+};
+
+enum win_sizes {
+    HANDLE_TABLE_ENTRY,
+
+    __WIN_SIZES_MAX
 };
 
 #endif

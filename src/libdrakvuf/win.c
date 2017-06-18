@@ -247,6 +247,13 @@ bool set_os_windows(drakvuf_t drakvuf) {
     if ( !fill_offsets_from_rekall(drakvuf, __WIN_OFFSETS_MAX, win_offset_names) )
         return 0;
 
+    drakvuf->sizes = g_malloc0(sizeof(size_t) * __WIN_SIZES_MAX);
+    if ( !drakvuf->sizes )
+        return 0;
+
+    if ( !drakvuf_get_struct_size(drakvuf->rekall_profile, "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY]) )
+        return 0;
+
     drakvuf->osi.get_current_thread = win_get_current_thread;
     drakvuf->osi.get_current_process = win_get_current_process;
     drakvuf->osi.get_process_name = win_get_process_name;

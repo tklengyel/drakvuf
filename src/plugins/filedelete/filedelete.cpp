@@ -111,9 +111,9 @@
 #include "filedelete.h"
 
 #define FILE_DISPOSITION_INFORMATION 13
-#define WIN7_TYPEINDEX_LAST 44
 
 enum offset {
+    FILE_OBJECT_TYPE,
     FILE_OBJECT_FILENAME,
     FILE_OBJECT_SIZE,
     FILE_OBJECT_SECTIONOBJECTPOINTER,
@@ -129,8 +129,6 @@ enum offset {
     SUBSECTION_PTESINSUBSECTION,
     SUBSECTION_CONTROLAREA,
     SUBSECTION_STARTINGSECTOR,
-    HANDLE_TABLE_HANDLECOUNT,
-    OBJECT_HEADER_TYPEINDEX,
     OBJECT_HEADER_BODY,
     UNICODE_STRING_LENGTH,
     UNICODE_STRING_BUFFER,
@@ -138,6 +136,7 @@ enum offset {
 };
 
 static const char *offset_names[__OFFSET_MAX][2] = {
+    [FILE_OBJECT_TYPE] = {"_FILE_OBJECT", "Type"},
     [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
     [FILE_OBJECT_SIZE] = {"_FILE_OBJECT", "Size"},
     [FILE_OBJECT_SECTIONOBJECTPOINTER] = {"_FILE_OBJECT", "SectionObjectPointer"},
@@ -153,8 +152,6 @@ static const char *offset_names[__OFFSET_MAX][2] = {
     [SUBSECTION_PTESINSUBSECTION] = {"_SUBSECTION", "PtesInSubsection"},
     [SUBSECTION_CONTROLAREA] = {"_SUBSECTION", "ControlArea"},
     [SUBSECTION_STARTINGSECTOR] = {"_SUBSECTION", "StartingSector"},
-    [HANDLE_TABLE_HANDLECOUNT] = {"_HANDLE_TABLE", "HandleCount" },
-    [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
     [UNICODE_STRING_LENGTH] = {"_UNICODE_STRING", "Length" },
     [UNICODE_STRING_BUFFER] = {"_UNICODE_STRING", "Buffer" },
@@ -303,7 +300,7 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
                                 vmi_instance_t vmi,
                                 drakvuf_trap_info_t *info, addr_t handle)
 {
-    uint8_t type_index = 0;
+    uint8_t type = 0;
     addr_t process=drakvuf_get_current_process(drakvuf, info->vcpu);
 
     // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
@@ -316,19 +313,20 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
     if (!obj)
         return;
 
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.addr = obj + f->offsets[OBJECT_HEADER_TYPEINDEX];
-    ctx.dtb = info->regs->cr3;
-
-    if (VMI_FAILURE == vmi_read_8(vmi, &ctx, &type_index))
-        return;
-
-    if (type_index >= WIN7_TYPEINDEX_LAST || type_index != 28)
-        return;
-
     addr_t file = obj + f->offsets[OBJECT_HEADER_BODY];
     addr_t filename = file + f->offsets[FILE_OBJECT_FILENAME];
+    addr_t filetype = file + f->offsets[FILE_OBJECT_TYPE];
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.addr = filetype;
+    ctx.dtb = info->regs->cr3;
+
+    if (VMI_FAILURE == vmi_read_8(vmi, &ctx, &type))
+        return;
+
+    if (type != 5)
+        return;
 
     uint16_t length = 0, size = 0;
     addr_t buffer = 0;
