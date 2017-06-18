@@ -1092,7 +1092,7 @@ bool init_vmi(drakvuf_t drakvuf) {
     /* initialize the libvmi library */
     if (VMI_FAILURE == vmi_init(&drakvuf->vmi, VMI_XEN, &drakvuf->domID, VMI_INIT_DOMAINID | VMI_INIT_EVENTS, NULL, NULL)) {
         printf("Failed to init LibVMI library.\n");
-        return 1;
+        return 0;
     }
 
     GHashTable *config = g_hash_table_new(g_str_hash, g_str_equal);
