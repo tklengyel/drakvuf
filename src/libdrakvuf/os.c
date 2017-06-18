@@ -121,7 +121,7 @@ bool fill_offsets_from_rekall(drakvuf_t drakvuf, size_t size, const char *names 
         return 0;
 
     for (i = 0; i < size; i++) {
-         if (VMI_FAILURE == drakvuf_get_struct_member_rva(
+         if (!drakvuf_get_struct_member_rva(
                      drakvuf->rekall_profile, names[i][0],
                      names[i][1], &drakvuf->offsets[i]))
          {
