@@ -876,10 +876,13 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         remapped_gfn = g_malloc0(sizeof(struct remapped_gfn));
         remapped_gfn->o = current_gfn;
 
-        int rc = xc_domain_increase_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
+        int rc;
+        /* = xc_domain_increase_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
         PRINT_DEBUG("Reservation increased? %u with new gfn: 0x%lx\n", rc, remapped_gfn->r);
         if (rc < 0 || !remapped_gfn->r)
-            return 0;
+            return 0;*/
+
+        remapped_gfn->r = ++(drakvuf->max_gpfn);
 
         rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
         PRINT_DEBUG("Physmap populated? %i\n", rc);
@@ -1126,6 +1129,10 @@ bool init_vmi(drakvuf_t drakvuf) {
     drakvuf->pm = vmi_get_page_mode(drakvuf->vmi, 0);
     drakvuf->vcpus = vmi_get_num_vcpus(drakvuf->vmi);
     drakvuf->init_memsize = xen_get_maxmemkb(drakvuf->xen, drakvuf->domID);
+    if ( xc_domain_maximum_gpfn(drakvuf->xen->xc, drakvuf->domID, &drakvuf->max_gpfn) < 0 )
+        return 0;
+
+    PRINT_DEBUG("Max GPFN: 0x%lx\n", drakvuf->max_gpfn);
 
     // Crete tables to lookup breakpoints
     drakvuf->breakpoint_lookup_pa =
@@ -1164,10 +1171,7 @@ bool init_vmi(drakvuf_t drakvuf) {
     if (rc < 0)
         return 0;
 
-    rc = xc_domain_increase_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &drakvuf->zero_page_gfn);
-    PRINT_DEBUG("Reservation increased? %i with new gfn: 0x%lx\n", rc, drakvuf->zero_page_gfn);
-    if (rc < 0 || !drakvuf->zero_page_gfn)
-        return 0;
+    drakvuf->zero_page_gfn = ++(drakvuf->max_gpfn);
 
     rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &drakvuf->zero_page_gfn);
     PRINT_DEBUG("Physmap populated? %i\n", rc);

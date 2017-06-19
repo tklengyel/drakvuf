@@ -173,6 +173,7 @@ struct drakvuf {
     page_mode_t pm;
     unsigned int vcpus;
     uint64_t init_memsize;
+    xen_pfn_t max_gpfn;
     addr_t kernbase;
     addr_t kdtb;
 
