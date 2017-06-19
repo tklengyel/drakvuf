@@ -876,17 +876,17 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         remapped_gfn = g_malloc0(sizeof(struct remapped_gfn));
         remapped_gfn->o = current_gfn;
 
-        int rc = xc_domain_setmaxmem(drakvuf->xen->xc, drakvuf->domID, drakvuf->memsize+VMI_PS_4KB);
-        drakvuf->memsize+=VMI_PS_4KB;
+        int rc;
+        /* = xc_domain_increase_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
+        PRINT_DEBUG("Reservation increased? %u with new gfn: 0x%lx\n", rc, remapped_gfn->r);
+        if (rc < 0 || !remapped_gfn->r)
+            return 0;*/
 
-        rc = xc_domain_increase_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
-        if (!rc)
-            PRINT_DEBUG("Reservation increased? %u with new gfn: 0x%lx\n", rc, remapped_gfn->r);
-        else
-            return 0;
+        remapped_gfn->r = ++(drakvuf->max_gpfn);
 
         rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
-        if (rc)
+        PRINT_DEBUG("Physmap populated? %i\n", rc);
+        if (rc < 0)
             return 0;
 
         g_hash_table_insert(drakvuf->remapped_gfns,
@@ -1128,7 +1128,11 @@ bool init_vmi(drakvuf_t drakvuf) {
 
     drakvuf->pm = vmi_get_page_mode(drakvuf->vmi, 0);
     drakvuf->vcpus = vmi_get_num_vcpus(drakvuf->vmi);
-    drakvuf->memsize = drakvuf->init_memsize = vmi_get_memsize(drakvuf->vmi);
+    drakvuf->init_memsize = xen_get_maxmemkb(drakvuf->xen, drakvuf->domID);
+    if ( xc_domain_maximum_gpfn(drakvuf->xen->xc, drakvuf->domID, &drakvuf->max_gpfn) < 0 )
+        return 0;
+
+    PRINT_DEBUG("Max GPFN: 0x%lx\n", drakvuf->max_gpfn);
 
     // Crete tables to lookup breakpoints
     drakvuf->breakpoint_lookup_pa =
@@ -1161,44 +1165,35 @@ bool init_vmi(drakvuf_t drakvuf) {
         }
     }
 
-    rc = xc_domain_setmaxmem(drakvuf->xen->xc, drakvuf->domID, drakvuf->memsize+VMI_PS_4KB);
-    if ( rc ) {
-        fprintf(stderr, "Failed to increase max memory\n");
+    /* domain->max_pages is mostly just an annoyance that we can safely ignore */
+    rc = xc_domain_setmaxmem(drakvuf->xen->xc, drakvuf->domID, ~0);
+    PRINT_DEBUG("Max mem set? %i\n", rc);
+    if (rc < 0)
         return 0;
-    }
 
-    drakvuf->memsize+=VMI_PS_4KB;
-
-    rc = xc_domain_increase_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &drakvuf->zero_page_gfn);
-    if (!rc)
-        PRINT_DEBUG("Reservation increased? %u with new gfn: 0x%lx\n", rc, drakvuf->zero_page_gfn);
-    else
-        return 0;
+    drakvuf->zero_page_gfn = ++(drakvuf->max_gpfn);
 
     rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &drakvuf->zero_page_gfn);
-    if (rc)
+    PRINT_DEBUG("Physmap populated? %i\n", rc);
+    if (rc < 0)
         return 0;
 
     /*
      * Create altp2m view
      */
     rc = xc_altp2m_set_domain_state(drakvuf->xen->xc, drakvuf->domID, 1);
-    if ( rc < 0 )
-    {
-        fprintf(stderr, "Failed to enable altp2m on domain!\n");
+    PRINT_DEBUG("Altp2m enabled? %i\n", rc);
+    if (rc < 0)
         return 0;
-    }
 
     /*
      * The idx view is used primarily during DRAKVUF execution. In this view all breakpointed
      * pages will have their shadow copies activated.
      */
     rc = xc_altp2m_create_view( drakvuf->xen->xc, drakvuf->domID, 0, &drakvuf->altp2m_idx );
-    if ( rc < 0 )
-    {
-        fprintf(stderr, "Failed to create altp2m view\n");
+    PRINT_DEBUG("Altp2m view X created? %i with ID %u\n", rc, drakvuf->altp2m_idx);
+    if (rc < 0)
         return 0;
-    }
 
     /*
      * TODO: We will use the idr view to map all shadow pages to the zero (empty) page in case
@@ -1209,12 +1204,9 @@ bool init_vmi(drakvuf_t drakvuf) {
      * custom read data to only return the change in the page on the gfn it was written to.
      */
     rc = xc_altp2m_create_view( drakvuf->xen->xc, drakvuf->domID, 0, &drakvuf->altp2m_idr );
-    if ( rc < 0 )
-    {
-        fprintf(stderr, "Failed to create altp2m view\n");
+    PRINT_DEBUG("Altp2m view R created? %i with ID %u\n", rc, drakvuf->altp2m_idr);
+    if (rc < 0)
         return 0;
-    }
-    PRINT_DEBUG("Xen altp2m view created with idx: %u idr: %u\n", drakvuf->altp2m_idx, drakvuf->altp2m_idr);
 
     SETUP_INTERRUPT_EVENT(&drakvuf->interrupt_event, 0, int3_cb);
     drakvuf->interrupt_event.data = drakvuf;
@@ -1241,10 +1233,9 @@ bool init_vmi(drakvuf_t drakvuf) {
     }
 
     rc = xc_altp2m_switch_to_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx);
-    if ( rc < 0 ) {
-        fprintf(stderr, "Failed to switch to altp2m view %u\n", drakvuf->altp2m_idx);
+    PRINT_DEBUG("Switched Altp2m view to X? %i\n", rc);
+    if (rc < 0)
         return 0;
-    }
 
     return 1;
 }

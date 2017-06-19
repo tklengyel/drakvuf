@@ -172,9 +172,10 @@ struct drakvuf {
     int interrupted;
     page_mode_t pm;
     unsigned int vcpus;
-    unsigned int init_memsize;
-    unsigned int memsize;
+    uint64_t init_memsize;
+    xen_pfn_t max_gpfn;
     addr_t kernbase;
+    addr_t kdtb;
 
     x86_registers_t *regs[16]; // vCPU specific registers recorded during the last event
     addr_t kpcr[16]; // vCPU specific kpcr recorded on mov-to-cr3
