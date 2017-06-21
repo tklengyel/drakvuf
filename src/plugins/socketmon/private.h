@@ -105,54 +105,40 @@
 #ifndef SOCKETMON_PRIVATE_H
 #define SOCKETMON_PRIVATE_H
 
-struct pool_header_x86 {
-    union {
-        struct {
-            uint16_t previous_size :9;
-            uint16_t pool_index :7;
-            uint16_t block_size :9; // bits 0-9
-            uint16_t pool_type :7; // bits 10-16
-        };
-        uint16_t flags;
-    };
-    uint32_t pool_tag;
-}__attribute__ ((packed));
-
-struct pool_header_x64 {
-    union {
-        struct {
-            uint32_t previous_size :8;
-            uint32_t pool_index :8;
-            uint32_t block_size :8;
-            uint32_t pool_type :8;
-        };
-        uint32_t flags;
-    };
-    uint32_t pool_tag;
-    uint64_t process_billed; // _EPROCESS *
-}__attribute__ ((packed));
-
-/* TcpL */
-struct tcp_listener_x86 {
-    uint8_t _pad1[0x18];
+/* _pad fields are unknown/unlabeled members */
+struct tcp_listener_x86 { // 44h
+    uint32_t _pad1[6];
     uint32_t owner;
     uint32_t _pad2;
     uint64_t createtime;
-    uint8_t _pad3[0xc];
+    uint32_t _pad3[3];
     uint32_t localaddr;
     uint32_t inetaf;
-    uint8_t _pad4[0x2];
+    uint16_t _pad4;
     uint16_t port;
+    uint32_t _pad5;
 }__attribute__ ((packed));
 
-struct tcp_listener_x64 {
-    uint8_t _pad1[0x20];
-    uint64_t createtime;
+struct tcp_listener_x64 { //78h
+    uint64_t _pad[5];
     uint64_t owner;
-    uint8_t _pad2[0x28];
+    uint64_t _pad2;
+    uint64_t createtime;
+    uint64_t _pad3[3];
     uint64_t localaddr;
     uint64_t inetaf;
-    uint8_t _pad3[0x2];
+    uint16_t _pad4;
+    uint16_t port;
+    uint8_t _pad5[12];
+}__attribute__ ((packed));
+
+struct tcp_listener_win10_x64 {
+    uint64_t inetaf;
+    uint64_t owner;
+    uint64_t _pad1[5];
+    uint64_t localaddr;
+    uint64_t _pad2;
+    uint16_t _pad3;
     uint16_t port;
 }__attribute__ ((packed));
 

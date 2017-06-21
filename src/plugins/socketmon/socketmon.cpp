@@ -137,32 +137,14 @@
 #include "private.h"
 #include "socketmon.h"
 
-#define POOLTAG_TCPE "TcpE"
-#define POOLTAG_TCPL "TcpL"
-#define POOLTAG_UDPA "UdpA"
-
-#define ALIGN_SIZE(alignment, size) \
-    ( (size % alignment) ? (alignment - (size % alignment)) : 0 )
-
-struct rettrap_struct {
+struct wrapper {
     socketmon *s;
-    drakvuf_trap_t *trap;
-    unsigned long counter;
+    addr_t obj;
 };
 
-struct watch {
-    socketmon *s;
-    addr_t obj_base;
-    addr_t obj_base_pa;
-};
-
-static void free_writetrap(drakvuf_trap_t *trap) {
-    //printf("Freeing writetrap @ %p\n", trap);
-    struct watch *watch = (struct watch *)trap->data;
-    socketmon *s = watch->s;
-    s->writetraps = g_slist_remove(s->writetraps, trap);
+void free_wrapper (drakvuf_trap_t *trap) {
+    g_free(trap->data);
     g_free(trap);
-    g_free(watch);
 }
 
 static inline void ipv4_to_str(char **str, uint8_t ipv4[4])
@@ -196,32 +178,31 @@ static inline void ipv6_to_str(char **str, uint8_t ipv6[16])
 }
 
 static event_response_t udpa_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
     int64_t ownerid = 0;
     addr_t p1 = 0;
     char *lip = NULL, *owner = NULL;
-    struct watch *watch = (struct watch *)info->trap->data;
-    socketmon *s = watch->s;
+    struct wrapper *w = (struct wrapper *)info->trap->data;
+    socketmon *s = w->s;
 
-    if (info->trap_pa != watch->obj_base + offsetof(struct udp_endpoint_x86, port))
-        return 0;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    struct udp_endpoint_x86 udpa;
+    struct udp_endpoint_x86 udpa;;
     struct inetaf_x86 inetaf;
     struct local_address_x86 local;
     memset(&udpa, 0, sizeof(struct udp_endpoint_x86));
     memset(&inetaf, 0, sizeof(struct inetaf_x86));
     memset(&local, 0, sizeof(local_address_x86));
 
-    if ( sizeof(struct udp_endpoint_x86) != vmi_read_pa(vmi, watch->obj_base, &udpa, sizeof(struct udp_endpoint_x86)) )
+    ctx.addr = w->obj;
+    if ( sizeof(struct udp_endpoint_x86) != vmi_read(vmi, &ctx, &udpa, sizeof(struct udp_endpoint_x86)) )
         goto done;
 
-    /* Convert port to little endian */
+    // Convert port to little endian
     udpa.port = __bswap_16(udpa.port);
 
     if ( !udpa.port )
@@ -231,21 +212,26 @@ static event_response_t udpa_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     if ( sizeof(struct inetaf_x86) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_x86)) )
         goto done;
 
-    ctx.addr = udpa.localaddr;
-    if ( sizeof(struct local_address_x86) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x86)) )
-        goto done;
+    if ( udpa.localaddr ) {
+        ctx.addr = udpa.localaddr;
+        if ( sizeof(struct local_address_x86) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x86)) )
+            goto done;
 
-    ctx.addr = local.pdata;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-        goto done;
+
+        ctx.addr = local.pdata;
+        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
+            goto done;
+    }
 
     if ( inetaf.addressfamily == AF_INET )
     {
         uint8_t localip[4]  = {[0 ... 3] = 0};
 
-        ctx.addr = p1;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-            goto done;
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
+                goto done;
+        }
 
         ipv4_to_str(&lip, localip);
     }
@@ -253,16 +239,13 @@ static event_response_t udpa_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     {
         uint8_t localip[16]  = {[0 ... 15] = 0};
 
-        ctx.addr = p1;
-        if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
-            goto done;
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+                goto done;
+        }
 
         ipv6_to_str(&lip, localip);
-    }
-    else
-    {
-        drakvuf_remove_trap(drakvuf, info->trap, free_writetrap);
-        goto done;
     }
 
     owner = drakvuf_get_process_name(drakvuf, udpa.owner);
@@ -292,6 +275,7 @@ done:
     g_free(owner);
     g_free(lip);
     drakvuf_release_vmi(drakvuf);
+    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
     return 0;
 }
 
@@ -303,11 +287,8 @@ static event_response_t udpa_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     int64_t ownerid = 0;
     addr_t p1 = 0;
     char *lip = NULL, *owner = NULL;
-    struct watch *watch = (struct watch *)info->trap->data;
-    socketmon *s = watch->s;
-
-    if (info->trap_pa != watch->obj_base + offsetof(struct udp_endpoint_x64, port))
-        return 0;
+    struct wrapper *w = (struct wrapper *)info->trap->data;
+    socketmon *s = w->s;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -318,10 +299,11 @@ static event_response_t udpa_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     memset(&inetaf, 0, sizeof(struct inetaf_x64));
     memset(&local, 0, sizeof(local_address_x64));
 
-    if ( sizeof(struct udp_endpoint_x64) != vmi_read_pa(vmi, watch->obj_base, &udpa, sizeof(struct udp_endpoint_x64)) )
+    ctx.addr = w->obj;
+    if ( sizeof(struct udp_endpoint_x64) != vmi_read(vmi, &ctx, &udpa, sizeof(struct udp_endpoint_x64)) )
         goto done;
 
-    /* Convert port to little endian */
+    // Convert port to little endian
     udpa.port = __bswap_16(udpa.port);
 
     if ( !udpa.port )
@@ -331,21 +313,25 @@ static event_response_t udpa_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     if ( sizeof(struct inetaf_x64) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_x64)) )
         goto done;
 
-    ctx.addr = udpa.localaddr;
-    if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
-        goto done;
+    if ( udpa.localaddr ) {
+        ctx.addr = udpa.localaddr;
+        if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
+            goto done;
 
-    ctx.addr = local.pdata;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-        goto done;
+        ctx.addr = local.pdata;
+        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
+            goto done;
+    }
 
     if ( inetaf.addressfamily == AF_INET )
     {
         uint8_t localip[4]  = {[0 ... 3] = 0};
 
-        ctx.addr = p1;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-            goto done;
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
+                goto done;
+        }
 
         ipv4_to_str(&lip, localip);
     }
@@ -353,16 +339,13 @@ static event_response_t udpa_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     {
         uint8_t localip[16]  = {[0 ... 15] = 0};
 
-        ctx.addr = p1;
-        if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
-            goto done;
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+                goto done;
+        }
 
         ipv6_to_str(&lip, localip);
-    }
-    else
-    {
-        drakvuf_remove_trap(drakvuf, info->trap, free_writetrap);
-        goto done;
     }
 
     owner = drakvuf_get_process_name(drakvuf, udpa.owner);
@@ -392,15 +375,13 @@ done:
     g_free(owner);
     g_free(lip);
     drakvuf_release_vmi(drakvuf);
+    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
     return 0;
 }
 
 static event_response_t tcpe_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    struct watch *watch = (struct watch *)info->trap->data;
-    socketmon *s = watch->s;
 
-    if (info->trap_pa != watch->obj_base + offsetof(struct tcp_endpoint_x86, state) )
-        return 0;
+    socketmon *s = (socketmon *)info->trap->data;;
 
     int64_t ownerid = -1;
     addr_t p1 = 0;
@@ -419,13 +400,18 @@ static event_response_t tcpe_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     memset(&local, 0, sizeof(local_address_x86));
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    if ( sizeof(struct tcp_endpoint_x86) != vmi_read_pa(vmi, watch->obj_base, &tcpe, sizeof(struct tcp_endpoint_x86)) )
+
+    ctx.addr = info->regs->rsp + sizeof(uint32_t);
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
+        goto done;
+
+    if ( sizeof(struct tcp_endpoint_x86) != vmi_read(vmi, &ctx, &tcpe, sizeof(struct tcp_endpoint_x86)) )
         goto done;
 
     if ( tcpe.state >= __TCP_STATE_MAX )
         goto done;
 
-    /* Convert ports to little endian */
+    // Convert ports to little endian
     tcpe.localport = __bswap_16(tcpe.localport);
     tcpe.remoteport = __bswap_16(tcpe.remoteport);
 
@@ -433,30 +419,40 @@ static event_response_t tcpe_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     if ( sizeof(struct inetaf_x86) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_x86)) )
         goto done;
 
-    ctx.addr = tcpe.addrinfo;
-    if ( sizeof(struct addr_info_x86) != vmi_read(vmi, &ctx, &addrinfo, sizeof(struct addr_info_x86)) )
-        goto done;
+    if ( tcpe.addrinfo ) {
+        ctx.addr = tcpe.addrinfo;
+        if ( sizeof(struct addr_info_x86) != vmi_read(vmi, &ctx, &addrinfo, sizeof(struct addr_info_x86)) )
+            goto done;
+    }
 
-    ctx.addr = addrinfo.local;
-    if ( sizeof(struct local_address_x86) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x86)) )
-        goto done;
+    if ( addrinfo.local ) {
+        ctx.addr = addrinfo.local;
+        if ( sizeof(struct local_address_x86) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x86)) )
+            goto done;
+    }
 
-    ctx.addr = local.pdata;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-        goto done;
+    if ( local.pdata ) {
+        ctx.addr = local.pdata;
+        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
+            goto done;
+    }
 
     if ( inetaf.addressfamily == AF_INET )
     {
         uint8_t localip[4]  = {[0 ... 3] = 0};
         uint8_t remoteip[4] = {[0 ... 3] = 0};
 
-        ctx.addr = p1;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-            goto done;
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
+                goto done;
+        }
 
-        ctx.addr = addrinfo.remote;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&remoteip[0]) )
-            goto done;
+        if ( addrinfo.remote ) {
+            ctx.addr = addrinfo.remote;
+            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&remoteip[0]) )
+                goto done;
+        }
 
         ipv4_to_str(&lip, localip);
         ipv4_to_str(&rip, remoteip);
@@ -503,9 +499,6 @@ static event_response_t tcpe_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         break;
     };
 
-    if ( !tcpe.state )
-        drakvuf_remove_trap(drakvuf, info->trap, free_writetrap);
-
 done:
     g_free(lip);
     g_free(rip);
@@ -515,11 +508,7 @@ done:
 }
 
 static event_response_t tcpe_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    struct watch *watch = (struct watch *)info->trap->data;
-    socketmon *s = watch->s;
-
-    if (info->trap_pa != watch->obj_base + offsetof(struct tcp_endpoint_x64, state) )
-        return 0;
+    socketmon *s = (socketmon *)info->trap->data;
 
     int64_t ownerid;
     addr_t p1 = 0;
@@ -538,13 +527,15 @@ static event_response_t tcpe_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     memset(&local, 0, sizeof(local_address_x64));
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    if ( sizeof(struct tcp_endpoint_x64) != vmi_read_pa(vmi, watch->obj_base, &tcpe, sizeof(struct tcp_endpoint_x64)) )
+
+    ctx.addr = info->regs->rcx;
+    if ( sizeof(struct tcp_endpoint_x64) != vmi_read(vmi, &ctx, &tcpe, sizeof(struct tcp_endpoint_x64)) )
         goto done;
 
     if ( tcpe.state >= __TCP_STATE_MAX )
         goto done;
 
-    /* Convert ports to little endian */
+    // Convert ports to little endian
     tcpe.localport = __bswap_16(tcpe.localport);
     tcpe.remoteport = __bswap_16(tcpe.remoteport);
 
@@ -622,9 +613,6 @@ static event_response_t tcpe_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         break;
     };
 
-    if ( !tcpe.state )
-        drakvuf_remove_trap(drakvuf, info->trap, free_writetrap);
-
 done:
     g_free(owner);
     g_free(lip);
@@ -635,11 +623,10 @@ done:
 }
 
 static event_response_t tcpl_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    struct watch *watch = (struct watch *)info->trap->data;
-    socketmon *s = watch->s;
+    struct wrapper *w = (struct wrapper *)info->trap->data;
+    socketmon *s = w->s;
 
-    if (info->trap_pa != watch->obj_base + offsetof(struct tcp_listener_x86, port) )
-        return 0;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     int64_t ownerid = 0;
     addr_t p1 = 0;
@@ -655,32 +642,46 @@ static event_response_t tcpl_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     memset(&inetaf, 0, sizeof(struct inetaf_x86));
     memset(&local, 0, sizeof(local_address_x86));
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    if ( sizeof(struct tcp_listener_x86) != vmi_read_pa(vmi, watch->obj_base, &tcpl, sizeof(struct tcp_listener_x86)) )
-        goto done;
+    uint32_t ownerp = 0;
 
-    /* Convert port to little endian */
+    ctx.addr = w->obj - sizeof(struct tcp_listener_x86);
+    if ( sizeof(struct tcp_listener_x86) != vmi_read(vmi, &ctx, &tcpl, sizeof(struct tcp_listener_x86)) ) {
+        printf("Failed to tcp listener @ 0x%lx\n", ctx.addr);
+        goto done;
+    }
+
+    // Convert port to little endian
     tcpl.port = __bswap_16(tcpl.port);
+
+    ctx.addr = w->obj - sizeof(struct tcp_listener_x86);
+    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &ownerp) )
+        goto done;
 
     ctx.addr = tcpl.inetaf;
     if ( sizeof(struct inetaf_x86) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_x86)) )
         goto done;
 
-    ctx.addr = tcpl.localaddr;
-    if ( sizeof(struct local_address_x86) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x86)) )
-        goto done;
+    if ( tcpl.localaddr ) {
+        ctx.addr = tcpl.localaddr;
+        if ( sizeof(struct local_address_x86) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x86)) )
+            goto done;
+    }
 
-    ctx.addr = local.pdata;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-        goto done;
+    if ( local.pdata ) {
+        ctx.addr = local.pdata;
+        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
+            goto done;
+    }
 
     if ( inetaf.addressfamily == AF_INET )
     {
         uint8_t localip[4]  = {[0 ... 3] = 0};
 
-        ctx.addr = p1;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-            goto done;
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
+                goto done;
+        }
 
         ipv4_to_str(&lip, localip);
     }
@@ -688,9 +689,11 @@ static event_response_t tcpl_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     {
         uint8_t localip[16]  = {[0 ... 15] = 0};
 
-        ctx.addr = p1;
-        if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
-            goto done;
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+                goto done;
+        }
 
         ipv6_to_str(&lip, localip);
     }
@@ -722,16 +725,14 @@ done:
     g_free(owner);
     g_free(lip);
     drakvuf_release_vmi(drakvuf);
+    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
 
     return 0;
 }
 
 static event_response_t tcpl_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    struct watch *watch = (struct watch *)info->trap->data;
-    socketmon *s = watch->s;
-
-    if (info->trap_pa != watch->obj_base + offsetof(struct tcp_listener_x64, port) )
-        return 0;
+    struct wrapper *w = (struct wrapper *)info->trap->data;
+    socketmon *s = w->s;
 
     int64_t ownerid = 0;
     addr_t p1 = 0;
@@ -748,31 +749,39 @@ static event_response_t tcpl_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     memset(&local, 0, sizeof(local_address_x64));
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    if ( sizeof(struct tcp_listener_x64) != vmi_read_pa(vmi, watch->obj_base, &tcpl, sizeof(struct tcp_listener_x64)) )
+
+    ctx.addr = w->obj - sizeof(struct tcp_listener_x64);
+    if ( sizeof(struct tcp_listener_x64) != vmi_read(vmi, &ctx, &tcpl, sizeof(struct tcp_listener_x64)) )
         goto done;
 
-    /* Convert port to little endian */
+    // Convert port to little endian
     tcpl.port = __bswap_16(tcpl.port);
 
     ctx.addr = tcpl.inetaf;
     if ( sizeof(struct inetaf_x64) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_x64)) )
         goto done;
 
-    ctx.addr = tcpl.localaddr;
-    if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
-        goto done;
+    if ( tcpl.localaddr ) {
+        ctx.addr = tcpl.localaddr;
+        if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
+            goto done;
+    }
 
-    ctx.addr = local.pdata;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-        goto done;
+    if ( local.pdata ) {
+        ctx.addr = local.pdata;
+        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
+            goto done;
+    }
 
     if ( inetaf.addressfamily == AF_INET )
     {
         uint8_t localip[4]  = {[0 ... 3] = 0};
 
-        ctx.addr = p1;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-            goto done;
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
+                goto done;
+        }
 
         ipv4_to_str(&lip, localip);
     }
@@ -780,9 +789,11 @@ static event_response_t tcpl_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     {
         uint8_t localip[16]  = {[0 ... 15] = 0};
 
-        ctx.addr = p1;
-        if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
-            goto done;
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+                goto done;
+        }
 
         ipv6_to_str(&lip, localip);
     }
@@ -814,278 +825,128 @@ done:
     g_free(owner);
     g_free(lip);
     drakvuf_release_vmi(drakvuf);
+    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
 
     return 0;
 }
 
-static inline void tag_test(void *tag, bool *tcpe_alloc, bool *tcpl_alloc, bool *udpa_alloc)
-{
-    if(!memcmp(tag, &POOLTAG_TCPE, 4))
-    {
-        *tcpe_alloc = 1;
-        return;
-    }
+static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+    addr_t rsp = 0;
+    struct wrapper *w = (struct wrapper *)g_malloc0(sizeof(struct wrapper));
+    w->s = (socketmon *)info->trap->data;
 
-    if(!memcmp(tag, &POOLTAG_TCPL, 4))
-    {
-        *tcpl_alloc = 1;
-        return;
-    }
-
-    if(!memcmp(tag, &POOLTAG_UDPA, 4))
-    {
-        *udpa_alloc = 1;
-        return;
-    }
-}
-
-/* This will be hit for all sorts of heap alloc returns */
-static event_response_t pool_alloc_return(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    struct rettrap_struct *r = (struct rettrap_struct *)info->trap->data;
-    socketmon *s = r->s;
-    addr_t obj_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, info->regs->rax);
-    bool tcpe_alloc = 0;
-    bool tcpl_alloc = 0;
-    bool udpa_alloc = 0;
+    vmi_read_addr_va(vmi, info->regs->rsp, 0, &rsp);
 
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
+    if ( w->s->pm == VMI_PM_IA32E )
+        w->obj = info->regs->rcx;
+    else
+        vmi_read_addr_va(vmi, info->regs->rsp + sizeof(uint32_t), 0, &w->obj);
 
-    if ( s->pm == VMI_PM_IA32E ) {
-        addr_t ph_base = obj_pa - sizeof(struct pool_header_x64);
-        struct pool_header_x64 ph;
-        memset(&ph, 0, sizeof(struct pool_header_x64));
-
-        if ( sizeof(struct pool_header_x64) != vmi_read_pa(vmi, ph_base, &ph, sizeof(struct pool_header_x64)) )
-            goto done;
-
-        tag_test(&ph.pool_tag, &tcpe_alloc, &tcpl_alloc, &udpa_alloc);
-    } else {
-        addr_t ph_base = obj_pa - sizeof(struct pool_header_x86);
-        struct pool_header_x86 ph;
-        memset(&ph, 0, sizeof(struct pool_header_x86));
-
-        if ( sizeof(struct pool_header_x86) != vmi_read_pa(vmi, ph_base, &ph, sizeof(struct pool_header_x86)) )
-            goto done;
-
-        tag_test(&ph.pool_tag, &tcpe_alloc, &tcpl_alloc, &udpa_alloc);
-    }
-
-    if (!tcpe_alloc && !tcpl_alloc && !udpa_alloc)
-        goto done;
-
-    /*
-     * Normal pool allocations would have to be aligned based on the top of the
-     * block size, but since our struct definitions aren't based on the info
-     * in the Rekall profile, we can just use the base allocation address.
-     */
-
-    if ( tcpe_alloc )
-    {
-        struct watch *watch = (struct watch *)g_malloc0(sizeof(struct watch));
-        if ( !watch )
-            goto done;
-
-        watch->s = s;
-        watch->obj_base = obj_pa;
-
-        drakvuf_trap_t *writetrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
-        writetrap->memaccess.access = VMI_MEMACCESS_W;
-        writetrap->memaccess.type = POST;
-        writetrap->memaccess.gfn = obj_pa >> 12;
-        writetrap->cb = (s->pm == VMI_PM_IA32E) ? tcpe_x64_write_cb : tcpe_x86_write_cb;
-        writetrap->data = watch;
-        writetrap->type = MEMACCESS;
-
-        if (!drakvuf_add_trap(drakvuf, writetrap))
-        {
-            fprintf(stderr, "[SOCKETMON] Error: failed to add write memaccess trap!\n");
-            g_free(writetrap);
-            g_free(watch);
-            goto done;
-        }
-
-        s->writetraps = g_slist_prepend(s->writetraps, writetrap);
-        goto done;
-    }
-
-    if ( tcpl_alloc )
-    {
-        struct watch *watch = (struct watch *)g_malloc0(sizeof(struct watch));
-        if ( !watch )
-            goto done;
-
-        watch->s = s;
-        watch->obj_base = obj_pa;
-
-        drakvuf_trap_t *writetrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
-        writetrap->memaccess.access = VMI_MEMACCESS_W;
-        writetrap->memaccess.type = POST;
-        writetrap->memaccess.gfn = obj_pa >> 12;
-        writetrap->cb = (s->pm == VMI_PM_IA32E) ? tcpl_x64_write_cb : tcpl_x86_write_cb;
-        writetrap->data = watch;
-        writetrap->type = MEMACCESS;
-
-        if (!drakvuf_add_trap(drakvuf, writetrap))
-        {
-            fprintf(stderr, "[SOCKETMON] Error: failed to add write memaccess trap!\n");
-            g_free(writetrap);
-            g_free(watch);
-            goto done;
-        }
-
-        s->writetraps = g_slist_prepend(s->writetraps, writetrap);
-        goto done;
-    }
-
-    if ( udpa_alloc )
-    {
-        struct watch *watch = (struct watch *)g_malloc0(sizeof(struct watch));
-        if ( !watch )
-            goto done;
-
-        watch->s = s;
-        watch->obj_base = obj_pa;
-
-        drakvuf_trap_t *writetrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
-        if ( !writetrap )
-        {
-            g_free(watch);
-            goto done;
-        }
-
-        writetrap->memaccess.access = VMI_MEMACCESS_W;
-        writetrap->memaccess.type = POST;
-        writetrap->memaccess.gfn = obj_pa >> 12;
-        writetrap->cb = (s->pm == VMI_PM_IA32E) ? udpa_x64_write_cb: udpa_x86_write_cb;
-        writetrap->data = watch;
-        writetrap->type = MEMACCESS;
-
-        if (!drakvuf_add_trap(drakvuf, writetrap))
-        {
-            fprintf(stderr, "[SOCKETMON] Error: failed to add write memaccess trap!\n");
-            g_free(writetrap);
-            g_free(watch);
-            goto done;
-        }
-
-        s->writetraps = g_slist_prepend(s->writetraps, writetrap);
-        goto done;
-    }
-
-done:
     drakvuf_release_vmi(drakvuf);
+
+    drakvuf_trap_t *trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+    trap->breakpoint.lookup_type = LOOKUP_PID;
+    trap->breakpoint.pid = 4;
+    trap->breakpoint.addr_type = ADDR_VA;
+    trap->breakpoint.addr = rsp;
+    trap->type = BREAKPOINT;
+    trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? tcpl_x64_write_cb : tcpl_x86_write_cb;
+    trap->data = w;
+
+    if ( !drakvuf_add_trap(drakvuf, trap) )
+        printf("Failed to trap return at 0x%lx\n", rsp);
+
     return 0;
 }
 
-static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+    addr_t rsp = 0;
+    struct wrapper *w = (struct wrapper *)g_malloc0(sizeof(struct wrapper));
+    w->s = (socketmon *)info->trap->data;
 
-    socketmon *s = (socketmon*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    reg_t tag = 0, size = 0;
-    bool tcpe_alloc = 0;
-    bool tcpl_alloc = 0;
-    bool udpa_alloc = 0;
+    vmi_read_addr_va(vmi, info->regs->rsp, 0, &rsp);
 
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
+    if ( w->s->pm == VMI_PM_IA32E )
+        w->obj = info->regs->rcx;
+    else
+        vmi_read_addr_va(vmi, info->regs->rsp + sizeof(uint32_t), 0, &w->obj);
 
-    if (s->pm == VMI_PM_IA32E) {
-        size = info->regs->rdx;
-        tag = info->regs->r8;
-    } else {
-        ctx.addr = info->regs->rsp+8;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&size) )
-            goto done;
-
-        ctx.addr = info->regs->rsp+12;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&tag) )
-            goto done;
-    }
-
-    tag_test(&tag, &tcpe_alloc, &tcpl_alloc, &udpa_alloc);
-
-    if(tcpe_alloc || tcpl_alloc || udpa_alloc) {
-
-        addr_t ret = 0, ret_pa = 0;
-        ctx.addr = info->regs->rsp;
-        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ret) )
-            goto done;
-
-        ret_pa = vmi_pagetable_lookup(vmi, info->regs->cr3, ret);
-
-        struct rettrap_struct *r = (struct rettrap_struct*)g_hash_table_lookup(s->rettraps, &ret_pa);
-        if (r) {
-            r->counter++;
-        } else {
-            drakvuf_trap_t *rettrap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
-            r = (struct rettrap_struct*)g_malloc0(sizeof(struct rettrap_struct));
-            if ( !r )
-                goto  done;
-
-            r->trap = rettrap;
-            r->counter = 1;
-            r->s = s;
-
-            rettrap->breakpoint.lookup_type = LOOKUP_NONE;
-            rettrap->breakpoint.addr_type = ADDR_PA;
-            rettrap->breakpoint.addr = ret_pa;
-            rettrap->type = BREAKPOINT;
-            rettrap->name = "HeapRetTrap";
-            rettrap->cb = pool_alloc_return;
-            rettrap->data = r;
-
-            if (!drakvuf_add_trap(drakvuf, rettrap))
-                goto done;
-
-            g_hash_table_insert(s->rettraps, &rettrap->breakpoint.addr, r);
-        }
-    }
-
-done:
     drakvuf_release_vmi(drakvuf);
+
+    drakvuf_trap_t *trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+    trap->breakpoint.lookup_type = LOOKUP_PID;
+    trap->breakpoint.pid = 4;
+    trap->breakpoint.addr_type = ADDR_VA;
+    trap->breakpoint.addr = rsp;
+    trap->type = BREAKPOINT;
+    trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_x64_write_cb : udpa_x86_write_cb;
+    trap->data = w;
+
+    if ( !drakvuf_add_trap(drakvuf, trap) )
+        printf("Failed to trap return at 0x%lx\n", rsp);
+
     return 0;
 }
 
 /* ----------------------------------------------------- */
 
 socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t output) {
-    const char *rekall_profile = (const char *)config;
+    const struct socketmon_config *c = (const struct socketmon_config *)config;
+    const char *tcpip_profile = c->tcpip_profile;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->pm = vmi_get_page_mode(vmi, 0);
     drakvuf_release_vmi(drakvuf);
     this->rettraps = g_hash_table_new(g_int64_hash, g_int64_equal);
     this->format = output;
-    this->writetraps = NULL;
 
-    this->poolalloc.breakpoint.lookup_type = LOOKUP_PID;
-    this->poolalloc.breakpoint.pid = 4;
-    this->poolalloc.breakpoint.addr_type = ADDR_RVA;
-    this->poolalloc.breakpoint.module = "ntoskrnl.exe";
-    this->poolalloc.name = "ExAllocatePoolWithTag";
-    this->poolalloc.type = BREAKPOINT;
-    this->poolalloc.cb = cb;
-    this->poolalloc.data = (void*)this;
+    if ( !tcpip_profile ) {
+        fprintf(stderr, "Socketmon plugin requires the Rekall profile for tcpip.sys!\n");
+        throw -1;
+    }
 
-    if ( !drakvuf_get_function_rva(rekall_profile, "ExAllocatePoolWithTag", &this->poolalloc.breakpoint.rva) )
+    if ( this->pm == VMI_PM_IA32E ) {
+        this->trap[0].cb = tcpe_x64_write_cb;
+        this->trap[1].cb = tcpe_x64_write_cb;
+        this->trap[2].cb = tcpe_x64_write_cb;
+        this->trap[3].cb = tcpe_x64_write_cb;
+    } else {
+        this->trap[0].cb = tcpe_x86_write_cb;
+        this->trap[1].cb = tcpe_x86_write_cb;
+        this->trap[2].cb = tcpe_x86_write_cb;
+        this->trap[3].cb = tcpe_x86_write_cb;
+    }
+
+    this->trap[4].cb = udpb_cb;
+    this->trap[5].cb = tcpl_cb;
+
+    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpTcbDelay", &this->trap[0].breakpoint.rva) )
+        throw -1;
+    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpFinAcknowledged", &this->trap[1].breakpoint.rva) )
+        throw -1;
+    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpDisconnectTcb", &this->trap[2].breakpoint.rva) )
+        throw -1;
+    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpShutdownTcb", &this->trap[3].breakpoint.rva) )
+        throw -1;
+    if ( !drakvuf_get_function_rva(tcpip_profile, "UdpBindEndpoint", &this->trap[4].breakpoint.rva) )
+        throw -1;
+    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpCreateListenerWorkQueueRoutine", &this->trap[5].breakpoint.rva) )
         throw -1;
 
-    if ( !drakvuf_add_trap(drakvuf, &this->poolalloc) )
+    if ( !drakvuf_add_trap(drakvuf, &this->trap[0]) )
+        throw -1;
+    if ( !drakvuf_add_trap(drakvuf, &this->trap[1]) )
+        throw -1;
+    if ( !drakvuf_add_trap(drakvuf, &this->trap[2]) )
+        throw -1;
+    if ( !drakvuf_add_trap(drakvuf, &this->trap[3]) )
+        throw -1;
+    if ( !drakvuf_add_trap(drakvuf, &this->trap[4]) )
+        throw -1;
+    if ( !drakvuf_add_trap(drakvuf, &this->trap[5]) )
         throw -1;
 }
 
 socketmon::~socketmon() {
-
-    GSList *loop = this->writetraps;
-    while(loop) {
-        g_free(loop->data);
-        loop=loop->next;
-    }
-    g_slist_free(this->writetraps);
-
-    if ( this->rettraps )
-        g_hash_table_destroy(this->rettraps);
 }

@@ -167,7 +167,7 @@ class drakvuf_c {
         void pause();
         void resume();
         int inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char *inject_cmd);
-        int start_plugins(const bool* plugin_list, const char *dump_folder, bool cpuid_stealth);
+        int start_plugins(const bool* plugin_list, const char *dump_folder, bool cpuid_stealth, const char *tcpip_profile);
         bool wait_for_process(const char *processname);
 
 };
