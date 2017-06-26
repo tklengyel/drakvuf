@@ -112,8 +112,9 @@ class socketmon: public plugin {
     public:
         page_mode_t pm;
         output_format_t format;
-        drakvuf_trap_t trap[6] = {
-            [0 ... 5] = {
+        win_ver_t winver;
+        drakvuf_trap_t trap[7] = {
+            [0 ... 6] = {
                 .breakpoint.lookup_type = LOOKUP_PID,
                 .breakpoint.pid = 4,
                 .breakpoint.addr_type = ADDR_RVA,

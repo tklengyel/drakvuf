@@ -133,13 +133,17 @@ struct tcp_listener_x64 { //78h
 }__attribute__ ((packed));
 
 struct tcp_listener_win10_x64 {
-    uint64_t inetaf;
+    uint64_t _pad[5];
+    uint64_t inetaf; // inetaf_win10_x64
     uint64_t owner;
-    uint64_t _pad1[5];
-    uint64_t localaddr;
     uint64_t _pad2;
-    uint16_t _pad3;
+    uint64_t createtime;
+    uint64_t _pad3[3];
+    uint64_t localaddr;
+    uint64_t _pad4;
+    uint16_t _pad5;
     uint16_t port;
+    uint8_t _pad6[12];
 }__attribute__ ((packed));
 
 /* TcpE */
@@ -172,8 +176,7 @@ static const char *tcp_state_str[] = {
     [LIST_ACK] = "list_ack",
     [TIME_WAIT] = "time_wait",
     [DELETE_TCB] = "delete_tcb",
-    [10] = "__undefined__",
-    [11] = "__undefined__"
+    [10 ... 11] = "__undefined__"
 };
 
 struct tcp_endpoint_x86 {
@@ -203,6 +206,20 @@ struct tcp_endpoint_x64 {
     uint64_t owner;
 }__attribute__ ((packed));
 
+struct tcp_endpoint_win10_x64 {
+    addr_t _pad1[2];
+    addr_t inetaf; // inetaf_win10_x64
+    addr_t addrinfo;
+    uint8_t _pad2[0x4c];
+    uint32_t state;
+    uint16_t localport;
+    uint16_t remoteport;
+    uint8_t _pad3[0x1E4];
+    addr_t owner;
+    addr_t _pad4;
+    addr_t createtime;
+}__attribute__((packed));
+
 struct addr_info_x86 {
     uint32_t local; // local_address
     uint32_t _pad;
@@ -225,12 +242,12 @@ struct local_address_x64 {
     uint64_t pdata;
 }__attribute__ ((packed));
 
-#ifndef AF_INET
+struct local_address_win10_udp_x64 {
+    addr_t pdata;
+}__attribute__((packed));
+
 #define AF_INET     0x2
-#endif
-#ifndef AF_INET6
 #define AF_INET6    0x17
-#endif
 
 struct inetaf_x86 {
     uint8_t _pad[0xc];
@@ -239,6 +256,11 @@ struct inetaf_x86 {
 
 struct inetaf_x64 {
     uint8_t _pad[0x14];
+    uint8_t addressfamily;
+}__attribute__ ((packed));
+
+struct inetaf_win10_x64 {
+    uint8_t _pad[0x18];
     uint8_t addressfamily;
 }__attribute__ ((packed));
 
@@ -263,6 +285,17 @@ struct udp_endpoint_x64 {
     uint64_t localaddr;
     uint8_t _pad3[0x18];
     uint16_t port;
+}__attribute__ ((packed));
+
+struct udp_endpoint_win10_x64 {
+    addr_t _pad1[4];
+    addr_t inetaf; // inetaf_win10_x64
+    addr_t owner;
+    addr_t _pad2[5];
+    addr_t createtime;
+    uint8_t _pad3[0x18];
+    uint16_t port;
+    addr_t localaddr; // local_address_win10_udp_x64
 }__attribute__ ((packed));
 
 #endif

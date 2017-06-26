@@ -127,9 +127,6 @@
 #include <glib.h>
 #include <err.h>
 
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 #include <byteswap.h>
 
 #include <libvmi/libvmi.h>
@@ -177,7 +174,7 @@ static inline void ipv6_to_str(char **str, uint8_t ipv6[16])
            ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
 }
 
-static event_response_t udpa_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -279,7 +276,7 @@ done:
     return 0;
 }
 
-static event_response_t udpa_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
@@ -379,7 +376,108 @@ done:
     return 0;
 }
 
-static event_response_t tcpe_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    int64_t ownerid = 0;
+    addr_t p1 = 0;
+    char *lip = NULL, *owner = NULL;
+    struct wrapper *w = (struct wrapper *)info->trap->data;
+    socketmon *s = w->s;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    struct udp_endpoint_win10_x64 udpa;
+    struct inetaf_win10_x64 inetaf;
+    struct local_address_x64 local;
+    memset(&udpa, 0, sizeof(struct udp_endpoint_win10_x64));
+    memset(&inetaf, 0, sizeof(struct inetaf_win10_x64));
+    memset(&local, 0, sizeof(local_address_x64));
+
+    ctx.addr = w->obj;
+    if ( sizeof(struct udp_endpoint_win10_x64) != vmi_read(vmi, &ctx, &udpa, sizeof(struct udp_endpoint_win10_x64)) )
+        goto done;
+
+    // Convert port to little endian
+    udpa.port = __bswap_16(udpa.port);
+
+    if ( !udpa.port )
+        goto done;
+
+    ctx.addr = udpa.inetaf;
+    if ( sizeof(struct inetaf_win10_x64) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_win10_x64)) )
+        goto done;
+
+    if ( udpa.localaddr ) {
+        ctx.addr = udpa.localaddr;
+        if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
+            goto done;
+
+        ctx.addr = local.pdata;
+        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
+            goto done;
+    }
+
+    if ( inetaf.addressfamily == AF_INET )
+    {
+        uint8_t localip[4]  = {[0 ... 3] = 0};
+
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
+                goto done;
+        }
+
+        ipv4_to_str(&lip, localip);
+    }
+    else if (inetaf.addressfamily == AF_INET6 )
+    {
+
+        uint8_t localip[16]  = {[0 ... 15] = 0};
+
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+                goto done;
+        }
+
+        ipv6_to_str(&lip, localip);
+    }
+
+    owner = drakvuf_get_process_name(drakvuf, udpa.owner);
+    ownerid = drakvuf_get_process_userid(drakvuf, udpa.owner);
+
+    switch(s->format) {
+    case OUTPUT_CSV:
+        printf("socketmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%" PRIi64",%s,%s,%u\n",
+               info->vcpu, info->regs->cr3,
+               info->procname, info->userid,
+               owner, ownerid,
+               (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
+               lip, udpa.port);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[SOCKETMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s %s:%u\n",
+               info->vcpu, info->regs->cr3, info->procname,
+               USERIDSTR(drakvuf), info->userid,
+               owner, USERIDSTR(drakvuf), ownerid,
+               (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
+               lip, udpa.port);
+        break;
+    };
+
+done:
+    g_free(owner);
+    g_free(lip);
+    drakvuf_release_vmi(drakvuf);
+    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
+    return 0;
+}
+
+static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     socketmon *s = (socketmon *)info->trap->data;;
 
@@ -507,7 +605,7 @@ done:
     return 0;
 }
 
-static event_response_t tcpe_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     socketmon *s = (socketmon *)info->trap->data;
 
     int64_t ownerid;
@@ -622,7 +720,122 @@ done:
     return 0;
 }
 
-static event_response_t tcpl_x86_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+    socketmon *s = (socketmon *)info->trap->data;
+
+    int64_t ownerid;
+    addr_t p1 = 0;
+    char *lip = NULL, *rip = NULL, *owner = NULL;
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    struct tcp_endpoint_win10_x64 tcpe;
+    struct inetaf_win10_x64 inetaf;
+    struct addr_info_x64 addrinfo;
+    struct local_address_x64 local;
+    memset(&tcpe, 0, sizeof(struct tcp_endpoint_win10_x64));
+    memset(&inetaf, 0, sizeof(struct inetaf_win10_x64));
+    memset(&addrinfo, 0, sizeof(struct addr_info_x64));
+    memset(&local, 0, sizeof(local_address_x64));
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    ctx.addr = info->regs->rcx;
+    if ( sizeof(struct tcp_endpoint_win10_x64) != vmi_read(vmi, &ctx, &tcpe, sizeof(struct tcp_endpoint_win10_x64)) )
+        goto done;
+
+    if ( tcpe.state >= __TCP_STATE_MAX )
+        goto done;
+
+    // Convert ports to little endian
+    tcpe.localport = __bswap_16(tcpe.localport);
+    tcpe.remoteport = __bswap_16(tcpe.remoteport);
+
+    ctx.addr = tcpe.inetaf;
+    if ( sizeof(struct inetaf_win10_x64) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_win10_x64)) )
+        goto done;
+
+    ctx.addr = tcpe.addrinfo;
+    if ( sizeof(struct addr_info_x64) != vmi_read(vmi, &ctx, &addrinfo, sizeof(struct addr_info_x64)) )
+        goto done;
+
+    ctx.addr = addrinfo.local;
+    if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
+        goto done;
+
+    ctx.addr = local.pdata;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
+        goto done;
+
+    if ( inetaf.addressfamily == AF_INET )
+    {
+        uint8_t localip[4]  = {[0 ... 3] = 0};
+        uint8_t remoteip[4] = {[0 ... 3] = 0};
+
+        ctx.addr = p1;
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
+            goto done;
+
+        ctx.addr = addrinfo.remote;
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&remoteip[0]) )
+            goto done;
+
+        ipv4_to_str(&lip, localip);
+        ipv4_to_str(&rip, remoteip);
+    }
+    else if (inetaf.addressfamily == AF_INET6 )
+    {
+        uint8_t localip[16]  = {[0 ... 15] = 0};
+        uint8_t remoteip[16] = {[0 ... 15] = 0};
+
+        ctx.addr = p1;
+        if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+            goto done;
+
+        ctx.addr = addrinfo.remote;
+        if ( 16 != vmi_read(vmi, &ctx, &remoteip[0], 16) )
+            goto done;
+
+        ipv6_to_str(&lip, localip);
+        ipv6_to_str(&rip, remoteip);
+    }
+
+    owner = drakvuf_get_process_name(drakvuf, tcpe.owner);
+    ownerid = drakvuf_get_process_userid(drakvuf, tcpe.owner);
+
+    switch(s->format) {
+    case OUTPUT_CSV:
+        printf("socketmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s,%" PRIi64 ",%s,%s,%s,%u,%s,%u\n",
+               info->vcpu, info->regs->cr3,
+               info->procname, info->userid,
+               owner,ownerid,
+               (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+               tcp_state_str[tcpe.state],
+               lip, tcpe.localport, rip, tcpe.remoteport);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[SOCKETMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s State:%s Local:%s:%u Remote:%s:%u\n",
+               info->vcpu, info->regs->cr3,
+               info->procname, USERIDSTR(drakvuf), info->userid,
+               owner, USERIDSTR(drakvuf), ownerid,
+               (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+               tcp_state_str[tcpe.state],
+               lip, tcpe.localport, rip, tcpe.remoteport);
+        break;
+    };
+
+done:
+    g_free(owner);
+    g_free(lip);
+    g_free(rip);
+    drakvuf_release_vmi(drakvuf);
+
+    return 0;
+}
+
+static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     struct wrapper *w = (struct wrapper *)info->trap->data;
     socketmon *s = w->s;
 
@@ -730,7 +943,7 @@ done:
     return 0;
 }
 
-static event_response_t tcpl_x64_write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     struct wrapper *w = (struct wrapper *)info->trap->data;
     socketmon *s = w->s;
 
@@ -830,6 +1043,106 @@ done:
     return 0;
 }
 
+static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+    struct wrapper *w = (struct wrapper *)info->trap->data;
+    socketmon *s = w->s;
+
+    int64_t ownerid = 0;
+    addr_t p1 = 0;
+    char *lip = NULL, *owner = NULL;
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    struct tcp_listener_win10_x64 tcpl;
+    struct inetaf_win10_x64 inetaf;
+    struct local_address_x64 local;
+    memset(&tcpl, 0, sizeof(struct tcp_listener_win10_x64));
+    memset(&inetaf, 0, sizeof(struct inetaf_win10_x64));
+    memset(&local, 0, sizeof(local_address_x64));
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    ctx.addr = w->obj - sizeof(struct tcp_listener_win10_x64);
+    if ( sizeof(struct tcp_listener_win10_x64) != vmi_read(vmi, &ctx, &tcpl, sizeof(struct tcp_listener_win10_x64)) )
+        goto done;
+
+    // Convert port to little endian
+    tcpl.port = __bswap_16(tcpl.port);
+
+    ctx.addr = tcpl.inetaf;
+    if ( sizeof(struct inetaf_win10_x64) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_win10_x64)) )
+        goto done;
+
+    if ( tcpl.localaddr ) {
+        ctx.addr = tcpl.localaddr;
+        if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
+            goto done;
+    }
+
+    if ( local.pdata ) {
+        ctx.addr = local.pdata;
+        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
+            goto done;
+    }
+
+    if ( inetaf.addressfamily == AF_INET )
+    {
+        uint8_t localip[4]  = {[0 ... 3] = 0};
+
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
+                goto done;
+        }
+
+        ipv4_to_str(&lip, localip);
+    }
+    else if (inetaf.addressfamily == AF_INET6 )
+    {
+        uint8_t localip[16]  = {[0 ... 15] = 0};
+
+        if ( p1 ) {
+            ctx.addr = p1;
+            if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+                goto done;
+        }
+
+        ipv6_to_str(&lip, localip);
+    }
+
+    owner = drakvuf_get_process_name(drakvuf, tcpl.owner);
+    ownerid = drakvuf_get_process_userid(drakvuf, tcpl.owner);
+
+    switch(s->format) {
+    case OUTPUT_CSV:
+        printf("socketmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s,%" PRIi64 ",%s,listener,%s,%u\n",
+               info->vcpu, info->regs->cr3,
+               info->procname, info->userid,
+               owner, ownerid,
+               (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+               lip, tcpl.port);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[SOCKETMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s listener %s:%u\n",
+               info->vcpu, info->regs->cr3, info->procname,
+               USERIDSTR(drakvuf), info->userid,
+               owner, USERIDSTR(drakvuf), ownerid,
+               (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+               lip, tcpl.port);
+        break;
+    };
+
+done:
+    g_free(owner);
+    g_free(lip);
+    drakvuf_release_vmi(drakvuf);
+    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
+
+    return 0;
+}
+
 static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     addr_t rsp = 0;
     struct wrapper *w = (struct wrapper *)g_malloc0(sizeof(struct wrapper));
@@ -851,8 +1164,18 @@ static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     trap->breakpoint.addr_type = ADDR_VA;
     trap->breakpoint.addr = rsp;
     trap->type = BREAKPOINT;
-    trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? tcpl_x64_write_cb : tcpl_x86_write_cb;
     trap->data = w;
+
+    switch(w->s->winver) {
+    case VMI_OS_WINDOWS_7:
+    case VMI_OS_WINDOWS_8:
+        trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? tcpl_x64_ret_cb : tcpl_x86_ret_cb;
+        break;
+    default:
+    case VMI_OS_WINDOWS_10:
+        trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? tcpl_win10_x64_ret_cb : NULL;
+        break;
+    };
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
         printf("Failed to trap return at 0x%lx\n", rsp);
@@ -881,8 +1204,18 @@ static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     trap->breakpoint.addr_type = ADDR_VA;
     trap->breakpoint.addr = rsp;
     trap->type = BREAKPOINT;
-    trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_x64_write_cb : udpa_x86_write_cb;
     trap->data = w;
+
+    switch(w->s->winver) {
+    case VMI_OS_WINDOWS_7:
+    case VMI_OS_WINDOWS_8:
+        trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_x64_ret_cb : udpa_x86_ret_cb;
+        break;
+    default:
+    case VMI_OS_WINDOWS_10:
+        trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_win10_x64_ret_cb : NULL;
+        break;
+    };
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
         printf("Failed to trap return at 0x%lx\n", rsp);
@@ -897,9 +1230,15 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
     const char *tcpip_profile = c->tcpip_profile;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->pm = vmi_get_page_mode(vmi, 0);
+    this->winver = vmi_get_winver(vmi);
     drakvuf_release_vmi(drakvuf);
-    this->rettraps = g_hash_table_new(g_int64_hash, g_int64_equal);
     this->format = output;
+
+    if ( this->winver == VMI_OS_WINDOWS_10 && this->pm != VMI_PM_IA32E )
+    {
+        fprintf(stderr, "Socketmon plugin not supported on 32-bit Windows 10\n");
+        throw -1;
+    }
 
     if ( !tcpip_profile ) {
         fprintf(stderr, "Socketmon plugin requires the Rekall profile for tcpip.sys!\n");
@@ -907,19 +1246,33 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
     }
 
     if ( this->pm == VMI_PM_IA32E ) {
-        this->trap[0].cb = tcpe_x64_write_cb;
-        this->trap[1].cb = tcpe_x64_write_cb;
-        this->trap[2].cb = tcpe_x64_write_cb;
-        this->trap[3].cb = tcpe_x64_write_cb;
+        switch(this->winver) {
+        case VMI_OS_WINDOWS_10:
+            this->trap[0].cb = tcpe_win10_x64_cb;
+            this->trap[1].cb = tcpe_win10_x64_cb;
+            this->trap[2].cb = tcpe_win10_x64_cb;
+            this->trap[3].cb = tcpe_win10_x64_cb;
+            this->trap[4].cb = tcpe_win10_x64_cb;
+            break;
+        default:
+        case VMI_OS_WINDOWS_7:
+            this->trap[0].cb = tcpe_x64_cb;
+            this->trap[1].cb = tcpe_x64_cb;
+            this->trap[2].cb = tcpe_x64_cb;
+            this->trap[3].cb = tcpe_x64_cb;
+            this->trap[4].cb = tcpe_x64_cb;
+            break;
+        };
     } else {
-        this->trap[0].cb = tcpe_x86_write_cb;
-        this->trap[1].cb = tcpe_x86_write_cb;
-        this->trap[2].cb = tcpe_x86_write_cb;
-        this->trap[3].cb = tcpe_x86_write_cb;
+        this->trap[0].cb = tcpe_x86_cb;
+        this->trap[1].cb = tcpe_x86_cb;
+        this->trap[2].cb = tcpe_x86_cb;
+        this->trap[3].cb = tcpe_x86_cb;
+        this->trap[4].cb = tcpe_x86_cb;
     }
 
-    this->trap[4].cb = udpb_cb;
-    this->trap[5].cb = tcpl_cb;
+    this->trap[5].cb = udpb_cb;
+    this->trap[6].cb = tcpl_cb;
 
     if ( !drakvuf_get_function_rva(tcpip_profile, "TcpTcbDelay", &this->trap[0].breakpoint.rva) )
         throw -1;
@@ -929,9 +1282,11 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
         throw -1;
     if ( !drakvuf_get_function_rva(tcpip_profile, "TcpShutdownTcb", &this->trap[3].breakpoint.rva) )
         throw -1;
-    if ( !drakvuf_get_function_rva(tcpip_profile, "UdpBindEndpoint", &this->trap[4].breakpoint.rva) )
+    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpSetSockOptTcb", &this->trap[4].breakpoint.rva) )
         throw -1;
-    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpCreateListenerWorkQueueRoutine", &this->trap[5].breakpoint.rva) )
+    if ( !drakvuf_get_function_rva(tcpip_profile, "UdpSetSockOptEndpoint", &this->trap[5].breakpoint.rva) )
+        throw -1;
+    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpCreateListenerWorkQueueRoutine", &this->trap[6].breakpoint.rva) )
         throw -1;
 
     if ( !drakvuf_add_trap(drakvuf, &this->trap[0]) )
@@ -945,6 +1300,8 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
     if ( !drakvuf_add_trap(drakvuf, &this->trap[4]) )
         throw -1;
     if ( !drakvuf_add_trap(drakvuf, &this->trap[5]) )
+        throw -1;
+    if ( !drakvuf_add_trap(drakvuf, &this->trap[6]) )
         throw -1;
 }
 
