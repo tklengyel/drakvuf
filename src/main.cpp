@@ -133,6 +133,7 @@ int main(int argc, char** argv) {
     char *rekall_profile = NULL;
     char *dump_folder = NULL;
     char *start_process_name = NULL;
+    char *tcpip = NULL;
     vmi_pid_t injection_pid = -1;
     uint32_t injection_thread = 0;
     struct sigaction act;
@@ -162,7 +163,12 @@ int main(int argc, char** argv) {
                "\t -x <plugin>               Don't activate the specified plugin\n"
                "\t -p                        Leave domain paused after DRAKVUF exits\n"
                "\t -w <process name>         Wait with plugin start until process name is detected\n"
+#ifdef ENABLE_PLUGIN_FILEDELETE
                "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
+#endif
+#ifdef ENABLE_PLUGIN_SOCKETMON
+               "\t -T <rekall profile>       The Rekall profile for tcpip.sys\n"
+#endif
 #ifdef ENABLE_PLUGIN_CPUIDMON
                "\t -s                        Hide Hypervisor bits and signature in CPUID\n"
 #endif
@@ -173,7 +179,7 @@ int main(int argc, char** argv) {
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:t:D:o:vx:spw:")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:t:D:o:vx:spw:T:")) != -1)
     switch (c)
     {
     case 'r':
@@ -212,6 +218,9 @@ int main(int argc, char** argv) {
         break;
     case 'w':
         start_process_name = optarg;
+        break;
+    case 'T':
+        tcpip = optarg;
         break;
 #ifdef DRAKVUF_DEBUG
     case 'v':
@@ -268,7 +277,7 @@ int main(int argc, char** argv) {
 
     PRINT_DEBUG("Starting plugins\n");
 
-    if ( drakvuf->start_plugins(plugin_list, dump_folder, cpuid_stealth) < 0 )
+    if ( drakvuf->start_plugins(plugin_list, dump_folder, cpuid_stealth, tcpip) < 0 )
         goto exit;
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");

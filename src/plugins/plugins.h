@@ -116,6 +116,10 @@ struct filedelete_config {
     const char *rekall_profile;
     const char *dump_folder;
 };
+struct socketmon_config {
+    const char *rekall_profile;
+    const char *tcpip_profile;
+};
 
 /***************************************************************************/
 

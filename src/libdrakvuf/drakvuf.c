@@ -316,7 +316,7 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
 
     bool ret;
 
-    if (!trap)
+    if (!trap || !trap->cb)
         return 0;
 
     if(g_hash_table_lookup(drakvuf->remove_traps, &trap)) {
