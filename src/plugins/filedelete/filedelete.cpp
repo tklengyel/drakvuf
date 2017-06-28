@@ -115,7 +115,6 @@
 enum offset {
     FILE_OBJECT_TYPE,
     FILE_OBJECT_FILENAME,
-    FILE_OBJECT_SIZE,
     FILE_OBJECT_SECTIONOBJECTPOINTER,
     SECTIONOBJECTPOINTER_DATASECTIONOBJECT,
     SECTIONOBJECTPOINTER_SHAREDCACHEMAP,
@@ -130,15 +129,12 @@ enum offset {
     SUBSECTION_CONTROLAREA,
     SUBSECTION_STARTINGSECTOR,
     OBJECT_HEADER_BODY,
-    UNICODE_STRING_LENGTH,
-    UNICODE_STRING_BUFFER,
     __OFFSET_MAX
 };
 
 static const char *offset_names[__OFFSET_MAX][2] = {
     [FILE_OBJECT_TYPE] = {"_FILE_OBJECT", "Type"},
     [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
-    [FILE_OBJECT_SIZE] = {"_FILE_OBJECT", "Size"},
     [FILE_OBJECT_SECTIONOBJECTPOINTER] = {"_FILE_OBJECT", "SectionObjectPointer"},
     [SECTIONOBJECTPOINTER_DATASECTIONOBJECT] = {"_SECTION_OBJECT_POINTERS", "DataSectionObject"},
     [SECTIONOBJECTPOINTER_SHAREDCACHEMAP] = {"_SECTION_OBJECT_POINTERS", "SharedCacheMap"},
@@ -153,8 +149,6 @@ static const char *offset_names[__OFFSET_MAX][2] = {
     [SUBSECTION_CONTROLAREA] = {"_SUBSECTION", "ControlArea"},
     [SUBSECTION_STARTINGSECTOR] = {"_SUBSECTION", "StartingSector"},
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
-    [UNICODE_STRING_LENGTH] = {"_UNICODE_STRING", "Length" },
-    [UNICODE_STRING_BUFFER] = {"_UNICODE_STRING", "Buffer" },
 };
 
 static void extract_ca_file(filedelete *f, drakvuf_t drakvuf, vmi_instance_t vmi, addr_t control_area, access_context_t *ctx)
@@ -328,54 +322,35 @@ static void grab_file_by_handle(filedelete *f, drakvuf_t drakvuf,
     if (type != 5)
         return;
 
-    uint16_t length = 0, size = 0;
-    addr_t buffer = 0;
+    ctx.addr = filename;
+    unicode_string_t *us = vmi_read_unicode_str(vmi, &ctx);
 
-    ctx.addr = filename + f->offsets[FILE_OBJECT_SIZE];
-    if ( VMI_FAILURE == vmi_read_16(vmi, &ctx, &size) )
+    if (!us)
         return;
 
-    ctx.addr = filename + f->offsets[UNICODE_STRING_BUFFER];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &buffer) )
-        return;
+    unicode_string_t str2 = { .contents = NULL };
+    if ( vmi_convert_str_encoding(us, &str2, "UTF-8") == VMI_SUCCESS )
+    {
+        switch(f->format) {
+        case OUTPUT_CSV:
+            printf("filedelete,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",\"%s\"\n",
+                   info->vcpu, info->regs->cr3, info->procname, info->userid, str2.contents);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[FILEDELETE] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" \"%s\"\n",
+                   info->vcpu, info->regs->cr3, info->procname,
+                   USERIDSTR(drakvuf), info->userid, str2.contents);
+            break;
+        };
 
-    ctx.addr = filename + f->offsets[UNICODE_STRING_LENGTH];
-    if ( VMI_FAILURE == vmi_read_16(vmi, &ctx, &length) )
-        return;
+        if (f->dump_folder)
+            extract_file(f, drakvuf, vmi, file, &ctx);
 
-    if (length && buffer) {
-        unicode_string_t str;
-        str.length = length;
-        str.encoding = "UTF-16";
-        str.contents = (unsigned char *)g_malloc0(length);
-
-        ctx.addr = buffer;
-        if ( length != vmi_read(vmi, &ctx, str.contents, length) )
-            return;
-
-        unicode_string_t str2 = { .contents = NULL };
-        if ( vmi_convert_str_encoding(&str, &str2, "UTF-8") == VMI_SUCCESS )
-        {
-            switch(f->format) {
-            case OUTPUT_CSV:
-                printf("filedelete,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",\"%s\"\n",
-                       info->vcpu, info->regs->cr3, info->procname, info->userid, str2.contents);
-                break;
-            default:
-            case OUTPUT_DEFAULT:
-                printf("[FILEDELETE] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" \"%s\"\n",
-                       info->vcpu, info->regs->cr3, info->procname,
-                       USERIDSTR(drakvuf), info->userid, str2.contents);
-                break;
-            };
-
-            if (f->dump_folder)
-                extract_file(f, drakvuf, vmi, file, &ctx);
-
-            free(str2.contents);
-        }
-        g_free(str.contents);
+        free(str2.contents);
     }
+
+    vmi_free_unicode_str(us);
 }
 
 /*
