@@ -130,9 +130,39 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     return 0;
 }
 
+static event_response_t win_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+
+    syscall_wrapper_t *wrapper = (syscall_wrapper_t*)info->trap->data;
+    syscalls *s = wrapper->sc;
+
+    s->traps = g_slist_remove(s->traps,info->trap);
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+
+    switch(s->format) {
+    case OUTPUT_CSV:
+        printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s,ReturnValue,0x%lx\n",
+               info->vcpu, info->regs->cr3, info->procname, info->userid, info->trap->breakpoint.module, info->trap->name, info->regs->rax);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[SYSCALL] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" %s!%s\n",
+               info->vcpu, info->regs->cr3, info->procname,
+               USERIDSTR(drakvuf), info->userid,
+               info->trap->breakpoint.module, info->trap->name);
+        printf("\tReturn Value: 0x%lx\n", info->regs->rax);
+        break;
+    }
+
+    return 0;
+}
+
+
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     int i = 0, nargs = 0;
     size_t size = 0;
+
+    // WARNING! If you use this variable, be sure to check if the syscall index is valid first!
+    // Otherwise you risk null dereference errors...
     unsigned char* buf = NULL; // pointer to buffer to hold argument values
 
     syscall_wrapper_t *wrapper = (syscall_wrapper_t*)info->trap->data;
@@ -148,6 +178,8 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         buf = (unsigned char *)g_malloc(sizeof(char)*size);
     }
 
+    // WARNING! If you use these variables, be sure to check if the syscall index is valid first!
+    // Otherwise you risk null dereference errors...
     uint32_t *buf32 = (uint32_t *)buf;
     uint64_t *buf64 = (uint64_t *)buf;
 
@@ -194,6 +226,35 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         }
     }
 
+    if(wsc->ret != VOID){
+        addr_t ret_addr;
+
+        access_context_t ctx;
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+        ctx.addr = info->regs->rsp;
+        vmi_read(vmi,&ctx,&ret_addr,s->reg_size);
+
+        drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
+        trap->breakpoint.lookup_type = LOOKUP_PID;
+        trap->breakpoint.pid = info->trap->breakpoint.pid;
+        trap->breakpoint.addr_type = ADDR_VA;
+        trap->breakpoint.addr = ret_addr;
+        trap->breakpoint.module = info->trap->breakpoint.module;
+
+        char ret_str[strlen(info->trap->name)+strlen("_Return")];
+        strcpy(ret_str,info->trap->name);
+        strcat(ret_str,"_Return");
+        trap->name = g_strdup(ret_str);
+
+        trap->type = BREAKPOINT;
+        trap->cb = win_ret_cb;
+        trap->data = wrapper;
+        s->traps = g_slist_prepend(s->traps, trap);
+        if(!drakvuf_add_trap(drakvuf,trap))
+                printf("Error setting drakvuf return trap for %s\n",info->trap->name);
+    }
+
     switch(s->format) {
     case OUTPUT_CSV:
         printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s",
@@ -218,7 +279,6 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                     printf("-");
             }
         }
-
         printf("\n");
         break;
       default:
@@ -247,10 +307,12 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
                 printf("\n");
             }
-        } else
+        }  else
             printf("\n");
         break;
     }
+
+
 exit:
     g_free(buf);
     drakvuf_release_vmi(drakvuf);

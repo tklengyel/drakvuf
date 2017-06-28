@@ -3442,3 +3442,4 @@ static const win_syscall_t win_syscalls[] = {
   { .name = "NtYieldExecution", .ret = NTSTATUS, .num_args = 0 }
 };
 
+
