@@ -1158,6 +1158,9 @@ static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     drakvuf_release_vmi(drakvuf);
 
+    if ( !w->obj )
+        return 0;
+
     drakvuf_trap_t *trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
     trap->breakpoint.lookup_type = LOOKUP_PID;
     trap->breakpoint.pid = 4;
@@ -1197,6 +1200,9 @@ static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         vmi_read_addr_va(vmi, info->regs->rsp + sizeof(uint32_t), 0, &w->obj);
 
     drakvuf_release_vmi(drakvuf);
+
+    if ( !w->obj )
+        return 0;
 
     drakvuf_trap_t *trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
     trap->breakpoint.lookup_type = LOOKUP_PID;
