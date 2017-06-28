@@ -256,7 +256,7 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
             addr_t trap_pa = vmi_pagetable_lookup(drakvuf->vmi, dtb, trap->breakpoint.addr);
             if (!trap_pa)
             {
-                PRINT_DEBUG("Failed to find PA for breakpoint VA addr 0x%lx\n", trap->breakpoint.addr);
+                PRINT_DEBUG("Failed to find PA for breakpoint VA addr 0x%lx in DTB 0x%lx\n", trap->breakpoint.addr, dtb);
                 return 0;
             }
 
