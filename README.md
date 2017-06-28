@@ -34,3 +34,9 @@ developed with malware analysis in mind, it is certainly not limited to that tas
 can be used to monitor the execution of arbitrary binaries.
 
 More information can be found on the project website: https://drakvuf.com
+
+[![Build Status](https://travis-ci.org/tklengyel/drakvuf.svg?branch=master)](https://travis-ci.org/tklengyel/drakvuf)
+<a href="https://scan.coverity.com/projects/tklengyel-drakvuf">
+  <img alt="Coverity Scan Build Status"
+       src="https://scan.coverity.com/projects/3238/badge.svg"/>
+</a>
