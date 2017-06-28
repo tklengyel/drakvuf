@@ -130,6 +130,49 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     return 0;
 }
 
+static unicode_string_t* read_unicode(vmi_instance_t vmi, access_context_t *ctx)
+{
+    unicode_string_t *us = vmi_read_unicode_str(vmi, ctx);
+    if ( !us )
+        return NULL;
+
+    unicode_string_t *out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+
+    if ( !out ) {
+        vmi_free_unicode_str(us);
+        return NULL;
+    }
+
+    status_t rc = vmi_convert_str_encoding(us, out, "UTF-8");
+    vmi_free_unicode_str(us);
+
+    if(VMI_SUCCESS == rc)
+        return out;
+
+    g_free(out);
+    return NULL;
+}
+
+static unicode_string_t* get_filename_from_handle(syscalls *s,
+                                                  drakvuf_t drakvuf,
+                                                  drakvuf_trap_info_t *info,
+                                                  vmi_instance_t vmi,
+                                                  access_context_t *ctx,
+                                                  addr_t handle)
+{
+    addr_t process=drakvuf_get_current_process(drakvuf, info->vcpu);
+
+    if (!process)
+        return NULL;
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
+    if ( !obj )
+        return NULL;
+
+    ctx->addr = obj + s->object_header_body + s->file_object_filename;
+    return read_unicode(vmi, ctx);
+}
+
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     int i = 0, nargs = 0;
     size_t size = 0;
@@ -205,17 +248,40 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
             for ( i=0; i<nargs; i++ )
             {
-                printf(",%s,",wsc->args[i].name);
+                addr_t val = 0;
+                printf(",%s,%s,%s,",win_arg_direction_names[wsc->args[i].dir],win_type_names[wsc->args[i].type],wsc->args[i].name);
+
+                if ( 4 == s->reg_size ) {
+                    val = buf32[i];
+                    printf("0x%" PRIx32",", buf32[i]);
+                } else {
+                    val = buf64[i];
+                    printf("0x%" PRIx64",", buf64[i]);
+                }
 
                 if ( wsc->args[i].dir == DIR_IN || wsc->args[i].dir == DIR_INOUT )
                 {
-                    if ( 4 == s->reg_size )
-                        printf("0x%" PRIx32, buf32[i]);
-                    else
-                        printf("0x%" PRIx64, buf64[i]);
+                    if ( wsc->args[i].type == PUNICODE_STRING) {
+                        ctx.addr = val;
+                        unicode_string_t *us = read_unicode(vmi, &ctx);
+
+                        if ( us ) {
+                            printf("%s", us->contents);
+                            vmi_free_unicode_str(us);
+                        }
+                    }
+
+                    if ( !strcmp(wsc->args[i].name, "FileHandle") ) {
+                        unicode_string_t *us = get_filename_from_handle(s, drakvuf, info, vmi, &ctx, val);
+
+                        if ( us ) {
+                            printf("%s", us->contents);
+                            vmi_free_unicode_str(us);
+                        }
+                    }
                 }
-                else
-                    printf("-");
+
+                printf(",");
             }
         }
 
@@ -234,22 +300,43 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
             for( i =0; i<nargs; i++ )
             {
-                printf("\t%s: ", wsc->args[i].name);
+                addr_t val = 0;
+                printf("\t%s %s %s: ", win_arg_direction_names[wsc->args[i].dir], win_type_names[wsc->args[i].type], wsc->args[i].name);
+
+                if ( 4 == s->reg_size ) {
+                    val = buf32[i];
+                    printf("0x%" PRIx32, buf32[i]);
+                } else {
+                    val = buf64[i];
+                    printf("0x%" PRIx64, buf64[i]);
+                }
+
                 if ( wsc->args[i].dir == DIR_IN || wsc->args[i].dir == DIR_INOUT )
                 {
-                    if ( 4 == s->reg_size )
-                        printf("0x%" PRIx32, buf32[i]);
-                    else
-                        printf("0x%" PRIx64, buf64[i]);
+                    if ( wsc->args[i].type == PUNICODE_STRING) {
+                        ctx.addr = val;
+                        unicode_string_t *us = read_unicode(vmi, &ctx);
+
+                        if ( us ) {
+                            printf(" -> '%s'", us->contents);
+                            vmi_free_unicode_str(us);
+                        }
+                    }
+
+                    if ( !strcmp(wsc->args[i].name, "FileHandle") ) {
+                        unicode_string_t *us = get_filename_from_handle(s, drakvuf, info, vmi, &ctx, val);
+
+                        if ( us ) {
+                            printf(" -> '%s'", us->contents);
+                            vmi_free_unicode_str(us);
+                        }
+                    }
                 }
-                else
-                    printf("-");
 
                 printf("\n");
             }
         } else
             printf("\n");
-        break;
     }
 exit:
     g_free(buf);
@@ -267,6 +354,14 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls *s, symbols_t *sym
     if ( s->os == VMI_OS_WINDOWS )
     {
         addr_t ntoskrnl = drakvuf_get_kernel_base(drakvuf);
+
+        if ( !ntoskrnl )
+            return NULL;
+
+        if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "Body", &s->object_header_body) )
+            return NULL;
+        if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_OBJECT", "FileName", &s->file_object_filename) )
+            return NULL;
 
         for (i=0; i < symbols->count; i++)
         {
@@ -367,6 +462,9 @@ syscalls::syscalls(drakvuf_t drakvuf, const void *config, output_format_t output
     this->os = drakvuf_get_os_type(drakvuf);
     this->traps = create_trap_config(drakvuf, this, symbols, rekall_profile);
     this->format = output;
+
+    if ( !this->traps )
+        throw -1;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->reg_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
