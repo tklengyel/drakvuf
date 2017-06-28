@@ -122,64 +122,10 @@
 #include "private.h"
 #include "filetracer.h"
 
-/*static event_response_t file_name_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    struct file_watch *watch = (struct file_watch*)info->trap->data;
-    filetracer *f = watch->f;
-
-    if (info->trap_pa == watch->file_name_buffer)
-    {
-        addr_t file_name = 0;
-        uint16_t length = 0;
-        vmi_read_addr_pa(vmi, watch->file_name_buffer, &file_name);
-        vmi_read_16_pa(vmi, watch->file_name_length, &length);
-
-        //printf("File name @ 0x%lx. Length: %u\n", file_name, length);
-
-        if (file_name && length > 0 && length < VMI_PS_4KB) {
-            unicode_string_t str = { .contents = NULL };
-            str.length = length;
-            str.encoding = "UTF-16";
-            str.contents = (unsigned char *)g_malloc0(length);
-            vmi_read_va(vmi, file_name, 0, str.contents, length);
-            unicode_string_t str2 = { .contents = NULL };
-            status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
-
-            if (VMI_SUCCESS == rc) {
-
-                switch(f->format) {
-                case OUTPUT_CSV:
-                    printf("filetracer,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s\n",
-                           info->vcpu, info->regs->cr3, info->procname, info->userid, str2.contents);
-                    break;
-                default:
-                case OUTPUT_DEFAULT:
-                    printf("[FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s\n",
-                           info->vcpu, info->regs->cr3, info->procname,
-                           USERIDSTR(drakvuf), info->userid, str2.contents);
-                    break;
-                };
-
-                g_free(str2.contents);
-            }
-
-            free(str.contents);
-            //printf("Requesting to free writetrap @ %p\n", info->trap);
-            info->trap->data=f;
-            drakvuf_remove_trap(drakvuf, info->trap, free_writetrap);
-        }
-    }
-
-    drakvuf_release_vmi(drakvuf);
-    return 0;
-}*/
-
 static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t attr)
 {
     filetracer *f = (filetracer*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    addr_t name = 0;
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -191,42 +137,20 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
     }
 
     ctx.addr = attr + f->objattr_name;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &name) )
-        printf("Nothing at 0x%lx\n", ctx.addr);
-
-    uint16_t length = 0;
-
-    ctx.addr = name;
-    status_t rc = vmi_read_16(vmi, &ctx, &length);
-
-    if ( VMI_FAILURE == rc || length > VMI_PS_4KB ) {
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) ) {
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
 
-    unicode_string_t str, str2 = { .contents = NULL };
-    str.contents = (unsigned char*)g_malloc0(length + 2);
-    str.length = length;
-    str.encoding = "UTF-16";
-
-    ctx.addr = name + f->unicode_buf;
-    rc = vmi_read_addr(vmi, &ctx, &ctx.addr);
-    if ( VMI_FAILURE == rc ) {
-        g_free(str.contents);
+    unicode_string_t *us = vmi_read_unicode_str(vmi, &ctx);
+    if ( !us ) {
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
 
-    if ( length != vmi_read(vmi, &ctx, str.contents, length) ) {
-        g_free(str.contents);
-        drakvuf_release_vmi(drakvuf);
-        return 0;
-    }
+    unicode_string_t str2 = { .contents = NULL };
 
-    rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
-    g_free(str.contents);
-
-    if (VMI_SUCCESS == rc) {
+    if (VMI_SUCCESS == vmi_convert_str_encoding(us, &str2, "UTF-8")) {
         switch(f->format) {
         case OUTPUT_CSV:
             printf("filetracer,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s\n",
@@ -243,6 +167,7 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
         g_free(str2.contents);
     }
 
+    vmi_free_unicode_str(us);
     drakvuf_release_vmi(drakvuf);
     return 0;
 }
@@ -297,8 +222,6 @@ filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t ou
         this->trap[i].cb = cb2;
 
     if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
-        throw -1;
-    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_UNICODE_STRING", "Buffer", &this->unicode_buf) )
         throw -1;
     if ( !drakvuf_get_function_rva(rekall_profile, "NtCreateFile", &this->trap[0].breakpoint.rva) )
         throw -1;

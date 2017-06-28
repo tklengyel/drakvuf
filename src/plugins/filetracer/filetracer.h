@@ -114,7 +114,6 @@ class filetracer: public plugin {
         output_format_t format;
 
         addr_t objattr_name;
-        addr_t unicode_buf;
 
         drakvuf_trap_t trap[8] = {
             [0 ... 7] = {
