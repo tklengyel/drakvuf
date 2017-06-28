@@ -174,7 +174,7 @@ static unicode_string_t* get_filename_from_handle(syscalls *s,
 }
 
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    int i = 0, nargs = 0;
+    unsigned int i = 0, nargs = 0;
     size_t size = 0;
     unsigned char* buf = NULL; // pointer to buffer to hold argument values
 

@@ -140,6 +140,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     page_mode_t pm = vmi_get_page_mode(vmi, 0);
     reg_t pool_type, size;
     char tag[5] = { [0 ... 4] = '\0' };
+    struct pooltag *s = NULL;
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -151,14 +152,19 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         *(reg_t*)tag = info->regs->r8;
     } else {
         ctx.addr = info->regs->rsp+12;
-        vmi_read_32(vmi, &ctx, (uint32_t*)tag);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)tag) )
+            goto done;
+
         ctx.addr = info->regs->rsp+8;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&size);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&size) )
+            goto done;
+
         ctx.addr = info->regs->rsp+4;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&pool_type);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&pool_type) )
+            goto done;
     }
 
-    struct pooltag *s = (struct pooltag*)g_tree_lookup(p->pooltag_tree, tag);
+    s = (struct pooltag*)g_tree_lookup(p->pooltag_tree, tag);
 
     switch(p->format) {
     case OUTPUT_CSV:
@@ -184,6 +190,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     printf("\n");
 
+done:
     drakvuf_release_vmi(drakvuf);
     return 0;
 }

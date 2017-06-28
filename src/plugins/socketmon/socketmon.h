@@ -123,8 +123,6 @@ class socketmon: public plugin {
                 .data = (void*)this
             }
         };
-        GSList *writetraps;
-        GHashTable *rettraps;
 
         socketmon(drakvuf_t drakvuf, const void *config, output_format_t output);
         ~socketmon();

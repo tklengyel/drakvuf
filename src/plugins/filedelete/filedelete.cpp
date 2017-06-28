@@ -189,8 +189,8 @@ static void extract_ca_file(filedelete *f, drakvuf_t drakvuf, vmi_instance_t vmi
         if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &test) || test != control_area )
             break;
 
-        addr_t base;
-        uint32_t ptes, start;
+        addr_t base = 0, start = 0;
+        uint32_t ptes = 0;
 
         ctx->addr = subsection + f->offsets[SUBSECTION_SUBSECTIONBASE];
         if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &base) )
@@ -204,7 +204,7 @@ static void extract_ca_file(filedelete *f, drakvuf_t drakvuf, vmi_instance_t vmi
             break;
 
         ctx->addr = subsection + f->offsets[SUBSECTION_STARTINGSECTOR];
-        if ( VMI_FAILURE == vmi_read_32(vmi, ctx, &start) )
+        if ( VMI_FAILURE == vmi_read_32(vmi, ctx, (uint32_t*)&start) )
             break;
 
         /*
@@ -230,8 +230,8 @@ static void extract_ca_file(filedelete *f, drakvuf_t drakvuf, vmi_instance_t vmi
                 if ( 4096 != vmi_read_pa(vmi, VMI_BIT_MASK(12,48) & pte, page, 4096) )
                     continue;
 
-                fseek ( fp , fileoffset , SEEK_SET );
-                fwrite(page, 4096, 1, fp);
+                if ( !fseek ( fp , fileoffset , SEEK_SET ) )
+                    fwrite(page, 4096, 1, fp);
             }
         }
 
