@@ -15,8 +15,9 @@ before_install:
   - git submodule update libvmi
   - cd libvmi && ./autogen.sh && ./configure --enable-xen --disable-kvm --without-xenstore
   - make && sudo make install
+  - cd ..
 
-script: "./autogen.sh; ./configure --enable-debug; make clean; make"
+script: "./autogen.sh && ./configure --enable-debug && make"
 
 git:
   submodules: false
