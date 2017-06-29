@@ -50,9 +50,9 @@
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Supported guests</h3>
 <p>DRAKVUF currently supports monitoring the following operating systems:
 <ul>
-<li>Windows 7 32-bit</li>
-<li>Windows 7 64-bit</li>
-<li>Linux</li>
+<li>Windows 7-8, both 32-bit and 64-bit</li>
+<li>Windows 10 64-bit</li>
+<li>Linux 2.6.x - 4.x, both 32-bit and 64-bit</li>
 </ul>
 </p>
 
@@ -99,19 +99,24 @@
 <ul>
 <li>Agentless start of binary execution.</li>
 <li>Agentless monitoring of Windows internal kernel functions.</li>
+<li>Cloning of analysis VMs via copy-on-write memory and disk.</li>
 <li>Guest multi-vCPU support.</li>
+</ul>
+
+<p><a href="https://github.com/tklengyel/drakvuf/wiki/DRAKVUF-Plugin-Documentation">Plugins are also available for Windows</a> to monitor several system aspects:</p>
+
+<ul>
 <li>Tracing heap allocations.</li>
 <li>Tracing files being accessed.</li>
 <li>Extracting files from memory before they are deleted.</li>
-<li>Cloning of analysis VMs via copy-on-write memory and disk.</li>
+<li>Tracing UDP and TCP connections</li>
 </ul>
 
-<p>Be advised that DRAKVUF is still in its early development stage and lacks features other binary analyzers may have. There are many opportunities to improve and extend DRAKVUF. Just to name a few:</p>
+<p>There are many opportunities to improve and extend DRAKVUF. Take a look at our <a href="https://github.com/tklengyel/drakvuf/issues">Issues page</a> and also, just to name a few more:</p>
 
 <ul>
 <li>Structured logging into JSON/MySQL/MongoDB.</li>
 <li>Automatic submission of extracted files to VirusTotal.</li>
-<li>Linux support.</li>
 <li>Run-time deduplication of unused memory with Xen's memory sharing.</li>
 <li>Integration into malware analysis operations, such as <a href="https://holmesprocessing.github.io">HOLMES</a>.</li>
 </ul>
