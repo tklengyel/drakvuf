@@ -969,8 +969,8 @@ static const win_syscall_t win_syscalls[] = {
   },
   { .name = "NtContinue", .ret = NTSTATUS, .num_args = 2, .args =
     {
-      {.name = "ContextRecord", .dir = DIR_OUT, .dir_opt = "", .type = PCONTEXT},
-      {.name = "TestAlert", .dir = DIR_OUT, .dir_opt = "", .type = BOOLEAN}
+      {.name = "ContextRecord", .dir = DIR_IN, .dir_opt = "", .type = PCONTEXT},
+      {.name = "TestAlert", .dir = DIR_IN, .dir_opt = "", .type = BOOLEAN}
     }
   },
   { .name = "NtCreateDebugObject", .ret = NTSTATUS, .num_args = 4, .args =
