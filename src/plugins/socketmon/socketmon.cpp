@@ -1240,14 +1240,14 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
     drakvuf_release_vmi(drakvuf);
     this->format = output;
 
+    if ( !tcpip_profile ) {
+        fprintf(stderr, "Socketmon plugin requires the Rekall profile for tcpip.sys!\n");
+        return;
+    }
+
     if ( this->winver == VMI_OS_WINDOWS_10 && this->pm != VMI_PM_IA32E )
     {
         fprintf(stderr, "Socketmon plugin not supported on 32-bit Windows 10\n");
-        throw -1;
-    }
-
-    if ( !tcpip_profile ) {
-        fprintf(stderr, "Socketmon plugin requires the Rekall profile for tcpip.sys!\n");
         throw -1;
     }
 
