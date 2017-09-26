@@ -361,9 +361,10 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_p
 
         char *procname = vmi_read_str_va(vmi, current_process + drakvuf->offsets[EPROCESS_PNAME], 0);
 
-        if((find_pid != ~0 && pid == find_pid) || (find_procname && procname && !strcmp(procname, find_procname))) {
+        if((find_pid != ~0 && pid == find_pid) || (find_procname && procname && !strcasecmp(procname, find_procname))) {
             *eprocess_addr = current_process;
-            free(procname);
+            if ( procname )
+                free(procname);
             return true;
         }
 
