@@ -140,6 +140,7 @@ typedef enum drakvuf_plugin {
     PLUGIN_DEBUGMON,
     PLUGIN_CPUIDMON,
     PLUGIN_SOCKETMON,
+    PLUGIN_REGMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -154,6 +155,7 @@ static const char *drakvuf_plugin_names[] = {
     [PLUGIN_DEBUGMON] = "debugmon",
     [PLUGIN_CPUIDMON] = "cpuidmon",
     [PLUGIN_SOCKETMON] = "socketmon",
+    [PLUGIN_REGMON] = "regmon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] = {
@@ -167,6 +169,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_DEBUGMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
     [PLUGIN_CPUIDMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
     [PLUGIN_SOCKETMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_REGMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
 class plugin {

@@ -1,6 +1,6 @@
-/*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
+ /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -102,114 +102,106 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdarg.h>
-#include "plugins.h"
-#include "syscalls/syscalls.h"
-#include "poolmon/poolmon.h"
-#include "filetracer/filetracer.h"
-#include "filedelete/filedelete.h"
-#include "objmon/objmon.h"
-#include "exmon/exmon.h"
-#include "ssdtmon/ssdtmon.h"
-#include "debugmon/debugmon.h"
-#include "cpuidmon/cpuidmon.h"
-#include "socketmon/socketmon.h"
-#include "regmon/regmon.h"
+#include <glib.h>
+#include <config.h>
+#include <inttypes.h>
+#include <libvmi/x86.h>
 
-drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output, os_t os)
-{
-    this->drakvuf = drakvuf;
-    this->output = output;
-    this->os = os;
-}
+#include "../plugins.h"
+#include "regmon.h"
 
-drakvuf_plugins::~drakvuf_plugins()
-{
-    int i;
-    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
-        if ( this->plugins[i] )
-            delete this->plugins[i];
-}
 
-int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
-                           const void *config)
+static void log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t *info, const char *syscall_name )
 {
-    if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
-         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX)
+    if ( info->regs->rcx )
     {
-        PRINT_DEBUG("Starting plugin %s\n", drakvuf_plugin_names[plugin_id]);
+        char *key_path = drakvuf_reg_keyhandle_path( drakvuf, info, info->regs->rcx, 0 );
 
-        if ( !drakvuf_plugin_os_support[plugin_id][this->os] )
-            return 0;
+        if ( key_path )
+        {
+            regmon *reg = (regmon *)info->trap->data;
 
-        try {
-            switch(plugin_id) {
-#ifdef ENABLE_PLUGIN_SYSCALLS
-            case PLUGIN_SYSCALLS:
-                this->plugins[plugin_id] = new syscalls(this->drakvuf, config, this->output);
+            switch( reg->format ) 
+            {
+                case OUTPUT_CSV:
+                    printf("regmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%s\n",
+                        info->vcpu, info->regs->cr3, info->procname, info->userid, syscall_name, key_path );
                 break;
-#endif
-#ifdef ENABLE_PLUGIN_POOLMON
-            case PLUGIN_POOLMON:
-                this->plugins[plugin_id] = new poolmon(this->drakvuf, config, this->output);
+
+                default:
+                case OUTPUT_DEFAULT:
+                    printf("[REGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s:%s\n",
+                        info->vcpu, info->regs->cr3, info->procname, USERIDSTR(drakvuf), info->userid, syscall_name, key_path );
                 break;
-#endif
-#ifdef ENABLE_PLUGIN_FILETRACER
-            case PLUGIN_FILETRACER:
-                this->plugins[plugin_id] = new filetracer(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_FILEDELETE
-            case PLUGIN_FILEDELETE:
-                this->plugins[plugin_id] = new filedelete(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_OBJMON
-            case PLUGIN_OBJMON:
-                this->plugins[plugin_id] = new objmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_EXMON
-            case PLUGIN_EXMON:
-                this->plugins[plugin_id] = new exmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_SSDTMON
-            case PLUGIN_SSDTMON:
-                this->plugins[plugin_id] = new ssdtmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_DEBUGMON
-            case PLUGIN_DEBUGMON:
-                this->plugins[plugin_id] = new debugmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_CPUIDMON
-            case PLUGIN_CPUIDMON:
-                this->plugins[plugin_id] = new cpuidmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_SOCKETMON
-            case PLUGIN_SOCKETMON:
-                this->plugins[plugin_id] = new socketmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_REGMON
-            case PLUGIN_REGMON:
-                this->plugins[plugin_id] = new regmon(this->drakvuf, config, this->output);
-                break;
-#endif
-            default:
-                break;
-            };
-        } catch (int e) {
-            fprintf(stderr, "Plugin %s startup failed!\n", drakvuf_plugin_names[plugin_id]);
-            return -1;
+            }
+
+            g_free( key_path );
         }
-
-        PRINT_DEBUG("Starting plugin %s finished\n", drakvuf_plugin_names[plugin_id]);
-        return 1;
     }
-
-    return 0;
 }
+
+
+static event_response_t hook_deletekey_cb( drakvuf_t drakvuf, drakvuf_trap_info_t *info )
+{
+    log_reg_hook( drakvuf, info, "DELETEKEY" );
+
+    return 0 ;
+}
+
+static event_response_t hook_deletevaluekey_cb( drakvuf_t drakvuf, drakvuf_trap_info_t *info )
+{
+    log_reg_hook( drakvuf, info, "DELETEVALUEKEY" );
+
+    return 0 ;
+}
+
+static event_response_t hook_setvaluekey_cb( drakvuf_t drakvuf, drakvuf_trap_info_t *info )
+{
+    log_reg_hook( drakvuf, info, "SETVALUEKEY" );
+
+    return 0 ;
+}
+
+
+
+regmon::regmon(drakvuf_t drakvuf, const void *config, output_format_t output)
+{
+    const char *rekall_profile = (const char *)config;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    this->pm = vmi_get_page_mode(vmi, 0);
+
+    drakvuf_release_vmi(drakvuf);
+
+    this->format = output;
+
+    ////////////////////////////////////////////////////////////////////////
+
+    if( !drakvuf_get_function_rva( rekall_profile, "NtDeleteKey",      &this->traps[0].breakpoint.rva) ) throw -1;
+
+    this->traps[0].name = "NtDeleteKey";
+    this->traps[0].cb   = hook_deletekey_cb;
+
+    if ( ! drakvuf_add_trap( drakvuf, &traps[0] ) ) throw -1;
+
+    ////////////////////////////////////////////////////////////////////////
+
+    if( !drakvuf_get_function_rva( rekall_profile, "NtSetValueKey",    &this->traps[1].breakpoint.rva) ) throw -1;
+
+    this->traps[1].name = "NtSetValueKey";
+    this->traps[1].cb   = hook_setvaluekey_cb;
+
+    if ( ! drakvuf_add_trap( drakvuf, &traps[1] ) ) throw -1;
+
+    ////////////////////////////////////////////////////////////////////////
+
+    if( !drakvuf_get_function_rva( rekall_profile, "NtDeleteValueKey", &this->traps[2].breakpoint.rva) ) throw -1;
+
+    this->traps[2].name = "NtDeleteValueKey";
+    this->traps[2].cb   = hook_deletevaluekey_cb;
+
+    if ( ! drakvuf_add_trap( drakvuf, &traps[2] ) ) throw -1;
+}
+
+regmon::~regmon(void) {}
+
