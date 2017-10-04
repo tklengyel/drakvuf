@@ -355,6 +355,19 @@ bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
                                    addr_t module_list_head,
                                    const char *module_name,
                                    addr_t *base_addr );
+
+char *drakvuf_reg_keybody_path( drakvuf_t drakvuf,
+                                drakvuf_trap_info_t *info,
+                                addr_t p_key_body );
+
+char *drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf,
+                                        drakvuf_trap_info_t *info,
+                                        addr_t p_key_control_block );
+
+char *drakvuf_reg_keyhandle_path( drakvuf_t drakvuf,
+                                  drakvuf_trap_info_t *info,
+                                  addr_t key_handle,
+                                  addr_t process_arg );
 #pragma GCC visibility pop
 
 #ifdef __cplusplus

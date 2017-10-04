@@ -102,52 +102,162 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_OFFSETS_MAP_H
-#define WIN_OFFSETS_MAP_H
+#include <libvmi/libvmi.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <stdio.h>
+#include <glib.h>
 
-/*
- * Map offset enums to actual structure+member or global variable/function names.
- */
-static const char *win_offset_names[__WIN_OFFSETS_MAX][2] = {
-    [KIINITIALPCR] = { "KiInitialPCR", NULL },
-    [EPROCESS_PID] = { "_EPROCESS", "UniqueProcessId" },
-    [EPROCESS_PDBASE] = { "_KPROCESS", "DirectoryTableBase" },
-    [EPROCESS_PNAME] = { "_EPROCESS", "ImageFileName" },
-    [EPROCESS_TASKS] = { "_EPROCESS", "ActiveProcessLinks" },
-    [EPROCESS_PEB] = { "_EPROCESS", "Peb" },
-    [EPROCESS_OBJECTTABLE] = {"_EPROCESS", "ObjectTable" },
-    [EPROCESS_PCB] = { "_EPROCESS", "Pcb" },
-    [KPROCESS_HEADER] = { "_KPROCESS", "Header" },
-    [PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
-    [PEB_LDR] = { "_PEB", "Ldr" },
-    [PEB_SESSIONID] = { "_PEB", "SessionId" },
-    [PEB_LDR_DATA_INLOADORDERMODULELIST] = {"_PEB_LDR_DATA", "InLoadOrderModuleList" },
-    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
-    [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
-    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
-    [HANDLE_TABLE_TABLECODE] = {"_HANDLE_TABLE", "TableCode" },
-    [KPCR_PRCB] = {"_KPCR", "Prcb" },
-    [KPCR_PRCBDATA] = {"_KPCR", "PrcbData" },
-    [KPRCB_CURRENTTHREAD] = { "_KPRCB", "CurrentThread" },
-    [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
-    [KTHREAD_PREVIOUSMODE] = { "_KTHREAD", "PreviousMode" },
-    [KTHREAD_HEADER] = { "_KTHREAD", "Header" },
-    [ETHREAD_CID] = {"_ETHREAD", "Cid" },
-    [ETHREAD_TCB] = { "_ETHREAD", "Tcb" },
-    [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
-    [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
-    [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
-    [POOL_HEADER_BLOCKSIZE] = {"_POOL_HEADER", "BlockSize" },
-    [POOL_HEADER_POOLTYPE] = {"_POOL_HEADER", "PoolType" },
-    [POOL_HEADER_POOLTAG] = {"_POOL_HEADER", "PoolTag" },
-    [DISPATCHER_TYPE] = { "_DISPATCHER_HEADER",  "Type" },
+#include "private.h"
+#include "win-offsets.h"
 
-    [CM_KEY_CONTROL_BLOCK] = { "_CM_KEY_BODY",           "KeyControlBlock" },
-    [CM_KEY_NAMEBLOCK]     = { "_CM_KEY_CONTROL_BLOCK",  "NameBlock"       },
-    [CM_KEY_NAMEBUFFER]    = { "_CM_NAME_CONTROL_BLOCK", "Name"            },
-    [CM_KEY_NAMELENGTH]    = { "_CM_NAME_CONTROL_BLOCK", "NameLength"      },
-    [CM_KEY_PARENTKCB]     = { "_CM_KEY_CONTROL_BLOCK",  "ParentKcb"       },
-    [CM_KEY_PROCESSID]     = { "_CM_KEY_BODY",           "ProcessID"       },
-};
 
-#endif
+char *drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t p_key_control_block )
+{
+    status_t vmi_status ;
+    addr_t p_name_control_block = 0 ;
+    char *buf_ret ;
+    vmi_instance_t vmi = drakvuf->vmi;
+    access_context_t ctx = {
+        .addr = p_key_control_block + drakvuf->offsets[ CM_KEY_NAMEBLOCK ],
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    vmi_status = vmi_read_addr( vmi, &ctx, (void *)&p_name_control_block );
+
+    if ( ( vmi_status == VMI_SUCCESS ) && p_name_control_block )
+    {
+        uint16_t name_length = 0 ;
+
+        ctx.addr = p_name_control_block + drakvuf->offsets[ CM_KEY_NAMELENGTH ] ;
+
+        if ( vmi_read_16( vmi, &ctx, &name_length ) == VMI_SUCCESS )
+        {
+            if ( name_length && ( name_length < 240 ) )
+            {
+                buf_ret = (char *)g_malloc0( name_length + 1 );
+
+                if ( buf_ret )
+                {
+                    ctx.addr = p_name_control_block + drakvuf->offsets[ CM_KEY_NAMEBUFFER] ;
+
+                    if ( vmi_read( vmi, &ctx, buf_ret, name_length ) == name_length )
+                    {
+                        int i ;
+
+                        for ( i=0 ; i< name_length ; i++ )
+                        {
+                            if ( ( buf_ret[ i ] < 32 ) || ( buf_ret[ i ] > 126 ) )
+                                buf_ret[ i ] = '?' ;
+                        }
+
+                        buf_ret[ name_length ] = 0 ;
+
+                        return buf_ret ;
+                    }
+
+                    g_free( buf_ret );
+                }
+            }
+#ifdef DRAKVUF_DEBUG            
+            else
+                PRINT_DEBUG( "Inconsistent registry key name length [%d]!!\n", name_length );
+#endif            
+        }
+    }
+
+    return NULL ;
+}
+
+
+char *drakvuf_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t p_key_body )
+{
+    char *buf_ret = NULL ;
+    status_t vmi_status ;
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t p_key_control_block = 0 ;
+    access_context_t ctx = {
+        .addr = p_key_body + drakvuf->offsets[ CM_KEY_CONTROL_BLOCK ],
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    vmi_status = vmi_read_addr( vmi, &ctx, &p_key_control_block );
+
+    if ( ( vmi_status == VMI_SUCCESS ) && p_key_control_block )
+    {
+        GSList *key_path_list = NULL ;
+        int tot_len = 0;
+
+        while ( ( vmi_status == VMI_SUCCESS ) && p_key_control_block )
+        {
+            char *key_path = drakvuf_reg_keycontrolblock_path( drakvuf, info, p_key_control_block );
+
+            if ( key_path )
+            {
+                key_path_list = g_slist_prepend( key_path_list, key_path );
+                tot_len += strlen( key_path );
+            }
+            else
+                break ;
+
+            ctx.addr = p_key_control_block + drakvuf->offsets[ CM_KEY_PARENTKCB ] ;
+
+            vmi_status = vmi_read_addr( vmi, &ctx, &p_key_control_block );
+        }
+
+        if ( tot_len )
+        {
+            tot_len += g_slist_length( key_path_list ) + 1 ;
+
+            buf_ret = (char *)g_malloc0( tot_len ) ;
+
+            if ( buf_ret )
+            {
+                GSList *iterator ;
+
+                *buf_ret = 0 ;
+
+                for ( iterator = key_path_list; iterator ; iterator = iterator->next )
+                {
+                    strcat( buf_ret, "\\" );
+                    strcat( buf_ret, (char *)iterator->data );
+                    g_free( iterator->data );
+                }
+            }
+        }
+
+        g_slist_free( key_path_list );
+    }
+
+    return buf_ret ;
+}
+
+
+char *drakvuf_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t key_handle, addr_t process_arg )
+{
+    addr_t process = process_arg ;
+
+    if ( ! process )
+        process = drakvuf_get_current_process( drakvuf, info->vcpu );
+
+    if ( process )
+    {
+        addr_t obj = drakvuf_get_obj_by_handle( drakvuf, process, key_handle );
+
+        if ( obj )
+        {
+            // TODO: Check if object type is REG_KEY
+            addr_t p_key_body = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
+
+            if ( p_key_body )
+                return drakvuf_reg_keybody_path( drakvuf, info, p_key_body );
+        }
+    }
+
+    return NULL ;
+}
+
