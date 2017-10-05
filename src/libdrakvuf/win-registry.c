@@ -102,114 +102,162 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdarg.h>
-#include "plugins.h"
-#include "syscalls/syscalls.h"
-#include "poolmon/poolmon.h"
-#include "filetracer/filetracer.h"
-#include "filedelete/filedelete.h"
-#include "objmon/objmon.h"
-#include "exmon/exmon.h"
-#include "ssdtmon/ssdtmon.h"
-#include "debugmon/debugmon.h"
-#include "cpuidmon/cpuidmon.h"
-#include "socketmon/socketmon.h"
-#include "regmon/regmon.h"
+#include <libvmi/libvmi.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/mman.h>
+#include <stdio.h>
+#include <glib.h>
 
-drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output, os_t os)
-{
-    this->drakvuf = drakvuf;
-    this->output = output;
-    this->os = os;
-}
+#include "private.h"
+#include "win-offsets.h"
 
-drakvuf_plugins::~drakvuf_plugins()
-{
-    int i;
-    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
-        if ( this->plugins[i] )
-            delete this->plugins[i];
-}
 
-int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
-                           const void *config)
+char *drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t p_key_control_block )
 {
-    if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
-         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX)
+    status_t vmi_status ;
+    addr_t p_name_control_block = 0 ;
+    char *buf_ret ;
+    vmi_instance_t vmi = drakvuf->vmi;
+    access_context_t ctx = {
+        .addr = p_key_control_block + drakvuf->offsets[ CM_KEY_NAMEBLOCK ],
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    vmi_status = vmi_read_addr( vmi, &ctx, (void *)&p_name_control_block );
+
+    if ( ( vmi_status == VMI_SUCCESS ) && p_name_control_block )
     {
-        PRINT_DEBUG("Starting plugin %s\n", drakvuf_plugin_names[plugin_id]);
+        uint16_t name_length = 0 ;
 
-        if ( !drakvuf_plugin_os_support[plugin_id][this->os] )
-            return 0;
+        ctx.addr = p_name_control_block + drakvuf->offsets[ CM_KEY_NAMELENGTH ] ;
 
-        try {
-            switch(plugin_id) {
-#ifdef ENABLE_PLUGIN_SYSCALLS
-            case PLUGIN_SYSCALLS:
-                this->plugins[plugin_id] = new syscalls(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_POOLMON
-            case PLUGIN_POOLMON:
-                this->plugins[plugin_id] = new poolmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_FILETRACER
-            case PLUGIN_FILETRACER:
-                this->plugins[plugin_id] = new filetracer(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_FILEDELETE
-            case PLUGIN_FILEDELETE:
-                this->plugins[plugin_id] = new filedelete(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_OBJMON
-            case PLUGIN_OBJMON:
-                this->plugins[plugin_id] = new objmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_EXMON
-            case PLUGIN_EXMON:
-                this->plugins[plugin_id] = new exmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_SSDTMON
-            case PLUGIN_SSDTMON:
-                this->plugins[plugin_id] = new ssdtmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_DEBUGMON
-            case PLUGIN_DEBUGMON:
-                this->plugins[plugin_id] = new debugmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_CPUIDMON
-            case PLUGIN_CPUIDMON:
-                this->plugins[plugin_id] = new cpuidmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_SOCKETMON
-            case PLUGIN_SOCKETMON:
-                this->plugins[plugin_id] = new socketmon(this->drakvuf, config, this->output);
-                break;
-#endif
-#ifdef ENABLE_PLUGIN_REGMON
-            case PLUGIN_REGMON:
-                this->plugins[plugin_id] = new regmon(this->drakvuf, config, this->output);
-                break;
-#endif
-            default:
-                break;
-            };
-        } catch (int e) {
-            fprintf(stderr, "Plugin %s startup failed!\n", drakvuf_plugin_names[plugin_id]);
-            return -1;
+        if ( vmi_read_16( vmi, &ctx, &name_length ) == VMI_SUCCESS )
+        {
+            if ( name_length && ( name_length < 240 ) )
+            {
+                buf_ret = (char *)g_malloc0( name_length + 1 );
+
+                if ( buf_ret )
+                {
+                    ctx.addr = p_name_control_block + drakvuf->offsets[ CM_KEY_NAMEBUFFER] ;
+
+                    if ( vmi_read( vmi, &ctx, buf_ret, name_length ) == name_length )
+                    {
+                        int i ;
+
+                        for ( i=0 ; i< name_length ; i++ )
+                        {
+                            if ( ( buf_ret[ i ] < 32 ) || ( buf_ret[ i ] > 126 ) )
+                                buf_ret[ i ] = '?' ;
+                        }
+
+                        buf_ret[ name_length ] = 0 ;
+
+                        return buf_ret ;
+                    }
+
+                    g_free( buf_ret );
+                }
+            }
+#ifdef DRAKVUF_DEBUG            
+            else
+                PRINT_DEBUG( "Inconsistent registry key name length [%d]!!\n", name_length );
+#endif            
         }
-
-        PRINT_DEBUG("Starting plugin %s finished\n", drakvuf_plugin_names[plugin_id]);
-        return 1;
     }
 
-    return 0;
+    return NULL ;
 }
+
+
+char *drakvuf_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t p_key_body )
+{
+    char *buf_ret = NULL ;
+    status_t vmi_status ;
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t p_key_control_block = 0 ;
+    access_context_t ctx = {
+        .addr = p_key_body + drakvuf->offsets[ CM_KEY_CONTROL_BLOCK ],
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    vmi_status = vmi_read_addr( vmi, &ctx, &p_key_control_block );
+
+    if ( ( vmi_status == VMI_SUCCESS ) && p_key_control_block )
+    {
+        GSList *key_path_list = NULL ;
+        int tot_len = 0;
+
+        while ( ( vmi_status == VMI_SUCCESS ) && p_key_control_block )
+        {
+            char *key_path = drakvuf_reg_keycontrolblock_path( drakvuf, info, p_key_control_block );
+
+            if ( key_path )
+            {
+                key_path_list = g_slist_prepend( key_path_list, key_path );
+                tot_len += strlen( key_path );
+            }
+            else
+                break ;
+
+            ctx.addr = p_key_control_block + drakvuf->offsets[ CM_KEY_PARENTKCB ] ;
+
+            vmi_status = vmi_read_addr( vmi, &ctx, &p_key_control_block );
+        }
+
+        if ( tot_len )
+        {
+            tot_len += g_slist_length( key_path_list ) + 1 ;
+
+            buf_ret = (char *)g_malloc0( tot_len ) ;
+
+            if ( buf_ret )
+            {
+                GSList *iterator ;
+
+                *buf_ret = 0 ;
+
+                for ( iterator = key_path_list; iterator ; iterator = iterator->next )
+                {
+                    strcat( buf_ret, "\\" );
+                    strcat( buf_ret, (char *)iterator->data );
+                    g_free( iterator->data );
+                }
+            }
+        }
+
+        g_slist_free( key_path_list );
+    }
+
+    return buf_ret ;
+}
+
+
+char *drakvuf_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t key_handle, addr_t process_arg )
+{
+    addr_t process = process_arg ;
+
+    if ( ! process )
+        process = drakvuf_get_current_process( drakvuf, info->vcpu );
+
+    if ( process )
+    {
+        addr_t obj = drakvuf_get_obj_by_handle( drakvuf, process, key_handle );
+
+        if ( obj )
+        {
+            // TODO: Check if object type is REG_KEY
+            addr_t p_key_body = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
+
+            if ( p_key_body )
+                return drakvuf_reg_keybody_path( drakvuf, info, p_key_body );
+        }
+    }
+
+    return NULL ;
+}
+

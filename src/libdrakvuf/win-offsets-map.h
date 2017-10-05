@@ -141,6 +141,13 @@ static const char *win_offset_names[__WIN_OFFSETS_MAX][2] = {
     [POOL_HEADER_POOLTYPE] = {"_POOL_HEADER", "PoolType" },
     [POOL_HEADER_POOLTAG] = {"_POOL_HEADER", "PoolTag" },
     [DISPATCHER_TYPE] = { "_DISPATCHER_HEADER",  "Type" },
+
+    [CM_KEY_CONTROL_BLOCK] = { "_CM_KEY_BODY",           "KeyControlBlock" },
+    [CM_KEY_NAMEBLOCK]     = { "_CM_KEY_CONTROL_BLOCK",  "NameBlock"       },
+    [CM_KEY_NAMEBUFFER]    = { "_CM_NAME_CONTROL_BLOCK", "Name"            },
+    [CM_KEY_NAMELENGTH]    = { "_CM_NAME_CONTROL_BLOCK", "NameLength"      },
+    [CM_KEY_PARENTKCB]     = { "_CM_KEY_CONTROL_BLOCK",  "ParentKcb"       },
+    [CM_KEY_PROCESSID]     = { "_CM_KEY_BODY",           "ProcessID"       },
 };
 
 #endif
