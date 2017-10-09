@@ -141,4 +141,6 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_p
 
 vmi_pid_t win_get_process_ppid( drakvuf_t drakvuf, addr_t eprocess_base );
 
+proc_data_t *win_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id );
+
 #endif

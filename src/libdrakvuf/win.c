@@ -272,6 +272,7 @@ bool set_os_windows(drakvuf_t drakvuf) {
     drakvuf->osi.exportsym_to_va = eprocess_sym2va;
     drakvuf->osi.get_process_pid = win_get_process_pid;
     drakvuf->osi.get_process_ppid = win_get_process_ppid;
+    drakvuf->osi.get_current_process_data = win_get_current_process_data;
 
     return 1;
 };

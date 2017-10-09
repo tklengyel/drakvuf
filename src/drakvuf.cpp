@@ -282,7 +282,7 @@ static event_response_t wait_for_process_cb(drakvuf_t drakvuf, drakvuf_trap_info
     UNUSED(drakvuf);
     drakvuf_c *dc = (drakvuf_c*)info->trap->data;
 
-    if ( !strcmp(info->procname, dc->process_start_name) )
+    if ( !strcmp(info->proc_data->name, dc->process_start_name) )
     {
         dc->interrupt(-1);
         dc->process_start_detected = 1;

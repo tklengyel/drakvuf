@@ -159,6 +159,9 @@ typedef struct os_interface {
 
     vmi_pid_t (*get_process_ppid)
         (drakvuf_t drakvuf, addr_t process_base);
+
+    proc_data_t *(*get_current_process_data)
+        (drakvuf_t drakvuf, uint64_t vcpu_id);
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);

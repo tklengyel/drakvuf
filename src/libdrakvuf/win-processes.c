@@ -393,3 +393,34 @@ vmi_pid_t win_get_process_ppid( drakvuf_t drakvuf, addr_t eprocess_base )
     return ppid;
 }
 
+proc_data_t *win_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id )
+{
+    proc_data_t *proc_data = (proc_data_t *)g_malloc0( sizeof( proc_data_t ) );
+
+    if ( proc_data )
+    {
+        proc_data->base_addr = win_get_current_process( drakvuf, vcpu_id );
+
+        if ( proc_data->base_addr )
+        {
+            proc_data->pid = win_get_process_pid( drakvuf, proc_data->base_addr );
+
+            if ( proc_data->pid != -1 )
+            {
+                proc_data->ppid = win_get_process_ppid( drakvuf, proc_data->base_addr );
+
+                if ( proc_data->ppid != -1 )
+                {
+                    proc_data->userid = win_get_process_userid( drakvuf, proc_data->base_addr );
+                    proc_data->name   = win_get_process_name( drakvuf, proc_data->base_addr );
+
+                    if ( proc_data->name )
+                        return proc_data;
+                }
+            }
+            g_free( proc_data );
+        }
+    }
+
+    return NULL ;
+}

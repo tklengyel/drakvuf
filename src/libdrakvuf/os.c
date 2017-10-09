@@ -269,3 +269,11 @@ vmi_pid_t drakvuf_get_process_ppid(drakvuf_t drakvuf, addr_t process_base)
 
     return 0;
 }
+
+proc_data_t *drakvuf_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id )
+{
+    if ( drakvuf->osi.get_current_process_data )
+        return drakvuf->osi.get_current_process_data( drakvuf, vcpu_id );
+
+    return NULL;
+}
