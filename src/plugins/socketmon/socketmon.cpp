@@ -252,7 +252,7 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
     case OUTPUT_CSV:
         printf("socketmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%" PRIi64 ",%s,%s,%u\n",
                info->vcpu, info->regs->cr3,
-               info->procname, info->userid,
+               info->proc_data->name, info->proc_data->userid,
                owner, ownerid,
                (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
                lip, udpa.port);
@@ -260,8 +260,8 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
     default:
     case OUTPUT_DEFAULT:
         printf("[SOCKETMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s %s:%u\n",
-               info->vcpu, info->regs->cr3, info->procname,
-               USERIDSTR(drakvuf), info->userid,
+               info->vcpu, info->regs->cr3, info->proc_data->name,
+               USERIDSTR(drakvuf), info->proc_data->userid,
                owner, USERIDSTR(drakvuf), ownerid,
                (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
                lip, udpa.port);
@@ -352,7 +352,7 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
     case OUTPUT_CSV:
         printf("socketmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%" PRIi64",%s,%s,%u\n",
                info->vcpu, info->regs->cr3,
-               info->procname, info->userid,
+               info->proc_data->name, info->proc_data->userid,
                owner, ownerid,
                (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
                lip, udpa.port);
@@ -360,8 +360,8 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
     default:
     case OUTPUT_DEFAULT:
         printf("[SOCKETMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s %s:%u\n",
-               info->vcpu, info->regs->cr3, info->procname,
-               USERIDSTR(drakvuf), info->userid,
+               info->vcpu, info->regs->cr3, info->proc_data->name,
+               USERIDSTR(drakvuf), info->proc_data->userid,
                owner, USERIDSTR(drakvuf), ownerid,
                (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
                lip, udpa.port);
@@ -453,7 +453,7 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     case OUTPUT_CSV:
         printf("socketmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%" PRIi64",%s,%s,%u\n",
                info->vcpu, info->regs->cr3,
-               info->procname, info->userid,
+               info->proc_data->name, info->proc_data->userid,
                owner, ownerid,
                (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
                lip, udpa.port);
@@ -461,8 +461,8 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     default:
     case OUTPUT_DEFAULT:
         printf("[SOCKETMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s %s:%u\n",
-               info->vcpu, info->regs->cr3, info->procname,
-               USERIDSTR(drakvuf), info->userid,
+               info->vcpu, info->regs->cr3, info->proc_data->name,
+               USERIDSTR(drakvuf), info->proc_data->userid,
                owner, USERIDSTR(drakvuf), ownerid,
                (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
                lip, udpa.port);
@@ -579,7 +579,7 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info
     case OUTPUT_CSV:
         printf("socketmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s,%" PRIi64 ",%s,%s,%s,%u,%s,%u\n",
                info->vcpu, info->regs->cr3,
-               info->procname, info->userid,
+               info->proc_data->name, info->proc_data->userid,
                owner,ownerid,
                (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                tcp_state_str[tcpe.state],
@@ -589,7 +589,7 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info
     case OUTPUT_DEFAULT:
         printf("[SOCKETMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s State:%s Local:%s:%u Remote:%s:%u\n",
                info->vcpu, info->regs->cr3,
-               info->procname, USERIDSTR(drakvuf), info->userid,
+               info->proc_data->name, USERIDSTR(drakvuf), info->proc_data->userid,
                owner, USERIDSTR(drakvuf), ownerid,
                (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                tcp_state_str[tcpe.state],
@@ -693,7 +693,7 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info
     case OUTPUT_CSV:
         printf("socketmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s,%" PRIi64 ",%s,%s,%s,%u,%s,%u\n",
                info->vcpu, info->regs->cr3,
-               info->procname, info->userid,
+               info->proc_data->name, info->proc_data->userid,
                owner,ownerid,
                (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                tcp_state_str[tcpe.state],
@@ -703,7 +703,7 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info
     case OUTPUT_DEFAULT:
         printf("[SOCKETMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s State:%s Local:%s:%u Remote:%s:%u\n",
                info->vcpu, info->regs->cr3,
-               info->procname, USERIDSTR(drakvuf), info->userid,
+               info->proc_data->name, USERIDSTR(drakvuf), info->proc_data->userid,
                owner, USERIDSTR(drakvuf), ownerid,
                (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                tcp_state_str[tcpe.state],
@@ -808,7 +808,7 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     case OUTPUT_CSV:
         printf("socketmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s,%" PRIi64 ",%s,%s,%s,%u,%s,%u\n",
                info->vcpu, info->regs->cr3,
-               info->procname, info->userid,
+               info->proc_data->name, info->proc_data->userid,
                owner,ownerid,
                (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                tcp_state_str[tcpe.state],
@@ -818,7 +818,7 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     case OUTPUT_DEFAULT:
         printf("[SOCKETMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s State:%s Local:%s:%u Remote:%s:%u\n",
                info->vcpu, info->regs->cr3,
-               info->procname, USERIDSTR(drakvuf), info->userid,
+               info->proc_data->name, USERIDSTR(drakvuf), info->proc_data->userid,
                owner, USERIDSTR(drakvuf), ownerid,
                (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                tcp_state_str[tcpe.state],
@@ -918,7 +918,7 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
     case OUTPUT_CSV:
         printf("socketmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%" PRIi64 ",%s,listener,%s,%u\n",
                info->vcpu, info->regs->cr3,
-               info->procname, info->userid,
+               info->proc_data->name, info->proc_data->userid,
                owner, ownerid,
                (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                lip, tcpl.port);
@@ -926,8 +926,8 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
     default:
     case OUTPUT_DEFAULT:
         printf("[SOCKETMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s listener %s:%u\n",
-               info->vcpu, info->regs->cr3, info->procname,
-               USERIDSTR(drakvuf), info->userid,
+               info->vcpu, info->regs->cr3, info->proc_data->name,
+               USERIDSTR(drakvuf), info->proc_data->userid,
                owner, USERIDSTR(drakvuf), ownerid,
                (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                lip, tcpl.port);
@@ -1018,7 +1018,7 @@ static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
     case OUTPUT_CSV:
         printf("socketmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s,%" PRIi64 ",%s,listener,%s,%u\n",
                info->vcpu, info->regs->cr3,
-               info->procname, info->userid,
+               info->proc_data->name, info->proc_data->userid,
                owner, ownerid,
                (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                lip, tcpl.port);
@@ -1026,8 +1026,8 @@ static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
     default:
     case OUTPUT_DEFAULT:
         printf("[SOCKETMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s listener %s:%u\n",
-               info->vcpu, info->regs->cr3, info->procname,
-               USERIDSTR(drakvuf), info->userid,
+               info->vcpu, info->regs->cr3, info->proc_data->name,
+               USERIDSTR(drakvuf), info->proc_data->userid,
                owner, USERIDSTR(drakvuf), ownerid,
                (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                lip, tcpl.port);
@@ -1118,7 +1118,7 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     case OUTPUT_CSV:
         printf("socketmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s,%" PRIi64 ",%s,listener,%s,%u\n",
                info->vcpu, info->regs->cr3,
-               info->procname, info->userid,
+               info->proc_data->name, info->proc_data->userid,
                owner, ownerid,
                (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                lip, tcpl.port);
@@ -1126,8 +1126,8 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     default:
     case OUTPUT_DEFAULT:
         printf("[SOCKETMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s listener %s:%u\n",
-               info->vcpu, info->regs->cr3, info->procname,
-               USERIDSTR(drakvuf), info->userid,
+               info->vcpu, info->regs->cr3, info->proc_data->name,
+               USERIDSTR(drakvuf), info->proc_data->userid,
                owner, USERIDSTR(drakvuf), ownerid,
                (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                lip, tcpl.port);

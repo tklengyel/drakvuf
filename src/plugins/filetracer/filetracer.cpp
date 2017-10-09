@@ -154,13 +154,13 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
         switch(f->format) {
         case OUTPUT_CSV:
             printf("filetracer,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s\n",
-                    info->vcpu, info->regs->cr3, info->procname, info->userid, str2.contents);
+                    info->vcpu, info->regs->cr3, info->proc_data->name, info->proc_data->userid, str2.contents);
             break;
         default:
         case OUTPUT_DEFAULT:
             printf("[FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s\n",
-                    info->vcpu, info->regs->cr3, info->procname,
-                    USERIDSTR(drakvuf), info->userid, str2.contents);
+                    info->vcpu, info->regs->cr3, info->proc_data->name,
+                    USERIDSTR(drakvuf), info->proc_data->userid, str2.contents);
             break;
         };
 

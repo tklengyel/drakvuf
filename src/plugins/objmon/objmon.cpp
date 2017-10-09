@@ -168,15 +168,15 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     case OUTPUT_CSV:
     {
         printf("objmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%c%c%c%c",
-               info->vcpu, info->regs->cr3, info->procname, info->userid,
+               info->vcpu, info->regs->cr3, info->proc_data->name, info->proc_data->userid,
                ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
         break;
     }
     default:
     case OUTPUT_DEFAULT:
         printf("[OBJMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" '%c%c%c%c'",
-               info->vcpu, info->regs->cr3, info->procname,
-               USERIDSTR(drakvuf), info->userid,
+               info->vcpu, info->regs->cr3, info->proc_data->name,
+               USERIDSTR(drakvuf), info->proc_data->userid,
                ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
         break;
     };
