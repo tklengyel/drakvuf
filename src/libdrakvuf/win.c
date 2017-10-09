@@ -271,6 +271,7 @@ bool set_os_windows(drakvuf_t drakvuf) {
     drakvuf->osi.inject_traps_modules = win_inject_traps_modules;
     drakvuf->osi.exportsym_to_va = eprocess_sym2va;
     drakvuf->osi.get_process_pid = win_get_process_pid;
+    drakvuf->osi.get_process_ppid = win_get_process_ppid;
 
     return 1;
 };

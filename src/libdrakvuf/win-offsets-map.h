@@ -117,6 +117,7 @@ static const char *win_offset_names[__WIN_OFFSETS_MAX][2] = {
     [EPROCESS_PEB] = { "_EPROCESS", "Peb" },
     [EPROCESS_OBJECTTABLE] = {"_EPROCESS", "ObjectTable" },
     [EPROCESS_PCB] = { "_EPROCESS", "Pcb" },
+    [EPROCESS_INHERITEDPID] = { "_EPROCESS", "InheritedFromUniqueProcessId" },
     [KPROCESS_HEADER] = { "_KPROCESS", "Header" },
     [PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
     [PEB_LDR] = { "_PEB", "Ldr" },

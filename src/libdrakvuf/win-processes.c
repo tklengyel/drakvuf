@@ -382,3 +382,14 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_p
 
     return false;
 }
+
+vmi_pid_t win_get_process_ppid( drakvuf_t drakvuf, addr_t eprocess_base )
+{
+    uint32_t ppid;
+
+    if ( VMI_FAILURE == vmi_read_32_va( drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_INHERITEDPID], 0, &ppid ) )
+        return -1;
+
+    return ppid;
+}
+

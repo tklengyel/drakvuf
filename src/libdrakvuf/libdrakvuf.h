@@ -368,6 +368,10 @@ char *drakvuf_reg_keyhandle_path( drakvuf_t drakvuf,
                                   drakvuf_trap_info_t *info,
                                   addr_t key_handle,
                                   addr_t process_arg );
+
+vmi_pid_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
+                                    addr_t process_base);
+
 #pragma GCC visibility pop
 
 #ifdef __cplusplus

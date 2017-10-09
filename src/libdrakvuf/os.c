@@ -262,3 +262,10 @@ addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
     return 0;
 }
 
+vmi_pid_t drakvuf_get_process_ppid(drakvuf_t drakvuf, addr_t process_base)
+{
+    if ( drakvuf->osi.get_process_pid )
+        return drakvuf->osi.get_process_ppid( drakvuf, process_base );
+
+    return 0;
+}

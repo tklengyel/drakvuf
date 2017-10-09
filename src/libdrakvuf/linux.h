@@ -124,4 +124,6 @@ int64_t linux_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id);
 
 bool linux_get_current_thread_id(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *thread_id);
 
+vmi_pid_t linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base );
+
 #endif

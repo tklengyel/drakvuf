@@ -139,4 +139,6 @@ bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t *module
 
 bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_procname, addr_t *eprocess_addr);
 
+vmi_pid_t win_get_process_ppid( drakvuf_t drakvuf, addr_t eprocess_base );
+
 #endif

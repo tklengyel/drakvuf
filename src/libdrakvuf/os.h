@@ -157,6 +157,8 @@ typedef struct os_interface {
     addr_t (*exportsym_to_va)
         (drakvuf_t drakvuf, addr_t process_addr, const char *module, const char *sym);
 
+    vmi_pid_t (*get_process_ppid)
+        (drakvuf_t drakvuf, addr_t process_base);
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);

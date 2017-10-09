@@ -267,3 +267,37 @@ bool linux_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t 
 
     return true;
 }
+
+vmi_pid_t linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base )
+{
+    uint32_t ppid = -1 ;
+    status_t ret = VMI_FAILURE ;
+    addr_t parent_proc_base = 0 ;
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_REALPARENT] };
+
+    ret = vmi_read_addr( drakvuf->vmi, &ctx, &parent_proc_base );
+
+    /* If we were unable to get the "proc->real_parent *" get "proc->parent *"... */
+    if ( ret == VMI_FAILURE )
+    {
+        ctx.addr = process_base + drakvuf->offsets[TASK_STRUCT_PARENT];
+
+        ret = vmi_read_addr( drakvuf->vmi, &ctx, &parent_proc_base );
+    }
+
+    /* Get pid from parent/real_parent...*/
+    if ( ret == VMI_SUCCESS )
+    {
+        ctx.translate_mechanism = VMI_TM_PROCESS_PID;
+        ctx.pid = 0 ;
+        ctx.addr = parent_proc_base + drakvuf->offsets[TASK_STRUCT_TGID];
+
+        vmi_read_32( drakvuf->vmi, &ctx, &ppid );
+    }
+
+    return ppid ;
+}
+
