@@ -270,12 +270,8 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
     }
 
 done:
-    if ( pass->proc_data )
-    {
-        if ( pass->proc_data->name )
-            g_free( pass->proc_data->name );
-        g_free( pass->proc_data );
-    }
+    g_free( (gpointer)pass->proc_data->name );
+    g_free( pass->proc_data );
     g_free(pass);
     /* We switch back to the altp2m view no matter what */
     event->slat_id = drakvuf->altp2m_idx;
@@ -402,8 +398,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
                VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
     }
 
-    if ( proc_data->name )
-        g_free( proc_data->name );
+    g_free( (gpointer)proc_data->name );
     g_free( proc_data );
     return rsp;
 }
@@ -473,8 +468,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     }
     drakvuf->in_callback = 0;
 
-    if ( proc_data->name )
-        g_free( proc_data->name );
+    g_free( (gpointer)proc_data->name );
     g_free( proc_data );
 
     process_free_requests(drakvuf);
@@ -542,8 +536,7 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     }
     drakvuf->in_callback = 0;
 
-    if ( proc_data->name )
-        g_free( proc_data->name );
+    g_free( (gpointer)proc_data->name );
     g_free( proc_data );
 
     process_free_requests(drakvuf);
@@ -581,8 +574,7 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t *event) {
     }
     drakvuf->in_callback = 0;
 
-    if ( proc_data->name )
-        g_free( proc_data->name );
+    g_free( (gpointer)proc_data->name );
     g_free( proc_data );
 
     process_free_requests(drakvuf);
@@ -622,8 +614,7 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t *event) {
     }
     drakvuf->in_callback = 0;
 
-    if ( proc_data->name )
-        g_free( proc_data->name );
+    g_free( (gpointer)proc_data->name );
     g_free( proc_data );
 
     process_free_requests(drakvuf);

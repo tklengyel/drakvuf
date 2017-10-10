@@ -237,7 +237,6 @@ struct memcb_pass {
     uint64_t gfn;
     addr_t pa;
     proc_data_t *proc_data ;
-    int64_t userid;
     struct remapped_gfn *remapped_gfn;
     vmi_mem_access_t access;
     GSList *traps;

@@ -152,13 +152,9 @@ char *win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base) {
     return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
 }
 
-vmi_pid_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base) {
-    uint32_t pid;
+status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t *pid) {
 
-    if ( VMI_FAILURE == vmi_read_32_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PID], 0, &pid) )
-        return -1;
-
-    return pid;
+    return vmi_read_32_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t *)pid);
 }
 
 char *win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id) {
@@ -383,43 +379,34 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_p
     return false;
 }
 
-vmi_pid_t win_get_process_ppid( drakvuf_t drakvuf, addr_t eprocess_base )
+status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *ppid )
 {
-    uint32_t ppid;
-
-    if ( VMI_FAILURE == vmi_read_32_va( drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_INHERITEDPID], 0, &ppid ) )
-        return -1;
-
-    return ppid;
+    return vmi_read_32_va( drakvuf->vmi, process_base + drakvuf->offsets[EPROCESS_INHERITEDPID], 0, (uint32_t *)ppid );
 }
 
 proc_data_t *win_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id )
 {
     proc_data_t *proc_data = (proc_data_t *)g_malloc0( sizeof( proc_data_t ) );
 
-    if ( proc_data )
+    if ( ! proc_data )
+        return NULL ;
+
+    proc_data->base_addr = win_get_current_process( drakvuf, vcpu_id );
+
+    if ( proc_data->base_addr )
     {
-        proc_data->base_addr = win_get_current_process( drakvuf, vcpu_id );
-
-        if ( proc_data->base_addr )
+        if ( win_get_process_pid( drakvuf, proc_data->base_addr, &proc_data->pid ) == VMI_SUCCESS )
         {
-            proc_data->pid = win_get_process_pid( drakvuf, proc_data->base_addr );
-
-            if ( proc_data->pid != -1 )
+            if ( win_get_process_ppid( drakvuf, proc_data->base_addr, &proc_data->ppid ) == VMI_SUCCESS )
             {
-                proc_data->ppid = win_get_process_ppid( drakvuf, proc_data->base_addr );
+                proc_data->userid = win_get_process_userid( drakvuf, proc_data->base_addr );
+                proc_data->name   = win_get_process_name( drakvuf, proc_data->base_addr );
 
-                if ( proc_data->ppid != -1 )
-                {
-                    proc_data->userid = win_get_process_userid( drakvuf, proc_data->base_addr );
-                    proc_data->name   = win_get_process_name( drakvuf, proc_data->base_addr );
-
-                    if ( proc_data->name )
-                        return proc_data;
-                }
+                if ( proc_data->name )
+                    return proc_data;
             }
-            g_free( proc_data );
         }
+        g_free( proc_data );
     }
 
     return NULL ;

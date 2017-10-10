@@ -121,8 +121,8 @@ typedef struct os_interface {
     int64_t (*get_process_userid)
         (drakvuf_t drakvuf, addr_t process_base);
 
-    vmi_pid_t (*get_process_pid)
-        (drakvuf_t drakvuf, addr_t process_base);
+    status_t (*get_process_pid)
+        (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *pid);
 
     int64_t (*get_current_process_userid)
         (drakvuf_t drakvuf, uint64_t vcpu_id);
@@ -157,8 +157,8 @@ typedef struct os_interface {
     addr_t (*exportsym_to_va)
         (drakvuf_t drakvuf, addr_t process_addr, const char *module, const char *sym);
 
-    vmi_pid_t (*get_process_ppid)
-        (drakvuf_t drakvuf, addr_t process_base);
+    status_t (*get_process_ppid)
+        ( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *ppid );
 
     proc_data_t *(*get_current_process_data)
         (drakvuf_t drakvuf, uint64_t vcpu_id);

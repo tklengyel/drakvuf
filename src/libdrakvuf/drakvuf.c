@@ -233,8 +233,7 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
 
                 if (pid == -1)
                 {
-                    pid = drakvuf_get_process_pid(drakvuf, process_base);
-                    if (pid == -1)
+                    if ( drakvuf_get_process_pid(drakvuf, process_base, &pid) == VMI_FAILURE )
                         return 0;
                 }
 

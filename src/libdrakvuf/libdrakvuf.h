@@ -183,7 +183,7 @@ typedef enum memaccess_type {
 } memaccess_type_t;
 
 typedef struct process_data {
-    char *name;         /* Process name */
+    const char *name;   /* Process name */
     vmi_pid_t pid ;     /* Process pid */
     vmi_pid_t ppid ;    /* Process parent pid */
     addr_t base_addr ;  /* Process base address */
@@ -309,8 +309,9 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
 char *drakvuf_get_process_name(drakvuf_t drakvuf,
                                addr_t process_base);
 
-vmi_pid_t drakvuf_get_process_pid(drakvuf_t drakvuf,
-                                  addr_t process_base);
+status_t drakvuf_get_process_pid( drakvuf_t drakvuf,
+                                  addr_t process_base,
+                                  vmi_pid_t *pid);
 
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
@@ -376,8 +377,9 @@ char *drakvuf_reg_keyhandle_path( drakvuf_t drakvuf,
                                   addr_t key_handle,
                                   addr_t process_arg );
 
-vmi_pid_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
-                                    addr_t process_base);
+status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
+                                   addr_t process_base,
+                                   vmi_pid_t *ppid );
 
 proc_data_t *drakvuf_get_current_process_data( drakvuf_t drakvuf,
                                                uint64_t vcpu_id );
