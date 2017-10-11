@@ -292,13 +292,8 @@ status_t linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid
     return VMI_FAILURE ;
 }
 
-proc_data_t *linux_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id )
+bool linux_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t *proc_data )
 {
-    proc_data_t *proc_data = (proc_data_t *)g_malloc0( sizeof( proc_data_t ) );
-
-    if ( ! proc_data )
-        return NULL ;
-
     proc_data->base_addr = linux_get_current_process( drakvuf, vcpu_id );
 
     if ( proc_data->base_addr )
@@ -312,13 +307,11 @@ proc_data_t *linux_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id
                 proc_data->userid = linux_get_process_userid( drakvuf, proc_data->base_addr );
                 linux_get_process_ppid( drakvuf, proc_data->base_addr, &proc_data->ppid );
 
-                return proc_data ;
+                return true ;
             }
         }
     }
 
-    g_free( proc_data );
-
-    return NULL ;
+    return false ;
 }
 

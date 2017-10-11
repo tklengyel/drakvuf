@@ -197,7 +197,7 @@ typedef struct drakvuf_trap drakvuf_trap_t;
 typedef struct drakvuf_trap_info {
     unsigned int vcpu;
     uint16_t altp2m_idx;
-    proc_data_t *proc_data ; /* Current executing process data */
+    proc_data_t proc_data ; /* Current executing process data */
     addr_t trap_pa;
     x86_registers_t *regs;
     drakvuf_trap_t *trap;
@@ -381,8 +381,9 @@ status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
                                    addr_t process_base,
                                    vmi_pid_t *ppid );
 
-proc_data_t *drakvuf_get_current_process_data( drakvuf_t drakvuf,
-                                               uint64_t vcpu_id );
+bool drakvuf_get_current_process_data( drakvuf_t drakvuf,
+                                       uint64_t vcpu_id,
+                                       proc_data_t *proc_data );
 #pragma GCC visibility pop
 
 #ifdef __cplusplus

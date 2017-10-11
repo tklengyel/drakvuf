@@ -158,7 +158,7 @@ status_t drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid
     if ( drakvuf->osi.get_process_pid )
         return drakvuf->osi.get_process_pid(drakvuf, process_base, pid);
 
-    return 0;
+    return VMI_FAILURE;
 }
 
 char *drakvuf_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id) {
@@ -267,13 +267,13 @@ status_t drakvuf_get_process_ppid(drakvuf_t drakvuf, addr_t process_base, vmi_pi
     if ( drakvuf->osi.get_process_ppid )
         return drakvuf->osi.get_process_ppid( drakvuf, process_base, ppid );
 
-    return 0;
+    return VMI_FAILURE ;
 }
 
-proc_data_t *drakvuf_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id )
+bool drakvuf_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t *proc_data )
 {
     if ( drakvuf->osi.get_current_process_data )
-        return drakvuf->osi.get_current_process_data( drakvuf, vcpu_id );
+        return drakvuf->osi.get_current_process_data( drakvuf, vcpu_id, proc_data );
 
-    return NULL;
+    return false;
 }

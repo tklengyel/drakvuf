@@ -160,8 +160,8 @@ typedef struct os_interface {
     status_t (*get_process_ppid)
         ( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *ppid );
 
-    proc_data_t *(*get_current_process_data)
-        (drakvuf_t drakvuf, uint64_t vcpu_id);
+    bool (*get_current_process_data)
+        (drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t *proc_data);
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);

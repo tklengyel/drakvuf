@@ -126,6 +126,6 @@ bool linux_get_current_thread_id(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *
 
 status_t linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *ppid );
 
-proc_data_t *linux_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id );
+bool linux_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t *proc_data );
 
 #endif

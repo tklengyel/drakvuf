@@ -170,7 +170,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     case OUTPUT_CSV:
     {
         printf("poolmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s,%" PRIu64 "",
-               info->vcpu, info->regs->cr3, info->proc_data->name, info->proc_data->userid, tag,
+               info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, tag,
                pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
         if (s)
             printf(",%s,%s", s->source, s->description);
@@ -179,8 +179,8 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     default:
     case OUTPUT_DEFAULT:
         printf("[POOLMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s (type: %s, size: %" PRIu64 ")",
-               info->vcpu, info->regs->cr3, info->proc_data->name,
-               USERIDSTR(drakvuf), info->proc_data->userid, tag,
+               info->vcpu, info->regs->cr3, info->proc_data.name,
+               USERIDSTR(drakvuf), info->proc_data.userid, tag,
                pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
         if (s)
             printf(": %s,%s", s->source, s->description);

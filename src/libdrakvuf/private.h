@@ -236,7 +236,7 @@ struct memcb_pass {
     drakvuf_t drakvuf;
     uint64_t gfn;
     addr_t pa;
-    proc_data_t *proc_data ;
+    proc_data_t proc_data ;
     struct remapped_gfn *remapped_gfn;
     vmi_mem_access_t access;
     GSList *traps;
