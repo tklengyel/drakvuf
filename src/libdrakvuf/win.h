@@ -115,7 +115,7 @@ addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id);
 
 char *win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base);
 
-vmi_pid_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base);
+status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t *pid);
 
 char *win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id);
 
@@ -138,5 +138,9 @@ bool win_is_eprocess(drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
 bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t *module_list);
 
 bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_procname, addr_t *eprocess_addr);
+
+status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, int32_t *ppid );
+
+bool win_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t *proc_data );
 
 #endif

@@ -169,7 +169,7 @@ char *linux_get_process_name(drakvuf_t drakvuf, addr_t process_base) {
     return vmi_read_str(drakvuf->vmi, &ctx);
 }
 
-vmi_pid_t linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base) {
+status_t linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *pid ) {
     /*
      * On Linux PID is actually a thread ID, while the TGID (Thread Group-ID) is
      * what getpid() would return. Because THAT makes sense.
@@ -180,12 +180,7 @@ vmi_pid_t linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base) {
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_TGID]
     };
 
-    uint32_t pid;
-
-    if ( VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &pid) )
-        return -1;
-
-    return pid;
+    return vmi_read_32(drakvuf->vmi, &ctx, (uint32_t *)pid);
 }
 
 char *linux_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id) {
@@ -267,3 +262,56 @@ bool linux_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t 
 
     return true;
 }
+
+status_t linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *ppid )
+{
+    status_t ret ;
+    addr_t parent_proc_base = 0 ;
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_REALPARENT] };
+
+    ret = vmi_read_addr( drakvuf->vmi, &ctx, &parent_proc_base );
+
+    /* If we were unable to get the "proc->real_parent *" get "proc->parent *"... */
+    /* Assuming a parent_proc_base == 0 is a fail... */
+    if ( (ret == VMI_FAILURE ) || ! parent_proc_base )
+    {
+        ctx.addr = process_base + drakvuf->offsets[TASK_STRUCT_PARENT];
+        ret = vmi_read_addr( drakvuf->vmi, &ctx, &parent_proc_base );
+    }
+
+    /* Get pid from parent/real_parent...*/
+    if ( ( ret == VMI_SUCCESS ) && parent_proc_base )
+    {
+        ctx.addr = parent_proc_base + drakvuf->offsets[TASK_STRUCT_TGID];
+        return vmi_read_32( drakvuf->vmi, &ctx, (uint32_t *)ppid );
+    }
+
+    return VMI_FAILURE ;
+}
+
+bool linux_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t *proc_data )
+{
+    proc_data->base_addr = linux_get_current_process( drakvuf, vcpu_id );
+
+    if ( proc_data->base_addr )
+    {
+        if ( linux_get_process_pid( drakvuf, proc_data->base_addr, &proc_data->pid ) == VMI_SUCCESS )
+        {
+            proc_data->name = linux_get_process_name( drakvuf, proc_data->base_addr );
+
+            if ( proc_data->name )
+            {
+                proc_data->userid = linux_get_process_userid( drakvuf, proc_data->base_addr );
+                linux_get_process_ppid( drakvuf, proc_data->base_addr, &proc_data->ppid );
+
+                return true ;
+            }
+        }
+    }
+
+    return false ;
+}
+

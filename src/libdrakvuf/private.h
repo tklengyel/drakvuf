@@ -236,8 +236,7 @@ struct memcb_pass {
     drakvuf_t drakvuf;
     uint64_t gfn;
     addr_t pa;
-    char *procname;
-    int64_t userid;
+    proc_data_t proc_data ;
     struct remapped_gfn *remapped_gfn;
     vmi_mem_access_t access;
     GSList *traps;
@@ -250,4 +249,5 @@ char *drakvuf_get_current_process_name(drakvuf_t drakvuf,
 
 int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf,
                                            uint64_t vcpu_id);
+
 #endif

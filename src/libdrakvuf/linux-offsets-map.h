@@ -114,6 +114,8 @@ static const char *linux_offset_names[__LINUX_OFFSETS_MAX][2] = {
     [TASK_STRUCT_CRED] = {"task_struct", "cred"},
     [TASK_STRUCT_PID] = {"task_struct", "pid"},
     [TASK_STRUCT_TGID] = {"task_struct", "tgid"},
+    [TASK_STRUCT_REALPARENT] = {"task_struct", "real_parent"},
+    [TASK_STRUCT_PARENT] = {"task_struct", "parent"},
     [CRED_UID] = {"cred", "uid"},
 };
 

@@ -182,6 +182,14 @@ typedef enum memaccess_type {
     POST
 } memaccess_type_t;
 
+typedef struct process_data {
+    const char *name;   /* Process name */
+    vmi_pid_t pid ;     /* Process pid */
+    vmi_pid_t ppid ;    /* Process parent pid */
+    addr_t base_addr ;  /* Process base address */
+    int64_t userid ;    /* Process SessionID/UID */
+} proc_data_t ;
+
 typedef struct drakvuf* drakvuf_t;
 struct drakvuf_trap;
 typedef struct drakvuf_trap drakvuf_trap_t;
@@ -189,8 +197,7 @@ typedef struct drakvuf_trap drakvuf_trap_t;
 typedef struct drakvuf_trap_info {
     unsigned int vcpu;
     uint16_t altp2m_idx;
-    const char* procname; /* Currently executing process' name */
-    int64_t userid; /* Currently executing process' SessionID/UID */
+    proc_data_t proc_data ; /* Current executing process data */
     addr_t trap_pa;
     x86_registers_t *regs;
     drakvuf_trap_t *trap;
@@ -302,8 +309,9 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
 char *drakvuf_get_process_name(drakvuf_t drakvuf,
                                addr_t process_base);
 
-vmi_pid_t drakvuf_get_process_pid(drakvuf_t drakvuf,
-                                  addr_t process_base);
+status_t drakvuf_get_process_pid( drakvuf_t drakvuf,
+                                  addr_t process_base,
+                                  vmi_pid_t *pid);
 
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
@@ -368,6 +376,14 @@ char *drakvuf_reg_keyhandle_path( drakvuf_t drakvuf,
                                   drakvuf_trap_info_t *info,
                                   addr_t key_handle,
                                   addr_t process_arg );
+
+status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
+                                   addr_t process_base,
+                                   vmi_pid_t *ppid );
+
+bool drakvuf_get_current_process_data( drakvuf_t drakvuf,
+                                       uint64_t vcpu_id,
+                                       proc_data_t *proc_data );
 #pragma GCC visibility pop
 
 #ifdef __cplusplus
