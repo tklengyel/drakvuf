@@ -245,15 +245,14 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
         }
 
         if(trap->breakpoint.addr_type == ADDR_VA) {
-            addr_t dtb = vmi_pid_to_dtb(drakvuf->vmi, trap->breakpoint.pid);
-            if (!dtb)
+            addr_t dtb, trap_pa;
+            if ( VMI_FAILURE == vmi_pid_to_dtb(drakvuf->vmi, trap->breakpoint.pid, &dtb) )
             {
                 PRINT_DEBUG("No DTB found for pid %i\n", trap->breakpoint.pid);
                 return 0;
             }
 
-            addr_t trap_pa = vmi_pagetable_lookup(drakvuf->vmi, dtb, trap->breakpoint.addr);
-            if (!trap_pa)
+            if ( VMI_FAILURE == vmi_pagetable_lookup(drakvuf->vmi, dtb, trap->breakpoint.addr, &trap_pa) )
             {
                 PRINT_DEBUG("Failed to find PA for breakpoint VA addr 0x%lx in DTB 0x%lx\n", trap->breakpoint.addr, dtb);
                 return 0;
@@ -270,10 +269,11 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
 
     if(trap->breakpoint.lookup_type == LOOKUP_DTB) {
         if(trap->breakpoint.addr_type == ADDR_VA) {
-            addr_t trap_pa = vmi_pagetable_lookup(drakvuf->vmi, trap->breakpoint.dtb, trap->breakpoint.addr);
-            PRINT_DEBUG("Breakpoint VA 0x%" PRIx64" -> PA 0x%" PRIx64 "\n", trap->breakpoint.addr, trap_pa);
-            if (!trap_pa)
+            addr_t trap_pa;
+            if ( VMI_FAILURE == vmi_pagetable_lookup(drakvuf->vmi, trap->breakpoint.dtb, trap->breakpoint.addr, &trap_pa) )
                 return 0;
+
+            PRINT_DEBUG("Breakpoint VA 0x%" PRIx64" -> PA 0x%" PRIx64 "\n", trap->breakpoint.addr, trap_pa);
 
             return inject_trap_pa(drakvuf, trap, trap_pa);
         }

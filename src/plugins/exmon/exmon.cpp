@@ -204,7 +204,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             goto done;
 
         ctx.addr = ptrap_frame;
-        if ( e->ktrap_frame_size != vmi_read(vmi,&ctx, trap_frame, e->ktrap_frame_size) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, e->ktrap_frame_size, trap_frame, NULL) )
             goto done;
 
         ctx.addr = exception_record;
@@ -260,7 +260,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
         reg_t exception_code;
 
         ctx.addr = info->regs->r8;
-        if ( e->ktrap_frame_size != vmi_read(vmi,&ctx, trap_frame, e->ktrap_frame_size) )
+        if ( VMI_FAILURE == vmi_read(vmi,&ctx, e->ktrap_frame_size, trap_frame, NULL) )
             goto done;
 
         ctx.addr = info->regs->rcx;

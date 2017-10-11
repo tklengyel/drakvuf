@@ -120,7 +120,9 @@
 #include "linux-offsets-map.h"
 
 static bool find_kernbase(drakvuf_t drakvuf) {
-    drakvuf->kernbase = vmi_translate_ksym2v(drakvuf->vmi, "_text");
+    if ( VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "_text", &drakvuf->kernbase) )
+        return 0;
+
     return !!drakvuf->kernbase;
 }
 

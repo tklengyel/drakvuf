@@ -196,7 +196,7 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
     memset(&local, 0, sizeof(local_address_x86));
 
     ctx.addr = w->obj;
-    if ( sizeof(struct udp_endpoint_x86) != vmi_read(vmi, &ctx, &udpa, sizeof(struct udp_endpoint_x86)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct udp_endpoint_x86), &udpa, NULL) )
         goto done;
 
     // Convert port to little endian
@@ -206,12 +206,12 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
         goto done;
 
     ctx.addr = udpa.inetaf;
-    if ( sizeof(struct inetaf_x86) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_x86)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_x86), &inetaf, NULL) )
         goto done;
 
     if ( udpa.localaddr ) {
         ctx.addr = udpa.localaddr;
-        if ( sizeof(struct local_address_x86) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x86)) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x86), &local, NULL) )
             goto done;
 
 
@@ -238,7 +238,7 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
 
         if ( p1 ) {
             ctx.addr = p1;
-            if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+            if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
                 goto done;
         }
 
@@ -297,7 +297,7 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
     memset(&local, 0, sizeof(local_address_x64));
 
     ctx.addr = w->obj;
-    if ( sizeof(struct udp_endpoint_x64) != vmi_read(vmi, &ctx, &udpa, sizeof(struct udp_endpoint_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct udp_endpoint_x64), &udpa, NULL) )
         goto done;
 
     // Convert port to little endian
@@ -307,12 +307,12 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
         goto done;
 
     ctx.addr = udpa.inetaf;
-    if ( sizeof(struct inetaf_x64) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_x64), &inetaf, NULL) )
         goto done;
 
     if ( udpa.localaddr ) {
         ctx.addr = udpa.localaddr;
-        if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x64), &local, NULL) )
             goto done;
 
         ctx.addr = local.pdata;
@@ -338,7 +338,7 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
 
         if ( p1 ) {
             ctx.addr = p1;
-            if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+            if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
                 goto done;
         }
 
@@ -397,7 +397,7 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     memset(&local, 0, sizeof(local_address_x64));
 
     ctx.addr = w->obj;
-    if ( sizeof(struct udp_endpoint_win10_x64) != vmi_read(vmi, &ctx, &udpa, sizeof(struct udp_endpoint_win10_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct udp_endpoint_win10_x64), &udpa, NULL) )
         goto done;
 
     // Convert port to little endian
@@ -407,12 +407,12 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
         goto done;
 
     ctx.addr = udpa.inetaf;
-    if ( sizeof(struct inetaf_win10_x64) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_win10_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_win10_x64), &inetaf, NULL) )
         goto done;
 
     if ( udpa.localaddr ) {
         ctx.addr = udpa.localaddr;
-        if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x64), &local, NULL) )
             goto done;
 
         ctx.addr = local.pdata;
@@ -439,7 +439,7 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
 
         if ( p1 ) {
             ctx.addr = p1;
-            if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+            if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
                 goto done;
         }
 
@@ -503,7 +503,7 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
         goto done;
 
-    if ( sizeof(struct tcp_endpoint_x86) != vmi_read(vmi, &ctx, &tcpe, sizeof(struct tcp_endpoint_x86)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct tcp_endpoint_x86), &tcpe, NULL) )
         goto done;
 
     if ( tcpe.state >= __TCP_STATE_MAX )
@@ -514,18 +514,18 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info
     tcpe.remoteport = __bswap_16(tcpe.remoteport);
 
     ctx.addr = tcpe.inetaf;
-    if ( sizeof(struct inetaf_x86) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_x86)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_x86), &inetaf, NULL) )
         goto done;
 
     if ( tcpe.addrinfo ) {
         ctx.addr = tcpe.addrinfo;
-        if ( sizeof(struct addr_info_x86) != vmi_read(vmi, &ctx, &addrinfo, sizeof(struct addr_info_x86)) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct addr_info_x86), &addrinfo, NULL) )
             goto done;
     }
 
     if ( addrinfo.local ) {
         ctx.addr = addrinfo.local;
-        if ( sizeof(struct local_address_x86) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x86)) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x86), &local, NULL) )
             goto done;
     }
 
@@ -561,11 +561,11 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info
         uint8_t remoteip[16] = {[0 ... 15] = 0};
 
         ctx.addr = p1;
-        if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
             goto done;
 
         ctx.addr = addrinfo.remote;
-        if ( 16 != vmi_read(vmi, &ctx, &remoteip[0], 16) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &remoteip[0], NULL) )
             goto done;
 
         ipv6_to_str(&lip, localip);
@@ -627,7 +627,7 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     ctx.addr = info->regs->rcx;
-    if ( sizeof(struct tcp_endpoint_x64) != vmi_read(vmi, &ctx, &tcpe, sizeof(struct tcp_endpoint_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct tcp_endpoint_x64), &tcpe, NULL) )
         goto done;
 
     if ( tcpe.state >= __TCP_STATE_MAX )
@@ -638,15 +638,15 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info
     tcpe.remoteport = __bswap_16(tcpe.remoteport);
 
     ctx.addr = tcpe.inetaf;
-    if ( sizeof(struct inetaf_x64) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_x64),  &inetaf, NULL) )
         goto done;
 
     ctx.addr = tcpe.addrinfo;
-    if ( sizeof(struct addr_info_x64) != vmi_read(vmi, &ctx, &addrinfo, sizeof(struct addr_info_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct addr_info_x64), &addrinfo, NULL) )
         goto done;
 
     ctx.addr = addrinfo.local;
-    if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x64), &local, NULL) )
         goto done;
 
     ctx.addr = local.pdata;
@@ -675,11 +675,11 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info
         uint8_t remoteip[16] = {[0 ... 15] = 0};
 
         ctx.addr = p1;
-        if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
             goto done;
 
         ctx.addr = addrinfo.remote;
-        if ( 16 != vmi_read(vmi, &ctx, &remoteip[0], 16) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &remoteip[0], NULL) )
             goto done;
 
         ipv6_to_str(&lip, localip);
@@ -742,7 +742,7 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     ctx.addr = info->regs->rcx;
-    if ( sizeof(struct tcp_endpoint_win10_x64) != vmi_read(vmi, &ctx, &tcpe, sizeof(struct tcp_endpoint_win10_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct tcp_endpoint_win10_x64), &tcpe, NULL) )
         goto done;
 
     if ( tcpe.state >= __TCP_STATE_MAX )
@@ -753,15 +753,15 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     tcpe.remoteport = __bswap_16(tcpe.remoteport);
 
     ctx.addr = tcpe.inetaf;
-    if ( sizeof(struct inetaf_win10_x64) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_win10_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_win10_x64), &inetaf, NULL) )
         goto done;
 
     ctx.addr = tcpe.addrinfo;
-    if ( sizeof(struct addr_info_x64) != vmi_read(vmi, &ctx, &addrinfo, sizeof(struct addr_info_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct addr_info_x64), &addrinfo, NULL) )
         goto done;
 
     ctx.addr = addrinfo.local;
-    if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x64), &local, NULL) )
         goto done;
 
     ctx.addr = local.pdata;
@@ -790,11 +790,11 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         uint8_t remoteip[16] = {[0 ... 15] = 0};
 
         ctx.addr = p1;
-        if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
             goto done;
 
         ctx.addr = addrinfo.remote;
-        if ( 16 != vmi_read(vmi, &ctx, &remoteip[0], 16) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &remoteip[0], NULL) )
             goto done;
 
         ipv6_to_str(&lip, localip);
@@ -858,7 +858,7 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
     uint32_t ownerp = 0;
 
     ctx.addr = w->obj - sizeof(struct tcp_listener_x86);
-    if ( sizeof(struct tcp_listener_x86) != vmi_read(vmi, &ctx, &tcpl, sizeof(struct tcp_listener_x86)) ) {
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct tcp_listener_x86), &tcpl, NULL) ) {
         printf("Failed to tcp listener @ 0x%lx\n", ctx.addr);
         goto done;
     }
@@ -871,12 +871,12 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
         goto done;
 
     ctx.addr = tcpl.inetaf;
-    if ( sizeof(struct inetaf_x86) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_x86)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_x86), &inetaf, NULL) )
         goto done;
 
     if ( tcpl.localaddr ) {
         ctx.addr = tcpl.localaddr;
-        if ( sizeof(struct local_address_x86) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x86)) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x86), &local, NULL) )
             goto done;
     }
 
@@ -904,7 +904,7 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
 
         if ( p1 ) {
             ctx.addr = p1;
-            if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+            if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
                 goto done;
         }
 
@@ -964,19 +964,19 @@ static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     ctx.addr = w->obj - sizeof(struct tcp_listener_x64);
-    if ( sizeof(struct tcp_listener_x64) != vmi_read(vmi, &ctx, &tcpl, sizeof(struct tcp_listener_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct tcp_listener_x64), &tcpl, NULL) )
         goto done;
 
     // Convert port to little endian
     tcpl.port = __bswap_16(tcpl.port);
 
     ctx.addr = tcpl.inetaf;
-    if ( sizeof(struct inetaf_x64) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_x64), &inetaf, NULL) )
         goto done;
 
     if ( tcpl.localaddr ) {
         ctx.addr = tcpl.localaddr;
-        if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x64), &local, NULL) )
             goto done;
     }
 
@@ -1004,7 +1004,7 @@ static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *
 
         if ( p1 ) {
             ctx.addr = p1;
-            if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+            if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
                 goto done;
         }
 
@@ -1064,19 +1064,19 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     ctx.addr = w->obj - sizeof(struct tcp_listener_win10_x64);
-    if ( sizeof(struct tcp_listener_win10_x64) != vmi_read(vmi, &ctx, &tcpl, sizeof(struct tcp_listener_win10_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct tcp_listener_win10_x64), &tcpl, NULL) )
         goto done;
 
     // Convert port to little endian
     tcpl.port = __bswap_16(tcpl.port);
 
     ctx.addr = tcpl.inetaf;
-    if ( sizeof(struct inetaf_win10_x64) != vmi_read(vmi, &ctx, &inetaf, sizeof(struct inetaf_win10_x64)) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_win10_x64), &inetaf, NULL) )
         goto done;
 
     if ( tcpl.localaddr ) {
         ctx.addr = tcpl.localaddr;
-        if ( sizeof(struct local_address_x64) != vmi_read(vmi, &ctx, &local, sizeof(struct local_address_x64)) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x64), &local, NULL) )
             goto done;
     }
 
@@ -1104,7 +1104,7 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
 
         if ( p1 ) {
             ctx.addr = p1;
-            if ( 16 != vmi_read(vmi, &ctx, &localip[0], 16) )
+            if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
                 goto done;
         }
 

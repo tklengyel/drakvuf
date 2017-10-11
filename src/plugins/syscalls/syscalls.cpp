@@ -212,7 +212,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
             // multiply num args by 4 for 32 bit systems to get the number of bytes we need
             // to read from the stack.  assumes standard calling convention (cdecl) for the
             // visual studio compile.
-            if ( size != vmi_read(vmi, &ctx, buf, size) )
+            if ( VMI_FAILURE == vmi_read(vmi, &ctx, size, buf, NULL) )
                 goto exit;
         }
 
@@ -231,7 +231,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
                 // first 4 agrs passed via rcx, rdx, r8, and r9
                 ctx.addr = info->regs->rsp+0x28;  // jump over homing space + base pointer
                 size_t sp_size = s->reg_size * (nargs-4);
-                if ( sp_size != vmi_read(vmi, &ctx, &(buf64[4]), sp_size) )
+                if ( VMI_FAILURE == vmi_read(vmi, &ctx, sp_size, &(buf64[4]), NULL) )
                     goto exit;
            }
         }
