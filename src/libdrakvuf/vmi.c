@@ -224,13 +224,13 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
         uint8_t backup[VMI_PS_4KB] = {0};
 
-        if ( VMI_FAILURE == vmi_read_pa(drakvuf->vmi, pass->remapped_gfn->o<<12, &backup, VMI_PS_4KB) ) {
+        if ( VMI_FAILURE == vmi_read_pa(drakvuf->vmi, pass->remapped_gfn->o<<12, VMI_PS_4KB, &backup, NULL) ) {
             fprintf(stderr, "Critical error in re-copying remapped gfn\n");
             drakvuf->interrupted = -1;
             return 0;
         }
 
-        if ( VMI_FAILURE == vmi_write_pa(drakvuf->vmi, pass->remapped_gfn->r<<12, &backup, VMI_PS_4KB) ) {
+        if ( VMI_FAILURE == vmi_write_pa(drakvuf->vmi, pass->remapped_gfn->r<<12, VMI_PS_4KB, &backup, NULL) ) {
             fprintf(stderr, "Critical error in re-copying remapped gfn\n");
             drakvuf->interrupted = -1;
             return 0;
@@ -941,13 +941,13 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     if (!g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &remapped_gfn->o) )
     {
         uint8_t backup[VMI_PS_4KB] = {0};
-        if(VMI_PS_4KB != vmi_read_pa(drakvuf->vmi, current_gfn<<12, &backup, VMI_PS_4KB))
+        if( VMI_FAILURE == vmi_read_pa(drakvuf->vmi, current_gfn<<12, VMI_PS_4KB, &backup, NULL) )
         {
             fprintf(stderr, "Copying trapped page to new location FAILED\n");
             return 0;
         }
 
-        if ( VMI_PS_4KB == vmi_write_pa(drakvuf->vmi, remapped_gfn->r << 12, &backup, VMI_PS_4KB) )
+        if ( VMI_FAILURE == vmi_write_pa(drakvuf->vmi, remapped_gfn->r << 12, VMI_PS_4KB, &backup, NULL) )
             PRINT_DEBUG("Copied trapped page to new location\n");
         else {
             // TODO cleanup
@@ -1040,17 +1040,18 @@ bool inject_trap(drakvuf_t drakvuf,
 {
 
     vmi_instance_t vmi = drakvuf->vmi;
-    addr_t dtb = vmi_pid_to_dtb(vmi, pid);
+    addr_t dtb, pa = 0;
+    status_t status;
 
-    // get pa
-    addr_t pa = 0;
+    if ( VMI_FAILURE == vmi_pid_to_dtb(vmi, pid, &dtb) )
+        return 0;
 
-    if (trap->breakpoint.addr_type == ADDR_VA)
-        pa = vmi_pagetable_lookup(vmi, dtb, trap->breakpoint.addr);
+    if ( trap->breakpoint.addr_type == ADDR_VA )
+        status = vmi_pagetable_lookup(vmi, dtb, trap->breakpoint.addr, &pa);
     else
-        pa = vmi_pagetable_lookup(vmi, dtb, vaddr + trap->breakpoint.rva);
+        status = vmi_pagetable_lookup(vmi, dtb, vaddr + trap->breakpoint.rva, &pa);
 
-    if (!pa)
+    if ( VMI_FAILURE == status )
         return 0;
 
     return inject_trap_pa(drakvuf, trap, pa);

@@ -220,14 +220,14 @@ static void extract_ca_file(filedelete *f, drakvuf_t drakvuf, vmi_instance_t vmi
 
             addr_t pte = 0;
             ctx->addr = pteoffset;
-            if ( f->mmpte_size != vmi_read(vmi, ctx, &pte, f->mmpte_size) )
+            if ( VMI_FAILURE == vmi_read(vmi, ctx, f->mmpte_size, &pte, NULL) )
                 break;
 
             if ( ENTRY_PRESENT(1, pte) )
             {
                 uint8_t page[4096];
 
-                if ( 4096 != vmi_read_pa(vmi, VMI_BIT_MASK(12,48) & pte, page, 4096) )
+                if ( VMI_FAILURE == vmi_read_pa(vmi, VMI_BIT_MASK(12,48) & pte, 4096, &page, NULL) )
                     continue;
 
                 if ( !fseek ( fp , fileoffset , SEEK_SET ) )

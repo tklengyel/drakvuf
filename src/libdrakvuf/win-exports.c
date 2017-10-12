@@ -161,7 +161,8 @@ modlist_sym2va(drakvuf_t drakvuf, addr_t list_head, access_context_t *ctx,
                     return VMI_FAILURE;
 
                 ctx->addr = dllbase;
-                *va = vmi_translate_sym2v(vmi, ctx, (char *) symbol);
+                if ( VMI_FAILURE == vmi_translate_sym2v(vmi, ctx, (char *) symbol, va) )
+                    return VMI_FAILURE;
 
                 PRINT_DEBUG("\t%s @ 0x%lx\n", symbol, *va);
 
@@ -210,14 +211,14 @@ addr_t eprocess_sym2va (drakvuf_t drakvuf, addr_t eprocess_base, const char *mod
 
 addr_t sym2va(drakvuf_t drakvuf, vmi_pid_t target_pid, const char *mod_name, const char *symbol) {
     vmi_instance_t vmi = drakvuf->vmi;
-    addr_t ret = 0;
-    addr_t list_head;
+    addr_t ret = 0, list_head, current_process, current_list_entry, next_list_entry;
     status_t status;
 
-    size_t pid_offset = vmi_get_offset(vmi, "win_pid");
-    size_t tasks_offset = vmi_get_offset(vmi, "win_tasks");
-
-    addr_t current_process, current_list_entry, next_list_entry;
+    size_t pid_offset, tasks_offset;
+    if ( VMI_FAILURE == vmi_get_offset(vmi, "win_pid", &pid_offset) )
+        return 0;
+    if ( VMI_FAILURE == vmi_get_offset(vmi, "win_tasks", &tasks_offset) )
+        return 0;
 
     status = vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
     if ( VMI_FAILURE == status )
@@ -320,8 +321,11 @@ status_t va2sym(drakvuf_t drakvuf, addr_t va, vmi_pid_t target_pid,
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t list_head;
 
-    size_t pid_offset = vmi_get_offset(vmi, "win_pid");
-    size_t tasks_offset = vmi_get_offset(vmi, "win_tasks");
+    size_t pid_offset, tasks_offset;
+    if ( VMI_FAILURE == vmi_get_offset(vmi, "win_pid", &pid_offset) )
+        return VMI_FAILURE;
+    if ( VMI_FAILURE == vmi_get_offset(vmi, "win_tasks", &tasks_offset) )
+        return VMI_FAILURE;
 
     addr_t current_process, current_list_entry, next_list_entry;
     if ( VMI_FAILURE == vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process) )

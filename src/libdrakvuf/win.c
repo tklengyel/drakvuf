@@ -220,9 +220,8 @@ bool win_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const
 }
 
 static bool find_kernbase(drakvuf_t drakvuf) {
-    addr_t sysproc_rva;
-    addr_t sysproc = vmi_translate_ksym2v(drakvuf->vmi, "PsInitialSystemProcess");
-    if ( !sysproc ) {
+    addr_t sysproc_rva, sysproc;
+    if ( VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "PsInitialSystemProcess", &sysproc) ) {
         printf("LibVMI failed to get us the VA of PsInitialSystemProcess!\n");
         return 0;
     }

@@ -144,7 +144,7 @@ char *drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_t *
                 {
                     ctx.addr = p_name_control_block + drakvuf->offsets[ CM_KEY_NAMEBUFFER] ;
 
-                    if ( vmi_read( vmi, &ctx, buf_ret, name_length ) == name_length )
+                    if ( VMI_SUCCESS == vmi_read( vmi, &ctx, name_length, buf_ret, NULL ) )
                     {
                         int i ;
 
