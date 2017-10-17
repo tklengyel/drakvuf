@@ -947,7 +947,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             return 0;
         }
 
-        if ( VMI_FAILURE == vmi_write_pa(drakvuf->vmi, remapped_gfn->r << 12, VMI_PS_4KB, &backup, NULL) )
+        if ( VMI_SUCCESS == vmi_write_pa(drakvuf->vmi, remapped_gfn->r << 12, VMI_PS_4KB, &backup, NULL) )
             PRINT_DEBUG("Copied trapped page to new location\n");
         else {
             // TODO cleanup
