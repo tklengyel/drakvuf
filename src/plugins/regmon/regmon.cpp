@@ -130,8 +130,8 @@ static void log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t *info, const ch
 
                 default:
                 case OUTPUT_DEFAULT:
-                    printf("[REGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s:%s\n",
-                        info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, key_path );
+                    printf("[REGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64 ", PID:%d, PPID:%d, %s %s:%" PRIi64 " %s:%s\n",
+                               info->vcpu, info->regs->cr3, info->proc_data.base_addr, info->proc_data.pid, info->proc_data.ppid, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, key_path );
                 break;
             }
 
