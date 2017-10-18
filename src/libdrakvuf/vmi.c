@@ -307,12 +307,8 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t *event) {
                 (event->mem_event.out_access & VMI_MEMACCESS_X) ? 'x' : '-'
                 );
 
-    proc_data_t proc_data = {
-        .name   = NULL,
-        .pid    = 0,
-        .ppid   = 0,
-        .userid = 0,
-    };
+    proc_data_t proc_data = {0};
+
     drakvuf_get_current_process_data( drakvuf, event->vcpu_id, &proc_data );
 
     GSList *loop = s->traps;
@@ -464,12 +460,8 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     else
         event->interrupt_event.reinject = 0;
 
-    proc_data_t proc_data = {
-        .name   = NULL,
-        .pid    = 0,
-        .ppid   = 0,
-        .userid = 0,
-    };
+    proc_data_t proc_data = {0};
+
     drakvuf_get_current_process_data(drakvuf, event->vcpu_id, &proc_data);
 
     drakvuf->in_callback = 1;
@@ -541,12 +533,8 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t *event) {
        drakvuf->kpcr[event->vcpu_id] = event->x86_regs->rsp;
     }
 
-    proc_data_t proc_data = {
-        .name   = NULL,
-        .pid    = 0,
-        .ppid   = 0,
-        .userid = 0,
-    };
+    proc_data_t proc_data = {0};
+
     drakvuf_get_current_process_data( drakvuf, event->vcpu_id, &proc_data );
 
     drakvuf->in_callback = 1;
@@ -586,12 +574,8 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t *event) {
                 event->vcpu_id, event->slat_id, event->x86_regs->cr3, pa,
                 event->debug_event.gla, event->debug_event.insn_length);
 
-    proc_data_t proc_data = {
-        .name   = NULL,
-        .pid    = 0,
-        .ppid   = 0,
-        .userid = 0,
-    };
+    proc_data_t proc_data = {0};
+
     drakvuf_get_current_process_data( drakvuf, event->vcpu_id, &proc_data );
 
     drakvuf->in_callback = 1;
@@ -634,12 +618,8 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t *event) {
                 event->x86_regs->rip, event->cpuid_event.insn_length);
 
     reg_t rip = event->x86_regs->rip;
-    proc_data_t proc_data = {
-        .name   = NULL,
-        .pid    = 0,
-        .ppid   = 0,
-        .userid = 0,
-    };
+    proc_data_t proc_data = {0};
+
     drakvuf_get_current_process_data( drakvuf, event->vcpu_id, &proc_data );
 
     drakvuf->in_callback = 1;
