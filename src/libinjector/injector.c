@@ -445,14 +445,14 @@ bool pass_inputs(struct injector *injector, drakvuf_trap_info_t *info) {
         addr -= len;
         injector->process_info = addr;
         ctx.addr = addr;
-        if(VMI_FAILURE != vmi_write(vmi, &ctx, len, &pi, NULL))
+        if(VMI_FAILURE == vmi_write(vmi, &ctx, len, &pi, NULL))
             goto err;
 
         len = sizeof(struct startup_info_64);
         addr -= len;
         sip_addr = addr;
         ctx.addr = addr;
-        if(VMI_FAILURE != vmi_write(vmi, &ctx, len, &si, NULL))
+        if(VMI_FAILURE == vmi_write(vmi, &ctx, len, &si, NULL))
             goto err;
 
         //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
@@ -774,7 +774,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
 
         if (injector->is32bit) {
             struct process_information_32 pip = { 0 };
-            if ( VMI_FAILURE == vmi_read(injector->vmi, &ctx, sizeof(struct process_information_32), &pip, NULL) )
+            if ( VMI_SUCCESS == vmi_read(injector->vmi, &ctx, sizeof(struct process_information_32), &pip, NULL) )
             {
                 injector->pid = pip.dwProcessId;
                 injector->tid = pip.dwThreadId;
@@ -783,7 +783,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) 
             }
         } else {
             struct process_information_64 pip = { 0 };
-            if ( VMI_FAILURE == vmi_read(injector->vmi, &ctx, sizeof(struct process_information_64), &pip, NULL) )
+            if ( VMI_SUCCESS == vmi_read(injector->vmi, &ctx, sizeof(struct process_information_64), &pip, NULL) )
             {
                 injector->pid = pip.dwProcessId;
                 injector->tid = pip.dwThreadId;
