@@ -122,18 +122,19 @@
 #include <time.h>
 #include <poll.h>
 
-static const char *in_folder;
-static const char *queue_folder;
+static const char* in_folder;
+static const char* queue_folder;
 
 int main(int argc, char** argv)
 {
-    DIR *indir, *qdir;
-    struct dirent *inent, *qdent;
+    DIR* indir, *qdir;
+    struct dirent* inent, *qdent;
     uint64_t processed = 0, total_processed = 0, jobs = 0;
     int ret = 0;
     uint64_t limit = 0;
 
-    if(argc < 3) {
+    if (argc < 3)
+    {
         printf("Not enough arguments: %i!\n", argc);
         printf("%s <in folder> <queue folder> <optional limit>\n", argv[0]);
         return 1;
@@ -149,39 +150,46 @@ int main(int argc, char** argv)
     int wd = inotify_add_watch(fd, in_folder, IN_CLOSE_WRITE | IN_MOVED_TO | IN_CREATE);
     char buffer[sizeof(struct inotify_event) + NAME_MAX + 1];
 
-    struct pollfd pollfd = {
+    struct pollfd pollfd =
+    {
         .fd = fd,
         .events = POLLIN
     };
 
-    do {
+    do
+    {
         jobs = 0;
         processed = 0;
 
-        if ((indir = opendir (in_folder)) != NULL) {
-            while ((inent = readdir (indir)) != NULL) {
+        if ((indir = opendir (in_folder)) != NULL)
+        {
+            while ((inent = readdir (indir)) != NULL)
+            {
                 if (!strcmp(inent->d_name, ".") || !strcmp(inent->d_name, ".."))
                     continue;
 
                 jobs++;
 
-                if ((qdir = opendir (queue_folder)) != NULL) {
-                    while ((qdent = readdir (qdir)) != NULL) {
+                if ((qdir = opendir (queue_folder)) != NULL)
+                {
+                    while ((qdent = readdir (qdir)) != NULL)
+                    {
                         if (!strcmp(qdent->d_name, ".") || !strcmp(qdent->d_name, ".."))
                             continue;
 
                         if ( !g_strrstr(qdent->d_name, "_") )
                             continue;
 
-                        gchar **qinfo = g_strsplit(qdent->d_name, "_", 2);
+                        gchar** qinfo = g_strsplit(qdent->d_name, "_", 2);
                         int qsize = atoi(qinfo[1]), count = -1;
-                        DIR *q;
-                        struct dirent *qent;
+                        DIR* q;
+                        struct dirent* qent;
 
-                        char *folder = g_malloc0(snprintf(NULL, 0, "%s/%s", queue_folder, qdent->d_name) + 1);
+                        char* folder = g_malloc0(snprintf(NULL, 0, "%s/%s", queue_folder, qdent->d_name) + 1);
                         sprintf(folder, "%s/%s", queue_folder, qdent->d_name);
 
-                        if ((q = opendir (folder)) != NULL) {
+                        if ((q = opendir (folder)) != NULL)
+                        {
                             count = 0;
                             while ((qent = readdir (q)) != NULL)
                                 if ( strcmp(qent->d_name, ".") && strcmp(qent->d_name, "..") )
@@ -193,7 +201,7 @@ int main(int argc, char** argv)
 
                         if ( count >= 0 && qsize >= 0 && qsize > count )
                         {
-                            char *command = g_malloc0(snprintf(NULL, 0, "mv %s/%s %s/%s/%s", in_folder, inent->d_name, queue_folder, qdent->d_name, inent->d_name) + 1);
+                            char* command = g_malloc0(snprintf(NULL, 0, "mv %s/%s %s/%s/%s", in_folder, inent->d_name, queue_folder, qdent->d_name, inent->d_name) + 1);
                             sprintf(command, "mv %s/%s %s/%s/%s", in_folder, inent->d_name, queue_folder, qdent->d_name, inent->d_name);
                             printf("** MOVING FILE FOR PROCESSING: %s\n", command);
                             g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
@@ -211,7 +219,9 @@ int main(int argc, char** argv)
                 }
             }
             closedir (indir);
-        } else {
+        }
+        else
+        {
             printf("Failed to open target folder!\n");
             ret = 1;
             break;
@@ -226,29 +236,36 @@ int main(int argc, char** argv)
                 break;
         }
 
-        if ( !jobs ) {
+        if ( !jobs )
+        {
             printf("In folder is empty, waiting for file creation\n");
 
-            do {
+            do
+            {
                 int rv = poll (&pollfd, 1, 1000);
-                if ( rv < 0 ) {
+                if ( rv < 0 )
+                {
                     printf("Error polling\n");
                     ret = 1;
                     break;
                 }
-                if ( rv > 0 && pollfd.revents & POLLIN ) {
-                    if ( read( fd, buffer, sizeof(struct inotify_event) + NAME_MAX + 1 ) < 0 ) {
+                if ( rv > 0 && pollfd.revents & POLLIN )
+                {
+                    if ( read( fd, buffer, sizeof(struct inotify_event) + NAME_MAX + 1 ) < 0 )
+                    {
                         printf("Error reading inotify event\n");
                         ret = 1;
                     }
                     break;
                 }
-            } while (!ret);
+            }
+            while (!ret);
         }
         else if ( processed != jobs )
             sleep(1);
 
-    } while(!ret);
+    }
+    while (!ret);
 
     inotify_rm_watch( fd, wd );
     close(fd);

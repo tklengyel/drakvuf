@@ -108,24 +108,26 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
-class regmon: public plugin {
-    public:
-        drakvuf_trap_t traps[3] = {
-            [0 ... 2] = {
-                .breakpoint.lookup_type = LOOKUP_PID,
-                .breakpoint.pid = 4,
-                .breakpoint.addr_type = ADDR_RVA,
-                .breakpoint.module = "ntoskrnl.exe",
-                .type = BREAKPOINT,
-                .data = (void*)this
-            }
-        };
+class regmon: public plugin
+{
+public:
+    drakvuf_trap_t traps[3] =
+    {
+        [0 ... 2] = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 4,
+            .breakpoint.addr_type = ADDR_RVA,
+            .breakpoint.module = "ntoskrnl.exe",
+            .type = BREAKPOINT,
+            .data = (void*)this
+        }
+    };
 
-        page_mode_t pm;
-        output_format_t format;
+    page_mode_t pm;
+    output_format_t format;
 
-        regmon(drakvuf_t drakvuf, const void *config, output_format_t output);
-        ~regmon();
+    regmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    ~regmon();
 };
 
 #endif

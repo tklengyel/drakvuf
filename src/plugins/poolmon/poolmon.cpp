@@ -122,35 +122,41 @@
 #include "private.h"
 #include "poolmon.h"
 
-static GTree* pooltag_build_tree() {
-    GTree *pooltags = g_tree_new((GCompareFunc) strcmp);
+static GTree* pooltag_build_tree()
+{
+    GTree* pooltags = g_tree_new((GCompareFunc) strcmp);
 
     uint32_t i = 0;
-    for (; i < TAG_COUNT; i++) {
+    for (; i < TAG_COUNT; i++)
+    {
         g_tree_insert(pooltags, (char*) tags[i].tag,
-                (char*) &tags[i]);
+                      (char*) &tags[i]);
     }
 
     return pooltags;
 }
 
-static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    poolmon *p = (poolmon*)info->trap->data;
+static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    poolmon* p = (poolmon*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     page_mode_t pm = vmi_get_page_mode(vmi, 0);
     reg_t pool_type, size;
     char tag[5] = { [0 ... 4] = '\0' };
-    struct pooltag *s = NULL;
+    struct pooltag* s = NULL;
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    if (pm == VMI_PM_IA32E) {
+    if (pm == VMI_PM_IA32E)
+    {
         pool_type = info->regs->rcx;
         size = info->regs->rdx;
         *(reg_t*)tag = info->regs->r8;
-    } else {
+    }
+    else
+    {
         ctx.addr = info->regs->rsp+12;
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)tag) )
             goto done;
@@ -166,26 +172,27 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
     s = (struct pooltag*)g_tree_lookup(p->pooltag_tree, tag);
 
-    switch(p->format) {
-    case OUTPUT_CSV:
+    switch (p->format)
     {
-        printf("poolmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s,%" PRIu64 "",
-               info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, tag,
-               pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
-        if (s)
-            printf(",%s,%s", s->source, s->description);
-        break;
-    }
-    default:
-    case OUTPUT_DEFAULT:
-        printf("[POOLMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s (type: %s, size: %" PRIu64 ")",
-               info->vcpu, info->regs->cr3, info->proc_data.name,
-               USERIDSTR(drakvuf), info->proc_data.userid, tag,
-               pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
-        if (s)
-            printf(": %s,%s", s->source, s->description);
+        case OUTPUT_CSV:
+        {
+            printf("poolmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s,%" PRIu64 "",
+                   info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, tag,
+                   pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
+            if (s)
+                printf(",%s,%s", s->source, s->description);
+            break;
+        }
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[POOLMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s (type: %s, size: %" PRIu64 ")",
+                   info->vcpu, info->regs->cr3, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid, tag,
+                   pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
+            if (s)
+                printf(": %s,%s", s->source, s->description);
 
-        break;
+            break;
     };
 
     printf("\n");
@@ -211,8 +218,9 @@ done:
 
 /* ----------------------------------------------------- */
 
-poolmon::poolmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
-    const char *rekall_profile = (const char*)config;
+poolmon::poolmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+{
+    const char* rekall_profile = (const char*)config;
     this->pooltag_tree = pooltag_build_tree();
 
     this->trap.breakpoint.lookup_type = LOOKUP_PID;
@@ -233,7 +241,8 @@ poolmon::poolmon(drakvuf_t drakvuf, const void *config, output_format_t output) 
         throw -1;
 }
 
-poolmon::~poolmon() {
-    if(this->pooltag_tree)
+poolmon::~poolmon()
+{
+    if (this->pooltag_tree)
         g_tree_destroy(this->pooltag_tree);
 }

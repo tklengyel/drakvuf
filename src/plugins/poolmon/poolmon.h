@@ -108,14 +108,15 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
-class poolmon: public plugin {
-    public:
-        output_format_t format;
-        GTree *pooltag_tree;
-        drakvuf_trap_t trap;
+class poolmon: public plugin
+{
+public:
+    output_format_t format;
+    GTree* pooltag_tree;
+    drakvuf_trap_t trap;
 
-        poolmon(drakvuf_t drakvuf, const void *config, output_format_t output);
-        ~poolmon();
+    poolmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    ~poolmon();
 };
 
 #endif

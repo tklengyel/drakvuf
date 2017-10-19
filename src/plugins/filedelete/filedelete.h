@@ -108,27 +108,29 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
-class filedelete: public plugin {
-    public:
-        drakvuf_trap_t traps[4] = {
-            [0 ... 3] = {
-                .breakpoint.lookup_type = LOOKUP_PID,
-                .breakpoint.pid = 4,
-                .breakpoint.addr_type = ADDR_RVA,
-                .breakpoint.module = "ntoskrnl.exe",
-                .type = BREAKPOINT,
-                .data = (void*)this
-            }
-        };
-        size_t* offsets;
-        size_t control_area_size, mmpte_size;
+class filedelete: public plugin
+{
+public:
+    drakvuf_trap_t traps[4] =
+    {
+        [0 ... 3] = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 4,
+            .breakpoint.addr_type = ADDR_RVA,
+            .breakpoint.module = "ntoskrnl.exe",
+            .type = BREAKPOINT,
+            .data = (void*)this
+        }
+    };
+    size_t* offsets;
+    size_t control_area_size, mmpte_size;
 
-        const char *dump_folder;
-        page_mode_t pm;
-        uint32_t domid;
-        output_format_t format;
-        filedelete(drakvuf_t drakvuf, const void *config, output_format_t output);
-        ~filedelete();
+    const char* dump_folder;
+    page_mode_t pm;
+    uint32_t domid;
+    output_format_t format;
+    filedelete(drakvuf_t drakvuf, const void* config, output_format_t output);
+    ~filedelete();
 };
 
 #endif

@@ -105,9 +105,12 @@
 #ifndef FILETRACER_PRIVATE_H
 #define FILETRACER_PRIVATE_H
 
-struct pool_header_x86 {
-    union {
-        struct {
+struct pool_header_x86
+{
+    union
+    {
+        struct
+        {
             uint16_t previous_size :9;
             uint16_t pool_index :7;
             uint16_t block_size :9; // bits 0-9
@@ -116,11 +119,14 @@ struct pool_header_x86 {
         uint16_t flags;
     };
     uint32_t pool_tag;
-}__attribute__ ((packed));
+} __attribute__ ((packed));
 
-struct pool_header_x64 {
-    union {
-        struct {
+struct pool_header_x64
+{
+    union
+    {
+        struct
+        {
             uint32_t previous_size :8;
             uint32_t pool_index :8;
             uint32_t block_size :8;
@@ -130,6 +136,6 @@ struct pool_header_x64 {
     };
     uint32_t pool_tag;
     uint64_t process_billed; // _EPROCESS *
-}__attribute__ ((packed));
+} __attribute__ ((packed));
 
 #endif

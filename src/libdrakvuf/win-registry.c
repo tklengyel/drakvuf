@@ -114,19 +114,20 @@
 #include "win-offsets.h"
 
 
-char *drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t p_key_control_block )
+char* drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t p_key_control_block )
 {
     status_t vmi_status ;
     addr_t p_name_control_block = 0 ;
-    char *buf_ret ;
+    char* buf_ret ;
     vmi_instance_t vmi = drakvuf->vmi;
-    access_context_t ctx = {
+    access_context_t ctx =
+    {
         .addr = p_key_control_block + drakvuf->offsets[ CM_KEY_NAMEBLOCK ],
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
     };
 
-    vmi_status = vmi_read_addr( vmi, &ctx, (void *)&p_name_control_block );
+    vmi_status = vmi_read_addr( vmi, &ctx, (void*)&p_name_control_block );
 
     if ( ( vmi_status == VMI_SUCCESS ) && p_name_control_block )
     {
@@ -138,7 +139,7 @@ char *drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_t *
         {
             if ( name_length && ( name_length < 240 ) )
             {
-                buf_ret = (char *)g_malloc0( name_length + 1 );
+                buf_ret = (char*)g_malloc0( name_length + 1 );
 
                 if ( buf_ret )
                 {
@@ -162,10 +163,10 @@ char *drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_t *
                     g_free( buf_ret );
                 }
             }
-#ifdef DRAKVUF_DEBUG            
+#ifdef DRAKVUF_DEBUG
             else
                 PRINT_DEBUG( "Inconsistent registry key name length [%d]!!\n", name_length );
-#endif            
+#endif
         }
     }
 
@@ -173,13 +174,14 @@ char *drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_t *
 }
 
 
-char *drakvuf_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t p_key_body )
+char* drakvuf_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t p_key_body )
 {
-    char *buf_ret = NULL ;
+    char* buf_ret = NULL ;
     status_t vmi_status ;
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t p_key_control_block = 0 ;
-    access_context_t ctx = {
+    access_context_t ctx =
+    {
         .addr = p_key_body + drakvuf->offsets[ CM_KEY_CONTROL_BLOCK ],
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
@@ -189,12 +191,12 @@ char *drakvuf_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t *info, ad
 
     if ( ( vmi_status == VMI_SUCCESS ) && p_key_control_block )
     {
-        GSList *key_path_list = NULL ;
+        GSList* key_path_list = NULL ;
         int tot_len = 0;
 
         while ( ( vmi_status == VMI_SUCCESS ) && p_key_control_block )
         {
-            char *key_path = drakvuf_reg_keycontrolblock_path( drakvuf, info, p_key_control_block );
+            char* key_path = drakvuf_reg_keycontrolblock_path( drakvuf, info, p_key_control_block );
 
             if ( key_path )
             {
@@ -213,18 +215,18 @@ char *drakvuf_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t *info, ad
         {
             tot_len += g_slist_length( key_path_list ) + 1 ;
 
-            buf_ret = (char *)g_malloc0( tot_len ) ;
+            buf_ret = (char*)g_malloc0( tot_len ) ;
 
             if ( buf_ret )
             {
-                GSList *iterator ;
+                GSList* iterator ;
 
                 *buf_ret = 0 ;
 
                 for ( iterator = key_path_list; iterator ; iterator = iterator->next )
                 {
                     strcat( buf_ret, "\\" );
-                    strcat( buf_ret, (char *)iterator->data );
+                    strcat( buf_ret, (char*)iterator->data );
                     g_free( iterator->data );
                 }
             }
@@ -237,7 +239,7 @@ char *drakvuf_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t *info, ad
 }
 
 
-char *drakvuf_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t key_handle, addr_t process_arg )
+char* drakvuf_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t key_handle, addr_t process_arg )
 {
     addr_t process = process_arg ;
 

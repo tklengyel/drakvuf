@@ -112,12 +112,14 @@ static gpointer timer(gpointer data)
     g_mutex_lock(&drakvuf->loop_signal);
     g_mutex_unlock(&drakvuf->loop_signal);
 
-    while(drakvuf->timeout && !drakvuf->interrupted) {
+    while (drakvuf->timeout && !drakvuf->interrupted)
+    {
         sleep(1);
         --drakvuf->timeout;
     }
 
-    if (!drakvuf->interrupted) {
+    if (!drakvuf->interrupted)
+    {
         drakvuf->interrupt(-1);
     }
 
@@ -126,44 +128,48 @@ static gpointer timer(gpointer data)
 }
 
 int drakvuf_c::start_plugins(const bool* plugin_list,
-                             const char *dump_folder,   // PLUGIN_FILEDELETE
+                             const char* dump_folder,   // PLUGIN_FILEDELETE
                              bool cpuid_stealth,        // PLUGIN_CPUIDMON
-                             const char *tcpip_profile) // PLUGIN_SOCKETMON
+                             const char* tcpip_profile) // PLUGIN_SOCKETMON
 {
     int i, rc;
 
-    for(i=0;i<__DRAKVUF_PLUGIN_LIST_MAX;i++)
+    for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
     {
-        if (plugin_list[i]) {
-            switch ((drakvuf_plugin_t)i) {
-            case PLUGIN_FILEDELETE:
+        if (plugin_list[i])
+        {
+            switch ((drakvuf_plugin_t)i)
             {
-                struct filedelete_config c = {
-                    .rekall_profile = this->rekall_profile,
-                    .dump_folder = dump_folder
-                };
+                case PLUGIN_FILEDELETE:
+                {
+                    struct filedelete_config c =
+                    {
+                        .rekall_profile = this->rekall_profile,
+                        .dump_folder = dump_folder
+                    };
 
-                rc = this->plugins->start((drakvuf_plugin_t)i, &c);
-                break;
-            }
+                    rc = this->plugins->start((drakvuf_plugin_t)i, &c);
+                    break;
+                }
 
-            case PLUGIN_CPUIDMON:
-                rc = this->plugins->start((drakvuf_plugin_t)i, &cpuid_stealth);
-                break;
+                case PLUGIN_CPUIDMON:
+                    rc = this->plugins->start((drakvuf_plugin_t)i, &cpuid_stealth);
+                    break;
 
-            case PLUGIN_SOCKETMON:
-            {
-                struct socketmon_config c = {
-                    .rekall_profile = this->rekall_profile,
-                    .tcpip_profile = tcpip_profile
-                };
-                rc = this->plugins->start((drakvuf_plugin_t)i, &c);
-                break;
-            }
+                case PLUGIN_SOCKETMON:
+                {
+                    struct socketmon_config c =
+                    {
+                        .rekall_profile = this->rekall_profile,
+                        .tcpip_profile = tcpip_profile
+                    };
+                    rc = this->plugins->start((drakvuf_plugin_t)i, &c);
+                    break;
+                }
 
-            default:
-                rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
-                break;
+                default:
+                    rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
+                    break;
             };
 
             if ( rc < 0 )
@@ -175,7 +181,7 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
 }
 
 drakvuf_c::drakvuf_c(const char* domain,
-                     const char *rekall_profile,
+                     const char* rekall_profile,
                      const output_format_t output,
                      const int timeout,
                      const bool verbose,
@@ -198,7 +204,7 @@ drakvuf_c::drakvuf_c(const char* domain,
     g_mutex_init(&this->loop_signal2);
     g_mutex_lock(&this->loop_signal2);
 
-    if(timeout > 0)
+    if (timeout > 0)
         this->timeout_thread = g_thread_new(NULL, timer, (void*)this);
 
     this->plugins = new drakvuf_plugins(this->drakvuf, output, this->os);
@@ -222,7 +228,7 @@ drakvuf_c::~drakvuf_c()
     if (this->plugins)
         delete this->plugins;
 
-    if(this->timeout_thread)
+    if (this->timeout_thread)
         g_thread_join(this->timeout_thread);
 }
 
@@ -249,7 +255,7 @@ void drakvuf_c::resume()
     drakvuf_resume(this->drakvuf);
 }
 
-int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char *inject_cmd)
+int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd)
 {
     int rc = injector_start_app(this->drakvuf, injection_pid, injection_tid, inject_cmd);
     if (!rc)
@@ -265,12 +271,14 @@ static gpointer timer2(gpointer data)
     g_mutex_lock(&drakvuf->loop_signal2);
     g_mutex_unlock(&drakvuf->loop_signal2);
 
-    while(drakvuf->process_start_timeout && !drakvuf->interrupted) {
+    while (drakvuf->process_start_timeout && !drakvuf->interrupted)
+    {
         sleep(1);
         --drakvuf->process_start_timeout;
     }
 
-    if (!drakvuf->interrupted) {
+    if (!drakvuf->interrupted)
+    {
         drakvuf->interrupt(-1);
     }
 
@@ -278,9 +286,10 @@ static gpointer timer2(gpointer data)
     return NULL;
 }
 
-static event_response_t wait_for_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
+static event_response_t wait_for_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
     UNUSED(drakvuf);
-    drakvuf_c *dc = (drakvuf_c*)info->trap->data;
+    drakvuf_c* dc = (drakvuf_c*)info->trap->data;
 
     if ( !strcmp(info->proc_data.name, dc->process_start_name) )
     {
@@ -291,9 +300,10 @@ static event_response_t wait_for_process_cb(drakvuf_t drakvuf, drakvuf_trap_info
     return 0;
 }
 
-bool drakvuf_c::wait_for_process(const char *processname)
+bool drakvuf_c::wait_for_process(const char* processname)
 {
-    drakvuf_trap_t trap = {
+    drakvuf_trap_t trap =
+    {
         .cb = wait_for_process_cb,
         .type = REGISTER,
         .reg = CR3,

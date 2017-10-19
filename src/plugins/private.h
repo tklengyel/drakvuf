@@ -105,7 +105,8 @@
 #ifndef DRAKVUF_PLUGINS_PRIVATE_H
 #define DRAKVUF_PLUGINS_PRIVATE_H
 
-static const char *userid[] = {
+static const char* userid[] =
+{
     [VMI_OS_WINDOWS] = "SessionID",
     [VMI_OS_LINUX] = "UID"
 };

@@ -113,76 +113,85 @@
 
 #include "private.h"
 
-bool fill_offsets_from_rekall(drakvuf_t drakvuf, size_t size, const char *names [][2]) {
+bool fill_offsets_from_rekall(drakvuf_t drakvuf, size_t size, const char* names [][2])
+{
     unsigned int i;
 
     drakvuf->offsets = g_malloc0(sizeof(addr_t) * size );
     if ( !drakvuf->offsets )
         return 0;
 
-    for (i = 0; i < size; i++) {
-         if (!drakvuf_get_struct_member_rva(
-                     drakvuf->rekall_profile, names[i][0],
-                     names[i][1], &drakvuf->offsets[i]))
-         {
-             PRINT_DEBUG("Failed to find offset for %s:%s\n",
-                         names[i][0], names[i][1]);
-         }
-     }
+    for (i = 0; i < size; i++)
+    {
+        if (!drakvuf_get_struct_member_rva(
+                    drakvuf->rekall_profile, names[i][0],
+                    names[i][1], &drakvuf->offsets[i]))
+        {
+            PRINT_DEBUG("Failed to find offset for %s:%s\n",
+                        names[i][0], names[i][1]);
+        }
+    }
 
     return 1;
 }
 
-addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id) {
+addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
+{
     if ( drakvuf->osi.get_current_thread )
         return drakvuf->osi.get_current_thread(drakvuf, vcpu_id);
 
     return 0;
 }
 
-addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id) {
+addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
+{
     if ( drakvuf->osi.get_current_process )
         return drakvuf->osi.get_current_process(drakvuf, vcpu_id);
 
     return 0;
 }
 
-char *drakvuf_get_process_name(drakvuf_t drakvuf, addr_t process_base) {
+char* drakvuf_get_process_name(drakvuf_t drakvuf, addr_t process_base)
+{
     if ( drakvuf->osi.get_process_name )
         return drakvuf->osi.get_process_name(drakvuf, process_base);
 
     return NULL;
 }
 
-status_t drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *pid) {
+status_t drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid)
+{
     if ( drakvuf->osi.get_process_pid )
         return drakvuf->osi.get_process_pid(drakvuf, process_base, pid);
 
     return VMI_FAILURE;
 }
 
-char *drakvuf_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id) {
+char* drakvuf_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id)
+{
     if ( drakvuf->osi.get_current_process_name )
         return drakvuf->osi.get_current_process_name(drakvuf, vcpu_id);
 
     return NULL;
 }
 
-int64_t drakvuf_get_process_userid(drakvuf_t drakvuf, addr_t process_base) {
+int64_t drakvuf_get_process_userid(drakvuf_t drakvuf, addr_t process_base)
+{
     if ( drakvuf->osi.get_process_userid )
         return drakvuf->osi.get_process_userid(drakvuf, process_base);
 
     return ~0l;
 }
 
-int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id) {
+int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id)
+{
     if ( drakvuf->osi.get_current_process_userid )
         return drakvuf->osi.get_current_process_userid(drakvuf, vcpu_id);
 
     return ~0l;
 }
 
-bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *thread_id )
+bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* thread_id )
 {
     if ( drakvuf->osi.get_current_thread_id )
         return drakvuf->osi.get_current_thread_id(drakvuf, vcpu_id, thread_id);
@@ -191,7 +200,7 @@ bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_
 }
 
 
-bool drakvuf_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_mode_t *previous_mode )
+bool drakvuf_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode )
 {
     if ( drakvuf->osi.get_thread_previous_mode )
         return drakvuf->osi.get_thread_previous_mode(drakvuf, kthread, previous_mode);
@@ -200,8 +209,8 @@ bool drakvuf_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privil
 }
 
 bool drakvuf_get_current_thread_previous_mode( drakvuf_t drakvuf,
-                                               uint64_t vcpu_id,
-                                               privilege_mode_t *previous_mode )
+        uint64_t vcpu_id,
+        privilege_mode_t* previous_mode )
 {
     if ( drakvuf->osi.get_current_thread_previous_mode )
         return drakvuf->osi.get_current_thread_previous_mode(drakvuf, vcpu_id, previous_mode);
@@ -225,28 +234,32 @@ bool drakvuf_is_process( drakvuf_t drakvuf, addr_t dtb, addr_t process_addr )
     return 0;
 }
 
-bool drakvuf_get_module_list(drakvuf_t drakvuf, addr_t process_base, addr_t *module_list) {
+bool drakvuf_get_module_list(drakvuf_t drakvuf, addr_t process_base, addr_t* module_list)
+{
     if ( drakvuf->osi.get_module_list )
         return drakvuf->osi.get_module_list(drakvuf, process_base, module_list);
 
     return 0;
 }
 
-bool drakvuf_find_process(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_procname, addr_t *process_addr) {
+bool drakvuf_find_process(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* process_addr)
+{
     if ( drakvuf->osi.find_process )
         return drakvuf->osi.find_process(drakvuf, find_pid, find_procname, process_addr);
 
     return 0;
 }
 
-bool inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t *trap, addr_t list_head, vmi_pid_t pid) {
+bool inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid)
+{
     if ( drakvuf->osi.inject_traps_modules )
         return drakvuf->osi.inject_traps_modules(drakvuf, trap, list_head, pid);
 
     return 0;
 }
 
-bool drakvuf_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const char *module_name, addr_t *base_addr_out) {
+bool drakvuf_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out)
+{
     if ( drakvuf->osi.get_module_base_addr )
         return drakvuf->osi.get_module_base_addr(drakvuf, module_list_head, module_name, base_addr_out);
 
@@ -254,7 +267,7 @@ bool drakvuf_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, co
 }
 
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
-                               const char *module, const char *sym)
+                               const char* module, const char* sym)
 {
     if ( drakvuf->osi.exportsym_to_va )
         return drakvuf->osi.exportsym_to_va(drakvuf, process_addr, module, sym);
@@ -262,7 +275,7 @@ addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
     return 0;
 }
 
-status_t drakvuf_get_process_ppid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *ppid )
+status_t drakvuf_get_process_ppid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid )
 {
     if ( drakvuf->osi.get_process_ppid )
         return drakvuf->osi.get_process_ppid( drakvuf, process_base, ppid );
@@ -270,7 +283,7 @@ status_t drakvuf_get_process_ppid(drakvuf_t drakvuf, addr_t process_base, vmi_pi
     return VMI_FAILURE ;
 }
 
-bool drakvuf_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t *proc_data )
+bool drakvuf_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t* proc_data )
 {
     if ( drakvuf->osi.get_current_process_data )
         return drakvuf->osi.get_current_process_data( drakvuf, vcpu_id, proc_data );

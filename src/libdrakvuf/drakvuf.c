@@ -113,15 +113,18 @@
 bool verbose = 0;
 #endif
 
-void drakvuf_close(drakvuf_t drakvuf, const bool pause) {
+void drakvuf_close(drakvuf_t drakvuf, const bool pause)
+{
     if (!drakvuf)
         return;
 
-    if (drakvuf->vmi) {
+    if (drakvuf->vmi)
+    {
         close_vmi(drakvuf);
     }
 
-    if (drakvuf->xen) {
+    if (drakvuf->xen)
+    {
 
         if ( !pause )
             drakvuf_force_resume(drakvuf);
@@ -137,7 +140,8 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause) {
     g_free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_profile, bool _verbose) {
+bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_profile, bool _verbose)
+{
 
     if ( !domain || !rekall_profile )
         return 0;
@@ -162,23 +166,25 @@ bool drakvuf_init(drakvuf_t *drakvuf, const char *domain, const char *rekall_pro
 
     drakvuf_pause(*drakvuf);
 
-    if (!init_vmi(*drakvuf)) {
+    if (!init_vmi(*drakvuf))
+    {
         drakvuf_resume(*drakvuf);
         goto err;
     }
 
-    switch((*drakvuf)->os) {
-    case VMI_OS_WINDOWS:
-        if ( !set_os_windows(*drakvuf) )
+    switch ((*drakvuf)->os)
+    {
+        case VMI_OS_WINDOWS:
+            if ( !set_os_windows(*drakvuf) )
+                goto err;
+            break;
+        case VMI_OS_LINUX:
+            if ( !set_os_linux(*drakvuf) )
+                goto err;
+            break;
+        default:
+            fprintf(stderr, "The Rekall profile describes an unknown operating system kernel!\n");
             goto err;
-        break;
-    case VMI_OS_LINUX:
-        if ( !set_os_linux(*drakvuf) )
-            goto err;
-        break;
-    default:
-        fprintf(stderr, "The Rekall profile describes an unknown operating system kernel!\n");
-        goto err;
     };
 
     PRINT_DEBUG("libdrakvuf initialized\n");
@@ -194,41 +200,49 @@ err:
     return 0;
 }
 
-void drakvuf_interrupt(drakvuf_t drakvuf, int sig) {
+void drakvuf_interrupt(drakvuf_t drakvuf, int sig)
+{
     drakvuf->interrupted = sig;
 }
 
-bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
+bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+{
 
-    if(trap->breakpoint.lookup_type == LOOKUP_NONE) {
+    if (trap->breakpoint.lookup_type == LOOKUP_NONE)
+    {
         return inject_trap_pa(drakvuf, trap, trap->breakpoint.addr);
     }
 
-    if(trap->breakpoint.lookup_type == LOOKUP_PID || trap->breakpoint.lookup_type == LOOKUP_NAME) {
-        if (trap->breakpoint.addr_type == ADDR_RVA && trap->breakpoint.module) {
+    if (trap->breakpoint.lookup_type == LOOKUP_PID || trap->breakpoint.lookup_type == LOOKUP_NAME)
+    {
+        if (trap->breakpoint.addr_type == ADDR_RVA && trap->breakpoint.module)
+        {
 
             vmi_pid_t pid = -1;
-            const char *name = NULL;
+            const char* name = NULL;
             addr_t module_list = 0;
 
-            if(trap->breakpoint.pid == 4 || !strcmp(trap->breakpoint.proc, "System")) {
+            if (trap->breakpoint.pid == 4 || !strcmp(trap->breakpoint.proc, "System"))
+            {
 
                 pid = 4;
                 name = "System";
-                if(VMI_FAILURE == vmi_read_addr_ksym(drakvuf->vmi, "PsLoadedModuleList", &module_list))
+                if (VMI_FAILURE == vmi_read_addr_ksym(drakvuf->vmi, "PsLoadedModuleList", &module_list))
                     return 0;
 
-            } else {
+            }
+            else
+            {
 
                 /* Process library */
                 addr_t process_base;
 
-                if(trap->breakpoint.lookup_type == LOOKUP_PID)
+                if (trap->breakpoint.lookup_type == LOOKUP_PID)
                     pid = trap->breakpoint.pid;
-                if(trap->breakpoint.lookup_type == LOOKUP_NAME)
+                if (trap->breakpoint.lookup_type == LOOKUP_NAME)
                     name = trap->breakpoint.proc;
 
-                if( !drakvuf_find_process(drakvuf, pid, name, &process_base) )
+                if ( !drakvuf_find_process(drakvuf, pid, name, &process_base) )
                     return 0;
 
                 if (pid == -1)
@@ -237,14 +251,15 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
                         return 0;
                 }
 
-                if( !drakvuf_get_module_list(drakvuf, process_base, &module_list) )
+                if ( !drakvuf_get_module_list(drakvuf, process_base, &module_list) )
                     return 0;
             }
 
             return inject_traps_modules(drakvuf, trap, module_list, pid);
         }
 
-        if(trap->breakpoint.addr_type == ADDR_VA) {
+        if (trap->breakpoint.addr_type == ADDR_VA)
+        {
             addr_t dtb, trap_pa;
             if ( VMI_FAILURE == vmi_pid_to_dtb(drakvuf->vmi, trap->breakpoint.pid, &dtb) )
             {
@@ -261,14 +276,17 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
             return inject_trap_pa(drakvuf, trap, trap_pa);
         }
 
-        if(trap->breakpoint.addr_type == ADDR_PA) {
+        if (trap->breakpoint.addr_type == ADDR_PA)
+        {
             fprintf(stderr, "DRAKVUF Trap misconfiguration: PID lookup specified for PA location\n");
             return 0;
         }
     }
 
-    if(trap->breakpoint.lookup_type == LOOKUP_DTB) {
-        if(trap->breakpoint.addr_type == ADDR_VA) {
+    if (trap->breakpoint.lookup_type == LOOKUP_DTB)
+    {
+        if (trap->breakpoint.addr_type == ADDR_VA)
+        {
             addr_t trap_pa;
             if ( VMI_FAILURE == vmi_pagetable_lookup(drakvuf->vmi, trap->breakpoint.dtb, trap->breakpoint.addr, &trap_pa) )
                 return 0;
@@ -284,8 +302,10 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
     return 0;
 }
 
-bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
-    if(CR3 == trap->reg) {
+bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+{
+    if (CR3 == trap->reg)
+    {
         drakvuf->cr3 = g_slist_prepend(drakvuf->cr3, trap);
         return 1;
     }
@@ -295,7 +315,8 @@ bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
     return 0;
 }
 
-bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
+bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+{
     if ( !drakvuf->debug && !control_debug_trap(drakvuf, 1) )
         return 0;
 
@@ -303,7 +324,8 @@ bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
     return 1;
 };
 
-bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
+bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+{
     if ( !drakvuf->cpuid && !control_cpuid_trap(drakvuf, 1) )
         return 0;
 
@@ -311,21 +333,24 @@ bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
     return 1;
 };
 
-bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
+bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+{
 
     bool ret;
 
     if (!trap || !trap->cb)
         return 0;
 
-    if(g_hash_table_lookup(drakvuf->remove_traps, &trap)) {
+    if (g_hash_table_lookup(drakvuf->remove_traps, &trap))
+    {
         g_hash_table_remove(drakvuf->remove_traps, &trap);
         return 1;
     }
 
     drakvuf_pause(drakvuf);
 
-    switch(trap->type) {
+    switch (trap->type)
+    {
         case BREAKPOINT:
             ret = inject_trap_breakpoint(drakvuf, trap);
             break;
@@ -350,14 +375,16 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap) {
     return ret;
 }
 
-void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap,
+void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap,
                          drakvuf_trap_free_t free_routine)
 {
-    if ( drakvuf->in_callback) {
-        struct free_trap_wrapper *free_wrapper =
+    if ( drakvuf->in_callback)
+    {
+        struct free_trap_wrapper* free_wrapper =
             g_hash_table_lookup(drakvuf->remove_traps, &trap);
 
-        if (!free_wrapper) {
+        if (!free_wrapper)
+        {
             free_wrapper = g_malloc0(sizeof(struct free_trap_wrapper));
             free_wrapper->free_routine = free_routine;
             free_wrapper->trap = trap;
@@ -367,67 +394,77 @@ void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t *trap,
         }
 
         free_wrapper->counter++;
-    } else {
+    }
+    else
+    {
         remove_trap(drakvuf, trap);
-        if(free_routine)
+        if (free_routine)
             free_routine(trap);
     }
 }
 
-vmi_instance_t drakvuf_lock_and_get_vmi(drakvuf_t drakvuf) {
+vmi_instance_t drakvuf_lock_and_get_vmi(drakvuf_t drakvuf)
+{
     g_mutex_lock(&drakvuf->vmi_lock);
     return drakvuf->vmi;
 }
 
-void drakvuf_release_vmi(drakvuf_t drakvuf) {
+void drakvuf_release_vmi(drakvuf_t drakvuf)
+{
     g_mutex_unlock(&drakvuf->vmi_lock);
 }
 
-void drakvuf_pause (drakvuf_t drakvuf) {
+void drakvuf_pause (drakvuf_t drakvuf)
+{
     xen_pause(drakvuf->xen, drakvuf->domID);
 }
 
-void drakvuf_resume (drakvuf_t drakvuf) {
+void drakvuf_resume (drakvuf_t drakvuf)
+{
     xen_resume(drakvuf->xen, drakvuf->domID);
 }
 
-void drakvuf_force_resume (drakvuf_t drakvuf) {
+void drakvuf_force_resume (drakvuf_t drakvuf)
+{
     xen_force_resume(drakvuf->xen, drakvuf->domID);
 }
 
-bool drakvuf_get_struct_size(const char *rekall_profile,
-                             const char *struct_name,
-                             size_t *size)
+bool drakvuf_get_struct_size(const char* rekall_profile,
+                             const char* struct_name,
+                             size_t* size)
 {
     return rekall_lookup(
-                rekall_profile,
-                struct_name,
-                NULL,
-                NULL,
-                size);
+               rekall_profile,
+               struct_name,
+               NULL,
+               NULL,
+               size);
 }
 
-bool drakvuf_get_struct_member_rva(const char *rekall_profile,
-                                   const char *struct_name,
-                                   const char *symbol,
-                                   addr_t *rva)
+bool drakvuf_get_struct_member_rva(const char* rekall_profile,
+                                   const char* struct_name,
+                                   const char* symbol,
+                                   addr_t* rva)
 {
     return rekall_lookup(
-                rekall_profile,
-                struct_name,
-                symbol,
-                rva,
-                NULL);
+               rekall_profile,
+               struct_name,
+               symbol,
+               rva,
+               NULL);
 }
 
-const char *drakvuf_get_rekall_profile(drakvuf_t drakvuf) {
+const char* drakvuf_get_rekall_profile(drakvuf_t drakvuf)
+{
     return drakvuf->rekall_profile;
 }
 
-addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf) {
+addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf)
+{
     return drakvuf->kernbase;
 }
 
-os_t drakvuf_get_os_type(drakvuf_t drakvuf) {
+os_t drakvuf_get_os_type(drakvuf_t drakvuf)
+{
     return drakvuf->os;
 }

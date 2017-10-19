@@ -114,66 +114,75 @@
 #include "private.h"
 #include "win-offsets.h"
 
-typedef enum dispatcher_object {
+typedef enum dispatcher_object
+{
     DISPATCHER_PROCESS_OBJECT = 3,
     DISPATCHER_THREAD_OBJECT  = 6
 } dispatcher_object_t ;
 
-addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id){
+addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
+{
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t thread;
     addr_t prcb;
 
-    if(drakvuf->pm == VMI_PM_IA32E)
+    if (drakvuf->pm == VMI_PM_IA32E)
         prcb=drakvuf->offsets[KPCR_PRCB];
     else
         prcb=drakvuf->offsets[KPCR_PRCBDATA];
 
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, drakvuf->kpcr[vcpu_id] + prcb + drakvuf->offsets[KPRCB_CURRENTTHREAD], 0, &thread)){
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, drakvuf->kpcr[vcpu_id] + prcb + drakvuf->offsets[KPRCB_CURRENTTHREAD], 0, &thread))
+    {
         return 0;
     }
 
     return thread;
 }
 
-addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id) {
+addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
+{
     addr_t thread, process;
 
     thread=win_get_current_thread(drakvuf,vcpu_id);
 
-    if (thread == 0 || VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_PROCESS], 0, &process)){
+    if (thread == 0 || VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_PROCESS], 0, &process))
+    {
         return 0;
     }
 
     return process;
 }
 
-char *win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base) {
+char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base)
+{
     return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
 }
 
-status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t *pid) {
+status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t* pid)
+{
 
-    return vmi_read_32_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t *)pid);
+    return vmi_read_32_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)pid);
 }
 
-char *win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id) {
+char* win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id)
+{
     return win_get_process_name(drakvuf, win_get_current_process(drakvuf, vcpu_id));
 }
 
-int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base) {
+int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
+{
 
     addr_t peb, userid;
     vmi_instance_t vmi = drakvuf->vmi;
     access_context_t ctx = {.translate_mechanism = VMI_TM_PROCESS_DTB};
 
-    if(!eprocess_base)
+    if (!eprocess_base)
         return -1;
 
-    if(VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb))
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb))
         return -1;
 
-    if(VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
         return -1;
 
     ctx.addr = peb + drakvuf->offsets[PEB_SESSIONID];
@@ -189,14 +198,15 @@ int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base) {
     return (int64_t)userid;
 };
 
-int64_t win_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id) {
+int64_t win_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id)
+{
     return win_get_process_userid(drakvuf, win_get_current_process(drakvuf, vcpu_id));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 
-bool win_get_current_thread_id(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *thread_id)
+bool win_get_current_thread_id(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* thread_id)
 {
     addr_t p_tid ;
     addr_t ethread = win_get_current_thread(drakvuf, vcpu_id);
@@ -222,14 +232,14 @@ bool win_get_current_thread_id(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t *th
 // Microsoft PreviousMode KTHREAD explanation:
 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff559860(v=vs.85).aspx
 
-bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_mode_t *previous_mode )
+bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode )
 {
     if ( kthread )
     {
         *previous_mode = 0 ;
 
         if ( vmi_read_8_va( drakvuf->vmi, kthread + drakvuf->offsets[ KTHREAD_PREVIOUSMODE ], 0,
-                            (uint8_t *)previous_mode ) == VMI_SUCCESS )
+                            (uint8_t*)previous_mode ) == VMI_SUCCESS )
         {
             if ( ( *previous_mode == KERNEL_MODE ) || ( *previous_mode == USER_MODE ) )
                 return true ;
@@ -240,8 +250,8 @@ bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_
 }
 
 bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
-                                          uint64_t vcpu_id,
-                                          privilege_mode_t *previous_mode )
+        uint64_t vcpu_id,
+        privilege_mode_t* previous_mode )
 {
     addr_t kthread = win_get_current_thread(drakvuf, vcpu_id);
 
@@ -255,15 +265,16 @@ bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
 bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 {
     dispatcher_object_t dispatcher_type = 0 ;
-    access_context_t ctx = {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = dtb,
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = dtb,
     };
 
     ctx.addr = ethread_addr + drakvuf->offsets[ ETHREAD_TCB ] + drakvuf->offsets[ KTHREAD_HEADER ]
-                            + drakvuf->offsets[ DISPATCHER_TYPE ] ;
+               + drakvuf->offsets[ DISPATCHER_TYPE ] ;
 
-    if ( vmi_read_8( drakvuf->vmi, &ctx, (uint8_t *)&dispatcher_type ) == VMI_SUCCESS )
+    if ( vmi_read_8( drakvuf->vmi, &ctx, (uint8_t*)&dispatcher_type ) == VMI_SUCCESS )
     {
         if ( dispatcher_type == DISPATCHER_THREAD_OBJECT )
             return true ;
@@ -279,15 +290,16 @@ bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
 {
     dispatcher_object_t dispatcher_type = 0;
-    access_context_t ctx = {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = dtb,
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = dtb,
     };
 
     ctx.addr = eprocess_addr + drakvuf->offsets[ EPROCESS_PCB ] + drakvuf->offsets[ KPROCESS_HEADER ]
-                             + drakvuf->offsets[ DISPATCHER_TYPE ] ;
+               + drakvuf->offsets[ DISPATCHER_TYPE ] ;
 
-    if ( vmi_read_8( drakvuf->vmi, &ctx, (uint8_t *)&dispatcher_type ) == VMI_SUCCESS )
+    if ( vmi_read_8( drakvuf->vmi, &ctx, (uint8_t*)&dispatcher_type ) == VMI_SUCCESS )
     {
         if ( dispatcher_type == DISPATCHER_PROCESS_OBJECT )
             return true ;
@@ -296,31 +308,32 @@ bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
     return false ;
 }
 
-bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t *module_list) {
+bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module_list)
+{
 
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t peb=0, ldr=0, modlist=0;
 
     access_context_t ctx = {.translate_mechanism = VMI_TM_PROCESS_DTB};
 
-    if(!eprocess_base)
+    if (!eprocess_base)
         return false;
 
-    if(VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
         return false;
 
-    if(VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb))
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb))
         return false;
 
     ctx.addr = peb + drakvuf->offsets[PEB_LDR];
-    if(VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ldr))
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ldr))
         return false;
 
     ctx.addr = ldr + drakvuf->offsets[PEB_LDR_DATA_INLOADORDERMODULELIST];
-    if(VMI_FAILURE == vmi_read_addr(vmi, &ctx, &modlist))
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &modlist))
         return false;
 
-    if(!modlist)
+    if (!modlist)
         return false;
 
     *module_list = modlist;
@@ -328,7 +341,8 @@ bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t *module
     return true;
 }
 
-bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_procname, addr_t *eprocess_addr) {
+bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* eprocess_addr)
+{
     addr_t current_process, next_list_entry;
     vmi_instance_t vmi = drakvuf->vmi;
 
@@ -340,24 +354,28 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_p
     addr_t current_list_entry = list_head;
 
     status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
-    if ( VMI_FAILURE == status ) {
+    if ( VMI_FAILURE == status )
+    {
         PRINT_DEBUG("Failed to read next pointer at 0x%"PRIx64" before entering loop\n", current_list_entry);
         return false;
     }
 
-    do {
+    do
+    {
         vmi_pid_t pid;
         current_process = current_list_entry - drakvuf->offsets[EPROCESS_TASKS] ;
 
         status = vmi_read_32_va(vmi, current_process + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
-        if ( VMI_FAILURE == status ) {
+        if ( VMI_FAILURE == status )
+        {
             PRINT_DEBUG("Failed to read PID of process at %"PRIx64"\n", current_process);
             return false;
         }
 
-        char *procname = vmi_read_str_va(vmi, current_process + drakvuf->offsets[EPROCESS_PNAME], 0);
+        char* procname = vmi_read_str_va(vmi, current_process + drakvuf->offsets[EPROCESS_PNAME], 0);
 
-        if((find_pid != ~0 && pid == find_pid) || (find_procname && procname && !strcasecmp(procname, find_procname))) {
+        if ((find_pid != ~0 && pid == find_pid) || (find_procname && procname && !strcasecmp(procname, find_procname)))
+        {
             *eprocess_addr = current_process;
             if ( procname )
                 free(procname);
@@ -369,22 +387,24 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char *find_p
         current_list_entry = next_list_entry;
 
         status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
-        if ( VMI_FAILURE == status ) {
+        if ( VMI_FAILURE == status )
+        {
             PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
             return false;
         }
 
-    } while (next_list_entry != list_head);
+    }
+    while (next_list_entry != list_head);
 
     return false;
 }
 
-status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t *ppid )
+status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid )
 {
-    return vmi_read_32_va( drakvuf->vmi, process_base + drakvuf->offsets[EPROCESS_INHERITEDPID], 0, (uint32_t *)ppid );
+    return vmi_read_32_va( drakvuf->vmi, process_base + drakvuf->offsets[EPROCESS_INHERITEDPID], 0, (uint32_t*)ppid );
 }
 
-bool win_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t *proc_data )
+bool win_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t* proc_data )
 {
     proc_data->base_addr = win_get_current_process( drakvuf, vcpu_id );
 

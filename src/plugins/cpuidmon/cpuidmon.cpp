@@ -121,34 +121,39 @@
 #include "../plugins.h"
 #include "cpuidmon.h"
 
-event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
+event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
 
     cpuidmon* s = (cpuidmon*)info->trap->data;
 
-    switch(s->format) {
-    case OUTPUT_CSV:
-        printf("cpuidmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 "\n",
-            info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid);
-        break;
-    default:
-    case OUTPUT_DEFAULT:
-        printf("[CPUIDMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64". "
-               "Leaf: 0x%" PRIx32 ". Subleaf: 0x%" PRIx32". "
-               "RAX: 0x%" PRIx64 " RBX: 0x%" PRIx64 " RCX: 0x%" PRIx64 " RDX: 0x%" PRIx64 "\n",
-               info->vcpu, info->regs->cr3, info->proc_data.name,
-               USERIDSTR(drakvuf), info->proc_data.userid,
-               info->cpuid->leaf, info->cpuid->subleaf,
-               info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx
-            );
-        break;
+    switch (s->format)
+    {
+        case OUTPUT_CSV:
+            printf("cpuidmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 "\n",
+                   info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[CPUIDMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64". "
+                   "Leaf: 0x%" PRIx32 ". Subleaf: 0x%" PRIx32". "
+                   "RAX: 0x%" PRIx64 " RBX: 0x%" PRIx64 " RCX: 0x%" PRIx64 " RDX: 0x%" PRIx64 "\n",
+                   info->vcpu, info->regs->cr3, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid,
+                   info->cpuid->leaf, info->cpuid->subleaf,
+                   info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx
+                  );
+            break;
     };
 
-    if ( s->stealth ) {
-        if ( info->cpuid->leaf == 1 ) {
+    if ( s->stealth )
+    {
+        if ( info->cpuid->leaf == 1 )
+        {
             info->regs->rcx &= ~0x80000000;
         }
 
-        if ( info->cpuid->leaf >= 0x40000000 && info->cpuid->leaf <= 0x40000004 ) {
+        if ( info->cpuid->leaf >= 0x40000000 && info->cpuid->leaf <= 0x40000004 )
+        {
             info->regs->rax = 0;
             info->regs->rbx = 0;
             info->regs->rcx = 0;
@@ -161,17 +166,19 @@ event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
 
 /* ----------------------------------------------------- */
 
-cpuidmon::cpuidmon(drakvuf_t drakvuf, const void *config, output_format_t output) {
+cpuidmon::cpuidmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+{
 
     this->format = output;
-    this->stealth = *(bool *)config;
+    this->stealth = *(bool*)config;
     this->drakvuf = drakvuf;
 
     this->cpuid.cb = cpuid_cb;
     this->cpuid.data = (void*)this;
     this->cpuid.type = CPUID;
 
-    if ( !drakvuf_add_trap(drakvuf, &this->cpuid) ) {
+    if ( !drakvuf_add_trap(drakvuf, &this->cpuid) )
+    {
         fprintf(stderr, "Failed to register CPUIDMON plugin\n");
         throw -1;
     }

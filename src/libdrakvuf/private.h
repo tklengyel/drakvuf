@@ -136,13 +136,14 @@ extern bool verbose;
 
 #define UNUSED(x) (void)(x)
 
-struct drakvuf {
-    char *dom_name;
+struct drakvuf
+{
+    char* dom_name;
     domid_t domID;
-    char *rekall_profile;
+    char* rekall_profile;
     os_t os;
 
-    xen_interface_t *xen;
+    xen_interface_t* xen;
     os_interface_t osi;
     uint16_t altp2m_idx, altp2m_idr;
 
@@ -157,17 +158,17 @@ struct drakvuf {
     vmi_event_t mem_event;
     vmi_event_t debug_event;
     vmi_event_t cpuid_event;
-    vmi_event_t *step_event[16];
+    vmi_event_t* step_event[16];
 
-    size_t *offsets;
-    size_t *sizes;
+    size_t* offsets;
+    size_t* sizes;
 
     // Processing trap removals in trap callbacks
     // is problematic so we save all such requests
     // in a list to be processed after all callbacks
     // are finished.
     bool in_callback;
-    GHashTable *remove_traps;
+    GHashTable* remove_traps;
 
     int interrupted;
     page_mode_t pm;
@@ -177,77 +178,84 @@ struct drakvuf {
     addr_t kernbase;
     addr_t kdtb;
 
-    x86_registers_t *regs[16]; // vCPU specific registers recorded during the last event
+    x86_registers_t* regs[16]; // vCPU specific registers recorded during the last event
     addr_t kpcr[16]; // vCPU specific kpcr recorded on mov-to-cr3
 
-    GHashTable *remapped_gfns; // Key: gfn
-                               // val: remapped gfn
+    GHashTable* remapped_gfns; // Key: gfn
+    // val: remapped gfn
 
-    GHashTable *breakpoint_lookup_pa;   // key: PA of trap
-                                        // val: struct breakpoint
-    GHashTable *breakpoint_lookup_gfn;  // key: gfn (size uint64_t)
-                                        // val: GSList of addr_t* for trap locations
-    GHashTable *breakpoint_lookup_trap; // key: trap pointer
-                                        // val: struct breakpoint
+    GHashTable* breakpoint_lookup_pa;   // key: PA of trap
+    // val: struct breakpoint
+    GHashTable* breakpoint_lookup_gfn;  // key: gfn (size uint64_t)
+    // val: GSList of addr_t* for trap locations
+    GHashTable* breakpoint_lookup_trap; // key: trap pointer
+    // val: struct breakpoint
 
-    GHashTable *memaccess_lookup_gfn;  // key: gfn of trap
-                                       // val: struct memaccess
-    GHashTable *memaccess_lookup_trap; // key: trap pointer
-                                       // val: struct memaccess
+    GHashTable* memaccess_lookup_gfn;  // key: gfn of trap
+    // val: struct memaccess
+    GHashTable* memaccess_lookup_trap; // key: trap pointer
+    // val: struct memaccess
 
-    GSList *cr0, *cr3, *cr4, *debug, *cpuid;
+    GSList* cr0, *cr3, *cr4, *debug, *cpuid;
 };
 
-struct breakpoint {
+struct breakpoint
+{
     addr_t pa;
     drakvuf_trap_t guard, guard2;
     bool doubletrap;
 } __attribute__ ((packed));
 
-struct memaccess {
+struct memaccess
+{
     addr_t gfn;
     bool guard2;
     vmi_mem_access_t access;
 } __attribute__ ((packed));
 
-struct wrapper {
+struct wrapper
+{
     trap_type_t type;
     drakvuf_t drakvuf;
-    GSList *traps; /* List of DRAKVUF traps registered for this event */
-    union {
+    GSList* traps; /* List of DRAKVUF traps registered for this event */
+    union
+    {
         struct memaccess memaccess;
         struct breakpoint breakpoint;
     };
 } __attribute__ ((packed));
 
-struct free_trap_wrapper {
+struct free_trap_wrapper
+{
     unsigned int counter;
-    drakvuf_trap_t *trap;
+    drakvuf_trap_t* trap;
     drakvuf_trap_free_t free_routine;
 };
 
-struct remapped_gfn {
+struct remapped_gfn
+{
     xen_pfn_t o;
     xen_pfn_t r;
     bool active;
 };
 
-struct memcb_pass {
+struct memcb_pass
+{
     drakvuf_t drakvuf;
     uint64_t gfn;
     addr_t pa;
     proc_data_t proc_data ;
-    struct remapped_gfn *remapped_gfn;
+    struct remapped_gfn* remapped_gfn;
     vmi_mem_access_t access;
-    GSList *traps;
+    GSList* traps;
 };
 
 void drakvuf_force_resume (drakvuf_t drakvuf);
 
-char *drakvuf_get_current_process_name(drakvuf_t drakvuf,
+char* drakvuf_get_current_process_name(drakvuf_t drakvuf,
                                        uint64_t vcpu_id);
 
 int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf,
-                                           uint64_t vcpu_id);
+        uint64_t vcpu_id);
 
 #endif

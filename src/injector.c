@@ -112,24 +112,26 @@
 
 static drakvuf_t drakvuf;
 
-static void close_handler(int sig) {
+static void close_handler(int sig)
+{
     drakvuf_interrupt(drakvuf, sig);
 }
 
 int main(int argc, char** argv)
 {
-    if (argc < 5) {
+    if (argc < 5)
+    {
         printf("Usage: %s <rekall profile> <domain> <pid> <app> [tid]\n", argv[0]);
         printf("\t<required> [optional]\n");
         return 1;
     }
 
     int rc = 0;
-    const char *rekall_profile = argv[1];
-    const char *domain = argv[2];
+    const char* rekall_profile = argv[1];
+    const char* domain = argv[2];
     vmi_pid_t pid = atoi(argv[3]);
     uint32_t tid = 0;
-    char *app = argv[4];
+    char* app = argv[4];
     bool verbose = 0;
 
     if ( argc == 6 )
@@ -149,18 +151,23 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose)) {
+    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose))
+    {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
         return rc;
     }
 
-    if (pid > 0 && app) {
+    if (pid > 0 && app)
+    {
         printf("Injector starting %s through PID %u TID: %u\n", app, pid, tid);
         rc = injector_start_app(drakvuf, pid, tid, app);
 
-        if (!rc) {
+        if (!rc)
+        {
             printf("Process startup failed\n");
-        } else {
+        }
+        else
+        {
             printf("Process startup success\n");
         }
     }

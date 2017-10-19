@@ -1,0 +1,8 @@
+indent-switches
+suffix=none
+style=allman
+align-pointer=type
+align-reference=type
+indent=spaces=4
+keep-one-line-blocks
+pad-header
