@@ -122,46 +122,51 @@
 #include "private.h"
 #include "filetracer.h"
 
-static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t attr)
+static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
 {
-    filetracer *f = (filetracer*)info->trap->data;
+    filetracer* f = (filetracer*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    if ( !attr ) {
+    if ( !attr )
+    {
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
 
     ctx.addr = attr + f->objattr_name;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) ) {
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
+    {
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
 
-    unicode_string_t *us = vmi_read_unicode_str(vmi, &ctx);
-    if ( !us ) {
+    unicode_string_t* us = vmi_read_unicode_str(vmi, &ctx);
+    if ( !us )
+    {
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
 
     unicode_string_t str2 = { .contents = NULL };
 
-    if (VMI_SUCCESS == vmi_convert_str_encoding(us, &str2, "UTF-8")) {
-        switch(f->format) {
-        case OUTPUT_CSV:
-            printf("filetracer,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s\n",
-                    info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, str2.contents);
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s\n",
-                    info->vcpu, info->regs->cr3, info->proc_data.name,
-                    USERIDSTR(drakvuf), info->proc_data.userid, str2.contents);
-            break;
+    if (VMI_SUCCESS == vmi_convert_str_encoding(us, &str2, "UTF-8"))
+    {
+        switch (f->format)
+        {
+            case OUTPUT_CSV:
+                printf("filetracer,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s\n",
+                       info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, str2.contents);
+                break;
+            default:
+            case OUTPUT_DEFAULT:
+                printf("[FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s\n",
+                       info->vcpu, info->regs->cr3, info->proc_data.name,
+                       USERIDSTR(drakvuf), info->proc_data.userid, str2.contents);
+                break;
         };
 
         g_free(str2.contents);
@@ -172,13 +177,15 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
     return 0;
 }
 
-static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    filetracer *f = (filetracer*)info->trap->data;
+static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    filetracer* f = (filetracer*)info->trap->data;
     addr_t attr = 0;
 
     if ( f->pm == VMI_PM_IA32E )
         attr = info->regs->r8;
-    else {
+    else
+    {
         vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
         vmi_read_32_va(vmi, info->regs->rsp + sizeof(uint32_t)*3, 0, (uint32_t*)&attr);
         drakvuf_release_vmi(drakvuf);
@@ -189,13 +196,15 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
     return 0;
 }
 
-static event_response_t cb2(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
-    filetracer *f = (filetracer*)info->trap->data;
+static event_response_t cb2(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    filetracer* f = (filetracer*)info->trap->data;
     addr_t attr = 0;
 
     if ( f->pm == VMI_PM_IA32E )
         attr = info->regs->rcx;
-    else {
+    else
+    {
         vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
         vmi_read_32_va(vmi, info->regs->rsp + sizeof(uint32_t), 0, (uint32_t*)&attr);
         drakvuf_release_vmi(drakvuf);
@@ -208,8 +217,9 @@ static event_response_t cb2(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
 /* ----------------------------------------------------- */
 
-filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t output) {
-    const char *rekall_profile = (const char *)config;
+filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t output)
+{
+    const char* rekall_profile = (const char*)config;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->pm = vmi_get_page_mode(vmi, 0);
     drakvuf_release_vmi(drakvuf);
@@ -245,5 +255,6 @@ filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t ou
             throw -1;
 }
 
-filetracer::~filetracer() {
+filetracer::~filetracer()
+{
 }

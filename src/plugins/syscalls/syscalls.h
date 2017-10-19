@@ -109,18 +109,19 @@
 #include "plugins/plugins.h"
 #include "plugins/private.h"
 
-class syscalls: public plugin {
+class syscalls: public plugin
+{
 
-    private:
-        GSList *traps;
+private:
+    GSList* traps;
 
-    public:
-        uint8_t reg_size;
-        output_format_t format;
-        os_t os;
-        addr_t file_object_filename, object_header_body;
-        syscalls(drakvuf_t drakvuf, const void *config, output_format_t output);
-        ~syscalls();
+public:
+    uint8_t reg_size;
+    output_format_t format;
+    os_t os;
+    addr_t file_object_filename, object_header_body;
+    syscalls(drakvuf_t drakvuf, const void* config, output_format_t output);
+    ~syscalls();
 };
 
 #endif

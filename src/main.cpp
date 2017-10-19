@@ -115,25 +115,28 @@
 
 static drakvuf_c* drakvuf;
 
-void close_handler(int signal) {
+void close_handler(int signal)
+{
     drakvuf->interrupt(signal);
 }
 
-static inline void disable_plugin(char *optarg, bool *plugin_list) {
+static inline void disable_plugin(char* optarg, bool* plugin_list)
+{
     int i;
     for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
-        if(!strcmp(optarg, drakvuf_plugin_names[i]))
+        if (!strcmp(optarg, drakvuf_plugin_names[i]))
             plugin_list[i] = 0;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char** argv)
+{
     int c, rc = 1, timeout = 0;
-    char *inject_cmd = NULL;
-    char *domain = NULL;
-    char *rekall_profile = NULL;
-    char *dump_folder = NULL;
-    char *start_process_name = NULL;
-    char *tcpip = NULL;
+    char* inject_cmd = NULL;
+    char* domain = NULL;
+    char* rekall_profile = NULL;
+    char* dump_folder = NULL;
+    char* start_process_name = NULL;
+    char* tcpip = NULL;
     vmi_pid_t injection_pid = -1;
     uint32_t injection_thread = 0;
     struct sigaction act;
@@ -145,108 +148,115 @@ int main(int argc, char** argv) {
 
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
 
-    if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 ) {
+    if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 )
+    {
         fprintf(stderr, "No plugins have been enabled, nothing to do!\n");
         return rc;
     }
 
-    if (argc < 4) {
+    if (argc < 4)
+    {
         fprintf(stderr, "Required input:\n"
-               "\t -r <rekall profile>       The Rekall profile of the OS kernel\n"
-               "\t -d <domain ID or name>    The domain's ID or name\n"
-               "Optional inputs:\n"
-               "\t -i <injection pid>        The PID of the process to hijack for injection\n"
-               "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
-               "\t -e <inject_exe>           The executable to start with injection\n"
-               "\t -t <timeout>              Timeout (in seconds)\n"
-               "\t -o <format>               Output format (default or csv)\n"
-               "\t -x <plugin>               Don't activate the specified plugin\n"
-               "\t -p                        Leave domain paused after DRAKVUF exits\n"
-               "\t -w <process name>         Wait with plugin start until process name is detected\n"
+                "\t -r <rekall profile>       The Rekall profile of the OS kernel\n"
+                "\t -d <domain ID or name>    The domain's ID or name\n"
+                "Optional inputs:\n"
+                "\t -i <injection pid>        The PID of the process to hijack for injection\n"
+                "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
+                "\t -e <inject_exe>           The executable to start with injection\n"
+                "\t -t <timeout>              Timeout (in seconds)\n"
+                "\t -o <format>               Output format (default or csv)\n"
+                "\t -x <plugin>               Don't activate the specified plugin\n"
+                "\t -p                        Leave domain paused after DRAKVUF exits\n"
+                "\t -w <process name>         Wait with plugin start until process name is detected\n"
 #ifdef ENABLE_PLUGIN_FILEDELETE
-               "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
+                "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
 #endif
 #ifdef ENABLE_PLUGIN_SOCKETMON
-               "\t -T <rekall profile>       The Rekall profile for tcpip.sys\n"
+                "\t -T <rekall profile>       The Rekall profile for tcpip.sys\n"
 #endif
 #ifdef ENABLE_PLUGIN_CPUIDMON
-               "\t -s                        Hide Hypervisor bits and signature in CPUID\n"
+                "\t -s                        Hide Hypervisor bits and signature in CPUID\n"
 #endif
 #ifdef DRAKVUF_DEBUG
-               "\t -v                        Turn on verbose (debug) output\n"
+                "\t -v                        Turn on verbose (debug) output\n"
 #endif
-        );
+               );
         return rc;
     }
 
     while ((c = getopt (argc, argv, "r:d:i:I:e:t:D:o:vx:spw:T:")) != -1)
-    switch (c)
-    {
-    case 'r':
-        rekall_profile = optarg;
-        break;
-    case 'd':
-        domain = optarg;
-        break;
-    case 'i':
-        injection_pid = atoi(optarg);
-        break;
-    case 'I':
-        injection_thread = atoi(optarg);
-        break;
-    case 'e':
-        inject_cmd = optarg;
-        break;
-    case 't':
-        timeout = atoi(optarg);
-        break;
-    case 'D':
-        dump_folder = optarg;
-        break;
-    case 'o':
-        if(!strncmp(optarg,"csv",3))
-            output = OUTPUT_CSV;
-        break;
-    case 'x':
-        disable_plugin(optarg, plugin_list);
-        break;
-    case 's':
-        cpuid_stealth = 1;
-        break;
-    case 'p':
-        leave_paused = 1;
-        break;
-    case 'w':
-        start_process_name = optarg;
-        break;
-    case 'T':
-        tcpip = optarg;
-        break;
+        switch (c)
+        {
+            case 'r':
+                rekall_profile = optarg;
+                break;
+            case 'd':
+                domain = optarg;
+                break;
+            case 'i':
+                injection_pid = atoi(optarg);
+                break;
+            case 'I':
+                injection_thread = atoi(optarg);
+                break;
+            case 'e':
+                inject_cmd = optarg;
+                break;
+            case 't':
+                timeout = atoi(optarg);
+                break;
+            case 'D':
+                dump_folder = optarg;
+                break;
+            case 'o':
+                if (!strncmp(optarg,"csv",3))
+                    output = OUTPUT_CSV;
+                break;
+            case 'x':
+                disable_plugin(optarg, plugin_list);
+                break;
+            case 's':
+                cpuid_stealth = 1;
+                break;
+            case 'p':
+                leave_paused = 1;
+                break;
+            case 'w':
+                start_process_name = optarg;
+                break;
+            case 'T':
+                tcpip = optarg;
+                break;
 #ifdef DRAKVUF_DEBUG
-    case 'v':
-        verbose = 1;
-        break;
+            case 'v':
+                verbose = 1;
+                break;
 #endif
-    default:
-        fprintf(stderr, "Unrecognized option: %c\n", c);
-        return rc;
-    }
+            default:
+                fprintf(stderr, "Unrecognized option: %c\n", c);
+                return rc;
+        }
 
-    if (!domain) {
+    if (!domain)
+    {
         fprintf(stderr, "No domain name specified (-d)!\n");
         return rc;
     }
 
-    if (!rekall_profile) {
+    if (!rekall_profile)
+    {
         fprintf(stderr, "No Rekall profile specified (-r)!\n");
         return rc;
     }
 
     PRINT_DEBUG("Starting DRAKVUF initialization\n");
 
-    try {
+    try
+    {
         drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose, leave_paused);
-    } catch(int e) {
+    }
+    catch (int e)
+    {
         fprintf(stderr, "Failed to initialize DRAKVUF\n");
         return rc;
     }
@@ -262,7 +272,8 @@ int main(int argc, char** argv) {
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if ( injection_pid > 0 && inject_cmd ) {
+    if ( injection_pid > 0 && inject_cmd )
+    {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_cmd);
         int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_cmd);
         if (!ret)

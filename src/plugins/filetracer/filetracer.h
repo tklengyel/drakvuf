@@ -108,26 +108,28 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
-class filetracer: public plugin {
-    public:
-        page_mode_t pm;
-        output_format_t format;
+class filetracer: public plugin
+{
+public:
+    page_mode_t pm;
+    output_format_t format;
 
-        addr_t objattr_name;
+    addr_t objattr_name;
 
-        drakvuf_trap_t trap[8] = {
-            [0 ... 7] = {
-                .breakpoint.lookup_type = LOOKUP_PID,
-                .breakpoint.pid = 4,
-                .breakpoint.addr_type = ADDR_RVA,
-                .breakpoint.module = "ntoskrnl.exe",
-                .type = BREAKPOINT,
-                .data = (void*)this
-             }
-        };
+    drakvuf_trap_t trap[8] =
+    {
+        [0 ... 7] = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 4,
+            .breakpoint.addr_type = ADDR_RVA,
+            .breakpoint.module = "ntoskrnl.exe",
+            .type = BREAKPOINT,
+            .data = (void*)this
+        }
+    };
 
-        filetracer(drakvuf_t drakvuf, const void *config, output_format_t output);
-        ~filetracer();
+    filetracer(drakvuf_t drakvuf, const void* config, output_format_t output);
+    ~filetracer();
 };
 
 #endif

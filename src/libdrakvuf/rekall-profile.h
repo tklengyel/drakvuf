@@ -109,12 +109,12 @@
 
 status_t
 rekall_lookup(
-    const char *rekall_profile,
-    const char *symbol,
-    const char *subsymbol,
-    addr_t *address,
-    addr_t *size);
+    const char* rekall_profile,
+    const char* symbol,
+    const char* subsymbol,
+    addr_t* address,
+    addr_t* size);
 
-os_t rekall_get_os_type(const char *rekall_profile);
+os_t rekall_get_os_type(const char* rekall_profile);
 
 #endif /* WIN_SYMBOLS_H_ */

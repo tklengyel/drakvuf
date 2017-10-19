@@ -108,24 +108,26 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
-class socketmon: public plugin {
-    public:
-        page_mode_t pm;
-        output_format_t format;
-        win_ver_t winver;
-        drakvuf_trap_t trap[7] = {
-            [0 ... 6] = {
-                .breakpoint.lookup_type = LOOKUP_PID,
-                .breakpoint.pid = 4,
-                .breakpoint.addr_type = ADDR_RVA,
-                .breakpoint.module = "tcpip.sys",
-                .type = BREAKPOINT,
-                .data = (void*)this
-            }
-        };
+class socketmon: public plugin
+{
+public:
+    page_mode_t pm;
+    output_format_t format;
+    win_ver_t winver;
+    drakvuf_trap_t trap[7] =
+    {
+        [0 ... 6] = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 4,
+            .breakpoint.addr_type = ADDR_RVA,
+            .breakpoint.module = "tcpip.sys",
+            .type = BREAKPOINT,
+            .data = (void*)this
+        }
+    };
 
-        socketmon(drakvuf_t drakvuf, const void *config, output_format_t output);
-        ~socketmon();
+    socketmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    ~socketmon();
 };
 
 #endif

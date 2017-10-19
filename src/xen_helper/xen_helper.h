@@ -110,11 +110,12 @@
 #include <libxl_utils.h>
 #include <xenctrl.h>
 
-typedef struct xen_interface {
+typedef struct xen_interface
+{
     //struct xs_handle *xsh;
-    xc_interface *xc;
-    libxl_ctx *xl_ctx;
-    xentoollog_logger *xl_logger;
+    xc_interface* xc;
+    libxl_ctx* xl_ctx;
+    xentoollog_logger* xl_logger;
 } xen_interface_t;
 
 /* FUNCTIONS */
@@ -122,19 +123,19 @@ typedef struct xen_interface {
 bool xen_init_interface(xen_interface_t** xen);
 void xen_free_interface(xen_interface_t* xen);
 
-int get_dom_info(xen_interface_t *xen, const char *input, domid_t *domID,
-		char **name);
+int get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
+                 char** name);
 
-uint64_t xen_get_maxmemkb(xen_interface_t *xen, domid_t domID);
+uint64_t xen_get_maxmemkb(xen_interface_t* xen, domid_t domID);
 
-uint64_t xen_memshare(xen_interface_t *xen, domid_t domID, domid_t cloneID);
-void xen_unshare_gfn(xen_interface_t *xen, domid_t domID, unsigned long gfn);
+uint64_t xen_memshare(xen_interface_t* xen, domid_t domID, domid_t cloneID);
+void xen_unshare_gfn(xen_interface_t* xen, domid_t domID, unsigned long gfn);
 
-void print_sharing_info(xen_interface_t *xen, domid_t domID);
+void print_sharing_info(xen_interface_t* xen, domid_t domID);
 
-bool xen_pause(xen_interface_t *xen, domid_t domID);
-void xen_resume(xen_interface_t *xen, domid_t domID);
-void xen_force_resume(xen_interface_t *xen, domid_t domID);
+bool xen_pause(xen_interface_t* xen, domid_t domID);
+void xen_resume(xen_interface_t* xen, domid_t domID);
+void xen_force_resume(xen_interface_t* xen, domid_t domID);
 
 
 #endif

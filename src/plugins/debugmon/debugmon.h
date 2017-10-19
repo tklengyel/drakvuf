@@ -108,14 +108,15 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
-class debugmon: public plugin {
-    public:
-        output_format_t format;
-        drakvuf_trap_t debug;
-        drakvuf_t drakvuf;
+class debugmon: public plugin
+{
+public:
+    output_format_t format;
+    drakvuf_trap_t debug;
+    drakvuf_t drakvuf;
 
-        debugmon(drakvuf_t drakvuf, const void *config, output_format_t output);
-        ~debugmon();
+    debugmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    ~debugmon();
 };
 
 #endif

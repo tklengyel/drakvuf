@@ -108,7 +108,8 @@
 /*
  * Map offset enums to actual structure+member or global variable/function names.
  */
-static const char *win_offset_names[__WIN_OFFSETS_MAX][2] = {
+static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
+{
     [KIINITIALPCR] = { "KiInitialPCR", NULL },
     [EPROCESS_PID] = { "_EPROCESS", "UniqueProcessId" },
     [EPROCESS_PDBASE] = { "_KPROCESS", "DirectoryTableBase" },

@@ -118,7 +118,8 @@
 #define HANDLE_MULTIPLIER   4
 #define EX_FAST_REF_MASK    7
 
-addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t handle) {
+addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t handle)
+{
 
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t handletable = 0, tablecode = 0, obj = 0;
@@ -133,7 +134,8 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
     addr_t table_base = tablecode & ~HANDLE_MASK;
     uint32_t table_levels = tablecode & HANDLE_MASK;
 
-    switch(table_levels) {
+    switch (table_levels)
+    {
         case 0:
             vmi_read_addr_va(vmi, table_base + handle * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj);
             break;
@@ -147,7 +149,8 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
             handle -= i;
             j = handle / ((low_count * HANDLE_MULTIPLIER) / psize);
 
-            if ( VMI_SUCCESS == vmi_read_addr_va(vmi, table_base + j, 0, &table) ) {
+            if ( VMI_SUCCESS == vmi_read_addr_va(vmi, table_base + j, 0, &table) )
+            {
                 vmi_read_addr_va(vmi, table + i * (drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER), 0, &obj);
             }
             break;
@@ -166,28 +169,28 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
             j = (j-k)/mid_count;
 
             if ( VMI_SUCCESS == vmi_read_addr_va(vmi, table_base + j, 0, &table) &&
-                 VMI_SUCCESS == vmi_read_addr_va(vmi, table + k, 0, &table2) )
+                    VMI_SUCCESS == vmi_read_addr_va(vmi, table + k, 0, &table2) )
                 vmi_read_addr_va(vmi, table2 + i * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj);
             break;
         }
     };
 
-    switch(vmi_get_winver(vmi))
+    switch (vmi_get_winver(vmi))
     {
-    case VMI_OS_WINDOWS_7:
-        return obj & ~EX_FAST_REF_MASK;
-    case VMI_OS_WINDOWS_8:
-        if ( drakvuf->pm == VMI_PM_IA32E )
-            return ((obj & VMI_BIT_MASK(19,63)) >> 16) | 0xFFFFE00000000000;
-        else
-            return (obj & VMI_BIT_MASK(2,31));
-    default:
-    // We set Win10 as the default case as vmi_get_winver may not pinpoint it as VMI_OS_WINDOWS_10 if the buildid is not known
-    case VMI_OS_WINDOWS_10:
-        if ( drakvuf->pm == VMI_PM_IA32E )
-            return ((obj & VMI_BIT_MASK(19,63)) >> 16) | 0xFFFF000000000000;
-        else
-            return (obj & VMI_BIT_MASK(2,31));
+        case VMI_OS_WINDOWS_7:
+            return obj & ~EX_FAST_REF_MASK;
+        case VMI_OS_WINDOWS_8:
+            if ( drakvuf->pm == VMI_PM_IA32E )
+                return ((obj & VMI_BIT_MASK(19,63)) >> 16) | 0xFFFFE00000000000;
+            else
+                return (obj & VMI_BIT_MASK(2,31));
+        default:
+        // We set Win10 as the default case as vmi_get_winver may not pinpoint it as VMI_OS_WINDOWS_10 if the buildid is not known
+        case VMI_OS_WINDOWS_10:
+            if ( drakvuf->pm == VMI_PM_IA32E )
+                return ((obj & VMI_BIT_MASK(19,63)) >> 16) | 0xFFFF000000000000;
+            else
+                return (obj & VMI_BIT_MASK(2,31));
     };
 }
 
@@ -195,8 +198,8 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 
-bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t current_eprocess,
-                                addr_t handle, object_manager_object_t obj_type_arg, addr_t *obj_body_addr )
+bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t current_eprocess,
+                                addr_t handle, object_manager_object_t obj_type_arg, addr_t* obj_body_addr )
 {
     bool ret        = false ;
     addr_t obj_addr = 0 ;
@@ -206,7 +209,8 @@ bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t *info, ad
     if ( obj_addr )
     {
         uint8_t object_type ;
-        access_context_t ctx = {
+        access_context_t ctx =
+        {
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
         };
@@ -223,8 +227,7 @@ bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t *info, ad
                     // Object Body must be an _EPROCESS...
                     ret = drakvuf_is_process( drakvuf, info->regs->cr3, obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ] );
                 }
-                else
-                if ( object_type == OBJ_MANAGER_THREAD_OBJECT )
+                else if ( object_type == OBJ_MANAGER_THREAD_OBJECT )
                 {
                     // Object Body must be an _ETHREAD...
                     ret = drakvuf_is_thread( drakvuf, info->regs->cr3, obj_addr + drakvuf->offsets[ OBJECT_HEADER_BODY ] );

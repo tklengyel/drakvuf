@@ -108,24 +108,26 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
-class exmon: public plugin {
-    public:
-        drakvuf_trap_t trap = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.pid = 4,
-            .breakpoint.addr_type = ADDR_RVA,
-            .breakpoint.module = "ntoskrnl.exe",
-            .name = "KiDispatchException",
-            .type = BREAKPOINT,
-            .data = (void*)this
-        };
-        output_format_t format;
-        page_mode_t pm;
-        size_t *offsets;
-        size_t ktrap_frame_size;
+class exmon: public plugin
+{
+public:
+    drakvuf_trap_t trap =
+    {
+        .breakpoint.lookup_type = LOOKUP_PID,
+        .breakpoint.pid = 4,
+        .breakpoint.addr_type = ADDR_RVA,
+        .breakpoint.module = "ntoskrnl.exe",
+        .name = "KiDispatchException",
+        .type = BREAKPOINT,
+        .data = (void*)this
+    };
+    output_format_t format;
+    page_mode_t pm;
+    size_t* offsets;
+    size_t ktrap_frame_size;
 
-        exmon(drakvuf_t drakvuf, const void *config, output_format_t output);
-        ~exmon();
+    exmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    ~exmon();
 };
 
 #endif

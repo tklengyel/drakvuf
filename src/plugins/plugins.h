@@ -112,24 +112,28 @@
 /***************************************************************************/
 
 /* Plugin-specific configuration input */
-struct filedelete_config {
-    const char *rekall_profile;
-    const char *dump_folder;
+struct filedelete_config
+{
+    const char* rekall_profile;
+    const char* dump_folder;
 };
-struct socketmon_config {
-    const char *rekall_profile;
-    const char *tcpip_profile;
+struct socketmon_config
+{
+    const char* rekall_profile;
+    const char* tcpip_profile;
 };
 
 /***************************************************************************/
 
-typedef enum {
+typedef enum
+{
     OUTPUT_DEFAULT,
     OUTPUT_CSV,
     __OUTPUT_MAX
 } output_format_t;
 
-typedef enum drakvuf_plugin {
+typedef enum drakvuf_plugin
+{
     PLUGIN_SYSCALLS,
     PLUGIN_POOLMON,
     PLUGIN_FILETRACER,
@@ -144,7 +148,8 @@ typedef enum drakvuf_plugin {
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
-static const char *drakvuf_plugin_names[] = {
+static const char* drakvuf_plugin_names[] =
+{
     [PLUGIN_SYSCALLS] = "syscalls",
     [PLUGIN_POOLMON] = "poolmon",
     [PLUGIN_FILETRACER] = "filetracer",
@@ -158,7 +163,8 @@ static const char *drakvuf_plugin_names[] = {
     [PLUGIN_REGMON] = "regmon",
 };
 
-static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] = {
+static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
+{
     [PLUGIN_SYSCALLS]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
     [PLUGIN_POOLMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_FILETRACER] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
@@ -172,23 +178,24 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_REGMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
-class plugin {
-    public:
-        virtual ~plugin() {};
+class plugin
+{
+public:
+    virtual ~plugin() {};
 };
 
 class drakvuf_plugins
 {
-    private:
-        drakvuf_t drakvuf;
-        output_format_t output;
-        os_t os;
-        plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = NULL };
+private:
+    drakvuf_t drakvuf;
+    output_format_t output;
+    os_t os;
+    plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = NULL };
 
-    public:
-        drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
-        ~drakvuf_plugins();
-        int start(drakvuf_plugin_t plugin, const void* config);
+public:
+    drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
+    ~drakvuf_plugins();
+    int start(drakvuf_plugin_t plugin, const void* config);
 };
 
 /***************************************************************************/

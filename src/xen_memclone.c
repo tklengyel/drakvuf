@@ -122,28 +122,32 @@
 
 #include "xen_helper/xen_helper.h"
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv)
+{
 
-    if (argc < 3) {
+    if (argc < 3)
+    {
         printf("Usage: %s <origin domain> <clone domain>\n", argv[0]);
         return 1;
     }
 
-    xen_interface_t *xen = NULL;
+    xen_interface_t* xen = NULL;
     xen_init_interface(&xen);
 
-    if (!xen) {
+    if (!xen)
+    {
         printf("Failed to init Xen interface\n");
         return 1;
     }
 
-    char *origin_name = NULL, *clone_name = NULL;
+    char* origin_name = NULL, *clone_name = NULL;
     domid_t origin_domID = 0, clone_domID = 0;
 
     get_dom_info(xen, argv[1], &origin_domID, &origin_name);
     get_dom_info(xen, argv[2], &clone_domID, &clone_name);
 
-    if (origin_domID && origin_name && clone_domID && clone_name) {
+    if (origin_domID && origin_name && clone_domID && clone_name)
+    {
         printf("Shared %lu pages %s -> %s\n",
                xen_memshare(xen, origin_domID, clone_domID),
                origin_name, clone_name);

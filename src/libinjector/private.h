@@ -119,7 +119,8 @@ extern bool verbose;
     do {} while(0)
 #endif
 
-enum offset {
+enum offset
+{
     NT_TIB_STACKBASE,
     NT_TIB_STACKLIMIT,
     KTHREAD_TRAPFRAME,
@@ -128,15 +129,16 @@ enum offset {
     OFFSET_MAX
 };
 
-static const char *offset_names[OFFSET_MAX][2] = {
+static const char* offset_names[OFFSET_MAX][2] =
+{
     [NT_TIB_STACKBASE] = { "_NT_TIB", "StackBase" },
     [NT_TIB_STACKLIMIT] = { "_NT_TIB", "StackLimit" },
     [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
     [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
 };
 
-event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info);
-event_response_t psexit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info);
-event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t *info);
+event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t psexit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 #endif

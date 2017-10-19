@@ -118,41 +118,44 @@ extern "C" {
  * Reading in Rekall profile informations
  */
 
-typedef struct symbol {
-    const char *name;
+typedef struct symbol
+{
+    const char* name;
     addr_t rva;
     uint8_t type;
     int inputs;
 } __attribute__ ((packed)) symbol_t;
 
-typedef struct symbols {
-    const char *name;
-    symbol_t *symbols; // array of size count
+typedef struct symbols
+{
+    const char* name;
+    symbol_t* symbols; // array of size count
     uint64_t count;
 } symbols_t;
 
-symbols_t* drakvuf_get_symbols_from_rekall(const char *profile);
-void drakvuf_free_symbols(symbols_t *symbols);
+symbols_t* drakvuf_get_symbols_from_rekall(const char* profile);
+void drakvuf_free_symbols(symbols_t* symbols);
 
-bool drakvuf_get_function_rva(const char *rekall_profile,
-                              const char *function,
-                              addr_t *rva);
-bool drakvuf_get_constant_rva(const char *rekall_profile,
-                              const char *constant,
-                                  addr_t *rva);
-bool drakvuf_get_struct_size(const char *rekall_profile,
-                             const char *struct_name,
-                             size_t *size);
-bool drakvuf_get_struct_member_rva(const char *rekall_profile,
-                                   const char *struct_name,
-                                   const char *symbol,
-                                   addr_t *rva);
+bool drakvuf_get_function_rva(const char* rekall_profile,
+                              const char* function,
+                              addr_t* rva);
+bool drakvuf_get_constant_rva(const char* rekall_profile,
+                              const char* constant,
+                              addr_t* rva);
+bool drakvuf_get_struct_size(const char* rekall_profile,
+                             const char* struct_name,
+                             size_t* size);
+bool drakvuf_get_struct_member_rva(const char* rekall_profile,
+                                   const char* struct_name,
+                                   const char* symbol,
+                                   addr_t* rva);
 
 /*---------------------------------------------------------
  * DRAKVUF functions
  */
 
-typedef enum lookup_type {
+typedef enum lookup_type
+{
     __INVALID_LOOKUP_TYPE,
     LOOKUP_NONE,
     LOOKUP_DTB,
@@ -160,14 +163,16 @@ typedef enum lookup_type {
     LOOKUP_NAME,
 } lookup_type_t;
 
-typedef enum addr_type {
+typedef enum addr_type
+{
     __INVALID_ADDR_TYPE,
     ADDR_RVA,
     ADDR_VA,
     ADDR_PA
 } addr_type_t;
 
-typedef enum trap_type {
+typedef enum trap_type
+{
     __INVALID_TRAP_TYPE,
     BREAKPOINT,
     MEMACCESS,
@@ -176,14 +181,16 @@ typedef enum trap_type {
     CPUID
 } trap_type_t;
 
-typedef enum memaccess_type {
+typedef enum memaccess_type
+{
     __INVALID_MEMACCESS_TYPE,
     PRE,
     POST
 } memaccess_type_t;
 
-typedef struct process_data {
-    const char *name;   /* Process name */
+typedef struct process_data
+{
+    const char* name;   /* Process name */
     vmi_pid_t pid ;     /* Process pid */
     vmi_pid_t ppid ;    /* Process parent pid */
     addr_t base_addr ;  /* Process base address */
@@ -194,47 +201,55 @@ typedef struct drakvuf* drakvuf_t;
 struct drakvuf_trap;
 typedef struct drakvuf_trap drakvuf_trap_t;
 
-typedef struct drakvuf_trap_info {
+typedef struct drakvuf_trap_info
+{
     unsigned int vcpu;
     uint16_t altp2m_idx;
     proc_data_t proc_data ; /* Current executing process data */
     addr_t trap_pa;
-    x86_registers_t *regs;
-    drakvuf_trap_t *trap;
-    union {
-        const cpuid_event_t *cpuid; /* For CPUID traps */
-        const debug_event_t *debug; /* For DEBUG traps */
+    x86_registers_t* regs;
+    drakvuf_trap_t* trap;
+    union
+    {
+        const cpuid_event_t* cpuid; /* For CPUID traps */
+        const debug_event_t* debug; /* For DEBUG traps */
     };
 } drakvuf_trap_info_t;
 
-struct drakvuf_trap {
+struct drakvuf_trap
+{
     trap_type_t type;
     event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*);
-    void *data;
-    const char *name; // Only used for informational/debugging purposes
+    void* data;
+    const char* name; // Only used for informational/debugging purposes
 
-    union {
-        struct {
+    union
+    {
+        struct
+        {
             lookup_type_t lookup_type;
-            union {
+            union
+            {
                 vmi_pid_t pid;
-                const char *proc;
+                const char* proc;
                 addr_t dtb;
             };
 
             /* If specified and RVA is used
                RVA will be calculated from the base
                of this module */
-            const char *module;
+            const char* module;
 
             addr_type_t addr_type;
-            union {
+            union
+            {
                 addr_t rva;
                 addr_t addr;
             };
         } breakpoint;
 
-        struct {
+        struct
+        {
             addr_t gfn;
             vmi_mem_access_t access;
             memaccess_type_t type;
@@ -251,31 +266,33 @@ struct drakvuf_trap {
 // libdrakvuf-windows.h or something similar
 
 // For get_previous_mode...
-typedef enum privilege_mode {
+typedef enum privilege_mode
+{
     KERNEL_MODE,
     USER_MODE,
     MAXIMUM_MODE
 } privilege_mode_t ;
 
 // Confirmed only on Win7 SP1...
-typedef enum object_manager_object {
+typedef enum object_manager_object
+{
     OBJ_MANAGER_PROCESS_OBJECT = 7,
     OBJ_MANAGER_THREAD_OBJECT  = 8
 } object_manager_object_t ;
 
 ////////////////////////////////////////////////////////////////////////////
 
-typedef void (*drakvuf_trap_free_t)(drakvuf_trap_t *trap);
+typedef void (*drakvuf_trap_free_t)(drakvuf_trap_t* trap);
 
-bool drakvuf_init (drakvuf_t *drakvuf,
-                   const char *domain,
-                   const char *rekall_profile,
+bool drakvuf_init (drakvuf_t* drakvuf,
+                   const char* domain,
+                   const char* rekall_profile,
                    const bool verbose);
 void drakvuf_close (drakvuf_t drakvuf, const bool pause);
 bool drakvuf_add_trap(drakvuf_t drakvuf,
-                      drakvuf_trap_t *trap);
+                      drakvuf_trap_t* trap);
 void drakvuf_remove_trap (drakvuf_t drakvuf,
-                          drakvuf_trap_t *trap,
+                          drakvuf_trap_t* trap,
                           drakvuf_trap_free_t free_routine);
 void drakvuf_loop (drakvuf_t drakvuf);
 void drakvuf_interrupt (drakvuf_t drakvuf,
@@ -291,7 +308,7 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
                                  uint64_t handle);
 
 os_t drakvuf_get_os_type(drakvuf_t drakvuf);
-const char *drakvuf_get_rekall_profile(drakvuf_t drakvuf);
+const char* drakvuf_get_rekall_profile(drakvuf_t drakvuf);
 
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf);
 
@@ -306,84 +323,84 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
                                   uint64_t vcpu_id);
 
 /* Caller must free the returned string */
-char *drakvuf_get_process_name(drakvuf_t drakvuf,
+char* drakvuf_get_process_name(drakvuf_t drakvuf,
                                addr_t process_base);
 
 status_t drakvuf_get_process_pid( drakvuf_t drakvuf,
                                   addr_t process_base,
-                                  vmi_pid_t *pid);
+                                  vmi_pid_t* pid);
 
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
-                                      addr_t process_base);
+                                   addr_t process_base);
 
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
                                    uint64_t vcpu_id,
-                                   uint32_t *thread_id);
+                                   uint32_t* thread_id);
 
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
-                               const char *module, const char *sym);
+                               const char* module, const char* sym);
 
 // Microsoft PreviousMode KTHREAD explanation:
 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff559860(v=vs.85).aspx
 bool drakvuf_get_current_thread_previous_mode(drakvuf_t drakvuf,
-                                              uint64_t vcpu_id,
-                                              privilege_mode_t *previous_mode);
+        uint64_t vcpu_id,
+        privilege_mode_t* previous_mode);
 
 bool drakvuf_get_thread_previous_mode(drakvuf_t drakvuf,
                                       addr_t kthread,
-                                      privilege_mode_t *previous_mode);
+                                      privilege_mode_t* previous_mode);
 
 bool drakvuf_is_thread(drakvuf_t drakvuf,
-                        addr_t dtb,
-                        addr_t thread_addr);
+                       addr_t dtb,
+                       addr_t thread_addr);
 
 bool drakvuf_is_process(drakvuf_t drakvuf,
-                         addr_t dtb,
-                         addr_t process_addr);
+                        addr_t dtb,
+                        addr_t process_addr);
 
 bool drakvuf_find_process(drakvuf_t drakvuf,
-                           vmi_pid_t find_pid,
-                           const char *find_procname,
-                           addr_t *process_addr);
+                          vmi_pid_t find_pid,
+                          const char* find_procname,
+                          addr_t* process_addr);
 
 bool drakvuf_get_module_list(drakvuf_t drakvuf,
                              addr_t process_base,
-                             addr_t *module_list);
+                             addr_t* module_list);
 
 // ObReferenceObjectByHandle
 bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
-                               drakvuf_trap_info_t *info,
+                               drakvuf_trap_info_t* info,
                                addr_t current_process,
                                addr_t handle,
                                object_manager_object_t obj_type_arg,
-                               addr_t *obj_body_addr);
+                               addr_t* obj_body_addr);
 
 bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
                                    addr_t module_list_head,
-                                   const char *module_name,
-                                   addr_t *base_addr );
+                                   const char* module_name,
+                                   addr_t* base_addr );
 
-char *drakvuf_reg_keybody_path( drakvuf_t drakvuf,
-                                drakvuf_trap_info_t *info,
+char* drakvuf_reg_keybody_path( drakvuf_t drakvuf,
+                                drakvuf_trap_info_t* info,
                                 addr_t p_key_body );
 
-char *drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf,
-                                        drakvuf_trap_info_t *info,
+char* drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf,
+                                        drakvuf_trap_info_t* info,
                                         addr_t p_key_control_block );
 
-char *drakvuf_reg_keyhandle_path( drakvuf_t drakvuf,
-                                  drakvuf_trap_info_t *info,
+char* drakvuf_reg_keyhandle_path( drakvuf_t drakvuf,
+                                  drakvuf_trap_info_t* info,
                                   addr_t key_handle,
                                   addr_t process_arg );
 
 status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
                                    addr_t process_base,
-                                   vmi_pid_t *ppid );
+                                   vmi_pid_t* ppid );
 
 bool drakvuf_get_current_process_data( drakvuf_t drakvuf,
                                        uint64_t vcpu_id,
-                                       proc_data_t *proc_data );
+                                       proc_data_t* proc_data );
 #pragma GCC visibility pop
 
 #ifdef __cplusplus
