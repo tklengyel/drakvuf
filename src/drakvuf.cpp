@@ -193,6 +193,7 @@ drakvuf_c::drakvuf_c(const char* domain,
     this->process_start_timeout = timeout;
     this->rekall_profile = rekall_profile;
     this->leave_paused = leave_paused;
+    this->process_start_detected = 0;
 
     if (!drakvuf_init(&this->drakvuf, domain, rekall_profile, verbose))
         throw -1;

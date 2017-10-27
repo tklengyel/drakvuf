@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -448,13 +448,15 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf_t drakvuf = event->data;
     drakvuf->regs[event->vcpu_id] = event->x86_regs;
 
-    reg_t cr3 = event->x86_regs->cr3;
     addr_t pa = (event->interrupt_event.gfn << 12)
                 + event->interrupt_event.offset + event->interrupt_event.insn_length - 1;
 
+#ifdef DEBUG
+    reg_t cr3 = event->x86_regs->cr3;
     PRINT_DEBUG("INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64". Insn_length: %u\n",
                 event->vcpu_id, event->slat_id, cr3, pa,
                 event->interrupt_event.gla, event->interrupt_event.insn_length);
+#endif
 
     struct wrapper* s = g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
     if (!s)
@@ -610,13 +612,15 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
     event_response_t rsp = 0;
-    addr_t pa = (event->debug_event.gfn << 12) + event->debug_event.offset;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
     drakvuf->regs[event->vcpu_id] = event->x86_regs;
 
+#ifdef DEBUG
+    addr_t pa = (event->debug_event.gfn << 12) + event->debug_event.offset;
     PRINT_DEBUG("Debug event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64". Insn_length: %u\n",
                 event->vcpu_id, event->slat_id, event->x86_regs->cr3, pa,
                 event->debug_event.gla, event->debug_event.insn_length);
+#endif
 
     proc_data_t proc_data = {0};
 
@@ -943,6 +947,12 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         GSList* traps = g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &current_gfn);
         traps = g_slist_append(traps, &container->breakpoint.pa);
 
+        /* this should never happen but at least it makes some static analyzers happy */
+        if ( 1 == g_slist_length(traps) )
+            g_hash_table_insert(drakvuf->breakpoint_lookup_gfn,
+                                g_memdup(&current_gfn, sizeof(xen_pfn_t)),
+                                traps);
+
         return 1;
     }
 
@@ -954,6 +964,8 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         old_access = s->memaccess.access;
 
     container = g_malloc0(sizeof(struct wrapper));
+    if ( !container )
+        return 0;
 
     container->drakvuf = drakvuf;
     container->traps = g_slist_prepend(container->traps, trap);
@@ -978,7 +990,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
         PRINT_DEBUG("Physmap populated? %i\n", rc);
         if (rc < 0)
-            return 0;
+            goto err_exit;
 
         g_hash_table_insert(drakvuf->remapped_gfns,
                             &remapped_gfn->o,
@@ -995,7 +1007,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         if ( VMI_FAILURE == vmi_read_pa(drakvuf->vmi, current_gfn<<12, VMI_PS_4KB, &backup, NULL) )
         {
             fprintf(stderr, "Copying trapped page to new location FAILED\n");
-            return 0;
+            goto err_exit;
         }
 
         if ( VMI_SUCCESS == vmi_write_pa(drakvuf->vmi, remapped_gfn->r << 12, VMI_PS_4KB, &backup, NULL) )
@@ -1004,7 +1016,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         {
             // TODO cleanup
             fprintf(stderr, "Copying trapped page to new location FAILED\n");
-            return 0;
+            goto err_exit;
         }
     }
 
@@ -1036,13 +1048,13 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard, 0) )
     {
         PRINT_DEBUG("Failed to create guard trap for the breakpoint!\n");
-        return 0;
+        goto err_exit;
     }
 
     if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard2, 1) )
     {
         PRINT_DEBUG("Failed to create guard2 trap for the breakpoint!\n");
-        return 0;
+        goto err_exit;
     }
 
     addr_t rpa = (remapped_gfn->r<<12) + (container->breakpoint.pa & VMI_BIT_MASK(0,11));
@@ -1051,7 +1063,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     if (VMI_FAILURE == vmi_read_8_pa(vmi, pa, &test))
     {
         PRINT_DEBUG("FAILED TO READ @ 0x%lx !\n", container->breakpoint.pa);
-        return 0;
+        goto err_exit;
     }
 
     if (test == bp)
@@ -1066,7 +1078,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         if (VMI_FAILURE == vmi_write_8_pa(vmi, rpa, &bp))
         {
             PRINT_DEBUG("FAILED TO INJECT TRAP @ 0x%lx !\n", container->breakpoint.pa);
-            return 0;
+            goto err_exit;
         }
     }
 
@@ -1086,6 +1098,11 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     PRINT_DEBUG("\t\tTrap added @ PA 0x%" PRIx64 " RPA 0x%" PRIx64 " Page %" PRIu64 " for %s. \n",
                 container->breakpoint.pa, rpa, pa >> 12, trap->name);
     return 1;
+
+err_exit:
+    g_free(container);
+    g_free(remapped_gfn);
+    return 0;
 }
 
 bool inject_trap(drakvuf_t drakvuf,

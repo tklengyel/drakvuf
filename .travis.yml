@@ -1,48 +1,172 @@
 dist: trusty
-sudo: required
-language: cpp
-compiler:
-- clang
-
-before_install:
-  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib
-  - sudo apt-get install -y bison flex check libjson-c-dev uuid-dev libstdc++-4.8-dev autoconf-archive astyle
-  - sudo apt-get build-dep libxen-dev
-  - sudo dpkg -i test-packages/xentools_4.7-drakvuf1-1_amd64.deb
-  - sudo ln -s /usr/lib/gcc/x86_64-linux-gnu/4.8/libstdc++.so /usr/lib/x86_64-linux-gnu/libstdc++.so
-  - git submodule init
-  - git submodule update libvmi
-  - cd libvmi && ./autogen.sh && ./configure --enable-xen --disable-kvm --without-xenstore
-  - make && sudo make install
-  - cd ..
-
-install:
-  - git remote add upstream https://github.com/$TRAVIS_REPO_SLUG.git
-  - git fetch upstream
-
-script:
-  - git diff --check upstream/master
-  - export ARTISTIC_STYLE_OPTIONS=".astylerc" && astyle `find src | egrep "\.c|\.h"` > astyle.out && git --no-pager diff
-  - TEST=$(cat astyle.out | grep Formatted | wc -l) && if [ $TEST -ne 0 ]; then echo "Please fix style issues as shown above" && exit 1; fi
-  - ./autogen.sh
-  - ./configure --enable-debug
-  - make
-
+language: c
+sudo: false
+compiler: clang
 git:
-  submodules: false
+    submodules: false
 
 env:
-  global:
-   # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
-   #   via the "travis encrypt" command using the project repo's public key
-   - secure: "ZkXc5huudqMN0PXeloNfnuwaq4PQ6BDmU1Ov/ONDOtnwxkm4hxHrbbPwZ9O7/DprAor9p7X7jhx6sf3fsMB+ib0ARffQPB0JQNPPEWjbgUhTLL//y0W64efuwSrRLfaHXbcm6OJT1pjeyXWOKOMPrM7GBOnnRRscpDNtjqriPAs="
+    global:
+        # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
+        #   via the "travis encrypt" command using the project repo's public key
+        - secure: "ZkXc5huudqMN0PXeloNfnuwaq4PQ6BDmU1Ov/ONDOtnwxkm4hxHrbbPwZ9O7/DprAor9p7X7jhx6sf3fsMB+ib0ARffQPB0JQNPPEWjbgUhTLL//y0W64efuwSrRLfaHXbcm6OJT1pjeyXWOKOMPrM7GBOnnRRscpDNtjqriPAs="
 
-addons:
-  coverity_scan:
-    project:
-      name: "tklengyel/drakvuf"
-      description: "Build submitted via Travis CI"
-    notification_email: tamas.k.lengyel@gmail.com
-    build_command_prepend: "./autogen.sh; ./configure; make clean"
-    build_command:   "make"
-    branch_pattern: staging
+matrix:
+    include:
+
+#
+# Whitespace check
+#
+    - env:
+        - TEST="whitespace"
+      script:
+        - git remote add upstream https://github.com/$TRAVIS_REPO_SLUG.git
+        - git fetch upstream
+        - git diff --check upstream/master
+
+#
+# Astyle check
+#
+    - env:
+        - TEST="astyle"
+      sudo: required
+      before_install:
+        - sudo add-apt-repository "deb mirror://mirrors.ubuntu.com/mirrors.txt xenial main restricted universe multiverse" -y
+        - sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 3B4FE6ACC0B21F32
+        - sudo apt-get update -qq
+      install:
+        - sudo apt-get install astyle
+      script:
+        - export ARTISTIC_STYLE_OPTIONS=".astylerc" && astyle `find . | egrep "\.c|\.h"` > astyle.out
+        - TEST=$(cat astyle.out | grep Formatted | wc -l)
+        - |
+          if [[ $TEST -ne 0 ]]; then
+            cat astyle.out
+            git --no-pager diff
+            echo "Please fix style issues as shown above"
+            exit 1
+          fi
+
+#
+# compile test
+#
+    - env:
+        - TEST="compile"
+      addons:
+        apt:
+            sources:
+                - ubuntu-toolchain-r-test
+            packages:
+                - bison
+                - flex
+                - check
+                - libjson-c-dev
+                - autoconf-archive
+                - libyajl2
+                - uuid-dev
+                - libpixman-1-dev
+                - libaio-dev
+      before_install:
+        - dpkg -x test-packages/xentools_4.7-drakvuf1-1_amd64.deb .
+        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
+        - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
+        - export LDFLAGS="-L$PWD/usr/local/lib"
+        - export CFLAGS="-I$PWD/usr/local/include"
+        - git submodule update --init libvmi
+        - cd libvmi
+        - ./autogen.sh
+        - ./configure --disable-kvm --disable-examples --without-xenstore --prefix=$PWD/../usr/local || cat config.log
+        - make
+        - make install
+        - cd ..
+      install:
+        - ./autogen.sh
+      script:
+        - ./configure --enable-debug || cat config.log
+        - make
+
+#
+# Coverity
+#
+    - env:
+        - TEST="Coverity"
+      addons:
+        apt:
+            sources:
+                - ubuntu-toolchain-r-test
+            packages:
+                - bison
+                - flex
+                - check
+                - libjson-c-dev
+                - autoconf-archive
+                - libyajl2
+                - uuid-dev
+                - libpixman-1-dev
+                - libaio-dev
+        coverity_scan:
+            project:
+                name: "tklengyel/drakvuf"
+                description: "Build submitted via Travis CI"
+            notification_email: tamas@tklengyel.com
+            build_command_prepend: "./autogen.sh; ./configure --enable-debug; make clean"
+            build_command:   "make"
+            branch_pattern: master
+      before_install:
+        - dpkg -x test-packages/xentools_4.7-drakvuf1-1_amd64.deb .
+        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
+        - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
+        - export LDFLAGS="-L$PWD/usr/local/lib"
+        - export CFLAGS="-I$PWD/usr/local/include"
+        - git submodule update --init libvmi
+        - cd libvmi
+        - ./autogen.sh
+        - ./configure --disable-kvm --disable-examples --without-xenstore --prefix=$PWD/../usr/local
+        - make
+        - make install
+        - cd ..
+      script:
+        - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
+
+    - env:
+        - TEST="scan-build"
+      addons:
+        apt:
+            sources:
+                - ubuntu-toolchain-r-test
+                - llvm-toolchain-trusty-5.0
+            packages:
+                - bison
+                - flex
+                - check
+                - libjson-c-dev
+                - autoconf-archive
+                - libyajl2
+                - uuid-dev
+                - libpixman-1-dev
+                - libaio-dev
+                - clang-5.0
+      before_install:
+        - dpkg -x test-packages/xentools_4.7-drakvuf1-1_amd64.deb .
+        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
+        - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
+        - export LDFLAGS="-L$PWD/usr/local/lib"
+        - export CFLAGS="-I$PWD/usr/local/include"
+        - git submodule update --init libvmi
+        - cd libvmi
+        - ./autogen.sh
+        - ./configure --disable-kvm --disable-examples --without-xenstore --prefix=$PWD/../usr/local
+        - make
+        - make install
+        - cd ..
+      install:
+        - ./autogen.sh
+      script:
+        - scan-build-5.0 ./configure --enable-debug
+        - cd src/libdrakvuf && scan-build-5.0 --status-bugs make && cd ../..
+        - cd src/xen_helper && scan-build-5.0 --status-bugs make && cd ../..
+        - cd src/libinjector && scan-build-5.0 --status-bugs make && cd ../..
+        - cd src/dirwatch && scan-build-5.0 --status-bugs make && cd ../..
