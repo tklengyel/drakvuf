@@ -1,12 +1,11 @@
+dist: trusty
+sudo: required
 language: cpp
 compiler:
 - clang
 
 before_install:
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib:/usr/local/lib
-  - sudo add-apt-repository "deb mirror://mirrors.ubuntu.com/mirrors.txt trusty main restricted universe multiverse" -y
-  - sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 3B4FE6ACC0B21F32
-  - sudo apt-get update -qq
   - sudo apt-get install -y bison flex check libjson-c-dev uuid-dev libstdc++-4.8-dev autoconf-archive astyle
   - sudo apt-get build-dep libxen-dev
   - sudo dpkg -i test-packages/xentools_4.7-drakvuf1-1_amd64.deb
@@ -17,11 +16,17 @@ before_install:
   - make && sudo make install
   - cd ..
 
+install:
+  - git remote add upstream https://github.com/$TRAVIS_REPO_SLUG.git
+  - git fetch upstream
+
 script:
-    - git diff --check master
-    - export ARTISTIC_STYLE_OPTIONS=".astylerc" && astyle `find src | egrep "\.c|\.h"` > astyle.out && git --no-pager diff
-    - TEST=$(cat astyle.out | grep Formatted | wc -l) && if [ $TEST -ne 0 ]; then echo "Please fix style issues as shown above" && exit 1; fi
-    - ./autogen.sh && ./configure --enable-debug && make
+  - git diff --check upstream/master
+  - export ARTISTIC_STYLE_OPTIONS=".astylerc" && astyle `find src | egrep "\.c|\.h"` > astyle.out && git --no-pager diff
+  - TEST=$(cat astyle.out | grep Formatted | wc -l) && if [ $TEST -ne 0 ]; then echo "Please fix style issues as shown above" && exit 1; fi
+  - ./autogen.sh
+  - ./configure --enable-debug
+  - make
 
 git:
   submodules: false
