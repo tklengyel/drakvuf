@@ -113,10 +113,6 @@ AC_PROG_CC_STDC
 AC_PROG_CXX(clang++)
 AX_CXX_COMPILE_STDCXX_11
 
-if test x$CXX != xclang++; then
-    AC_ERROR([No clang++ found on your system, please install clang!])
-fi
-
 ######################################################
 
 AC_ARG_ENABLE([plugin_syscalls],
