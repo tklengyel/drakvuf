@@ -154,17 +154,18 @@ int main(int argc, char** argv)
     if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
-        return rc;
+        return 1;
     }
 
     if (pid > 0 && app)
     {
         printf("Injector starting %s through PID %u TID: %u\n", app, pid, tid);
-        rc = injector_start_app(drakvuf, pid, tid, app);
+        int injection_result = injector_start_app(drakvuf, pid, tid, app);
 
-        if (!rc)
+        if (!injection_result)
         {
             printf("Process startup failed\n");
+            rc = 1;
         }
         else
         {
