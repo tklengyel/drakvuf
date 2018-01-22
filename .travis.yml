@@ -130,6 +130,9 @@ matrix:
       script:
         - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
 
+#
+# clang scan-build
+#
     - env:
         - TEST="scan-build"
       addons:
@@ -155,6 +158,7 @@ matrix:
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
         - export LDFLAGS="-L$PWD/usr/local/lib"
         - export CFLAGS="-I$PWD/usr/local/include"
+        - export PATH=$PATH:/usr/local/clang-5.0.0/bin
         - git submodule update --init libvmi
         - cd libvmi
         - ./autogen.sh
@@ -165,8 +169,8 @@ matrix:
       install:
         - ./autogen.sh
       script:
-        - scan-build-5.0 ./configure --enable-debug
-        - cd src/libdrakvuf && scan-build-5.0 --status-bugs make && cd ../..
-        - cd src/xen_helper && scan-build-5.0 --status-bugs make && cd ../..
-        - cd src/libinjector && scan-build-5.0 --status-bugs make && cd ../..
-        - cd src/dirwatch && scan-build-5.0 --status-bugs make && cd ../..
+        - scan-build --status-bugs --use-cc=clang-5.0 ./configure --enable-debug
+        - cd src/libdrakvuf && scan-build --status-bugs --use-cc=clang-5.0 make && cd ../..
+        - cd src/xen_helper && scan-build --status-bugs --use-cc=clang-5.0 make && cd ../..
+        - cd src/libinjector && scan-build --status-bugs --use-cc=clang-5.0 make && cd ../..
+        - cd src/dirwatch && scan-build --status-bugs --use-cc=clang-5.0 make && cd ../..
