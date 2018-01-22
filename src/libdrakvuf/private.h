@@ -204,14 +204,13 @@ struct breakpoint
     addr_t pa;
     drakvuf_trap_t guard, guard2;
     bool doubletrap;
-} __attribute__ ((packed));
-
+};
 struct memaccess
 {
     addr_t gfn;
     bool guard2;
     vmi_mem_access_t access;
-} __attribute__ ((packed));
+};
 
 struct wrapper
 {
@@ -223,7 +222,7 @@ struct wrapper
         struct memaccess memaccess;
         struct breakpoint breakpoint;
     };
-} __attribute__ ((packed));
+};
 
 struct free_trap_wrapper
 {
