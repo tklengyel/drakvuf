@@ -138,7 +138,7 @@
 
 <p>The following packages are normally required to build Xen and DRAKVUF on Debian based Linux distros. The system has been mainly tested on Debian Jessie and Ubuntu 14.04 LTS.</p>
 
-<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute libcurl3 libcurl4-openssl-dev bzip2 pciutils-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev python-dev python-pip libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool check libjson-c-dev libfuse-dev checkpolicy liblzma-dev autoconf-archive
+<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute libcurl3 libcurl4-openssl-dev bzip2 pciutils-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev python-dev python-pip libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool check libjson-c-dev libfuse-dev checkpolicy liblzma-dev autoconf-archive kpartx python-capstone
 </code></pre>
 
 We will be installing a slightly modified version of Xen 4.8 that includes a built-in XSM policy required for DRAKVUF.
@@ -313,6 +313,17 @@ The important fields are:
 <pre><code>PDB GUID: 684da42a30cc450f81c535b4d18944b12
 Kernel filename: ntkrpamp.pdb
 </code></pre>
+
+If vmi-win-guid fails to find the Windows kernel in memory, you can use Rekall to examine ntoskrnl.exe on the disk:
+<pre><code>sudo su
+kpartx -a /dev/vg/windows7
+mount -o ro /dev/vg/windows7p1 /mnt
+rekal peinfo -f /mnt/Windows/System32/ntoskrnl.exe > /tmp/peinfo.txt
+umount /mnt
+kpartx -d /dev/vg/windows7
+</code></pre>
+
+The generated /tmp/peinfo.txt file will contain the required PDB filename and GUID.
 
 Now generate the Rekall profile:
 <pre><code>cd /tmp
