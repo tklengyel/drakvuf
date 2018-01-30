@@ -115,12 +115,13 @@
 #include <glib.h>
 
 #include "libdrakvuf/libdrakvuf.h"
+#include <libinjector/libinjector.h>
 #include "private.h"
 
 struct injector
 {
     // Inputs:
-    const char* target_proc;
+    const char* target_file;
     reg_t target_cr3;
     vmi_pid_t target_pid;
     uint32_t target_tid;
@@ -130,7 +131,8 @@ struct injector
     vmi_instance_t vmi;
     const char* rekall_profile;
     bool is32bit, hijacked;
-    addr_t createprocessa;
+    injection_method_t method;
+    addr_t exec_func;
 
     addr_t process_info;
     x86_registers_t saved_regs;
@@ -310,18 +312,24 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
         goto err;
 
     //Push input arguments on the stack
+    //ShellExecute(NULL, NULL, &FilePath, NULL, NULL, SW_SHOWNORMAL)
     //CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, CREATE_SUSPENDED, NULL, NULL, &si, pi))
 
     uint64_t nul64 = 0;
     uint32_t nul32 = 0;
     uint8_t nul8 = 0;
-    size_t len = strlen(injector->target_proc);
+    size_t len = strlen(injector->target_file);
     addr_t addr = rsp;
 
     addr_t str_addr, sip_addr;
 
     if (injector->is32bit)
     {
+
+        if (INJECT_METHOD_SHELLEXEC == injector->method) {
+            // TODO Implement
+            goto err;
+        }
 
         addr -= 0x4; // the stack has to be alligned to 0x4
         // and we need a bit of extra buffer before the string for \0
@@ -334,7 +342,7 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
         addr -= len + 0x4 - (len % 0x4);
         str_addr = addr;
         ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write(vmi, &ctx, len, (void*) injector->target_proc, NULL))
+        if (VMI_FAILURE == vmi_write(vmi, &ctx, len, (void*) injector->target_file, NULL))
             goto err;
 
         // add null termination
@@ -444,31 +452,12 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
         addr -= len + 0x8 - (len % 0x8);
         str_addr = addr;
         ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write(vmi, &ctx, len, (void*) injector->target_proc, NULL))
+        if (VMI_FAILURE == vmi_write(vmi, &ctx, len, (void*) injector->target_file, NULL))
             goto err;
 
         // add null termination
         ctx.addr = addr+len;
         if (VMI_FAILURE == vmi_write_8(vmi, &ctx, &nul8))
-            goto err;
-
-        struct startup_info_64 si;
-        memset(&si, 0, sizeof(struct startup_info_64));
-        struct process_information_64 pi;
-        memset(&pi, 0, sizeof(struct process_information_64));
-
-        len = sizeof(struct process_information_64);
-        addr -= len;
-        injector->process_info = addr;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write(vmi, &ctx, len, &pi, NULL))
-            goto err;
-
-        len = sizeof(struct startup_info_64);
-        addr -= len;
-        sip_addr = addr;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write(vmi, &ctx, len, &si, NULL))
             goto err;
 
         //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
@@ -477,41 +466,95 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
         //P1=rcx, P2=rdx, P3=r8, P4=r9
         //5th parameter onwards (if any) passed via the stack
 
-        //p10
-        addr -= 0x8;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &injector->process_info))
-            goto err;
+        if (INJECT_METHOD_SHELLEXEC == injector->method) {
+            //p6
+            addr -= 0x8;
+            ctx.addr = addr;
+            uint64_t show_cmd = 1;
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &show_cmd))
+                goto err;
 
-        //p9
-        addr -= 0x8;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &sip_addr))
-            goto err;
+            //p5
+            addr -= 0x8;
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
+                goto err;
 
-        //p8
-        addr -= 0x8;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-            goto err;
+            //p1
+            info->regs->rcx = 0;
+            //p2
+            info->regs->rdx = 0;
+            //p3
+            info->regs->r8 = str_addr;
+            //p4
+            info->regs->r9 = 0;
+        }
+        else
+        {
+            struct startup_info_64 si;
+            memset(&si, 0, sizeof(struct startup_info_64));
+            struct process_information_64 pi;
+            memset(&pi, 0, sizeof(struct process_information_64));
 
-        //p7
-        addr -= 0x8;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-            goto err;
+            len = sizeof(struct process_information_64);
+            addr -= len;
+            injector->process_info = addr;
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write(vmi, &ctx, len, &pi, NULL))
+                goto err;
 
-        //p6
-        addr -= 0x8;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-            goto err;
+            len = sizeof(struct startup_info_64);
+            addr -= len;
+            sip_addr = addr;
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write(vmi, &ctx, len, &si, NULL))
+                goto err;
 
-        //p5
-        addr -= 0x8;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-            goto err;
+            //p10
+            addr -= 0x8;
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &injector->process_info))
+                goto err;
+
+            //p9
+            addr -= 0x8;
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &sip_addr))
+                goto err;
+
+            //p8
+            addr -= 0x8;
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
+                goto err;
+
+            //p7
+            addr -= 0x8;
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
+                goto err;
+
+            //p6
+            addr -= 0x8;
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
+                goto err;
+
+            //p5
+            addr -= 0x8;
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
+                goto err;
+
+            //p1
+            info->regs->rcx = 0;
+            //p2
+            info->regs->rdx = str_addr;
+            //p3
+            info->regs->r8 = 0;
+            //p4
+            info->regs->r9 = 0;
+        }
 
         // allocate 0x20 "homing space"
         addr -= 0x8;
@@ -533,15 +576,6 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
         ctx.addr = addr;
         if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
             goto err;
-
-        //p1
-        info->regs->rcx = 0;
-        //p2
-        info->regs->rdx = str_addr;
-        //p3
-        info->regs->r8 = 0;
-        //p4
-        info->regs->r9 = 0;
 
         // save the return address
         addr -= 0x8;
@@ -622,7 +656,7 @@ event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     PRINT_DEBUG("Stack setup finished and return trap added @ 0x%" PRIx64 "\n",
                 injector->bp.breakpoint.addr);
 
-    info->regs->rip = injector->createprocessa;
+    info->regs->rip = injector->exec_func;
     injector->hijacked = 1;
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -785,7 +819,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             return 0;
         }
 
-        info->regs->rip = injector->createprocessa;
+        info->regs->rip = injector->exec_func;
 
         injector->hijacked = 1;
 
@@ -848,7 +882,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
-int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* app)
+int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, injection_method_t method)
 {
 
     struct injector injector = { 0 };
@@ -857,7 +891,9 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
     injector.rekall_profile = drakvuf_get_rekall_profile(drakvuf);
     injector.target_pid = pid;
     injector.target_tid = tid;
-    injector.target_proc = app;
+    injector.target_file = file;
+
+    injector.method = method;
 
     injector.is32bit = (vmi_get_page_mode(injector.vmi, 0) == VMI_PM_IA32E) ? 0 : 1;
     if ( VMI_FAILURE == vmi_pid_to_dtb(injector.vmi, pid, &injector.target_cr3) )
@@ -878,16 +914,23 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
     }
 
     PRINT_DEBUG("Target PID %u with DTB 0x%lx to start '%s'\n", pid,
-                injector.target_cr3, app);
+                injector.target_cr3, file);
 
     addr_t eprocess_base = 0;
     if ( !drakvuf_find_process(injector.drakvuf, pid, NULL, &eprocess_base) )
         goto done;
 
-    injector.createprocessa = drakvuf_exportsym_to_va(injector.drakvuf, eprocess_base, "kernel32.dll", "CreateProcessA");
-    if (!injector.createprocessa)
+    char *lib = "kernel32.dll";
+    char *fun = "CreateProcessA";
+    if (INJECT_METHOD_SHELLEXEC == method) {
+        lib = "shell32.dll";
+        fun = "ShellExecuteA";
+    }
+
+    injector.exec_func = drakvuf_exportsym_to_va(injector.drakvuf, eprocess_base, lib, fun);
+    if (!injector.exec_func)
     {
-        PRINT_DEBUG("Failed to get address of kernel32.dll!CreateProcessA\n");
+        PRINT_DEBUG("Failed to get address of %s!%s\n", lib, fun);
         goto done;
     }
 

@@ -113,10 +113,17 @@ extern "C" {
 
 #include <libdrakvuf/libdrakvuf.h>
 
+typedef enum {
+    INJECT_METHOD_CREATEPROC,
+    INJECT_METHOD_SHELLEXEC,
+    __INJECT_METHOD_MAX
+} injection_method_t;
+
 int injector_start_app(drakvuf_t drakvuf,
                        vmi_pid_t pid,
                        uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-                       const char* app);
+                       const char* app,
+                       injection_method_t method);
 
 #pragma GCC visibility pop
 
