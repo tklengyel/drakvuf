@@ -326,7 +326,8 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
     if (injector->is32bit)
     {
 
-        if (INJECT_METHOD_SHELLEXEC == injector->method) {
+        if (INJECT_METHOD_SHELLEXEC == injector->method)
+        {
             // TODO Implement
             goto err;
         }
@@ -466,7 +467,8 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
         //P1=rcx, P2=rdx, P3=r8, P4=r9
         //5th parameter onwards (if any) passed via the stack
 
-        if (INJECT_METHOD_SHELLEXEC == injector->method) {
+        if (INJECT_METHOD_SHELLEXEC == injector->method)
+        {
             //p6
             addr -= 0x8;
             ctx.addr = addr;
@@ -920,9 +922,10 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
     if ( !drakvuf_find_process(injector.drakvuf, pid, NULL, &eprocess_base) )
         goto done;
 
-    char *lib = "kernel32.dll";
-    char *fun = "CreateProcessA";
-    if (INJECT_METHOD_SHELLEXEC == method) {
+    char* lib = "kernel32.dll";
+    char* fun = "CreateProcessA";
+    if (INJECT_METHOD_SHELLEXEC == method)
+    {
         lib = "shell32.dll";
         fun = "ShellExecuteA";
     }

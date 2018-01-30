@@ -113,7 +113,8 @@ extern "C" {
 
 #include <libdrakvuf/libdrakvuf.h>
 
-typedef enum {
+typedef enum
+{
     INJECT_METHOD_CREATEPROC,
     INJECT_METHOD_SHELLEXEC,
     __INJECT_METHOD_MAX
