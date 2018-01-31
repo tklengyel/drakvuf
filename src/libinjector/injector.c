@@ -285,11 +285,374 @@ struct kapc_64
     uint8_t inserted;
 };
 
+static bool pass_inputs_createproc_32(struct injector* injector, drakvuf_trap_info_t* info, access_context_t* ctx)
+{
+
+    vmi_instance_t vmi = injector->vmi;
+
+    uint32_t nul32 = 0;
+    uint8_t nul8 = 0;
+    size_t len = strlen(injector->target_file);
+
+    addr_t addr = info->regs->rsp;
+
+    addr_t str_addr, sip_addr;
+
+    addr -= 0x4; // the stack has to be alligned to 0x4
+    // and we need a bit of extra buffer before the string for \0
+    // we just going to null out that extra space fully
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, &nul32))
+        goto err;
+
+    // this string has to be aligned as well!
+    addr -= len + 0x4 - (len % 0x4);
+    str_addr = addr;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write(vmi, ctx, len, (void*) injector->target_file, NULL))
+        goto err;
+
+    // add null termination
+    ctx->addr = addr + len;
+    if (VMI_FAILURE == vmi_write_8(vmi, ctx, &nul8))
+        goto err;
+
+    //struct startup_info_32 si = {.wShowWindow = SW_SHOWDEFAULT };
+    struct startup_info_32 si;
+    memset(&si, 0, sizeof(struct startup_info_32));
+    struct process_information_32 pi;
+    memset(&pi, 0, sizeof(struct process_information_32));
+
+    len = sizeof(struct process_information_32);
+    addr -= len;
+    injector->process_info = addr;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write(vmi, ctx, len, &pi, NULL))
+        goto err;
+
+    len = sizeof(struct startup_info_32);
+    addr -= len;
+    sip_addr = addr;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write(vmi, ctx, len, &si, NULL))
+        goto err;
+
+    //p10
+    addr -= 0x4;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, (uint32_t*) &injector->process_info))
+        goto err;
+
+    //p9
+    addr -= 0x4;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, (uint32_t*) &sip_addr))
+        goto err;
+
+    //p8
+    addr -= 0x4;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, &nul32))
+        goto err;
+
+    //p7
+    addr -= 0x4;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, &nul32))
+        goto err;
+
+    //p6
+    addr -= 0x4;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, &nul32))
+        goto err;
+
+    //p5
+    addr -= 0x4;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, &nul32))
+        goto err;
+
+    //p4
+    addr -= 0x4;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, &nul32))
+        goto err;
+
+    //p3
+    addr -= 0x4;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, &nul32))
+        goto err;
+
+    //p2
+    addr -= 0x4;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, (uint32_t*) &str_addr))
+        goto err;
+
+    //p1
+    addr -= 0x4;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, &nul32))
+        goto err;
+
+    // save the return address
+    addr -= 0x4;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, (uint32_t*) &info->regs->rip))
+        goto err;
+
+    // Grow the stack
+    info->regs->rsp = addr;
+
+    return 1;
+
+err:
+    return 0;
+}
+
+static bool pass_inputs_createproc_64(struct injector* injector, drakvuf_trap_info_t* info, access_context_t* ctx)
+{
+
+    vmi_instance_t vmi = injector->vmi;
+
+    uint64_t nul64 = 0;
+    uint8_t nul8 = 0;
+    size_t len = strlen(injector->target_file);
+
+    addr_t addr = info->regs->rsp;
+
+    addr_t str_addr, sip_addr;
+
+    addr -= 0x8; // the stack has to be alligned to 0x8
+    // and we need a bit of extra buffer before the string for \0
+
+    // we just going to null out that extra space fully
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    // this string has to be aligned as well!
+    addr -= len + 0x8 - (len % 0x8);
+    str_addr = addr;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write(vmi, ctx, len, (void*) injector->target_file, NULL))
+        goto err;
+
+    // add null termination
+    ctx->addr = addr+len;
+    if (VMI_FAILURE == vmi_write_8(vmi, ctx, &nul8))
+        goto err;
+
+    //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
+    //
+    //First 4 parameters to functions are always passed in registers
+    //P1=rcx, P2=rdx, P3=r8, P4=r9
+    //5th parameter onwards (if any) passed via the stack
+
+    struct startup_info_64 si;
+    memset(&si, 0, sizeof(struct startup_info_64));
+    struct process_information_64 pi;
+    memset(&pi, 0, sizeof(struct process_information_64));
+
+    len = sizeof(struct process_information_64);
+    addr -= len;
+    injector->process_info = addr;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write(vmi, ctx, len, &pi, NULL))
+        goto err;
+
+    len = sizeof(struct startup_info_64);
+    addr -= len;
+    sip_addr = addr;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write(vmi, ctx, len, &si, NULL))
+        goto err;
+
+    //p10
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &injector->process_info))
+        goto err;
+
+    //p9
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &sip_addr))
+        goto err;
+
+    //p8
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    //p7
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    //p6
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    //p5
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    //p1
+    info->regs->rcx = 0;
+    //p2
+    info->regs->rdx = str_addr;
+    //p3
+    info->regs->r8 = 0;
+    //p4
+    info->regs->r9 = 0;
+
+    // allocate 0x20 "homing space"
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    // save the return address
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &info->regs->rip))
+        goto err;
+
+    // Grow the stack
+    info->regs->rsp = addr;
+
+    return 1;
+
+err:
+    return 0;
+}
+
+static bool pass_inputs_shellexec_64(struct injector* injector, drakvuf_trap_info_t* info, access_context_t* ctx)
+{
+
+    vmi_instance_t vmi = injector->vmi;
+
+    uint64_t nul64 = 0;
+    uint8_t nul8 = 0;
+    size_t len = strlen(injector->target_file);
+
+    addr_t addr = info->regs->rsp;
+
+    addr_t str_addr;
+
+    addr -= 0x8; // the stack has to be alligned to 0x8
+    // and we need a bit of extra buffer before the string for \0
+
+    // we just going to null out that extra space fully
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    // this string has to be aligned as well!
+    addr -= len + 0x8 - (len % 0x8);
+    str_addr = addr;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write(vmi, ctx, len, (void*) injector->target_file, NULL))
+        goto err;
+
+    // add null termination
+    ctx->addr = addr+len;
+    if (VMI_FAILURE == vmi_write_8(vmi, ctx, &nul8))
+        goto err;
+
+    //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
+    //
+    //First 4 parameters to functions are always passed in registers
+    //P1=rcx, P2=rdx, P3=r8, P4=r9
+    //5th parameter onwards (if any) passed via the stack
+
+    //p6
+    addr -= 0x8;
+    ctx->addr = addr;
+    uint64_t show_cmd = 1;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &show_cmd))
+        goto err;
+
+    //p5
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    //p1
+    info->regs->rcx = 0;
+    //p2
+    info->regs->rdx = 0;
+    //p3
+    info->regs->r8 = str_addr;
+    //p4
+    info->regs->r9 = 0;
+
+    // allocate 0x20 "homing space"
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        goto err;
+
+    // save the return address
+    addr -= 0x8;
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &info->regs->rip))
+        goto err;
+
+    // Grow the stack
+    info->regs->rsp = addr;
+
+    return 1;
+
+err:
+    return 0;
+}
+
 bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 {
 
     vmi_instance_t vmi = injector->vmi;
-    reg_t fsgs, rsp = info->regs->rsp;
+    reg_t fsgs;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -315,14 +678,6 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
     //ShellExecute(NULL, NULL, &FilePath, NULL, NULL, SW_SHOWNORMAL)
     //CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, CREATE_SUSPENDED, NULL, NULL, &si, pi))
 
-    uint64_t nul64 = 0;
-    uint32_t nul32 = 0;
-    uint8_t nul8 = 0;
-    size_t len = strlen(injector->target_file);
-    addr_t addr = rsp;
-
-    addr_t str_addr, sip_addr;
-
     if (injector->is32bit)
     {
 
@@ -331,263 +686,21 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
             // TODO Implement
             goto err;
         }
-
-        addr -= 0x4; // the stack has to be alligned to 0x4
-        // and we need a bit of extra buffer before the string for \0
-        // we just going to null out that extra space fully
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, &nul32))
-            goto err;
-
-        // this string has to be aligned as well!
-        addr -= len + 0x4 - (len % 0x4);
-        str_addr = addr;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write(vmi, &ctx, len, (void*) injector->target_file, NULL))
-            goto err;
-
-        // add null termination
-        ctx.addr = addr + len;
-        if (VMI_FAILURE == vmi_write_8(vmi, &ctx, &nul8))
-            goto err;
-
-        //struct startup_info_32 si = {.wShowWindow = SW_SHOWDEFAULT };
-        struct startup_info_32 si;
-        memset(&si, 0, sizeof(struct startup_info_32));
-        struct process_information_32 pi;
-        memset(&pi, 0, sizeof(struct process_information_32));
-
-        len = sizeof(struct process_information_32);
-        addr -= len;
-        injector->process_info = addr;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write(vmi, &ctx, len, &pi, NULL))
-            goto err;
-
-        len = sizeof(struct startup_info_32);
-        addr -= len;
-        sip_addr = addr;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write(vmi, &ctx, len, &si, NULL))
-            goto err;
-
-        //p10
-        addr -= 0x4;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*) &injector->process_info))
-            goto err;
-
-        //p9
-        addr -= 0x4;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*) &sip_addr))
-            goto err;
-
-        //p8
-        addr -= 0x4;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, &nul32))
-            goto err;
-
-        //p7
-        addr -= 0x4;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, &nul32))
-            goto err;
-
-        //p6
-        addr -= 0x4;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, &nul32))
-            goto err;
-
-        //p5
-        addr -= 0x4;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, &nul32))
-            goto err;
-
-        //p4
-        addr -= 0x4;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, &nul32))
-            goto err;
-
-        //p3
-        addr -= 0x4;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, &nul32))
-            goto err;
-
-        //p2
-        addr -= 0x4;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*) &str_addr))
-            goto err;
-
-        //p1
-        addr -= 0x4;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, &nul32))
-            goto err;
-
-        // save the return address
-        addr -= 0x4;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*) &info->regs->rip))
+        else if (!pass_inputs_createproc_32(injector, info, &ctx))
             goto err;
 
     }
     else
     {
 
-        addr -= 0x8; // the stack has to be alligned to 0x8
-        // and we need a bit of extra buffer before the string for \0
-
-        // we just going to null out that extra space fully
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-            goto err;
-
-        // this string has to be aligned as well!
-        addr -= len + 0x8 - (len % 0x8);
-        str_addr = addr;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write(vmi, &ctx, len, (void*) injector->target_file, NULL))
-            goto err;
-
-        // add null termination
-        ctx.addr = addr+len;
-        if (VMI_FAILURE == vmi_write_8(vmi, &ctx, &nul8))
-            goto err;
-
-        //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
-        //
-        //First 4 parameters to functions are always passed in registers
-        //P1=rcx, P2=rdx, P3=r8, P4=r9
-        //5th parameter onwards (if any) passed via the stack
-
         if (INJECT_METHOD_SHELLEXEC == injector->method)
         {
-            //p6
-            addr -= 0x8;
-            ctx.addr = addr;
-            uint64_t show_cmd = 1;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &show_cmd))
+            if (!pass_inputs_shellexec_64(injector, info, &ctx))
                 goto err;
-
-            //p5
-            addr -= 0x8;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-                goto err;
-
-            //p1
-            info->regs->rcx = 0;
-            //p2
-            info->regs->rdx = 0;
-            //p3
-            info->regs->r8 = str_addr;
-            //p4
-            info->regs->r9 = 0;
         }
-        else
-        {
-            struct startup_info_64 si;
-            memset(&si, 0, sizeof(struct startup_info_64));
-            struct process_information_64 pi;
-            memset(&pi, 0, sizeof(struct process_information_64));
-
-            len = sizeof(struct process_information_64);
-            addr -= len;
-            injector->process_info = addr;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write(vmi, &ctx, len, &pi, NULL))
-                goto err;
-
-            len = sizeof(struct startup_info_64);
-            addr -= len;
-            sip_addr = addr;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write(vmi, &ctx, len, &si, NULL))
-                goto err;
-
-            //p10
-            addr -= 0x8;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &injector->process_info))
-                goto err;
-
-            //p9
-            addr -= 0x8;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &sip_addr))
-                goto err;
-
-            //p8
-            addr -= 0x8;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-                goto err;
-
-            //p7
-            addr -= 0x8;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-                goto err;
-
-            //p6
-            addr -= 0x8;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-                goto err;
-
-            //p5
-            addr -= 0x8;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-                goto err;
-
-            //p1
-            info->regs->rcx = 0;
-            //p2
-            info->regs->rdx = str_addr;
-            //p3
-            info->regs->r8 = 0;
-            //p4
-            info->regs->r9 = 0;
-        }
-
-        // allocate 0x20 "homing space"
-        addr -= 0x8;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-            goto err;
-
-        addr -= 0x8;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-            goto err;
-
-        addr -= 0x8;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-            goto err;
-
-        addr -= 0x8;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-            goto err;
-
-        // save the return address
-        addr -= 0x8;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &info->regs->rip))
+        else if (!pass_inputs_createproc_64(injector, info, &ctx))
             goto err;
     }
-
-    // Grow the stack
-    info->regs->rsp = addr;
 
     return 1;
 
