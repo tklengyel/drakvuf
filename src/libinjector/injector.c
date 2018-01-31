@@ -954,7 +954,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
 
-    if (info->regs->rax)
+    if (INJECT_METHOD_CREATEPROC == injector->method && info->regs->rax)
     {
         ctx.addr = injector->process_info;
 
@@ -991,6 +991,14 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             PRINT_DEBUG("Failed to inject\n");
             injector->rc = 0;
         }
+    }
+    // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND while successfully opening file.
+    // So check only for out of resources (0) error.
+    else if (INJECT_METHOD_SHELLEXEC == injector->method && info->regs->rax)
+    {
+        // TODO Retrieve PID and TID
+        PRINT_DEBUG("Injected\n");
+        injector->rc = 1;
     }
 
     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
