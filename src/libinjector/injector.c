@@ -445,6 +445,12 @@ static bool pass_inputs_createproc_64(struct injector* injector, drakvuf_trap_in
     if (VMI_FAILURE == vmi_write_8(vmi, ctx, &nul8))
         goto err;
 
+    // Align stack after placing the string.
+    //
+    // The string's length is undefined and could misalign stack which must be
+    // aligned on 16B boundary (see Microsoft x64 ABI).
+    addr &= ~0x1f;
+
     //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
     //
     //First 4 parameters to functions are always passed in registers
@@ -583,6 +589,12 @@ static bool pass_inputs_shellexec_64(struct injector* injector, drakvuf_trap_inf
     ctx->addr = addr+len;
     if (VMI_FAILURE == vmi_write_8(vmi, ctx, &nul8))
         goto err;
+
+    // Align stack after placing the string.
+    //
+    // The string's length is undefined and could misalign stack which must be
+    // aligned on 16B boundary (see Microsoft x64 ABI).
+    addr &= ~0x1f;
 
     //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
     //
