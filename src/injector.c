@@ -102,9 +102,12 @@
  *                                                                         *
  ***************************************************************************/
 
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <unistd.h>
 #include <libvmi/libvmi.h>
 
 #include <libdrakvuf/libdrakvuf.h>
@@ -117,11 +120,26 @@ static void close_handler(int sig)
     drakvuf_interrupt(drakvuf, sig);
 }
 
+static bool is_integer(char* str)
+{
+    long val = 0;
+    char* endptr = NULL;
+
+    errno = 0;
+    val = strtol(str, &endptr, 10);
+
+    /* Check for various possible errors */
+    if ((errno == ERANGE && (val == LONG_MAX || val == LONG_MIN)) || (errno != 0 && val == 0) || (endptr == str))
+        return false;
+    else
+        return true;
+}
+
 int main(int argc, char** argv)
 {
     if (argc < 5)
     {
-        printf("Usage: %s <rekall profile> <domain> <pid> <app> [tid]\n", argv[0]);
+        printf("Usage: %s <rekall profile> <domain> <pid> <file_path> [tid] [method]\n", argv[0]);
         printf("\t<required> [optional]\n");
         return 1;
     }
@@ -131,11 +149,26 @@ int main(int argc, char** argv)
     const char* domain = argv[2];
     vmi_pid_t pid = atoi(argv[3]);
     uint32_t tid = 0;
-    char* app = argv[4];
+    char* file_path = argv[4];
+    char* method_arg = NULL;
+    injection_method_t method = INJECT_METHOD_CREATEPROC;
     bool verbose = 0;
 
-    if ( argc == 6 )
+    if ( argc >= 6 && is_integer(argv[5]) )
         tid = atoi(argv[5]);
+
+    if ( argc == 6 && !is_integer(argv[5]) )
+        method_arg = argv[5];
+    else if ( argc == 7 )
+        method_arg = argv[6];
+
+    if (method_arg)
+    {
+        if (!strncmp(method_arg,"shellexec",9))
+            method = INJECT_METHOD_SHELLEXEC;
+        else if (!strncmp(method_arg,"createproc",10))
+            method = INJECT_METHOD_CREATEPROC;
+    }
 
 #ifdef DRAKVUF_DEBUG
     verbose = 1;
@@ -157,10 +190,10 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    if (pid > 0 && app)
+    if (pid > 0 && file_path)
     {
-        printf("Injector starting %s through PID %u TID: %u\n", app, pid, tid);
-        int injection_result = injector_start_app(drakvuf, pid, tid, app);
+        printf("Injector starting %s through PID %u TID: %u\n", file_path, pid, tid);
+        int injection_result = injector_start_app(drakvuf, pid, tid, file_path, method);
 
         if (!injection_result)
         {
