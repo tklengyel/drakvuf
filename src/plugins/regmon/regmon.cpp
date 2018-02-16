@@ -256,7 +256,7 @@ regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
         throw -1;
 
-    assert(sizeof(traps) / sizeof(traps[0]) > 10);
+    assert(sizeof(traps) / sizeof(traps[0]) > 12);
     register_trap(drakvuf, rekall_profile, "NtDeleteKey",            &traps[0], log_reg_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtSetValueKey",          &traps[1], log_reg_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtDeleteValueKey",       &traps[2], log_reg_hook_cb);
@@ -268,6 +268,8 @@ regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     register_trap(drakvuf, rekall_profile, "NtOpenKeyEx",            &traps[8], log_reg_objattr_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtOpenKeyTransacted",    &traps[9], log_reg_objattr_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtOpenKeyTransactedEx",  &traps[10], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtQueryKey",             &traps[11], log_reg_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtQueryMultipleValueKey",&traps[12], log_reg_hook_cb);
 }
 
 regmon::~regmon(void) {}
