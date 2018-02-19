@@ -106,16 +106,18 @@
 #include <config.h>
 #include <inttypes.h>
 #include <libvmi/x86.h>
+#include <assert.h>
 
 #include "../plugins.h"
 #include "regmon.h"
 
 
-static void log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* syscall_name )
+static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr )
 {
-    if ( info->regs->rcx )
+    if ( attr )
     {
-        char* key_path = drakvuf_reg_keyhandle_path( drakvuf, info, info->regs->rcx, 0 );
+        const char* syscall_name = info->trap->name;
+        char* key_path = drakvuf_reg_keyhandle_path( drakvuf, info, attr, 0 );
 
         if ( key_path )
         {
@@ -131,37 +133,111 @@ static void log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* info, const ch
                 default:
                 case OUTPUT_DEFAULT:
                     printf("[REGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64 ", PID:%d, PPID:%d, %s %s:%" PRIi64 " %s:%s\n",
-                           info->vcpu, info->regs->cr3, info->proc_data.base_addr, info->proc_data.pid, info->proc_data.ppid, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, key_path );
+                           info->vcpu, info->regs->cr3, info->proc_data.base_addr, info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                           USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, key_path );
                     break;
             }
 
             g_free( key_path );
         }
     }
+
+    return 0;
 }
 
-
-static event_response_t hook_deletekey_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+static event_response_t log_reg_hook_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
-    log_reg_hook( drakvuf, info, "DELETEKEY" );
-
-    return 0 ;
+    return log_reg_hook( drakvuf, info, info->regs->rcx );
 }
 
-static event_response_t hook_deletevaluekey_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+static event_response_t log_reg_objattr_hook(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
 {
-    log_reg_hook( drakvuf, info, "DELETEVALUEKEY" );
+    if ( !attr )
+    {
+        return 0;
+    }
 
-    return 0 ;
+    const char* syscall_name = info->trap->name;
+    regmon* reg = (regmon*)info->trap->data;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    ctx.addr = attr + reg->objattr_root;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
+    {
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
+
+    char* key_root_p = drakvuf_reg_keyhandle_path( drakvuf, info, ctx.addr, 0 );
+
+    ctx.addr = attr + reg->objattr_name;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
+    {
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
+
+    unicode_string_t* us = vmi_read_unicode_str(vmi, &ctx);
+    if ( !us )
+    {
+        g_free(key_root_p);
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
+
+    unicode_string_t str2 = { .contents = NULL };
+
+    if (VMI_SUCCESS == vmi_convert_str_encoding(us, &str2, "UTF-8"))
+    {
+        const char* key_root = key_root_p ?: "";
+        const char* key_name = (const char*)str2.contents ?: "";
+        const char* key_sep = key_root_p ? "\\" : "";
+
+        switch ( reg->format )
+        {
+            case OUTPUT_CSV:
+                printf("regmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%s%s%s\n",
+                       info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, key_root, key_sep, key_name );
+                break;
+
+            default:
+            case OUTPUT_DEFAULT:
+                printf("[REGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64 ", PID:%d, PPID:%d, %s %s:%" PRIi64 " %s:%s%s%s\n",
+                       info->vcpu, info->regs->cr3, info->proc_data.base_addr, info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                       USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, key_root, key_sep, key_name );
+                break;
+        }
+
+        g_free(str2.contents);
+    }
+
+    g_free(key_root_p);
+    vmi_free_unicode_str(us);
+    drakvuf_release_vmi(drakvuf);
+
+    return 0;
 }
 
-static event_response_t hook_setvaluekey_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+static event_response_t log_reg_objattr_hook_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
-    log_reg_hook( drakvuf, info, "SETVALUEKEY" );
-
-    return 0 ;
+    return log_reg_objattr_hook( drakvuf, info, info->regs->r8 );
 }
 
+static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
+                           drakvuf_trap_t* trap,
+                           event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
+{
+    if ( !drakvuf_get_function_rva( rekall_profile, syscall_name, &trap->breakpoint.rva) ) throw -1;
+
+    trap->name = syscall_name;
+    trap->cb   = hook_cb;
+
+    if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
+}
 
 
 regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
@@ -175,32 +251,25 @@ regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 
     this->format = output;
 
-    ////////////////////////////////////////////////////////////////////////
+    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
+        throw -1;
+    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
+        throw -1;
 
-    if ( !drakvuf_get_function_rva( rekall_profile, "NtDeleteKey",      &this->traps[0].breakpoint.rva) ) throw -1;
-
-    this->traps[0].name = "NtDeleteKey";
-    this->traps[0].cb   = hook_deletekey_cb;
-
-    if ( ! drakvuf_add_trap( drakvuf, &traps[0] ) ) throw -1;
-
-    ////////////////////////////////////////////////////////////////////////
-
-    if ( !drakvuf_get_function_rva( rekall_profile, "NtSetValueKey",    &this->traps[1].breakpoint.rva) ) throw -1;
-
-    this->traps[1].name = "NtSetValueKey";
-    this->traps[1].cb   = hook_setvaluekey_cb;
-
-    if ( ! drakvuf_add_trap( drakvuf, &traps[1] ) ) throw -1;
-
-    ////////////////////////////////////////////////////////////////////////
-
-    if ( !drakvuf_get_function_rva( rekall_profile, "NtDeleteValueKey", &this->traps[2].breakpoint.rva) ) throw -1;
-
-    this->traps[2].name = "NtDeleteValueKey";
-    this->traps[2].cb   = hook_deletevaluekey_cb;
-
-    if ( ! drakvuf_add_trap( drakvuf, &traps[2] ) ) throw -1;
+    assert(sizeof(traps) / sizeof(traps[0]) > 12);
+    register_trap(drakvuf, rekall_profile, "NtDeleteKey",            &traps[0], log_reg_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtSetValueKey",          &traps[1], log_reg_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtDeleteValueKey",       &traps[2], log_reg_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtCreateKey",            &traps[3], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtCreateKeyTransacted",  &traps[4], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtEnumerateKey",         &traps[5], log_reg_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtEnumerateValueKey",    &traps[6], log_reg_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtOpenKey",              &traps[7], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtOpenKeyEx",            &traps[8], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtOpenKeyTransacted",    &traps[9], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtOpenKeyTransactedEx",  &traps[10], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtQueryKey",             &traps[11], log_reg_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtQueryMultipleValueKey",&traps[12], log_reg_hook_cb);
 }
 
 regmon::~regmon(void) {}
