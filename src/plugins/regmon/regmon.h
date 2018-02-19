@@ -111,9 +111,9 @@
 class regmon: public plugin
 {
 public:
-    drakvuf_trap_t traps[32] =
+    drakvuf_trap_t traps[13] =
     {
-        [0 ... 31] = {
+        [0 ... 12] = {
             .breakpoint.lookup_type = LOOKUP_PID,
             .breakpoint.pid = 4,
             .breakpoint.addr_type = ADDR_RVA,
