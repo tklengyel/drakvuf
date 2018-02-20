@@ -177,6 +177,7 @@ static event_response_t log_reg_objattr_hook(drakvuf_t drakvuf, drakvuf_trap_inf
     ctx.addr = attr + reg->objattr_name;
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
     {
+        g_free(key_root_p);
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
