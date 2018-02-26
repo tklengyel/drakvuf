@@ -209,7 +209,7 @@ exit:
 symbols_t* drakvuf_get_symbols_from_rekall(const char* rekall_profile)
 {
 
-    symbols_t* ret = g_malloc0(sizeof(symbols_t));;
+    symbols_t* ret = g_malloc0(sizeof(symbols_t));
     json_object* root = json_object_from_file(rekall_profile);
     if (!root)
     {
@@ -229,7 +229,7 @@ symbols_t* drakvuf_get_symbols_from_rekall(const char* rekall_profile)
     }
 
     ret->count = json_object_object_length(functions);
-    ret->symbols = g_malloc0(sizeof(symbols_t) * ret->count);
+    ret->symbols = g_malloc0(sizeof(symbol_t) * ret->count);
 
     PRINT_DEBUG("Rekall profile defines %lu symbols\n", ret->count);
 
