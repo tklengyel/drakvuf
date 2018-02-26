@@ -390,8 +390,6 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 
             if (strncmp(symbol->name, "Nt", 2))
                 continue;
-            //if (strcmp(symbol->name, "NtCallbackReturn"))
-            //    continue;
 
             PRINT_DEBUG("[SYSCALLS] Adding trap to %s\n", symbol->name);
 
@@ -448,9 +446,6 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             if (!strcmp(symbol->name, "sys_call_table") )
                 continue;
 
-            //if (strcmp(symbol->name, "sys_gettimeofday"))
-            //    continue;
-
             PRINT_DEBUG("[SYSCALLS] Adding trap to %s at 0x%lx (kaslr 0x%lx)\n", symbol->name, symbol->rva + kaslr, kaslr);
 
             drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
@@ -471,22 +466,104 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
     return ret;
 }
 
+static GHashTable* read_syscalls_filter(const char* filter_file)
+{
+    GHashTable* table = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+    if (!table) return NULL;
+
+    FILE* f = fopen(filter_file, "r");
+    if (!f)
+    {
+        g_hash_table_destroy(table);
+        return NULL;
+    }
+    ssize_t read;
+    do
+    {
+        char* line = NULL;
+        size_t len = 0;
+        read = getline(&line, &len, f);
+        while (read > 0 && (line[read - 1] == '\n' || line[read - 1] == '\r')) read--;
+        if (read > 0)
+        {
+            line[read] = '\0';
+            g_hash_table_insert(table, line, NULL);
+        }
+        else
+            free(line);
+    }
+    while (read != -1);
+
+    fclose(f);
+    return table;
+}
+
+static symbols_t* filter_symbols(const symbols_t* symbols, const char* filter_file)
+{
+    GHashTable* filter = read_syscalls_filter(filter_file);
+    if (!filter) return NULL;
+    symbols_t* ret = (symbols_t*)g_malloc0(sizeof(symbols_t));
+    if (!ret)
+    {
+        g_hash_table_destroy(filter);
+        return NULL;
+    }
+
+    ret->count = symbols->count;
+    ret->symbols = (symbol_t*)g_malloc0(sizeof(symbol_t) * ret->count);
+    if (!ret->symbols)
+    {
+        g_hash_table_destroy(filter);
+        g_free(ret);
+        return NULL;
+    }
+
+    size_t filtered_size = 0;
+    for (size_t i = 0; i < symbols->count; ++i)
+    {
+        if (g_hash_table_contains(filter, symbols->symbols[i].name))
+        {
+            ret->symbols[filtered_size] = symbols->symbols[i];
+            ret->symbols[filtered_size].name = g_strdup(symbols->symbols[i].name);
+            filtered_size++;
+        }
+    }
+    ret->count = filtered_size;
+    g_hash_table_destroy(filter);
+    return ret;
+}
+
 syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
-    const char* rekall_profile = (const char*)config;
-    symbols_t* symbols = drakvuf_get_symbols_from_rekall(rekall_profile);
+    const struct syscalls_config* c = (const struct syscalls_config*)config;
+    symbols_t* symbols = drakvuf_get_symbols_from_rekall(c->rekall_profile);
     if (!symbols)
     {
-        fprintf(stderr, "Failed to parse Rekall profile at %s\n", rekall_profile);
+        fprintf(stderr, "Failed to parse Rekall profile at %s\n", c->rekall_profile);
         throw -1;
     }
 
+    if (c->syscalls_filter_file)
+    {
+        symbols_t* filtered_symbols = filter_symbols(symbols, c->syscalls_filter_file);
+        drakvuf_free_symbols(symbols);
+        if (!filtered_symbols)
+        {
+            fprintf(stderr, "Failed to apply syscalls filter %s\n", c->syscalls_filter_file);
+            throw -1;
+        }
+        symbols = filtered_symbols;
+    }
+
     this->os = drakvuf_get_os_type(drakvuf);
-    this->traps = create_trap_config(drakvuf, this, symbols, rekall_profile);
+    this->traps = create_trap_config(drakvuf, this, symbols, c->rekall_profile);
     this->format = output;
 
     if ( !this->traps )
+    {
+        drakvuf_free_symbols(symbols);
         throw -1;
+    }
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->reg_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)

@@ -128,9 +128,10 @@ static gpointer timer(gpointer data)
 }
 
 int drakvuf_c::start_plugins(const bool* plugin_list,
-                             const char* dump_folder,   // PLUGIN_FILEDELETE
-                             bool cpuid_stealth,        // PLUGIN_CPUIDMON
-                             const char* tcpip_profile) // PLUGIN_SOCKETMON
+                             const char* dump_folder,          // PLUGIN_FILEDELETE
+                             bool cpuid_stealth,               // PLUGIN_CPUIDMON
+                             const char* tcpip_profile,        // PLUGIN_SOCKETMON
+                             const char* syscalls_filter_file) // PLUGIN_SYSCALLS
 {
     int i, rc;
 
@@ -162,6 +163,17 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     {
                         .rekall_profile = this->rekall_profile,
                         .tcpip_profile = tcpip_profile
+                    };
+                    rc = this->plugins->start((drakvuf_plugin_t)i, &c);
+                    break;
+                }
+
+                case PLUGIN_SYSCALLS:
+                {
+                    struct syscalls_config c =
+                    {
+                        .rekall_profile = this->rekall_profile,
+                        .syscalls_filter_file = syscalls_filter_file
                     };
                     rc = this->plugins->start((drakvuf_plugin_t)i, &c);
                     break;
