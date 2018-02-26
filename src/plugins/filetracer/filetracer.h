@@ -115,10 +115,15 @@ public:
     output_format_t format;
 
     addr_t objattr_name;
+    addr_t objattr_root;
+    addr_t newfile_name_offset;
+    addr_t newfile_name_length_offset;
+    addr_t newfile_root_offset;
+    addr_t file_object_filename, object_header_body;
 
-    drakvuf_trap_t trap[8] =
+    drakvuf_trap_t trap[10] =
     {
-        [0 ... 7] = {
+        [0 ... 9] = {
             .breakpoint.lookup_type = LOOKUP_PID,
             .breakpoint.pid = 4,
             .breakpoint.addr_type = ADDR_RVA,
