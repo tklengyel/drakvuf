@@ -146,6 +146,7 @@ int main(int argc, char** argv)
     bool verbose = 0;
     bool cpuid_stealth = 0;
     bool leave_paused = 0;
+    char const* syscalls_filter_file = NULL;
 
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
 
@@ -182,11 +183,14 @@ int main(int argc, char** argv)
 #ifdef DRAKVUF_DEBUG
                 "\t -v                        Turn on verbose (debug) output\n"
 #endif
+#ifdef ENABLE_PLUGIN_SYSCALLS
+                "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
+#endif
                );
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:")) != -1)
         switch (c)
         {
             case 'r':
@@ -240,6 +244,9 @@ int main(int argc, char** argv)
                 verbose = 1;
                 break;
 #endif
+            case 'S':
+                syscalls_filter_file = optarg;
+                break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
                 return rc;
@@ -296,7 +303,7 @@ int main(int argc, char** argv)
 
     PRINT_DEBUG("Starting plugins\n");
 
-    if ( drakvuf->start_plugins(plugin_list, dump_folder, cpuid_stealth, tcpip) < 0 )
+    if ( drakvuf->start_plugins(plugin_list, dump_folder, cpuid_stealth, tcpip, syscalls_filter_file) < 0 )
         goto exit;
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");

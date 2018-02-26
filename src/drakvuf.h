@@ -168,7 +168,11 @@ public:
     void pause();
     void resume();
     int inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, injection_method_t method);
-    int start_plugins(const bool* plugin_list, const char* dump_folder, bool cpuid_stealth, const char* tcpip_profile);
+    int start_plugins(const bool* plugin_list,
+                      const char* dump_folder,
+                      bool cpuid_stealth,
+                      const char* tcpip_profile,
+                      const char* syscalls_filter_file);
     bool wait_for_process(const char* processname);
 
 };
