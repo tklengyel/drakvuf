@@ -116,14 +116,115 @@
 #include <dirent.h>
 #include <glib.h>
 #include <err.h>
+#include <assert.h>
 
 #include <libvmi/libvmi.h>
 #include "plugins/plugins.h"
 #include "private.h"
 #include "filetracer.h"
 
+static unicode_string_t* read_unicode(vmi_instance_t vmi, access_context_t* ctx)
+{
+    unicode_string_t* us = vmi_read_unicode_str(vmi, ctx);
+    if ( !us )
+        return NULL;
+
+    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+
+    if ( !out )
+    {
+        vmi_free_unicode_str(us);
+        return NULL;
+    }
+
+    status_t rc = vmi_convert_str_encoding(us, out, "UTF-8");
+    vmi_free_unicode_str(us);
+
+    if (VMI_SUCCESS == rc)
+        return out;
+
+    g_free(out);
+    return NULL;
+}
+
+static unicode_string_t* read_wchar_array(vmi_instance_t vmi, const access_context_t* ctx, size_t length)
+{
+    unicode_string_t* us = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+    if ( !us )
+        return NULL;
+
+    us->length = length * 2;
+    us->contents = (uint8_t*)g_malloc0(sizeof(uint8_t) * (length * 2 + 2));
+
+    if ( !us->contents )
+    {
+        vmi_free_unicode_str(us);
+        return NULL;
+    }
+
+    if ( VMI_FAILURE == vmi_read(vmi, ctx, us->length, us->contents, NULL) )
+    {
+        vmi_free_unicode_str(us);
+        return NULL;
+    }
+
+    // end with NUL symbol
+    us->contents[us->length] = 0;
+    us->contents[us->length + 1] = 0;
+    us->encoding = "UTF-16";
+
+    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+
+    if ( !out )
+    {
+        vmi_free_unicode_str(us);
+        return NULL;
+    }
+
+    status_t rc = vmi_convert_str_encoding(us, out, "UTF-8");
+    vmi_free_unicode_str(us);
+
+    if (VMI_SUCCESS != rc)
+    {
+        g_free(out);
+        return NULL;
+    }
+
+    return out;
+}
+
+static unicode_string_t* get_filename_from_handle(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    vmi_instance_t vmi,
+    access_context_t* ctx,
+    addr_t handle)
+{
+    filetracer* f = (filetracer*)info->trap->data;
+    addr_t process=drakvuf_get_current_process(drakvuf, info->vcpu);
+
+    if (!process)
+        return NULL;
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
+    if ( !obj )
+        return NULL;
+
+    ctx->addr = obj + f->object_header_body + f->file_object_filename;
+    return read_unicode(vmi, ctx);
+}
+
+static void safe_free_unicode_str(unicode_string_t* us)
+{
+    if (us) vmi_free_unicode_str(us);
+}
+
 static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
 {
+    if ( !attr )
+        return 0;
+
+    const char* syscall_name = info->trap->name;
     filetracer* f = (filetracer*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -131,50 +232,145 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    if ( !attr )
+    addr_t file_root_handle = 0;
+    ctx.addr = attr + f->objattr_root;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &file_root_handle) )
     {
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
+
+    unicode_string_t* file_root_us = get_filename_from_handle(drakvuf, info, vmi, &ctx, file_root_handle);
 
     ctx.addr = attr + f->objattr_name;
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
     {
+        safe_free_unicode_str(file_root_us);
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
 
-    unicode_string_t* us = vmi_read_unicode_str(vmi, &ctx);
-    if ( !us )
+    unicode_string_t* file_name_us = read_unicode(vmi, &ctx);
+    if ( !file_name_us )
     {
+        safe_free_unicode_str(file_root_us);
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
 
-    unicode_string_t str2 = { .contents = NULL };
+    const char* file_root = file_root_us ? (const char*)file_root_us->contents : "";
+    const char* file_name = file_name_us ? (const char*)file_name_us->contents : "";
+    const char* file_sep = file_root_us ? "\\" : "";
 
-    if (VMI_SUCCESS == vmi_convert_str_encoding(us, &str2, "UTF-8"))
+    switch (f->format)
     {
-        switch (f->format)
-        {
-            case OUTPUT_CSV:
-                printf("filetracer,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s\n",
-                       info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, str2.contents);
-                break;
-            default:
-            case OUTPUT_DEFAULT:
-                printf("[FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s\n",
-                       info->vcpu, info->regs->cr3, info->proc_data.name,
-                       USERIDSTR(drakvuf), info->proc_data.userid, str2.contents);
-                break;
-        };
+        case OUTPUT_CSV:
+            printf("filetracer,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%s%s%s\n",
+                   info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, file_root, file_sep, file_name);
+            break;
 
-        g_free(str2.contents);
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s,%s%s%s\n",
+                   info->vcpu, info->regs->cr3, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, file_root, file_sep, file_name);
+            break;
     }
 
-    vmi_free_unicode_str(us);
+    safe_free_unicode_str(file_name_us);
+    safe_free_unicode_str(file_root_us);
     drakvuf_release_vmi(drakvuf);
     return 0;
+}
+
+static bool is_absolute_path(char const* file_name)
+{
+    // TODO: need more strong way determing that the @file_name is absolute path.
+    return file_name && file_name[0] == '\\';
+}
+
+static char* get_parent_folder(char const* file_name)
+{
+    // TODO: need more strong way getting parent folder for @file_name.
+    if (file_name)
+    {
+        char* end = g_strrstr(file_name, "\\");
+        if (end && end != file_name)
+            return g_strndup(file_name, end - file_name);
+    }
+    return g_strdup("\\");
+}
+
+
+static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t src_file_handle, addr_t fileinfo)
+{
+    filetracer* f = (filetracer*)info->trap->data;
+    const char* syscall_name = info->trap->name;
+    const char* operation_name = "FileRenameInformation";
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    addr_t dst_file_root_handle = 0;
+    ctx.addr = fileinfo + f->newfile_root_offset;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &dst_file_root_handle) )
+        return;
+
+    uint32_t dst_file_name_length = 0;
+    ctx.addr = fileinfo + f->newfile_name_length_offset;
+    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &dst_file_name_length) )
+        return;
+
+    ctx.addr = fileinfo + f->newfile_name_offset;
+    unicode_string_t* dst_file_name_us = read_wchar_array(vmi, &ctx, dst_file_name_length);
+    if ( !dst_file_name_us )
+        return;
+
+    unicode_string_t* src_file_us = get_filename_from_handle(drakvuf, info, vmi, &ctx, src_file_handle);
+    if ( !src_file_us )
+    {
+        vmi_free_unicode_str(dst_file_name_us);
+        return;
+    }
+
+    char* dst_file_p = NULL;
+    if (dst_file_root_handle)
+    {
+        unicode_string_t* dst_file_root_us = get_filename_from_handle(drakvuf, info, vmi, &ctx, dst_file_root_handle);
+        dst_file_p = g_strdup_printf("%s\\%s", dst_file_root_us->contents, dst_file_name_us->contents);
+        vmi_free_unicode_str(dst_file_root_us);
+    }
+    else if (is_absolute_path(reinterpret_cast<char*>(dst_file_name_us->contents)))
+    {
+        dst_file_p = g_strdup(reinterpret_cast<char*>(dst_file_name_us->contents));
+    }
+    else
+    {
+        char* dst_file_root_p = get_parent_folder(reinterpret_cast<char*>(src_file_us->contents));
+        dst_file_p = g_strdup_printf("%s\\%s", dst_file_root_p, dst_file_name_us->contents);
+        g_free(dst_file_root_p);
+    }
+    vmi_free_unicode_str(dst_file_name_us);
+
+    switch (f->format)
+    {
+        case OUTPUT_CSV:
+            printf("filetracer,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%s,%s,%s\n",
+                   info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
+                   syscall_name, operation_name, src_file_us->contents, dst_file_p);
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64 " %s,%s,%s,%s\n",
+                   info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
+                   syscall_name, operation_name, src_file_us->contents, dst_file_p);
+            break;
+    }
+
+    g_free(dst_file_p);
+    vmi_free_unicode_str(src_file_us);
 }
 
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -215,44 +411,105 @@ static event_response_t cb2(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
+#define FILE_RENAME_INFORMATION 10
+
+static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    filetracer* f = (filetracer*)info->trap->data;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    uint32_t fileinfoclass = 0;
+    reg_t handle = 0, fileinfo = 0;
+
+    if (f->pm == VMI_PM_IA32E)
+    {
+        handle = info->regs->rcx;
+        fileinfo = info->regs->r8;
+
+        ctx.addr = info->regs->rsp + 5 * sizeof(addr_t); // addr of fileinfoclass
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &fileinfoclass) )
+            goto done;
+    }
+    else
+    {
+        ctx.addr = info->regs->rsp + sizeof(uint32_t);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*) &handle) )
+            goto done;
+        ctx.addr += 2 * sizeof(uint32_t);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*) &fileinfo) )
+            goto done;
+        ctx.addr += 2 * sizeof(uint32_t);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &fileinfoclass) )
+            goto done;
+    }
+
+    if (fileinfoclass == FILE_RENAME_INFORMATION)
+    {
+        print_rename_file_info(vmi, drakvuf, info, handle, fileinfo);
+    }
+
+done:
+    drakvuf_release_vmi(drakvuf);
+    return 0;
+}
+
 /* ----------------------------------------------------- */
+
+static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
+                           drakvuf_trap_t* trap,
+                           event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
+{
+    if ( !drakvuf_get_function_rva( rekall_profile, syscall_name, &trap->breakpoint.rva) ) throw -1;
+
+    trap->name = syscall_name;
+    trap->cb   = hook_cb;
+
+    if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
+}
 
 filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
     const char* rekall_profile = (const char*)config;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->pm = vmi_get_page_mode(vmi, 0);
+    int addr_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
     drakvuf_release_vmi(drakvuf);
     this->format = output;
 
-    unsigned long i;
-    for (i=0; i < 6; i++)
-        this->trap[i].cb = cb;
-    for (i=6; i < 8; i++)
-        this->trap[i].cb = cb2;
-
     if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
         throw -1;
-    if ( !drakvuf_get_function_rva(rekall_profile, "NtCreateFile", &this->trap[0].breakpoint.rva) )
+    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
         throw -1;
-    if ( !drakvuf_get_function_rva(rekall_profile, "ZwCreateFile", &this->trap[1].breakpoint.rva) )
+//    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_RENAME_INFORMATION", "RootDirectory", &this->newfile_root_offset ) )
+//        throw -1;
+    this->newfile_root_offset = addr_size;
+//    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_RENAME_INFORMATION", "FileName", &this->newfile_name_offset ) )
+//        throw -1;
+    this->newfile_name_offset = addr_size * 2 + 4;
+//    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_RENAME_INFORMATION", "FileNameLength", &this->newfile_name_length_offset ) )
+//        throw -1;
+    this->newfile_name_length_offset = addr_size * 2;
+
+    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "Body", &this->object_header_body) )
         throw -1;
-    if ( !drakvuf_get_function_rva(rekall_profile, "NtOpenFile", &this->trap[2].breakpoint.rva) )
-        throw -1;
-    if ( !drakvuf_get_function_rva(rekall_profile, "ZwOpenFile", &this->trap[3].breakpoint.rva) )
-        throw -1;
-    if ( !drakvuf_get_function_rva(rekall_profile, "NtOpenDirectoryObject", &this->trap[4].breakpoint.rva) )
-        throw -1;
-    if ( !drakvuf_get_function_rva(rekall_profile, "ZwOpenDirectoryObject", &this->trap[5].breakpoint.rva) )
-        throw -1;
-    if ( !drakvuf_get_function_rva(rekall_profile, "NtQueryAttributesFile", &this->trap[6].breakpoint.rva) )
-        throw -1;
-    if ( !drakvuf_get_function_rva(rekall_profile, "ZwQueryAttributesFile", &this->trap[7].breakpoint.rva) )
+    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_OBJECT", "FileName", &this->file_object_filename) )
         throw -1;
 
-    for (i=0; i < sizeof(this->trap)/sizeof(drakvuf_trap_t); i++)
-        if ( !drakvuf_add_trap(drakvuf, &this->trap[i]) )
-            throw -1;
+    assert(sizeof(trap)/sizeof(trap[0]) > 9);
+    register_trap(drakvuf, rekall_profile, "NtCreateFile",          &trap[0], cb);
+    register_trap(drakvuf, rekall_profile, "ZwCreateFile",          &trap[1], cb);
+    register_trap(drakvuf, rekall_profile, "NtOpenFile",            &trap[2], cb);
+    register_trap(drakvuf, rekall_profile, "ZwOpenFile",            &trap[3], cb);
+    register_trap(drakvuf, rekall_profile, "NtOpenDirectoryObject", &trap[4], cb);
+    register_trap(drakvuf, rekall_profile, "ZwOpenDirectoryObject", &trap[5], cb);
+    register_trap(drakvuf, rekall_profile, "NtQueryAttributesFile", &trap[6], cb2);
+    register_trap(drakvuf, rekall_profile, "ZwQueryAttributesFile", &trap[7], cb2);
+    register_trap(drakvuf, rekall_profile, "NtSetInformationFile",  &trap[8], setinformation_cb);
+    register_trap(drakvuf, rekall_profile, "ZwSetInformationFile",  &trap[9], setinformation_cb);
 }
 
 filetracer::~filetracer()
