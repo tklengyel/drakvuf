@@ -122,6 +122,11 @@ struct socketmon_config
     const char* rekall_profile;
     const char* tcpip_profile;
 };
+struct syscalls_config
+{
+    const char* rekall_profile;
+    const char* syscalls_filter_file;
+};
 
 /***************************************************************************/
 
