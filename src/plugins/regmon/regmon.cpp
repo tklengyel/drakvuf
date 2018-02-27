@@ -277,8 +277,8 @@ regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 
     assert(sizeof(traps) / sizeof(traps[0]) > 13);
     register_trap(drakvuf, rekall_profile, "NtDeleteKey",            &traps[0], log_reg_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtSetValueKey",          &traps[1], log_reg_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtDeleteValueKey",       &traps[2], log_reg_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtSetValueKey",          &traps[1], log_reg_value_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtDeleteValueKey",       &traps[2], log_reg_value_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtCreateKey",            &traps[3], log_reg_objattr_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtCreateKeyTransacted",  &traps[4], log_reg_objattr_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtEnumerateKey",         &traps[5], log_reg_hook_cb);
