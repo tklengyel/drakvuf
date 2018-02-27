@@ -132,38 +132,12 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
-static unicode_string_t* read_unicode(vmi_instance_t vmi, access_context_t* ctx)
-{
-    unicode_string_t* us = vmi_read_unicode_str(vmi, ctx);
-    if ( !us )
-        return NULL;
-
-    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
-
-    if ( !out )
-    {
-        vmi_free_unicode_str(us);
-        return NULL;
-    }
-
-    status_t rc = vmi_convert_str_encoding(us, out, "UTF-8");
-    vmi_free_unicode_str(us);
-
-    if (VMI_SUCCESS == rc)
-        return out;
-
-    g_free(out);
-    return NULL;
-}
-
 static unicode_string_t* get_filename_from_handle(syscalls* s,
         drakvuf_t drakvuf,
         drakvuf_trap_info_t* info,
-        vmi_instance_t vmi,
-        access_context_t* ctx,
         addr_t handle)
 {
-    addr_t process=drakvuf_get_current_process(drakvuf, info->vcpu);
+    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
 
     if (!process)
         return NULL;
@@ -172,8 +146,7 @@ static unicode_string_t* get_filename_from_handle(syscalls* s,
     if ( !obj )
         return NULL;
 
-    ctx->addr = obj + s->object_header_body + s->file_object_filename;
-    return read_unicode(vmi, ctx);
+    return drakvuf_read_unicode(drakvuf, info, obj + s->object_header_body + s->file_object_filename);
 }
 
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -271,8 +244,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     {
                         if ( wsc->args[i].type == PUNICODE_STRING)
                         {
-                            ctx.addr = val;
-                            unicode_string_t* us = read_unicode(vmi, &ctx);
+                            unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
 
                             if ( us )
                             {
@@ -283,7 +255,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
                         if ( !strcmp(wsc->args[i].name, "FileHandle") )
                         {
-                            unicode_string_t* us = get_filename_from_handle(s, drakvuf, info, vmi, &ctx, val);
+                            unicode_string_t* us = get_filename_from_handle(s, drakvuf, info, val);
 
                             if ( us )
                             {
@@ -330,8 +302,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     {
                         if ( wsc->args[i].type == PUNICODE_STRING)
                         {
-                            ctx.addr = val;
-                            unicode_string_t* us = read_unicode(vmi, &ctx);
+                            unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
 
                             if ( us )
                             {
@@ -342,7 +313,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
                         if ( !strcmp(wsc->args[i].name, "FileHandle") )
                         {
-                            unicode_string_t* us = get_filename_from_handle(s, drakvuf, info, vmi, &ctx, val);
+                            unicode_string_t* us = get_filename_from_handle(s, drakvuf, info, val);
 
                             if ( us )
                             {
