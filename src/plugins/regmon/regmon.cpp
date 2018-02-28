@@ -112,12 +112,17 @@
 #include "regmon.h"
 
 
-static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr )
+static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                                      addr_t key_handle_addr,
+                                      addr_t value_name_addr, bool with_value_name )
 {
-    if ( attr )
+    if ( key_handle_addr )
     {
         const char* syscall_name = info->trap->name;
-        char* key_path = drakvuf_reg_keyhandle_path( drakvuf, info, attr, 0 );
+        char* key_path = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle_addr, 0 );
+
+        unicode_string_t* value_name_us = drakvuf_read_unicode( drakvuf, info, value_name_addr );
+        char const* value_name = (value_name_us && value_name_us->length > 0) ? reinterpret_cast<char const*>(value_name_us->contents) : "(Default)";
 
         if ( key_path )
         {
@@ -126,20 +131,28 @@ static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* in
             switch ( reg->format )
             {
                 case OUTPUT_CSV:
-                    printf("regmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%s\n",
+                    printf("regmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%s",
                            info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, key_path );
+                    if (with_value_name)
+                        printf(",%s", value_name);
+                    printf("\n");
                     break;
 
                 default:
                 case OUTPUT_DEFAULT:
-                    printf("[REGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64 ", PID:%d, PPID:%d, %s %s:%" PRIi64 " %s:%s\n",
+                    printf("[REGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64 ", PID:%d, PPID:%d, %s %s:%" PRIi64 " %s:%s",
                            info->vcpu, info->regs->cr3, info->proc_data.base_addr, info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                            USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, key_path );
+                    if (with_value_name)
+                        printf(",%s", value_name);
+                    printf("\n");
                     break;
             }
-
-            g_free( key_path );
         }
+
+        if (value_name_us) vmi_free_unicode_str(value_name_us);
+        g_free( key_path );
+
     }
 
     return 0;
@@ -147,7 +160,7 @@ static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* in
 
 static event_response_t log_reg_hook_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
-    return log_reg_hook( drakvuf, info, info->regs->rcx );
+    return log_reg_hook( drakvuf, info, info->regs->rcx, 0L, false );
 }
 
 static event_response_t log_reg_objattr_hook(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
@@ -228,6 +241,11 @@ static event_response_t log_reg_objattr_hook_cb( drakvuf_t drakvuf, drakvuf_trap
     return log_reg_objattr_hook( drakvuf, info, info->regs->r8 );
 }
 
+static event_response_t log_reg_value_hook_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    return log_reg_hook( drakvuf, info, info->regs->rcx, info->regs->rdx, true );
+}
+
 static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
                            drakvuf_trap_t* trap,
                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
@@ -257,10 +275,10 @@ regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
         throw -1;
 
-    assert(sizeof(traps) / sizeof(traps[0]) > 12);
+    assert(sizeof(traps) / sizeof(traps[0]) > 13);
     register_trap(drakvuf, rekall_profile, "NtDeleteKey",            &traps[0], log_reg_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtSetValueKey",          &traps[1], log_reg_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtDeleteValueKey",       &traps[2], log_reg_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtSetValueKey",          &traps[1], log_reg_value_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtDeleteValueKey",       &traps[2], log_reg_value_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtCreateKey",            &traps[3], log_reg_objattr_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtCreateKeyTransacted",  &traps[4], log_reg_objattr_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtEnumerateKey",         &traps[5], log_reg_hook_cb);
@@ -271,6 +289,7 @@ regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     register_trap(drakvuf, rekall_profile, "NtOpenKeyTransactedEx",  &traps[10], log_reg_objattr_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtQueryKey",             &traps[11], log_reg_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtQueryMultipleValueKey",&traps[12], log_reg_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtQueryValueKey",        &traps[13], log_reg_value_hook_cb);
 }
 
 regmon::~regmon(void) {}
