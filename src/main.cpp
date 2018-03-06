@@ -147,6 +147,7 @@ int main(int argc, char** argv)
     bool cpuid_stealth = 0;
     bool leave_paused = 0;
     char const* syscalls_filter_file = NULL;
+    bool dump_modified_files = false;
 
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
 
@@ -173,6 +174,7 @@ int main(int argc, char** argv)
                 "\t -w <process name>         Wait with plugin start until process name is detected\n"
 #ifdef ENABLE_PLUGIN_FILEDELETE
                 "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
+                "\t -M                        Dump new or modified files also (requires -D)\n"
 #endif
 #ifdef ENABLE_PLUGIN_SOCKETMON
                 "\t -T <rekall profile>       The Rekall profile for tcpip.sys\n"
@@ -190,7 +192,7 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:M")) != -1)
         switch (c)
         {
             case 'r':
@@ -246,6 +248,9 @@ int main(int argc, char** argv)
 #endif
             case 'S':
                 syscalls_filter_file = optarg;
+                break;
+            case 'M':
+                dump_modified_files = true;
                 break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
@@ -303,7 +308,7 @@ int main(int argc, char** argv)
 
     PRINT_DEBUG("Starting plugins\n");
 
-    if ( drakvuf->start_plugins(plugin_list, dump_folder, cpuid_stealth, tcpip, syscalls_filter_file) < 0 )
+    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, cpuid_stealth, tcpip, syscalls_filter_file) < 0 )
         goto exit;
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");
