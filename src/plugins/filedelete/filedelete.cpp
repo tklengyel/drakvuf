@@ -155,10 +155,10 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
 };
 
-static void save_file_metadata(filedelete* f, addr_t control_area, const unicode_string_t* filename)
+static void save_file_metadata(filedelete* f, int curr_sequence_number, addr_t control_area, const unicode_string_t* filename)
 {
     char* file = NULL;
-    if ( asprintf(&file, "%s/file.0x%lx.metadata", f->dump_folder, control_area) < 0 )
+    if ( asprintf(&file, "%s/file.%d.0x%lx.metadata", f->dump_folder, curr_sequence_number, control_area) < 0 )
         return;
 
     FILE* fp = fopen(file, "w");
@@ -167,6 +167,7 @@ static void save_file_metadata(filedelete* f, addr_t control_area, const unicode
 
     if (filename)
         fprintf(fp, "FileName: \"%s\"\n", filename->contents);
+    fprintf(fp, "SequenceNumber: %d\n", curr_sequence_number);
 
     fclose(fp);
     free(file);
@@ -197,8 +198,11 @@ static void extract_ca_file(filedelete* f, drakvuf_t drakvuf, vmi_instance_t vmi
     if ( test != (test2 * 4096) )
         return;
 
+    static int sequence_number = 0;
+    const int curr_sequence_number = ++sequence_number;
+
     char* file = NULL;
-    if ( asprintf(&file, "%s/file.0x%lx.mm", f->dump_folder, control_area) < 0 )
+    if ( asprintf(&file, "%s/file.%d.0x%lx.mm", f->dump_folder, curr_sequence_number, control_area) < 0 )
         return;
 
     FILE* fp = fopen(file, "w");
@@ -264,7 +268,7 @@ static void extract_ca_file(filedelete* f, drakvuf_t drakvuf, vmi_instance_t vmi
     fclose(fp);
     free(file);
 
-    save_file_metadata(f, control_area, filename);
+    save_file_metadata(f, curr_sequence_number, control_area, filename);
 }
 
 static void extract_file(filedelete* f,
