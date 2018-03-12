@@ -170,6 +170,7 @@ public:
     int inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, injection_method_t method);
     int start_plugins(const bool* plugin_list,
                       const char* dump_folder,
+                      bool dump_modified_files,
                       bool cpuid_stealth,
                       const char* tcpip_profile,
                       const char* syscalls_filter_file);
