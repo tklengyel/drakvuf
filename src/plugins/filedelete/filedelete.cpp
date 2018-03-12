@@ -155,25 +155,42 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
 };
 
-static void save_file_metadata(filedelete* f, int curr_sequence_number, addr_t control_area, const unicode_string_t* filename)
+static void save_file_metadata(filedelete* f,
+                               const drakvuf_trap_info_t* info,
+                               int sequence_number,
+                               addr_t control_area,
+                               const unicode_string_t* filename)
 {
     char* file = NULL;
-    if ( asprintf(&file, "%s/file.%d.0x%lx.metadata", f->dump_folder, curr_sequence_number, control_area) < 0 )
+    if ( asprintf(&file, "%s/file.%06d.metadata", f->dump_folder, sequence_number) < 0 )
         return;
 
     FILE* fp = fopen(file, "w");
     if (!fp)
+    {
+        free(file);
         return;
+    }
 
     if (filename)
         fprintf(fp, "FileName: \"%s\"\n", filename->contents);
-    fprintf(fp, "SequenceNumber: %d\n", curr_sequence_number);
+    fprintf(fp, "SequenceNumber: %d\n", sequence_number);
+    fprintf(fp, "ControlArea: 0x%lx\n", control_area);
+    fprintf(fp, "PID: %" PRIu64 "\n", static_cast<uint64_t>(info->proc_data.pid));
+    fprintf(fp, "PPID: %" PRIu64 "\n", static_cast<uint64_t>(info->proc_data.ppid));
+    fprintf(fp, "ProcessName: \"%s\"\n", info->proc_data.name);
 
     fclose(fp);
     free(file);
 }
 
-static void extract_ca_file(filedelete* f, drakvuf_t drakvuf, vmi_instance_t vmi, addr_t control_area, access_context_t* ctx, const unicode_string_t* filename)
+static void extract_ca_file(filedelete* f,
+                            drakvuf_t drakvuf,
+                            const drakvuf_trap_info_t* info,
+                            vmi_instance_t vmi,
+                            addr_t control_area,
+                            access_context_t* ctx,
+                            const unicode_string_t* filename)
 {
     addr_t subsection = control_area + f->control_area_size;
     addr_t segment = 0, test = 0, test2 = 0;
@@ -198,11 +215,10 @@ static void extract_ca_file(filedelete* f, drakvuf_t drakvuf, vmi_instance_t vmi
     if ( test != (test2 * 4096) )
         return;
 
-    static int sequence_number = 0;
-    const int curr_sequence_number = ++sequence_number;
+    const int curr_sequence_number = ++f->sequence_number;
 
     char* file = NULL;
-    if ( asprintf(&file, "%s/file.%d.0x%lx.mm", f->dump_folder, curr_sequence_number, control_area) < 0 )
+    if ( asprintf(&file, "%s/file.%06d.mm", f->dump_folder, curr_sequence_number) < 0 )
         return;
 
     FILE* fp = fopen(file, "w");
@@ -268,11 +284,12 @@ static void extract_ca_file(filedelete* f, drakvuf_t drakvuf, vmi_instance_t vmi
     fclose(fp);
     free(file);
 
-    save_file_metadata(f, curr_sequence_number, control_area, filename);
+    save_file_metadata(f, info, curr_sequence_number, control_area, filename);
 }
 
 static void extract_file(filedelete* f,
                          drakvuf_t drakvuf,
+                         const drakvuf_trap_info_t* info,
                          vmi_instance_t vmi,
                          addr_t file_pa,
                          access_context_t* ctx,
@@ -290,7 +307,7 @@ static void extract_file(filedelete* f,
         return;
 
     if ( datasection )
-        extract_ca_file(f, drakvuf, vmi, datasection, ctx, filename);
+        extract_ca_file(f, drakvuf, info, vmi, datasection, ctx, filename);
 
     ctx->addr = sop + f->offsets[SECTIONOBJECTPOINTER_SHAREDCACHEMAP];
     if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &sharedcachemap) )
@@ -303,7 +320,7 @@ static void extract_file(filedelete* f,
         return;
 
     if ( imagesection != datasection )
-        extract_ca_file(f, drakvuf, vmi, imagesection, ctx, filename);
+        extract_ca_file(f, drakvuf, info, vmi, imagesection, ctx, filename);
 }
 
 /*
@@ -369,7 +386,7 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
         }
 
         if (f->dump_folder)
-            extract_file(f, drakvuf, vmi, file, &ctx, filename_us);
+            extract_file(f, drakvuf, info, vmi, file, &ctx, filename_us);
 
         vmi_free_unicode_str(filename_us);
     }
@@ -439,8 +456,6 @@ done:
     return 0;
 }
 
-static std::set<uint64_t> g_ChangedFileHandles;
-
 static event_response_t writefile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     filedelete* f = (filedelete*)info->trap->data;
@@ -462,7 +477,7 @@ static event_response_t writefile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             goto done;
     }
 
-    g_ChangedFileHandles.insert(handle);
+    f->changed_file_handles.insert(std::make_pair(info->proc_data.pid, handle));
 
 done:
     drakvuf_release_vmi(drakvuf);
@@ -490,7 +505,7 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             goto done;
     }
 
-    if (g_ChangedFileHandles.erase(handle) > 0)
+    if (f->changed_file_handles.erase(std::make_pair(info->proc_data.pid, handle)) > 0)
     {
         // We detect the fact of closing of the previously modified file.
         grab_file_by_handle(f, drakvuf, vmi, info, handle);
@@ -514,6 +529,7 @@ static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const 
 }
 
 filedelete::filedelete(drakvuf_t drakvuf, const void* config, output_format_t output)
+    : sequence_number()
 {
     const struct filedelete_config* c = (const struct filedelete_config*)config;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -528,8 +544,8 @@ filedelete::filedelete(drakvuf_t drakvuf, const void* config, output_format_t ou
     register_trap(drakvuf, c->rekall_profile, "NtSetInformationFile", &traps[0], setinformation);
     if (c->dump_modified_files)
     {
-        register_trap(drakvuf, c->rekall_profile, "NtWriteFile",          &traps[1], writefile_cb);
-        register_trap(drakvuf, c->rekall_profile, "NtClose",              &traps[2], close_cb);
+        register_trap(drakvuf, c->rekall_profile, "NtWriteFile",      &traps[1], writefile_cb);
+        register_trap(drakvuf, c->rekall_profile, "NtClose",          &traps[2], close_cb);
     }
     /* TODO
     register_trap(drakvuf, c->rekall_profile, "NtDeleteFile",            &traps[3], deletefile_cb);
