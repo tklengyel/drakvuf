@@ -114,6 +114,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [EPROCESS_PID] = { "_EPROCESS", "UniqueProcessId" },
     [EPROCESS_PDBASE] = { "_KPROCESS", "DirectoryTableBase" },
     [EPROCESS_PNAME] = { "_EPROCESS", "ImageFileName" },
+    [EPROCESS_PROCCREATIONINFO] = { "_EPROCESS", "SeAuditProcessCreationInfo" },
     [EPROCESS_TASKS] = { "_EPROCESS", "ActiveProcessLinks" },
     [EPROCESS_PEB] = { "_EPROCESS", "Peb" },
     [EPROCESS_OBJECTTABLE] = {"_EPROCESS", "ObjectTable" },
@@ -150,6 +151,10 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [CM_KEY_NAMELENGTH]    = { "_CM_NAME_CONTROL_BLOCK", "NameLength"      },
     [CM_KEY_PARENTKCB]     = { "_CM_KEY_CONTROL_BLOCK",  "ParentKcb"       },
     [CM_KEY_PROCESSID]     = { "_CM_KEY_BODY",           "ProcessID"       },
+
+    [PROCCREATIONINFO_IMAGEFILENAME] = { "_SE_AUDIT_PROCESS_CREATION_INFO", "ImageFileName" },
+    [OBJECTNAMEINFORMATION_NAME] = { "_OBJECT_NAME_INFORMATION", "Name" },
+
 };
 
 #endif
