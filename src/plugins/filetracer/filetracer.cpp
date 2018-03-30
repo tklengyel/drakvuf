@@ -232,8 +232,8 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     }
 
     const char* file_root = file_root_us ? (const char*)file_root_us->contents : "";
-    const char* file_name = file_name_us ? (const char*)file_name_us->contents : "";
     const char* file_sep = file_root_us ? "\\" : "";
+    const char* file_name = (const char*)file_name_us->contents;
 
     switch (f->format)
     {
