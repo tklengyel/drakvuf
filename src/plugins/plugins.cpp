@@ -115,6 +115,7 @@
 #include "cpuidmon/cpuidmon.h"
 #include "socketmon/socketmon.h"
 #include "regmon/regmon.h"
+#include "procmon/procmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output, os_t os)
 {
@@ -201,9 +202,14 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     this->plugins[plugin_id] = new regmon(this->drakvuf, config, this->output);
                     break;
 #endif
+#ifdef ENABLE_PLUGIN_PROCMON
+                case PLUGIN_PROCMON:
+                    this->plugins[plugin_id] = new procmon(this->drakvuf, config, this->output);
+                    break;
+#endif
                 default:
                     break;
-            };
+            }
         }
         catch (int e)
         {
