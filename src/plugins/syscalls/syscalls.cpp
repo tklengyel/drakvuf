@@ -117,12 +117,12 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     switch (s->format)
     {
         case OUTPUT_CSV:
-            printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s\n",
+            printf("syscall,%" PRIu32" 0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s\n",
                    info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->breakpoint.module, info->trap->name);
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[SYSCALL] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" %s!%s\n",
+            printf("[SYSCALL] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" %s!%s\n",
                    info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    info->trap->breakpoint.module, info->trap->name);
@@ -217,7 +217,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     switch (s->format)
     {
         case OUTPUT_CSV:
-            printf("syscall,%" PRIu32" 0x%" PRIx64 ",%s,%" PRIi64 ",%s,%s",
+            printf("syscall,%" PRIu32" 0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s",
                    info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->breakpoint.module, info->trap->name);
 
             if ( nargs )
@@ -273,7 +273,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[SYSCALL] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" %s!%s",
+            printf("[SYSCALL] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" %s!%s",
                    info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    info->trap->breakpoint.module, info->trap->name);

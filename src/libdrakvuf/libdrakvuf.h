@@ -378,6 +378,8 @@ bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
 
 unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr);
 
+unicode_string_t* drakvuf_read_unicode_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid);
+
 bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
                                    addr_t module_list_head,
                                    const char* module_name,
