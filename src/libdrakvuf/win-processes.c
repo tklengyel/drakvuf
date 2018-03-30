@@ -153,8 +153,39 @@ addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
     return process;
 }
 
+static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t eprocess_base)
+{
+    addr_t image_file_name_addr;
+    if ( vmi_read_addr_va(drakvuf->vmi,
+                          eprocess_base + drakvuf->offsets[EPROCESS_PROCCREATIONINFO] + drakvuf->offsets[PROCCREATIONINFO_IMAGEFILENAME],
+                          0, &image_file_name_addr) != VMI_SUCCESS )
+    {
+#ifdef DRAKVUF_DEBUG
+        PRINT_DEBUG("in win_get_process_full_name(...) couldn't read IMAGEFILENAME address\n");
+#endif
+        return NULL;
+    }
+
+    return drakvuf_read_unicode_va(drakvuf->vmi,
+                                   image_file_name_addr + drakvuf->offsets[OBJECTNAMEINFORMATION_NAME], 0);
+}
+
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base)
 {
+    unicode_string_t* fullname = win_get_process_full_name( drakvuf, eprocess_base );
+
+    if (fullname && fullname->contents && strlen((const char*)fullname->contents) > 0)
+    {
+        // Replace 'proc_data->name' with 'fullname->contents'
+        // Moving ownership of fullname->contents to name for later cleanup
+        char* name = (char*)fullname->contents;
+        g_free( (gpointer)fullname );
+        return name;
+    }
+
+    if (fullname)
+        vmi_free_unicode_str(fullname);
+
     return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
 }
 

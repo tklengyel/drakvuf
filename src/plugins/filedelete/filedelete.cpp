@@ -374,12 +374,12 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
         switch (f->format)
         {
             case OUTPUT_CSV:
-                printf("filedelete,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64 ",\"%s\"\n",
+                printf("filedelete,%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\"\n",
                        info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, filename_us->contents);
                 break;
             default:
             case OUTPUT_DEFAULT:
-                printf("[FILEDELETE] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",%s %s:%" PRIi64" \"%s\"\n",
+                printf("[FILEDELETE] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\"\n",
                        info->vcpu, info->regs->cr3, info->proc_data.name,
                        USERIDSTR(drakvuf), info->proc_data.userid, filename_us->contents);
                 break;
