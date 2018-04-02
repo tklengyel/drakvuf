@@ -369,18 +369,19 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
 
     unicode_string_t* filename_us = drakvuf_read_unicode(drakvuf, info, filename);
 
+    timeval t = get_time();
     if (filename_us)
     {
         switch (f->format)
         {
             case OUTPUT_CSV:
-                printf("filedelete,%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\"\n",
-                       info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, filename_us->contents);
+                printf("[" FORMAT_TIMEVAL "] filedelete,%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\"\n",
+                       UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, filename_us->contents);
                 break;
             default:
             case OUTPUT_DEFAULT:
-                printf("[FILEDELETE] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\"\n",
-                       info->vcpu, info->regs->cr3, info->proc_data.name,
+                printf("[" FORMAT_TIMEVAL "][FILEDELETE] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\"\n",
+                       UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
                        USERIDSTR(drakvuf), info->proc_data.userid, filename_us->contents);
                 break;
         }

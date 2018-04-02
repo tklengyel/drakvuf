@@ -143,18 +143,19 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     debugmon* s = (debugmon*)info->trap->data;
 
+    timeval t = get_time();
     switch (s->format)
     {
         case OUTPUT_CSV:
-            printf("debugmon,%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%" PRIx64 ",%" PRIi32 ",%s\n",
-                   info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
+            printf("[" FORMAT_TIMEVAL "] debugmon,%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%" PRIx64 ",%" PRIi32 ",%s\n",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
                    info->regs->rip, info->debug->type, debug_type[info->debug->type]);
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[DEBUGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64". "
+            printf("[" FORMAT_TIMEVAL "][DEBUGMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64". "
                    "RIP: 0x%" PRIx64". Debug type: %" PRIi32 ",%s\n",
-                   info->vcpu, info->regs->cr3, info->proc_data.name,
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    info->regs->rip, info->debug->type, debug_type[info->debug->type]);
             break;

@@ -235,17 +235,18 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     const char* file_sep = file_root_us ? "\\" : "";
     const char* file_name = (const char*)file_name_us->contents;
 
+    timeval t = get_time();
     switch (f->format)
     {
         case OUTPUT_CSV:
-            printf("filetracer,%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s%s%s\n",
-                   info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, file_root, file_sep, file_name);
+            printf("[" FORMAT_TIMEVAL "] filetracer,%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s%s%s\n",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, file_root, file_sep, file_name);
             break;
 
         default:
         case OUTPUT_DEFAULT:
-            printf("[FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s%s%s\n",
-                   info->vcpu, info->regs->cr3, info->proc_data.name,
+            printf("[" FORMAT_TIMEVAL "][FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s%s%s\n",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, file_root, file_sep, file_name);
             break;
     }
@@ -326,18 +327,19 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     }
     vmi_free_unicode_str(dst_file_name_us);
 
+    timeval t = get_time();
     switch (f->format)
     {
         case OUTPUT_CSV:
-            printf("filetracer,%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,%s,%s\n",
-                   info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
+            printf("[" FORMAT_TIMEVAL "] filetracer,%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,%s,%s\n",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
                    syscall_name, operation_name, src_file_us->contents, dst_file_p);
             break;
 
         default:
         case OUTPUT_DEFAULT:
-            printf("[FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,%s,%s\n",
-                   info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
+            printf("[" FORMAT_TIMEVAL "][FILETRACER] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,%s,%s\n",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
                    syscall_name, operation_name, src_file_us->contents, dst_file_p);
             break;
     }

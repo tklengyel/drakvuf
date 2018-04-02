@@ -107,6 +107,8 @@
 
 #include <config.h>
 #include <stdlib.h>
+#include <inttypes.h>
+#include <sys/time.h>
 #include <libdrakvuf/libdrakvuf.h>
 
 /***************************************************************************/
@@ -180,7 +182,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_SSDTMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_DEBUGMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
     [PLUGIN_CPUIDMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_SOCKETMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_SOCKETMON]  = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_REGMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
@@ -203,6 +205,20 @@ public:
     ~drakvuf_plugins();
     int start(drakvuf_plugin_t plugin, const void* config);
 };
+
+/***************************************************************************/
+
+// Retrieves system time in seconds and microseconds.
+inline timeval get_time()
+{
+    struct timeval now{};
+    gettimeofday(&now, nullptr);
+    return now;
+}
+
+// Printf helpers for timeval.
+#define FORMAT_TIMEVAL "%" PRId64 ".%06" PRId64
+#define UNPACK_TIMEVAL(t) (t).tv_sec, (t).tv_usec
 
 /***************************************************************************/
 
