@@ -211,7 +211,7 @@ public:
 // Retrieves system time in seconds and microseconds.
 inline timeval get_time()
 {
-    struct timeval now{};
+    struct timeval now {};
     gettimeofday(&now, nullptr);
     return now;
 }
