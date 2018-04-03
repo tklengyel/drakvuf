@@ -263,7 +263,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 printf(user_format,pid,ppid,name);
                 free(name);
             }
-            else printf(user_format,0,"NOPROC");
+            else printf(user_format,0,0,"NOPROC");
         }
         else
         {
@@ -334,7 +334,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 printf(user_format,pid,ppid,name);
                 free(name);
             }
-            else printf(user_format,0,"NOPROC");
+            else printf(user_format,0,0,"NOPROC");
         }
         else
         {
