@@ -220,13 +220,13 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         switch (e->format)
         {
             case OUTPUT_CSV:
-                str_format="[" FORMAT_TIMEVAL "] " CSV_FORMAT32;
-                user_format="[" FORMAT_TIMEVAL "] " CSV_FORMAT_USER;
+                str_format=CSV_FORMAT32;
+                user_format=CSV_FORMAT_USER;
                 break;
             default:
             case OUTPUT_DEFAULT:
-                str_format="[" FORMAT_TIMEVAL "]" DEFAULT_FORMAT32;
-                user_format="[" FORMAT_TIMEVAL "]" DEFAULT_FORMAT_USER;
+                str_format=DEFAULT_FORMAT32;
+                user_format=DEFAULT_FORMAT_USER;
                 break;
         }
 
@@ -260,10 +260,10 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     goto done;
 
                 name = vmi_read_str_va(vmi, process + e->offsets[EPROCESS_NAME], 0);
-                printf(user_format,UNPACK_TIMEVAL(t),pid,ppid,name);
+                printf(user_format,pid,ppid,name);
                 free(name);
             }
-            else printf(user_format,UNPACK_TIMEVAL(t),0,"NOPROC");
+            else printf(user_format,0,"NOPROC");
         }
         else
         {
@@ -290,13 +290,13 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         switch (e->format)
         {
             case OUTPUT_CSV:
-                str_format="[" FORMAT_TIMEVAL "] " CSV_FORMAT64;
-                user_format="[" FORMAT_TIMEVAL "] " CSV_FORMAT_USER;
+                str_format=CSV_FORMAT64;
+                user_format=CSV_FORMAT_USER;
                 break;
             default:
             case OUTPUT_DEFAULT:
-                str_format="[" FORMAT_TIMEVAL "]" DEFAULT_FORMAT64;
-                user_format="[" FORMAT_TIMEVAL "]" DEFAULT_FORMAT_USER;
+                str_format=DEFAULT_FORMAT64;
+                user_format=DEFAULT_FORMAT_USER;
                 break;
         }
         printf(str_format, \
@@ -331,10 +331,10 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     goto done;
 
                 name = vmi_read_str_va(vmi, process + e->offsets[EPROCESS_NAME], 0);
-                printf(user_format,UNPACK_TIMEVAL(t),pid,ppid,name);
+                printf(user_format,pid,ppid,name);
                 free(name);
             }
-            else printf(user_format,UNPACK_TIMEVAL(t),0,"NOPROC");
+            else printf(user_format,0,"NOPROC");
         }
         else
         {
