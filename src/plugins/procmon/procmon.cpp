@@ -146,17 +146,20 @@ static event_response_t create_user_process_hook(drakvuf_t drakvuf, drakvuf_trap
     char const* cmdline = cmdline_us ? reinterpret_cast<char const*>(cmdline_us->contents) : "";
     char const* imagepath = imagepath_us ? reinterpret_cast<char const*>(imagepath_us->contents) : "";
 
+    timeval t = get_time();
     switch ( f->format )
     {
         case OUTPUT_CSV:
-            printf("procmon,%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%s,%s\n",
-                   info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, cmdline, imagepath);
+            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",%s,%" PRIi64",%s,%s,%s\n",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, syscall_name, cmdline, imagepath);
             break;
 
         default:
         case OUTPUT_DEFAULT:
-            printf("[PROCMON] VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64 ", PID:%d, PPID:%d, %s %s:%" PRIi64 " %s:%s:%s\n",
-                   info->vcpu, info->regs->cr3, info->proc_data.base_addr, info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+            printf("[PROCMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64 ", PID:%d, PPID:%d, %s %s:%" PRIi64 " %s:%s:%s\n",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.base_addr,
+                   info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, cmdline, imagepath);
             break;
     }
