@@ -216,6 +216,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code) )
             goto done;
 
+        timeval t = get_time();
         switch (e->format)
         {
             case OUTPUT_CSV:
@@ -230,6 +231,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
 
         printf(str_format, \
+               UNPACK_TIMEVAL(t),
                (uint32_t)info->regs->rsp,
                (uint32_t)exception_record,
                (uint32_t)exception_code,
@@ -261,7 +263,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 printf(user_format,pid,ppid,name);
                 free(name);
             }
-            else printf(user_format,0,"NOPROC");
+            else printf(user_format,0,0,"NOPROC");
         }
         else
         {
@@ -284,6 +286,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&first_chance) )
             goto done;
 
+        timeval t = get_time();
         switch (e->format)
         {
             case OUTPUT_CSV:
@@ -297,6 +300,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 break;
         }
         printf(str_format, \
+               UNPACK_TIMEVAL(t),
                info->regs->rcx, exception_code, first_chance & 1,
                *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RIP]),
                *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RAX]),
@@ -330,7 +334,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 printf(user_format,pid,ppid,name);
                 free(name);
             }
-            else printf(user_format,0,"NOPROC");
+            else printf(user_format,0,0,"NOPROC");
         }
         else
         {
