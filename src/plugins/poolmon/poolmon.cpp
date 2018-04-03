@@ -144,6 +144,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     reg_t pool_type, size;
     char tag[5] = { [0 ... 4] = '\0' };
     struct pooltag* s = NULL;
+    timeval t;
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -172,12 +173,13 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     s = (struct pooltag*)g_tree_lookup(p->pooltag_tree, tag);
 
+    t = get_time();
     switch (p->format)
     {
         case OUTPUT_CSV:
         {
-            printf("poolmon,%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s,%" PRIu64 "",
-                   info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, tag,
+            printf("poolmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s,%" PRIu64 "",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, tag,
                    pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
             if (s)
                 printf(",%s,%s", s->source, s->description);
@@ -185,13 +187,12 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
         default:
         case OUTPUT_DEFAULT:
-            printf("[POOLMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s (type: %s, size: %" PRIu64 ")",
-                   info->vcpu, info->regs->cr3, info->proc_data.name,
+            printf("[POOLMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s (type: %s, size: %" PRIu64 ")",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid, tag,
                    pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
             if (s)
                 printf(": %s,%s", s->source, s->description);
-
             break;
     };
 

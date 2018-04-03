@@ -170,19 +170,20 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     vmi_read_32(vmi, &ctx, &ckey.key);
 
+    timeval t = get_time();
     switch (o->format)
     {
         case OUTPUT_CSV:
         {
-            printf("objmon,%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%c%c%c%c",
-                   info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
+            printf("objmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%c%c%c%c",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
                    ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
             break;
         }
         default:
         case OUTPUT_DEFAULT:
-            printf("[OBJMON] vCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" '%c%c%c%c'",
-                   info->vcpu, info->regs->cr3, info->proc_data.name,
+            printf("[OBJMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" '%c%c%c%c'",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
             break;
