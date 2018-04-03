@@ -150,6 +150,10 @@ if PLUGIN_REGMON
 sources += regmon/regmon.cpp
 endif
 
+if PLUGIN_PROCMON
+sources += procmon/procmon.cpp
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h
 
