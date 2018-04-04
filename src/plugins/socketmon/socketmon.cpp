@@ -737,7 +737,7 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIMNE:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s State:%s Local:%s:%u Remote:%s:%u\n",
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s State:%s Local:%s:%u Remote:%s:%u\n",
                    UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3,
                    info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
                    owner, USERIDSTR(drakvuf), ownerid,
