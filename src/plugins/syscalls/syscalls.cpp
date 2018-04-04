@@ -150,9 +150,142 @@ static unicode_string_t* get_filename_from_handle(syscalls* s,
     return drakvuf_read_unicode(drakvuf, info, obj + s->object_header_body + s->file_object_filename);
 }
 
+static unicode_string_t* extract_unicode_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val)
+{
+    if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
+    {
+        if ( arg.type == PUNICODE_STRING )
+        {
+            unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
+            if ( us ) return us;
+        }
+
+        if ( !strcmp(arg.name, "FileHandle") )
+        {
+            unicode_string_t* us = get_filename_from_handle(s, drakvuf, info, val);
+
+            if ( us ) return us;
+        }
+    }
+
+    return nullptr;
+}
+
+static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
+{
+    timeval t = get_time();
+    switch (format)
+    {
+        case OUTPUT_CSV:
+            printf("syscall," FORMAT_TIMEVAL ",%" PRIu32" 0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, info->trap->breakpoint.module, info->trap->name);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[SYSCALL] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" %s!%s",
+                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid,
+                   info->trap->breakpoint.module, info->trap->name);
+            break;
+    }
+}
+
+static void print_nargs(output_format_t format, uint32_t nargs)
+{
+    switch (format)
+    {
+        case OUTPUT_CSV:
+            printf(",%" PRIu32, nargs);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf(" Arguments: %" PRIu32 "\n", nargs);
+            break;
+    }
+}
+
+static void print_csv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const unicode_string_t* us)
+{
+    printf(",%s,%s,%s,", win_arg_direction_names[arg.dir], win_type_names[arg.type], arg.name);
+
+    if ( 4 == s->reg_size )
+        printf("0x%" PRIx32 ",", static_cast<uint32_t>(val));
+    else
+        printf("0x%" PRIx64 ",", static_cast<uint64_t>(val));
+
+    if ( us )
+    {
+        printf("%s", us->contents);
+    }
+
+    printf(",");
+}
+
+static void print_default_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const unicode_string_t* us)
+{
+    printf("\t%s %s %s: ", win_arg_direction_names[arg.dir], win_type_names[arg.type], arg.name);
+
+    if ( 4 == s->reg_size )
+        printf("0x%" PRIx32, static_cast<uint32_t>(val));
+    else
+        printf("0x%" PRIx64, static_cast<uint64_t>(val));
+
+    if ( us )
+    {
+        printf(" -> '%s'", us->contents);
+    }
+
+    printf("\n");
+}
+
+static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_syscall_t* wsc, unsigned char* args_data)
+{
+    size_t nargs = wsc->num_args;
+    uint32_t* args_data32 = (uint32_t*)args_data;
+    uint64_t* args_data64 = (uint64_t*)args_data;
+
+    for ( size_t i=0; i<nargs; i++ )
+    {
+        addr_t val = ( 4 == s->reg_size ) ? args_data32[i] : args_data64[i];
+        unicode_string_t* us = extract_unicode_string(s, drakvuf, info, wsc->args[i], val);
+
+        switch (s->format)
+        {
+            case OUTPUT_CSV:
+                print_csv_arg(s, drakvuf, info, wsc->args[i], val, us);
+                break;
+            default:
+            case OUTPUT_DEFAULT:
+                print_default_arg(s, drakvuf, info, wsc->args[i], val, us);
+                break;
+        }
+
+        if ( us )
+        {
+            vmi_free_unicode_str(us);
+        }
+    }
+}
+
+static void print_footer(output_format_t format, uint32_t nargs)
+{
+    switch (format)
+    {
+        case OUTPUT_CSV:
+            printf("\n");
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            if ( nargs == 0 )
+                printf("\n");
+            break;
+    }
+}
+
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    unsigned int i = 0, nargs = 0;
+    unsigned int nargs = 0;
     size_t size = 0;
     unsigned char* buf = NULL; // pointer to buffer to hold argument values
 
@@ -169,16 +302,11 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         buf = (unsigned char*)g_malloc(sizeof(char)*size);
     }
 
-    uint32_t* buf32 = (uint32_t*)buf;
-    uint64_t* buf64 = (uint64_t*)buf;
-
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
-
-    timeval t;
 
     if ( nargs )
     {
@@ -198,6 +326,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         if ( 8 == s->reg_size )
         {
+            uint64_t* buf64 = (uint64_t*)buf;
             if ( nargs > 0 )
                 buf64[0] = info->regs->rcx;
             if ( nargs > 1 )
@@ -217,122 +346,12 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
-    t = get_time();
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("syscall," FORMAT_TIMEVAL ",%" PRIu32" 0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s",
-                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->breakpoint.module, info->trap->name);
+    print_header(s->format, drakvuf, info);
+    if ( nargs )
+        print_nargs(s->format, nargs);
+    print_args(s, drakvuf, info, wsc, buf);
+    print_footer(s->format, nargs);
 
-            if ( nargs )
-            {
-                printf(",%" PRIu32,nargs);
-
-                for ( i=0; i<nargs; i++ )
-                {
-                    addr_t val = 0;
-                    printf(",%s,%s,%s,",win_arg_direction_names[wsc->args[i].dir],win_type_names[wsc->args[i].type],wsc->args[i].name);
-
-                    if ( 4 == s->reg_size )
-                    {
-                        val = buf32[i];
-                        printf("0x%" PRIx32",", buf32[i]);
-                    }
-                    else
-                    {
-                        val = buf64[i];
-                        printf("0x%" PRIx64",", buf64[i]);
-                    }
-
-                    if ( wsc->args[i].dir == DIR_IN || wsc->args[i].dir == DIR_INOUT )
-                    {
-                        if ( wsc->args[i].type == PUNICODE_STRING)
-                        {
-                            unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
-
-                            if ( us )
-                            {
-                                printf("%s", us->contents);
-                                vmi_free_unicode_str(us);
-                            }
-                        }
-
-                        if ( !strcmp(wsc->args[i].name, "FileHandle") )
-                        {
-                            unicode_string_t* us = get_filename_from_handle(s, drakvuf, info, val);
-
-                            if ( us )
-                            {
-                                printf("%s", us->contents);
-                                vmi_free_unicode_str(us);
-                            }
-                        }
-                    }
-
-                    printf(",");
-                }
-            }
-
-            printf("\n");
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SYSCALL] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" %s!%s",
-                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
-                   info->trap->breakpoint.module, info->trap->name);
-
-            if ( nargs )
-            {
-                printf(" Arguments: %" PRIu32 "\n",nargs);
-
-                for ( i =0; i<nargs; i++ )
-                {
-                    addr_t val = 0;
-                    printf("\t%s %s %s: ", win_arg_direction_names[wsc->args[i].dir], win_type_names[wsc->args[i].type], wsc->args[i].name);
-
-                    if ( 4 == s->reg_size )
-                    {
-                        val = buf32[i];
-                        printf("0x%" PRIx32, buf32[i]);
-                    }
-                    else
-                    {
-                        val = buf64[i];
-                        printf("0x%" PRIx64, buf64[i]);
-                    }
-
-                    if ( wsc->args[i].dir == DIR_IN || wsc->args[i].dir == DIR_INOUT )
-                    {
-                        if ( wsc->args[i].type == PUNICODE_STRING)
-                        {
-                            unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
-
-                            if ( us )
-                            {
-                                printf(" -> '%s'", us->contents);
-                                vmi_free_unicode_str(us);
-                            }
-                        }
-
-                        if ( !strcmp(wsc->args[i].name, "FileHandle") )
-                        {
-                            unicode_string_t* us = get_filename_from_handle(s, drakvuf, info, val);
-
-                            if ( us )
-                            {
-                                printf(" -> '%s'", us->contents);
-                                vmi_free_unicode_str(us);
-                            }
-                        }
-                    }
-
-                    printf("\n");
-                }
-            }
-            else
-                printf("\n");
-    }
 exit:
     g_free(buf);
     drakvuf_release_vmi(drakvuf);
