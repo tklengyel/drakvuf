@@ -348,8 +348,10 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     print_header(s->format, drakvuf, info);
     if ( nargs )
+    {
         print_nargs(s->format, nargs);
-    print_args(s, drakvuf, info, wsc, buf);
+        print_args(s, drakvuf, info, wsc, buf);
+    }
     print_footer(s->format, nargs);
 
 exit:
