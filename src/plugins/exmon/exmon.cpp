@@ -232,6 +232,10 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 str_format=CSV_FORMAT32;
                 user_format=CSV_FORMAT_USER;
                 break;
+            case OUTPUT_KV:
+                str_format=KV_FORMAT32;
+                user_format=KV_FORMAT_USER;
+                break;
             default:
             case OUTPUT_DEFAULT:
                 str_format=DEFAULT_FORMAT32;
@@ -278,6 +282,10 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             case OUTPUT_CSV:
                 str_format=CSV_FORMAT64;
                 user_format=CSV_FORMAT_USER;
+                break;
+            case OUTPUT_KV:
+                str_format=KV_FORMAT64;
+                user_format=KV_FORMAT_USER;
                 break;
             default:
             case OUTPUT_DEFAULT:
