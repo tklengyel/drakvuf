@@ -116,29 +116,8 @@ static event_response_t create_user_process_hook(drakvuf_t drakvuf, drakvuf_trap
     const char* syscall_name = info->trap->name;
     procmon* f = (procmon*)info->trap->data;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    addr_t cmdline_addr;
-    ctx.addr = user_process_parameters_addr + f->command_line;
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &cmdline_addr))
-    {
-        cmdline_addr = 0;
-    }
-
-    addr_t imagepath_addr;
-    ctx.addr = user_process_parameters_addr + f->image_path_name;
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &imagepath_addr))
-    {
-        imagepath_addr = 0;
-    }
-
-    drakvuf_release_vmi(drakvuf);
+    addr_t cmdline_addr = user_process_parameters_addr + f->command_line;
+    addr_t imagepath_addr = user_process_parameters_addr + f->image_path_name;
 
     unicode_string_t* cmdline_us = drakvuf_read_unicode(drakvuf, info, cmdline_addr);
     unicode_string_t* imagepath_us = drakvuf_read_unicode(drakvuf, info, imagepath_addr);
