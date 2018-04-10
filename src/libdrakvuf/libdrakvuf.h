@@ -223,6 +223,7 @@ struct drakvuf_trap
     trap_type_t type;
     event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*);
     void* data;
+    bool is_own_data; // If trap owns data, data must be freed on trap destruction
     const char* name; // Only used for informational/debugging purposes
 
     union
@@ -261,6 +262,7 @@ struct drakvuf_trap
     };
 };
 
+void drakvuf_trap_free(drakvuf_trap_t* trap);
 
 ////////////////////////////////////////////////////////////////////////////
 

@@ -519,3 +519,13 @@ unicode_string_t* drakvuf_read_unicode_va(vmi_instance_t vmi, addr_t vaddr, vmi_
 
     return drakvuf_read_unicode_common(vmi, &ctx);
 }
+
+void drakvuf_trap_free(drakvuf_trap_t* trap)
+{
+    g_free((char*)trap->name);
+    if (trap->is_own_data)
+    {
+        g_free((char*)trap->data);
+    }
+    g_free(trap);
+}
