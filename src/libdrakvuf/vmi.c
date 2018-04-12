@@ -208,6 +208,8 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                 .vcpu = event->vcpu_id,
             };
 
+            g_get_current_time(&trap_info.timestamp);
+
             rsp |= trap->cb(drakvuf, &trap_info);
         }
 
@@ -346,6 +348,9 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                 .regs = event->x86_regs,
                 .vcpu = event->vcpu_id,
             };
+
+            g_get_current_time(&trap_info.timestamp);
+
             rsp |= trap->cb(drakvuf, &trap_info);
         }
 
@@ -378,6 +383,8 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                     .regs = event->x86_regs,
                     .vcpu = event->vcpu_id,
                 };
+
+                g_get_current_time(&trap_info.timestamp);
 
                 loop = loop->next;
                 rsp |= trap->cb(drakvuf, &trap_info);
@@ -517,6 +524,8 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
             .vcpu = event->vcpu_id,
         };
 
+        g_get_current_time(&trap_info.timestamp);
+
         loop = loop->next;
         rsp |= trap->cb(drakvuf, &trap_info);
     }
@@ -596,6 +605,8 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
             .vcpu = event->vcpu_id,
         };
 
+        g_get_current_time(&trap_info.timestamp);
+
         loop = loop->next;
         rsp |= trap->cb(drakvuf, &trap_info);
     }
@@ -644,6 +655,8 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
             .debug = &event->debug_event
         };
 
+        g_get_current_time(&trap_info.timestamp);
+
         loop = loop->next;
         rsp |= trap->cb(drakvuf, &trap_info);
     }
@@ -691,6 +704,8 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
             .vcpu = event->vcpu_id,
             .cpuid = &event->cpuid_event
         };
+
+        g_get_current_time(&trap_info.timestamp);
 
         loop = loop->next;
         rsp |= trap->cb(drakvuf, &trap_info);

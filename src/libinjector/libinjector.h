@@ -105,8 +105,6 @@
 #ifndef LIBINJECTOR_H
 #define LIBINJECTOR_H
 
-#include "../print_util.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif

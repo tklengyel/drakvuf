@@ -111,6 +111,7 @@ extern "C" {
 
 #pragma GCC visibility push(default)
 
+#include <glib.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
 
@@ -203,6 +204,7 @@ typedef struct drakvuf_trap drakvuf_trap_t;
 
 typedef struct drakvuf_trap_info
 {
+    GTimeVal timestamp;
     unsigned int vcpu;
     uint16_t altp2m_idx;
     proc_data_t proc_data ; /* Current executing process data */
@@ -405,6 +407,23 @@ status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
 bool drakvuf_get_current_process_data( drakvuf_t drakvuf,
                                        uint64_t vcpu_id,
                                        proc_data_t* proc_data );
+
+/*---------------------------------------------------------
+ * Output helpers
+ */
+
+typedef enum
+{
+    OUTPUT_DEFAULT,
+    OUTPUT_CSV,
+    OUTPUT_KV,
+    __OUTPUT_MAX
+} output_format_t;
+
+// Printf helpers for timestamp.
+#define FORMAT_TIMEVAL "%" PRId64 ".%06" PRId64
+#define UNPACK_TIMEVAL(t) (t).tv_sec, (t).tv_usec
+
 #pragma GCC visibility pop
 
 #ifdef __cplusplus
