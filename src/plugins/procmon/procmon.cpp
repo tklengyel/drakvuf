@@ -111,7 +111,8 @@
 #include "../plugins.h"
 #include "procmon.h"
 
-namespace {
+namespace
+{
 
 struct process_creation_result_t
 {
@@ -126,8 +127,9 @@ struct process_creation_result_t
 
 }
 
-static void print_process_creation_result(procmon* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                                          reg_t status, vmi_pid_t new_pid, addr_t user_process_parameters_addr)
+static void print_process_creation_result(
+    procmon* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    reg_t status, vmi_pid_t new_pid, addr_t user_process_parameters_addr)
 {
     addr_t cmdline_addr = user_process_parameters_addr + f->command_line;
     addr_t imagepath_addr = user_process_parameters_addr + f->image_path_name;
@@ -177,7 +179,7 @@ static vmi_pid_t get_pid_from_handle(procmon* f, drakvuf_t drakvuf, drakvuf_trap
     return pid;
 }
 
-static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     process_creation_result_t* wrapper = (process_creation_result_t*)info->trap->data;
     if (info->regs->cr3 != wrapper->target_cr3)
@@ -310,9 +312,10 @@ static drakvuf_trap_t* add_result_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     return trap;
 }
 
-static event_response_t create_user_process_hook(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                                                 addr_t process_handle_addr,
-                                                 addr_t user_process_parameters_addr)
+static event_response_t create_user_process_hook(
+    drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    addr_t process_handle_addr,
+    addr_t user_process_parameters_addr)
 {
     procmon* f = (procmon*)info->trap->data;
 
