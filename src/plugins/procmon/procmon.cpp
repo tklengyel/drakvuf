@@ -127,6 +127,13 @@ struct process_creation_result_t
 
 }
 
+static void trap_free(drakvuf_trap_t* trap)
+{
+    g_free((char*)trap->name);
+    g_free((char*)trap->data);
+    g_free(trap);
+}
+
 static void print_process_creation_result(
     procmon* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     reg_t status, vmi_pid_t new_pid, addr_t user_process_parameters_addr)
@@ -204,7 +211,7 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
     reg_t status = info->regs->rax;
 
     f->result_traps = g_slist_remove(f->result_traps, info->trap);
-    drakvuf_remove_trap(drakvuf, info->trap, drakvuf_trap_free);
+    drakvuf_remove_trap(drakvuf, info->trap, trap_free);
 
     access_context_t ctx =
     {
@@ -303,7 +310,6 @@ static drakvuf_trap_t* add_result_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     trap->name = g_strdup(info->trap->name);
     trap->cb = cb;
     trap->data = data;
-    trap->is_own_data = true;
     if (!drakvuf_add_trap(drakvuf, trap))
     {
         g_free(trap);
@@ -389,5 +395,5 @@ procmon::procmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 
 procmon::~procmon()
 {
-    g_slist_free_full(result_traps, (GDestroyNotify)drakvuf_trap_free);
+    g_slist_free_full(result_traps, (GDestroyNotify)trap_free);
 }
