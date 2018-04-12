@@ -150,6 +150,14 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
                    info->regs->rip, info->debug->type, debug_type[info->debug->type]);
             break;
+
+        case OUTPUT_KV:
+            printf("debugmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
+                   "RIP=0x%" PRIx64",DebugType=%" PRIi32 ",DebugTypeStr=\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   info->regs->rip, info->debug->type, debug_type[info->debug->type]);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
             printf("[DEBUGMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64". "
