@@ -118,6 +118,8 @@
 #include <plugins/plugins.h>
 #include <libinjector/libinjector.h>
 
+#include "print_util.h"
+
 #ifdef DRAKVUF_DEBUG
 // This is defined in libdrakvuf
 extern bool verbose;
@@ -167,7 +169,7 @@ public:
     void loop();
     void pause();
     void resume();
-    int inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, injection_method_t method);
+    int inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, injection_method_t method, output_format_t format);
     int start_plugins(const bool* plugin_list,
                       const char* dump_folder,
                       bool dump_modified_files,

@@ -117,6 +117,7 @@
 #include "libdrakvuf/libdrakvuf.h"
 #include <libinjector/libinjector.h>
 #include "private.h"
+#include "print_util.h"
 
 struct injector
 {
@@ -1017,7 +1018,26 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
-int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, injection_method_t method)
+static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t dtb, const char* file, vmi_pid_t injected_pid, uint32_t injected_tid)
+{
+    struct timeval t = get_time();
+
+    switch (format)
+    {
+        case OUTPUT_CSV:
+            printf("inject," FORMAT_TIMEVAL ",%u,0x%lx,\"%s\",%u,%u\n",
+                   UNPACK_TIMEVAL(t), pid, dtb, file, injected_pid, injected_tid);
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[INJECT] TIME:" FORMAT_TIMEVAL " PID:%u DTB:0x%lx FILE:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
+                   UNPACK_TIMEVAL(t), pid, dtb, file, injected_pid, injected_tid);
+            break;
+    };
+}
+
+int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, injection_method_t method, output_format_t format)
 {
 
     struct injector injector = { 0 };
@@ -1093,6 +1113,8 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
 
     drakvuf_pause(drakvuf);
     drakvuf_remove_trap(drakvuf, &injector.cr3_event, NULL);
+
+    print_injection_info(format, pid, injector.target_cr3, file, injector.pid, injector.tid);
 
 done:
     PRINT_DEBUG("Finished with injection. Ret: %i\n", injector.rc);
