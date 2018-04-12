@@ -416,6 +416,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             trap->type = BREAKPOINT;
             trap->cb = win_cb;
             trap->data = wrapper;
+            trap->is_own_data = true;
 
             ret = g_slist_prepend(ret, trap);
         }
@@ -454,6 +455,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             trap->type = BREAKPOINT;
             trap->cb = linux_cb;
             trap->data = s;
+            trap->is_own_data = false;
 
             ret = g_slist_prepend(ret, trap);
         }
@@ -530,6 +532,8 @@ static symbols_t* filter_symbols(const symbols_t* symbols, const char* filter_fi
 }
 
 syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output)
+    : file_object_filename{}
+    , object_header_body{}
 {
     const struct syscalls_config* c = (const struct syscalls_config*)config;
     symbols_t* symbols = drakvuf_get_symbols_from_rekall(c->rekall_profile);
@@ -581,18 +585,5 @@ syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output
 
 syscalls::~syscalls()
 {
-    GSList* loop = this->traps;
-    while (loop)
-    {
-        drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
-        g_free((char*)trap->name);
-        if (trap->data != (void*)this)
-        {
-            g_free(trap->data);
-        }
-        g_free(loop->data);
-        loop = loop->next;
-    }
-
-    g_slist_free(this->traps);
+    g_slist_free_full(traps, (GDestroyNotify)drakvuf_trap_free);
 }
