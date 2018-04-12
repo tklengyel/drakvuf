@@ -118,8 +118,6 @@
 #include <plugins/plugins.h>
 #include <libinjector/libinjector.h>
 
-#include "print_util.h"
-
 #ifdef DRAKVUF_DEBUG
 // This is defined in libdrakvuf
 extern bool verbose;

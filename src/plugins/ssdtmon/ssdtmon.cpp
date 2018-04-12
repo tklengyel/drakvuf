@@ -126,7 +126,6 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
 
     ssdtmon* s = (ssdtmon*)info->trap->data;
-    timeval t = get_time();
 
     if ( info->trap_pa > s->kiservicetable - 8 && info->trap_pa <= s->kiservicetable + s->ulongs * s->kiservicelimit + s->ulongs - 1 )
     {
@@ -134,12 +133,12 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             case OUTPUT_CSV:
                 printf("ssdtmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ", %" PRIi64 "\n",
-                       UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, (info->trap_pa - s->kiservicetable)/s->ulongs);
+                       UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, (info->trap_pa - s->kiservicetable)/s->ulongs);
                 break;
             default:
             case OUTPUT_DEFAULT:
                 printf("[SSDTMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" Table index:%" PRIi64 "\n",
-                       UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
+                       UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                        USERIDSTR(drakvuf), info->proc_data.userid, (info->trap_pa - s->kiservicetable)/s->ulongs);
                 break;
         };

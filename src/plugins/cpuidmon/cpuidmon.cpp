@@ -126,19 +126,18 @@ event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     cpuidmon* s = (cpuidmon*)info->trap->data;
 
-    timeval t = get_time();
     switch (s->format)
     {
         case OUTPUT_CSV:
             printf("cpuidmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 "\n",
-                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid);
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid);
             break;
         default:
         case OUTPUT_DEFAULT:
             printf("[CPUIDMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64". "
                    "Leaf: 0x%" PRIx32 ". Subleaf: 0x%" PRIx32". "
                    "RAX: 0x%" PRIx64 " RBX: 0x%" PRIx64 " RCX: 0x%" PRIx64 " RDX: 0x%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    info->cpuid->leaf, info->cpuid->subleaf,
                    info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx

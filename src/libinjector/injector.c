@@ -117,7 +117,6 @@
 #include "libdrakvuf/libdrakvuf.h"
 #include <libinjector/libinjector.h>
 #include "private.h"
-#include "print_util.h"
 
 struct injector
 {
@@ -1020,7 +1019,8 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t dtb, const char* file, vmi_pid_t injected_pid, uint32_t injected_tid)
 {
-    struct timeval t = get_time();
+    GTimeVal t;
+    g_get_current_time(&t);
 
     switch (format)
     {
