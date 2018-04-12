@@ -111,8 +111,6 @@
 #include <sys/time.h>
 #include <libdrakvuf/libdrakvuf.h>
 
-#include "../print_util.h"
-
 /***************************************************************************/
 
 /* Plugin-specific configuration input */

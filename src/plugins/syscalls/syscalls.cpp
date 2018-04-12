@@ -113,7 +113,8 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
 
     syscalls* s = (syscalls*)info->trap->data;
-    timeval t = get_time();
+    GTimeVal t;
+    g_get_current_time(&t);
 
     switch (s->format)
     {
@@ -173,18 +174,17 @@ static unicode_string_t* extract_unicode_string(syscalls* s, drakvuf_t drakvuf, 
 
 static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
 {
-    timeval t = get_time();
     switch (format)
     {
         case OUTPUT_CSV:
             printf("syscall," FORMAT_TIMEVAL ",%" PRIu32" 0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s",
-                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    info->proc_data.userid, info->trap->breakpoint.module, info->trap->name);
             break;
         default:
         case OUTPUT_DEFAULT:
             printf("[SYSCALL] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" %s!%s",
-                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    info->trap->breakpoint.module, info->trap->name);
             break;
