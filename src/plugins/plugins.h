@@ -111,6 +111,8 @@
 #include <sys/time.h>
 #include <libdrakvuf/libdrakvuf.h>
 
+#include "../print_util.h"
+
 /***************************************************************************/
 
 /* Plugin-specific configuration input */
@@ -132,13 +134,6 @@ struct syscalls_config
 };
 
 /***************************************************************************/
-
-typedef enum
-{
-    OUTPUT_DEFAULT,
-    OUTPUT_CSV,
-    __OUTPUT_MAX
-} output_format_t;
 
 typedef enum drakvuf_plugin
 {
@@ -208,20 +203,6 @@ public:
     ~drakvuf_plugins();
     int start(drakvuf_plugin_t plugin, const void* config);
 };
-
-/***************************************************************************/
-
-// Retrieves system time in seconds and microseconds.
-inline timeval get_time()
-{
-    struct timeval now {};
-    gettimeofday(&now, nullptr);
-    return now;
-}
-
-// Printf helpers for timeval.
-#define FORMAT_TIMEVAL "%" PRId64 ".%06" PRId64
-#define UNPACK_TIMEVAL(t) (t).tv_sec, (t).tv_usec
 
 /***************************************************************************/
 

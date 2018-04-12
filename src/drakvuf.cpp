@@ -270,9 +270,9 @@ void drakvuf_c::resume()
     drakvuf_resume(this->drakvuf);
 }
 
-int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, injection_method_t method)
+int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, injection_method_t method, output_format_t format)
 {
-    int rc = injector_start_app(this->drakvuf, injection_pid, injection_tid, inject_cmd, method);
+    int rc = injector_start_app(this->drakvuf, injection_pid, injection_tid, inject_cmd, method, format);
     if (!rc)
         fprintf(stderr, "Process startup failed\n");
     return rc;
