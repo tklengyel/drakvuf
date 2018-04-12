@@ -416,7 +416,6 @@ typedef enum
 {
     OUTPUT_DEFAULT,
     OUTPUT_CSV,
-    OUTPUT_KV,
     __OUTPUT_MAX
 } output_format_t;
 
