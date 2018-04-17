@@ -530,6 +530,8 @@ static symbols_t* filter_symbols(const symbols_t* symbols, const char* filter_fi
 }
 
 syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output)
+    : file_object_filename{}
+    , object_header_body{}
 {
     const struct syscalls_config* c = (const struct syscalls_config*)config;
     symbols_t* symbols = drakvuf_get_symbols_from_rekall(c->rekall_profile);
