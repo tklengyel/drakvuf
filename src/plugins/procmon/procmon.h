@@ -105,6 +105,7 @@
 #ifndef PROCMON_H
 #define PROCMON_H
 
+#include <glib.h>
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
@@ -123,11 +124,14 @@ public:
         }
     };
 
+    GSList* result_traps;
+
     page_mode_t pm;
     output_format_t format;
 
     addr_t command_line;
     addr_t image_path_name;
+    addr_t object_header_body;
 
     procmon(drakvuf_t drakvuf, const void* config, output_format_t output);
     ~procmon();

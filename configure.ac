@@ -402,4 +402,5 @@ CPUIDmon:   $plugin_cpuidmon
 Debugmon:   $plugin_debugmon
 Socketmon:  $plugin_socketmon
 Regmon:     $plugin_regmon
+Procmon:    $plugin_procmon
 -------------------------------------------------------------------------------])
