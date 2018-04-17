@@ -192,7 +192,7 @@ int main(int argc, char** argv)
 #endif
 #ifdef ENABLE_PLUGIN_SYSCALLS
                 "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
-		"\t -a <analysis method>      Option which selects the preffered analysis technique; for x86: BKP (%d); for ARM: HW-SS (%d), DBL-SMC-SS (%d)", BREAKPOINT, PRIVCALL_HW_SS, PRIVCALL_DBL_SMC
+		"\t -a <analysis method>      Option which selects the preffered analysis technique; for x86: BKP (%d); for ARM: HW-SS (%d), DBL-SMC-SS (%d), SPLIT-TLB-SS (%d)\n", BREAKPOINT, PRIVCALL_HW_SS, PRIVCALL_DBL_SMC, PRIVCALL_SPLIT_TLB
 #endif
                );
         return rc;
@@ -293,7 +293,7 @@ int main(int argc, char** argv)
 #if defined (I386) || defined(X86_64)
         (traptype != BREAKPOINT)
 #elif defined (ARM64)
-	(traptype != PRIVCALL_HW_SS && traptype != PRIVCALL_DBL_SMC)
+	(traptype != PRIVCALL_HW_SS && traptype != PRIVCALL_DBL_SMC && traptype != PRIVCALL_SPLIT_TLB)
 #endif
 	)
     {
@@ -301,7 +301,7 @@ int main(int argc, char** argv)
 #if defined (I386) || defined(X86_64)
 	fprintf(stderr, "Available options for x86: BK (%d)\n", BREAKPOINT);
 #elif defined (ARM64)
-	fprintf(stderr, "Available options for ARM: HW-SS (%d), DBL-SMC-SS (%d)\n", PRIVCALL_HW_SS, PRIVCALL_DBL_SMC);
+	fprintf(stderr, "Available options for ARM: HW-SS (%d), DBL-SMC-SS (%d), SPLIT-TLB-SS (%d)\n", PRIVCALL_HW_SS, PRIVCALL_DBL_SMC, PRIVCALL_SPLIT_TLB);
 #endif
         return rc; 
     }

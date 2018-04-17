@@ -114,6 +114,7 @@ extern "C" {
 #include <glib.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
+#include <glib.h>
 
 /*---------------------------------------------------------
  * Reading in Rekall profile informations
@@ -181,7 +182,8 @@ typedef enum trap_type
     DEBUG,
     CPUID,
     PRIVCALL_HW_SS,
-    PRIVCALL_DBL_SMC
+    PRIVCALL_DBL_SMC,
+    PRIVCALL_SPLIT_TLB
 } trap_type_t;
 
 typedef enum memaccess_type
@@ -456,6 +458,10 @@ typedef enum
 // Printf helpers for timestamp.
 #define FORMAT_TIMEVAL "%" PRId64 ".%06" PRId64
 #define UNPACK_TIMEVAL(t) (t).tv_sec, (t).tv_usec
+
+void drakvuf_config_views_for_split_tlb(vmi_instance_t vmi,
+                              drakvuf_t drakvuf, 
+                              GSList* traps);
 
 #pragma GCC visibility pop
 

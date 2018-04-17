@@ -613,6 +613,9 @@ syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output
 
         loop = loop->next;
     }
+
+    if (c->traptype == PRIVCALL_SPLIT_TLB)
+        drakvuf_config_views_for_split_tlb(vmi, drakvuf, this->traps);
 }
 
 syscalls::~syscalls()

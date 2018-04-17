@@ -221,7 +221,6 @@ void drakvuf_interrupt(drakvuf_t drakvuf, int sig)
 
 bool inject_trap_sw(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
-
     if (trap->breakpoint.lookup_type == LOOKUP_NONE)
     {
         return inject_trap_pa(drakvuf, trap, trap->breakpoint.addr);
@@ -381,6 +380,7 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
             break;
         case PRIVCALL_HW_SS:
         case PRIVCALL_DBL_SMC:
+        case PRIVCALL_SPLIT_TLB:
             ret = inject_trap_sw(drakvuf, trap);
             break;
         default:
@@ -704,4 +704,11 @@ int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, event_cb_t event_cb, void* d
     PRINT_DEBUG("regenerating event_fds and fd_info_lookup...\n");
     drakvuf_event_fd_generate(drakvuf);
     return 1;
+}
+
+void drakvuf_config_views_for_split_tlb(vmi_instance_t vmi,
+                              drakvuf_t drakvuf, 
+                              GSList* traps)
+{
+    vmi_config_views_for_split_tlb(vmi, drakvuf, traps);
 }

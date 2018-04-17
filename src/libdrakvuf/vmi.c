@@ -488,15 +488,38 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     return rsp;
 }
 
+event_response_t split_tlb_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
+{
+    UNUSED(vmi);
+    event_response_t rsp = 0;
+    drakvuf_t drakvuf = event->data;
+    addr_t pa = (event->mem_event.gfn<<12) + event->mem_event.offset;
+
+    PRINT_DEBUG("Pre mem cb with vCPU %u @ 0x%lx in view %u: %c%c%c\n",
+                event->vcpu_id, pa, event->slat_id,
+                (event->mem_event.out_access & VMI_MEMACCESS_R) ? 'r' : '-',
+                (event->mem_event.out_access & VMI_MEMACCESS_W) ? 'w' : '-',
+                (event->mem_event.out_access & VMI_MEMACCESS_X) ? 'x' : '-'
+               );
+
+
+    if ( event->slat_id == drakvuf->altp2m_idr )
+	event->slat_id = drakvuf->altp2m_ids;
+    else 
+	event->slat_id = drakvuf->altp2m_idr;
+    
+    return rsp | VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+}
+
 event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
     event_response_t rsp = 0;
     drakvuf_t drakvuf = event->data;
     drakvuf->arm_regs[event->vcpu_id] = event->arm_regs;
-    
+
     addr_t pa = (event->privcall_event.gfn << 12) + event->privcall_event.offset;
-	
+
 	PRINT_DEBUG("SMC event vCPU %u altp2m:%u PA=0x%"PRIx64" PC=0x%"PRIx64" offset=0x%"PRIx64".\n",
                 event->vcpu_id, event->slat_id, pa,
                 event->arm_regs->pc, event->privcall_event.offset);
@@ -504,32 +527,27 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
     struct wrapper* s = g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
     if (!s)
     {
-        if ( event->slat_id == drakvuf->altp2m_ids )
+        if ( event->slat_id != drakvuf->altp2m_ids && event->slat_id != drakvuf->altp2m_idr )
         {
-            /*
-             * We are right now in the 'simulated' single step. We look
-             * for the original trap, thats why we want decrease the pa by 4.
-             */
-            addr_t pa_first_smc = pa - 4;
-            if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa_first_smc) )
-            {
-				PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u - %i SMC executed\n", event->vcpu_id, event->slat_id);
-                event->slat_id = drakvuf->altp2m_idx;
-                return rsp |
-                       VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
-            }
+         	/*
+         	* No trap is currently registered for this location
+         	* but this event may have been triggered by one we just
+         	* removed.
+         	* If there is already a SMC instruction at pa we could reinject it,
+         	* as soon as this is supported by xen and libvmi. We could check if
+	        * this is necessary by reading pa and check if it is a SMC similiar
+        	* to int3_cb.
+        	 */
+	        return 0;
         }
+        
         /*
-         * No trap is currently registered for this location
-         * but this event may have been triggered by one we just
-         * removed.
-         * If there is already a SMC instruction at pa we could reinject it,
-         * as soon as this is supported by xen and libvmi. We could check if
-         * this is necessary by reading pa and check if it is a SMC similiar
-         * to int3_cb.
+         * We are right now in the 'simulated' single step. We look
+         * for the original trap, thats why we want decrease the pa by 4.
          */
-
-        return 0;
+	pa -= 4;
+	s = g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
+	if ( !s ) return 0;
     }
 
     drakvuf->in_callback = 1;
@@ -559,19 +577,21 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
     // Check if we have traps still active on this breakpoint
     if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa) )
 	{
-		if (traptype == PRIVCALL_HW_SS)
+		if ( traptype == PRIVCALL_HW_SS )
 		{
-			PRINT_DEBUG("Switching altp2m HW-singlestep on vcpu %u - step view %i\n", event->vcpu_id, event->slat_id);
+			PRINT_DEBUG("[HW_SS] Switching altp2m HW-singlestep on vcpu %u - step view %i\n", event->vcpu_id, event->slat_id);
 			event->slat_id = 0;
 			rsp |= VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP;
 		}
-		else if (traptype == PRIVCALL_DBL_SMC)
+		else if ( traptype == PRIVCALL_DBL_SMC || traptype == PRIVCALL_SPLIT_TLB )
 		{
-			PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u - %i SMC executed\n", event->vcpu_id, event->slat_id);
+			PRINT_DEBUG("[%s] Switching altp2m and to singlestep on vcpu %u - %i SMC executed\n", traptype == PRIVCALL_DBL_SMC ? "DBL_SMC" : "SPLIT_TLB", event->vcpu_id, event->slat_id);
 			if ( event->slat_id == drakvuf->altp2m_idx )
-					event->slat_id = drakvuf->altp2m_ids;	
+			    event->slat_id = drakvuf->altp2m_ids;
+			else 
+			    event->slat_id = drakvuf->altp2m_idx;
 		}
-		else if (traptype == __INVALID_TRAP_TYPE)
+		else if ( traptype == __INVALID_TRAP_TYPE )
 		{
 			PRINT_DEBUG("Invalid trap type\n");
 			return 0;
@@ -871,6 +891,7 @@ void remove_trap(drakvuf_t drakvuf,
     {
         case PRIVCALL_HW_SS: // intentional fall-through
         case PRIVCALL_DBL_SMC:
+        case PRIVCALL_SPLIT_TLB:
         case BREAKPOINT:
         {
             struct wrapper* container =
@@ -926,7 +947,7 @@ void remove_trap(drakvuf_t drakvuf,
                 remove_trap(drakvuf, &container->breakpoint.guard);
                 remove_trap(drakvuf, &container->breakpoint.guard2);
 
-                if ( trap->type == PRIVCALL_DBL_SMC )
+                if ( trap->type == PRIVCALL_DBL_SMC || trap->type == PRIVCALL_SPLIT_TLB )
                 {
                     uint32_t backup_dsmc;
 
@@ -1180,7 +1201,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         if (rc < 0)
             goto err_exit;
 
-        if (trap->type == PRIVCALL_DBL_SMC)
+        if ( trap->type == PRIVCALL_DBL_SMC || trap->type == PRIVCALL_SPLIT_TLB )
         {
             remapped_gfn->step_view = ++(drakvuf->max_gpfn);
 
@@ -1217,7 +1238,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             goto err_exit;
         }
 
-        if ( trap->type == PRIVCALL_DBL_SMC )
+        if ( trap->type == PRIVCALL_DBL_SMC || trap->type == PRIVCALL_SPLIT_TLB )
         {
             if ( VMI_SUCCESS == vmi_write_pa(drakvuf->vmi, remapped_gfn->step_view << 12, VMI_PS_4KB, &backup, NULL) )
                 PRINT_DEBUG("Copied trapped page to new location (second remapped gfn)\n");
@@ -1240,7 +1261,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID,
                              drakvuf->altp2m_idr, remapped_gfn->r, drakvuf->zero_page_gfn);
 
-        if ( trap->type == PRIVCALL_DBL_SMC )
+        if ( trap->type == PRIVCALL_DBL_SMC || trap->type == PRIVCALL_SPLIT_TLB )
         {
             xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID,
                                  drakvuf->altp2m_ids, current_gfn, remapped_gfn->step_view);
@@ -1275,7 +1296,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         goto err_exit;
     }
 
-    if ( trap->type == PRIVCALL_DBL_SMC )
+    if ( trap->type == PRIVCALL_DBL_SMC || trap->type == PRIVCALL_SPLIT_TLB )
     {
         container->breakpoint.step_guard.type = MEMACCESS;
         container->breakpoint.step_guard.memaccess.access = VMI_MEMACCESS_RWX;
@@ -1314,7 +1335,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             goto err_exit;
         }
 		addr_t rpa1 =0;
-        if ( trap->type == PRIVCALL_DBL_SMC )
+        if ( trap->type == PRIVCALL_DBL_SMC || trap->type == PRIVCALL_SPLIT_TLB )
         {
             rpa1 = (remapped_gfn->step_view<<12) + ((container->breakpoint.pa & VMI_BIT_MASK(0,11)) + 4);
             if ( VMI_FAILURE == vmi_write_32_pa(vmi, rpa1, &sw_trap) )
@@ -1644,6 +1665,13 @@ bool init_vmi(drakvuf_t drakvuf)
     if (rc < 0)
         return 0;
 
+    rc = xc_altp2m_pair_vmid(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr, drakvuf->altp2m_ids);
+    PRINT_DEBUG("Paired VMIDs %d and %d. Failed? %d\n", drakvuf->altp2m_idr, drakvuf->altp2m_ids, rc);
+    
+    /*rc = xc_altp2m_pair_vmid(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr, drakvuf->altp2m_ids);
+    PRINT_DEBUG("Paired VMIDs %d and %d. Failed? %d\n", drakvuf->altp2m_idr, drakvuf->altp2m_ids, rc);*/
+
+
 #if defined(I386) || defined(X86_64)
     SETUP_INTERRUPT_EVENT(&drakvuf->interrupt_event, 0, int3_cb);
     drakvuf->interrupt_event.data = drakvuf;
@@ -1673,7 +1701,7 @@ bool init_vmi(drakvuf_t drakvuf)
     }
 #endif
 
-    SETUP_MEM_EVENT(&drakvuf->mem_event, ~0ULL, VMI_MEMACCESS_RWX, pre_mem_cb, 1);
+    SETUP_MEM_EVENT(&drakvuf->mem_event, ~0ULL, VMI_MEMACCESS_RWX, split_tlb_mem_cb, 1);
     drakvuf->mem_event.data = drakvuf;
 
     if (VMI_FAILURE == vmi_register_event(drakvuf->vmi, &drakvuf->mem_event))
@@ -1807,3 +1835,41 @@ void close_vmi(drakvuf_t drakvuf)
 
     PRINT_DEBUG("close_vmi_drakvuf finished\n");
 }
+
+#define START_PFN (GUEST_RAM0_BASE >> 12)
+
+void vmi_config_views_for_split_tlb(vmi_instance_t vmi, drakvuf_t drakvuf, GSList* traps)
+{
+	/*
+	 * Change all gfns in in the execute and step views to RW_
+	 *
+	 */
+	unsigned long i;
+	for (i=START_PFN; i<=drakvuf->max_gpfn; i++) {
+		xc_altp2m_set_mem_access( drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx, i, XENMEM_access_rw);
+		xc_altp2m_set_mem_access( drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_ids, i, XENMEM_access_rw);
+	}
+
+	GSList* loop = traps;
+	while (loop)
+	{
+		drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
+
+		addr_t syscall_pa;
+		if (VMI_FAILURE == vmi_translate_kv2p(vmi, trap->breakpoint.addr, &syscall_pa))
+		{
+			printf("Failed to translate syscall_va\n");
+			return;
+		}
+
+		xc_altp2m_set_mem_access( drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx, syscall_pa >> 12, XENMEM_access_rwx);
+		xc_altp2m_set_mem_access( drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_ids, syscall_pa >> 12, XENMEM_access_rwx);
+		xc_altp2m_set_mem_access( drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr, syscall_pa >> 12, XENMEM_access_rw);
+
+		loop = loop->next;
+	}
+
+	int rc = xc_altp2m_switch_to_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr);
+	PRINT_DEBUG("Switching to altp2m[%d]. Failed? %d\n", drakvuf->altp2m_idr, rc);
+}
+
