@@ -349,6 +349,35 @@ static event_response_t create_user_process_hook(
     return 0;
 }
 
+static event_response_t terminate_process_hook(
+    drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    addr_t process_handle, addr_t exit_status)
+{
+    procmon* f = (procmon*)info->trap->data;
+
+    vmi_pid_t exit_pid = get_pid_from_handle(f, drakvuf, info, process_handle);
+
+    switch ( f->format )
+    {
+        case OUTPUT_CSV:
+            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%d,0x%" PRIx64 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, info->trap->name, exit_pid, exit_status);
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[PROCMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64
+                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s:%d:0x%" PRIx64 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr,
+                   info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, exit_pid, exit_status);
+            break;
+    }
+
+    return 0;
+}
+
 static event_response_t create_user_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     // PHANDLE ProcessHandle
@@ -356,6 +385,15 @@ static event_response_t create_user_process_hook_cb(drakvuf_t drakvuf, drakvuf_t
     // PRTL_USER_PROCESS_PARAMETERS RtlUserProcessParameters
     addr_t user_process_parameters_addr = get_function_argument(drakvuf, info, 9);
     return create_user_process_hook(drakvuf, info, process_handle_addr, user_process_parameters_addr);
+}
+
+static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    // HANDLE ProcessHandle
+    addr_t process_handle = get_function_argument(drakvuf, info, 1);
+    // NTSTATUS ExitStatus
+    addr_t exit_status = get_function_argument(drakvuf, info, 2);
+    return terminate_process_hook(drakvuf, info, process_handle, exit_status);
 }
 
 static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
@@ -389,8 +427,9 @@ procmon::procmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "Body", &this->object_header_body) )
         throw -1;
 
-    assert(sizeof(traps) / sizeof(traps[0]) > 0);
+    assert(sizeof(traps) / sizeof(traps[0]) > 1);
     register_trap(drakvuf, rekall_profile, "NtCreateUserProcess", &traps[0], create_user_process_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtTerminateProcess", &traps[1], terminate_process_hook_cb);
 }
 
 procmon::~procmon()

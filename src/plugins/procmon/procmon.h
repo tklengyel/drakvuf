@@ -112,9 +112,9 @@
 class procmon: public plugin
 {
 public:
-    drakvuf_trap_t traps[1] =
+    drakvuf_trap_t traps[2] =
     {
-        [0 ... 0] = {
+        [0 ... 1] = {
             .breakpoint.lookup_type = LOOKUP_PID,
             .breakpoint.pid = 4,
             .breakpoint.addr_type = ADDR_RVA,
