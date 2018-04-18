@@ -132,9 +132,6 @@ enum offset
     KTRAP_FRAME_R9,
     KTRAP_FRAME_R10,
     KTRAP_FRAME_R11,
-    EPROCESS_PID,
-    EPROCESS_NAME,
-    EPROCESS_PPID,
     __OFFSET_MAX
 };
 
@@ -162,10 +159,23 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [KTRAP_FRAME_R9] = {"_KTRAP_FRAME","R9"},
     [KTRAP_FRAME_R10] = {"_KTRAP_FRAME","R10"},
     [KTRAP_FRAME_R11] = {"_KTRAP_FRAME","R11"},
-    [EPROCESS_PID] = {"_EPROCESS", "UniqueProcessId"},
-    [EPROCESS_NAME] = {"_EPROCESS", "ImageFileName"},
-    [EPROCESS_PPID] = {"_EPROCESS", "InheritedFromUniqueProcessId"}
 };
+
+static void print_program_info(uint8_t previous_mode, char const* user_format, drakvuf_trap_info_t* info)
+{
+    if (previous_mode == 1)
+    {
+        if (info->proc_data.base_addr)
+        {
+            printf(user_format, info->proc_data.pid, info->proc_data.ppid, info->proc_data.name);
+        }
+        else printf(user_format, 0, 0, "NOPROC");
+    }
+    else
+    {
+        printf("\n");
+    }
+}
 
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -229,7 +239,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 break;
         }
 
-        printf(str_format, \
+        printf(str_format,
                UNPACK_TIMEVAL(info->timestamp),
                (uint32_t)info->regs->rsp,
                (uint32_t)exception_record,
@@ -245,29 +255,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EBP]),
                *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_HWESP]));
 
-        if (previous_mode == 1)
-        {
-            addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
-            if (process)
-            {
-                uint32_t pid,ppid;
-                char* name;
-                if ( VMI_FAILURE == vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PID], 0, (uint32_t*)&pid) )
-                    goto done;
-
-                if ( VMI_FAILURE == vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PPID], 0, (uint32_t*)&ppid) )
-                    goto done;
-
-                name = vmi_read_str_va(vmi, process + e->offsets[EPROCESS_NAME], 0);
-                printf(user_format,pid,ppid,name);
-                free(name);
-            }
-            else printf(user_format,0,0,"NOPROC");
-        }
-        else
-        {
-            printf("\n");
-        }
+        print_program_info(previous_mode, user_format, info);
     }
     else
     {
@@ -297,7 +285,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 user_format=DEFAULT_FORMAT_USER;
                 break;
         }
-        printf(str_format, \
+        printf(str_format,
                UNPACK_TIMEVAL(info->timestamp),
                info->regs->rcx, exception_code, first_chance & 1,
                *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RIP]),
@@ -314,30 +302,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_R10]),
                *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_R11]));
 
-        if ((uint8_t)(info->regs->r9) == 1)
-        {
-            addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
-            if (process)
-            {
-                uint32_t pid,ppid;
-                char* name;
-
-                if ( VMI_FAILURE == vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PID], 0, (uint32_t*)&pid) )
-                    goto done;
-
-                if ( VMI_FAILURE == vmi_read_32_va(vmi, process + e->offsets[EPROCESS_PPID], 0, (uint32_t*)&ppid) )
-                    goto done;
-
-                name = vmi_read_str_va(vmi, process + e->offsets[EPROCESS_NAME], 0);
-                printf(user_format,pid,ppid,name);
-                free(name);
-            }
-            else printf(user_format,0,0,"NOPROC");
-        }
-        else
-        {
-            printf("\n");
-        }
+        print_program_info((uint8_t)(info->regs->r9), user_format, info);
     }
 
 done:
@@ -348,7 +313,7 @@ done:
 
 exmon::exmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
-    const char* rekall_profile =(const char*)config;
+    const char* rekall_profile = (const char*)config;
 
     if ( !drakvuf_get_function_rva(rekall_profile, "KiDispatchException", &this->trap.breakpoint.rva) )
         throw -1;
