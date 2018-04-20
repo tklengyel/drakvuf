@@ -173,8 +173,9 @@ static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t epr
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base)
 {
     unicode_string_t* fullname = win_get_process_full_name( drakvuf, eprocess_base );
+    drakvuf_normalize_file_path_us(fullname);
 
-    if (fullname && fullname->contents && strlen((const char*)fullname->contents) > 0)
+    if (fullname && fullname->contents && *fullname->contents != '\0')
     {
         // Replace 'proc_data->name' with 'fullname->contents'
         // Moving ownership of fullname->contents to name for later cleanup
