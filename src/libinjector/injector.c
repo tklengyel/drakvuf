@@ -1029,12 +1029,17 @@ static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t
                    UNPACK_TIMEVAL(t), pid, dtb, file, injected_pid, injected_tid);
             break;
 
+        case OUTPUT_KV:
+            printf("inject Time=" FORMAT_TIMEVAL ",PID=%u,DTB=0x%lx,ProcessName=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
+                   UNPACK_TIMEVAL(t), pid, dtb, file, injected_pid, injected_tid);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
             printf("[INJECT] TIME:" FORMAT_TIMEVAL " PID:%u DTB:0x%lx FILE:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
                    UNPACK_TIMEVAL(t), pid, dtb, file, injected_pid, injected_tid);
             break;
-    };
+    }
 }
 
 int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, injection_method_t method, output_format_t format)

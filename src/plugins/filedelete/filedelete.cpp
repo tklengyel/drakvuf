@@ -340,7 +340,7 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
                                 drakvuf_trap_info_t* info, addr_t handle)
 {
     uint8_t type = 0;
-    addr_t process=drakvuf_get_current_process(drakvuf, info->vcpu);
+    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
 
     // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
 
@@ -376,6 +376,11 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
             case OUTPUT_CSV:
                 printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\"\n",
                        UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, filename_us->contents);
+                break;
+            case OUTPUT_KV:
+                printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\"\n",
+                       UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                       info->trap->name, filename_us->contents);
                 break;
             default:
             case OUTPUT_DEFAULT:

@@ -122,6 +122,10 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             printf("syscall," FORMAT_TIMEVAL ",%" PRIu32" 0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s\n",
                    UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->breakpoint.module, info->trap->name);
             break;
+        case OUTPUT_KV:
+            printf("syscall Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s\n",
+                   UNPACK_TIMEVAL(t), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name, info->trap->name);
+            break;
         default:
         case OUTPUT_DEFAULT:
             printf("[SYSCALL] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" %s!%s\n",
@@ -181,6 +185,11 @@ static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvu
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    info->proc_data.userid, info->trap->breakpoint.module, info->trap->name);
             break;
+        case OUTPUT_KV:
+            printf("syscall Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   info->trap->name);
+            break;
         default:
         case OUTPUT_DEFAULT:
             printf("[SYSCALL] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" %s!%s",
@@ -197,6 +206,8 @@ static void print_nargs(output_format_t format, uint32_t nargs)
     {
         case OUTPUT_CSV:
             printf(",%" PRIu32, nargs);
+            break;
+        case OUTPUT_KV:
             break;
         default:
         case OUTPUT_DEFAULT:
@@ -220,6 +231,20 @@ static void print_csv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* i
     }
 
     printf(",");
+}
+
+static void print_kv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const unicode_string_t* us)
+{
+    if ( us )
+    {
+        printf(",%s=\"%s\"", arg.name, us->contents);
+        return;
+    }
+
+    if ( 4 == s->reg_size )
+        printf(",%s=0x%" PRIx32, arg.name, static_cast<uint32_t>(val));
+    else
+        printf(",%s=0x%" PRIx64, arg.name, static_cast<uint64_t>(val));
 }
 
 static void print_default_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const unicode_string_t* us)
@@ -255,6 +280,9 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
             case OUTPUT_CSV:
                 print_csv_arg(s, drakvuf, info, wsc->args[i], val, us);
                 break;
+            case OUTPUT_KV:
+                print_kv_arg(s, drakvuf, info, wsc->args[i], val, us);
+                break;
             default:
             case OUTPUT_DEFAULT:
                 print_default_arg(s, drakvuf, info, wsc->args[i], val, us);
@@ -273,6 +301,9 @@ static void print_footer(output_format_t format, uint32_t nargs)
     switch (format)
     {
         case OUTPUT_CSV:
+            printf("\n");
+            break;
+        case OUTPUT_KV:
             printf("\n");
             break;
         default:

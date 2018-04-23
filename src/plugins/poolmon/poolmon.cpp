@@ -144,6 +144,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     reg_t pool_type, size;
     char tag[5] = { [0 ... 4] = '\0' };
     struct pooltag* s = NULL;
+    const char* pool_type_str;
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -172,27 +173,37 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     s = (struct pooltag*)g_tree_lookup(p->pooltag_tree, tag);
 
+    pool_type_str = pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type";
+
     switch (p->format)
     {
         case OUTPUT_CSV:
-        {
             printf("poolmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s,%" PRIu64 "",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, tag,
-                   pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
+                   pool_type_str, size);
             if (s)
                 printf(",%s,%s", s->source, s->description);
             break;
-        }
+
+        case OUTPUT_KV:
+            printf("poolmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
+                   "Tag=%s,Type=%s,Size=%" PRIu64,
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   tag, pool_type_str, size);
+            if (s)
+                printf(",Source=%s,Description=%s", s->source, s->description);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
             printf("[POOLMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s (type: %s, size: %" PRIu64 ")",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid, tag,
-                   pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type", size);
+                   pool_type_str, size);
             if (s)
                 printf(": %s,%s", s->source, s->description);
             break;
-    };
+    }
 
     printf("\n");
 
