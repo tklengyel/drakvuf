@@ -257,16 +257,26 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     switch (s->format)
     {
         case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%" PRIi64 ",%s,%s,%u\n",
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%" PRIi64 ",%s,%s,%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, info->proc_data.userid,
                    owner, ownerid,
                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
                    lip, udpa.port);
             break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64",Owner=%s,OwnerId=%" PRIi64 ",Protocol=%s,LocalIp=%s,LocalPort=%" PRIu16 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner, ownerid,
+                   (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
+                   lip, udpa.port);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s %s:%u\n",
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s %s:%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    owner, USERIDSTR(drakvuf), ownerid,
@@ -362,16 +372,26 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     switch (s->format)
     {
         case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%" PRIi64",%s,%s,%u\n",
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%" PRIi64",%s,%s,%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, info->proc_data.userid,
                    owner, ownerid,
                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
                    lip, udpa.port);
             break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64",Owner=%s,OwnerId=%" PRIi64",Protocol=%s,LocalIp=%s,LocalPort=%" PRIu16 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner, ownerid,
+                   (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
+                   lip, udpa.port);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s %s:%u\n",
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s %s:%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    owner, USERIDSTR(drakvuf), ownerid,
@@ -468,16 +488,27 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     switch (s->format)
     {
         case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%" PRIi64",%s,%s,%u\n",
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%" PRIi64",%s,%s,%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, info->proc_data.userid,
                    owner, ownerid,
                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
                    lip, udpa.port);
             break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64",Owner=%s,"
+                   "OwnerId=%" PRIi64",Protocol=%s,LocalIp=%s,LocalPort=%" PRIu16 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner, ownerid,
+                   (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
+                   lip, udpa.port);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s %s:%u\n",
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s %s:%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    owner, USERIDSTR(drakvuf), ownerid,
@@ -601,7 +632,7 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     switch (s->format)
     {
         case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%" PRIi64 ",%s,%s,%s,%u,%s,%u\n",
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%" PRIi64 ",%s,%s,%s,%" PRIu16 ",%s,%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, info->proc_data.userid,
                    owner,ownerid,
@@ -609,9 +640,21 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
                    tcp_state_str[tcpe.state],
                    lip, tcpe.localport, rip, tcpe.remoteport);
             break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ",Owner=%s,OwnerId=%" PRIi64 ",Protocol=%s,TcpState=%s,"
+                   "LocalIp=%s,LocalPort=%" PRIu16 ",RemoteIp=%s,RemotePort=%" PRIu16 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner,ownerid,
+                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+                   tcp_state_str[tcpe.state],
+                   lip, tcpe.localport, rip, tcpe.remoteport);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s State:%s Local:%s:%u Remote:%s:%u\n",
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s State:%s Local:%s:%" PRIu16 " Remote:%s:%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
                    owner, USERIDSTR(drakvuf), ownerid,
@@ -717,7 +760,7 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     switch (s->format)
     {
         case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%" PRIi64 ",%s,%s,%s,%u,%s,%u\n",
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%" PRIi64 ",%s,%s,%s,%" PRIu16 ",%s,%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, info->proc_data.userid,
                    owner,ownerid,
@@ -725,9 +768,21 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
                    tcp_state_str[tcpe.state],
                    lip, tcpe.localport, rip, tcpe.remoteport);
             break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ",Owner=%s,OwnerId=%" PRIi64 ",Protocol=%s,TcpState=%s,"
+                   "LocalIp=%s,LocalPort=%" PRIu16 ",RemoteIp=%s,RemotePort=%" PRIu16 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner,ownerid,
+                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+                   tcp_state_str[tcpe.state],
+                   lip, tcpe.localport, rip, tcpe.remoteport);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s State:%s Local:%s:%u Remote:%s:%u\n",
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s State:%s Local:%s:%" PRIu16 " Remote:%s:%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
                    owner, USERIDSTR(drakvuf), ownerid,
@@ -834,7 +889,7 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     switch (s->format)
     {
         case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%" PRIi64 ",%s,%s,%s,%u,%s,%u\n",
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%" PRIi64 ",%s,%s,%s,%" PRIu16 ",%s,%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, info->proc_data.userid,
                    owner,ownerid,
@@ -842,9 +897,21 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
                    tcp_state_str[tcpe.state],
                    lip, tcpe.localport, rip, tcpe.remoteport);
             break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ",Owner=%s,OwnerId=%" PRIi64 ",Protocol=%s,TcpState=%s,"
+                   "LocalIp=%s,LocalPort=%" PRIu16 ",RemoteIp=%s,RemotePort=%" PRIu16 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner,ownerid,
+                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+                   tcp_state_str[tcpe.state],
+                   lip, tcpe.localport, rip, tcpe.remoteport);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s State:%s Local:%s:%u Remote:%s:%u\n",
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s State:%s Local:%s:%" PRIu16 " Remote:%s:%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
                    owner, USERIDSTR(drakvuf), ownerid,
@@ -951,16 +1018,26 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     switch (s->format)
     {
         case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%" PRIi64 ",%s,listener,%s,%u\n",
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%" PRIi64 ",%s,listener,%s,%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, info->proc_data.userid,
                    owner, ownerid,
                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                    lip, tcpl.port);
             break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ",Owner=%s,OwnerId=%" PRIi64 ",Protocol=%s,listener,LocalIp=%s,LocalPort=%" PRIu16 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner, ownerid,
+                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+                   lip, tcpl.port);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s listener %s:%u\n",
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s listener %s:%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    owner, USERIDSTR(drakvuf), ownerid,
@@ -1057,16 +1134,26 @@ static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     switch (s->format)
     {
         case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%" PRIi64 ",%s,listener,%s,%u\n",
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%" PRIi64 ",%s,listener,%s,%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, info->proc_data.userid,
                    owner, ownerid,
                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                    lip, tcpl.port);
             break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ",Owner=%s,OwnerId=%" PRIi64 ",Protocol=%s,listener,LocalIp=%s,LocalPort=%" PRIu16 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner, ownerid,
+                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+                   lip, tcpl.port);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s listener %s:%u\n",
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s listener %s:%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    owner, USERIDSTR(drakvuf), ownerid,
@@ -1163,16 +1250,26 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     switch (s->format)
     {
         case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%" PRIi64 ",%s,listener,%s,%u\n",
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%" PRIi64 ",%s,listener,%s,%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, info->proc_data.userid,
                    owner, ownerid,
                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                    lip, tcpl.port);
             break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ",Owner=%s,OwnerId=%" PRIi64 ",Protocol=%s,listener,LocalIp=%s,LocalPort=%" PRIu16 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner, ownerid,
+                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+                   lip, tcpl.port);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s listener %s:%u\n",
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s listener %s:%" PRIu16 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    owner, USERIDSTR(drakvuf), ownerid,

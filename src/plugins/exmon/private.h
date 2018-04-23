@@ -107,13 +107,18 @@
 
 #include "plugins/plugins.h"
 
+#define KV_FORMAT32 "exmon Time=" FORMAT_TIMEVAL ",RSP=%x,ExceptionRecord=0x%x,ExceptionCode=0x%x,FirstChance=%d,EIP=%x,EAX=%x,EBX=%x,ECX=%x,EDX=%x,EDI=%x,ESI=%x,EBP=%x,ESP=%x"
+#define KV_FORMAT64 "exmon Time=" FORMAT_TIMEVAL ",ExceptionRecord=0x%x,ExceptionCode=0x%x,FirstChance=%d,RIP=%x,RAX=%x,RBX=%x,RCX=%x,RDX=%x,RSP=%x,RBP=%x,RSI=%x,RDI=%x,R8=%x,R9=%x,R10=%x,R11=%x"
+
 #define CSV_FORMAT32 "exmon," FORMAT_TIMEVAL ",%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x"
 #define CSV_FORMAT64 "exmon," FORMAT_TIMEVAL ",%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x"
 
 #define DEFAULT_FORMAT32 "[EXMON] TIME:" FORMAT_TIMEVAL " RSP: %x EXCEPTION_RECORD: %x EXCEPTION_CODE: %x FIRST_CHANCE: %x EIP: %x EAX: %x EBX: %x ECX: %x EDX: %x EDI: %x ESI: %x EBP: %x ESP: %x"
-#define DEFAULT_FORMAT64 "[EXMON] TIME:" FORMAT_TIMEVAL " EXCEPTION_RECORD: %x EXCEPTION_CODE: %x FIRST_CHANCE: %x RIP: %x RAX: %x RBX: %x RCX: %x RDX: %x RSP: %x RBP: %x RSI: %x RDI: %x R8: %x R9: %x R10: %x R11:%x"
+#define DEFAULT_FORMAT64 "[EXMON] TIME:" FORMAT_TIMEVAL " EXCEPTION_RECORD: %x EXCEPTION_CODE: %x FIRST_CHANCE: %x RIP: %x RAX: %x RBX: %x RCX: %x RDX: %x RSP: %x RBP: %x RSI: %x RDI: %x R8: %x R9: %x R10: %x R11: %x"
 
 #define CSV_FORMAT_USER ",%d,%d,%s\n"
+
+#define KV_FORMAT_USER ",PID=%d,PPID=%d,Name=\"%s\"\n"
 
 #define DEFAULT_FORMAT_USER " PID: %d PPID: %d NAME: %s\n"
 

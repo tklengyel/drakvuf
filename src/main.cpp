@@ -225,6 +225,8 @@ int main(int argc, char** argv)
             case 'o':
                 if (!strncmp(optarg,"csv",3))
                     output = OUTPUT_CSV;
+                if (!strncmp(optarg,"kv",2))
+                    output = OUTPUT_KV;
                 break;
             case 'x':
                 disable_plugin(optarg, plugin_list);
