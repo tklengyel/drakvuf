@@ -144,7 +144,7 @@ static void print_process_creation_result(
     unicode_string_t* cmdline_us = drakvuf_read_unicode(drakvuf, info, cmdline_addr);
     unicode_string_t* imagepath_us = drakvuf_read_unicode(drakvuf, info, imagepath_addr);
 
-    char const* cmdline = cmdline_us ? reinterpret_cast<char const*>(cmdline_us->contents) : "";
+    char* cmdline = g_strescape(cmdline_us ? reinterpret_cast<char const*>(cmdline_us->contents) : "", NULL);
     char const* imagepath = imagepath_us ? reinterpret_cast<char const*>(imagepath_us->contents) : "";
 
     switch ( f->format )
@@ -172,6 +172,7 @@ static void print_process_creation_result(
             break;
     }
 
+    g_free(cmdline);
     if (cmdline_us) vmi_free_unicode_str(cmdline_us);
     if (imagepath_us) vmi_free_unicode_str(imagepath_us);
 }
