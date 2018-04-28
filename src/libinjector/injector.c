@@ -125,6 +125,7 @@ struct injector
     reg_t target_cr3;
     vmi_pid_t target_pid;
     uint32_t target_tid;
+    const char* cwd;
 
     // Internal:
     drakvuf_t drakvuf;
@@ -287,6 +288,9 @@ struct kapc_64
 
 static bool pass_inputs_createproc_32(struct injector* injector, drakvuf_trap_info_t* info, access_context_t* ctx)
 {
+    // TODO: implement
+    if (injector->cwd)
+        goto err;
 
     vmi_instance_t vmi = injector->vmi;
 
@@ -412,44 +416,47 @@ err:
     return 0;
 }
 
+static addr_t place_string_on_stack_64(vmi_instance_t vmi, access_context_t* ctx, addr_t addr, char const* str)
+{
+    if (!str) return addr;
+    // String length with null terminator
+    size_t len = strlen(str) + 1;
+    addr_t orig_addr = addr;
+
+    addr -= len;
+    // Align string address on 32B boundary (for SSE2 instructions).
+    addr &= ~0x1f;
+
+    size_t buf_len = orig_addr - addr;
+    void* buf = g_malloc0(buf_len);
+    g_stpcpy(buf, str);
+
+    ctx->addr = addr;
+    status_t status = vmi_write(vmi, ctx, buf_len, buf, NULL);
+    g_free(buf);
+
+    return status == VMI_FAILURE ? 0 : addr;
+}
+
 static bool pass_inputs_createproc_64(struct injector* injector, drakvuf_trap_info_t* info, access_context_t* ctx)
 {
-
     vmi_instance_t vmi = injector->vmi;
-
-    uint64_t nul64 = 0;
-    uint8_t nul8 = 0;
-    size_t len = strlen(injector->target_file);
-
     addr_t addr = info->regs->rsp;
+    uint64_t nul64 = 0;
+    addr_t str_addr, sip_addr, cwd_addr;
 
-    addr_t str_addr, sip_addr;
-
-    addr -= 0x8; // the stack has to be alligned to 0x8
-    // and we need a bit of extra buffer before the string for \0
-
-    // we just going to null out that extra space fully
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
-        goto err;
-
-    // this string has to be aligned as well!
-    addr -= len + 0x8 - (len % 0x8);
+    addr = place_string_on_stack_64(vmi, ctx, addr, injector->target_file);
+    if (!addr) goto err;
     str_addr = addr;
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write(vmi, ctx, len, (void*) injector->target_file, NULL))
-        goto err;
 
-    // add null termination
-    ctx->addr = addr+len;
-    if (VMI_FAILURE == vmi_write_8(vmi, ctx, &nul8))
-        goto err;
-
-    // Align stack after placing the string.
-    //
-    // The string's length is undefined and could misalign stack which must be
-    // aligned on 16B boundary (see Microsoft x64 ABI).
-    addr &= ~0x1f;
+    if (injector->cwd)
+    {
+        addr = place_string_on_stack_64(vmi, ctx, addr, injector->cwd);
+        if (!addr) goto err;
+        cwd_addr = addr;
+    }
+    else
+        cwd_addr = nul64;
 
     //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
     //
@@ -462,7 +469,7 @@ static bool pass_inputs_createproc_64(struct injector* injector, drakvuf_trap_in
     struct process_information_64 pi;
     memset(&pi, 0, sizeof(struct process_information_64));
 
-    len = sizeof(struct process_information_64);
+    size_t len = sizeof(struct process_information_64);
     addr -= len;
     injector->process_info = addr;
     ctx->addr = addr;
@@ -491,7 +498,7 @@ static bool pass_inputs_createproc_64(struct injector* injector, drakvuf_trap_in
     //p8
     addr -= 0x8;
     ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &cwd_addr))
         goto err;
 
     //p7
@@ -563,38 +570,22 @@ static bool pass_inputs_shellexec_64(struct injector* injector, drakvuf_trap_inf
     vmi_instance_t vmi = injector->vmi;
 
     uint64_t nul64 = 0;
-    uint8_t nul8 = 0;
-    size_t len = strlen(injector->target_file);
+    addr_t str_addr, cwd_addr;
 
     addr_t addr = info->regs->rsp;
 
-    addr_t str_addr;
-
-    addr -= 0x8; // the stack has to be alligned to 0x8
-    // and we need a bit of extra buffer before the string for \0
-
-    // we just going to null out that extra space fully
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
-        goto err;
-
-    // this string has to be aligned as well!
-    addr -= len + 0x8 - (len % 0x8);
+    addr = place_string_on_stack_64(vmi, ctx, addr, injector->target_file);
+    if (!addr) goto err;
     str_addr = addr;
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write(vmi, ctx, len, (void*) injector->target_file, NULL))
-        goto err;
 
-    // add null termination
-    ctx->addr = addr+len;
-    if (VMI_FAILURE == vmi_write_8(vmi, ctx, &nul8))
-        goto err;
-
-    // Align stack after placing the string.
-    //
-    // The string's length is undefined and could misalign stack which must be
-    // aligned on 16B boundary (see Microsoft x64 ABI).
-    addr &= ~0x1f;
+    if (injector->cwd)
+    {
+        addr = place_string_on_stack_64(vmi, ctx, addr, injector->cwd);
+        if (!addr) goto err;
+        cwd_addr = addr;
+    }
+    else
+        cwd_addr = nul64;
 
     //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
     //
@@ -612,7 +603,7 @@ static bool pass_inputs_shellexec_64(struct injector* injector, drakvuf_trap_inf
     //p5
     addr -= 0x8;
     ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &cwd_addr))
         goto err;
 
     //p1
@@ -1042,7 +1033,7 @@ static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t
     }
 }
 
-int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, injection_method_t method, output_format_t format)
+int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, const char* cwd, injection_method_t method, output_format_t format)
 {
 
     struct injector injector = { 0 };
@@ -1052,6 +1043,7 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
     injector.target_pid = pid;
     injector.target_tid = tid;
     injector.target_file = file;
+    injector.cwd = cwd;
 
     injector.method = method;
 
