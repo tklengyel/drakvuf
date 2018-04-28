@@ -131,6 +131,7 @@ public:
 
     addr_t command_line;
     addr_t image_path_name;
+    addr_t dll_path;
     addr_t object_header_body;
 
     procmon(drakvuf_t drakvuf, const void* config, output_format_t output);
