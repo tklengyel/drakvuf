@@ -138,24 +138,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
-static unicode_string_t* get_filename_from_handle(syscalls* s,
-        drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info,
-        addr_t handle)
-{
-    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
-
-    if (!process)
-        return NULL;
-
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
-    if ( !obj )
-        return NULL;
-
-    return drakvuf_read_unicode(drakvuf, info, obj + s->object_header_body + s->file_object_filename);
-}
-
-static unicode_string_t* extract_unicode_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val)
+static unicode_string_t* extract_unicode_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val)
 {
     if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
     {
@@ -167,7 +150,7 @@ static unicode_string_t* extract_unicode_string(syscalls* s, drakvuf_t drakvuf, 
 
         if ( !strcmp(arg.name, "FileHandle") )
         {
-            unicode_string_t* us = get_filename_from_handle(s, drakvuf, info, val);
+            unicode_string_t* us = drakvuf_get_filename_from_handle(drakvuf, info, val);
 
             if ( us ) return us;
         }
@@ -273,7 +256,7 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
     for ( size_t i=0; i<nargs; i++ )
     {
         addr_t val = ( 4 == s->reg_size ) ? args_data32[i] : args_data64[i];
-        unicode_string_t* us = extract_unicode_string(s, drakvuf, info, wsc->args[i], val);
+        unicode_string_t* us = extract_unicode_string(drakvuf, info, wsc->args[i], val);
 
         switch (s->format)
         {
@@ -404,11 +387,6 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
         addr_t ntoskrnl = drakvuf_get_kernel_base(drakvuf);
 
         if ( !ntoskrnl )
-            return NULL;
-
-        if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "Body", &s->object_header_body) )
-            return NULL;
-        if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_OBJECT", "FileName", &s->file_object_filename) )
             return NULL;
 
         for (i=0; i < symbols->count; i++)
@@ -561,8 +539,6 @@ static symbols_t* filter_symbols(const symbols_t* symbols, const char* filter_fi
 }
 
 syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output)
-    : file_object_filename{}
-    , object_header_body{}
 {
     const struct syscalls_config* c = (const struct syscalls_config*)config;
     symbols_t* symbols = drakvuf_get_symbols_from_rekall(c->rekall_profile);

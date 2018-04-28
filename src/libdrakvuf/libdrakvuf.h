@@ -400,6 +400,10 @@ char* drakvuf_reg_keyhandle_path( drakvuf_t drakvuf,
                                   addr_t key_handle,
                                   addr_t process_arg );
 
+unicode_string_t* drakvuf_get_filename_from_handle( drakvuf_t drakvuf,
+                                                    drakvuf_trap_info_t* info,
+                                                    addr_t handle );
+
 /*---------------------------------------------------------
  * Output helpers
  */

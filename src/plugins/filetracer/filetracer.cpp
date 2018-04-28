@@ -169,24 +169,6 @@ static unicode_string_t* read_wchar_array(vmi_instance_t vmi, const access_conte
     return out;
 }
 
-static unicode_string_t* get_filename_from_handle(
-    drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    addr_t handle)
-{
-    filetracer* f = (filetracer*)info->trap->data;
-    addr_t process=drakvuf_get_current_process(drakvuf, info->vcpu);
-
-    if (!process)
-        return NULL;
-
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
-    if ( !obj )
-        return NULL;
-
-    return drakvuf_read_unicode(drakvuf, info, obj + f->object_header_body + f->file_object_filename);
-}
-
 static void safe_free_unicode_str(unicode_string_t* us)
 {
     if (us) vmi_free_unicode_str(us);
@@ -213,7 +195,7 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         return 0;
     }
 
-    unicode_string_t* file_root_us = get_filename_from_handle(drakvuf, info, file_root_handle);
+    unicode_string_t* file_root_us = drakvuf_get_filename_from_handle(drakvuf, info, file_root_handle);
 
     ctx.addr = attr + f->objattr_name;
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
@@ -306,7 +288,7 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     if ( !dst_file_name_us )
         return;
 
-    unicode_string_t* src_file_us = get_filename_from_handle(drakvuf, info, src_file_handle);
+    unicode_string_t* src_file_us = drakvuf_get_filename_from_handle(drakvuf, info, src_file_handle);
     if ( !src_file_us )
     {
         vmi_free_unicode_str(dst_file_name_us);
@@ -316,7 +298,7 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     char* dst_file_p = NULL;
     if (dst_file_root_handle)
     {
-        unicode_string_t* dst_file_root_us = get_filename_from_handle(drakvuf, info, dst_file_root_handle);
+        unicode_string_t* dst_file_root_us = drakvuf_get_filename_from_handle(drakvuf, info, dst_file_root_handle);
         dst_file_p = g_strdup_printf("%s\\%s", dst_file_root_us->contents, dst_file_name_us->contents);
         vmi_free_unicode_str(dst_file_root_us);
     }
@@ -479,11 +461,6 @@ filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t ou
 //    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_RENAME_INFORMATION", "FileNameLength", &this->newfile_name_length_offset ) )
 //        throw -1;
     this->newfile_name_length_offset = addr_size * 2;
-
-    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "Body", &this->object_header_body) )
-        throw -1;
-    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_OBJECT", "FileName", &this->file_object_filename) )
-        throw -1;
 
     assert(sizeof(trap)/sizeof(trap[0]) > 9);
     register_trap(drakvuf, rekall_profile, "NtCreateFile",          &trap[0], cb);
