@@ -519,3 +519,39 @@ unicode_string_t* drakvuf_read_unicode_va(vmi_instance_t vmi, addr_t vaddr, vmi_
 
     return drakvuf_read_unicode_common(vmi, &ctx);
 }
+
+bool drakvuf_normalize_file_path_us(unicode_string_t* file_path)
+{
+    if (!file_path || !file_path->contents) return false;
+    if (g_ascii_strcasecmp((char*)file_path->encoding, "UTF-8")) return false;
+
+    bool changed = drakvuf_normalize_file_path((char**)&file_path->contents);
+    if (changed)
+    {
+        file_path->length = strlen((char*)file_path->contents);
+    }
+    return changed;
+}
+
+static bool remove_prefix(char* str, const char* prefix)
+{
+    bool has_prefix = g_str_has_prefix(str, prefix);
+    if (has_prefix)
+    {
+        size_t prefix_len = strlen(prefix);
+        char* new_str = str + prefix_len;
+        size_t new_len = strlen(new_str);
+        memmove(str, new_str, new_len + 1);
+        if (new_len == 0) g_strlcpy(str, "\\", prefix_len);
+    }
+    return has_prefix;
+}
+
+bool drakvuf_normalize_file_path(char** file_path)
+{
+    if (!file_path || !*file_path) return false;
+
+    return remove_prefix(*file_path, "\\Device\\HarddiskVolume2") ||
+           remove_prefix(*file_path, "\\??\\C:") ||
+           remove_prefix(*file_path, "C:");
+}

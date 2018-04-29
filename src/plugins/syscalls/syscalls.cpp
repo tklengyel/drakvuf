@@ -162,13 +162,14 @@ static unicode_string_t* extract_unicode_string(syscalls* s, drakvuf_t drakvuf, 
         if ( arg.type == PUNICODE_STRING )
         {
             unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
+            drakvuf_normalize_file_path_us(us);
             if ( us ) return us;
         }
 
         if ( !strcmp(arg.name, "FileHandle") )
         {
             unicode_string_t* us = get_filename_from_handle(s, drakvuf, info, val);
-
+            drakvuf_normalize_file_path_us(us);
             if ( us ) return us;
         }
     }

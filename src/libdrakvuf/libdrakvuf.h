@@ -408,6 +408,9 @@ bool drakvuf_get_current_process_data( drakvuf_t drakvuf,
                                        uint64_t vcpu_id,
                                        proc_data_t* proc_data );
 
+bool drakvuf_normalize_file_path_us( unicode_string_t* file_path );
+bool drakvuf_normalize_file_path( char** file_path );
+
 /*---------------------------------------------------------
  * Output helpers
  */

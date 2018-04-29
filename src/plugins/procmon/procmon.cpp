@@ -144,6 +144,8 @@ static void print_process_creation_result(
     unicode_string_t* cmdline_us = drakvuf_read_unicode(drakvuf, info, cmdline_addr);
     unicode_string_t* imagepath_us = drakvuf_read_unicode(drakvuf, info, imagepath_addr);
 
+    drakvuf_normalize_file_path_us(imagepath_us);
+
     char* cmdline = g_strescape(cmdline_us ? reinterpret_cast<char const*>(cmdline_us->contents) : "", NULL);
     char const* imagepath = imagepath_us ? reinterpret_cast<char const*>(imagepath_us->contents) : "";
 

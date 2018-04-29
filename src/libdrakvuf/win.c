@@ -118,6 +118,7 @@
 #include "win.h"
 #include "win-offsets.h"
 #include "win-offsets-map.h"
+#include "libdrakvuf.h"
 
 bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap,
                               addr_t list_head, vmi_pid_t pid)
@@ -142,33 +143,30 @@ bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap,
         if (!dllbase)
             break;
 
-        unicode_string_t* us = vmi_read_unicode_str_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
-        unicode_string_t out = { .contents = NULL };
+        unicode_string_t* us = drakvuf_read_unicode_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
 
         if (us)
         {
-            status_t status = vmi_convert_str_encoding(us, &out, "UTF-8");
-            if (VMI_SUCCESS == status)
-                PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", out.contents, dllbase);
+            PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", us->contents, dllbase);
 
+            bool match = (us->contents && !strcmp((char*)us->contents, trap->breakpoint.module));
             vmi_free_unicode_str(us);
-        }
 
-        if (out.contents && !strcmp((char*)out.contents,trap->breakpoint.module))
-        {
-            g_free(out.contents);
-            return inject_trap(drakvuf, trap, dllbase, pid);
+            if (match)
+            {
+                return inject_trap(drakvuf, trap, dllbase, pid);
+            }
         }
 
         next_module = tmp_next;
     }
 
-    return 0;
+    return false;
 }
 
 bool win_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out )
 {
-    addr_t base_addr ;
+    addr_t base_addr;
     size_t name_len = strlen( module_name );
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t next_module = module_list_head;
@@ -184,7 +182,7 @@ bool win_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const
         if ( module_list_head == tmp_next )
             break;
 
-        base_addr = 0 ;
+        base_addr = 0;
 
         if ( vmi_read_addr_va( vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], 4, &base_addr ) != VMI_SUCCESS )
             break;
@@ -192,27 +190,18 @@ bool win_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const
         if ( ! base_addr )
             break;
 
-        unicode_string_t* us = vmi_read_unicode_str_va( vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4 );
+        unicode_string_t* us = drakvuf_read_unicode_va( vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4 );
 
         if ( us )
         {
-            unicode_string_t out = { 0 };
-            if ( VMI_FAILURE == vmi_convert_str_encoding( us, &out, "UTF-8" ) )
-            {
-                vmi_free_unicode_str(us);
-                break;
-            }
-
-            if ( ! strncasecmp( (char*)out.contents, module_name, name_len ) )
-            {
-                free( out.contents );
-                vmi_free_unicode_str( us );
-                *base_addr_out = base_addr ;
-                return true ;
-            }
-
-            free( out.contents );
+            bool match = !strncasecmp( (char*)us->contents, module_name, name_len );
             vmi_free_unicode_str( us );
+
+            if ( match )
+            {
+                *base_addr_out = base_addr;
+                return true;
+            }
         }
 
         next_module = tmp_next;
@@ -220,7 +209,7 @@ bool win_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const
     }
 
     PRINT_DEBUG("Failed to find %s in list starting at 0x%lx\n", module_name, module_list_head);
-    return false ;
+    return false;
 }
 
 static bool find_kernbase(drakvuf_t drakvuf)
@@ -229,37 +218,37 @@ static bool find_kernbase(drakvuf_t drakvuf)
     if ( VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "PsInitialSystemProcess", &sysproc) )
     {
         printf("LibVMI failed to get us the VA of PsInitialSystemProcess!\n");
-        return 0;
+        return false;
     }
 
     if ( !drakvuf_get_constant_rva(drakvuf->rekall_profile, "PsInitialSystemProcess", &sysproc_rva) )
     {
         fprintf(stderr, "Failed to get PsInitialSystemProcess RVA from Rekall profile!\n");
-        return 0;
+        return false;
     }
 
     drakvuf->kernbase = sysproc - sysproc_rva;
     PRINT_DEBUG("Windows kernel base address is 0x%lx\n", drakvuf->kernbase);
 
-    return 1;
+    return true;
 }
 
 bool set_os_windows(drakvuf_t drakvuf)
 {
 
     if ( !find_kernbase(drakvuf) )
-        return 0;
+        return false;
 
     // Get the offsets from the Rekall profile
     if ( !fill_offsets_from_rekall(drakvuf, __WIN_OFFSETS_MAX, win_offset_names) )
-        return 0;
+        return false;
 
     drakvuf->sizes = g_malloc0(sizeof(size_t) * __WIN_SIZES_MAX);
     if ( !drakvuf->sizes )
-        return 0;
+        return false;
 
     if ( !drakvuf_get_struct_size(drakvuf->rekall_profile, "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY]) )
-        return 0;
+        return false;
 
     drakvuf->osi.get_current_thread = win_get_current_thread;
     drakvuf->osi.get_current_process = win_get_current_process;
@@ -281,5 +270,5 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_process_ppid = win_get_process_ppid;
     drakvuf->osi.get_current_process_data = win_get_current_process_data;
 
-    return 1;
-};
+    return true;
+}

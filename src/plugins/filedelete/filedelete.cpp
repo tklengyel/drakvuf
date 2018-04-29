@@ -368,6 +368,7 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
         return;
 
     unicode_string_t* filename_us = drakvuf_read_unicode(drakvuf, info, filename);
+    drakvuf_normalize_file_path_us(filename_us);
 
     if (filename_us)
     {
