@@ -387,19 +387,6 @@ bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
                                    const char* module_name,
                                    addr_t* base_addr );
 
-char* drakvuf_reg_keybody_path( drakvuf_t drakvuf,
-                                drakvuf_trap_info_t* info,
-                                addr_t p_key_body );
-
-char* drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf,
-                                        drakvuf_trap_info_t* info,
-                                        addr_t p_key_control_block );
-
-char* drakvuf_reg_keyhandle_path( drakvuf_t drakvuf,
-                                  drakvuf_trap_info_t* info,
-                                  addr_t key_handle,
-                                  addr_t process_arg );
-
 status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
                                    addr_t process_base,
                                    vmi_pid_t* ppid );
@@ -407,6 +394,11 @@ status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
 bool drakvuf_get_current_process_data( drakvuf_t drakvuf,
                                        uint64_t vcpu_id,
                                        proc_data_t* proc_data );
+
+char* drakvuf_reg_keyhandle_path( drakvuf_t drakvuf,
+                                  drakvuf_trap_info_t* info,
+                                  addr_t key_handle,
+                                  addr_t process_arg );
 
 /*---------------------------------------------------------
  * Output helpers
