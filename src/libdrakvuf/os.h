@@ -159,10 +159,13 @@ typedef struct os_interface
     (drakvuf_t drakvuf, addr_t process_addr, const char* module, const char* sym);
 
     status_t (*get_process_ppid)
-    ( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid );
+    (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid);
 
     bool (*get_current_process_data)
     (drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t* proc_data);
+
+    char* (*get_registry_keyhandle_path)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t key_handle, addr_t process_arg );
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);

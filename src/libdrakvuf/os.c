@@ -290,3 +290,11 @@ bool drakvuf_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc
 
     return false;
 }
+
+char* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t key_handle, addr_t process_arg )
+{
+    if ( drakvuf->osi.get_registry_keyhandle_path )
+        return drakvuf->osi.get_registry_keyhandle_path( drakvuf, info, key_handle, process_arg );
+
+    return NULL;
+}

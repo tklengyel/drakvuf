@@ -114,7 +114,7 @@
 #include "win-offsets.h"
 
 
-char* drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t p_key_control_block )
+static char* win_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t p_key_control_block )
 {
     status_t vmi_status ;
     addr_t p_name_control_block = 0 ;
@@ -174,7 +174,7 @@ char* drakvuf_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_t* 
 }
 
 
-char* drakvuf_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t p_key_body )
+static char* win_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t p_key_body )
 {
     char* buf_ret = NULL ;
     status_t vmi_status ;
@@ -196,7 +196,7 @@ char* drakvuf_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, ad
 
         while ( ( vmi_status == VMI_SUCCESS ) && p_key_control_block )
         {
-            char* key_path = drakvuf_reg_keycontrolblock_path( drakvuf, info, p_key_control_block );
+            char* key_path = win_reg_keycontrolblock_path( drakvuf, info, p_key_control_block );
 
             if ( key_path )
             {
@@ -239,7 +239,7 @@ char* drakvuf_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, ad
 }
 
 
-char* drakvuf_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t key_handle, addr_t process_arg )
+char* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t key_handle, addr_t process_arg )
 {
     addr_t process = process_arg ;
 
@@ -256,7 +256,7 @@ char* drakvuf_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
             addr_t p_key_body = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
 
             if ( p_key_body )
-                return drakvuf_reg_keybody_path( drakvuf, info, p_key_body );
+                return win_reg_keybody_path( drakvuf, info, p_key_body );
         }
     }
 
