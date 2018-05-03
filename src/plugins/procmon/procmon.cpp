@@ -147,13 +147,24 @@ static void print_process_creation_result(
     unicode_string_t* cmdline_us = drakvuf_read_unicode(drakvuf, info, cmdline_addr);
     unicode_string_t* imagepath_us = drakvuf_read_unicode(drakvuf, info, imagepath_addr);
     unicode_string_t* dllpath_us = drakvuf_read_unicode(drakvuf, info, dllpath_addr);
-    unicode_string_t* curdir_us = drakvuf_get_filename_from_handle(drakvuf, info, curdir_handle_addr);
-    if (!curdir_us) curdir_us = drakvuf_read_unicode(drakvuf, info, curdir_dospath_addr);
+
+    char* curdir = drakvuf_get_filename_from_handle(drakvuf, info, curdir_handle_addr);
+    if (!curdir)
+    {
+        unicode_string_t* curdir_us = drakvuf_read_unicode(drakvuf, info, curdir_dospath_addr);
+        if (curdir_us)
+        {
+            curdir = (char*)curdir_us->contents;
+            curdir_us->contents = nullptr;
+            vmi_free_unicode_str(curdir_us);
+        }
+        else
+            curdir = g_strdup("");
+    }
 
     char* cmdline = g_strescape(cmdline_us ? reinterpret_cast<char const*>(cmdline_us->contents) : "", NULL);
     char const* imagepath = imagepath_us ? reinterpret_cast<char const*>(imagepath_us->contents) : "";
     char const* dllpath = dllpath_us ? reinterpret_cast<char const*>(dllpath_us->contents) : "";
-    char const* curdir = curdir_us ? reinterpret_cast<char const*>(curdir_us->contents) : "";
 
     switch ( f->format )
     {
@@ -182,10 +193,10 @@ static void print_process_creation_result(
     }
 
     g_free(cmdline);
+    g_free(curdir);
     if (cmdline_us) vmi_free_unicode_str(cmdline_us);
     if (imagepath_us) vmi_free_unicode_str(imagepath_us);
     if (dllpath_us) vmi_free_unicode_str(dllpath_us);
-    if (curdir_us) vmi_free_unicode_str(curdir_us);
 }
 
 static vmi_pid_t get_pid_from_handle(procmon* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)

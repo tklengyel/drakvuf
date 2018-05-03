@@ -103,17 +103,12 @@
  ***************************************************************************/
 
 #include <libvmi/libvmi.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <sys/mman.h>
-#include <stdio.h>
-#include <glib.h>
 
+#include "win.h"
 #include "private.h"
 #include "win-offsets.h"
 
-unicode_string_t* drakvuf_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)
+char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)
 {
     addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
     if (!process) return NULL;
@@ -121,5 +116,12 @@ unicode_string_t* drakvuf_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_tr
     addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
     if (!obj) return NULL;
 
-    return drakvuf_read_unicode(drakvuf, info, obj + drakvuf->offsets[OBJECT_HEADER_BODY] + drakvuf->offsets[FILEOBJECT_NAME]);
+    unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, obj + drakvuf->offsets[OBJECT_HEADER_BODY] + drakvuf->offsets[FILEOBJECT_NAME]);
+    if (!us) return NULL;
+
+    char* filename = (char*)us->contents;
+    us->contents = NULL;
+    vmi_free_unicode_str(us);
+
+    return filename;
 }

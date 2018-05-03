@@ -138,21 +138,26 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
-static unicode_string_t* extract_unicode_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val)
+static char* extract_utf8_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val)
 {
     if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
     {
         if ( arg.type == PUNICODE_STRING )
         {
             unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
-            if ( us ) return us;
+            if ( us )
+            {
+                char* str = (char*)us->contents;
+                us->contents = nullptr;
+                vmi_free_unicode_str(us);
+                return str;
+            }
         }
 
         if ( !strcmp(arg.name, "FileHandle") )
         {
-            unicode_string_t* us = drakvuf_get_filename_from_handle(drakvuf, info, val);
-
-            if ( us ) return us;
+            char* filename = drakvuf_get_filename_from_handle(drakvuf, info, val);
+            if ( filename ) return filename;
         }
     }
 
@@ -199,7 +204,7 @@ static void print_nargs(output_format_t format, uint32_t nargs)
     }
 }
 
-static void print_csv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const unicode_string_t* us)
+static void print_csv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const char* str)
 {
     printf(",%s,%s,%s,", win_arg_direction_names[arg.dir], win_type_names[arg.type], arg.name);
 
@@ -208,19 +213,19 @@ static void print_csv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* i
     else
         printf("0x%" PRIx64 ",", static_cast<uint64_t>(val));
 
-    if ( us )
+    if ( str )
     {
-        printf("%s", us->contents);
+        printf("%s", str);
     }
 
     printf(",");
 }
 
-static void print_kv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const unicode_string_t* us)
+static void print_kv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const char* str)
 {
-    if ( us )
+    if ( str )
     {
-        printf(",%s=\"%s\"", arg.name, us->contents);
+        printf(",%s=\"%s\"", arg.name, str);
         return;
     }
 
@@ -230,7 +235,7 @@ static void print_kv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* in
         printf(",%s=0x%" PRIx64, arg.name, static_cast<uint64_t>(val));
 }
 
-static void print_default_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const unicode_string_t* us)
+static void print_default_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const char* str)
 {
     printf("\t%s %s %s: ", win_arg_direction_names[arg.dir], win_type_names[arg.type], arg.name);
 
@@ -239,9 +244,9 @@ static void print_default_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_
     else
         printf("0x%" PRIx64, static_cast<uint64_t>(val));
 
-    if ( us )
+    if ( str )
     {
-        printf(" -> '%s'", us->contents);
+        printf(" -> '%s'", str);
     }
 
     printf("\n");
@@ -256,26 +261,23 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
     for ( size_t i=0; i<nargs; i++ )
     {
         addr_t val = ( 4 == s->reg_size ) ? args_data32[i] : args_data64[i];
-        unicode_string_t* us = extract_unicode_string(drakvuf, info, wsc->args[i], val);
+        char* str = extract_utf8_string(drakvuf, info, wsc->args[i], val);
 
         switch (s->format)
         {
             case OUTPUT_CSV:
-                print_csv_arg(s, drakvuf, info, wsc->args[i], val, us);
+                print_csv_arg(s, drakvuf, info, wsc->args[i], val, str);
                 break;
             case OUTPUT_KV:
-                print_kv_arg(s, drakvuf, info, wsc->args[i], val, us);
+                print_kv_arg(s, drakvuf, info, wsc->args[i], val, str);
                 break;
             default:
             case OUTPUT_DEFAULT:
-                print_default_arg(s, drakvuf, info, wsc->args[i], val, us);
+                print_default_arg(s, drakvuf, info, wsc->args[i], val, str);
                 break;
         }
 
-        if ( us )
-        {
-            vmi_free_unicode_str(us);
-        }
+        g_free(str);
     }
 }
 
