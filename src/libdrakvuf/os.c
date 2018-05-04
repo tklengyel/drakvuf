@@ -298,3 +298,11 @@ char* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
 
     return NULL;
 }
+
+char* drakvuf_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)
+{
+    if ( drakvuf->osi.get_filename_from_handle )
+        return drakvuf->osi.get_filename_from_handle( drakvuf, info, handle );
+
+    return NULL;
+}

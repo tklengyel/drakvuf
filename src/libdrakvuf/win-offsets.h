@@ -169,6 +169,8 @@ enum win_offsets
 
     OBJECTNAMEINFORMATION_NAME,
 
+    FILEOBJECT_NAME,
+
     __WIN_OFFSETS_MAX
 };
 

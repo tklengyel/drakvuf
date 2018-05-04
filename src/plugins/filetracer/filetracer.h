@@ -119,7 +119,6 @@ public:
     addr_t newfile_name_offset;
     addr_t newfile_name_length_offset;
     addr_t newfile_root_offset;
-    addr_t file_object_filename, object_header_body;
 
     drakvuf_trap_t trap[10] =
     {

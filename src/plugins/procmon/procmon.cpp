@@ -140,41 +140,63 @@ static void print_process_creation_result(
 {
     addr_t cmdline_addr = user_process_parameters_addr + f->command_line;
     addr_t imagepath_addr = user_process_parameters_addr + f->image_path_name;
+    addr_t dllpath_addr = user_process_parameters_addr + f->dll_path;
+    addr_t curdir_handle_addr = user_process_parameters_addr + f->current_directory_handle;
+    addr_t curdir_dospath_addr = user_process_parameters_addr + f->current_directory_dospath;
 
     unicode_string_t* cmdline_us = drakvuf_read_unicode(drakvuf, info, cmdline_addr);
     unicode_string_t* imagepath_us = drakvuf_read_unicode(drakvuf, info, imagepath_addr);
+    unicode_string_t* dllpath_us = drakvuf_read_unicode(drakvuf, info, dllpath_addr);
+
+    char* curdir = drakvuf_get_filename_from_handle(drakvuf, info, curdir_handle_addr);
+    if (!curdir)
+    {
+        unicode_string_t* curdir_us = drakvuf_read_unicode(drakvuf, info, curdir_dospath_addr);
+        if (curdir_us)
+        {
+            curdir = (char*)curdir_us->contents;
+            curdir_us->contents = nullptr;
+            vmi_free_unicode_str(curdir_us);
+        }
+        else
+            curdir = g_strdup("");
+    }
 
     char* cmdline = g_strescape(cmdline_us ? reinterpret_cast<char const*>(cmdline_us->contents) : "", NULL);
     char const* imagepath = imagepath_us ? reinterpret_cast<char const*>(imagepath_us->contents) : "";
+    char const* dllpath = dllpath_us ? reinterpret_cast<char const*>(dllpath_us->contents) : "";
 
     switch ( f->format )
     {
         case OUTPUT_CSV:
-            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,0x%" PRIx64 ",%d,%s,%s\n",
+            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,0x%" PRIx64 ",%d,%s,%s,%s,%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name, status, new_pid, cmdline, imagepath);
+                   info->proc_data.userid, info->trap->name, status, new_pid, cmdline, imagepath, dllpath, curdir);
             break;
 
         case OUTPUT_KV:
             printf("procmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
-                   "Method=%s,Status=0x%" PRIx64 ",NewPid=%d,CommandLine=\"%s\",ImagePathName=\"%s\"\n",
+                   "Method=%s,Status=0x%" PRIx64 ",NewPid=%d,CommandLine=\"%s\",ImagePathName=\"%s\",DllPath=\"%s\",CWD=\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, status, new_pid, cmdline, imagepath);
+                   info->trap->name, status, new_pid, cmdline, imagepath, dllpath, curdir);
             break;
 
         default:
         case OUTPUT_DEFAULT:
             printf("[PROCMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64
-                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s:0x%" PRIx64 ":%d:%s:%s\n",
+                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s:0x%" PRIx64 ":%d:%s:%s:%s:%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr,
                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, status, new_pid, cmdline, imagepath);
+                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, status, new_pid,
+                   cmdline, imagepath, dllpath, curdir);
             break;
     }
 
     g_free(cmdline);
+    g_free(curdir);
     if (cmdline_us) vmi_free_unicode_str(cmdline_us);
     if (imagepath_us) vmi_free_unicode_str(imagepath_us);
+    if (dllpath_us) vmi_free_unicode_str(dllpath_us);
 }
 
 static vmi_pid_t get_pid_from_handle(procmon* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)
@@ -439,6 +461,19 @@ procmon::procmon(drakvuf_t drakvuf, const void* config, output_format_t output)
         throw -1;
     if (!drakvuf_get_struct_member_rva(rekall_profile, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &this->image_path_name))
         throw -1;
+    if (!drakvuf_get_struct_member_rva(rekall_profile, "_RTL_USER_PROCESS_PARAMETERS", "DllPath", &this->dll_path))
+        throw -1;
+    addr_t current_directory_offset;
+    if (!drakvuf_get_struct_member_rva(rekall_profile, "_RTL_USER_PROCESS_PARAMETERS", "CurrentDirectory", &current_directory_offset))
+        throw -1;
+    addr_t curdir_handle_offset;
+    if (!drakvuf_get_struct_member_rva(rekall_profile, "_CURDIR", "Handle", &curdir_handle_offset))
+        throw -1;
+    addr_t curdir_dospath_offset;
+    if (!drakvuf_get_struct_member_rva(rekall_profile, "_CURDIR", "DosPath", &curdir_dospath_offset))
+        throw -1;
+    this->current_directory_handle = current_directory_offset + curdir_handle_offset;
+    this->current_directory_dospath = current_directory_offset + curdir_dospath_offset;
     if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "Body", &this->object_header_body) )
         throw -1;
 

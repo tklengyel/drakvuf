@@ -169,24 +169,6 @@ static unicode_string_t* read_wchar_array(vmi_instance_t vmi, const access_conte
     return out;
 }
 
-static unicode_string_t* get_filename_from_handle(
-    drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    addr_t handle)
-{
-    filetracer* f = (filetracer*)info->trap->data;
-    addr_t process=drakvuf_get_current_process(drakvuf, info->vcpu);
-
-    if (!process)
-        return NULL;
-
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
-    if ( !obj )
-        return NULL;
-
-    return drakvuf_read_unicode(drakvuf, info, obj + f->object_header_body + f->file_object_filename);
-}
-
 static void safe_free_unicode_str(unicode_string_t* us)
 {
     if (us) vmi_free_unicode_str(us);
@@ -213,52 +195,56 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         return 0;
     }
 
-    unicode_string_t* file_root_us = get_filename_from_handle(drakvuf, info, file_root_handle);
+    char* file_root = drakvuf_get_filename_from_handle(drakvuf, info, file_root_handle);
 
     ctx.addr = attr + f->objattr_name;
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
     {
-        safe_free_unicode_str(file_root_us);
+        g_free(file_root);
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
 
     unicode_string_t* file_name_us = drakvuf_read_unicode(drakvuf, info, ctx.addr);
+    drakvuf_release_vmi(drakvuf);
+
     if ( !file_name_us )
     {
-        safe_free_unicode_str(file_root_us);
-        drakvuf_release_vmi(drakvuf);
+        g_free(file_root);
         return 0;
     }
 
-    const char* file_root = file_root_us ? (const char*)file_root_us->contents : "";
-    const char* file_sep = file_root_us ? "\\" : "";
-    const char* file_name = (const char*)file_name_us->contents;
+    char* file_path = g_strdup_printf("%s%s%s",
+                                      file_root ?: "",
+                                      file_root ? "\\" : "",
+                                      file_name_us->contents);
+
+    safe_free_unicode_str(file_name_us);
+    g_free(file_root);
 
     switch (f->format)
     {
         case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s%s%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, file_root, file_sep, file_name);
+            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, file_path);
             break;
 
         case OUTPUT_KV:
-            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s%s%s\"\n",
+            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   syscall_name, file_root, file_sep, file_name);
+                   syscall_name, file_path);
             break;
 
         default:
         case OUTPUT_DEFAULT:
-            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s%s%s\n",
+            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, file_root, file_sep, file_name);
+                   USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, file_path);
             break;
     }
 
-    safe_free_unicode_str(file_name_us);
-    safe_free_unicode_str(file_root_us);
-    drakvuf_release_vmi(drakvuf);
+    g_free(file_path);
+
     return 0;
 }
 
@@ -306,8 +292,8 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     if ( !dst_file_name_us )
         return;
 
-    unicode_string_t* src_file_us = get_filename_from_handle(drakvuf, info, src_file_handle);
-    if ( !src_file_us )
+    char* src_file = drakvuf_get_filename_from_handle(drakvuf, info, src_file_handle);
+    if ( !src_file )
     {
         vmi_free_unicode_str(dst_file_name_us);
         return;
@@ -316,9 +302,9 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     char* dst_file_p = NULL;
     if (dst_file_root_handle)
     {
-        unicode_string_t* dst_file_root_us = get_filename_from_handle(drakvuf, info, dst_file_root_handle);
-        dst_file_p = g_strdup_printf("%s\\%s", dst_file_root_us->contents, dst_file_name_us->contents);
-        vmi_free_unicode_str(dst_file_root_us);
+        char* dst_file_root = drakvuf_get_filename_from_handle(drakvuf, info, dst_file_root_handle);
+        dst_file_p = g_strdup_printf("%s\\%s", dst_file_root ?: "", dst_file_name_us->contents);
+        g_free(dst_file_root);
     }
     else if (is_absolute_path(reinterpret_cast<char*>(dst_file_name_us->contents)))
     {
@@ -326,8 +312,8 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     }
     else
     {
-        char* dst_file_root_p = get_parent_folder(reinterpret_cast<char*>(src_file_us->contents));
-        dst_file_p = g_strdup_printf("%s\\%s", dst_file_root_p, dst_file_name_us->contents);
+        char* dst_file_root_p = get_parent_folder(src_file);
+        dst_file_p = g_strdup_printf("%s\\%s", dst_file_root_p ?: "", dst_file_name_us->contents);
         g_free(dst_file_root_p);
     }
     vmi_free_unicode_str(dst_file_name_us);
@@ -337,26 +323,26 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
         case OUTPUT_CSV:
             printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,%s,%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
-                   syscall_name, operation_name, src_file_us->contents, dst_file_p);
+                   syscall_name, operation_name, src_file, dst_file_p);
             break;
 
         case OUTPUT_KV:
             printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Operation=%s,FileSrc=\"%s\",FileDst=\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    syscall_name, operation_name,
-                   src_file_us->contents, dst_file_p);
+                   src_file, dst_file_p);
             break;
 
         default:
         case OUTPUT_DEFAULT:
             printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,%s,%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
-                   syscall_name, operation_name, src_file_us->contents, dst_file_p);
+                   syscall_name, operation_name, src_file, dst_file_p);
             break;
     }
 
     g_free(dst_file_p);
-    vmi_free_unicode_str(src_file_us);
+    g_free(src_file);
 }
 
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -479,11 +465,6 @@ filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t ou
 //    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_RENAME_INFORMATION", "FileNameLength", &this->newfile_name_length_offset ) )
 //        throw -1;
     this->newfile_name_length_offset = addr_size * 2;
-
-    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "Body", &this->object_header_body) )
-        throw -1;
-    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_OBJECT", "FileName", &this->file_object_filename) )
-        throw -1;
 
     assert(sizeof(trap)/sizeof(trap[0]) > 9);
     register_trap(drakvuf, rekall_profile, "NtCreateFile",          &trap[0], cb);
