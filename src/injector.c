@@ -193,7 +193,7 @@ int main(int argc, char** argv)
     if (pid > 0 && file_path)
     {
         printf("Injector starting %s through PID %u TID: %u\n", file_path, pid, tid);
-        int injection_result = injector_start_app(drakvuf, pid, tid, file_path, method, OUTPUT_DEFAULT);
+        int injection_result = injector_start_app(drakvuf, pid, tid, file_path, NULL, method, OUTPUT_DEFAULT);
 
         if (!injection_result)
         {
