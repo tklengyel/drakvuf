@@ -124,6 +124,7 @@ int injector_start_app(drakvuf_t drakvuf,
                        vmi_pid_t pid,
                        uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
                        const char* app,
+                       const char* cwd,
                        injection_method_t method,
                        output_format_t format);
 

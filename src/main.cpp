@@ -131,7 +131,8 @@ static inline void disable_plugin(char* optarg, bool* plugin_list)
 int main(int argc, char** argv)
 {
     int c, rc = 1, timeout = 0;
-    char* inject_file = NULL;
+    char const* inject_file = NULL;
+    char const* inject_cwd = NULL;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     char* domain = NULL;
     char* rekall_profile = NULL;
@@ -166,6 +167,7 @@ int main(int argc, char** argv)
                 "\t -i <injection pid>        The PID of the process to hijack for injection\n"
                 "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
                 "\t -e <inject_file>          The executable to start with injection\n"
+                "\t -c <current_working_dir>  The current working directory for injected executable\n"
                 "\t -m <inject_method>        The injection method (default or shellexec for Windows amd64 only)\n"
                 "\t -t <timeout>              Timeout (in seconds)\n"
                 "\t -o <format>               Output format (default or csv)\n"
@@ -192,7 +194,7 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:M")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:Mc:")) != -1)
         switch (c)
         {
             case 'r':
@@ -209,6 +211,9 @@ int main(int argc, char** argv)
                 break;
             case 'e':
                 inject_file = optarg;
+                break;
+            case 'c':
+                inject_cwd = optarg;
                 break;
             case 'm':
                 if (!strncmp(optarg,"shellexec",9))
@@ -297,7 +302,7 @@ int main(int argc, char** argv)
     if ( injection_pid > 0 && inject_file )
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, injection_method, output);
+        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output);
         if (!ret)
             goto exit;
     }
