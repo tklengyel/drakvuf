@@ -102,61 +102,26 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_OFFSETS_MAP_H
-#define WIN_OFFSETS_MAP_H
+#include <libvmi/libvmi.h>
 
-/*
- * Map offset enums to actual structure+member or global variable/function names.
- */
-static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
+#include "win.h"
+#include "private.h"
+#include "win-offsets.h"
+
+char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)
 {
-    [KIINITIALPCR] = { "KiInitialPCR", NULL },
-    [EPROCESS_PID] = { "_EPROCESS", "UniqueProcessId" },
-    [EPROCESS_PDBASE] = { "_KPROCESS", "DirectoryTableBase" },
-    [EPROCESS_PNAME] = { "_EPROCESS", "ImageFileName" },
-    [EPROCESS_PROCCREATIONINFO] = { "_EPROCESS", "SeAuditProcessCreationInfo" },
-    [EPROCESS_TASKS] = { "_EPROCESS", "ActiveProcessLinks" },
-    [EPROCESS_PEB] = { "_EPROCESS", "Peb" },
-    [EPROCESS_OBJECTTABLE] = {"_EPROCESS", "ObjectTable" },
-    [EPROCESS_PCB] = { "_EPROCESS", "Pcb" },
-    [EPROCESS_INHERITEDPID] = { "_EPROCESS", "InheritedFromUniqueProcessId" },
-    [KPROCESS_HEADER] = { "_KPROCESS", "Header" },
-    [PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
-    [PEB_LDR] = { "_PEB", "Ldr" },
-    [PEB_SESSIONID] = { "_PEB", "SessionId" },
-    [PEB_LDR_DATA_INLOADORDERMODULELIST] = {"_PEB_LDR_DATA", "InLoadOrderModuleList" },
-    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
-    [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
-    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
-    [HANDLE_TABLE_TABLECODE] = {"_HANDLE_TABLE", "TableCode" },
-    [KPCR_PRCB] = {"_KPCR", "Prcb" },
-    [KPCR_PRCBDATA] = {"_KPCR", "PrcbData" },
-    [KPRCB_CURRENTTHREAD] = { "_KPRCB", "CurrentThread" },
-    [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
-    [KTHREAD_PREVIOUSMODE] = { "_KTHREAD", "PreviousMode" },
-    [KTHREAD_HEADER] = { "_KTHREAD", "Header" },
-    [ETHREAD_CID] = {"_ETHREAD", "Cid" },
-    [ETHREAD_TCB] = { "_ETHREAD", "Tcb" },
-    [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
-    [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
-    [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
-    [POOL_HEADER_BLOCKSIZE] = {"_POOL_HEADER", "BlockSize" },
-    [POOL_HEADER_POOLTYPE] = {"_POOL_HEADER", "PoolType" },
-    [POOL_HEADER_POOLTAG] = {"_POOL_HEADER", "PoolTag" },
-    [DISPATCHER_TYPE] = { "_DISPATCHER_HEADER",  "Type" },
+    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
+    if (!process) return NULL;
 
-    [CM_KEY_CONTROL_BLOCK] = { "_CM_KEY_BODY",           "KeyControlBlock" },
-    [CM_KEY_NAMEBLOCK]     = { "_CM_KEY_CONTROL_BLOCK",  "NameBlock"       },
-    [CM_KEY_NAMEBUFFER]    = { "_CM_NAME_CONTROL_BLOCK", "Name"            },
-    [CM_KEY_NAMELENGTH]    = { "_CM_NAME_CONTROL_BLOCK", "NameLength"      },
-    [CM_KEY_PARENTKCB]     = { "_CM_KEY_CONTROL_BLOCK",  "ParentKcb"       },
-    [CM_KEY_PROCESSID]     = { "_CM_KEY_BODY",           "ProcessID"       },
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
+    if (!obj) return NULL;
 
-    [PROCCREATIONINFO_IMAGEFILENAME] = { "_SE_AUDIT_PROCESS_CREATION_INFO", "ImageFileName" },
-    [OBJECTNAMEINFORMATION_NAME] = { "_OBJECT_NAME_INFORMATION", "Name" },
+    unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, obj + drakvuf->offsets[OBJECT_HEADER_BODY] + drakvuf->offsets[FILEOBJECT_NAME]);
+    if (!us) return NULL;
 
-    [FILEOBJECT_NAME] = { "_FILE_OBJECT", "FileName" },
+    char* filename = (char*)us->contents;
+    us->contents = NULL;
+    vmi_free_unicode_str(us);
 
-};
-
-#endif
+    return filename;
+}
