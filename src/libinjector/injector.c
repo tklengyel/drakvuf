@@ -1022,24 +1022,69 @@ static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t
     GTimeVal t;
     g_get_current_time(&t);
 
+    size_t str_length = strlen(file);
+    char* process_name = NULL;
+    char* arguments = NULL;
+
+    char stop_on = ' ';
+    const char* begin_proc_name = &file[0];
+
+    if (str_length > 1)
+    {
+        if (file[0] == '"')
+        {
+            stop_on = '"';
+            begin_proc_name = &file[1];
+        }
+
+        char* cut_off = strchr(begin_proc_name, stop_on);
+        size_t process_length = (cut_off) ? ((size_t)(cut_off - begin_proc_name)) : str_length;
+        process_name = g_strndup(begin_proc_name, process_length);
+
+        if (process_length < str_length)
+        {
+            if (stop_on == '"')
+                ++cut_off;
+            if ( *cut_off == ' ' )
+                ++cut_off;
+
+            arguments = g_strndup(cut_off, str_length);
+        }
+    }
+    else
+    {
+        process_name = g_strndup(file, str_length);
+    }
+
+    if (!arguments)
+    {
+        arguments = g_strdup("");
+    }
+
+    char* ecaped_arguments = g_strescape(arguments, NULL);
+
     switch (format)
     {
         case OUTPUT_CSV:
-            printf("inject," FORMAT_TIMEVAL ",%u,0x%lx,\"%s\",%u,%u\n",
-                   UNPACK_TIMEVAL(t), pid, dtb, file, injected_pid, injected_tid);
+            printf("inject," FORMAT_TIMEVAL ",%u,0x%lx,\"%s\",\"%s\",%u,%u\n",
+                   UNPACK_TIMEVAL(t), pid, dtb, process_name, ecaped_arguments, injected_pid, injected_tid);
             break;
 
         case OUTPUT_KV:
-            printf("inject Time=" FORMAT_TIMEVAL ",PID=%u,DTB=0x%lx,ProcessName=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
-                   UNPACK_TIMEVAL(t), pid, dtb, file, injected_pid, injected_tid);
+            printf("inject Time=" FORMAT_TIMEVAL ",PID=%u,DTB=0x%lx,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
+                   UNPACK_TIMEVAL(t), pid, dtb, process_name, ecaped_arguments, injected_pid, injected_tid);
             break;
 
         default:
         case OUTPUT_DEFAULT:
-            printf("[INJECT] TIME:" FORMAT_TIMEVAL " PID:%u DTB:0x%lx FILE:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
-                   UNPACK_TIMEVAL(t), pid, dtb, file, injected_pid, injected_tid);
+            printf("[INJECT] TIME:" FORMAT_TIMEVAL " PID:%u DTB:0x%lx FILE:\"%s\" ARGUMENTS:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
+                   UNPACK_TIMEVAL(t), pid, dtb, process_name, ecaped_arguments, injected_pid, injected_tid);
             break;
     }
+
+    g_free(process_name);
+    g_free(arguments);
+    g_free(ecaped_arguments);
 }
 
 int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, injection_method_t method, output_format_t format)
