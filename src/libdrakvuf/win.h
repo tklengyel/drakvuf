@@ -147,4 +147,5 @@ char* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr
 
 char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
 
+char* win_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t p_key_body );
 #endif
