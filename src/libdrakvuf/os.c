@@ -306,3 +306,11 @@ char* drakvuf_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     return NULL;
 }
+
+char* drakvuf_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t p_key_body )
+{
+    if ( drakvuf->osi.get_registry_keybody_path )
+        return drakvuf->osi.get_registry_keybody_path( drakvuf, info, p_key_body );
+
+    return NULL;
+}

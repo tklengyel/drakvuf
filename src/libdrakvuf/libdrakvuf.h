@@ -404,6 +404,10 @@ char* drakvuf_get_filename_from_handle( drakvuf_t drakvuf,
                                         drakvuf_trap_info_t* info,
                                         addr_t handle );
 
+char* drakvuf_reg_keybody_path( drakvuf_t drakvuf,
+                                drakvuf_trap_info_t* info,
+                                addr_t p_key_body );
+
 /*---------------------------------------------------------
  * Output helpers
  */
