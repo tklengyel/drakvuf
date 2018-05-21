@@ -6,7 +6,3 @@
 	path = libvmi
 	url = https://github.com/tklengyel/libvmi
 	ignore = dirty
-[submodule "rekall"]
-	path = rekall
-	url = https://github.com/google/rekall
-	ignore = dirty
