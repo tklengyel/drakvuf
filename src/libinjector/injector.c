@@ -150,6 +150,14 @@ struct injector
     uint32_t hProc, hThr;
 };
 
+struct arg
+{
+    uint32_t type;
+    uint32_t size;
+    uint64_t addr_on_stack;
+    void *data;
+};
+
 #define SW_SHOWDEFAULT 10
 
 struct startup_info_32
@@ -564,16 +572,48 @@ err:
     return 0;
 }
 
-static bool pass_inputs_shellexec_64(struct injector* injector, drakvuf_trap_info_t* info, access_context_t* ctx)
+// ex-ShellExecute
+static bool setup_stack_64(
+    struct injector* injector,
+    drakvuf_trap_info_t* info,
+    access_context_t* ctx,
+    struct arg args[],
+    int nb_args)
 {
-
     vmi_instance_t vmi = injector->vmi;
-
     uint64_t nul64 = 0;
-    addr_t str_addr, cwd_addr;
 
     addr_t addr = info->regs->rsp;
 
+    // Make room for strings and structs
+    for (int i = 0; i < nb_args; i++)
+    {
+        if (ARGUMENT_STRING == args[i].type)
+        {
+            // TODO : find stack problem
+            //      -> doesn't call the function when 'addr' is used
+            //      -> return 0x3 when place_string.. value put directly to the
+            //      struct
+            args[i].data = (void*)place_string_on_stack_64(vmi, ctx, addr, args[i].data);
+            // addr = (void*)place_string_on_stack_64(vmi, ctx, addr, args[i].data);
+            if ( !(args[i].data) ) goto err;
+            //args[i].addr_on_stack = addr;
+        }
+        else if (ARGUMENT_STRUCT == args[i].type)
+        {
+            size_t len = args[i].size;
+            addr -= len;
+            ctx->addr = addr;
+            if (VMI_FAILURE == vmi_write(vmi, ctx, len, &(args[i].data), NULL))
+                goto err;
+
+            // Specific to CreateProcess
+            if (INJECT_METHOD_CREATEPROC && i == 9)
+                injector->process_info = addr;
+        }
+    }
+
+    /*
     addr = place_string_on_stack_64(vmi, ctx, addr, injector->target_file);
     if (!addr) goto err;
     str_addr = addr;
@@ -586,6 +626,7 @@ static bool pass_inputs_shellexec_64(struct injector* injector, drakvuf_trap_inf
     }
     else
         cwd_addr = nul64;
+    */
 
     //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
     //
@@ -593,6 +634,15 @@ static bool pass_inputs_shellexec_64(struct injector* injector, drakvuf_trap_inf
     //P1=rcx, P2=rdx, P3=r8, P4=r9
     //5th parameter onwards (if any) passed via the stack
 
+    for (int i = nb_args; i > 3; i--)
+    {
+        addr -= 0x8;
+        ctx->addr = addr;
+        if (VMI_FAILURE == vmi_write_64(vmi, ctx, (uint64_t *)&(args[i].data)) )
+            goto err;
+    }
+
+    /*
     //p6
     addr -= 0x8;
     ctx->addr = addr;
@@ -605,36 +655,27 @@ static bool pass_inputs_shellexec_64(struct injector* injector, drakvuf_trap_inf
     ctx->addr = addr;
     if (VMI_FAILURE == vmi_write_64(vmi, ctx, &cwd_addr))
         goto err;
+    */
 
-    //p1
-    info->regs->rcx = 0;
-    //p2
-    info->regs->rdx = 0;
-    //p3
-    info->regs->r8 = str_addr;
-    //p4
-    info->regs->r9 = 0;
+    // p1
+    info->regs->rcx = (uint64_t)args[0].data;
+    // p2
+    info->regs->rdx = (uint64_t)args[1].data;
+    // p3 : TODO : problem coming from this one
+    printf("(debug) args 2 : %ld\n", (uint64_t)args[2].data);
+    //info->regs->r8 = (ARGUMENT_STRING == args[2].type) ? args[2].addr_on_stack : (uint64_t)args[2].data;
+    info->regs->r8 = (uint64_t)args[2].data;
+    // p4
+    info->regs->r9 = (uint64_t)args[3].data;
 
     // allocate 0x20 "homing space"
-    addr -= 0x8;
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
-        goto err;
-
-    addr -= 0x8;
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
-        goto err;
-
-    addr -= 0x8;
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
-        goto err;
-
-    addr -= 0x8;
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
-        goto err;
+    for (int i = 0; i < 4; i++)
+    {
+        addr -= 0x8;
+        ctx->addr = addr;
+        if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+            goto err;
+    }
 
     // save the return address
     addr -= 0x8;
@@ -649,6 +690,13 @@ static bool pass_inputs_shellexec_64(struct injector* injector, drakvuf_trap_inf
 
 err:
     return 0;
+}
+
+void init_argument(struct arg *arg, argument_type_t type, size_t size, void *data)
+{
+    arg->type = type;
+    arg->size = size;
+    arg->data = data;
 }
 
 bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
@@ -698,11 +746,27 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 
         if (INJECT_METHOD_SHELLEXEC == injector->method)
         {
-            if (!pass_inputs_shellexec_64(injector, info, &ctx))
-                goto err;
+            struct arg args[6] = { {0} };
+            uint64_t null64 = 0;
+            uint64_t show_cmd = 1;
+
+            init_argument(&args[0], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[1], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[2], ARGUMENT_STRING, strlen(injector->target_file),
+                (void*)injector->target_file);
+            init_argument(&args[3], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[4], ARGUMENT_STRUCT, 0, NULL);
+            init_argument(&(args[5]), ARGUMENT_GENERIC, sizeof(uint64_t), (void*)show_cmd);
+
+            setup_stack_64(injector, info, &ctx, args, 6);
+            // TODO : create args here and put them into an array
+            //if (!pass_inputs_shellexec_64(injector, info, &ctx))
+            //    goto err;
         }
         else if (!pass_inputs_createproc_64(injector, info, &ctx))
             goto err;
+
+        // TODO : make a single call to setup_stack(...)
     }
 
     return 1;
