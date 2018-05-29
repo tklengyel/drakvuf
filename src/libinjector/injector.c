@@ -154,7 +154,6 @@ struct arg
 {
     uint32_t type;
     uint32_t size;
-    uint64_t addr_on_stack;
     void *data;
 };
 
@@ -590,14 +589,9 @@ static bool setup_stack_64(
     {
         if (ARGUMENT_STRING == args[i].type)
         {
-            // TODO : find stack problem
-            //      -> doesn't call the function when 'addr' is used
-            //      -> return 0x3 when place_string.. value put directly to the
-            //      struct
-            args[i].data = (void*)place_string_on_stack_64(vmi, ctx, addr, args[i].data);
-            // addr = (void*)place_string_on_stack_64(vmi, ctx, addr, args[i].data);
+            addr = place_string_on_stack_64(vmi, ctx, addr, (const char*)args[i].data);
             if ( !(args[i].data) ) goto err;
-            //args[i].addr_on_stack = addr;
+            args[i].data = (void*)addr;
         }
         else if (ARGUMENT_STRUCT == args[i].type)
         {
@@ -613,28 +607,13 @@ static bool setup_stack_64(
         }
     }
 
-    /*
-    addr = place_string_on_stack_64(vmi, ctx, addr, injector->target_file);
-    if (!addr) goto err;
-    str_addr = addr;
-
-    if (injector->cwd)
-    {
-        addr = place_string_on_stack_64(vmi, ctx, addr, injector->cwd);
-        if (!addr) goto err;
-        cwd_addr = addr;
-    }
-    else
-        cwd_addr = nul64;
-    */
-
-    //http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
+    // http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
     //
-    //First 4 parameters to functions are always passed in registers
-    //P1=rcx, P2=rdx, P3=r8, P4=r9
-    //5th parameter onwards (if any) passed via the stack
+    // First 4 parameters to functions are always passed in registers
+    // P1=rcx, P2=rdx, P3=r8, P4=r9
+    // 5th parameter onwards (if any) passed via the stack
 
-    for (int i = nb_args; i > 3; i--)
+    for (int i = nb_args-1; i > 3; i--)
     {
         addr -= 0x8;
         ctx->addr = addr;
@@ -642,28 +621,11 @@ static bool setup_stack_64(
             goto err;
     }
 
-    /*
-    //p6
-    addr -= 0x8;
-    ctx->addr = addr;
-    uint64_t show_cmd = 1;
-    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &show_cmd))
-        goto err;
-
-    //p5
-    addr -= 0x8;
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &cwd_addr))
-        goto err;
-    */
-
     // p1
     info->regs->rcx = (uint64_t)args[0].data;
     // p2
     info->regs->rdx = (uint64_t)args[1].data;
-    // p3 : TODO : problem coming from this one
-    printf("(debug) args 2 : %ld\n", (uint64_t)args[2].data);
-    //info->regs->r8 = (ARGUMENT_STRING == args[2].type) ? args[2].addr_on_stack : (uint64_t)args[2].data;
+    // p3
     info->regs->r8 = (uint64_t)args[2].data;
     // p4
     info->regs->r9 = (uint64_t)args[3].data;
@@ -726,7 +688,6 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
         goto err;
 
     //Push input arguments on the stack
-    //ShellExecute(NULL, NULL, &FilePath, NULL, NULL, SW_SHOWNORMAL)
     //CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, CREATE_SUSPENDED, NULL, NULL, &si, pi))
 
     if (injector->is32bit)
@@ -750,19 +711,21 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
             uint64_t null64 = 0;
             uint64_t show_cmd = 1;
 
+            //ShellExecute(NULL, NULL, &FilePath, NULL, NULL, SW_SHOWNORMAL)
             init_argument(&args[0], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
             init_argument(&args[1], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
             init_argument(&args[2], ARGUMENT_STRING, strlen(injector->target_file),
                 (void*)injector->target_file);
             init_argument(&args[3], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[4], ARGUMENT_STRUCT, 0, NULL);
+            init_argument(&args[4], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
             init_argument(&(args[5]), ARGUMENT_GENERIC, sizeof(uint64_t), (void*)show_cmd);
 
-            setup_stack_64(injector, info, &ctx, args, 6);
-            // TODO : create args here and put them into an array
-            //if (!pass_inputs_shellexec_64(injector, info, &ctx))
-            //    goto err;
+            if ( !setup_stack_64(injector, info, &ctx, args, 6) )
+                goto err;
+            PRINT_DEBUG("RCX: %ld\nRDX: %ld\nR8: %ld\nR9: %ld\n",
+                info->regs->rcx, info->regs->rdx, info->regs->r8, info->regs->r9);
         }
+        // TODO : test with CreateProc
         else if (!pass_inputs_createproc_64(injector, info, &ctx))
             goto err;
 
@@ -1059,8 +1022,8 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             injector->rc = 0;
         }
     }
-    // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND while successfully opening file.
-    // So check only for out of resources (0) error.
+    // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND while
+    // successfully opening file. So check only for out of resources (0) error.
     else if (INJECT_METHOD_SHELLEXEC == injector->method && info->regs->rax)
     {
         // TODO Retrieve PID and TID
