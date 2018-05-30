@@ -105,10 +105,11 @@
 #ifndef XEN_HELPER_H
 #define XEN_HELPER_H
 
+#include <xenctrl.h>
+
 #define LIBXL_API_VERSION 0x040500
 
 #include <libxl_utils.h>
-#include <xenctrl.h>
 
 typedef struct xen_interface
 {
@@ -116,6 +117,8 @@ typedef struct xen_interface
     xc_interface* xc;
     libxl_ctx* xl_ctx;
     xentoollog_logger* xl_logger;
+    void* evtchn;                  // the Xen event channel
+    int evtchn_fd;                 // its FD
 } xen_interface_t;
 
 /* FUNCTIONS */

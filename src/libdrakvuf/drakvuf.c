@@ -123,6 +123,16 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
         close_vmi(drakvuf);
     }
 
+    g_free(drakvuf->event_fds);
+    g_free(drakvuf->fd_info_lookup);
+    GSList* loop = drakvuf->event_fd_info;
+    while (loop)
+    {
+        g_free(loop->data);
+        loop = loop->next;
+    }
+    g_slist_free(drakvuf->event_fd_info);
+
     if (drakvuf->xen)
     {
 
@@ -158,6 +168,9 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
 
     if ( !xen_init_interface(&(*drakvuf)->xen) )
         goto err;
+
+    drakvuf_event_fd_add(*drakvuf, (*drakvuf)->xen->evtchn_fd, NULL, NULL, EVENT_FD_VMI);
+    PRINT_DEBUG("drakvuf_init: adding event_fd done\n");
 
     get_dom_info((*drakvuf)->xen, domain, &(*drakvuf)->domID, &(*drakvuf)->dom_name);
     domid_t test = ~0;
@@ -518,4 +531,106 @@ unicode_string_t* drakvuf_read_unicode_va(vmi_instance_t vmi, addr_t vaddr, vmi_
     };
 
     return drakvuf_read_unicode_common(vmi, &ctx);
+}
+
+static void drakvuf_event_fd_generate(drakvuf_t drakvuf)
+{
+    /* event_fds and fd_info_lookup are both generated based off of
+       drakvuf->event_fd_info */
+    if (drakvuf->event_fds != NULL)
+    {
+        PRINT_DEBUG("freeing existing event_fds\n");
+        g_free(drakvuf->event_fds);
+    }
+    if (drakvuf->fd_info_lookup != NULL)
+    {
+        PRINT_DEBUG("freeing existing fd_info_lookup\n");
+        g_free(drakvuf->fd_info_lookup);
+    }
+
+    /* allocate and populate new pollfd array and new fd_info_lookup array */
+    drakvuf->event_fds = (struct pollfd*) g_malloc0(sizeof(struct pollfd) * \
+                         (g_slist_length(drakvuf->event_fd_info)));
+
+    drakvuf->fd_info_lookup = (fd_info_t) g_malloc0(sizeof(struct fd_info) * \
+                              (g_slist_length(drakvuf->event_fd_info)));
+
+    int i = 0;
+    GSList* loop = drakvuf->event_fd_info;
+    while (loop)
+    {
+        fd_info_t fd_info = (fd_info_t) loop->data;
+        drakvuf->event_fds[i].fd = fd_info->fd;
+        drakvuf->event_fds[i].events = POLLIN;
+        drakvuf->event_fds[i].revents = 0;
+        PRINT_DEBUG("new event_fd i=%d for fd=%d\n", i, fd_info->fd);
+
+        drakvuf->fd_info_lookup[i].fd = fd_info->fd;
+        drakvuf->fd_info_lookup[i].flags = fd_info->flags;
+        drakvuf->fd_info_lookup[i].plugin_cb = fd_info->plugin_cb;
+        drakvuf->fd_info_lookup[i].data = fd_info->data;
+        PRINT_DEBUG("new fd_info_lookup i=%d for fd=%d\n", i, fd_info->fd);
+
+        loop = loop->next;
+        i++;
+    }
+
+    return;
+}
+
+int drakvuf_event_fd_remove(drakvuf_t drakvuf, int fd)
+{
+    PRINT_DEBUG("drakvuf_event_fd_remove fd=%d\n", fd);
+    int i = 0;
+    GSList* loop = drakvuf->event_fd_info;
+    while (loop)
+    {
+        fd_info_t fd_info = (fd_info_t) loop->data;
+        if (fd_info->fd == fd)
+        {
+            PRINT_DEBUG("found match at index=%d\n", i);
+            drakvuf->event_fd_info = g_slist_remove(drakvuf->event_fd_info, fd_info);
+            drakvuf->event_fd_cnt = g_slist_length(drakvuf->event_fd_info);
+            PRINT_DEBUG("regenerating event_fds and fd_info_lookup...\n");
+            drakvuf_event_fd_generate(drakvuf);
+            return 1;
+        }
+        loop = loop->next;
+        i++;
+    }
+    PRINT_DEBUG("drakvuf_event_fd_remove could not find fd!\n");
+    return 0;
+}
+
+int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, void (*plugin_cb) (int fd, void* data), void* data, int flags)
+{
+    PRINT_DEBUG("drakvuf_event_fd_add fd=%d\n", fd);
+
+    if (flags & EVENT_FD_PLUGIN && flags & EVENT_FD_VMI)
+    {
+        printf("EVENT_FD_PLUGIN and EVENT_FD_VMI flags are mutually exclusive\n");
+        return 0;
+    }
+    if (!(flags & EVENT_FD_PLUGIN) && !(flags & EVENT_FD_VMI))
+    {
+        printf("must pass either EVENT_FD_PLUGIN or EVENT_FD_VMI in flags\n");
+        return 0;
+    }
+
+    /* add new fd_info */
+    fd_info_t new_fd_info = (fd_info_t) g_malloc0(sizeof(struct fd_info));
+    new_fd_info->fd = fd;
+    new_fd_info->flags = flags;
+    new_fd_info->plugin_cb = plugin_cb;
+    new_fd_info->data = data;
+    /* the event_fd_info list is the authoritive data source used to
+       create the event_fds and fd_info_lookup data structures */
+    drakvuf->event_fd_info = g_slist_append(drakvuf->event_fd_info, new_fd_info);
+
+    drakvuf->event_fd_cnt = g_slist_length(drakvuf->event_fd_info);
+    PRINT_DEBUG("size of list=%d\n", drakvuf->event_fd_cnt);
+
+    PRINT_DEBUG("regenerating event_fds and fd_info_lookup...\n");
+    drakvuf_event_fd_generate(drakvuf);
+    return 1;
 }
