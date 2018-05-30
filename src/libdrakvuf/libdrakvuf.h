@@ -286,6 +286,8 @@ typedef enum object_manager_object
 
 typedef void (*drakvuf_trap_free_t)(drakvuf_trap_t* trap);
 
+typedef void (*event_cb_t) (int fd, void* data);
+
 bool drakvuf_init (drakvuf_t* drakvuf,
                    const char* domain,
                    const char* rekall_profile,
@@ -423,6 +425,25 @@ unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_con
 addr_t drakvuf_get_function_argument(drakvuf_t drakvuf,
                                      drakvuf_trap_info_t* info,
                                      int argument_number);
+
+/*---------------------------------------------------------
+ * Event FD functions
+ */
+
+int drakvuf_event_fd_add(drakvuf_t drakvuf,
+                         int fd,
+                         event_cb_t event_cb,
+                         void* data);
+
+int drakvuf_event_fd_remove(drakvuf_t drakvuf,
+                            int fd);
+
+typedef enum
+{
+    __INVALID_EVENT_FD,
+    EVENT_FD_PLUGIN,
+    EVENT_FD_VMI
+} event_fd_t;
 
 /*---------------------------------------------------------
  * Output helpers
