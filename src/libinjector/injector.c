@@ -150,7 +150,7 @@ struct injector
     uint32_t hProc, hThr;
 };
 
-struct arg
+struct argument
 {
     uint32_t type;
     uint32_t size;
@@ -576,7 +576,7 @@ static bool setup_stack_64(
     struct injector* injector,
     drakvuf_trap_info_t* info,
     access_context_t* ctx,
-    struct arg args[],
+    struct argument args[],
     int nb_args)
 {
     vmi_instance_t vmi = injector->vmi;
@@ -597,13 +597,18 @@ static bool setup_stack_64(
         {
             size_t len = args[i].size;
             addr -= len;
+            args[i].data = (void*)addr;
             ctx->addr = addr;
-            if (VMI_FAILURE == vmi_write(vmi, ctx, len, &(args[i].data), NULL))
-                goto err;
 
             // Specific to CreateProcess
-            if (INJECT_METHOD_CREATEPROC && i == 9)
+            if (INJECT_METHOD_CREATEPROC == injector->method && i == 9) {
+                puts("(debug) process_info set");
                 injector->process_info = addr;
+                if (VMI_FAILURE == vmi_write(vmi, ctx, len, &(injector->process_info), NULL))
+                    goto err;
+            }
+            else if (VMI_FAILURE == vmi_write(vmi, ctx, len, &(args[i].data), NULL))
+                goto err;
         }
     }
 
@@ -617,7 +622,11 @@ static bool setup_stack_64(
     {
         addr -= 0x8;
         ctx->addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, ctx, (uint64_t *)&(args[i].data)) )
+        if (i == 9) {
+            if (VMI_FAILURE == vmi_write_64(vmi, ctx, &(injector->process_info)) )
+                goto err;
+        }
+        else if (VMI_FAILURE == vmi_write_64(vmi, ctx, (uint64_t *)&(args[i].data)) )
             goto err;
     }
 
@@ -654,7 +663,7 @@ err:
     return 0;
 }
 
-void init_argument(struct arg *arg, argument_type_t type, size_t size, void *data)
+void init_argument(struct argument *arg, argument_type_t type, size_t size, void *data)
 {
     arg->type = type;
     arg->size = size;
@@ -688,7 +697,6 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
         goto err;
 
     //Push input arguments on the stack
-    //CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, CREATE_SUSPENDED, NULL, NULL, &si, pi))
 
     if (injector->is32bit)
     {
@@ -707,7 +715,7 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 
         if (INJECT_METHOD_SHELLEXEC == injector->method)
         {
-            struct arg args[6] = { {0} };
+            struct argument args[6] = { {0} };
             uint64_t null64 = 0;
             uint64_t show_cmd = 1;
 
@@ -726,8 +734,43 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
                 info->regs->rcx, info->regs->rdx, info->regs->r8, info->regs->r9);
         }
         // TODO : test with CreateProc
+        /*
         else if (!pass_inputs_createproc_64(injector, info, &ctx))
             goto err;
+        */
+        else if (INJECT_METHOD_CREATEPROC == injector->method)
+        {
+            // TODO : find out why createprocess() returns 0
+            struct argument args[10] = { {0} };
+            struct startup_info_64 si;
+            struct process_information_64 pi;
+            uint64_t null64 = 0;
+
+            memset(&si, 0, sizeof(struct startup_info_64));
+            memset(&pi, 0, sizeof(struct process_information_64));
+
+            //CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, CREATE_SUSPENDED, NULL, NULL, &si, pi))
+            init_argument(&args[0], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[1], ARGUMENT_STRING, strlen(injector->target_file),
+                (void*)injector->target_file);
+            init_argument(&args[2], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[3], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[4], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[5], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[6], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[7], ARGUMENT_GENERIC, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[8], ARGUMENT_STRUCT, sizeof(struct startup_info_64),
+                (void*)&si);
+            init_argument(&args[9], ARGUMENT_STRUCT, sizeof(struct process_information_64),
+                (void*)&pi);
+
+            if ( !setup_stack_64(injector, info, &ctx, args, 10) )
+                goto err;
+        }
+        // TODO : temporary for gcc unused function error
+        else if (0)
+            pass_inputs_createproc_64(injector, info, &ctx);
+
 
         // TODO : make a single call to setup_stack(...)
     }
