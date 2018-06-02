@@ -124,7 +124,7 @@ typedef enum
 {
     ARGUMENT_STRING,
     ARGUMENT_STRUCT,
-    ARGUMENT_GENERIC,
+    ARGUMENT_INT,
     __ARGUMENT_MAX
 } argument_type_t;
 
