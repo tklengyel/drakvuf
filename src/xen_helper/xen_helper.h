@@ -105,11 +105,11 @@
 #ifndef XEN_HELPER_H
 #define XEN_HELPER_H
 
-#include <xenctrl.h>
 
 #define LIBXL_API_VERSION 0x040500
 
 #include <libxl_utils.h>
+#include <xenctrl.h>
 
 typedef struct xen_interface
 {
