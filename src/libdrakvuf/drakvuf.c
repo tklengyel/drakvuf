@@ -602,7 +602,7 @@ int drakvuf_event_fd_remove(drakvuf_t drakvuf, int fd)
     return 0;
 }
 
-int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, void (*event_cb) (int fd, void* data), void* data)
+int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, event_cb_t event_cb, void* data)
 {
     PRINT_DEBUG("drakvuf_event_fd_add fd=%d\n", fd);
 
