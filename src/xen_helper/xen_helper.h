@@ -105,7 +105,6 @@
 #ifndef XEN_HELPER_H
 #define XEN_HELPER_H
 
-
 #define LIBXL_API_VERSION 0x040500
 
 #include <libxl_utils.h>
