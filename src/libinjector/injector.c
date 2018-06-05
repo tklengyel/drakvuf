@@ -159,7 +159,10 @@ struct argument
     bool is_output;
 };
 
-#define SW_SHOWDEFAULT 10
+#define SW_SHOWDEFAULT  10
+#define MEM_COMMIT      0x00001000
+#define MEM_RESERVE     0x00002000
+#define PAGE_EXECUTE_READWRITE  0x40
 
 struct startup_info_32
 {
@@ -646,6 +649,22 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
             if ( !setup_stack_64(injector, info, &ctx, args, 10) )
                 goto err;
         }
+        else if (INJECT_METHOD_SHELLCODE == injector->method)
+        {
+            struct argument args[4] = { {0} };
+            uint64_t null64 = 0;
+            uint64_t size = 1024; // TODO : replace with size of SC
+            uint64_t allocation_type = MEM_COMMIT | MEM_RESERVE;
+            uint64_t protect = PAGE_EXECUTE_READWRITE;
+
+            init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)null64, 0);
+            init_argument(&args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)size, 0);
+            init_argument(&args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)allocation_type, 0);
+            init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)protect, 0);
+
+            if ( !setup_stack_64(injector, info, &ctx, args, 4) )
+                goto err;
+        }
     }
 
     return 1;
@@ -895,6 +914,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     // We are now in the return path from CreateProcessA
 
+    PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
     drakvuf_interrupt(drakvuf, -1);
     drakvuf_remove_trap(drakvuf, &injector->bp, NULL);
 
@@ -944,6 +964,12 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         // TODO Retrieve PID and TID
         PRINT_DEBUG("Injected\n");
+        injector->rc = 1;
+    }
+    else if (INJECT_METHOD_SHELLCODE == injector->method && info->regs->rax)
+    {
+        // TODO : write shellcode at RAX and change RIP
+        PRINT_DEBUG("VirtualAlloc succeed!\n");
         injector->rc = 1;
     }
 
@@ -1024,6 +1050,7 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
     injector.target_file = file;
     injector.cwd = cwd;
 
+    method = INJECT_METHOD_SHELLCODE;
     injector.method = method;
 
     injector.is32bit = (vmi_get_page_mode(injector.vmi, 0) == VMI_PM_IA32E) ? 0 : 1;
@@ -1057,6 +1084,11 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
     {
         lib = "shell32.dll";
         fun = "ShellExecuteA";
+    }
+    else if (INJECT_METHOD_SHELLCODE == method)
+    {
+        lib = "kernel32.dll";
+        fun = "VirtualAlloc";
     }
 
     injector.exec_func = drakvuf_exportsym_to_va(injector.drakvuf, eprocess_base, lib, fun);
