@@ -107,7 +107,6 @@
 
 #include <stdlib.h>
 #include <xenctrl.h>
-#include <xenctrl_compat.h>
 #include <libxl_utils.h>
 #include <glib.h>
 #include <sys/mman.h>
