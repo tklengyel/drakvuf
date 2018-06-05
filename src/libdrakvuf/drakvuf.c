@@ -169,7 +169,8 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
     if ( !xen_init_interface(&(*drakvuf)->xen) )
         goto err;
 
-    drakvuf_event_fd_add(*drakvuf, (*drakvuf)->xen->evtchn_fd, NULL, NULL, EVENT_FD_VMI);
+    /* register the main VMI event callback */
+    drakvuf_event_fd_add(*drakvuf, (*drakvuf)->xen->evtchn_fd, drakvuf_vmi_event_callback, drakvuf);
     PRINT_DEBUG("drakvuf_init: adding event_fd done\n");
 
     get_dom_info((*drakvuf)->xen, domain, &(*drakvuf)->domID, &(*drakvuf)->dom_name);
@@ -566,8 +567,7 @@ static void drakvuf_event_fd_generate(drakvuf_t drakvuf)
         PRINT_DEBUG("new event_fd i=%d for fd=%d\n", i, fd_info->fd);
 
         drakvuf->fd_info_lookup[i].fd = fd_info->fd;
-        drakvuf->fd_info_lookup[i].flags = fd_info->flags;
-        drakvuf->fd_info_lookup[i].plugin_cb = fd_info->plugin_cb;
+        drakvuf->fd_info_lookup[i].event_cb = fd_info->event_cb;
         drakvuf->fd_info_lookup[i].data = fd_info->data;
         PRINT_DEBUG("new fd_info_lookup i=%d for fd=%d\n", i, fd_info->fd);
 
@@ -602,26 +602,14 @@ int drakvuf_event_fd_remove(drakvuf_t drakvuf, int fd)
     return 0;
 }
 
-int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, void (*plugin_cb) (int fd, void* data), void* data, int flags)
+int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, void (*event_cb) (int fd, void* data), void* data)
 {
     PRINT_DEBUG("drakvuf_event_fd_add fd=%d\n", fd);
-
-    if (flags & EVENT_FD_PLUGIN && flags & EVENT_FD_VMI)
-    {
-        printf("EVENT_FD_PLUGIN and EVENT_FD_VMI flags are mutually exclusive\n");
-        return 0;
-    }
-    if (!(flags & EVENT_FD_PLUGIN) && !(flags & EVENT_FD_VMI))
-    {
-        printf("must pass either EVENT_FD_PLUGIN or EVENT_FD_VMI in flags\n");
-        return 0;
-    }
 
     /* add new fd_info */
     fd_info_t new_fd_info = (fd_info_t) g_malloc0(sizeof(struct fd_info));
     new_fd_info->fd = fd;
-    new_fd_info->flags = flags;
-    new_fd_info->plugin_cb = plugin_cb;
+    new_fd_info->event_cb = event_cb;
     new_fd_info->data = data;
     /* the event_fd_info list is the authoritive data source used to
        create the event_fds and fd_info_lookup data structures */

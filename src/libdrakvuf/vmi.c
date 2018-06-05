@@ -1198,6 +1198,18 @@ bool control_cpuid_trap(drakvuf_t drakvuf, bool toggle)
     return 1;
 }
 
+void drakvuf_vmi_event_callback (int fd, void* data)
+{
+    UNUSED(fd);
+    drakvuf_t* drakvuf = (drakvuf_t*) data;
+    status_t status = vmi_events_listen((*drakvuf)->vmi, 0);
+    if (VMI_SUCCESS != status)
+    {
+        PRINT_DEBUG("Error waiting for events or timeout, quitting...\n");
+        (*drakvuf)->interrupted = -1;
+    }
+}
+
 void drakvuf_loop(drakvuf_t drakvuf)
 {
 
@@ -1228,22 +1240,7 @@ void drakvuf_loop(drakvuf_t drakvuf)
             }
 
             fd_info_t fd_info = &drakvuf->fd_info_lookup[poll_ix];
-
-            /* this is a normal VMI event */
-            if (fd_info->flags & EVENT_FD_VMI)
-            {
-                status_t status = vmi_events_listen(drakvuf->vmi, 0);
-                if (VMI_SUCCESS != status)
-                {
-                    PRINT_DEBUG("Error waiting for events or timeout, quitting...\n");
-                    drakvuf->interrupted = -1;
-                }
-            }
-            /* this is an external FD passed by a plugin */
-            else if (fd_info->flags & EVENT_FD_PLUGIN)
-            {
-                fd_info->plugin_cb(fd_info->fd, fd_info->data);
-            }
+            fd_info->event_cb(fd_info->fd, fd_info->data);
         }
     }
 

@@ -406,23 +406,11 @@ char* drakvuf_get_filename_from_handle( drakvuf_t drakvuf,
 
 int drakvuf_event_fd_add(drakvuf_t drakvuf,
                          int fd,
-                         void (*plugin_cb) (int fd, void* data),
-                         void* data,
-                         int flags);
+                         void (*event_cb) (int fd, void* data),
+                         void* data);
 
 int drakvuf_event_fd_remove(drakvuf_t drakvuf,
                             int fd);
-
-/*---------------------------------------------------------
- * Event FD flags
- */
-
-typedef enum
-{
-    __INVALID_EVENT_FD,
-    EVENT_FD_PLUGIN,
-    EVENT_FD_VMI
-} event_fd_t;
 
 /*---------------------------------------------------------
  * Output helpers

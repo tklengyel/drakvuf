@@ -142,8 +142,7 @@ extern bool verbose;
 struct fd_info
 {
     int fd;
-    int flags;
-    void (*plugin_cb) (int fd, void* data);
+    void (*event_cb) (int fd, void* data);
     void* data;
 };
 typedef struct fd_info* fd_info_t;
