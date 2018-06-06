@@ -1198,6 +1198,18 @@ bool control_cpuid_trap(drakvuf_t drakvuf, bool toggle)
     return 1;
 }
 
+void drakvuf_vmi_event_callback (int fd, void* data)
+{
+    UNUSED(fd);
+    drakvuf_t* drakvuf = (drakvuf_t*) data;
+    status_t status = vmi_events_listen((*drakvuf)->vmi, 0);
+    if (VMI_SUCCESS != status)
+    {
+        PRINT_DEBUG("Error waiting for events or timeout, quitting...\n");
+        (*drakvuf)->interrupted = -1;
+    }
+}
+
 void drakvuf_loop(drakvuf_t drakvuf)
 {
 
@@ -1208,13 +1220,27 @@ void drakvuf_loop(drakvuf_t drakvuf)
 
     while (!drakvuf->interrupted)
     {
-        //PRINT_DEBUG("Waiting for events in DRAKVUF...\n");
-        status_t status = vmi_events_listen(drakvuf->vmi, 1000);
-
-        if ( VMI_SUCCESS != status )
+        int rc = poll(drakvuf->event_fds, drakvuf->event_fd_cnt, 1000);
+        if (rc == 0)
         {
-            PRINT_DEBUG("Error waiting for events or timeout, quitting...\n");
+            continue;
+        }
+        else if (rc < 0)
+        {
+            perror("drakvuf_loop poll error: ");
             drakvuf->interrupted = -1;
+        }
+
+        /* check and process each fd if it was raised */
+        for (int poll_ix=0; poll_ix<drakvuf->event_fd_cnt; poll_ix++)
+        {
+            if ( !(drakvuf->event_fds[poll_ix].revents & POLLIN) )
+            {
+                continue;
+            }
+
+            fd_info_t fd_info = &drakvuf->fd_info_lookup[poll_ix];
+            fd_info->event_cb(fd_info->fd, fd_info->data);
         }
     }
 
@@ -1233,11 +1259,17 @@ bool init_vmi(drakvuf_t drakvuf)
     PRINT_DEBUG("Init VMI on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
 
     /* initialize the libvmi library */
-    if (VMI_FAILURE == vmi_init(&drakvuf->vmi, VMI_XEN, &drakvuf->domID, VMI_INIT_DOMAINID | VMI_INIT_EVENTS, NULL, NULL))
+    if (VMI_FAILURE == vmi_init(&drakvuf->vmi,
+                                VMI_XEN,
+                                &drakvuf->domID,
+                                VMI_INIT_XEN_EVTCHN | VMI_INIT_DOMAINID | VMI_INIT_EVENTS,
+                                (void*) drakvuf->xen->evtchn,
+                                NULL))
     {
         printf("Failed to init LibVMI library.\n");
         return 0;
     }
+    PRINT_DEBUG("init_vmi: initializing vmi done\n");
 
     GHashTable* config = g_hash_table_new(g_str_hash, g_str_equal);
     g_hash_table_insert(config, "rekall_profile", drakvuf->rekall_profile);
