@@ -107,6 +107,9 @@
 
 #include "plugins/private.h"
 #include "plugins/plugins.h"
+#include "private.h"
+
+#include <vector>
 
 class socketmon: public plugin
 {
@@ -114,6 +117,7 @@ public:
     page_mode_t pm;
     output_format_t format;
     win_ver_t winver;
+
     drakvuf_trap_t trap[7] =
     {
         [0 ... 6] = {
@@ -125,6 +129,9 @@ public:
             .data = (void*)this
         }
     };
+
+    std::vector<socketmon_trapinfo> traps;
+    unsigned traps_set = 0;
 
     socketmon(drakvuf_t drakvuf, const void* config, output_format_t output);
     ~socketmon();
