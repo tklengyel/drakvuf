@@ -172,6 +172,8 @@ struct drakvuf
     vmi_event_t cpuid_event;
     vmi_event_t* step_event[16];
 
+    drakvuf_trap_t guard0;
+
     size_t* offsets;
     size_t* sizes;
 

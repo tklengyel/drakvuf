@@ -304,6 +304,13 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     UNUSED(vmi);
     event_response_t rsp = 0;
     drakvuf_t drakvuf = event->data;
+
+    if (event->mem_event.gfn == drakvuf->zero_page_gfn)
+    {
+        PRINT_DEBUG("Somebody try to do something to the empty page, let's emulate it\n");
+        return rsp | VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
+    }
+
     drakvuf->regs[event->vcpu_id] = event->x86_regs;
 
     struct wrapper* s = g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &event->mem_event.gfn);
@@ -433,7 +440,14 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             }
         }
         else
+        {
             event->slat_id = drakvuf->altp2m_idr;
+            if (event->mem_event.out_access & VMI_MEMACCESS_W)
+            {
+                PRINT_DEBUG("Somebody try to write to the shadow page, let's emulate it instead\n");
+                return rsp | VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
+            }
+        }
 
         PRINT_DEBUG("Switching to altp2m view %u on vCPU %u\n", event->slat_id, event->vcpu_id);
 
@@ -1359,6 +1373,13 @@ bool init_vmi(drakvuf_t drakvuf)
     if (rc < 0)
         return 0;
 
+    uint8_t fmask[VMI_PS_4KB] = {[0 ... VMI_PS_4KB-1] = 0xFF};
+    if (VMI_FAILURE == vmi_write_pa(drakvuf->vmi, drakvuf->zero_page_gfn<<12, VMI_PS_4KB, &fmask, NULL))
+    {
+        PRINT_DEBUG("Failed to mask FF to the empty page\n");
+        return 0;
+    }
+
     /*
      * Create altp2m view
      */
@@ -1421,6 +1442,18 @@ bool init_vmi(drakvuf_t drakvuf)
     if (rc < 0)
         return 0;
 
+    //setup a mem event for the empty page
+    drakvuf->guard0.type = MEMACCESS;
+    drakvuf->guard0.memaccess.access = VMI_MEMACCESS_RWX;
+    drakvuf->guard0.memaccess.type = PRE;
+    drakvuf->guard0.memaccess.gfn = drakvuf->zero_page_gfn;
+
+    if (!inject_trap_mem(drakvuf, &drakvuf->guard0, 0))
+    {
+        PRINT_DEBUG("Failed to create guard trap for the empty page!\n");
+        return 0;
+    }
+
     return 1;
 }
 
@@ -1445,6 +1478,8 @@ void close_vmi(drakvuf_t drakvuf)
             s->traps = NULL;
         }
     }
+
+    remove_trap(drakvuf, &drakvuf->guard0);
 
     if (drakvuf->vmi)
     {
