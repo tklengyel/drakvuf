@@ -1450,6 +1450,8 @@ void close_vmi(drakvuf_t drakvuf)
     {
         vmi_destroy(drakvuf->vmi);
         drakvuf->vmi = NULL;
+        drakvuf->xen->evtchn = NULL;
+        drakvuf->xen->evtchn_fd = 0;
     }
 
     if (drakvuf->breakpoint_lookup_gfn)
