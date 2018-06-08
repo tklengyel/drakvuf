@@ -286,40 +286,50 @@ struct kapc_64
     uint8_t inserted;
 };
 
-static bool pass_inputs_createproc_32(struct injector* injector, drakvuf_trap_info_t* info, access_context_t* ctx)
+static addr_t place_string_on_stack_32(vmi_instance_t vmi, access_context_t* ctx, addr_t addr, char const* str)
 {
-    // TODO: implement
-    if (injector->cwd)
+    if (!str)
+        return 0;
+
+    const uint32_t string_align = 64;
+    const size_t len = strlen(str) + 1;// null terminated string
+
+    // the stack has to be aligned _not_ to 0x4 but to 64
+    // for special instructions operating on strings to work correctly
+    // this string has to be aligned as well!
+    addr -= len + string_align - (len % string_align);
+    ctx->addr = addr;
+    if (VMI_FAILURE == vmi_write(vmi, ctx, len, (void*) str, NULL))
         goto err;
 
+    return addr;
+
+err:
+    return 0;
+}
+
+static bool pass_inputs_createproc_32(struct injector* injector, drakvuf_trap_info_t* info, access_context_t* ctx)
+{
     vmi_instance_t vmi = injector->vmi;
 
+    const uint32_t stack_align = 64;
     uint32_t nul32 = 0;
-    uint8_t nul8 = 0;
-    size_t len = strlen(injector->target_file);
 
     addr_t addr = info->regs->rsp;
 
-    addr_t str_addr, sip_addr;
+    addr_t str_addr, sip_addr, cwd_addr = 0;
 
-    addr -= 0x4; // the stack has to be alligned to 0x4
-    // and we need a bit of extra buffer before the string for \0
-    // we just going to null out that extra space fully
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_32(vmi, ctx, &nul32))
+    str_addr = place_string_on_stack_32(vmi, ctx, addr, injector->target_file);
+    if (!str_addr)
         goto err;
+    addr = str_addr;
 
-    // this string has to be aligned as well!
-    addr -= len + 0x4 - (len % 0x4);
-    str_addr = addr;
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write(vmi, ctx, len, (void*) injector->target_file, NULL))
-        goto err;
-
-    // add null termination
-    ctx->addr = addr + len;
-    if (VMI_FAILURE == vmi_write_8(vmi, ctx, &nul8))
-        goto err;
+    if (injector->cwd)
+    {
+        cwd_addr = place_string_on_stack_32(vmi, ctx, addr, injector->cwd);
+        if (cwd_addr)
+            addr = cwd_addr;
+    }
 
     //struct startup_info_32 si = {.wShowWindow = SW_SHOWDEFAULT };
     struct startup_info_32 si;
@@ -327,8 +337,9 @@ static bool pass_inputs_createproc_32(struct injector* injector, drakvuf_trap_in
     struct process_information_32 pi;
     memset(&pi, 0, sizeof(struct process_information_32));
 
-    len = sizeof(struct process_information_32);
+    size_t len = sizeof(struct process_information_32);
     addr -= len;
+    addr -= addr % stack_align;
     injector->process_info = addr;
     ctx->addr = addr;
     if (VMI_FAILURE == vmi_write(vmi, ctx, len, &pi, NULL))
@@ -336,6 +347,7 @@ static bool pass_inputs_createproc_32(struct injector* injector, drakvuf_trap_in
 
     len = sizeof(struct startup_info_32);
     addr -= len;
+    addr -= addr % stack_align;
     sip_addr = addr;
     ctx->addr = addr;
     if (VMI_FAILURE == vmi_write(vmi, ctx, len, &si, NULL))
@@ -356,7 +368,7 @@ static bool pass_inputs_createproc_32(struct injector* injector, drakvuf_trap_in
     //p8
     addr -= 0x4;
     ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_32(vmi, ctx, &nul32))
+    if (VMI_FAILURE == vmi_write_32(vmi, ctx, (uint32_t*) &cwd_addr))
         goto err;
 
     //p7
