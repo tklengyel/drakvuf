@@ -117,7 +117,6 @@ typedef enum
 {
     INJECT_METHOD_CREATEPROC,
     INJECT_METHOD_SHELLEXEC,
-    INJECT_METHOD_SHELLCODE,
     __INJECT_METHOD_MAX
 } injection_method_t;
 
