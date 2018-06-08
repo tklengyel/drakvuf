@@ -914,6 +914,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     // We are now in the return path from CreateProcessA
 
+    PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
     drakvuf_interrupt(drakvuf, -1);
     drakvuf_remove_trap(drakvuf, &injector->bp, NULL);
 
@@ -967,31 +968,8 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     else if (INJECT_METHOD_SHELLCODE == injector->method && info->regs->rax)
     {
-        PRINT_DEBUG("VirtualAlloc succeed!\n");
         // TODO : write shellcode at RAX and change RIP
-        // Messagebox("BrokenByte");
-        char* shellcode = "\x31\xd2\xb2\x30\x64\x8b\x12\x8b\x52\x0c\x8b\x52\x1c\x8b\x42"
-        "\x08\x8b\x72\x20\x8b\x12\x80\x7e\x0c\x33\x75\xf2\x89\xc7\x03"
-        "\x78\x3c\x8b\x57\x78\x01\xc2\x8b\x7a\x20\x01\xc7\x31\xed\x8b"
-        "\x34\xaf\x01\xc6\x45\x81\x3e\x46\x61\x74\x61\x75\xf2\x81\x7e"
-        "\x08\x45\x78\x69\x74\x75\xe9\x8b\x7a\x24\x01\xc7\x66\x8b\x2c"
-        "\x6f\x8b\x7a\x1c\x01\xc7\x8b\x7c\xaf\xfc\x01\xc7\x68\x79\x74"
-        "\x65\x01\x68\x6b\x65\x6e\x42\x68\x20\x42\x72\x6f\x89\xe1\xfe"
-        "\x49\x0b\x31\xc0\x51\x50\xff\xd7";
-        size_t size_sc = 113;
-        size_t bytes_written = 0;
-        
-        ctx.addr = info->regs->rax;
-        ctx.pid = injector->target_pid;
-        //ctx.translate_mechanism = VMI_TM_PROCESS_PID;
-        PRINT_DEBUG("(debug) ctx.pid = %d\n", (int)ctx.pid);
-        // TODO : find out why vmi_write fails
-        if (VMI_FAILURE == vmi_write(injector->vmi, &ctx, size_sc, (void*)shellcode, &bytes_written))
-            return 0;
-
-        PRINT_DEBUG("(debug) Bytes written: %d\n", (int)bytes_written);
-        info->regs->rip = info->regs->rax;
-
+        PRINT_DEBUG("VirtualAlloc succeed!\n");
         injector->rc = 1;
     }
 
