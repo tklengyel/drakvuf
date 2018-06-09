@@ -123,57 +123,6 @@
 #include "private.h"
 #include "filetracer.h"
 
-static unicode_string_t* read_wchar_array(vmi_instance_t vmi, const access_context_t* ctx, size_t length)
-{
-    unicode_string_t* us = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
-    if ( !us )
-        return NULL;
-
-    us->length = length * 2;
-    us->contents = (uint8_t*)g_malloc0(sizeof(uint8_t) * (length * 2 + 2));
-
-    if ( !us->contents )
-    {
-        vmi_free_unicode_str(us);
-        return NULL;
-    }
-
-    if ( VMI_FAILURE == vmi_read(vmi, ctx, us->length, us->contents, NULL) )
-    {
-        vmi_free_unicode_str(us);
-        return NULL;
-    }
-
-    // end with NUL symbol
-    us->contents[us->length] = 0;
-    us->contents[us->length + 1] = 0;
-    us->encoding = "UTF-16";
-
-    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
-
-    if ( !out )
-    {
-        vmi_free_unicode_str(us);
-        return NULL;
-    }
-
-    status_t rc = vmi_convert_str_encoding(us, out, "UTF-8");
-    vmi_free_unicode_str(us);
-
-    if (VMI_SUCCESS != rc)
-    {
-        g_free(out);
-        return NULL;
-    }
-
-    return out;
-}
-
-static void safe_free_unicode_str(unicode_string_t* us)
-{
-    if (us) vmi_free_unicode_str(us);
-}
-
 static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
 {
     if ( !attr )
@@ -219,7 +168,7 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
                                       file_root ? "\\" : "",
                                       file_name_us->contents);
 
-    safe_free_unicode_str(file_name_us);
+    vmi_free_unicode_str(file_name_us);
     g_free(file_root);
 
     switch (f->format)
@@ -288,7 +237,7 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
         return;
 
     ctx.addr = fileinfo + f->newfile_name_offset;
-    unicode_string_t* dst_file_name_us = read_wchar_array(vmi, &ctx, dst_file_name_length);
+    unicode_string_t* dst_file_name_us = drakvuf_read_wchar_array(vmi, &ctx, dst_file_name_length);
     if ( !dst_file_name_us )
         return;
 

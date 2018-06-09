@@ -622,3 +622,73 @@ int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, event_cb_t event_cb, void* d
     drakvuf_event_fd_generate(drakvuf);
     return 1;
 }
+
+size_t drakvuf_wchar_string_length(vmi_instance_t vmi, const access_context_t* ctx)
+{
+    access_context_t mutable_ctx = *ctx;
+
+    size_t str_len = 0;
+    uint16_t wchar = 1;
+    for ( ; wchar ; str_len += 2 )
+    {
+        mutable_ctx.addr = ctx->addr + str_len;
+        if ( VMI_FAILURE == vmi_read_16(vmi, &mutable_ctx, &wchar) )
+        {
+            str_len = 0;
+            goto end;
+        }
+    }
+
+end:
+    return (str_len / 2);
+}
+
+unicode_string_t* drakvuf_read_wchar_array(vmi_instance_t vmi, const access_context_t* ctx, size_t length)
+{
+    unicode_string_t us;
+
+    us.length = length * 2;
+    us.contents = (uint8_t*)g_malloc0(sizeof(uint8_t) * (length * 2 + 2));
+
+    if ( !us.contents )
+        return NULL;
+
+    if ( VMI_FAILURE == vmi_read(vmi, ctx, us.length, us.contents, NULL) )
+    {
+        g_free(us.contents);
+        return NULL;
+    }
+
+    // end with NUL symbol
+    us.contents[us.length] = 0;
+    us.contents[us.length + 1] = 0;
+    us.encoding = "UTF-16";
+
+    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+
+    if ( !out )
+    {
+        g_free(us.contents);
+        return NULL;
+    }
+
+    status_t rc = vmi_convert_str_encoding(&us, out, "UTF-8");
+    g_free(us.contents);
+
+    if (VMI_SUCCESS != rc)
+    {
+        if (out->contents)
+            free(out->contents);
+        memset((void*) out, 0, sizeof(*out));
+        free(out);
+        return NULL;
+    }
+
+    return out;
+}
+
+unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_context_t* ctx)
+{
+    size_t strlen = drakvuf_wchar_string_length(vmi, ctx);
+    return drakvuf_read_wchar_array(vmi, ctx, strlen);
+}
