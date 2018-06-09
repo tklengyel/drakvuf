@@ -230,7 +230,7 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
         return 0;
     }
 
-    if (info->regs->rsp != wrapper->target_rsp)
+    if (info->regs->rsp <= wrapper->target_rsp)
     {
         return 0;
     }
@@ -283,28 +283,23 @@ static addr_t get_function_argument(drakvuf_t drakvuf, const drakvuf_trap_info_t
             case 4:
                 return info->regs->r9;
         }
-
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = info->regs->rsp + narg * 8,
-        };
-
-        addr_t addr;
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &addr))
-        {
-            addr = 0;
-        }
-        drakvuf_release_vmi(drakvuf);
-        return addr;
     }
-    else
+
+    access_context_t ctx =
     {
-        // TODO: Implement and test for 32bit guests.
-        return 0;
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rsp + narg * f->reg_size,
+    };
+
+    addr_t addr;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &addr))
+    {
+        addr = 0;
     }
+    drakvuf_release_vmi(drakvuf);
+    return addr;
 }
 
 static addr_t get_function_ret_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -362,7 +357,7 @@ static event_response_t create_user_process_hook(
     data->plugin = f;
     data->target_cr3 = info->regs->cr3;
     data->target_thread = thread;
-    data->target_rsp = info->regs->rsp + 8;
+    data->target_rsp = info->regs->rsp;
     data->new_process_handle_addr = process_handle_addr;
     data->user_process_parameters_addr = user_process_parameters_addr;
 
@@ -453,6 +448,7 @@ procmon::procmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->pm = vmi_get_page_mode(vmi, 0);
+    this->reg_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
     drakvuf_release_vmi(drakvuf);
 
     this->format = output;
