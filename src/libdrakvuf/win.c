@@ -270,12 +270,8 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, i
     };
 
     addr_t addr;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &addr))
-    {
-        addr = 0;
-    }
-    drakvuf_release_vmi(drakvuf);
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &addr))
+        return 0;
     return addr;
 }
 
