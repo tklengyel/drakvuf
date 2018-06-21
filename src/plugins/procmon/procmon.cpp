@@ -442,7 +442,7 @@ static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const 
 
 
 procmon::procmon(drakvuf_t drakvuf, const void* config, output_format_t output)
-    : result_traps{}
+    : result_traps {}
 {
     const char* rekall_profile = (const char*)config;
 

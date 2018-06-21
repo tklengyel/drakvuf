@@ -118,7 +118,8 @@ typedef enum
     INJECT_METHOD_CREATEPROC,
     INJECT_METHOD_SHELLEXEC,
     __INJECT_METHOD_MAX
-} injection_method_t;
+}
+injection_method_t;
 
 int injector_start_app(drakvuf_t drakvuf,
                        vmi_pid_t pid,
