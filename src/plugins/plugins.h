@@ -204,4 +204,19 @@ public:
 
 /***************************************************************************/
 
+struct vmi_lock_guard
+{
+    vmi_lock_guard(drakvuf_t drakvuf_) : drakvuf(drakvuf_), vmi( drakvuf_lock_and_get_vmi(this->drakvuf) )
+    {
+    }
+
+    ~vmi_lock_guard()
+    {
+        drakvuf_release_vmi(this->drakvuf);
+    }
+
+    drakvuf_t drakvuf;
+    vmi_instance_t vmi;
+};
+
 #endif
