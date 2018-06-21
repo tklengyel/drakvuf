@@ -306,3 +306,11 @@ char* drakvuf_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     return NULL;
 }
+
+addr_t drakvuf_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg)
+{
+    if ( drakvuf->osi.get_function_argument )
+        return drakvuf->osi.get_function_argument( drakvuf, info, narg );
+
+    return 0;
+}

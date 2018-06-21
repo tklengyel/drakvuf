@@ -244,6 +244,41 @@ static bool find_kernbase(drakvuf_t drakvuf)
     return 1;
 }
 
+addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg)
+{
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
+    if (pm == VMI_PM_IA32E)
+    {
+        switch (narg)
+        {
+            case 1:
+                return info->regs->rcx;
+            case 2:
+                return info->regs->rdx;
+            case 3:
+                return info->regs->r8;
+            case 4:
+                return info->regs->r9;
+        }
+    }
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rsp + narg * drakvuf_get_address_width(drakvuf),
+    };
+
+    addr_t addr;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &addr))
+    {
+        addr = 0;
+    }
+    drakvuf_release_vmi(drakvuf);
+    return addr;
+}
+
 bool set_os_windows(drakvuf_t drakvuf)
 {
 
@@ -282,6 +317,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_current_process_data = win_get_current_process_data;
     drakvuf->osi.get_registry_keyhandle_path = win_reg_keyhandle_path;
     drakvuf->osi.get_filename_from_handle = win_get_filename_from_handle;
+    drakvuf->osi.get_function_argument = win_get_function_argument;
 
     return true;
 }

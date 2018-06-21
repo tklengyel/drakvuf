@@ -111,7 +111,6 @@
 #include "../plugins.h"
 #include "regmon.h"
 
-
 static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
                                       addr_t key_handle_addr,
                                       addr_t value_name_addr, bool with_value_name )
@@ -169,7 +168,8 @@ static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* in
 
 static event_response_t log_reg_hook_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
-    return log_reg_hook( drakvuf, info, info->regs->rcx, 0L, false );
+    addr_t key_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
+    return log_reg_hook( drakvuf, info, key_handle_addr, 0L, false );
 }
 
 static event_response_t log_reg_objattr_hook(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
@@ -253,12 +253,15 @@ static event_response_t log_reg_objattr_hook(drakvuf_t drakvuf, drakvuf_trap_inf
 
 static event_response_t log_reg_objattr_hook_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
-    return log_reg_objattr_hook( drakvuf, info, info->regs->r8 );
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    return log_reg_objattr_hook( drakvuf, info, objattr_addr );
 }
 
 static event_response_t log_reg_value_hook_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
 {
-    return log_reg_hook( drakvuf, info, info->regs->rcx, info->regs->rdx, true );
+    addr_t key_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t value_name_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+    return log_reg_hook( drakvuf, info, key_handle_addr, value_name_addr, true );
 }
 
 static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
@@ -277,11 +280,6 @@ static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const 
 regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
     const char* rekall_profile = (const char*)config;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    this->pm = vmi_get_page_mode(vmi, 0);
-
-    drakvuf_release_vmi(drakvuf);
 
     this->format = output;
 
@@ -308,4 +306,3 @@ regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 }
 
 regmon::~regmon(void) {}
-
