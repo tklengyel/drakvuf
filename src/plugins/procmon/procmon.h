@@ -126,8 +126,6 @@ public:
 
     GSList* result_traps;
 
-    page_mode_t pm;
-    int reg_size;
     output_format_t format;
 
     addr_t command_line;

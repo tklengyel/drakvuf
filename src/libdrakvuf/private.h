@@ -191,6 +191,8 @@ struct drakvuf
     addr_t kernbase;
     addr_t kdtb;
 
+    int address_width;
+
     x86_registers_t* regs[16]; // vCPU specific registers recorded during the last event
     addr_t kpcr[16]; // vCPU specific kpcr recorded on mov-to-cr3
 

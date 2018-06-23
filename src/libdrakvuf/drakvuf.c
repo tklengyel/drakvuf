@@ -482,6 +482,16 @@ os_t drakvuf_get_os_type(drakvuf_t drakvuf)
     return drakvuf->os;
 }
 
+page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf)
+{
+    return drakvuf->pm;
+}
+
+int drakvuf_get_address_width(drakvuf_t drakvuf)
+{
+    return drakvuf->address_width;
+}
+
 static unicode_string_t* drakvuf_read_unicode_common(vmi_instance_t vmi, const access_context_t* ctx)
 {
     unicode_string_t* us = vmi_read_unicode_str(vmi, ctx);
