@@ -123,7 +123,6 @@ public:
         }
     };
 
-    page_mode_t pm;
     output_format_t format;
 
     addr_t objattr_name;
