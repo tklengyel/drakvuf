@@ -252,6 +252,12 @@ AC_ARG_ENABLE([debug],
   [debug="no"])
 AM_CONDITIONAL([DEBUG], [test x$debug = xyes])
 
+AC_ARG_WITH([stdlib],
+  [AS_HELP_STRING([--with-stdlib=LIB], [specify the C++ standard library to use [default=system]])],
+  [], [with_stdlib=system])
+AS_IF([test "x$with_stdlib" != "xsystem"],
+  [CXXFLAGS="$CXXFLAGS -stdlib=$with_stdlib"])
+
 #####################################################
 # AUTOHARDEN START
 # We want to check for compiler flag support, but there is no way to make
