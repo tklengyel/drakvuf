@@ -236,6 +236,9 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &dst_file_name_length) )
         return;
 
+    // convert length in bytes to length in wchar symbols
+    dst_file_name_length /= 2;
+
     ctx.addr = fileinfo + f->newfile_name_offset;
     unicode_string_t* dst_file_name_us = drakvuf_read_wchar_array(vmi, &ctx, dst_file_name_length);
     if ( !dst_file_name_us )
@@ -405,14 +408,11 @@ filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t ou
         throw -1;
     if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
         throw -1;
-//    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_RENAME_INFORMATION", "RootDirectory", &this->newfile_root_offset ) )
-//        throw -1;
+    // Offset of the RootDirectory field in _FILE_RENAME_INFORMATION structure
     this->newfile_root_offset = addr_size;
-//    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_RENAME_INFORMATION", "FileName", &this->newfile_name_offset ) )
-//        throw -1;
+    // Offset of the FileName field in _FILE_RENAME_INFORMATION structure
     this->newfile_name_offset = addr_size * 2 + 4;
-//    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_RENAME_INFORMATION", "FileNameLength", &this->newfile_name_length_offset ) )
-//        throw -1;
+    // Offset of the FileNameLength field in _FILE_RENAME_INFORMATION structure
     this->newfile_name_length_offset = addr_size * 2;
 
     assert(sizeof(trap)/sizeof(trap[0]) > 9);
