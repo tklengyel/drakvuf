@@ -296,39 +296,15 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
 
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    filetracer* f = (filetracer*)info->trap->data;
-    addr_t attr = 0;
-
-    if ( f->pm == VMI_PM_IA32E )
-        attr = info->regs->r8;
-    else
-    {
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        vmi_read_32_va(vmi, info->regs->rsp + sizeof(uint32_t)*3, 0, (uint32_t*)&attr);
-        drakvuf_release_vmi(drakvuf);
-    }
-
+    addr_t attr = drakvuf_get_function_argument(drakvuf, info, 3);
     objattr_read(drakvuf, info, attr);
-
     return 0;
 }
 
 static event_response_t cb2(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    filetracer* f = (filetracer*)info->trap->data;
-    addr_t attr = 0;
-
-    if ( f->pm == VMI_PM_IA32E )
-        attr = info->regs->rcx;
-    else
-    {
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        vmi_read_32_va(vmi, info->regs->rsp + sizeof(uint32_t), 0, (uint32_t*)&attr);
-        drakvuf_release_vmi(drakvuf);
-    }
-
+    addr_t attr = drakvuf_get_function_argument(drakvuf, info, 1);
     objattr_read(drakvuf, info, attr);
-
     return 0;
 }
 
@@ -336,45 +312,17 @@ static event_response_t cb2(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    filetracer* f = (filetracer*)info->trap->data;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    uint32_t fileinfoclass = 0;
-    reg_t handle = 0, fileinfo = 0;
-
-    if (f->pm == VMI_PM_IA32E)
-    {
-        handle = info->regs->rcx;
-        fileinfo = info->regs->r8;
-
-        ctx.addr = info->regs->rsp + 5 * sizeof(addr_t); // addr of fileinfoclass
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &fileinfoclass) )
-            goto done;
-    }
-    else
-    {
-        ctx.addr = info->regs->rsp + sizeof(uint32_t);
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*) &handle) )
-            goto done;
-        ctx.addr += 2 * sizeof(uint32_t);
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*) &fileinfo) )
-            goto done;
-        ctx.addr += 2 * sizeof(uint32_t);
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &fileinfoclass) )
-            goto done;
-    }
+    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t fileinfo = drakvuf_get_function_argument(drakvuf, info, 3);
+    uint32_t fileinfoclass = (uint32_t)drakvuf_get_function_argument(drakvuf, info, 5);
 
     if (fileinfoclass == FILE_RENAME_INFORMATION)
     {
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
         print_rename_file_info(vmi, drakvuf, info, handle, fileinfo);
+        drakvuf_release_vmi(drakvuf);
     }
 
-done:
-    drakvuf_release_vmi(drakvuf);
     return 0;
 }
 
@@ -395,10 +343,7 @@ static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const 
 filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
     const char* rekall_profile = (const char*)config;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->pm = vmi_get_page_mode(vmi, 0);
-    int addr_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
-    drakvuf_release_vmi(drakvuf);
+    int addr_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
     this->format = output;
 
     if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
