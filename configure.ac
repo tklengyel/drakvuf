@@ -1,6 +1,6 @@
 #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
 #                                                                         #
-# DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  #
+# DRAKVUF (C) 2014-2018 Tamas K Lengyel.                                  #
 # Tamas K Lengyel is hereinafter referred to as the author.               #
 # This program is free software; you may redistribute and/or modify it    #
 # under the terms of the GNU General Public License as published by the   #
@@ -111,6 +111,7 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AC_PROG_CC_STDC
 AC_PROG_CXX(clang++)
+AX_REQUIRE_DEFINED([AX_CXX_COMPILE_STDCXX_11])
 AX_CXX_COMPILE_STDCXX_11
 
 ######################################################
