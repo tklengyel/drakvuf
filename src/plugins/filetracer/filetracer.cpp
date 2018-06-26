@@ -123,57 +123,6 @@
 #include "private.h"
 #include "filetracer.h"
 
-static unicode_string_t* read_wchar_array(vmi_instance_t vmi, const access_context_t* ctx, size_t length)
-{
-    unicode_string_t* us = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
-    if ( !us )
-        return NULL;
-
-    us->length = length * 2;
-    us->contents = (uint8_t*)g_malloc0(sizeof(uint8_t) * (length * 2 + 2));
-
-    if ( !us->contents )
-    {
-        vmi_free_unicode_str(us);
-        return NULL;
-    }
-
-    if ( VMI_FAILURE == vmi_read(vmi, ctx, us->length, us->contents, NULL) )
-    {
-        vmi_free_unicode_str(us);
-        return NULL;
-    }
-
-    // end with NUL symbol
-    us->contents[us->length] = 0;
-    us->contents[us->length + 1] = 0;
-    us->encoding = "UTF-16";
-
-    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
-
-    if ( !out )
-    {
-        vmi_free_unicode_str(us);
-        return NULL;
-    }
-
-    status_t rc = vmi_convert_str_encoding(us, out, "UTF-8");
-    vmi_free_unicode_str(us);
-
-    if (VMI_SUCCESS != rc)
-    {
-        g_free(out);
-        return NULL;
-    }
-
-    return out;
-}
-
-static void safe_free_unicode_str(unicode_string_t* us)
-{
-    if (us) vmi_free_unicode_str(us);
-}
-
 static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
 {
     if ( !attr )
@@ -219,7 +168,7 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
                                       file_root ? "\\" : "",
                                       file_name_us->contents);
 
-    safe_free_unicode_str(file_name_us);
+    vmi_free_unicode_str(file_name_us);
     g_free(file_root);
 
     switch (f->format)
@@ -287,8 +236,11 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &dst_file_name_length) )
         return;
 
+    // convert length in bytes to length in wchar symbols
+    dst_file_name_length /= 2;
+
     ctx.addr = fileinfo + f->newfile_name_offset;
-    unicode_string_t* dst_file_name_us = read_wchar_array(vmi, &ctx, dst_file_name_length);
+    unicode_string_t* dst_file_name_us = drakvuf_read_wchar_array(vmi, &ctx, dst_file_name_length);
     if ( !dst_file_name_us )
         return;
 
@@ -347,39 +299,15 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
 
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    filetracer* f = (filetracer*)info->trap->data;
-    addr_t attr = 0;
-
-    if ( f->pm == VMI_PM_IA32E )
-        attr = info->regs->r8;
-    else
-    {
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        vmi_read_32_va(vmi, info->regs->rsp + sizeof(uint32_t)*3, 0, (uint32_t*)&attr);
-        drakvuf_release_vmi(drakvuf);
-    }
-
+    addr_t attr = drakvuf_get_function_argument(drakvuf, info, 3);
     objattr_read(drakvuf, info, attr);
-
     return 0;
 }
 
 static event_response_t cb2(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    filetracer* f = (filetracer*)info->trap->data;
-    addr_t attr = 0;
-
-    if ( f->pm == VMI_PM_IA32E )
-        attr = info->regs->rcx;
-    else
-    {
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        vmi_read_32_va(vmi, info->regs->rsp + sizeof(uint32_t), 0, (uint32_t*)&attr);
-        drakvuf_release_vmi(drakvuf);
-    }
-
+    addr_t attr = drakvuf_get_function_argument(drakvuf, info, 1);
     objattr_read(drakvuf, info, attr);
-
     return 0;
 }
 
@@ -387,45 +315,17 @@ static event_response_t cb2(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    filetracer* f = (filetracer*)info->trap->data;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    uint32_t fileinfoclass = 0;
-    reg_t handle = 0, fileinfo = 0;
-
-    if (f->pm == VMI_PM_IA32E)
-    {
-        handle = info->regs->rcx;
-        fileinfo = info->regs->r8;
-
-        ctx.addr = info->regs->rsp + 5 * sizeof(addr_t); // addr of fileinfoclass
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &fileinfoclass) )
-            goto done;
-    }
-    else
-    {
-        ctx.addr = info->regs->rsp + sizeof(uint32_t);
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*) &handle) )
-            goto done;
-        ctx.addr += 2 * sizeof(uint32_t);
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*) &fileinfo) )
-            goto done;
-        ctx.addr += 2 * sizeof(uint32_t);
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &fileinfoclass) )
-            goto done;
-    }
+    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t fileinfo = drakvuf_get_function_argument(drakvuf, info, 3);
+    uint32_t fileinfoclass = (uint32_t)drakvuf_get_function_argument(drakvuf, info, 5);
 
     if (fileinfoclass == FILE_RENAME_INFORMATION)
     {
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
         print_rename_file_info(vmi, drakvuf, info, handle, fileinfo);
+        drakvuf_release_vmi(drakvuf);
     }
 
-done:
-    drakvuf_release_vmi(drakvuf);
     return 0;
 }
 
@@ -446,24 +346,18 @@ static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const 
 filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
     const char* rekall_profile = (const char*)config;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->pm = vmi_get_page_mode(vmi, 0);
-    int addr_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
-    drakvuf_release_vmi(drakvuf);
+    int addr_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
     this->format = output;
 
     if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
         throw -1;
     if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
         throw -1;
-//    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_RENAME_INFORMATION", "RootDirectory", &this->newfile_root_offset ) )
-//        throw -1;
+    // Offset of the RootDirectory field in _FILE_RENAME_INFORMATION structure
     this->newfile_root_offset = addr_size;
-//    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_RENAME_INFORMATION", "FileName", &this->newfile_name_offset ) )
-//        throw -1;
+    // Offset of the FileName field in _FILE_RENAME_INFORMATION structure
     this->newfile_name_offset = addr_size * 2 + 4;
-//    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_FILE_RENAME_INFORMATION", "FileNameLength", &this->newfile_name_length_offset ) )
-//        throw -1;
+    // Offset of the FileNameLength field in _FILE_RENAME_INFORMATION structure
     this->newfile_name_length_offset = addr_size * 2;
 
     assert(sizeof(trap)/sizeof(trap[0]) > 9);

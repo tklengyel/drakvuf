@@ -312,6 +312,8 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
                                  uint64_t handle);
 
 os_t drakvuf_get_os_type(drakvuf_t drakvuf);
+page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf);
+int drakvuf_get_address_width(drakvuf_t drakvuf);
 const char* drakvuf_get_rekall_profile(drakvuf_t drakvuf);
 
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf);
@@ -413,6 +415,20 @@ int drakvuf_event_fd_add(drakvuf_t drakvuf,
 
 int drakvuf_event_fd_remove(drakvuf_t drakvuf,
                             int fd);
+
+// Reads 'length' characters from array of UTF_16 charachters into unicode_string_t object with UTF_8 encoding
+unicode_string_t* drakvuf_read_wchar_array(vmi_instance_t vmi, const access_context_t* ctx, size_t length);
+
+
+// Determines length of null-terminated array of UTF_16 charachters
+size_t drakvuf_wchar_string_length(vmi_instance_t vmi, const access_context_t* ctx);
+
+// Reads null-terminated string of UTF_16 charachters, automatically determining length, into unicode_string_t object with UTF_8 encoding
+unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_context_t* ctx);
+
+addr_t drakvuf_get_function_argument(drakvuf_t drakvuf,
+                                     drakvuf_trap_info_t* info,
+                                     int argument_number);
 
 /*---------------------------------------------------------
  * Output helpers

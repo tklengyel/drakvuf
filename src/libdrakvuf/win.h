@@ -147,4 +147,6 @@ char* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr
 
 char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
 
+addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int argument_number);
+
 #endif

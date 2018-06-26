@@ -267,41 +267,6 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
     return 0;
 }
 
-static addr_t get_function_argument(drakvuf_t drakvuf, const drakvuf_trap_info_t* info, int narg)
-{
-    procmon* f = (procmon*)info->trap->data;
-    if (f->pm == VMI_PM_IA32E)
-    {
-        switch (narg)
-        {
-            case 1:
-                return info->regs->rcx;
-            case 2:
-                return info->regs->rdx;
-            case 3:
-                return info->regs->r8;
-            case 4:
-                return info->regs->r9;
-        }
-    }
-
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp + narg * f->reg_size,
-    };
-
-    addr_t addr;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &addr))
-    {
-        addr = 0;
-    }
-    drakvuf_release_vmi(drakvuf);
-    return addr;
-}
-
 static addr_t get_function_ret_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     access_context_t ctx =
@@ -413,18 +378,18 @@ static event_response_t terminate_process_hook(
 static event_response_t create_user_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     // PHANDLE ProcessHandle
-    addr_t process_handle_addr = get_function_argument(drakvuf, info, 1);
+    addr_t process_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
     // PRTL_USER_PROCESS_PARAMETERS RtlUserProcessParameters
-    addr_t user_process_parameters_addr = get_function_argument(drakvuf, info, 9);
+    addr_t user_process_parameters_addr = drakvuf_get_function_argument(drakvuf, info, 9);
     return create_user_process_hook(drakvuf, info, process_handle_addr, user_process_parameters_addr);
 }
 
 static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     // HANDLE ProcessHandle
-    addr_t process_handle = get_function_argument(drakvuf, info, 1);
+    addr_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
     // NTSTATUS ExitStatus
-    addr_t exit_status = get_function_argument(drakvuf, info, 2);
+    addr_t exit_status = drakvuf_get_function_argument(drakvuf, info, 2);
     return terminate_process_hook(drakvuf, info, process_handle, exit_status);
 }
 
@@ -442,14 +407,9 @@ static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const 
 
 
 procmon::procmon(drakvuf_t drakvuf, const void* config, output_format_t output)
-    : result_traps{}
+    : result_traps {}
 {
     const char* rekall_profile = (const char*)config;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->pm = vmi_get_page_mode(vmi, 0);
-    this->reg_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
-    drakvuf_release_vmi(drakvuf);
 
     this->format = output;
 
