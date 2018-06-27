@@ -523,12 +523,12 @@ void init_argument(
 {
     arg->type = type;
     arg->size = size;
-    
+
     if (is32bit)
         arg->data_32 = data;
     else
         arg->data_64 = data;
-    
+
     arg->data_on_stack = 0;
     arg->is_output = is_output;
 }
