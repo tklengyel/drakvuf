@@ -117,6 +117,7 @@ typedef enum
 {
     INJECT_METHOD_CREATEPROC,
     INJECT_METHOD_SHELLEXEC,
+    INJECT_METHOD_SHELLCODE,
     __INJECT_METHOD_MAX
 }
 injection_method_t;
@@ -128,6 +129,15 @@ typedef enum
     ARGUMENT_INT,
     __ARGUMENT_MAX
 } argument_type_t;
+
+typedef enum
+{
+    STATUS_NULL,
+    STATUS_ALLOC_OK,
+    STATUS_WRITE_OK,
+    STATUS_EXEC_OK,
+    __STATUS_MAX
+} status_type_t;
 
 int injector_start_app(drakvuf_t drakvuf,
                        vmi_pid_t pid,

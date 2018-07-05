@@ -168,6 +168,8 @@ int main(int argc, char** argv)
             method = INJECT_METHOD_SHELLEXEC;
         else if (!strncmp(method_arg,"createproc",10))
             method = INJECT_METHOD_CREATEPROC;
+        else if (!strncmp(method_arg,"shellcode",9))
+            method = INJECT_METHOD_SHELLCODE;
     }
 
 #ifdef DRAKVUF_DEBUG

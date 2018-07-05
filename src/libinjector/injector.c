@@ -135,6 +135,11 @@ struct injector
     injection_method_t method;
     addr_t exec_func;
 
+    // For shellcode execution
+    addr_t payload, payload_addr, write_proc_mem;
+    size_t payload_size;
+    uint32_t status;
+
     addr_t process_info;
     x86_registers_t saved_regs;
 
@@ -163,7 +168,11 @@ struct argument
     bool is_output;
 };
 
-#define SW_SHOWDEFAULT 10
+#define SW_SHOWDEFAULT  10
+#define MEM_COMMIT      0x00001000
+#define MEM_RESERVE     0x00002000
+#define MEM_PHYSICAL    0x00400000
+#define PAGE_EXECUTE_READWRITE  0x40
 
 struct startup_info_32
 {
@@ -429,65 +438,68 @@ static bool setup_stack_64(
 
     addr_t addr = info->regs->rsp;
 
-    // make room for strings and structs into guest's stack
-    for (int i = 0; i < nb_args; i++)
+    if ( args )
     {
-        switch (args[i].type)
+        // make room for strings and structs into guest's stack
+        for (int i = 0; i < nb_args; i++)
         {
-            case ARGUMENT_STRING:
+            switch (args[i].type)
             {
-                addr = place_string_on_stack_64(vmi, ctx, addr, (const char*)args[i].data_64);
-                if ( !addr ) goto err;
-                args[i].data_on_stack = addr;
-                break;
-            }
-            case ARGUMENT_STRUCT:
-            {
-                size_t len = args[i].size;
-                addr -= len;
-                ctx->addr = addr;
-                args[i].data_on_stack = addr;
+                case ARGUMENT_STRING:
+                {
+                    addr = place_string_on_stack_64(vmi, ctx, addr, (const char*)args[i].data_64);
+                    if ( !addr ) goto err;
+                    args[i].data_on_stack = addr;
+                    break;
+                }
+                case ARGUMENT_STRUCT:
+                {
+                    size_t len = args[i].size;
+                    addr -= len;
+                    ctx->addr = addr;
+                    args[i].data_on_stack = addr;
 
-                if (args[i].is_output)
-                    injector->process_info = addr;
+                    if (args[i].is_output)
+                        injector->process_info = addr;
 
-                if (VMI_FAILURE == vmi_write(vmi, ctx, len, args[i].data_64, NULL))
+                    if (VMI_FAILURE == vmi_write(vmi, ctx, len, args[i].data_64, NULL))
+                        goto err;
+                    break;
+                }
+                case ARGUMENT_INT:
+                {
+                    args[i].data_on_stack = (uint64_t)args[i].data_64;
+                    break;
+                }
+                default:
                     goto err;
-                break;
             }
-            case ARGUMENT_INT:
-            {
-                args[i].data_on_stack = (uint64_t)args[i].data_64;
-                break;
-            }
-            default:
+        }
+
+        // http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
+        //
+        // First 4 parameters to functions are always passed in registers
+        // P1=rcx, P2=rdx, P3=r8, P4=r9
+        // 5th parameter onwards (if any) passed via the stack
+
+        // write parameters (5th onwards) into guest's stack
+        for (int i = nb_args-1; i > 3; i--)
+        {
+            addr -= 0x8;
+            ctx->addr = addr;
+            if (VMI_FAILURE == vmi_write_64(vmi, ctx, &(args[i].data_on_stack)) )
                 goto err;
         }
+
+        // p1
+        info->regs->rcx = args[0].data_on_stack;
+        // p2
+        info->regs->rdx = args[1].data_on_stack;
+        // p3
+        info->regs->r8 = args[2].data_on_stack;
+        // p4
+        info->regs->r9 = args[3].data_on_stack;
     }
-
-    // http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
-    //
-    // First 4 parameters to functions are always passed in registers
-    // P1=rcx, P2=rdx, P3=r8, P4=r9
-    // 5th parameter onwards (if any) passed via the stack
-
-    // write parameters (5th onwards) into guest's stack
-    for (int i = nb_args-1; i > 3; i--)
-    {
-        addr -= 0x8;
-        ctx->addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, ctx, &(args[i].data_on_stack)) )
-            goto err;
-    }
-
-    // p1
-    info->regs->rcx = args[0].data_on_stack;
-    // p2
-    info->regs->rdx = args[1].data_on_stack;
-    // p3
-    info->regs->r8 = args[2].data_on_stack;
-    // p4
-    info->regs->r9 = args[3].data_on_stack;
 
     // allocate 0x20 "homing space"
     for (int i = 0; i < 4; i++)
@@ -646,6 +658,43 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 
             if ( !setup_stack_64(injector, info, &ctx, args, 10) )
                 goto err;
+        }
+        else if (INJECT_METHOD_SHELLCODE == injector->method && STATUS_NULL == injector->status)
+        {
+            struct argument args[4] = { {0} };
+            uint64_t null64 = 0;
+            uint64_t allocation_type = MEM_COMMIT | MEM_RESERVE;
+            uint64_t protect = PAGE_EXECUTE_READWRITE;
+
+            init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)null64, 0);
+            init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->payload_size, 0);
+            init_argument(0, &args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)allocation_type, 0);
+            init_argument(0, &args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)protect, 0);
+
+            if ( !setup_stack_64(injector, info, &ctx, args, 4) )
+                goto err;
+
+        }
+        else if (INJECT_METHOD_SHELLCODE == injector->method && STATUS_ALLOC_OK == injector->status)
+        {
+            struct argument args[5] = { {0} };
+            uint64_t handle = -1;
+            size_t bytes_written = 0;
+
+            init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)handle, 0);
+            init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->payload_addr, 0);
+            init_argument(0, &args[2], ARGUMENT_STRING, injector->payload_size, (void*)injector->payload, 0);
+            init_argument(0, &args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->payload_size, 0);
+            init_argument(0, &args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)bytes_written, 0);
+
+            if ( !setup_stack_64(injector, info, &ctx, args, 5) )
+                return 0;
+            g_free((void*)injector->payload);
+        }
+        else if (INJECT_METHOD_SHELLCODE == injector->method && STATUS_WRITE_OK == injector->status)
+        {
+            if ( !setup_stack_64(injector, info, &ctx, NULL, 4) )
+                return 0;
         }
     }
 
@@ -869,7 +918,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if ( !drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, &threadid) || !threadid )
         return 0;
 
-    if ( !injector->is32bit && !injector->hijacked && info->regs->rip == injector->bp.breakpoint.addr )
+    if ( !injector->is32bit && !injector->hijacked && info->regs->rip == injector->bp.breakpoint.addr && injector->status == STATUS_NULL )
     {
         /* We just hit the RIP from the trapframe */
 
@@ -883,10 +932,59 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         info->regs->rip = injector->exec_func;
 
+        if (INJECT_METHOD_SHELLCODE == injector->method)
+        {
+           injector->status = STATUS_ALLOC_OK;
+        }
+        else
+        {
+            injector->hijacked = 1;
+
+            if ( !injector->target_tid )
+                injector->target_tid = threadid;
+        }
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+
+    // Chain the injection with a second function
+    if ( !injector->is32bit && info->regs->rip == injector->bp.breakpoint.addr && STATUS_ALLOC_OK == injector->status)
+    {
+        PRINT_DEBUG("Writing payload in memory..\n");
+        PRINT_DEBUG("Payload is at: 0x%lx\n", info->regs->rax);
+
+        injector->payload_addr = info->regs->rax;
+        if ( !pass_inputs(injector, info) )
+        {
+            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+            return 0;
+        }
+
+        info->regs->rip = injector->write_proc_mem;
+
+        injector->status = STATUS_WRITE_OK;
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+
+    // Execute the payload
+    if ( !injector->is32bit && info->regs->rip == injector->bp.breakpoint.addr && STATUS_WRITE_OK == injector->status)
+    {
+        PRINT_DEBUG("Executing the payload..\n");
+        if ( !pass_inputs(injector, info) )
+        {
+            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+            return 0;
+        }
+
+        info->regs->rip = injector->payload_addr;
+
         injector->hijacked = 1;
 
         if ( !injector->target_tid )
             injector->target_tid = threadid;
+
+        injector->status = STATUS_EXEC_OK;
 
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
@@ -947,9 +1045,55 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         PRINT_DEBUG("Injected\n");
         injector->rc = 1;
     }
+    else if (INJECT_METHOD_SHELLCODE == injector->method && STATUS_EXEC_OK == injector->status)
+    {
+        PRINT_DEBUG("Shellcode executed\n");
+        PRINT_DEBUG("RAX : 0x%lx (expexted: 0x7)\n", info->regs->rax);
+
+        injector->rc = 1;
+    }
 
     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
+}
+
+status_t read_payload(struct injector* injector, const char* file)
+{
+    size_t bytes_read = 0;
+    size_t mem_size = 4096, payload_size = 0;
+    unsigned char* shellcode = NULL, *tmp = NULL;
+    char buffer[4096] = { '\0' };
+    FILE* fp = NULL;
+
+    if ( !(fp = fopen(file, "rb")) )
+        return VMI_FAILURE;
+
+    shellcode = g_malloc0(sizeof(char) * mem_size);
+
+    tmp = shellcode;
+    while ( (bytes_read = fread(buffer, 1, 4096, fp)) )
+    {
+        if (bytes_read + payload_size > mem_size)
+        {
+            mem_size *= 2;
+            shellcode = g_realloc(shellcode, mem_size);
+            tmp = shellcode;
+            tmp += payload_size;
+        }
+
+        memcpy(shellcode, buffer, bytes_read);
+        payload_size += bytes_read;
+        tmp += bytes_read;
+    }
+
+    injector->payload = (addr_t)shellcode;
+    injector->payload_size = payload_size;
+
+    PRINT_DEBUG("Size of shellcode : %lu\n", injector->payload_size);
+
+    fclose(fp);
+
+    return VMI_SUCCESS;
 }
 
 static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t dtb, const char* file, vmi_pid_t injected_pid, uint32_t injected_tid)
@@ -1059,7 +1203,26 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
         lib = "shell32.dll";
         fun = "ShellExecuteA";
     }
+    else if (INJECT_METHOD_SHELLCODE == method)
+    {
+        // Read payload to inject from a file
+        if ( VMI_SUCCESS != read_payload(&injector, file) )
+            goto done;
 
+        lib = "kernel32.dll";
+        fun = "WriteProcessMemory";
+        injector.write_proc_mem = drakvuf_exportsym_to_va(injector.drakvuf, eprocess_base, lib, fun);
+        if (!injector.write_proc_mem)
+        {
+            PRINT_DEBUG("Failed to get address of %s!%s\n", lib, fun);
+            goto done;
+        }
+
+        lib = "kernel32.dll";
+        fun = "VirtualAlloc";
+    }
+
+    injector.status = STATUS_NULL;
     injector.exec_func = drakvuf_exportsym_to_va(injector.drakvuf, eprocess_base, lib, fun);
     if (!injector.exec_func)
     {
