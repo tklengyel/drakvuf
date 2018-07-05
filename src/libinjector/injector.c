@@ -934,7 +934,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         if (INJECT_METHOD_SHELLCODE == injector->method)
         {
-           injector->status = STATUS_ALLOC_OK;
+            injector->status = STATUS_ALLOC_OK;
         }
         else
         {
