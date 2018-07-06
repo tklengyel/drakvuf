@@ -1048,7 +1048,6 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     else if (INJECT_METHOD_SHELLCODE == injector->method && STATUS_EXEC_OK == injector->status)
     {
         PRINT_DEBUG("Shellcode executed\n");
-        PRINT_DEBUG("RAX : 0x%lx (expexted: 0x7)\n", info->regs->rax);
 
         injector->rc = 1;
     }
