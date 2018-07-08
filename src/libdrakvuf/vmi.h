@@ -109,7 +109,7 @@
 #define BIT64 1
 #define PM2BIT(pm) ((pm == VMI_PM_IA32E) ? BIT64 : BIT32)
 
-#define TRAP 0xCC
+#define SW_TRAP 0xCC
 
 #include <glib.h>
 #include <stdbool.h>

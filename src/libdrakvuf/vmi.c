@@ -124,7 +124,7 @@
 #include "vmi.h"
 #include "rekall-profile.h"
 
-static uint8_t bp = TRAP;
+static uint8_t sw_trap = SW_TRAP;
 
 /*
  * This function gets called from the singlestep event
@@ -263,7 +263,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                 return 0;
             }
 
-            if ( test == bp )
+            if ( test == sw_trap )
             {
                 PRINT_DEBUG("Double-trap at 0x%lx\n", *pa);
                 s->breakpoint.doubletrap = 1;
@@ -273,7 +273,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                 s->breakpoint.doubletrap = 0;
                 if ( VMI_FAILURE == vmi_write_8_pa(drakvuf->vmi,
                                                    (pass->remapped_gfn->r << 12) + (*pa & VMI_BIT_MASK(0,11)),
-                                                   &bp) )
+                                                   &sw_trap) )
                 {
                     fprintf(stderr, "Critical error in re-copying remapped gfn\n");
                     drakvuf->interrupted = -1;
@@ -495,7 +495,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
             return 0;
         }
 
-        if (test == bp)
+        if (test == sw_trap)
         {
             // There is a breakpoint instruction in memory here
             // so we need to reinject this to the guest.
@@ -1095,7 +1095,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         goto err_exit;
     }
 
-    if (test == bp)
+    if (test == sw_trap)
     {
         PRINT_DEBUG("Double-trap location @ 0x%lx !\n", container->breakpoint.pa);
         container->breakpoint.doubletrap = 1;
@@ -1104,7 +1104,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     {
         container->breakpoint.doubletrap = 0;
 
-        if (VMI_FAILURE == vmi_write_8_pa(vmi, rpa, &bp))
+        if (VMI_FAILURE == vmi_write_8_pa(vmi, rpa, &sw_trap))
         {
             PRINT_DEBUG("FAILED TO INJECT TRAP @ 0x%lx !\n", container->breakpoint.pa);
             goto err_exit;
