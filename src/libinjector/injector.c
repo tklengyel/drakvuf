@@ -683,7 +683,7 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 
             init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)handle, 0);
             init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->payload_addr, 0);
-            init_argument(0, &args[2], ARGUMENT_STRING, injector->payload_size, (void*)injector->payload, 0);
+            init_argument(0, &args[2], ARGUMENT_STRUCT, injector->payload_size, (void*)injector->payload, 0);
             init_argument(0, &args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->payload_size, 0);
             init_argument(0, &args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)bytes_written, 0);
 
