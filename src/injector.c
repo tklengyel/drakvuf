@@ -134,7 +134,7 @@ static inline void print_help(void)
 #ifdef DRAKVUF_DEBUG
             "\t -v                        Turn on verbose (debug) output\n"
 #endif
-            );
+           );
 }
 
 int main(int argc, char** argv)
