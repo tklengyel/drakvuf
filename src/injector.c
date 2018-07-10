@@ -131,7 +131,7 @@ static inline void print_help(void)
             "\t -m <inject_method>        The injection method, default is createproc; shellexec for Windows amd64 only\n"
             "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
             "\t -c <current_working_dir>  The current working directory for injected executable\n"
-            );
+           );
 }
 
 int main(int argc, char** argv)
