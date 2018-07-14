@@ -129,6 +129,9 @@
 
 #include <byteswap.h>
 
+#include <string>
+#include <iostream>
+
 #include <libvmi/libvmi.h>
 #include "plugins/plugins.h"
 #include "private.h"
@@ -1379,6 +1382,287 @@ static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 /* ----------------------------------------------------- */
 
+static void print_dns_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* sm, const char* function_name, const char* dns_name)
+{
+    switch (sm->format)
+    {
+        case OUTPUT_CSV:
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",\"%s\",\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
+                   info->proc_data.name, dns_name, function_name);
+            break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",DnsName=\"%s\",Method=\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, dns_name, function_name);
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" DNS_NAME:\"%s\" METHOD:\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   dns_name, function_name);
+            break;
+    };
+}
+
+static event_response_t trap_DnsQuery_A_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    socketmon* sm = (socketmon*)info->trap->data;
+
+    addr_t domain_name_addr = 0;
+
+    if (sm->pm == VMI_PM_IA32E) // only 64 bit for now
+    {
+        domain_name_addr = info->regs->rcx;
+
+        access_context_t ctx;
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+        ctx.addr = domain_name_addr;
+
+        char* dns_name = [&]
+        {
+            vmi_lock_guard vmi_lg(drakvuf);
+            return vmi_read_str(vmi_lg.vmi, &ctx);
+        }();
+        print_dns_info(drakvuf, info, sm, info->trap->name, dns_name);
+        g_free(dns_name);
+    }
+    else
+    {
+        fprintf(stderr, "[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
+    }
+
+    return 0;
+}
+
+
+static event_response_t trap_DnsQuery_W_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    socketmon* sm = (socketmon*)info->trap->data;
+
+    addr_t domain_name_addr = 0;
+    unicode_string_t* domain_name_us = nullptr;
+
+    if (sm->pm == VMI_PM_IA32E) // only 64 bit for now
+    {
+        domain_name_addr = info->regs->rcx;
+
+        access_context_t ctx;
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+        ctx.addr = domain_name_addr;
+
+        {
+            vmi_lock_guard vmi_lg(drakvuf);
+            domain_name_us = drakvuf_read_wchar_string(vmi_lg.vmi, &ctx);
+        }
+
+        if (domain_name_us)
+        {
+            print_dns_info(drakvuf, info, sm, info->trap->name, (char*)domain_name_us->contents);
+        }
+        else
+        {
+            fprintf(stderr, "[SOCKETMON] Error, getting unicode domain name string in %s()", __FUNCTION__);
+        }
+        vmi_free_unicode_str(domain_name_us);
+    }
+    else
+    {
+        fprintf(stderr, "[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
+    }
+
+
+    return 0;
+}
+
+// Works on Windows 7
+static event_response_t trap_DnsQueryExW_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    socketmon* sm = (socketmon*)info->trap->data;
+
+    if (sm->pm != VMI_PM_IA32E) // only 64 bit for now
+    {
+        fprintf(stderr, "[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
+        return 0;
+    }
+
+    unicode_string_t* domain_name_us = drakvuf_read_unicode(drakvuf, info, info->regs->rcx);
+
+    if (domain_name_us)
+    {
+        print_dns_info(drakvuf, info, sm, info->trap->name, (char*)domain_name_us->contents);
+    }
+    else
+    {
+        fprintf(stderr, "[SOCKETMON] Error, getting unicode domain name string in %s()", __FUNCTION__);
+    }
+
+    vmi_free_unicode_str(domain_name_us);
+
+    return 0;
+}
+
+// Works on Windows 7
+static event_response_t trap_DnsQueryExA_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    socketmon* sm = (socketmon*)info->trap->data;
+
+    addr_t domain_name_addr = 0;
+
+    if (sm->pm == VMI_PM_IA32E) // only 64 bit for now
+    {
+        domain_name_addr = info->regs->rcx;
+
+        access_context_t ctx;
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+        ctx.addr = domain_name_addr;
+
+        char* dns_name = [&]
+        {
+            vmi_lock_guard vmi_lg(drakvuf);
+            return vmi_read_str(vmi_lg.vmi, &ctx);
+        }();
+
+        print_dns_info(drakvuf, info, sm, info->trap->name, dns_name);
+        g_free(dns_name);
+    }
+    else
+    {
+        fprintf(stderr, "[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
+    }
+
+    return 0;
+}
+
+// Works on Windows 8+
+static event_response_t trap_DnsQueryEx_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    socketmon* sm = (socketmon*)info->trap->data;
+
+    unicode_string_t* domain_name_us = nullptr;
+
+    if (sm->pm == VMI_PM_IA32E) // only 64 bit for now
+    {
+        addr_t query_request_addr = info->regs->rcx;
+        addr_t query_name_addr = 0;
+
+        access_context_t ctx;
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+        ctx.addr = query_request_addr + 8;
+
+        {
+            vmi_lock_guard vmi_lg(drakvuf);
+
+            if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &query_name_addr) )
+            {
+                fprintf(stderr, "[SOCKETMON] Couldn't read query_name_addr in %s(...) trap. Unsupported.\n", info->trap->name);
+                return 0;
+            }
+
+            ctx.addr = query_name_addr;
+            domain_name_us = drakvuf_read_wchar_string(vmi_lg.vmi, &ctx);
+        }
+
+        if (domain_name_us)
+        {
+            print_dns_info(drakvuf, info, sm, info->trap->name, (const char*)domain_name_us->contents);
+        }
+        else
+        {
+            fprintf(stderr, "[SOCKETMON] Error, getting unicode domain name string in %s()", __FUNCTION__);
+        }
+    }
+    else
+    {
+        fprintf(stderr, "[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
+    }
+
+    vmi_free_unicode_str(domain_name_us);
+
+    return 0;
+}
+
+static int set_trap_universal(socketmon_trapinfo& ti, socketmon* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    if (ti.already_set)
+        return 0;
+
+    drakvuf_trap_t& current_trap = ti.trap;
+    auto response = 0;
+    addr_t exec_func = 0;
+
+    auto eprocess_base = drakvuf_get_current_process(drakvuf, info->vcpu);
+    if ( 0 == eprocess_base )
+    {
+        PRINT_DEBUG("[SOCKETMON] Failed to get process base on vCPU 0x%d\n",
+                    info->vcpu);
+        goto err;
+    }
+
+    exec_func = drakvuf_exportsym_to_va(drakvuf, eprocess_base, ti.lib, ti.fun);
+    if (!exec_func)
+    {
+        PRINT_DEBUG("[SOCKETMON] Failed to get address of %s!%s\n", ti.lib, ti.fun);
+        goto err;
+    }
+
+    current_trap.type = BREAKPOINT;
+    current_trap.name = ti.fun;
+    current_trap.cb = ti.trap_callback;
+    current_trap.data = info->trap->data;
+    current_trap.breakpoint.lookup_type = LOOKUP_DTB;
+    current_trap.breakpoint.dtb = info->regs->cr3;
+    current_trap.breakpoint.addr_type = ADDR_VA;
+    current_trap.breakpoint.addr = exec_func;
+
+    if ( !drakvuf_add_trap(drakvuf, &current_trap) )
+    {
+        fprintf(stderr, "[SOCKETMON] Failed to trap function call @ 0x%lx!\n",
+                current_trap.breakpoint.addr);
+        return 0;
+    }
+
+    fprintf(stderr, "[SOCKETMON] Set trap for %s:%s successfully\n", ti.lib, ti.fun);
+    ti.already_set = true;
+
+    return 1;
+
+err:
+    return response;
+}
+
+static event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    socketmon* sm = (socketmon*)info->trap->data;
+
+    const unsigned expected_number_of_traps = sm->traps.size();
+    for (auto& ti : sm->traps)
+    {
+        sm->traps_set += set_trap_universal(ti, sm, drakvuf, info);
+    }
+
+    fprintf(stderr, "[SOCKETMON] cr3_cb(...) traps_set=%d.\n", (int)sm->traps_set);
+
+    // Unsubscribe from the CR3 trap
+    if (sm->traps_set == expected_number_of_traps)
+    {
+        fprintf(stderr, "[SOCKETMON] Set all traps, removing CR3 trap.\n");
+        fprintf(stderr, "[SOCKETMON] TIME:" FORMAT_TIMEVAL "\n", UNPACK_TIMEVAL(info->timestamp) );
+
+        drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+        drakvuf_interrupt(drakvuf, -1); // break drakvuf_loop(...) in constructor
+    }
+
+    return 0;
+}
+
+
 socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
     const struct socketmon_config* c = (const struct socketmon_config*)config;
@@ -1388,6 +1672,36 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
     this->winver = vmi_get_winver(vmi);
     drakvuf_release_vmi(drakvuf);
     this->format = output;
+
+    if (pm == VMI_PM_IA32E)
+    {
+        traps.emplace_back("dnsapi.dll", "DnsQuery_W", trap_DnsQuery_W_cb);
+        traps.emplace_back("dnsapi.dll", "DnsQuery_A", trap_DnsQuery_A_cb);
+        traps.emplace_back("dnsapi.dll", "DnsQuery_UTF8", trap_DnsQuery_A_cb); // intentionally trap_DnsQuery_A_cb
+
+        if (this->winver == VMI_OS_WINDOWS_7)
+        {
+            traps.emplace_back( "dnsapi.dll", "DnsQueryExW", trap_DnsQueryExW_cb );
+            traps.emplace_back( "dnsapi.dll", "DnsQueryExA", trap_DnsQueryExA_cb );
+        }
+
+        if (this->winver >= VMI_OS_WINDOWS_8)
+        {
+            traps.emplace_back( "dnsapi.dll", "DnsQueryEx", trap_DnsQueryEx_cb );
+        }
+    }
+
+    // Will be freed while "drakvuf_remove_trap()"
+    drakvuf_trap_t* bp = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+    if (!bp)
+        throw -1;
+
+    bp->type = REGISTER;
+    bp->reg = CR3;
+    bp->cb = cr3_cb;
+    bp->data = this;
+    if ( !drakvuf_add_trap(drakvuf, bp) )
+        throw -1;
 
     if ( !tcpip_profile )
     {
@@ -1463,6 +1777,9 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
         throw -1;
     if ( !drakvuf_add_trap(drakvuf, &this->trap[6]) )
         throw -1;
+
+    fprintf(stderr, "[SOCKETMON] Socketmon constructor end.\n");
+
 }
 
 socketmon::~socketmon()
