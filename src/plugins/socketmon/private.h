@@ -317,4 +317,21 @@ struct udp_endpoint_win10_x64
     addr_t localaddr; // local_address_win10_udp_x64
 } __attribute__ ((packed));
 
+typedef event_response_t (*TrapFunction)(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+struct socketmon_trapinfo
+{
+    socketmon_trapinfo(const char* lib_, const char* fun_, TrapFunction cb_) : lib(lib_), fun(fun_), trap_callback(cb_)
+    {}
+
+    const char* lib = nullptr;
+    const char* fun = nullptr;
+    bool already_set = false;
+    TrapFunction trap_callback = nullptr;
+    drakvuf_trap_t trap =
+    {
+        .data = (void*)this
+    };
+};
+
 #endif
