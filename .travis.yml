@@ -91,6 +91,7 @@ matrix:
 #
     - env:
         - TEST="Coverity"
+      sudo: required
       addons:
         apt:
             sources:
