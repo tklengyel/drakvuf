@@ -129,6 +129,36 @@ typedef enum
     __ARGUMENT_MAX
 } argument_type_t;
 
+struct argument
+{
+    uint32_t type;
+    uint32_t size;
+    uint64_t data_on_stack;
+    union
+    {
+        uint32_t* data_32;
+        uint64_t* data_64;
+    };
+};
+
+void init_argument(bool is32bit,
+                   struct argument* arg,
+                   argument_type_t type,
+                   size_t size,
+                   void* data);
+
+bool setup_stack_32(vmi_instance_t vmi,
+                    drakvuf_trap_info_t* info,
+                    access_context_t* ctx,
+                    struct argument args[],
+                    int nb_args);
+
+bool setup_stack_64(vmi_instance_t vmi,
+                    drakvuf_trap_info_t* info,
+                    access_context_t* ctx,
+                    struct argument args[],
+                    int nb_args);
+
 int injector_start_app(drakvuf_t drakvuf,
                        vmi_pid_t pid,
                        uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
