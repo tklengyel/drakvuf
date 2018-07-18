@@ -128,9 +128,12 @@ static inline void print_help(void)
             "\t -i <injection pid>        The PID of the process to hijack for injection\n"
             "\t -e <inject_file>          The executable to start with injection\n"
             "Optional inputs:\n"
-            "\t -m <inject_method>        The injection method, default is createproc; shellexec for Windows amd64 only\n"
+            "\t -m <inject_method>        The injection method (createproc, shellexec or shellcode for Windows amd64 only)\n"
             "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
             "\t -c <current_working_dir>  The current working directory for injected executable\n"
+#ifdef DRAKVUF_DEBUG
+            "\t -v                        Turn on verbose (debug) output\n"
+#endif
            );
 }
 
@@ -179,6 +182,8 @@ int main(int argc, char** argv)
                     injection_method = INJECT_METHOD_SHELLEXEC;
                 else if (!strncmp(optarg,"createproc",10))
                     injection_method = INJECT_METHOD_CREATEPROC;
+                else if (!strncmp(optarg,"shellcode",9))
+                    injection_method = INJECT_METHOD_SHELLCODE;
                 else
                 {
                     fprintf(stderr, "Unrecognized injection method\n");
