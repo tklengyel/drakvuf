@@ -102,236 +102,41 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
-#include <glib.h>
+#ifndef FILEDELETE_PRIVATE_H
+#define FILEDELETE_PRIVATE_H
 
-#include "drakvuf.h"
+#define FILE_DISPOSITION_INFORMATION 13
 
-static drakvuf_c* drakvuf;
-
-void close_handler(int signal)
+enum offset
 {
-    drakvuf->interrupt(signal);
-}
+    FILE_OBJECT_TYPE,
+    FILE_OBJECT_FILENAME,
+    FILE_OBJECT_SECTIONOBJECTPOINTER,
+    SECTIONOBJECTPOINTER_DATASECTIONOBJECT,
+    SECTIONOBJECTPOINTER_SHAREDCACHEMAP,
+    SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT,
+    CONTROL_AREA_SEGMENT,
+    SEGMENT_CONTROLAREA,
+    SEGMENT_SIZEOFSEGMENT,
+    SEGMENT_TOTALNUMBEROFPTES,
+    SUBSECTION_NEXTSUBSECTION,
+    SUBSECTION_SUBSECTIONBASE,
+    SUBSECTION_PTESINSUBSECTION,
+    SUBSECTION_CONTROLAREA,
+    SUBSECTION_STARTINGSECTOR,
+    OBJECT_HEADER_BODY,
+    __OFFSET_MAX
+};
 
-static inline void disable_plugin(char* optarg, bool* plugin_list)
-{
-    int i;
-    for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
-        if (!strcmp(optarg, drakvuf_plugin_names[i]))
-            plugin_list[i] = 0;
-}
+extern const char* offset_names[__OFFSET_MAX][2];
 
-int main(int argc, char** argv)
-{
-    int c, rc = 1, timeout = 0;
-    char const* inject_file = NULL;
-    char const* inject_cwd = NULL;
-    injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
-    char* domain = NULL;
-    char* rekall_profile = NULL;
-    char* dump_folder = NULL;
-    char* start_process_name = NULL;
-    char* tcpip = NULL;
-    vmi_pid_t injection_pid = -1;
-    uint32_t injection_thread = 0;
-    struct sigaction act;
-    output_format_t output = OUTPUT_DEFAULT;
-    bool plugin_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 1};
-    bool verbose = 0;
-    bool cpuid_stealth = 0;
-    bool leave_paused = 0;
-    char const* syscalls_filter_file = NULL;
-    bool dump_modified_files = false;
-    bool filedelete_use_injector = false;
+void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
+                    drakvuf_trap_t* trap,
+                    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) );
 
-    fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
+unicode_string_t* get_file_name(filedelete* f, drakvuf_t drakvuf,
+                                vmi_instance_t vmi,
+                                drakvuf_trap_info_t* info, addr_t handle,
+                                addr_t* out_file, addr_t* out_filetype);
 
-    if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 )
-    {
-        fprintf(stderr, "No plugins have been enabled, nothing to do!\n");
-        return rc;
-    }
-
-    if (argc < 4)
-    {
-        fprintf(stderr, "Required input:\n"
-                "\t -r <rekall profile>       The Rekall profile of the OS kernel\n"
-                "\t -d <domain ID or name>    The domain's ID or name\n"
-                "Optional inputs:\n"
-                "\t -i <injection pid>        The PID of the process to hijack for injection\n"
-                "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
-                "\t -e <inject_file>          The executable to start with injection\n"
-                "\t -c <current_working_dir>  The current working directory for injected executable\n"
-                "\t -m <inject_method>        The injection method (default or shellexec for Windows amd64 only)\n"
-                "\t -t <timeout>              Timeout (in seconds)\n"
-                "\t -o <format>               Output format (default or csv)\n"
-                "\t -x <plugin>               Don't activate the specified plugin\n"
-                "\t -p                        Leave domain paused after DRAKVUF exits\n"
-                "\t -w <process name>         Wait with plugin start until process name is detected\n"
-#ifdef ENABLE_PLUGIN_FILEDELETE
-                "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
-                "\t -M                        Dump new or modified files also (requires -D)\n"
-                "\t -n                        Use extraction method based on function injection (requires -D)\n"
-#endif
-#ifdef ENABLE_PLUGIN_SOCKETMON
-                "\t -T <rekall profile>       The Rekall profile for tcpip.sys\n"
-#endif
-#ifdef ENABLE_PLUGIN_CPUIDMON
-                "\t -s                        Hide Hypervisor bits and signature in CPUID\n"
-#endif
-#ifdef DRAKVUF_DEBUG
-                "\t -v                        Turn on verbose (debug) output\n"
-#endif
-#ifdef ENABLE_PLUGIN_SYSCALLS
-                "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
-#endif
-               );
-        return rc;
-    }
-
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:Mc:n")) != -1)
-        switch (c)
-        {
-            case 'r':
-                rekall_profile = optarg;
-                break;
-            case 'd':
-                domain = optarg;
-                break;
-            case 'i':
-                injection_pid = atoi(optarg);
-                break;
-            case 'I':
-                injection_thread = atoi(optarg);
-                break;
-            case 'e':
-                inject_file = optarg;
-                break;
-            case 'c':
-                inject_cwd = optarg;
-                break;
-            case 'm':
-                if (!strncmp(optarg,"shellexec",9))
-                    injection_method = INJECT_METHOD_SHELLEXEC;
-                if (!strncmp(optarg,"createproc",10))
-                    injection_method = INJECT_METHOD_CREATEPROC;
-                break;
-            case 't':
-                timeout = atoi(optarg);
-                break;
-            case 'D':
-                dump_folder = optarg;
-                break;
-            case 'o':
-                if (!strncmp(optarg,"csv",3))
-                    output = OUTPUT_CSV;
-                if (!strncmp(optarg,"kv",2))
-                    output = OUTPUT_KV;
-                break;
-            case 'x':
-                disable_plugin(optarg, plugin_list);
-                break;
-            case 's':
-                cpuid_stealth = 1;
-                break;
-            case 'p':
-                leave_paused = 1;
-                break;
-            case 'w':
-                start_process_name = optarg;
-                break;
-            case 'T':
-                tcpip = optarg;
-                break;
-#ifdef DRAKVUF_DEBUG
-            case 'v':
-                verbose = 1;
-                break;
-#endif
-            case 'S':
-                syscalls_filter_file = optarg;
-                break;
-            case 'M':
-                dump_modified_files = true;
-                break;
-            case 'n':
-                filedelete_use_injector = true;
-                break;
-            default:
-                fprintf(stderr, "Unrecognized option: %c\n", c);
-                return rc;
-        }
-
-    if (!domain)
-    {
-        fprintf(stderr, "No domain name specified (-d)!\n");
-        return rc;
-    }
-
-    if (!rekall_profile)
-    {
-        fprintf(stderr, "No Rekall profile specified (-r)!\n");
-        return rc;
-    }
-
-    PRINT_DEBUG("Starting DRAKVUF initialization\n");
-
-    try
-    {
-        drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose, leave_paused);
-    }
-    catch (int e)
-    {
-        fprintf(stderr, "Failed to initialize DRAKVUF\n");
-        return rc;
-    }
-
-    PRINT_DEBUG("DRAKVUF initializated\n");
-
-    /* for a clean exit */
-    act.sa_handler = close_handler;
-    act.sa_flags = 0;
-    sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
-
-    if ( injection_pid > 0 && inject_file )
-    {
-        PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output);
-        if (!ret)
-            goto exit;
-    }
-
-    if ( start_process_name )
-    {
-        if ( !drakvuf->wait_for_process(start_process_name) )
-            goto exit;
-    }
-
-    PRINT_DEBUG("Starting plugins\n");
-
-    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, syscalls_filter_file) < 0 )
-        goto exit;
-
-    PRINT_DEBUG("Beginning DRAKVUF loop\n");
-
-    /* Start the event listener */
-    drakvuf->loop();
-    rc = 0;
-
-    PRINT_DEBUG("Finished DRAKVUF loop\n");
-
-exit:
-    delete drakvuf;
-    return rc;
-}
+#endif // FILEDELETE_PRIVATE_H

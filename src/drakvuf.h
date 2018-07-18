@@ -171,6 +171,7 @@ public:
     int start_plugins(const bool* plugin_list,
                       const char* dump_folder,
                       bool dump_modified_files,
+                      bool filedelete_use_injector,
                       bool cpuid_stealth,
                       const char* tcpip_profile,
                       const char* syscalls_filter_file);
