@@ -221,7 +221,7 @@ int main(int argc, char** argv)
                 if (!strncmp(optarg,"createproc",10))
                     injection_method = INJECT_METHOD_CREATEPROC;
                 if (!strncmp(optarg,"shellcode",9))
-                    injection_method = INJECT_METHOD_CREATEPROC;
+                    injection_method = INJECT_METHOD_SHELLCODE;
                 break;
             case 't':
                 timeout = atoi(optarg);
