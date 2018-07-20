@@ -130,6 +130,7 @@ static gpointer timer(gpointer data)
 int drakvuf_c::start_plugins(const bool* plugin_list,
                              const char* dump_folder,          // PLUGIN_FILEDELETE
                              bool dump_modified_files,         // PLUGIN_FILEDELETE
+                             bool filedelete_use_injector,     // PLUGIN_FILEDELETE
                              bool cpuid_stealth,               // PLUGIN_CPUIDMON
                              const char* tcpip_profile,        // PLUGIN_SOCKETMON
                              const char* syscalls_filter_file) // PLUGIN_SYSCALLS
@@ -148,7 +149,8 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     {
                         .rekall_profile = this->rekall_profile,
                         .dump_folder = dump_folder,
-                        .dump_modified_files = dump_modified_files
+                        .dump_modified_files = dump_modified_files,
+                        .filedelete_use_injector = filedelete_use_injector,
                     };
 
                     rc = this->plugins->start((drakvuf_plugin_t)i, &c);

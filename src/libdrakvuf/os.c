@@ -266,6 +266,15 @@ bool drakvuf_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, co
     return 0;
 }
 
+addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf, const vmi_pid_t pid, const char* proc_name,
+                                const char* mod_name, addr_t rva)
+{
+    if ( drakvuf->osi.exportksym_to_va )
+        return drakvuf->osi.exportksym_to_va(drakvuf, pid, proc_name, mod_name, rva);
+
+    return 0;
+}
+
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
                                const char* module, const char* sym)
 {

@@ -117,6 +117,7 @@ typedef enum
 {
     INJECT_METHOD_CREATEPROC,
     INJECT_METHOD_SHELLEXEC,
+    INJECT_METHOD_SHELLCODE,
     __INJECT_METHOD_MAX
 }
 injection_method_t;
@@ -128,6 +129,45 @@ typedef enum
     ARGUMENT_INT,
     __ARGUMENT_MAX
 } argument_type_t;
+
+typedef enum
+{
+    STATUS_NULL,
+    STATUS_ALLOC_OK,
+    STATUS_WRITE_OK,
+    STATUS_EXEC_OK,
+    __STATUS_MAX
+} status_type_t;
+
+struct argument
+{
+    uint32_t type;
+    uint32_t size;
+    uint64_t data_on_stack;
+    union
+    {
+        uint32_t* data_32;
+        uint64_t* data_64;
+    };
+};
+
+void init_argument(bool is32bit,
+                   struct argument* arg,
+                   argument_type_t type,
+                   size_t size,
+                   void* data);
+
+bool setup_stack_32(vmi_instance_t vmi,
+                    drakvuf_trap_info_t* info,
+                    access_context_t* ctx,
+                    struct argument args[],
+                    int nb_args);
+
+bool setup_stack_64(vmi_instance_t vmi,
+                    drakvuf_trap_info_t* info,
+                    access_context_t* ctx,
+                    struct argument args[],
+                    int nb_args);
 
 int injector_start_app(drakvuf_t drakvuf,
                        vmi_pid_t pid,
