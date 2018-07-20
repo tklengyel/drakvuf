@@ -307,6 +307,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_module_list = win_get_module_list;
     drakvuf->osi.find_process = win_find_eprocess;
     drakvuf->osi.inject_traps_modules = win_inject_traps_modules;
+    drakvuf->osi.exportksym_to_va = ksym2va;
     drakvuf->osi.exportsym_to_va = eprocess_sym2va;
     drakvuf->osi.get_process_pid = win_get_process_pid;
     drakvuf->osi.get_process_ppid = win_get_process_ppid;

@@ -188,6 +188,77 @@ modlist_sym2va(drakvuf_t drakvuf, addr_t list_head, access_context_t* ctx,
     return VMI_FAILURE;
 }
 
+addr_t ksym2va(drakvuf_t drakvuf, vmi_pid_t pid, const char* proc_name, const char* mod_name, addr_t rva)
+{
+    addr_t module_list = 0;
+
+    if (4 == pid || !strcmp(proc_name, "System"))
+    {
+        if (VMI_FAILURE == vmi_read_addr_ksym(drakvuf->vmi, "PsLoadedModuleList", &module_list))
+            return 0;
+    }
+    else
+    {
+        /* Process library */
+        addr_t process_base;
+
+        if ( !drakvuf_find_process(drakvuf, pid, proc_name, &process_base) )
+            return 0;
+
+        if (pid == -1)
+        {
+            if ( drakvuf_get_process_pid(drakvuf, process_base, &pid) == VMI_FAILURE )
+                return 0;
+        }
+
+        if ( !drakvuf_get_module_list(drakvuf, process_base, &module_list) )
+            return 0;
+    }
+
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t next_module = module_list;
+    addr_t tmp_next;
+    addr_t dllbase;
+
+    while (1)
+    {
+
+        if ( VMI_FAILURE == vmi_read_addr_va(vmi, next_module, pid, &tmp_next) )
+            break;
+
+        if (module_list == tmp_next)
+            break;
+
+        if ( VMI_FAILURE == vmi_read_addr_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid, &dllbase) )
+            break;
+
+        if (!dllbase)
+            break;
+
+        unicode_string_t* us = vmi_read_unicode_str_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
+        unicode_string_t out = { .contents = NULL };
+
+        if (us)
+        {
+            status_t status = vmi_convert_str_encoding(us, &out, "UTF-8");
+            if (VMI_SUCCESS == status)
+                PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", out.contents, dllbase);
+
+            vmi_free_unicode_str(us);
+        }
+
+        if (out.contents && !strcmp((char*)out.contents, mod_name))
+        {
+            g_free(out.contents);
+            return dllbase + rva;
+        }
+
+        next_module = tmp_next;
+    }
+
+    return 0;
+}
+
 addr_t eprocess_sym2va (drakvuf_t drakvuf, addr_t eprocess_base, const char* mod_name, const char* symbol)
 {
     addr_t peb, ldr, inloadorder, ret = 0;

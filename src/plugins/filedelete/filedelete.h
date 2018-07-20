@@ -112,6 +112,14 @@
 #include <utility>
 #include <cstdint>
 
+// For `filedelete2`
+#include <map>
+
+// For `filedelete2`
+using handle_t = reg_t;
+using handled_t = bool;
+using file_name_t = std::string;
+
 class filedelete: public plugin
 {
 public:
@@ -139,6 +147,15 @@ public:
 
     filedelete(drakvuf_t drakvuf, const void* config, output_format_t output);
     ~filedelete();
+
+    // For `filedelete2`
+    addr_t queryobject_va;
+    addr_t readfile_va;
+    std::map<std::pair<addr_t, uint32_t>, handled_t> closing_handles;
+    std::map<vmi_pid_t, std::map<handle_t, file_name_t>> files;
+
+private:
+    void filedelete2(drakvuf_t drakvuf, const char* rekall_profile);
 };
 
 #endif
