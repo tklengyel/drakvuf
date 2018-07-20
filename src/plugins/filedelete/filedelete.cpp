@@ -111,31 +111,9 @@
 
 #include "../plugins.h"
 #include "filedelete.h"
+#include "private.h"
 
-#define FILE_DISPOSITION_INFORMATION 13
-
-enum offset
-{
-    FILE_OBJECT_TYPE,
-    FILE_OBJECT_FILENAME,
-    FILE_OBJECT_SECTIONOBJECTPOINTER,
-    SECTIONOBJECTPOINTER_DATASECTIONOBJECT,
-    SECTIONOBJECTPOINTER_SHAREDCACHEMAP,
-    SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT,
-    CONTROL_AREA_SEGMENT,
-    SEGMENT_CONTROLAREA,
-    SEGMENT_SIZEOFSEGMENT,
-    SEGMENT_TOTALNUMBEROFPTES,
-    SUBSECTION_NEXTSUBSECTION,
-    SUBSECTION_SUBSECTIONBASE,
-    SUBSECTION_PTESINSUBSECTION,
-    SUBSECTION_CONTROLAREA,
-    SUBSECTION_STARTINGSECTOR,
-    OBJECT_HEADER_BODY,
-    __OFFSET_MAX
-};
-
-static const char* offset_names[__OFFSET_MAX][2] =
+const char* offset_names[__OFFSET_MAX][2] =
 {
     [FILE_OBJECT_TYPE] = {"_FILE_OBJECT", "Type"},
     [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
@@ -339,35 +317,9 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
                                 vmi_instance_t vmi,
                                 drakvuf_trap_info_t* info, addr_t handle)
 {
-    uint8_t type = 0;
-    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
-
-    // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
-
-    if (!process)
-        return;
-
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
-
-    if (!obj)
-        return;
-
-    addr_t file = obj + f->offsets[OBJECT_HEADER_BODY];
-    addr_t filename = file + f->offsets[FILE_OBJECT_FILENAME];
-    addr_t filetype = file + f->offsets[FILE_OBJECT_TYPE];
-
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.addr = filetype;
-    ctx.dtb = info->regs->cr3;
-
-    if (VMI_FAILURE == vmi_read_8(vmi, &ctx, &type))
-        return;
-
-    if (type != 5)
-        return;
-
-    unicode_string_t* filename_us = drakvuf_read_unicode(drakvuf, info, filename);
+    addr_t file = 0;
+    addr_t filetype = 0;
+    unicode_string_t* filename_us = get_file_name(f, drakvuf, vmi, info, handle, &file, &filetype);
 
     if (filename_us)
     {
@@ -391,7 +343,13 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
         }
 
         if (f->dump_folder)
+        {
+            access_context_t ctx;
+            ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+            ctx.addr = filetype;
+            ctx.dtb = info->regs->cr3;
             extract_file(f, drakvuf, info, vmi, file, &ctx, filename_us);
+        }
 
         vmi_free_unicode_str(filename_us);
     }
@@ -521,9 +479,54 @@ done:
     return 0;
 }
 
-static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
-                           drakvuf_trap_t* trap,
-                           event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
+/*
+ * Drakvuf must be locked/unlocked in the caller
+ */
+unicode_string_t* get_file_name(filedelete* f, drakvuf_t drakvuf,
+                                vmi_instance_t vmi,
+                                drakvuf_trap_info_t* info, addr_t handle,
+                                addr_t* out_file, addr_t* out_filetype)
+{
+    uint8_t type = 0;
+    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
+
+    // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
+
+    if (!process)
+        return nullptr;
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
+
+    if (!obj)
+        return nullptr;
+
+    addr_t file = obj + f->offsets[OBJECT_HEADER_BODY];
+    addr_t filename = file + f->offsets[FILE_OBJECT_FILENAME];
+    addr_t filetype = file + f->offsets[FILE_OBJECT_TYPE];
+
+    if (out_file)
+        *out_file = file;
+
+    if (out_filetype)
+        *out_filetype = filetype;
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.addr = filetype;
+    ctx.dtb = info->regs->cr3;
+
+    if (VMI_FAILURE == vmi_read_8(vmi, &ctx, &type))
+        return nullptr;
+
+    if (type != 5)
+        return nullptr;
+
+    return drakvuf_read_unicode(drakvuf, info, filename);
+}
+
+void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
+                    drakvuf_trap_t* trap,
+                    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
     if ( !drakvuf_get_function_rva( rekall_profile, syscall_name, &trap->breakpoint.rva) ) throw -1;
 
@@ -545,16 +548,21 @@ filedelete::filedelete(drakvuf_t drakvuf, const void* config, output_format_t ou
     this->dump_folder = c->dump_folder;
     this->format = output;
 
-    assert(sizeof(traps)/sizeof(traps[0]) > 2);
-    register_trap(drakvuf, c->rekall_profile, "NtSetInformationFile", &traps[0], setinformation);
-    if (c->dump_modified_files)
+    if (!c->filedelete_use_injector)
     {
-        register_trap(drakvuf, c->rekall_profile, "NtWriteFile",      &traps[1], writefile_cb);
-        register_trap(drakvuf, c->rekall_profile, "NtClose",          &traps[2], close_cb);
+        assert(sizeof(traps)/sizeof(traps[0]) > 2);
+        register_trap(drakvuf, c->rekall_profile, "NtSetInformationFile", &traps[0], setinformation);
+        if (c->dump_modified_files)
+        {
+            register_trap(drakvuf, c->rekall_profile, "NtWriteFile",      &traps[1], writefile_cb);
+            register_trap(drakvuf, c->rekall_profile, "NtClose",          &traps[2], close_cb);
+        }
+        /* TODO
+        register_trap(drakvuf, c->rekall_profile, "NtDeleteFile",            &traps[3], deletefile_cb);
+        register_trap(drakvuf, c->rekall_profile, "ZwDeleteFile",            &traps[4], deletefile_cb); */
     }
-    /* TODO
-    register_trap(drakvuf, c->rekall_profile, "NtDeleteFile",            &traps[3], deletefile_cb);
-    register_trap(drakvuf, c->rekall_profile, "ZwDeleteFile",            &traps[4], deletefile_cb); */
+    else
+        filedelete2(drakvuf, c->rekall_profile);
 
     this->offsets = (size_t*)malloc(sizeof(size_t)*__OFFSET_MAX);
 

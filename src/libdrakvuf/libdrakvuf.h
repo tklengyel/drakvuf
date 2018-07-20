@@ -344,6 +344,10 @@ bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
                                    uint64_t vcpu_id,
                                    uint32_t* thread_id);
 
+addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf,
+                                const vmi_pid_t pid, const char* proc_name,
+                                const char* mod_name, addr_t rva);
+
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
                                const char* module, const char* sym);
 

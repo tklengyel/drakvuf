@@ -108,6 +108,7 @@
 #include <libvmi/libvmi.h>
 
 addr_t sym2va(drakvuf_t drakvuf, vmi_pid_t pid, const char* mod_name, const char* sym);
+addr_t ksym2va(drakvuf_t drakvuf, vmi_pid_t pid, const char* proc_name, const char* mod_name, addr_t rva);
 addr_t eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char* mod_name, const char* sym);
 const char* rva2sym(drakvuf_t drakvuf, const char* mod_name, addr_t base_vaddr, vmi_pid_t pid, addr_t rva);
 status_t va2sym(drakvuf_t drakvuf, addr_t va, vmi_pid_t pid, char** mod, char** sym);
