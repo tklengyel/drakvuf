@@ -736,7 +736,7 @@ static event_response_t createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             goto done;
         // Filter out system handles: those having high bits rised
         // WARNING Without this target VM could freeze or crash!
-        if (handle & ~(0x7fffffffULL))
+        if ((int64_t)handle < 0LL)
             goto done;
     }
     else
