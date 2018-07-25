@@ -557,8 +557,7 @@ err:
     if (restore_regs)
         memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
 
-    if (injector)
-        delete injector;
+    delete injector;
 
     return response;
 }
@@ -714,6 +713,57 @@ done:
     return 0;
 }
 
+static event_response_t createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    filedelete* f = (filedelete*)info->trap->data;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    unicode_string_t* filename_us = nullptr;
+    std::string filename = "<UNKNOWN>";
+    handle_t handle = 0;
+    uint32_t access_mask = 0;
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    if (f->pm == VMI_PM_IA32E)
+    {
+        access_mask = (uint32_t) info->regs->rdx;
+        ctx.addr = info->regs->rsp + 7 * sizeof(uint64_t);
+        if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, (uint64_t*) &handle) )
+            goto done;
+        // Filter out system handles: those having high bits rised
+        // WARNING Without this target VM could freeze or crash!
+        if ((int64_t)handle < 0LL)
+            goto done;
+    }
+    else
+    {
+        ctx.addr = info->regs->rsp + 2 * sizeof(uint32_t);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*) &access_mask) )
+            goto done;
+
+        ctx.addr = info->regs->rsp + 7 * sizeof(uint32_t);
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*) &handle) )
+            goto done;
+    }
+
+    if ( !(0x2 & access_mask) ) // SECTION_MAP_WRITE
+        goto done;
+
+    filename_us = get_file_name(f, drakvuf, vmi, info, handle, nullptr, nullptr);
+    if (filename_us)
+        filename = std::string((const char*)filename_us->contents);
+
+    f->files[info->proc_data.pid][handle] = filename;
+
+done:
+    drakvuf_release_vmi(drakvuf);
+    return 0;
+}
+
 void filedelete::filedelete2(drakvuf_t drakvuf, const char* rekall_profile)
 {
     const char* lib = "ntoskrnl.exe";
@@ -752,4 +802,5 @@ void filedelete::filedelete2(drakvuf_t drakvuf, const char* rekall_profile)
     register_trap(drakvuf, rekall_profile, "NtSetInformationFile", &traps[0], setinformation_cb);
     register_trap(drakvuf, rekall_profile, "NtWriteFile", &traps[1], writefile_cb);
     register_trap(drakvuf, rekall_profile, "NtClose", &traps[2], closehandle_cb);
+    register_trap(drakvuf, rekall_profile, "ZwCreateSection", &traps[3], createsection_cb);
 }
