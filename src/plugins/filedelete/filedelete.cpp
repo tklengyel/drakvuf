@@ -201,6 +201,9 @@ static void extract_ca_file(filedelete* f,
 
     FILE* fp = fopen(file, "w");
 
+    if (!fp)
+        return;
+
     while (subsection)
     {
         /* Check whether subsection points back to the control area */
