@@ -102,8 +102,7 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef FILEDELETE_PRIVATE_H
-#define FILEDELETE_PRIVATE_H
+#pragma once
 
 #define FILE_DISPOSITION_INFORMATION 13
 
@@ -129,14 +128,3 @@ enum offset
 };
 
 extern const char* offset_names[__OFFSET_MAX][2];
-
-void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
-                    drakvuf_trap_t* trap,
-                    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) );
-
-unicode_string_t* get_file_name(filedelete* f, drakvuf_t drakvuf,
-                                vmi_instance_t vmi,
-                                drakvuf_trap_info_t* info, addr_t handle,
-                                addr_t* out_file, addr_t* out_filetype);
-
-#endif // FILEDELETE_PRIVATE_H
