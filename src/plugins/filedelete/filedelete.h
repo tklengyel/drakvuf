@@ -151,6 +151,7 @@ public:
     // For `filedelete2`
     addr_t queryobject_va;
     addr_t readfile_va;
+    addr_t waitobject_va;
     std::map<std::pair<addr_t, uint32_t>, handled_t> closing_handles;
     std::map<vmi_pid_t, std::map<handle_t, file_name_t>> files;
 
