@@ -152,7 +152,7 @@ static const uint64_t BYTES_TO_READ = 0x4000;
 
 struct IO_STATUS_BLOCK
 {
-    uint64_t dummy;
+    uint64_t status;
     uint64_t info;
 } __attribute__((packed));
 
@@ -166,6 +166,14 @@ struct FILE_FS_DEVICE_INFORMATION
     uint32_t device_type;
     uint32_t characteristics;
 } __attribute__((packed));
+
+static event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+static event_response_t waitobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    // Handle error codes there
+    return readfile_cb(drakvuf, info);
+}
 
 static event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -200,7 +208,7 @@ static event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
             goto err;
     }
 
-    if ( !info->regs->rax)
+    if ( !info->regs->rax && !io_status_block.status )
     {
         static uint64_t idx = 0;
         char* file = NULL;
@@ -291,6 +299,40 @@ static event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
             goto done;
         }
     }
+    else if (0x103 == info->regs->rax) // STATUS_PENDING
+    {
+        // Preserve "local" variables from previous ReadFile injection
+        // info->regs->rsp = injector->saved_regs.rsp;
+
+        ctx.addr = info->regs->rsp;
+
+        if (injector->is32bit)
+        {
+            PRINT_DEBUG("[FILEDELETE2] 32bit VMs not supported yet\n");
+            goto err;
+        }
+
+        struct argument args[3] = { {0} };
+        uint64_t null64 = 0;
+
+        init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->handle);
+        init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+        init_argument(0, &args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+
+        if ( !setup_stack_64(vmi, info, &ctx, args, 3) )
+            goto err;
+
+        info->regs->rip = f->waitobject_va;
+
+        injector->bp->name = "WaitForSingleObject ret";
+        injector->bp->cb = waitobject_cb;
+
+        response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+
+        PRINT_DEBUG("[FILEDELETE2] [ReadFile] Wait for pending read of file '%s'\n", injector->f->files[info->proc_data.pid][injector->handle].c_str());
+
+        goto done;
+    }
     else
         PRINT_DEBUG("[FILEDELETE2] [ReadFile] Failed to read %s with status 0x%lx.\n", injector->f->files[info->proc_data.pid][injector->handle].c_str(), info->regs->rax);
 
@@ -310,8 +352,8 @@ static event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     goto done;
 
 err:
-    PRINT_DEBUG("[FILEDELETE2] [ReadFile] Error. Stop processing (CR3 0x%lx, TID %d).\n",
-                info->regs->cr3, thread_id);
+    PRINT_DEBUG("[FILEDELETE2] [ReadFile] Error. Stop processing (CR3 0x%lx, TID %d, FileName '%s', status 0x%lx).\n",
+                info->regs->cr3, thread_id, injector->f->files[info->proc_data.pid][injector->handle].c_str(), info->regs->rax);
 
     thread = std::make_pair(info->regs->cr3, thread_id);
     injector->f->closing_handles[thread] = true;
@@ -793,6 +835,21 @@ void filedelete::filedelete2(drakvuf_t drakvuf, const char* rekall_profile)
 
     readfile_va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, lib, rva);
     if (!readfile_va)
+    {
+        PRINT_DEBUG("[FILEDELETE2] [Init] Failed to get VA of %s\n", readfile_name);
+        throw -1;
+    }
+
+    const char* waitobject_name = "ZwWaitForSingleObject";
+
+    if ( !drakvuf_get_function_rva( rekall_profile, waitobject_name, &rva) )
+    {
+        PRINT_DEBUG("[FILEDELETE2] [Init] Failed to get RVA of %s\n", readfile_name);
+        throw -1;
+    }
+
+    waitobject_va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, lib, rva);
+    if (!waitobject_va)
     {
         PRINT_DEBUG("[FILEDELETE2] [Init] Failed to get VA of %s\n", readfile_name);
         throw -1;
