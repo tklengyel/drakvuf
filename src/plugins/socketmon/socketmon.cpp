@@ -1656,7 +1656,6 @@ static event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         fprintf(stderr, "[SOCKETMON] TIME:" FORMAT_TIMEVAL "\n", UNPACK_TIMEVAL(info->timestamp) );
 
         drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
-        drakvuf_interrupt(drakvuf, -1); // break drakvuf_loop(...) in constructor
     }
 
     return 0;
