@@ -102,7 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#define XC_WANT_COMPAT_EVTCHN_API 1
 #define XC_WANT_COMPAT_MAP_FOREIGN_API 1
 
 #include <stdlib.h>
@@ -144,14 +143,6 @@ bool xen_init_interface(xen_interface_t** xen)
         goto err;
     }
 
-    (*xen)->evtchn = xc_evtchn_open(NULL, 0);
-    if (!(*xen)->evtchn)
-    {
-        printf("xc_evtchn_open() could not build event channel!\n");
-        goto err;
-    }
-    (*xen)->evtchn_fd = xc_evtchn_fd((*xen)->evtchn);
-
     return 1;
 
 err:
@@ -171,8 +162,6 @@ void xen_free_interface(xen_interface_t* xen)
         //if (xen->xsh) xs_close(xen->xsh);
         if (xen->xc)
             xc_interface_close(xen->xc);
-        if (xen->evtchn)
-            xc_evtchn_close(xen->evtchn);
         free(xen);
     }
 }

@@ -116,8 +116,6 @@ typedef struct xen_interface
     xc_interface* xc;
     libxl_ctx* xl_ctx;
     xentoollog_logger* xl_logger;
-    void* evtchn;                  // the Xen event channel
-    int evtchn_fd;                 // its FD
 } xen_interface_t;
 
 /* FUNCTIONS */
