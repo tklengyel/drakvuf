@@ -120,9 +120,6 @@
 #include "os.h"
 #include "../xen_helper/xen_helper.h"
 
-#include <sys/poll.h>
-
-
 #ifdef DRAKVUF_DEBUG
 
 extern bool verbose;
@@ -138,15 +135,6 @@ extern bool verbose;
 #endif
 
 #define UNUSED(x) (void)(x)
-
-struct fd_info
-{
-    int fd;
-    event_cb_t event_cb;
-    void* data;
-};
-typedef struct fd_info* fd_info_t;
-
 
 struct drakvuf
 {
@@ -212,11 +200,6 @@ struct drakvuf
     // val: struct memaccess
 
     GSList* cr0, *cr3, *cr4, *debug, *cpuid;
-
-    GSList* event_fd_info;     // the list of registered event FDs
-    struct pollfd* event_fds;  // auto-generated pollfd for poll()
-    int event_fd_cnt;          // auto-generated for poll()
-    fd_info_t fd_info_lookup;  // auto-generated for fast drakvuf_loop lookups
 };
 
 struct breakpoint
