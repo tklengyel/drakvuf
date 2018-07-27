@@ -1432,7 +1432,7 @@ static event_response_t trap_DnsQuery_A_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     }
     else
     {
-        fprintf(stderr, "[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
+        PRINT_DEBUG("[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
     }
 
     return 0;
@@ -1466,13 +1466,13 @@ static event_response_t trap_DnsQuery_W_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         }
         else
         {
-            fprintf(stderr, "[SOCKETMON] Error, getting unicode domain name string in %s()", __FUNCTION__);
+            PRINT_DEBUG("[SOCKETMON] Error, getting unicode domain name string in %s()", __FUNCTION__);
         }
         vmi_free_unicode_str(domain_name_us);
     }
     else
     {
-        fprintf(stderr, "[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
+        PRINT_DEBUG("[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
     }
 
 
@@ -1486,7 +1486,7 @@ static event_response_t trap_DnsQueryExW_cb(drakvuf_t drakvuf, drakvuf_trap_info
 
     if (sm->pm != VMI_PM_IA32E) // only 64 bit for now
     {
-        fprintf(stderr, "[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
+        PRINT_DEBUG("[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
         return 0;
     }
 
@@ -1498,7 +1498,7 @@ static event_response_t trap_DnsQueryExW_cb(drakvuf_t drakvuf, drakvuf_trap_info
     }
     else
     {
-        fprintf(stderr, "[SOCKETMON] Error, getting unicode domain name string in %s()", __FUNCTION__);
+        PRINT_DEBUG("[SOCKETMON] Error, getting unicode domain name string in %s()", __FUNCTION__);
     }
 
     vmi_free_unicode_str(domain_name_us);
@@ -1533,7 +1533,7 @@ static event_response_t trap_DnsQueryExA_cb(drakvuf_t drakvuf, drakvuf_trap_info
     }
     else
     {
-        fprintf(stderr, "[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
+        PRINT_DEBUG("[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
     }
 
     return 0;
@@ -1561,7 +1561,7 @@ static event_response_t trap_DnsQueryEx_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
             if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &query_name_addr) )
             {
-                fprintf(stderr, "[SOCKETMON] Couldn't read query_name_addr in %s(...) trap. Unsupported.\n", info->trap->name);
+                PRINT_DEBUG("[SOCKETMON] Couldn't read query_name_addr in %s(...) trap. Unsupported.\n", info->trap->name);
                 return 0;
             }
 
@@ -1575,12 +1575,12 @@ static event_response_t trap_DnsQueryEx_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         }
         else
         {
-            fprintf(stderr, "[SOCKETMON] Error, getting unicode domain name string in %s()", __FUNCTION__);
+            PRINT_DEBUG("[SOCKETMON] Error, getting unicode domain name string in %s()", __FUNCTION__);
         }
     }
     else
     {
-        fprintf(stderr, "[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
+        PRINT_DEBUG("[SOCKETMON] Suddenly, we are in 32 bit mode in %s(...) trap. Unsupported.\n", info->trap->name);
     }
 
     vmi_free_unicode_str(domain_name_us);
@@ -1623,12 +1623,12 @@ static int set_trap_universal(socketmon_trapinfo& ti, socketmon* f, drakvuf_t dr
 
     if ( !drakvuf_add_trap(drakvuf, &current_trap) )
     {
-        fprintf(stderr, "[SOCKETMON] Failed to trap function call @ 0x%lx!\n",
+        PRINT_DEBUG("[SOCKETMON] Failed to trap function call @ 0x%lx!\n",
                 current_trap.breakpoint.addr);
         return 0;
     }
 
-    fprintf(stderr, "[SOCKETMON] Set trap for %s:%s successfully\n", ti.lib, ti.fun);
+    PRINT_DEBUG("[SOCKETMON] Set trap for %s:%s successfully\n", ti.lib, ti.fun);
     ti.already_set = true;
 
     return 1;
@@ -1647,13 +1647,13 @@ static event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         sm->traps_set += set_trap_universal(ti, sm, drakvuf, info);
     }
 
-    fprintf(stderr, "[SOCKETMON] cr3_cb(...) traps_set=%d.\n", (int)sm->traps_set);
+    PRINT_DEBUG("[SOCKETMON] cr3_cb(...) traps_set=%d.\n", (int)sm->traps_set);
 
     // Unsubscribe from the CR3 trap
     if (sm->traps_set == expected_number_of_traps)
     {
-        fprintf(stderr, "[SOCKETMON] Set all traps, removing CR3 trap.\n");
-        fprintf(stderr, "[SOCKETMON] TIME:" FORMAT_TIMEVAL "\n", UNPACK_TIMEVAL(info->timestamp) );
+        PRINT_DEBUG("[SOCKETMON] Set all traps, removing CR3 trap.\n");
+        PRINT_DEBUG("[SOCKETMON] TIME:" FORMAT_TIMEVAL "\n", UNPACK_TIMEVAL(info->timestamp) );
 
         drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
     }
@@ -1704,13 +1704,13 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
 
     if ( !tcpip_profile )
     {
-        fprintf(stderr, "Socketmon plugin requires the Rekall profile for tcpip.sys!\n");
+        PRINT_DEBUG("Socketmon plugin requires the Rekall profile for tcpip.sys!\n");
         return;
     }
 
     if ( this->winver == VMI_OS_WINDOWS_10 && this->pm != VMI_PM_IA32E )
     {
-        fprintf(stderr, "Socketmon plugin not supported on 32-bit Windows 10\n");
+        PRINT_DEBUG("Socketmon plugin not supported on 32-bit Windows 10\n");
         throw -1;
     }
 
@@ -1777,7 +1777,7 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
     if ( !drakvuf_add_trap(drakvuf, &this->trap[6]) )
         throw -1;
 
-    fprintf(stderr, "[SOCKETMON] Socketmon constructor end.\n");
+    PRINT_DEBUG("[SOCKETMON] Socketmon constructor end.\n");
 
 }
 
