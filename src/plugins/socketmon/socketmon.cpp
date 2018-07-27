@@ -1624,7 +1624,7 @@ static int set_trap_universal(socketmon_trapinfo& ti, socketmon* f, drakvuf_t dr
     if ( !drakvuf_add_trap(drakvuf, &current_trap) )
     {
         PRINT_DEBUG("[SOCKETMON] Failed to trap function call @ 0x%lx!\n",
-                current_trap.breakpoint.addr);
+                    current_trap.breakpoint.addr);
         return 0;
     }
 
