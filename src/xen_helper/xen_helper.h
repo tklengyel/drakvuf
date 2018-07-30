@@ -139,5 +139,6 @@ bool xen_pause(xen_interface_t* xen, domid_t domID);
 void xen_resume(xen_interface_t* xen, domid_t domID);
 void xen_force_resume(xen_interface_t* xen, domid_t domID);
 
+bool xen_unmask_evtchn(xen_interface_t *xen);
 
 #endif

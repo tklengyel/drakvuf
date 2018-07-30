@@ -1215,13 +1215,16 @@ bool control_cpuid_trap(drakvuf_t drakvuf, bool toggle)
 void drakvuf_vmi_event_callback (int fd, void* data)
 {
     UNUSED(fd);
-    drakvuf_t* drakvuf = (drakvuf_t*) data;
-    status_t status = vmi_events_listen((*drakvuf)->vmi, 0);
+    drakvuf_t drakvuf = *(drakvuf_t*) data;
+    status_t status = vmi_events_listen(drakvuf->vmi, 0);
     if (VMI_SUCCESS != status)
     {
         PRINT_DEBUG("Error waiting for events or timeout, quitting...\n");
-        (*drakvuf)->interrupted = -1;
+        drakvuf->interrupted = -1;
     }
+
+    if ( !xen_unmask_evtchn(drakvuf->xen) )
+        drakvuf->interrupted = -1;
 }
 
 void drakvuf_loop(drakvuf_t drakvuf)
@@ -1241,14 +1244,15 @@ void drakvuf_loop(drakvuf_t drakvuf)
         }
         else if (rc < 0)
         {
-            perror("drakvuf_loop poll error: ");
+            PRINT_DEBUG("DRAKVUF loop broke unexpectedly\n");
             drakvuf->interrupted = -1;
+            break;
         }
 
         /* check and process each fd if it was raised */
         for (int poll_ix=0; poll_ix<drakvuf->event_fd_cnt; poll_ix++)
         {
-            if ( !(drakvuf->event_fds[poll_ix].revents & POLLIN) )
+            if ( !(drakvuf->event_fds[poll_ix].revents & (POLLIN | POLLERR)) )
             {
                 continue;
             }

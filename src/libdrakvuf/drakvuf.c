@@ -642,8 +642,7 @@ static void drakvuf_event_fd_generate(drakvuf_t drakvuf)
     {
         fd_info_t fd_info = (fd_info_t) loop->data;
         drakvuf->event_fds[i].fd = fd_info->fd;
-        drakvuf->event_fds[i].events = POLLIN;
-        drakvuf->event_fds[i].revents = 0;
+        drakvuf->event_fds[i].events = POLLIN | POLLERR;
         PRINT_DEBUG("new event_fd i=%d for fd=%d\n", i, fd_info->fd);
 
         drakvuf->fd_info_lookup[i].fd = fd_info->fd;
