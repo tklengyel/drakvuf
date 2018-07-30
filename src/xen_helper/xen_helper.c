@@ -332,15 +332,17 @@ void xen_force_resume(xen_interface_t* xen, domid_t domID)
     while (1);
 }
 
-bool xen_unmask_evtchn(xen_interface_t *xen)
+bool xen_unmask_evtchn(xen_interface_t* xen)
 {
     int port = xc_evtchn_pending(xen->evtchn);
-    if ( -1 == port ) {
+    if ( -1 == port )
+    {
         fprintf(stderr, "Error unmasking Xen event channel\n");
         return 0;
     }
 
-    if ( xc_evtchn_unmask(xen->evtchn, port) ) {
+    if ( xc_evtchn_unmask(xen->evtchn, port) )
+    {
         fprintf(stderr, "Error unmasking Xen event channel\n");
         return 0;
     }
