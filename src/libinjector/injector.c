@@ -489,14 +489,27 @@ bool setup_stack_64(
                 goto err;
         }
 
-        // p1
-        info->regs->rcx = args[0].data_on_stack;
-        // p2
-        info->regs->rdx = args[1].data_on_stack;
-        // p3
-        info->regs->r8 = args[2].data_on_stack;
-        // p4
-        info->regs->r9 = args[3].data_on_stack;
+        switch (nb_args)
+        {
+            default:
+                // p4
+                info->regs->r9 = args[3].data_on_stack;
+            // fall through
+            case 3:
+                // p3
+                info->regs->r8 = args[2].data_on_stack;
+            // fall through
+            case 2:
+                // p2
+                info->regs->rdx = args[1].data_on_stack;
+            // fall through
+            case 1:
+                // p1
+                info->regs->rcx = args[0].data_on_stack;
+            // fall through
+            case 0:
+                break;
+        }
     }
 
     // allocate 0x20 "homing space"
