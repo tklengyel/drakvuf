@@ -1640,6 +1640,10 @@ err:
 static event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     socketmon* sm = (socketmon*)info->trap->data;
+    sm->cr3_count++;
+
+    if ( sm->cr3_count > CR3_COUNT_BEFORE_BAIL )
+        drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
 
     const unsigned expected_number_of_traps = sm->traps.size();
     for (auto& ti : sm->traps)

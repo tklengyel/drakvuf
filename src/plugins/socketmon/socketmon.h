@@ -131,7 +131,8 @@ public:
     };
 
     std::vector<socketmon_trapinfo> traps;
-    unsigned traps_set = 0;
+    unsigned long traps_set = 0;
+    unsigned long cr3_count = 0;
 
     socketmon(drakvuf_t drakvuf, const void* config, output_format_t output);
     ~socketmon();
