@@ -1672,6 +1672,12 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
     drakvuf_release_vmi(drakvuf);
     this->format = output;
 
+    if ( !tcpip_profile )
+    {
+        PRINT_DEBUG("Socketmon plugin requires the Rekall profile for tcpip.sys!\n");
+        return;
+    }
+
     if (pm == VMI_PM_IA32E)
     {
         traps.emplace_back("dnsapi.dll", "DnsQuery_W", trap_DnsQuery_W_cb);
@@ -1701,12 +1707,6 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
     bp->data = this;
     if ( !drakvuf_add_trap(drakvuf, bp) )
         throw -1;
-
-    if ( !tcpip_profile )
-    {
-        PRINT_DEBUG("Socketmon plugin requires the Rekall profile for tcpip.sys!\n");
-        return;
-    }
 
     if ( this->winver == VMI_OS_WINDOWS_10 && this->pm != VMI_PM_IA32E )
     {
