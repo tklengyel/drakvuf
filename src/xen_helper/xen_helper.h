@@ -116,6 +116,8 @@ typedef struct xen_interface
     xc_interface* xc;
     libxl_ctx* xl_ctx;
     xentoollog_logger* xl_logger;
+    void* evtchn;                  // the Xen event channel
+    int evtchn_fd;                 // its FD
 } xen_interface_t;
 
 /* FUNCTIONS */
@@ -137,5 +139,6 @@ bool xen_pause(xen_interface_t* xen, domid_t domID);
 void xen_resume(xen_interface_t* xen, domid_t domID);
 void xen_force_resume(xen_interface_t* xen, domid_t domID);
 
+bool xen_unmask_evtchn(xen_interface_t* xen);
 
 #endif
