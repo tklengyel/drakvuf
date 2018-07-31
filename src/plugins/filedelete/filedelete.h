@@ -108,15 +108,12 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
-#include <set>
+#include <map>
 #include <utility>
 #include <cstdint>
 
 // For `filedelete2`
-#include <map>
-
-// For `filedelete2`
-using handle_t = reg_t;
+using handle_t = uint64_t;
 using handled_t = bool;
 using file_name_t = std::string;
 
@@ -141,8 +138,9 @@ public:
     page_mode_t pm;
     uint32_t domid;
     output_format_t format;
+    bool use_injector;
 
-    std::set<std::pair<vmi_pid_t, uint64_t>> changed_file_handles;
+    std::map<std::pair<vmi_pid_t, handle_t>, file_name_t> files;
     int sequence_number;
 
     filedelete(drakvuf_t drakvuf, const void* config, output_format_t output);
@@ -153,10 +151,6 @@ public:
     addr_t readfile_va;
     addr_t waitobject_va;
     std::map<std::pair<addr_t, uint32_t>, handled_t> closing_handles;
-    std::map<vmi_pid_t, std::map<handle_t, file_name_t>> files;
-
-private:
-    void filedelete2(drakvuf_t drakvuf, const char* rekall_profile);
 };
 
 #endif
