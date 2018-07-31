@@ -102,7 +102,8 @@
  *                                                                         *
  ***************************************************************************/
 
-#pragma once
+#ifndef FILEDELETE_H
+#define FILEDELETE_H
 
 #include "plugins/private.h"
 #include "plugins/plugins.h"
@@ -151,3 +152,5 @@ public:
     addr_t waitobject_va;
     std::map<std::pair<addr_t, uint32_t>, handled_t> closing_handles;
 };
+
+#endif

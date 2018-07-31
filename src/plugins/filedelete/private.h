@@ -102,7 +102,8 @@
  *                                                                         *
  ***************************************************************************/
 
-#pragma once
+#ifndef FILEDELETE_PRIVATE_H
+#define FILEDELETE_PRIVATE_H
 
 #define FILE_DISPOSITION_INFORMATION 13
 
@@ -128,3 +129,5 @@ enum offset
 };
 
 extern const char* offset_names[__OFFSET_MAX][2];
+
+#endif // FILEDELETE_PRIVATE_H

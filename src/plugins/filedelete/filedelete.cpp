@@ -134,7 +134,8 @@ const char* offset_names[__OFFSET_MAX][2] =
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
 };
 
-namespace {
+namespace
+{
 
 struct wrapper_t
 {
