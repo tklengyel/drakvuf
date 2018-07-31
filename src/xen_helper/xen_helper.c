@@ -102,6 +102,7 @@
  *                                                                         *
  ***************************************************************************/
 
+#define XC_WANT_COMPAT_EVTCHN_API 1
 #define XC_WANT_COMPAT_MAP_FOREIGN_API 1
 
 #include <stdlib.h>
@@ -142,6 +143,14 @@ bool xen_init_interface(xen_interface_t** xen)
         fprintf(stderr, "libxl_ctx_alloc() failed!\n");
         goto err;
     }
+
+    (*xen)->evtchn = xc_evtchn_open(NULL, 0);
+    if (!(*xen)->evtchn)
+    {
+        printf("xc_evtchn_open() could not build event channel!\n");
+        goto err;
+    }
+    (*xen)->evtchn_fd = xc_evtchn_fd((*xen)->evtchn);
 
     return 1;
 
@@ -321,4 +330,22 @@ void xen_force_resume(xen_interface_t* xen, domid_t domID)
 
     }
     while (1);
+}
+
+bool xen_unmask_evtchn(xen_interface_t* xen)
+{
+    int port = xc_evtchn_pending(xen->evtchn);
+    if ( -1 == port )
+    {
+        fprintf(stderr, "Error unmasking Xen event channel\n");
+        return 0;
+    }
+
+    if ( xc_evtchn_unmask(xen->evtchn, port) )
+    {
+        fprintf(stderr, "Error unmasking Xen event channel\n");
+        return 0;
+    }
+
+    return 1;
 }

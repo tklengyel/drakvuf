@@ -1640,6 +1640,10 @@ err:
 static event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     socketmon* sm = (socketmon*)info->trap->data;
+    sm->cr3_count++;
+
+    if ( sm->cr3_count > CR3_COUNT_BEFORE_BAIL )
+        drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
 
     const unsigned expected_number_of_traps = sm->traps.size();
     for (auto& ti : sm->traps)
@@ -1672,6 +1676,12 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
     drakvuf_release_vmi(drakvuf);
     this->format = output;
 
+    if ( !tcpip_profile )
+    {
+        PRINT_DEBUG("Socketmon plugin requires the Rekall profile for tcpip.sys!\n");
+        return;
+    }
+
     if (pm == VMI_PM_IA32E)
     {
         traps.emplace_back("dnsapi.dll", "DnsQuery_W", trap_DnsQuery_W_cb);
@@ -1701,12 +1711,6 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
     bp->data = this;
     if ( !drakvuf_add_trap(drakvuf, bp) )
         throw -1;
-
-    if ( !tcpip_profile )
-    {
-        PRINT_DEBUG("Socketmon plugin requires the Rekall profile for tcpip.sys!\n");
-        return;
-    }
 
     if ( this->winver == VMI_OS_WINDOWS_10 && this->pm != VMI_PM_IA32E )
     {
