@@ -105,6 +105,13 @@
 #ifndef SOCKETMON_PRIVATE_H
 #define SOCKETMON_PRIVATE_H
 
+/*
+ * Socketmon installs some traps on CR3 switches to ensure
+ * that traps get registered properly. This sets an upper bound.
+ * before bailing.
+ */
+#define CR3_COUNT_BEFORE_BAIL 1000
+
 /* _pad fields are unknown/unlabeled members */
 struct tcp_listener_x86   // 44h
 {
