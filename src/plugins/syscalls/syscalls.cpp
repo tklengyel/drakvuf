@@ -457,6 +457,10 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             if (!strcmp(symbol->name, "sys_tz") )
                 continue;
 
+            /* These are all variables, not syscalls */
+            if (!strncmp(symbol->name, "sys_dmi", 7) )
+                continue;
+
             PRINT_DEBUG("[SYSCALLS] Adding trap to %s at 0x%lx (kaslr 0x%lx)\n", symbol->name, symbol->rva + kaslr, kaslr);
 
             drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
