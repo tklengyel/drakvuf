@@ -1150,8 +1150,8 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         ctx.addr = info->regs->rsp;
         if ( !(VMI_SUCCESS == vmi_read(injector->vmi, &ctx, sizeof(addr_t), &saved_rip, NULL)) )
         {
-           PRINT_DEBUG("[-] Error while reading the saved RIP\n");
-           return 0;
+            PRINT_DEBUG("[-] Error while reading the saved RIP\n");
+            return 0;
         }
 
         // Bypass call to the function
