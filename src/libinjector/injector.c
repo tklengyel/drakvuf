@@ -136,9 +136,13 @@ struct injector
     addr_t exec_func;
 
     // For shellcode execution
-    addr_t payload, payload_addr, write_proc_mem;
-    size_t payload_size;
+    addr_t payload, payload_addr, memset;
+    size_t binary_size, payload_size;
     uint32_t status;
+    // For process doppelganging shellcode
+    addr_t binary, binary_addr, saved_bp;
+    const char* binary_path;
+    const char* target_process;
 
     addr_t process_info;
     x86_registers_t saved_regs;
@@ -293,6 +297,12 @@ struct kapc_64
     uint8_t apc_state_index;
     uint8_t apc_mode;
     uint8_t inserted;
+};
+
+struct win32_memory_range_entry
+{
+    uint64_t virtual_address;
+    size_t number_of_bytes;
 };
 
 static addr_t place_string_on_stack_32(vmi_instance_t vmi, access_context_t* ctx, addr_t addr, char const* str)
@@ -554,6 +564,62 @@ void init_argument(
     arg->data_on_stack = 0;
 }
 
+int patch_payload(struct injector* injector, unsigned char* addr)
+{
+    // First byte at which each variable instanciation start in the shellcode.
+    addr_t offset_target_process = 0xa;
+    addr_t offset_binary_buffer = 0xd0b;
+    addr_t offset_binary_size = 0xd22;
+    addr_t tmp_baddr = injector->binary_addr;
+    addr_t tmp_bsize = injector->binary_size;
+    unsigned char* tmp = NULL;
+    unsigned char* patch = NULL;
+    unsigned int size = sizeof(addr_t);
+    unsigned int size_dword = sizeof(uint32_t);
+
+    // Patch targetProcess string (cf. doppelganging.c) by the one provided at the
+    // command line. This variable contains the path of the program that will be
+    // used as a cover. The string is set one byte at a time, every 13 bytes
+    // (instructions' opcodes are between).
+    tmp = (unsigned char*)(addr + offset_target_process);
+    patch = (unsigned char*)injector->target_process;
+
+    while (*patch != '\0')
+    {
+        *tmp = *patch;
+
+        tmp += 13;
+        patch++;
+    }
+    *tmp = '\0';
+
+    // Patch lpBinaryBuffer address (cf. doppelganging.c). It's an address pointing
+    // to the content of the binary file to inject.
+    tmp = (unsigned char*)(addr + offset_binary_buffer);
+
+    for (; size > 0; size--)
+    {
+        *tmp = (unsigned char)tmp_baddr;
+
+        tmp_baddr = tmp_baddr >> 8;
+        tmp++;
+    }
+
+    // Patch binarySize (cf. doppelganging.c). It's an address pointing
+    // to the content of the binary file to inject.
+    tmp = (unsigned char*)(addr + offset_binary_size);
+
+    for (; size_dword > 0; size_dword--)
+    {
+        *tmp = (unsigned char)tmp_bsize;
+
+        tmp_bsize = tmp_bsize >> 8;
+        tmp++;
+    }
+
+    return 0;
+}
+
 bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 {
 
@@ -672,15 +738,21 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 
             injector->process_info = args[9].data_on_stack;
         }
-        else if (INJECT_METHOD_SHELLCODE == injector->method && STATUS_NULL == injector->status)
+        else if ( (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method) && STATUS_NULL == injector->status)
         {
             struct argument args[4] = { {0} };
             uint64_t null64 = 0;
             uint64_t allocation_type = MEM_COMMIT | MEM_RESERVE;
             uint64_t protect = PAGE_EXECUTE_READWRITE;
+            size_t size = injector->payload_size;
 
+            // Allocate enough space for the shellcode and the binary at once
+            if (INJECT_METHOD_DOPP == injector->method)
+                size += injector->binary_size;
+
+            // VirtualAlloc(NULL, size, allocation_type, protect);
             init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->payload_size);
+            init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)size);
             init_argument(0, &args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)allocation_type);
             init_argument(0, &args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)protect);
 
@@ -688,23 +760,26 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
                 goto err;
 
         }
-        else if (INJECT_METHOD_SHELLCODE == injector->method && STATUS_ALLOC_OK == injector->status)
+        else if ( (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method) && STATUS_ALLOC_OK == injector->status)
         {
-            struct argument args[5] = { {0} };
-            uint64_t handle = -1;
-            size_t bytes_written = 0;
+            struct argument args[4] = { {0} };
+            uint64_t c = 1;
+            uint64_t null64 = 0;
+            size_t size = injector->payload_size;
 
-            init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)handle);
-            init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->payload_addr);
-            init_argument(0, &args[2], ARGUMENT_STRUCT, injector->payload_size, (void*)injector->payload);
-            init_argument(0, &args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->payload_size);
-            init_argument(0, &args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)bytes_written);
+            if (INJECT_METHOD_DOPP == injector->method)
+                size += injector->binary_size;
 
-            if ( !setup_stack_64(injector->vmi, info, &ctx, args, 5) )
+            // memset(payload_addr, c, payload_size);
+            init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->payload_addr);
+            init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)c);
+            init_argument(0, &args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)size);
+            init_argument(0, &args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+
+            if ( !setup_stack_64(injector->vmi, info, &ctx, args, 4) )
                 return 0;
-            g_free((void*)injector->payload);
         }
-        else if (INJECT_METHOD_SHELLCODE == injector->method && STATUS_WRITE_OK == injector->status)
+        else if ( (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method) && STATUS_PHYS_ALLOC_OK == injector->status)
         {
             if ( !setup_stack_64(injector->vmi, info, &ctx, NULL, 4) )
                 return 0;
@@ -924,6 +999,8 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         PRINT_DEBUG("INT3 received but CR3 (0x%lx) doesn't match target process (0x%lx)\n",
                     cr3, injector->target_cr3);
+        PRINT_DEBUG("INT3 received from PID: %d [%s]\n",
+                    info->proc_data.pid, info->proc_data.name);
         return 0;
     }
 
@@ -945,7 +1022,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         info->regs->rip = injector->exec_func;
 
-        if (INJECT_METHOD_SHELLCODE == injector->method)
+        if (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method)
         {
             injector->status = STATUS_ALLOC_OK;
         }
@@ -963,8 +1040,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     // Chain the injection with a second function
     if ( !injector->is32bit && info->regs->rip == injector->bp.breakpoint.addr && STATUS_ALLOC_OK == injector->status)
     {
-        PRINT_DEBUG("Writing payload in memory..\n");
-        PRINT_DEBUG("Payload is at: 0x%lx\n", info->regs->rax);
+        PRINT_DEBUG("Writing to allocated virtual memory to allocate physical memory..\n");
 
         injector->payload_addr = info->regs->rax;
         if ( !pass_inputs(injector, info) )
@@ -973,17 +1049,61 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             return 0;
         }
 
-        info->regs->rip = injector->write_proc_mem;
+        info->regs->rip = injector->memset;
 
-        injector->status = STATUS_WRITE_OK;
+        injector->status = STATUS_PHYS_ALLOC_OK;
+
+        PRINT_DEBUG("Payload is at: 0x%lx\n", injector->payload_addr);
 
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
     // Execute the payload
-    if ( !injector->is32bit && info->regs->rip == injector->bp.breakpoint.addr && STATUS_WRITE_OK == injector->status)
+    if ( !injector->is32bit && info->regs->rip == injector->bp.breakpoint.addr && STATUS_PHYS_ALLOC_OK == injector->status)
     {
-        PRINT_DEBUG("Executing the payload..\n");
+        addr_t process_notify = 0;
+
+        // If we are doing process doppelganging we need to write the binary to
+        // inject in memory too (in addition to the shellcode), since it is not
+        // present in the guest's filesystem.
+        if (INJECT_METHOD_DOPP == injector->method)
+        {
+            addr_t kernbase = 0, process_notify_rva = 0;
+
+            injector->binary_addr = injector->payload_addr + injector->payload_size;
+
+            ctx.addr = injector->binary_addr;
+            if ( VMI_SUCCESS != vmi_write(injector->vmi, &ctx, injector->binary_size, (void*)injector->binary, NULL) )
+            {
+                PRINT_DEBUG("Failed to write the binary into memory!\n");
+                return 0;
+            }
+            g_free((void*)injector->binary);
+
+            // Patch payload
+            PRINT_DEBUG("Patching the shellcode with user inputs..\n");
+            patch_payload(injector, (unsigned char*)injector->payload);
+
+            // Get address of PspCallProcessNotifyRoutines() from the rekall profile
+            if ( !drakvuf_get_function_rva(injector->rekall_profile, "PspCallProcessNotifyRoutines", &process_notify_rva) )
+            {
+                PRINT_DEBUG("[-] Error getting PspCallProcessNotifyRoutines RVA\n");
+                return 0;
+            }
+
+            kernbase = drakvuf_get_kernel_base(drakvuf);
+            process_notify = kernbase + process_notify_rva;
+        }
+
+        // Write payload into guest's memory
+        ctx.addr = injector->payload_addr;
+        if ( VMI_SUCCESS != vmi_write(injector->vmi, &ctx, injector->payload_size, (void*)injector->payload, NULL) )
+        {
+            PRINT_DEBUG("Failed to write the payload into memory!\n");
+            return 0;
+        }
+        g_free((void*)injector->payload);
+
         if ( !pass_inputs(injector, info) )
         {
             PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
@@ -992,10 +1112,59 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         info->regs->rip = injector->payload_addr;
 
+        // Place a breakpoint on PspCallProcessNotifyRoutines()
+        if (INJECT_METHOD_DOPP == injector->method)
+        {
+            // Save breakpoint address to restore it latter
+            injector->saved_bp = injector->bp.breakpoint.addr;
+            injector->bp.breakpoint.addr = process_notify;
+
+            if ( drakvuf_add_trap(drakvuf, &injector->bp) )
+            {
+                PRINT_DEBUG("BP placed on PspCallProcessNotifyRoutines() at: 0x%lx\n", injector->bp.breakpoint.addr);
+            }
+
+            injector->status = STATUS_BP_HIT;
+        }
+        else
+        {
+            injector->hijacked = 1;
+
+            if ( !injector->target_tid )
+                injector->target_tid = threadid;
+
+            injector->status = STATUS_EXEC_OK;
+        }
+
+        PRINT_DEBUG("Executing the payload..\n");
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+
+    // Handle breakpoint on PspCallProcessNotifyRoutines()
+    if ( !injector->is32bit && info->regs->rip == injector->bp.breakpoint.addr && STATUS_BP_HIT == injector->status)
+    {
+        addr_t saved_rip = 0;
+
+        // Get saved RIP from the stack
+        ctx.addr = info->regs->rsp;
+        if ( !(VMI_SUCCESS == vmi_read(injector->vmi, &ctx, sizeof(addr_t), &saved_rip, NULL)) )
+        {
+            PRINT_DEBUG("[-] Error while reading the saved RIP\n");
+            return 0;
+        }
+
+        // Bypass call to the function
+        info->regs->rip = saved_rip;
+        info->regs->rsp += 0x8;
+
         injector->hijacked = 1;
 
         if ( !injector->target_tid )
             injector->target_tid = threadid;
+
+        // Restore original value of the breakpoint
+        injector->bp.breakpoint.addr = injector->saved_bp;
 
         injector->status = STATUS_EXEC_OK;
 
@@ -1058,7 +1227,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         PRINT_DEBUG("Injected\n");
         injector->rc = 1;
     }
-    else if (INJECT_METHOD_SHELLCODE == injector->method && STATUS_EXEC_OK == injector->status)
+    else if ( (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method) && STATUS_EXEC_OK == injector->status)
     {
         PRINT_DEBUG("Shellcode executed\n");
 
@@ -1069,12 +1238,12 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
-status_t read_payload(struct injector* injector, const char* file)
+status_t file_to_memory(addr_t* output, size_t* size, const char* file)
 {
     size_t bytes_read = 0;
     size_t mem_size = 4096, payload_size = 0;
     unsigned char* shellcode = NULL, *tmp = NULL;
-    char buffer[4096] = { '\0' };
+    unsigned char buffer[4096] = { '\0' };
     FILE* fp = NULL;
 
     if ( !(fp = fopen(file, "rb")) )
@@ -1093,15 +1262,15 @@ status_t read_payload(struct injector* injector, const char* file)
             tmp += payload_size;
         }
 
-        memcpy(shellcode, buffer, bytes_read);
+        memcpy(tmp, buffer, bytes_read);
         payload_size += bytes_read;
         tmp += bytes_read;
     }
 
-    injector->payload = (addr_t)shellcode;
-    injector->payload_size = payload_size;
+    *output = (addr_t)shellcode;
+    *size = payload_size;
 
-    PRINT_DEBUG("Size of shellcode : %lu\n", injector->payload_size);
+    PRINT_DEBUG("Size of file read: %lu\n", *size);
 
     fclose(fp);
 
@@ -1169,7 +1338,7 @@ static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t
     g_strfreev(split_results);
 }
 
-int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, const char* cwd, injection_method_t method, output_format_t format)
+int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, const char* cwd, injection_method_t method, output_format_t format, const char* binary_path, const char* target_process)
 {
 
     struct injector injector = { 0 };
@@ -1182,6 +1351,8 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
     injector.cwd = cwd;
 
     injector.method = method;
+    injector.binary_path = binary_path;
+    injector.target_process = target_process;
 
     injector.is32bit = (vmi_get_page_mode(injector.vmi, 0) == VMI_PM_IA32E) ? 0 : 1;
     if ( VMI_FAILURE == vmi_pid_to_dtb(injector.vmi, pid, &injector.target_cr3) )
@@ -1215,16 +1386,23 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
         lib = "shell32.dll";
         fun = "ShellExecuteA";
     }
-    else if (INJECT_METHOD_SHELLCODE == method)
+    else if (INJECT_METHOD_SHELLCODE == method || INJECT_METHOD_DOPP == method)
     {
-        // Read payload to inject from a file
-        if ( VMI_SUCCESS != read_payload(&injector, file) )
+        // Read shellcode from a file
+        if ( VMI_SUCCESS != file_to_memory(&(injector.payload), &(injector.payload_size), file) )
             goto done;
 
-        lib = "kernel32.dll";
-        fun = "WriteProcessMemory";
-        injector.write_proc_mem = drakvuf_exportsym_to_va(injector.drakvuf, eprocess_base, lib, fun);
-        if (!injector.write_proc_mem)
+        if (INJECT_METHOD_DOPP == method)
+        {
+            // Read binary to inject from a file
+            if ( VMI_SUCCESS != file_to_memory(&(injector.binary), &(injector.binary_size), binary_path) )
+                goto done;
+        }
+
+        lib = "ntdll.dll";
+        fun = "memset";
+        injector.memset= drakvuf_exportsym_to_va(injector.drakvuf, eprocess_base, lib, fun);
+        if (!injector.memset)
         {
             PRINT_DEBUG("Failed to get address of %s!%s\n", lib, fun);
             goto done;

@@ -118,6 +118,7 @@ typedef enum
     INJECT_METHOD_CREATEPROC,
     INJECT_METHOD_SHELLEXEC,
     INJECT_METHOD_SHELLCODE,
+    INJECT_METHOD_DOPP,
     __INJECT_METHOD_MAX
 }
 injection_method_t;
@@ -134,8 +135,10 @@ typedef enum
 {
     STATUS_NULL,
     STATUS_ALLOC_OK,
+    STATUS_PHYS_ALLOC_OK,
     STATUS_WRITE_OK,
     STATUS_EXEC_OK,
+    STATUS_BP_HIT,
     __STATUS_MAX
 } status_type_t;
 
@@ -175,7 +178,9 @@ int injector_start_app(drakvuf_t drakvuf,
                        const char* app,
                        const char* cwd,
                        injection_method_t method,
-                       output_format_t format);
+                       output_format_t format,
+                       const char* binary_path,     // if -m = doppelganging
+                       const char* target_process); // if -m = doppelganging
 
 #pragma GCC visibility pop
 

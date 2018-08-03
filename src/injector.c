@@ -128,7 +128,9 @@ static inline void print_help(void)
             "\t -i <injection pid>        The PID of the process to hijack for injection\n"
             "\t -e <inject_file>          The executable to start with injection\n"
             "Optional inputs:\n"
-            "\t -m <inject_method>        The injection method (createproc, shellexec or shellcode for Windows amd64 only)\n"
+            "\t -m <inject_method>        The injection method (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
+            "\t [-B] <path>               The path of the windows binary to inject (requires -m doppelganging)\n"
+            "\t [-P] <target>             The path of the clean guest process to use as a cover (requires -m doppelganging)\n"
             "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
             "\t -c <current_working_dir>  The current working directory for injected executable\n"
 #ifdef DRAKVUF_DEBUG
@@ -147,6 +149,8 @@ int main(int argc, char** argv)
     char* domain = NULL;
     char* inject_file = NULL;
     char* inject_cwd = NULL;
+    char* binary_path = NULL;
+    char* target_process = NULL;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     bool verbose = 0;
 
@@ -156,7 +160,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:v")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:v")) != -1)
         switch (c)
         {
             case 'r':
@@ -184,11 +188,19 @@ int main(int argc, char** argv)
                     injection_method = INJECT_METHOD_CREATEPROC;
                 else if (!strncmp(optarg,"shellcode",9))
                     injection_method = INJECT_METHOD_SHELLCODE;
+                else if (!strncmp(optarg,"doppelganging",13))
+                    injection_method = INJECT_METHOD_DOPP;
                 else
                 {
                     fprintf(stderr, "Unrecognized injection method\n");
                     return rc;
                 }
+                break;
+            case 'B':
+                binary_path = optarg;
+                break;
+            case 'P':
+                target_process = optarg;
                 break;
 #ifdef DRAKVUF_DEBUG
             case 'v':
@@ -201,6 +213,11 @@ int main(int argc, char** argv)
         }
 
     if ( !rekall_profile || !domain || !injection_pid || !inject_file )
+    {
+        print_help();
+        return 1;
+    }
+    if ( INJECT_METHOD_DOPP == injection_method && (!binary_path || !target_process) )
     {
         print_help();
         return 1;
@@ -223,7 +240,7 @@ int main(int argc, char** argv)
     }
 
     printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
-    int injection_result = injector_start_app(drakvuf, injection_pid, injection_thread, inject_file, inject_cwd, injection_method, OUTPUT_DEFAULT);
+    int injection_result = injector_start_app(drakvuf, injection_pid, injection_thread, inject_file, inject_cwd, injection_method, OUTPUT_DEFAULT, binary_path, target_process);
 
     if (injection_result)
         printf("Process startup success\n");
