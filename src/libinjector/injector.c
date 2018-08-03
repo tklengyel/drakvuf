@@ -1112,7 +1112,11 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         info->regs->rip = injector->payload_addr;
 
-        // Place a breakpoint on PspCallProcessNotifyRoutines()
+        // At some point the shellcode will call NtCreateThreadEx() wich in turn
+        // will cause a call to PspCallProcessNotifyRoutines(). In our case,
+        // this function will make NtCreateThreadEx() to fail and the binary we
+        // want to inject will never run. We want to place a breakpoint on it to
+        // bypass this call.
         if (INJECT_METHOD_DOPP == injector->method)
         {
             // Save breakpoint address to restore it latter
