@@ -120,7 +120,6 @@ endif
 
 if PLUGIN_FILEDELETE
 sources += filedelete/filedelete.cpp
-sources += filedelete/filedelete2.cpp
 endif
 
 if PLUGIN_OBJMON
