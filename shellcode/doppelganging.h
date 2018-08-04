@@ -162,7 +162,7 @@ typedef struct _PROCESS_BASIC_INFORMATION {
 /*
  * Pointer to the NtCreateSection() function.
  */
-typedef NTSTATUS (NTAPI *NT_CREATE_SECTION)(
+typedef NTSTATUS (NTAPI* NT_CREATE_SECTION)(
     PHANDLE				SectionHandle,
     ACCESS_MASK			DesiredAccess,
     POBJECT_ATTRIBUTES	ObjectAttributes,
@@ -175,7 +175,7 @@ typedef NTSTATUS (NTAPI *NT_CREATE_SECTION)(
 /*
  * Pointer to the NtCreatProcessEx() function.
  */
-typedef NTSTATUS (NTAPI *NT_CREATE_PROCESS_EX)
+typedef NTSTATUS (NTAPI* NT_CREATE_PROCESS_EX)
 (
     OUT PHANDLE				ProcessHandle,
     IN ACCESS_MASK			DesiredAccess,
@@ -191,7 +191,7 @@ typedef NTSTATUS (NTAPI *NT_CREATE_PROCESS_EX)
 /*
  * Pointer to the NtCreatThreadEx() function.
  */
-typedef NTSTATUS (NTAPI *NT_CREATE_THREAD_EX) (
+typedef NTSTATUS (NTAPI* NT_CREATE_THREAD_EX) (
     OUT PHANDLE					ThreadHandle,
     IN  ACCESS_MASK				DesiredAccess,
     IN  POBJECT_ATTRIBUTES		ObjectAttributes	OPTIONAL,
@@ -205,7 +205,7 @@ typedef NTSTATUS (NTAPI *NT_CREATE_THREAD_EX) (
     IN  PVOID					AttributeList		OPTIONAL
 );
 
-typedef DWORD(WINAPI * RTL_CREATE_USER_THREAD) (
+typedef DWORD(WINAPI* RTL_CREATE_USER_THREAD) (
     IN HANDLE 					ProcessHandle,
     IN PSECURITY_DESCRIPTOR 	SecurityDescriptor,
     IN BOOL 					CreateSuspended,
@@ -221,8 +221,8 @@ typedef DWORD(WINAPI * RTL_CREATE_USER_THREAD) (
 /*
  * Pointer to the RtlCreateProcessParameters() function.
  */
-typedef NTSTATUS(NTAPI *RTL_CREATE_PROCESS_PARAMETERS_EX)(
-    OUT PRTL_USER_PROCESS_PARAMETERS	*pProcessParameters,
+typedef NTSTATUS(NTAPI* RTL_CREATE_PROCESS_PARAMETERS_EX)(
+    OUT PRTL_USER_PROCESS_PARAMETERS*	pProcessParameters,
     IN	PUNICODE_STRING					ImagePathName,
     IN	PUNICODE_STRING					DllPath				OPTIONAL,
     IN	PUNICODE_STRING					CurrentDirectory	OPTIONAL,
@@ -238,7 +238,7 @@ typedef NTSTATUS(NTAPI *RTL_CREATE_PROCESS_PARAMETERS_EX)(
 /*
  * Pointer to the RtlInitUnicodeString() function.
  */
-typedef VOID (NTAPI *RTL_INIT_UNICODE_STRING)(
+typedef VOID (NTAPI* RTL_INIT_UNICODE_STRING)(
     OUT	PUNICODE_STRING DestinationString,
     IN	PCWSTR          SourceString	OPTIONAL
 );
@@ -246,7 +246,7 @@ typedef VOID (NTAPI *RTL_INIT_UNICODE_STRING)(
 /*
  * Pointer to the NtQueryInformationProcess() function.
  */
-typedef NTSTATUS (NTAPI *NT_QUERY_INFORMATION_PROCESS)(
+typedef NTSTATUS (NTAPI* NT_QUERY_INFORMATION_PROCESS)(
     IN	HANDLE				ProcessHandle,
     IN	PROCESSINFOCLASS	ProcessInformationClass,
     IN	PVOID				ProcessInformation,
@@ -257,7 +257,7 @@ typedef NTSTATUS (NTAPI *NT_QUERY_INFORMATION_PROCESS)(
 /*
  * Pointer to the NtReadVirtualMemory() function.
  */
-typedef NTSTATUS (NTAPI *NT_READ_VIRTUAL_MEMORY)(
+typedef NTSTATUS (NTAPI* NT_READ_VIRTUAL_MEMORY)(
     IN	HANDLE	ProcessHandle,
     IN	PVOID	BaseAddress,
     OUT	PVOID	Buffer				OPTIONAL,
@@ -268,7 +268,7 @@ typedef NTSTATUS (NTAPI *NT_READ_VIRTUAL_MEMORY)(
 /*
  * Pointer to the NtWriteVirtualMemory() function.
  */
-typedef NTSTATUS(NTAPI *NT_WRITE_VIRTUAL_MEMORY)(
+typedef NTSTATUS(NTAPI* NT_WRITE_VIRTUAL_MEMORY)(
     IN	HANDLE	ProcessHandle,
     IN	PVOID	BaseAddress,
     OUT	PVOID	Buffer				OPTIONAL,
@@ -278,7 +278,7 @@ typedef NTSTATUS(NTAPI *NT_WRITE_VIRTUAL_MEMORY)(
 /*
  * Pointer to the RtlCreateEnvironment() function.
  */
-typedef NTSTATUS (NTAPI *RTL_CREATE_ENVIRONMENT)(
+typedef NTSTATUS (NTAPI* RTL_CREATE_ENVIRONMENT)(
     IN	BOOLEAN Inherit,
-    OUT	PVOID	*Environment
+    OUT	PVOID*	Environment
 );
