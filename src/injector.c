@@ -129,8 +129,8 @@ static inline void print_help(void)
             "\t -e <inject_file>          The executable to start with injection\n"
             "Optional inputs:\n"
             "\t -m <inject_method>        The injection method (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
-            "\t [-B] <path>               The path of the windows binary to inject (requires -m doppelganging)\n"
-            "\t [-P] <target>             The path of the clean guest process to use as a cover (requires -m doppelganging)\n"
+            "\t [-B] <path>               The host path of the windows binary to inject (requires -m doppelganging)\n"
+            "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
             "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
             "\t -c <current_working_dir>  The current working directory for injected executable\n"
 #ifdef DRAKVUF_DEBUG
