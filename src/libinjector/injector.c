@@ -299,12 +299,6 @@ struct kapc_64
     uint8_t inserted;
 };
 
-struct win32_memory_range_entry
-{
-    uint64_t virtual_address;
-    size_t number_of_bytes;
-};
-
 static addr_t place_string_on_stack_32(vmi_instance_t vmi, access_context_t* ctx, addr_t addr, char const* str)
 {
     if (!str)
@@ -763,7 +757,7 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
         else if ( (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method) && STATUS_ALLOC_OK == injector->status)
         {
             struct argument args[4] = { {0} };
-            uint64_t c = 1;
+            uint64_t c = 0;
             uint64_t null64 = 0;
             size_t size = injector->payload_size;
 
@@ -1080,10 +1074,6 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             }
             g_free((void*)injector->binary);
 
-            // Patch payload
-            PRINT_DEBUG("Patching the shellcode with user inputs..\n");
-            patch_payload(injector, (unsigned char*)injector->payload);
-
             // Get address of PspCallProcessNotifyRoutines() from the rekall profile
             if ( !drakvuf_get_function_rva(injector->rekall_profile, "PspCallProcessNotifyRoutines", &process_notify_rva) )
             {
@@ -1093,6 +1083,10 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             kernbase = drakvuf_get_kernel_base(drakvuf);
             process_notify = kernbase + process_notify_rva;
+
+            // Patch payload
+            PRINT_DEBUG("Patching the shellcode with user inputs..\n");
+            patch_payload(injector, (unsigned char*)injector->payload);
         }
 
         // Write payload into guest's memory
