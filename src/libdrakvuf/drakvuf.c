@@ -379,6 +379,9 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
         case CPUID:
             ret = inject_trap_cpuid(drakvuf, trap);
             break;
+        case PRIVCALL:
+            ret = inject_trap_sw(drakvuf, trap);
+            break;
         default:
             ret = 0;
             break;

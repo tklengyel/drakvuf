@@ -114,6 +114,23 @@ AC_PROG_CXX(clang++)
 AX_REQUIRE_DEFINED([AX_CXX_COMPILE_STDCXX_11])
 AX_CXX_COMPILE_STDCXX_11
 
+AC_MSG_CHECKING([for supported architecture])
+case "$host_cpu" in
+i[[3456]]86|pentium)
+    arch=i386
+    AC_DEFINE([I386], 1, [Define for the i386 architecture.])
+    ;;
+x86?64*)
+    arch=x86_64
+    AC_DEFINE([X86_64], 1, [Define for the AMD x86-64 architecture.])
+    ;;
+aarch64*)
+    arch=arm64
+    AC_DEFINE([ARM64], 1, [Define for the ARM64 architecture.])
+    ;;
+esac
+AC_MSG_RESULT($arch)
+
 ######################################################
 
 AC_ARG_ENABLE([plugin_syscalls],
