@@ -1294,7 +1294,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         if ( trap->type == PRIVCALL )
         {
             rpa1 = (remapped_gfn->step_view<<12) + ((container->breakpoint.pa & VMI_BIT_MASK(0,11)) + 4);
-            if (VMI_FAILURE == vmi_write_32_pa(vmi, rpa1, &sw_trap)){
+            if ( VMI_FAILURE == vmi_write_32_pa(vmi, rpa1, &sw_trap) ){
                 PRINT_DEBUG("FAILED TO INJECT TRAP (second smc) @ 0x%lx !\n", container->breakpoint.pa);
                 goto err_exit;
             }
