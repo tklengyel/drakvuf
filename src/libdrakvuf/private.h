@@ -157,7 +157,19 @@ struct drakvuf
 
     xen_interface_t* xen;
     os_interface_t osi;
-    uint16_t altp2m_idx, altp2m_idr;
+
+    /*
+     * As Xen does not support single-stepping on ARM, yet, we emulate the
+     * single-stepping behavior by using two logically adjacent SMC
+     * instructions placed in two different views; the first SMC instruction
+     * is placed instead of the original instruction in the execute-view. The
+     * second SMC instruction follows the original instruction in the step-view.
+     * By switching to the step-view right after the first SMC invocation, the
+     * system will trap immediately after executing the original instruction.
+     * In this way, this allows the monitor to switch back to the exec-view
+     * and continue execution.
+     */
+    uint16_t altp2m_idx, altp2m_idr, altp2m_ids;
 
     xen_pfn_t zero_page_gfn;
 
@@ -171,6 +183,7 @@ struct drakvuf
     vmi_event_t debug_event;
     vmi_event_t cpuid_event;
     vmi_event_t* step_event[16];
+    vmi_event_t privcall_event;
     drakvuf_trap_t guard0;
 
     size_t* offsets;
@@ -194,6 +207,7 @@ struct drakvuf
     int address_width;
 
     x86_registers_t* regs[16]; // vCPU specific registers recorded during the last event
+    arm_registers_t* arm_regs[16];
     addr_t kpcr[16]; // vCPU specific kpcr recorded on mov-to-cr3
 
     GHashTable* remapped_gfns; // Key: gfn
@@ -223,6 +237,7 @@ struct breakpoint
 {
     addr_t pa;
     drakvuf_trap_t guard, guard2;
+    drakvuf_trap_t step_guard; //Guard for the step view altp2m_ids
     bool doubletrap;
 };
 struct memaccess
@@ -255,6 +270,7 @@ struct remapped_gfn
 {
     xen_pfn_t o;
     xen_pfn_t r;
+    xen_pfn_t step_view; //The step view used only on ARM
     bool active;
 };
 
