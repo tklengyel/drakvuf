@@ -921,9 +921,9 @@ void remove_trap(drakvuf_t drakvuf,
                         break;
                     }
                     if ( VMI_FAILURE == vmi_write_sw_trap(drakvuf->vmi,
-                                                         (remapped_gfn->step_view << 12) +
-                                                         (second_breakpoint_pa & VMI_BIT_MASK(0,11)),
-                                                         &backup_dsmc) )
+                                                          (remapped_gfn->step_view << 12) +
+                                                          (second_breakpoint_pa & VMI_BIT_MASK(0,11)),
+                                                          &backup_dsmc) )
                     {
                         fprintf(stderr, "Critical error in removing software trap from second view\n");
                         drakvuf->interrupted = -1;
