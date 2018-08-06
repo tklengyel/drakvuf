@@ -129,7 +129,7 @@ static uint32_t sw_trap = SW_TRAP;
 status_t vmi_read_sw_trap(vmi_instance_t vmi, addr_t pa, uint32_t* value)
 {
 #if defined(I386) || defined(X86_64)
-    return vmi_read_8_pa(vmi, pa, (uint8_t *)value);
+    return vmi_read_8_pa(vmi, pa, (uint8_t*)value);
 #elif defined(ARM64)
     return vmi_read_32_pa(vmi, pa, value);
 #endif
@@ -290,8 +290,8 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             {
                 s->breakpoint.doubletrap = 0;
                 if ( VMI_FAILURE == vmi_write_sw_trap(drakvuf->vmi,
-                                                     (pass->remapped_gfn->r << 12) + (*pa & VMI_BIT_MASK(0,11)),
-                                                     &sw_trap) )
+                                                      (pass->remapped_gfn->r << 12) + (*pa & VMI_BIT_MASK(0,11)),
+                                                      &sw_trap) )
                 {
                     fprintf(stderr, "Critical error in re-copying remapped gfn\n");
                     drakvuf->interrupted = -1;
@@ -560,7 +560,7 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
             event->slat_id = drakvuf->altp2m_ids;
 
         return rsp |
-               VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+              VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
     }
 
     return rsp;
@@ -891,9 +891,9 @@ void remove_trap(drakvuf_t drakvuf,
                 }
 
                 if ( VMI_FAILURE == vmi_write_sw_trap(drakvuf->vmi,
-                                                     (remapped_gfn->r << 12) +
-                                                     (container->breakpoint.pa & VMI_BIT_MASK(0,11)),
-                                                     &backup) )
+                                                      (remapped_gfn->r << 12) +
+                                                      (container->breakpoint.pa & VMI_BIT_MASK(0,11)),
+                                                      &backup) )
                 {
                     fprintf(stderr, "Critical error in removing int3\n");
                     drakvuf->interrupted = -1;
@@ -1220,9 +1220,9 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         if ( trap->type == PRIVCALL )
         {
             xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID,
-                                drakvuf->altp2m_ids, current_gfn, remapped_gfn->step_view);
+                                 drakvuf->altp2m_ids, current_gfn, remapped_gfn->step_view);
             xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID,
-                                drakvuf->altp2m_idr, remapped_gfn->step_view, drakvuf->zero_page_gfn);
+                                 drakvuf->altp2m_idr, remapped_gfn->step_view, drakvuf->zero_page_gfn);
         }
     }
 
