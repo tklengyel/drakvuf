@@ -110,9 +110,9 @@
 #define PM2BIT(pm) ((pm == VMI_PM_IA32E) ? BIT64 : BIT32)
 
 #if defined(I386) || defined(X86_64)
-    #define SW_TRAP 0xCC //INT3
+#define SW_TRAP 0xCC //INT3
 #elif defined(ARM64)
-    #define SW_TRAP 0xD4000003 //SMC64
+#define SW_TRAP 0xD4000003 //SMC64
 #endif
 
 #include <glib.h>
