@@ -126,7 +126,8 @@
 
 static uint32_t sw_trap = SW_TRAP;
 
-status_t vmi_read_sw_trap(vmi_instance_t vmi, addr_t pa, uint32_t *value){
+status_t vmi_read_sw_trap(vmi_instance_t vmi, addr_t pa, uint32_t* value)
+{
 #if defined(I386) || defined(X86_64)
     return vmi_read_8_pa(vmi, pa, (uint8_t *)value);
 #elif defined(ARM64)
@@ -134,9 +135,10 @@ status_t vmi_read_sw_trap(vmi_instance_t vmi, addr_t pa, uint32_t *value){
 #endif
 }
 
-status_t vmi_write_sw_trap(vmi_instance_t vmi, addr_t pa, uint32_t *value){
+status_t vmi_write_sw_trap(vmi_instance_t vmi, addr_t pa, uint32_t* value)
+{
 #if defined(I386) || defined(X86_64)
-    return vmi_write_8_pa(vmi, pa, (uint8_t *)value);
+    return vmi_write_8_pa(vmi, pa, (uint8_t*)value);
 #elif defined(ARM64)
     return vmi_write_32_pa(vmi, pa, value);
 #endif
