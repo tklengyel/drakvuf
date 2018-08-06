@@ -511,7 +511,7 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
             {
                 event->slat_id = drakvuf->altp2m_idx;
                 return rsp |
-                        VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+                       VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
             }
         }
         /*
@@ -560,7 +560,7 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
             event->slat_id = drakvuf->altp2m_ids;
 
         return rsp |
-              VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+               VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
     }
 
     return rsp;
