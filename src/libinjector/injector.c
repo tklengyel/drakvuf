@@ -141,6 +141,7 @@ struct injector
     uint32_t status;
     // For process doppelganging shellcode
     addr_t binary, binary_addr, saved_bp;
+    addr_t process_notify;
     const char* binary_path;
     const char* target_process;
 
@@ -298,6 +299,8 @@ struct kapc_64
     uint8_t apc_mode;
     uint8_t inserted;
 };
+
+int counter = 0;
 
 static addr_t place_string_on_stack_32(vmi_instance_t vmi, access_context_t* ctx, addr_t addr, char const* str)
 {
@@ -995,12 +998,31 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     cr3, injector->target_cr3);
         PRINT_DEBUG("INT3 received from PID: %d [%s]\n",
                     info->proc_data.pid, info->proc_data.name);
+        if (cr3 == injector->process_notify)
+            counter++;
         return 0;
     }
 
     uint32_t threadid = 0;
     if ( !drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, &threadid) || !threadid )
         return 0;
+
+    // Something went wrong with the doppelganging shellcode before the
+    // breakpoint gets hit so stop the injection to avoid looping indefinitely
+    if (counter == 5)
+    {
+        injector->hijacked = 1;
+
+        if ( !injector->target_tid )
+            injector->target_tid = threadid;
+
+        // Restore original value of the breakpoint
+        injector->bp.breakpoint.addr = injector->saved_bp;
+
+        injector->status = STATUS_EXEC_OK;
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
 
     if ( !injector->is32bit && !injector->hijacked && info->regs->rip == injector->bp.breakpoint.addr && injector->status == STATUS_NULL )
     {
@@ -1055,8 +1077,6 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     // Execute the payload
     if ( !injector->is32bit && info->regs->rip == injector->bp.breakpoint.addr && STATUS_PHYS_ALLOC_OK == injector->status)
     {
-        addr_t process_notify = 0;
-
         // If we are doing process doppelganging we need to write the binary to
         // inject in memory too (in addition to the shellcode), since it is not
         // present in the guest's filesystem.
@@ -1082,7 +1102,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             }
 
             kernbase = drakvuf_get_kernel_base(drakvuf);
-            process_notify = kernbase + process_notify_rva;
+            injector->process_notify = kernbase + process_notify_rva;
 
             // Patch payload
             PRINT_DEBUG("Patching the shellcode with user inputs..\n");
@@ -1115,7 +1135,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             // Save breakpoint address to restore it latter
             injector->saved_bp = injector->bp.breakpoint.addr;
-            injector->bp.breakpoint.addr = process_notify;
+            injector->bp.breakpoint.addr = injector->process_notify;
 
             if ( drakvuf_add_trap(drakvuf, &injector->bp) )
             {
