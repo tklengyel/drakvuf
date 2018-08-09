@@ -563,15 +563,15 @@ static event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
             const uint8_t buffer[BYTES_TO_READ] = { 0 };
             uint64_t null64 = 0;
 
-            init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->handle);
-            init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(0, &args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(0, &args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(0, &args[4], ARGUMENT_STRUCT, sizeof(struct IO_STATUS_BLOCK), (void*)&io_status_block);
-            init_argument(0, &args[5], ARGUMENT_STRUCT, BYTES_TO_READ, (void*)buffer);
-            init_argument(0, &args[6], ARGUMENT_INT, sizeof(uint64_t), (void*)BYTES_TO_READ);
-            init_argument(0, &args[7], ARGUMENT_STRUCT, sizeof(byte_offset), (void*)&byte_offset);
-            init_argument(0, &args[8], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->handle);
+            init_argument(&args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[4], ARGUMENT_STRUCT, sizeof(struct IO_STATUS_BLOCK), (void*)&io_status_block);
+            init_argument(&args[5], ARGUMENT_STRUCT, BYTES_TO_READ, (void*)buffer);
+            init_argument(&args[6], ARGUMENT_INT, sizeof(uint64_t), (void*)BYTES_TO_READ);
+            init_argument(&args[7], ARGUMENT_STRUCT, sizeof(byte_offset), (void*)&byte_offset);
+            init_argument(&args[8], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
 
             if ( !setup_stack_64(vmi, info, &ctx, args, 9) )
                 goto err;
@@ -602,9 +602,9 @@ static event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
         struct argument args[3] = { {0} };
         uint64_t null64 = 0;
 
-        init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->handle);
-        init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-        init_argument(0, &args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+        init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->handle);
+        init_argument(&args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+        init_argument(&args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
 
         if ( !setup_stack_64(vmi, info, &ctx, args, 3) )
             goto err;
@@ -712,15 +712,15 @@ static event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
             const uint8_t buffer[BYTES_TO_READ] = { 0 };
             uint64_t null64 = 0;
 
-            init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->handle);
-            init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(0, &args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(0, &args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(0, &args[4], ARGUMENT_STRUCT, sizeof(struct IO_STATUS_BLOCK), (void*)&io_status_block);
-            init_argument(0, &args[5], ARGUMENT_STRUCT, BYTES_TO_READ, (void*)buffer);
-            init_argument(0, &args[6], ARGUMENT_INT, sizeof(uint64_t), (void*)BYTES_TO_READ);
-            init_argument(0, &args[7], ARGUMENT_STRUCT, sizeof(byte_offset), (void*)&byte_offset);
-            init_argument(0, &args[8], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->handle);
+            init_argument(&args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[4], ARGUMENT_STRUCT, sizeof(struct IO_STATUS_BLOCK), (void*)&io_status_block);
+            init_argument(&args[5], ARGUMENT_STRUCT, BYTES_TO_READ, (void*)buffer);
+            init_argument(&args[6], ARGUMENT_INT, sizeof(uint64_t), (void*)BYTES_TO_READ);
+            init_argument(&args[7], ARGUMENT_STRUCT, sizeof(byte_offset), (void*)&byte_offset);
+            init_argument(&args[8], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
 
             if ( !setup_stack_64(vmi, info, &ctx, args, 9) )
                 goto err;
@@ -841,11 +841,11 @@ static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         const struct IO_STATUS_BLOCK io_status_block = { 0 };
         struct FILE_FS_DEVICE_INFORMATION dev_info = { 0 };
 
-        init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)handle);
-        init_argument(0, &args[1], ARGUMENT_STRUCT, sizeof(struct IO_STATUS_BLOCK), (void*)&io_status_block);
-        init_argument(0, &args[2], ARGUMENT_STRUCT, sizeof(struct FILE_FS_DEVICE_INFORMATION), (void*)&dev_info);
-        init_argument(0, &args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)sizeof(struct FILE_FS_DEVICE_INFORMATION));
-        init_argument(0, &args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)4); // FileFsDeviceInformation
+        init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)handle);
+        init_argument(&args[1], ARGUMENT_STRUCT, sizeof(struct IO_STATUS_BLOCK), (void*)&io_status_block);
+        init_argument(&args[2], ARGUMENT_STRUCT, sizeof(struct FILE_FS_DEVICE_INFORMATION), (void*)&dev_info);
+        init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)sizeof(struct FILE_FS_DEVICE_INFORMATION));
+        init_argument(&args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)4); // FileFsDeviceInformation
 
         if ( !setup_stack_64(vmi, info, &ctx, args, 5) )
             goto err;

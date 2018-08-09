@@ -144,15 +144,10 @@ struct argument
     uint32_t type;
     uint32_t size;
     uint64_t data_on_stack;
-    union
-    {
-        uint32_t* data_32;
-        uint64_t* data_64;
-    };
+    uint64_t* data;
 };
 
-void init_argument(bool is32bit,
-                   struct argument* arg,
+void init_argument(struct argument* arg,
                    argument_type_t type,
                    size_t size,
                    void* data);
