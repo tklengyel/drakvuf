@@ -300,8 +300,6 @@ struct kapc_64
     uint8_t inserted;
 };
 
-int counter = 0;
-
 static addr_t place_string_on_stack_32(vmi_instance_t vmi, access_context_t* ctx, addr_t addr, char const* str)
 {
     if (!str)
@@ -998,31 +996,12 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     cr3, injector->target_cr3);
         PRINT_DEBUG("INT3 received from PID: %d [%s]\n",
                     info->proc_data.pid, info->proc_data.name);
-        if (cr3 == injector->process_notify)
-            counter++;
         return 0;
     }
 
     uint32_t threadid = 0;
     if ( !drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, &threadid) || !threadid )
         return 0;
-
-    // Something went wrong with the doppelganging shellcode before the
-    // breakpoint gets hit so stop the injection to avoid looping indefinitely
-    if (counter == 5)
-    {
-        injector->hijacked = 1;
-
-        if ( !injector->target_tid )
-            injector->target_tid = threadid;
-
-        // Restore original value of the breakpoint
-        injector->bp.breakpoint.addr = injector->saved_bp;
-
-        injector->status = STATUS_EXEC_OK;
-
-        return VMI_EVENT_RESPONSE_SET_REGISTERS;
-    }
 
     if ( !injector->is32bit && !injector->hijacked && info->regs->rip == injector->bp.breakpoint.addr && injector->status == STATUS_NULL )
     {
@@ -1126,12 +1105,14 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         info->regs->rip = injector->payload_addr;
 
+        // TODO : check windows build version
         // At some point the shellcode will call NtCreateThreadEx() wich in turn
         // will cause a call to PspCallProcessNotifyRoutines(). In our case,
         // this function will make NtCreateThreadEx() to fail and the binary we
         // want to inject will never run. We want to place a breakpoint on it to
         // bypass this call.
-        if (INJECT_METHOD_DOPP == injector->method)
+        int build_1803 = 20180410;
+        if (INJECT_METHOD_DOPP == injector->method && drakvuf_get_os_build_date(injector->rekall_profile) >= build_1803)
         {
             // Save breakpoint address to restore it latter
             injector->saved_bp = injector->bp.breakpoint.addr;

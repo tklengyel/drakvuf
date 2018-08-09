@@ -151,6 +151,8 @@ bool drakvuf_get_struct_member_rva(const char* rekall_profile,
                                    const char* symbol,
                                    addr_t* rva);
 
+int drakvuf_get_os_build_date(const char* rekall_profile);
+
 /*---------------------------------------------------------
  * DRAKVUF functions
  */

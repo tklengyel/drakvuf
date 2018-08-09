@@ -301,6 +301,48 @@ err_exit:
     return ret;
 }
 
+int drakvuf_get_os_build_date(const char* rekall_profile)
+{
+    int ret = 0;
+    int year = 0, month = 0, day = 0;
+    char junk[15] = {'\0'};
+    char build_date[10] = {'\0'};
+
+    json_object* root = json_object_from_file(rekall_profile);
+    if (!root)
+    {
+        fprintf(stderr, "Rekall profile couldn't be opened!\n");
+        goto err_exit;
+    }
+
+    json_object* metadata = NULL, *timestamp = NULL;
+    if (!json_object_object_get_ex(root, "$METADATA", &metadata))
+    {
+        PRINT_DEBUG("Rekall profile: no $METADATA section found\n");
+        goto err_exit;
+    }
+
+    if (!json_object_object_get_ex(metadata, "Timestamp", &timestamp))
+    {
+        PRINT_DEBUG("Rekall profile: $METADATA/Timestamp not found\n");
+        goto err_exit;
+    }
+
+    const char* ts = json_object_get_string(timestamp);
+
+    // At this point timestamp should have the following format : "2018-07-14 03:53:24Z"
+    sscanf(ts, "%d%c%d%c%d %15s", &year, junk, &month, junk, &day, junk);
+    sprintf(build_date, "%d%02d%02d", year, month, day);
+
+    ret = (int)strtol(build_date, NULL, 10);
+
+err_exit:
+    if ( root )
+        json_object_put(root);
+
+    return ret;
+}
+
 bool drakvuf_get_function_rva(const char* rekall_profile, const char* function, addr_t* rva)
 {
 
