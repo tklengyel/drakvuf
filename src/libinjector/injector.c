@@ -1105,14 +1105,12 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         info->regs->rip = injector->payload_addr;
 
-        // TODO : check windows build version
         // At some point the shellcode will call NtCreateThreadEx() wich in turn
         // will cause a call to PspCallProcessNotifyRoutines(). In our case,
         // this function will make NtCreateThreadEx() to fail and the binary we
         // want to inject will never run. We want to place a breakpoint on it to
         // bypass this call.
-        int build_1803 = 20180410;
-        if (INJECT_METHOD_DOPP == injector->method && drakvuf_get_os_build_date(injector->rekall_profile) >= build_1803)
+        if (INJECT_METHOD_DOPP == injector->method)
         {
             // Save breakpoint address to restore it latter
             injector->saved_bp = injector->bp.breakpoint.addr;
@@ -1393,6 +1391,14 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
 
         if (INJECT_METHOD_DOPP == method)
         {
+            // Check for Windows 10 version 1803 or higher
+            int build_1803 = 20180410;
+            if ( drakvuf_get_os_build_date(injector.rekall_profile) < build_1803 )
+            {
+                PRINT_DEBUG("This injection method requires Windows 10 version 1803 or higher!\n");
+                goto done;
+            }
+
             // Read binary to inject from a file
             if ( VMI_SUCCESS != file_to_memory(&(injector.binary), &(injector.binary_size), binary_path) )
                 goto done;
