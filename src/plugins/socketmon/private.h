@@ -341,4 +341,15 @@ struct socketmon_trapinfo
     };
 };
 
+// This is yet another type of Windows string representation
+// specific for undocumented DnsQueryExW(...) function.
+// Same type for 64 and 32 bit versions.
+struct dns_query_ex_w_string_t
+{
+    uint32_t length = 0;
+    uint32_t unknown = 0; // maybe type of bytes in string, was equal to 1 in my case of wchars?
+    uint64_t pBuffer = 0; // pointer to a null-terminated string of wchars
+    //uint64_t unknown2 = 0; // maybe type of bytes in string, was equal to 1 in my case of wchars, commented out, since not needed yet
+};
+
 #endif
