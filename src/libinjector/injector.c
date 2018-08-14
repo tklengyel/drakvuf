@@ -536,20 +536,6 @@ err:
     return 0;
 }
 
-void init_argument(
-    struct argument* arg,
-    argument_type_t type,
-    size_t size,
-    void* data)
-{
-    arg->type = type;
-    arg->size = size;
-
-    arg->data = data;
-
-    arg->data_on_stack = 0;
-}
-
 bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 {
 
