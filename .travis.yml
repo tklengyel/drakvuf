@@ -219,6 +219,7 @@ matrix:
       install:
         - ./autogen.sh
       script:
+        - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
         - ./configure --enable-debug
         - build-wrapper-linux-x86-64 --out-dir bw-output make -j2
         - sonar-scanner
