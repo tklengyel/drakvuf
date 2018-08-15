@@ -175,3 +175,50 @@ matrix:
         - cd src/xen_helper && scan-build --status-bugs --use-cc=clang-5.0 make && cd ../..
         - cd src/libinjector && scan-build --status-bugs --use-cc=clang-5.0 make && cd ../..
         - cd src/dirwatch && scan-build --status-bugs --use-cc=clang-5.0 make && cd ../..
+
+#
+# SonarCloud
+#
+    - env:
+        - TEST="SonarCloud"
+      addons:
+        apt:
+            sources:
+                - ubuntu-toolchain-r-test
+                - llvm-toolchain-trusty-5.0
+            packages:
+                - bison
+                - flex
+                - check
+                - libjson-c-dev
+                - autoconf-archive
+                - libyajl2
+                - uuid-dev
+                - libpixman-1-dev
+                - libaio-dev
+                - clang-5.0
+        sonarcloud:
+            organization: "drakvuf"
+            token:
+                secure: "$SONAR_TOKEN"
+      before_install:
+        - dpkg -x test-packages/xentools_4.7-drakvuf1-1_amd64.deb .
+        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
+        - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
+        - export LDFLAGS="-L$PWD/usr/local/lib"
+        - export CFLAGS="-I$PWD/usr/local/include"
+        - export PATH=$PATH:/usr/local/clang-5.0.0/bin
+        - git submodule update --init libvmi
+        - cd libvmi
+        - ./autogen.sh
+        - ./configure --disable-kvm --disable-examples --without-xenstore --prefix=$PWD/../usr/local
+        - make
+        - make install
+        - cd ..
+      install:
+        - ./autogen.sh
+      script:
+        - ./configure --enable-debug
+        - build-wrapper-linux-x86-64 --out-dir bw-output make -j2
+        - sonar-scanner
