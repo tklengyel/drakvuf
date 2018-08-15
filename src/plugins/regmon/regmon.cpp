@@ -118,7 +118,7 @@ static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* in
     if ( key_handle_addr )
     {
         const char* syscall_name = info->trap->name;
-        char* key_path = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle_addr, 0 );
+        gchar* key_path = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle_addr, 0 );
 
         unicode_string_t* value_name_us = drakvuf_read_unicode( drakvuf, info, value_name_addr );
         char const* value_name = (value_name_us && value_name_us->length > 0) ? reinterpret_cast<char const*>(value_name_us->contents) : "(Default)";
@@ -194,7 +194,7 @@ static event_response_t log_reg_objattr_hook(drakvuf_t drakvuf, drakvuf_trap_inf
         return 0;
     }
 
-    char* key_root_p = drakvuf_reg_keyhandle_path( drakvuf, info, ctx.addr, 0 );
+    gchar* key_root_p = drakvuf_reg_keyhandle_path( drakvuf, info, ctx.addr, 0 );
 
     ctx.addr = attr + reg->objattr_name;
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
