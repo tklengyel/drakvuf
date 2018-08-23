@@ -138,6 +138,10 @@ if PLUGIN_DEBUGMON
 sources += debugmon/debugmon.cpp
 endif
 
+if PLUGIN_DELAYMON
+sources += delaymon/delaymon.cpp
+endif
+
 if PLUGIN_CPUIDMON
 sources += cpuidmon/cpuidmon.cpp
 endif
