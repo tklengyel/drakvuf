@@ -111,9 +111,17 @@
 #include "../plugins.h"
 #include "regmon.h"
 
+#include <vector>
+#include <memory>
+#include <functional>
+#include <cstring>
+
+#define PLUGIN_NAME "[REGMON]"
+
 static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
                                       addr_t key_handle_addr,
-                                      addr_t value_name_addr, bool with_value_name )
+                                      addr_t value_name_addr, bool with_value_name,
+                                      unicode_string_t* data_us = nullptr)
 {
     if ( key_handle_addr )
     {
@@ -134,6 +142,8 @@ static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* in
                            UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, key_path );
                     if (with_value_name)
                         printf(",%s", value_name);
+                    if (data_us)
+                        printf(",\"%s\"", data_us->contents);
                     printf("\n");
                     break;
 
@@ -143,6 +153,8 @@ static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* in
                            info->trap->name, key_path);
                     if (with_value_name)
                         printf(",ValueName=\"%s\"", value_name);
+                    if (data_us)
+                        printf(",Value=\"%s\"", data_us->contents);
                     printf("\n");
                     break;
 
@@ -153,9 +165,14 @@ static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* in
                            USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, key_path );
                     if (with_value_name)
                         printf(",%s", value_name);
+                    if (data_us)
+                        printf(", VALUE:\"%s\"", data_us->contents);
                     printf("\n");
                     break;
             }
+
+            if (data_us)
+                vmi_free_unicode_str(data_us);
         }
 
         if (value_name_us) vmi_free_unicode_str(value_name_us);
@@ -264,6 +281,136 @@ static event_response_t log_reg_value_hook_cb( drakvuf_t drakvuf, drakvuf_trap_i
     return log_reg_hook( drakvuf, info, key_handle_addr, value_name_addr, true );
 }
 
+static event_response_t log_reg_set_value_hook_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+
+    enum RegistryValueTypes
+    {
+        REG_NONE = 0
+        ,REG_SZ
+        ,REG_EXPAND_SZ
+        ,REG_BINARY
+        ,REG_DWORD
+        ,REG_DWORD_LITTLE_ENDIAN = REG_DWORD
+        ,REG_DWORD_BIG_ENDIAN
+        ,REG_LINK
+        ,REG_MULTI_SZ
+        ,REG_RESOURCE_LIST
+        ,REG_FULL_RESOURCE_DESCRIPTOR
+        ,REG_RESOURCE_REQUIREMENTS_LIST
+        ,REG_QWORD
+        ,REG_QWORD_LITTLE_ENDIAN = REG_QWORD
+    };
+
+    addr_t key_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
+
+    if (!key_handle_addr)
+        return 0;
+
+    addr_t value_name_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+    uint32_t type = drakvuf_get_function_argument(drakvuf, info, 4);
+    addr_t data_addr = drakvuf_get_function_argument(drakvuf, info, 5);
+    uint32_t data_size = drakvuf_get_function_argument(drakvuf, info, 6);
+
+    unicode_string_t* data_us = nullptr;
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+    ctx.addr = data_addr;
+
+    if ((type == REG_SZ) || (type == REG_LINK) || (type == REG_EXPAND_SZ))
+    {
+        vmi_lock_guard vmi_lg(drakvuf);
+        data_us = drakvuf_read_wchar_string(vmi_lg.vmi, &ctx);
+    }
+    else
+    {
+        std::vector<uint8_t> data_bytes(data_size, 0);
+
+        {
+            size_t bytes_read = 0;
+            vmi_lock_guard vmi_lg(drakvuf);
+            vmi_read(vmi_lg.vmi, &ctx, data_size, data_bytes.data(), &bytes_read);
+
+            if (bytes_read != data_size)
+            {
+                fprintf(stderr, PLUGIN_NAME "  Error, reading data, expected %" PRIu32 " bytes, but actually read %zu \n", data_size, bytes_read );
+                return log_reg_hook( drakvuf, info, key_handle_addr, value_name_addr, true, nullptr );
+            }
+        }
+
+        char** strings;
+        size_t number_of_strings = 0;
+        const char* spacer;
+
+        data_us = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+        data_us->encoding = "UTF-8";
+
+        if (type == REG_MULTI_SZ) // double-zero terminated Unicode strings array
+        {
+            std::vector< std::unique_ptr<unicode_string_t, std::function<void(unicode_string_t*)>> > multiple_strings;
+            multiple_strings.reserve(100); // allocate space for 100 string pointers at once
+            {
+                vmi_lock_guard vmi_lg(drakvuf);
+                ctx.addr = data_addr;
+                for (uint32_t i = 0 ; i < data_bytes.size() ; i += 2)
+                {
+                    uint16_t& value_word = *(reinterpret_cast<uint16_t*>(&data_bytes[i]));
+                    const uint32_t value_dword = *(reinterpret_cast<uint32_t*>(&data_bytes[i]));
+
+                    if (value_word == 0)
+                    {
+                        // Read current wchar string
+                        multiple_strings.emplace_back(
+                            drakvuf_read_wchar_string(vmi_lg.vmi, &ctx),
+                        [](unicode_string_t* p) { vmi_free_unicode_str(p); }
+                        );
+                        ctx.addr = data_addr + i + 2;
+                    }
+
+                    if ((value_dword == 0) && ((i + 4) >= data_bytes.size()))
+                        break;
+                }
+            }
+
+            number_of_strings = multiple_strings.size() + 1;
+            strings = (char**)g_malloc0(sizeof(char*) * number_of_strings);
+
+            for (size_t i = 0; i < multiple_strings.size(); ++i)
+            {
+                size_t quoted_str_len = multiple_strings[i]->length + 3;
+                strings[i] = (char*)g_malloc0(quoted_str_len);
+                snprintf(strings[i], quoted_str_len, "'%s'", multiple_strings[i]->contents);
+            }
+            spacer = ",";
+        }
+        else
+        {
+            const size_t bytes_an_item = 2;
+            number_of_strings = data_bytes.size() + 1;
+            strings = (char**)g_malloc0(sizeof(char*) * number_of_strings);
+
+            for (size_t i = 0; i < data_bytes.size(); ++i)
+            {
+                strings[i] = (char*)g_malloc0(bytes_an_item + 1);
+                snprintf(strings[i], bytes_an_item + 1, "%02x", (int)(data_bytes[i] & 0xff));
+            }
+            spacer = " ";
+        }
+
+        data_us->contents = (uint8_t*)g_strjoinv(spacer, strings);
+        data_us->length = std::strlen((char*)data_us->contents) + 1;
+
+        for (size_t i = 0; i < number_of_strings; ++i)
+            if (strings[i])
+                g_free(strings[i]);
+        g_free(strings);
+    }
+
+    return log_reg_hook( drakvuf, info, key_handle_addr, value_name_addr, true, data_us );
+}
+
 static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
                            drakvuf_trap_t* trap,
                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
@@ -290,7 +437,7 @@ regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 
     assert(sizeof(traps) / sizeof(traps[0]) > 13);
     register_trap(drakvuf, rekall_profile, "NtDeleteKey",            &traps[0], log_reg_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtSetValueKey",          &traps[1], log_reg_value_hook_cb);
+    register_trap(drakvuf, rekall_profile, "NtSetValueKey",          &traps[1], log_reg_set_value_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtDeleteValueKey",       &traps[2], log_reg_value_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtCreateKey",            &traps[3], log_reg_objattr_hook_cb);
     register_trap(drakvuf, rekall_profile, "NtCreateKeyTransacted",  &traps[4], log_reg_objattr_hook_cb);
