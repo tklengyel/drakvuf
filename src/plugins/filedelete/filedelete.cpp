@@ -207,14 +207,12 @@ static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_
                                  addr_t handle,
                                  addr_t* out_file, addr_t* out_filetype)
 {
-    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
-
     // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
 
-    if (!process)
+    if (!info->proc_data.base_addr)
         return {};
 
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
 
     if (!obj)
         return {};
@@ -789,7 +787,7 @@ static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     injector->target_cr3 = info->regs->cr3;
     injector->curr_sequence_number = -1;
 
-    injector->eprocess_base = drakvuf_get_current_process(drakvuf, info->vcpu);
+    injector->eprocess_base = info->proc_data.base_addr;
     if ( 0 == injector->eprocess_base )
     {
         PRINT_DEBUG("[FILEDELETE2] Failed to get process base on vCPU 0x%d\n",
