@@ -1579,15 +1579,14 @@ static int set_trap_universal(socketmon_trapinfo& ti, socketmon* f, drakvuf_t dr
     auto response = 0;
     addr_t exec_func = 0;
 
-    auto eprocess_base = drakvuf_get_current_process(drakvuf, info->vcpu);
-    if ( 0 == eprocess_base )
+    if ( 0 == info->proc_data.base_addr )
     {
         PRINT_DEBUG("[SOCKETMON] Failed to get process base on vCPU 0x%d\n",
                     info->vcpu);
         goto err;
     }
 
-    exec_func = drakvuf_exportsym_to_va(drakvuf, eprocess_base, ti.lib, ti.fun);
+    exec_func = drakvuf_exportsym_to_va(drakvuf, info->proc_data.base_addr, ti.lib, ti.fun);
     if (!exec_func)
     {
         PRINT_DEBUG("[SOCKETMON] Failed to get address of %s!%s\n", ti.lib, ti.fun);
