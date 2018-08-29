@@ -201,10 +201,9 @@ static void print_process_creation_result(
 
 static vmi_pid_t get_pid_from_handle(procmon* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)
 {
-    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
-    if (!process) return 0;
+    if (!info->proc_data.base_addr ) return 0;
 
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
     if (!obj) return 0;
 
     addr_t eprocess_base = obj + f->object_header_body;
