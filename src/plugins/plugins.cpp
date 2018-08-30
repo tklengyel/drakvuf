@@ -112,6 +112,7 @@
 #include "exmon/exmon.h"
 #include "ssdtmon/ssdtmon.h"
 #include "debugmon/debugmon.h"
+#include "delaymon/delaymon.h"
 #include "cpuidmon/cpuidmon.h"
 #include "socketmon/socketmon.h"
 #include "regmon/regmon.h"
@@ -185,6 +186,11 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #ifdef ENABLE_PLUGIN_DEBUGMON
                 case PLUGIN_DEBUGMON:
                     this->plugins[plugin_id] = new debugmon(this->drakvuf, config, this->output);
+                    break;
+#endif
+#ifdef ENABLE_PLUGIN_DELAYMON
+                case PLUGIN_DELAYMON:
+                    this->plugins[plugin_id] = new delaymon(this->drakvuf, config, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_CPUIDMON
