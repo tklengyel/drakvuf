@@ -147,18 +147,23 @@ struct argument
     uint32_t type;
     uint32_t size;
     uint64_t data_on_stack;
-    union
-    {
-        uint32_t* data_32;
-        uint64_t* data_64;
-    };
+    void* data;
 };
 
-void init_argument(bool is32bit,
-                   struct argument* arg,
-                   argument_type_t type,
-                   size_t size,
-                   void* data);
+static inline
+void init_argument(
+    struct argument* arg,
+    argument_type_t type,
+    size_t size,
+    void* data)
+{
+    arg->type = type;
+    arg->size = size;
+
+    arg->data = data;
+
+    arg->data_on_stack = 0;
+}
 
 bool setup_stack_32(vmi_instance_t vmi,
                     drakvuf_trap_info_t* info,

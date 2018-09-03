@@ -174,9 +174,9 @@ static char* win_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_
 }
 
 
-static char* win_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t p_key_body )
+static gchar* win_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t p_key_body )
 {
-    char* buf_ret = NULL ;
+    gchar* buf_ret = NULL ;
     status_t vmi_status ;
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t p_key_control_block = 0 ;
@@ -192,7 +192,6 @@ static char* win_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     if ( ( vmi_status == VMI_SUCCESS ) && p_key_control_block )
     {
         GSList* key_path_list = NULL ;
-        int tot_len = 0;
 
         while ( ( vmi_status == VMI_SUCCESS ) && p_key_control_block )
         {
@@ -201,7 +200,6 @@ static char* win_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
             if ( key_path )
             {
                 key_path_list = g_slist_prepend( key_path_list, key_path );
-                tot_len += strlen( key_path );
             }
             else
                 break ;
@@ -211,24 +209,14 @@ static char* win_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
             vmi_status = vmi_read_addr( vmi, &ctx, &p_key_control_block );
         }
 
-        if ( tot_len )
+        if ( key_path_list )
         {
-            tot_len += g_slist_length( key_path_list ) + 1 ;
-
-            buf_ret = (char*)g_malloc0( tot_len ) ;
-
-            if ( buf_ret )
+            GSList* iterator;
+            buf_ret = "";
+            for ( iterator = key_path_list; iterator ; iterator = iterator->next )
             {
-                GSList* iterator ;
-
-                *buf_ret = 0 ;
-
-                for ( iterator = key_path_list; iterator ; iterator = iterator->next )
-                {
-                    strcat( buf_ret, "\\" );
-                    strcat( buf_ret, (char*)iterator->data );
-                    g_free( iterator->data );
-                }
+                buf_ret = g_strconcat( buf_ret, "\\", (char*)iterator->data, NULL );
+                g_free( iterator->data );
             }
         }
 
@@ -239,7 +227,7 @@ static char* win_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 }
 
 
-char* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t key_handle, addr_t process_arg )
+gchar* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t key_handle, addr_t process_arg )
 {
     addr_t process = process_arg ;
 

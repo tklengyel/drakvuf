@@ -405,10 +405,10 @@ bool drakvuf_get_current_process_data( drakvuf_t drakvuf,
                                        uint64_t vcpu_id,
                                        proc_data_t* proc_data );
 
-char* drakvuf_reg_keyhandle_path( drakvuf_t drakvuf,
+gchar* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf,
                                   drakvuf_trap_info_t* info,
                                   addr_t key_handle,
-                                  addr_t process_arg );
+                                  addr_t process_arg);
 
 char* drakvuf_get_filename_from_handle( drakvuf_t drakvuf,
                                         drakvuf_trap_info_t* info,

@@ -196,6 +196,16 @@ if test x$plugin_debugmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_DEBUGMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_delaymon],
+  [AS_HELP_STRING([--disable-plugin-delaymon],
+    [Enable the debug exception watching plugin @<:@yes@:>@])],
+  [plugin_delaymon="$enableval"],
+  [plugin_delaymon="yes"])
+AM_CONDITIONAL([PLUGIN_DELAYMON], [test x$plugin_delaymon = xyes])
+if test x$plugin_delaymon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_DELAYMON, 1, "")
+fi
+
 AC_ARG_ENABLE([plugin_cpuidmon],
   [AS_HELP_STRING([--disable-plugin-cpuidmon],
     [Enable the CPUID watching plugin @<:@yes@:>@])],
