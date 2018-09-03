@@ -541,24 +541,6 @@ err:
     return 0;
 }
 
-void init_argument(
-    bool is32bit,
-    struct argument* arg,
-    argument_type_t type,
-    size_t size,
-    void* data)
-{
-    arg->type = type;
-    arg->size = size;
-
-    if (is32bit)
-        arg->data_32 = data;
-    else
-        arg->data_64 = data;
-
-    arg->data_on_stack = 0;
-}
-
 int patch_payload(struct injector* injector, unsigned char* addr)
 {
     // First byte at which each variable instanciation start in the shellcode.
@@ -746,10 +728,10 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
                 size += injector->binary_size;
 
             // VirtualAlloc(NULL, size, allocation_type, protect);
-            init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)size);
-            init_argument(0, &args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)allocation_type);
-            init_argument(0, &args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)protect);
+            init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)size);
+            init_argument(&args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)allocation_type);
+            init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)protect);
 
             if ( !setup_stack_64(injector->vmi, info, &ctx, args, 4) )
                 goto err;
@@ -766,10 +748,10 @@ bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
                 size += injector->binary_size;
 
             // memset(payload_addr, c, payload_size);
-            init_argument(0, &args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->payload_addr);
-            init_argument(0, &args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)c);
-            init_argument(0, &args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)size);
-            init_argument(0, &args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->payload_addr);
+            init_argument(&args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)c);
+            init_argument(&args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)size);
+            init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
 
             if ( !setup_stack_64(injector->vmi, info, &ctx, args, 4) )
                 return 0;
