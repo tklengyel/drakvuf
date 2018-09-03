@@ -183,6 +183,16 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     break;
                 }
 
+                case PLUGIN_BSODMON:
+                {
+                    struct bsodmon_config c =
+                    {
+                        .rekall_profile = this->rekall_profile,
+                    };
+                    rc = this->plugins->start((drakvuf_plugin_t)i, &c);
+                    break;
+                }
+
                 default:
                     rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
                     break;
