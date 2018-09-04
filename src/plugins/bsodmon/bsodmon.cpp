@@ -202,7 +202,8 @@ bsodmon::bsodmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     is32bit = vmi_get_page_mode(vmi, 0) != VMI_PM_IA32E;
     drakvuf_release_vmi(drakvuf);
 
-    register_trap(drakvuf, c->rekall_profile, "KeBugCheckEx", &traps[0], hook_cb);
     if (is32bit)
-        register_trap(drakvuf, c->rekall_profile, "KeBugCheck", &traps[1], hook_cb);
+        register_trap(drakvuf, c->rekall_profile, "KeBugCheck2", &trap, hook_cb);
+    else
+        register_trap(drakvuf, c->rekall_profile, "KeBugCheckEx", &trap, hook_cb);
 }
