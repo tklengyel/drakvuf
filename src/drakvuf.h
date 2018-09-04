@@ -167,7 +167,7 @@ public:
     void loop();
     void pause();
     void resume();
-    int inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, const char* cwd, injection_method_t method, output_format_t format);
+    int inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, const char* cwd, injection_method_t method, output_format_t format, const char* binary_path, const char* target_process);
     int start_plugins(const bool* plugin_list,
                       const char* dump_folder,
                       bool dump_modified_files,

@@ -139,6 +139,8 @@ int main(int argc, char** argv)
     char* dump_folder = NULL;
     char* start_process_name = NULL;
     char* tcpip = NULL;
+    char* binary_path = NULL;
+    char* target_process = NULL;
     vmi_pid_t injection_pid = -1;
     uint32_t injection_thread = 0;
     struct sigaction act;
@@ -169,7 +171,9 @@ int main(int argc, char** argv)
                 "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
                 "\t -e <inject_file>          The executable to start with injection\n"
                 "\t -c <current_working_dir>  The current working directory for injected executable\n"
-                "\t -m <inject_method>        The injection method (createproc, shellexec or shellcode for Windows amd64 only)\n"
+                "\t -m <inject_method>        The injection method (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
+                "\t [-B] <path>               The host path of the windows binary to inject (requires -m doppelganging)\n"
+                "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
                 "\t -t <timeout>              Timeout (in seconds)\n"
                 "\t -o <format>               Output format (default or csv)\n"
                 "\t -x <plugin>               Don't activate the specified plugin\n"
@@ -224,6 +228,14 @@ int main(int argc, char** argv)
                     injection_method = INJECT_METHOD_CREATEPROC;
                 if (!strncmp(optarg,"shellcode",9))
                     injection_method = INJECT_METHOD_SHELLCODE;
+                if (!strncmp(optarg,"doppelganging",13))
+                    injection_method = INJECT_METHOD_DOPP;
+                break;
+            case 'B':
+                binary_path = optarg;
+                break;
+            case 'P':
+                target_process = optarg;
                 break;
             case 't':
                 timeout = atoi(optarg);
@@ -283,6 +295,12 @@ int main(int argc, char** argv)
         return rc;
     }
 
+    if ( INJECT_METHOD_DOPP == injection_method && (!binary_path || !target_process) )
+    {
+        fprintf(stderr, "Missing parameters for process doppelganging injection (-B and -P)!\n");
+        return rc;
+    }
+
     PRINT_DEBUG("Starting DRAKVUF initialization\n");
 
     try
@@ -309,7 +327,7 @@ int main(int argc, char** argv)
     if ( injection_pid > 0 && inject_file )
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output);
+        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process);
         if (!ret)
             goto exit;
     }
