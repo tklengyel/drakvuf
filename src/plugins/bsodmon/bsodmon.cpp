@@ -110,37 +110,99 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     bsodmon* f = static_cast<bsodmon*>(info->trap->data);
 
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    uint64_t code = 0;
+    uint64_t params[4] = { 0 };
+
+    if (f->is32bit)
+    {
+        ctx.addr = info->regs->rsp + 4;
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&code) )
+            goto done;
+
+        ctx.addr = info->regs->rsp + 8;
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[0]) )
+            goto done;
+
+        ctx.addr = info->regs->rsp + 0xc;
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[1]) )
+            goto done;
+
+        ctx.addr = info->regs->rsp + 0x10;
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[2]) )
+            goto done;
+
+        ctx.addr = info->regs->rsp + 0x14;
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[3]) )
+            goto done;
+    }
+    else
+    {
+        code = info->regs->rcx;
+        params[0] = info->regs->rdx;
+        params[1] = info->regs->r8;
+        params[2] = info->regs->r9;
+
+        ctx.addr = info->regs->rsp + 0x20;
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[3]) )
+            goto done;
+    }
+
     switch (f->format)
     {
         case OUTPUT_CSV:
-            printf("bsodmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 "\n",
+            printf("bsodmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%" PRIx64
+                   ",%" PRIx64 ",%" PRIx64 ",%" PRIx64 ",%" PRIx64 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid);
+                   info->proc_data.userid, code, params[0], params[1], params[2], params[3]);
             break;
         case OUTPUT_KV:
-            printf("bsodmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name);
+            printf("bsodmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",BugCheckCode=%" PRIx64
+                   ",BugCheckParameter1=%" PRIx64 ",BugCheckParameter2=%" PRIx64 ",BugCheckParameter2=%" PRIx64
+                   ",BugCheckParameter4=%" PRIx64 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, code, params[0], params[1], params[2], params[3]);
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[BSODMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64"\n",
+            printf("[BSODMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64
+                   " BugCheckCode:%" PRIx64 " BugCheckParameter1:%" PRIx64 " BugCheckParameter2:%" PRIx64
+                   " BugCheckParameter3:%" PRIx64 " BugCheckParameter4:%" PRIx64 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid);
+                   USERIDSTR(drakvuf), info->proc_data.userid, code, params[0], params[1], params[2], params[3]);
             break;
     }
+
+done:
+    drakvuf_release_vmi(drakvuf);
 
     return 0;
 }
 
-bsodmon::bsodmon(drakvuf_t drakvuf, const void *config, output_format_t output)
+void bsodmon::register_trap(drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
+                            drakvuf_trap_t* trap,
+                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ))
+{
+    trap->name = syscall_name;
+    trap->cb   = hook_cb;
+    if ( !drakvuf_get_function_rva( rekall_profile, syscall_name, &trap->breakpoint.rva) ) throw -1;
+    if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
+}
+
+bsodmon::bsodmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     : format(output)
 {
     const struct filedelete_config* c = static_cast<const struct filedelete_config*>(config);
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    is32bit = vmi_get_page_mode(vmi, 0) != VMI_PM_IA32E;
+    drakvuf_release_vmi(drakvuf);
 
-    if ( !drakvuf_get_function_rva( c->rekall_profile, "KeBugCheckEx", &trap.breakpoint.rva) ) throw -1;
-
-    trap.name = "KeBugCheckEx";
-    trap.cb   = hook_cb;
-
-    if ( ! drakvuf_add_trap( drakvuf, &trap ) ) throw -1;
+    register_trap(drakvuf, c->rekall_profile, "KeBugCheckEx", &traps[0], hook_cb);
+    if (is32bit)
+        register_trap(drakvuf, c->rekall_profile, "KeBugCheck", &traps[1], hook_cb);
 }

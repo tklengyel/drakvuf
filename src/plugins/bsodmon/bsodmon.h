@@ -112,19 +112,26 @@ class bsodmon : public plugin
 {
 public:
     const output_format_t format;
+    bool is32bit;
 
     bsodmon(drakvuf_t drakvuf, const void* config, output_format_t output);
 
 private:
-    drakvuf_trap_t trap =
+    drakvuf_trap_t traps[2] =
     {
+        [0 ... 1] = {
             .breakpoint.lookup_type = LOOKUP_PID,
             .breakpoint.pid = 4,
             .breakpoint.addr_type = ADDR_RVA,
             .breakpoint.module = "ntoskrnl.exe",
             .type = BREAKPOINT,
             .data = (void*)this
+        }
     };
+
+    void register_trap(drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
+                       drakvuf_trap_t* trap,
+                       event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ));
 };
 
 #endif // BSODMON_H
