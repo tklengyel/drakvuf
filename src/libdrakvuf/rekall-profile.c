@@ -332,7 +332,7 @@ int drakvuf_get_os_build_date(const char* rekall_profile)
 
     // At this point timestamp should have the following format : "2018-07-14 03:53:24Z"
     sscanf(ts, "%d%c%d%c%d %15s", &year, junk, &month, junk, &day, junk);
-    sprintf(build_date, "%d%02d%02d", year, month, day);
+    g_snprintf(build_date, sizeof(build_date), "%04d%02d%02d", year, month, day);
 
     ret = (int)strtol(build_date, NULL, 10);
 
