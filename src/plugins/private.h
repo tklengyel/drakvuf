@@ -120,7 +120,7 @@ extern bool verbose;
 
 #define PRINT_DEBUG(...) \
     do { \
-        if(verbose) fprintf (stderr, __VA_ARGS__); \
+        if(verbose) { eprint_current_time(); fprintf (stderr, __VA_ARGS__); } \
     } while (0)
 
 #else

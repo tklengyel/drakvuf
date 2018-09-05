@@ -114,25 +114,19 @@
 /***************************************************************************/
 
 /* Plugin-specific configuration input */
-struct bsodmon_config
-{
-    const char* rekall_profile;
-};
 struct filedelete_config
 {
-    const char* rekall_profile;
     const char* dump_folder;
     bool dump_modified_files;
     bool filedelete_use_injector;
 };
 struct socketmon_config
 {
-    const char* rekall_profile;
     const char* tcpip_profile;
+    json_object* tcpip_profile_json;
 };
 struct syscalls_config
 {
-    const char* rekall_profile;
     const char* syscalls_filter_file;
 };
 

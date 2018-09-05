@@ -153,10 +153,12 @@ int main(int argc, char** argv)
     bool dump_modified_files = false;
     bool filedelete_use_injector = false;
 
+    eprint_current_time();
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
 
     if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 )
     {
+        eprint_current_time();
         fprintf(stderr, "No plugins have been enabled, nothing to do!\n");
         return rc;
     }

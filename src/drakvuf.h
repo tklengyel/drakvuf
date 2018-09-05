@@ -125,7 +125,7 @@ extern bool verbose;
 #define UNUSED(x) (void)(x)
 #define PRINT_DEBUG(...) \
     do { \
-        if(verbose) fprintf (stderr, __VA_ARGS__); \
+        if(verbose) { eprint_current_time(); fprintf (stderr, __VA_ARGS__); } \
     } while (0)
 
 #else
@@ -141,7 +141,6 @@ private:
     drakvuf_plugins* plugins;
     GThread* timeout_thread = NULL;
     GThread* timeout_thread2 = NULL;
-    const char* rekall_profile;
     os_t os;
 
 public:

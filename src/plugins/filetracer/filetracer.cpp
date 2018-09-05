@@ -331,11 +331,11 @@ static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
 /* ----------------------------------------------------- */
 
-static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
+static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
                            drakvuf_trap_t* trap,
                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
-    if ( !drakvuf_get_function_rva( rekall_profile, syscall_name, &trap->breakpoint.rva) ) throw -1;
+    if ( !drakvuf_get_function_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
 
     trap->name = syscall_name;
     trap->cb   = hook_cb;
@@ -345,13 +345,12 @@ static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const 
 
 filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
-    const char* rekall_profile = (const char*)config;
     int addr_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
     this->format = output;
 
-    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
+    if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
         throw -1;
-    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
+    if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
         throw -1;
     // Offset of the RootDirectory field in _FILE_RENAME_INFORMATION structure
     this->newfile_root_offset = addr_size;
@@ -361,16 +360,16 @@ filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t ou
     this->newfile_name_length_offset = addr_size * 2;
 
     assert(sizeof(trap)/sizeof(trap[0]) > 9);
-    register_trap(drakvuf, rekall_profile, "NtCreateFile",          &trap[0], cb);
-    register_trap(drakvuf, rekall_profile, "ZwCreateFile",          &trap[1], cb);
-    register_trap(drakvuf, rekall_profile, "NtOpenFile",            &trap[2], cb);
-    register_trap(drakvuf, rekall_profile, "ZwOpenFile",            &trap[3], cb);
-    register_trap(drakvuf, rekall_profile, "NtOpenDirectoryObject", &trap[4], cb);
-    register_trap(drakvuf, rekall_profile, "ZwOpenDirectoryObject", &trap[5], cb);
-    register_trap(drakvuf, rekall_profile, "NtQueryAttributesFile", &trap[6], cb2);
-    register_trap(drakvuf, rekall_profile, "ZwQueryAttributesFile", &trap[7], cb2);
-    register_trap(drakvuf, rekall_profile, "NtSetInformationFile",  &trap[8], setinformation_cb);
-    register_trap(drakvuf, rekall_profile, "ZwSetInformationFile",  &trap[9], setinformation_cb);
+    register_trap(drakvuf, "NtCreateFile",          &trap[0], cb);
+    register_trap(drakvuf, "ZwCreateFile",          &trap[1], cb);
+    register_trap(drakvuf, "NtOpenFile",            &trap[2], cb);
+    register_trap(drakvuf, "ZwOpenFile",            &trap[3], cb);
+    register_trap(drakvuf, "NtOpenDirectoryObject", &trap[4], cb);
+    register_trap(drakvuf, "ZwOpenDirectoryObject", &trap[5], cb);
+    register_trap(drakvuf, "NtQueryAttributesFile", &trap[6], cb2);
+    register_trap(drakvuf, "ZwQueryAttributesFile", &trap[7], cb2);
+    register_trap(drakvuf, "NtSetInformationFile",  &trap[8], setinformation_cb);
+    register_trap(drakvuf, "ZwSetInformationFile",  &trap[9], setinformation_cb);
 }
 
 filetracer::~filetracer()

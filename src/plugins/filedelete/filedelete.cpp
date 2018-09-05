@@ -1033,11 +1033,11 @@ done:
 }
 
 
-static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
+static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
                            drakvuf_trap_t* trap,
                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
-    if ( !drakvuf_get_function_rva( rekall_profile, syscall_name, &trap->breakpoint.rva) ) throw -1;
+    if ( !drakvuf_get_function_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
 
     trap->name = syscall_name;
     trap->cb   = hook_cb;
@@ -1045,10 +1045,10 @@ static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const 
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }
 
-static addr_t get_function_va(drakvuf_t drakvuf, const char* rekall_profile, const char* lib, const char* func_name)
+static addr_t get_function_va(drakvuf_t drakvuf, const char* lib, const char* func_name)
 {
     addr_t rva;
-    if ( !drakvuf_get_function_rva( rekall_profile, func_name, &rva) )
+    if ( !drakvuf_get_function_rva( drakvuf, func_name, &rva) )
     {
         PRINT_DEBUG("[FILEDELETE2] [Init] Failed to get RVA of %s\n", func_name);
         throw -1;
@@ -1080,35 +1080,32 @@ filedelete::filedelete(drakvuf_t drakvuf, const void* config, output_format_t ou
     if (!this->use_injector)
     {
         assert(sizeof(traps)/sizeof(traps[0]) > 2);
-        register_trap(drakvuf, c->rekall_profile, "NtSetInformationFile", &traps[0], setinformation_cb);
-        register_trap(drakvuf, c->rekall_profile, "NtWriteFile",          &traps[1], writefile_cb);
-        register_trap(drakvuf, c->rekall_profile, "NtClose",              &traps[2], close_cb);
+        register_trap(drakvuf, "NtSetInformationFile", &traps[0], setinformation_cb);
+        register_trap(drakvuf, "NtWriteFile",          &traps[1], writefile_cb);
+        register_trap(drakvuf, "NtClose",              &traps[2], close_cb);
         /* TODO
-        register_trap(drakvuf, c->rekall_profile, "NtDeleteFile",            &traps[3], deletefile_cb);
-        register_trap(drakvuf, c->rekall_profile, "ZwDeleteFile",            &traps[4], deletefile_cb); */
+        register_trap(drakvuf, "NtDeleteFile",            &traps[3], deletefile_cb);
+        register_trap(drakvuf, "ZwDeleteFile",            &traps[4], deletefile_cb); */
     }
     else
     {
-        this->queryobject_va = get_function_va(drakvuf, c->rekall_profile, "ntoskrnl.exe", "ZwQueryVolumeInformationFile");
-        this->readfile_va = get_function_va(drakvuf, c->rekall_profile, "ntoskrnl.exe", "ZwReadFile");
-        this->waitobject_va = get_function_va(drakvuf, c->rekall_profile, "ntoskrnl.exe", "ZwWaitForSingleObject");
+        this->queryobject_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryVolumeInformationFile");
+        this->readfile_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwReadFile");
+        this->waitobject_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwWaitForSingleObject");
 
         assert(sizeof(traps)/sizeof(traps[0]) > 3);
-        register_trap(drakvuf, c->rekall_profile, "NtSetInformationFile", &traps[0], setinformation_cb);
-        register_trap(drakvuf, c->rekall_profile, "NtWriteFile",          &traps[1], writefile_cb);
-        register_trap(drakvuf, c->rekall_profile, "NtClose",              &traps[2], close_cb);
-        register_trap(drakvuf, c->rekall_profile, "ZwCreateSection",      &traps[3], createsection_cb);
+        register_trap(drakvuf, "NtSetInformationFile", &traps[0], setinformation_cb);
+        register_trap(drakvuf, "NtWriteFile",          &traps[1], writefile_cb);
+        register_trap(drakvuf, "NtClose",              &traps[2], close_cb);
+        register_trap(drakvuf, "ZwCreateSection",      &traps[3], createsection_cb);
     }
 
     this->offsets = (size_t*)malloc(sizeof(size_t)*__OFFSET_MAX);
 
-    for (int i=0; i<__OFFSET_MAX; i++)
-    {
-        if ( !drakvuf_get_struct_member_rva(c->rekall_profile, offset_names[i][0], offset_names[i][1], &this->offsets[i]))
-            throw -1;
-    }
+    if ( !drakvuf_get_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, this->offsets) )
+        throw -1;
 
-    if ( !drakvuf_get_struct_size(c->rekall_profile, "_CONTROL_AREA", &this->control_area_size) )
+    if ( !drakvuf_get_struct_size(drakvuf, "_CONTROL_AREA", &this->control_area_size) )
         throw -1;
 
     if ( VMI_PM_LEGACY == this->pm )
