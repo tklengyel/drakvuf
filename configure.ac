@@ -246,6 +246,16 @@ if test x$plugin_procmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PROCMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_bsodmon],
+  [AS_HELP_STRING([--disable-plugin-bsodmon],
+    [Enable the windows kernel bugcheck watching plugin @<:@yes@:>@])],
+  [plugin_bsodmon="$enableval"],
+  [plugin_bsodmon="yes"])
+AM_CONDITIONAL([PLUGIN_BSODMON], [test x$plugin_bsodmon = xyes])
+if test x$plugin_bsodmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_BSODMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -420,4 +430,5 @@ Debugmon:   $plugin_debugmon
 Socketmon:  $plugin_socketmon
 Regmon:     $plugin_regmon
 Procmon:    $plugin_procmon
+BSODmon:    $plugin_bsodmon
 -------------------------------------------------------------------------------])
