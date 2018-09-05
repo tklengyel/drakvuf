@@ -1650,14 +1650,13 @@ static event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
     const struct socketmon_config* c = (const struct socketmon_config*)config;
-    const char* tcpip_profile = c->tcpip_profile;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->pm = vmi_get_page_mode(vmi, 0);
     this->winver = vmi_get_winver(vmi);
     drakvuf_release_vmi(drakvuf);
     this->format = output;
 
-    if ( !tcpip_profile )
+    if ( !c->tcpip_profile_json )
     {
         PRINT_DEBUG("Socketmon plugin requires the Rekall profile for tcpip.sys!\n");
         return;
@@ -1729,19 +1728,19 @@ socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t outp
     this->trap[5].cb = udpb_cb;
     this->trap[6].cb = tcpl_cb;
 
-    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpTcbDelay", &this->trap[0].breakpoint.rva) )
+    if ( !rekall_get_function_rva(c->tcpip_profile_json, "TcpTcbDelay", &this->trap[0].breakpoint.rva) )
         throw -1;
-    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpFinAcknowledged", &this->trap[1].breakpoint.rva) )
+    if ( !rekall_get_function_rva(c->tcpip_profile_json, "TcpFinAcknowledged", &this->trap[1].breakpoint.rva) )
         throw -1;
-    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpDisconnectTcb", &this->trap[2].breakpoint.rva) )
+    if ( !rekall_get_function_rva(c->tcpip_profile_json, "TcpDisconnectTcb", &this->trap[2].breakpoint.rva) )
         throw -1;
-    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpShutdownTcb", &this->trap[3].breakpoint.rva) )
+    if ( !rekall_get_function_rva(c->tcpip_profile_json, "TcpShutdownTcb", &this->trap[3].breakpoint.rva) )
         throw -1;
-    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpSetSockOptTcb", &this->trap[4].breakpoint.rva) )
+    if ( !rekall_get_function_rva(c->tcpip_profile_json, "TcpSetSockOptTcb", &this->trap[4].breakpoint.rva) )
         throw -1;
-    if ( !drakvuf_get_function_rva(tcpip_profile, "UdpSetSockOptEndpoint", &this->trap[5].breakpoint.rva) )
+    if ( !rekall_get_function_rva(c->tcpip_profile_json, "UdpSetSockOptEndpoint", &this->trap[5].breakpoint.rva) )
         throw -1;
-    if ( !drakvuf_get_function_rva(tcpip_profile, "TcpCreateListenerWorkQueueRoutine", &this->trap[6].breakpoint.rva) )
+    if ( !rekall_get_function_rva(c->tcpip_profile_json, "TcpCreateListenerWorkQueueRoutine", &this->trap[6].breakpoint.rva) )
         throw -1;
 
     if ( !drakvuf_add_trap(drakvuf, &this->trap[0]) )

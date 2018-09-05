@@ -392,11 +392,11 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
     return terminate_process_hook(drakvuf, info, process_handle, exit_status);
 }
 
-static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
+static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
                            drakvuf_trap_t* trap,
                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
-    if ( !drakvuf_get_function_rva( rekall_profile, syscall_name, &trap->breakpoint.rva) ) throw -1;
+    if ( !drakvuf_get_function_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
 
     trap->name = syscall_name;
     trap->cb   = hook_cb;
@@ -408,33 +408,31 @@ static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const 
 procmon::procmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     : result_traps {}
 {
-    const char* rekall_profile = (const char*)config;
-
     this->format = output;
 
-    if (!drakvuf_get_struct_member_rva(rekall_profile, "_RTL_USER_PROCESS_PARAMETERS", "CommandLine", &this->command_line))
+    if (!drakvuf_get_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "CommandLine", &this->command_line))
         throw -1;
-    if (!drakvuf_get_struct_member_rva(rekall_profile, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &this->image_path_name))
+    if (!drakvuf_get_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &this->image_path_name))
         throw -1;
-    if (!drakvuf_get_struct_member_rva(rekall_profile, "_RTL_USER_PROCESS_PARAMETERS", "DllPath", &this->dll_path))
+    if (!drakvuf_get_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "DllPath", &this->dll_path))
         throw -1;
     addr_t current_directory_offset;
-    if (!drakvuf_get_struct_member_rva(rekall_profile, "_RTL_USER_PROCESS_PARAMETERS", "CurrentDirectory", &current_directory_offset))
+    if (!drakvuf_get_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "CurrentDirectory", &current_directory_offset))
         throw -1;
     addr_t curdir_handle_offset;
-    if (!drakvuf_get_struct_member_rva(rekall_profile, "_CURDIR", "Handle", &curdir_handle_offset))
+    if (!drakvuf_get_struct_member_rva(drakvuf, "_CURDIR", "Handle", &curdir_handle_offset))
         throw -1;
     addr_t curdir_dospath_offset;
-    if (!drakvuf_get_struct_member_rva(rekall_profile, "_CURDIR", "DosPath", &curdir_dospath_offset))
+    if (!drakvuf_get_struct_member_rva(drakvuf, "_CURDIR", "DosPath", &curdir_dospath_offset))
         throw -1;
     this->current_directory_handle = current_directory_offset + curdir_handle_offset;
     this->current_directory_dospath = current_directory_offset + curdir_dospath_offset;
-    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_HEADER", "Body", &this->object_header_body) )
+    if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_HEADER", "Body", &this->object_header_body) )
         throw -1;
 
     assert(sizeof(traps) / sizeof(traps[0]) > 1);
-    register_trap(drakvuf, rekall_profile, "NtCreateUserProcess", &traps[0], create_user_process_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtTerminateProcess", &traps[1], terminate_process_hook_cb);
+    register_trap(drakvuf, "NtCreateUserProcess", &traps[0], create_user_process_hook_cb);
+    register_trap(drakvuf, "NtTerminateProcess", &traps[1], terminate_process_hook_cb);
 }
 
 procmon::~procmon()

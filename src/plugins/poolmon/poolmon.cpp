@@ -230,14 +230,13 @@ done:
 
 poolmon::poolmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
-    const char* rekall_profile = (const char*)config;
     this->pooltag_tree = pooltag_build_tree();
 
     this->trap.breakpoint.lookup_type = LOOKUP_PID;
     this->trap.breakpoint.pid = 4;
     this->trap.breakpoint.addr_type = ADDR_RVA;
 
-    if ( !drakvuf_get_function_rva(rekall_profile,"ExAllocatePoolWithTag", &this->trap.breakpoint.rva) )
+    if ( !drakvuf_get_function_rva(drakvuf,"ExAllocatePoolWithTag", &this->trap.breakpoint.rva) )
         throw -1;
 
     this->trap.breakpoint.module = "ntoskrnl.exe";

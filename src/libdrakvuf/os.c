@@ -115,21 +115,14 @@
 
 bool fill_offsets_from_rekall(drakvuf_t drakvuf, size_t size, const char* names [][2])
 {
-    unsigned int i;
-
     drakvuf->offsets = g_malloc0(sizeof(addr_t) * size );
     if ( !drakvuf->offsets )
         return 0;
 
-    for (i = 0; i < size; i++)
+    if (!drakvuf_get_struct_members_array_rva(
+                drakvuf, names, size, drakvuf->offsets))
     {
-        if (!drakvuf_get_struct_member_rva(
-                    drakvuf->rekall_profile, names[i][0],
-                    names[i][1], &drakvuf->offsets[i]))
-        {
-            PRINT_DEBUG("Failed to find offset for %s:%s\n",
-                        names[i][0], names[i][1]);
-        }
+        PRINT_DEBUG("Failed to find offsets for array of structure names and subsymbols.\n");
     }
 
     return 1;

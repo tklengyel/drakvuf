@@ -184,26 +184,25 @@ done:
     return 0;
 }
 
-void bsodmon::register_trap(drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
+void bsodmon::register_trap(drakvuf_t drakvuf, const char* syscall_name,
                             drakvuf_trap_t* trap,
                             event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ))
 {
     trap->name = syscall_name;
     trap->cb   = hook_cb;
-    if ( !drakvuf_get_function_rva( rekall_profile, syscall_name, &trap->breakpoint.rva) ) throw -1;
+    if ( !drakvuf_get_function_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }
 
 bsodmon::bsodmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     : format(output)
 {
-    const struct filedelete_config* c = static_cast<const struct filedelete_config*>(config);
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     is32bit = vmi_get_page_mode(vmi, 0) != VMI_PM_IA32E;
     drakvuf_release_vmi(drakvuf);
 
     if (is32bit)
-        register_trap(drakvuf, c->rekall_profile, "KeBugCheck2", &trap, hook_cb);
+        register_trap(drakvuf, "KeBugCheck2", &trap, hook_cb);
     else
-        register_trap(drakvuf, c->rekall_profile, "KeBugCheckEx", &trap, hook_cb);
+        register_trap(drakvuf, "KeBugCheckEx", &trap, hook_cb);
 }

@@ -411,11 +411,11 @@ static event_response_t log_reg_set_value_hook_cb( drakvuf_t drakvuf, drakvuf_tr
     return log_reg_hook( drakvuf, info, key_handle_addr, value_name_addr, true, data_us );
 }
 
-static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
+static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
                            drakvuf_trap_t* trap,
                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
-    if ( !drakvuf_get_function_rva( rekall_profile, syscall_name, &trap->breakpoint.rva) ) throw -1;
+    if ( !drakvuf_get_function_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
 
     trap->name = syscall_name;
     trap->cb   = hook_cb;
@@ -426,30 +426,28 @@ static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const 
 
 regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
-    const char* rekall_profile = (const char*)config;
-
     this->format = output;
 
-    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
+    if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
         throw -1;
-    if ( !drakvuf_get_struct_member_rva(rekall_profile, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
+    if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
         throw -1;
 
     assert(sizeof(traps) / sizeof(traps[0]) > 13);
-    register_trap(drakvuf, rekall_profile, "NtDeleteKey",            &traps[0], log_reg_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtSetValueKey",          &traps[1], log_reg_set_value_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtDeleteValueKey",       &traps[2], log_reg_value_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtCreateKey",            &traps[3], log_reg_objattr_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtCreateKeyTransacted",  &traps[4], log_reg_objattr_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtEnumerateKey",         &traps[5], log_reg_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtEnumerateValueKey",    &traps[6], log_reg_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtOpenKey",              &traps[7], log_reg_objattr_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtOpenKeyEx",            &traps[8], log_reg_objattr_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtOpenKeyTransacted",    &traps[9], log_reg_objattr_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtOpenKeyTransactedEx",  &traps[10], log_reg_objattr_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtQueryKey",             &traps[11], log_reg_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtQueryMultipleValueKey",&traps[12], log_reg_hook_cb);
-    register_trap(drakvuf, rekall_profile, "NtQueryValueKey",        &traps[13], log_reg_value_hook_cb);
+    register_trap(drakvuf, "NtDeleteKey",            &traps[0], log_reg_hook_cb);
+    register_trap(drakvuf, "NtSetValueKey",          &traps[1], log_reg_set_value_hook_cb);
+    register_trap(drakvuf, "NtDeleteValueKey",       &traps[2], log_reg_value_hook_cb);
+    register_trap(drakvuf, "NtCreateKey",            &traps[3], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, "NtCreateKeyTransacted",  &traps[4], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, "NtEnumerateKey",         &traps[5], log_reg_hook_cb);
+    register_trap(drakvuf, "NtEnumerateValueKey",    &traps[6], log_reg_hook_cb);
+    register_trap(drakvuf, "NtOpenKey",              &traps[7], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, "NtOpenKeyEx",            &traps[8], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, "NtOpenKeyTransacted",    &traps[9], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, "NtOpenKeyTransactedEx",  &traps[10], log_reg_objattr_hook_cb);
+    register_trap(drakvuf, "NtQueryKey",             &traps[11], log_reg_hook_cb);
+    register_trap(drakvuf, "NtQueryMultipleValueKey",&traps[12], log_reg_hook_cb);
+    register_trap(drakvuf, "NtQueryValueKey",        &traps[13], log_reg_value_hook_cb);
 }
 
 regmon::~regmon(void) {}
