@@ -158,6 +158,10 @@ if PLUGIN_PROCMON
 sources += procmon/procmon.cpp
 endif
 
+if PLUGIN_BSODMON
+sources += bsodmon/bsodmon.cpp
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h
 
