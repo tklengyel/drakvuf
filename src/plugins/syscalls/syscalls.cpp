@@ -376,7 +376,7 @@ exit:
     return 0;
 }
 
-static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* symbols, const char* rekall_profile)
+static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* symbols)
 {
 
     GSList* ret = NULL;
@@ -436,7 +436,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
     {
         addr_t rva = 0;
 
-        if ( !drakvuf_get_constant_rva(rekall_profile, "_text", &rva) )
+        if ( !drakvuf_get_constant_rva(drakvuf, "_text", &rva) )
             return NULL;
 
         addr_t kaslr = drakvuf_get_kernel_base(drakvuf) - rva;
@@ -557,10 +557,10 @@ static symbols_t* filter_symbols(const symbols_t* symbols, const char* filter_fi
 syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
     const struct syscalls_config* c = (const struct syscalls_config*)config;
-    symbols_t* symbols = drakvuf_get_symbols_from_rekall(c->rekall_profile);
+    symbols_t* symbols = drakvuf_get_symbols_from_rekall(drakvuf);
     if (!symbols)
     {
-        fprintf(stderr, "Failed to parse Rekall profile at %s\n", c->rekall_profile);
+        fprintf(stderr, "Failed to get symbols from Rekall profile\n");
         throw -1;
     }
 
@@ -577,7 +577,7 @@ syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output
     }
 
     this->os = drakvuf_get_os_type(drakvuf);
-    this->traps = create_trap_config(drakvuf, this, symbols, c->rekall_profile);
+    this->traps = create_trap_config(drakvuf, this, symbols);
     this->format = output;
 
     if ( !this->traps )

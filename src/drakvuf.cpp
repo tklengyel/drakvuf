@@ -147,7 +147,6 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                 {
                     struct filedelete_config c =
                     {
-                        .rekall_profile = this->rekall_profile,
                         .dump_folder = dump_folder,
                         .dump_modified_files = dump_modified_files,
                         .filedelete_use_injector = filedelete_use_injector,
@@ -165,8 +164,8 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                 {
                     struct socketmon_config c =
                     {
-                        .rekall_profile = this->rekall_profile,
-                        .tcpip_profile = tcpip_profile
+                        .tcpip_profile = tcpip_profile,
+                        .tcpip_profile_json = json_object_from_file(tcpip_profile)
                     };
                     rc = this->plugins->start((drakvuf_plugin_t)i, &c);
                     break;
@@ -176,25 +175,14 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                 {
                     struct syscalls_config c =
                     {
-                        .rekall_profile = this->rekall_profile,
                         .syscalls_filter_file = syscalls_filter_file
                     };
                     rc = this->plugins->start((drakvuf_plugin_t)i, &c);
                     break;
                 }
 
-                case PLUGIN_BSODMON:
-                {
-                    struct bsodmon_config c =
-                    {
-                        .rekall_profile = this->rekall_profile,
-                    };
-                    rc = this->plugins->start((drakvuf_plugin_t)i, &c);
-                    break;
-                }
-
                 default:
-                    rc = this->plugins->start((drakvuf_plugin_t)i, this->rekall_profile);
+                    rc = this->plugins->start((drakvuf_plugin_t)i, NULL);
                     break;
             };
 
@@ -217,7 +205,6 @@ drakvuf_c::drakvuf_c(const char* domain,
     this->interrupted = 0;
     this->timeout = timeout;
     this->process_start_timeout = timeout;
-    this->rekall_profile = rekall_profile;
     this->leave_paused = leave_paused;
     this->process_start_detected = 0;
 

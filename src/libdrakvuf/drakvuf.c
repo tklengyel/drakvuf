@@ -161,8 +161,10 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
 #endif
 
     *drakvuf = g_malloc0(sizeof(struct drakvuf));
+
+    (*drakvuf)->rekall_profile_json = json_object_from_file(rekall_profile);
     (*drakvuf)->rekall_profile = g_strdup(rekall_profile);
-    (*drakvuf)->os = rekall_get_os_type(rekall_profile);
+    (*drakvuf)->os = rekall_get_os_type((*drakvuf)->rekall_profile_json);
 
     g_mutex_init(&(*drakvuf)->vmi_lock);
 
@@ -442,34 +444,85 @@ void drakvuf_force_resume (drakvuf_t drakvuf)
     xen_force_resume(drakvuf->xen, drakvuf->domID);
 }
 
-bool drakvuf_get_struct_size(const char* rekall_profile,
+bool rekall_get_struct_size( json_object* rekall_profile_json,
                              const char* struct_name,
                              size_t* size)
 {
     return rekall_lookup(
-               rekall_profile,
+               rekall_profile_json,
                struct_name,
                NULL,
                NULL,
                size);
 }
+bool drakvuf_get_struct_size(drakvuf_t drakvuf,
+                             const char* struct_name,
+                             size_t* size)
+{
+    return rekall_get_struct_size(
+               drakvuf->rekall_profile_json,
+               struct_name,
+               size);
+}
 
-bool drakvuf_get_struct_member_rva(const char* rekall_profile,
+bool rekall_get_struct_member_rva( json_object* rekall_profile_json,
                                    const char* struct_name,
                                    const char* symbol,
                                    addr_t* rva)
 {
     return rekall_lookup(
-               rekall_profile,
+               rekall_profile_json,
                struct_name,
                symbol,
                rva,
                NULL);
 }
+bool drakvuf_get_struct_member_rva(drakvuf_t drakvuf,
+                                   const char* struct_name,
+                                   const char* symbol,
+                                   addr_t* rva)
+{
+    return rekall_get_struct_member_rva(
+               drakvuf->rekall_profile_json,
+               struct_name,
+               symbol,
+               rva);
+}
+
+bool rekall_get_struct_members_array_rva(
+    json_object* rekall_profile_json,
+    const char* struct_name_symbol_array[][2],
+    addr_t array_size,
+    addr_t* rva)
+{
+    return rekall_lookup_array(
+               rekall_profile_json,
+               struct_name_symbol_array,
+               array_size,
+               rva,
+               NULL);
+}
+bool drakvuf_get_struct_members_array_rva(
+    drakvuf_t drakvuf,
+    const char* struct_name_symbol_array[][2],
+    addr_t array_size,
+    addr_t* rva)
+{
+    return rekall_get_struct_members_array_rva(
+               drakvuf->rekall_profile_json,
+               struct_name_symbol_array,
+               array_size,
+               rva);
+}
 
 const char* drakvuf_get_rekall_profile(drakvuf_t drakvuf)
 {
     return drakvuf->rekall_profile;
+}
+
+json_object* drakvuf_get_rekall_profile_json(drakvuf_t drakvuf)
+{
+    return drakvuf->rekall_profile_json;
 }
 
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf)
@@ -669,8 +722,10 @@ int drakvuf_event_fd_remove(drakvuf_t drakvuf, int fd)
         {
             PRINT_DEBUG("found match at index=%d\n", i);
             drakvuf->event_fd_info = g_slist_remove(drakvuf->event_fd_info, fd_info);
+
             drakvuf->event_fd_cnt = g_slist_length(drakvuf->event_fd_info);
             PRINT_DEBUG("regenerating event_fds and fd_info_lookup...\n");
+
             drakvuf_event_fd_generate(drakvuf);
             return 1;
         }
@@ -693,10 +748,8 @@ int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, event_cb_t event_cb, void* d
     /* the event_fd_info list is the authoritive data source used to
        create the event_fds and fd_info_lookup data structures */
     drakvuf->event_fd_info = g_slist_append(drakvuf->event_fd_info, new_fd_info);
-
     drakvuf->event_fd_cnt = g_slist_length(drakvuf->event_fd_info);
     PRINT_DEBUG("size of list=%d\n", drakvuf->event_fd_cnt);
-
     PRINT_DEBUG("regenerating event_fds and fd_info_lookup...\n");
     drakvuf_event_fd_generate(drakvuf);
     return 1;

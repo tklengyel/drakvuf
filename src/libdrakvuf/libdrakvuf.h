@@ -114,44 +114,7 @@ extern "C" {
 #include <glib.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
-
-/*---------------------------------------------------------
- * Reading in Rekall profile informations
- */
-
-typedef struct symbol
-{
-    const char* name;
-    addr_t rva;
-    uint8_t type;
-    int inputs;
-} __attribute__ ((packed)) symbol_t;
-
-typedef struct symbols
-{
-    const char* name;
-    symbol_t* symbols; // array of size count
-    uint64_t count;
-} symbols_t;
-
-symbols_t* drakvuf_get_symbols_from_rekall(const char* profile);
-void drakvuf_free_symbols(symbols_t* symbols);
-
-bool drakvuf_get_function_rva(const char* rekall_profile,
-                              const char* function,
-                              addr_t* rva);
-bool drakvuf_get_constant_rva(const char* rekall_profile,
-                              const char* constant,
-                              addr_t* rva);
-bool drakvuf_get_struct_size(const char* rekall_profile,
-                             const char* struct_name,
-                             size_t* size);
-bool drakvuf_get_struct_member_rva(const char* rekall_profile,
-                                   const char* struct_name,
-                                   const char* symbol,
-                                   addr_t* rva);
-
-int drakvuf_get_os_build_date(const char* rekall_profile);
+#include <json-c/json.h>
 
 /*---------------------------------------------------------
  * DRAKVUF functions
@@ -286,6 +249,74 @@ typedef enum object_manager_object
 
 ////////////////////////////////////////////////////////////////////////////
 
+/*---------------------------------------------------------
+ * Reading in Rekall profile informations
+ */
+
+typedef struct symbol
+{
+    const char* name;
+    addr_t rva;
+    uint8_t type;
+    int inputs;
+} __attribute__ ((packed)) symbol_t;
+
+typedef struct symbols
+{
+    const char* name;
+    symbol_t* symbols; // array of size count
+    uint64_t count;
+} symbols_t;
+
+symbols_t* rekall_get_symbols_from_rekall(json_object* rekall_profile_json);
+symbols_t* drakvuf_get_symbols_from_rekall(drakvuf_t drakvuf);
+void drakvuf_free_symbols(symbols_t* symbols);
+
+bool drakvuf_get_function_rva(drakvuf_t drakvuf,
+                              const char* function,
+                              addr_t* rva);
+bool rekall_get_function_rva(json_object* rekall_profile_json,
+                             const char* function,
+                             addr_t* rva);
+
+bool drakvuf_get_constant_rva(drakvuf_t drakvuf,
+                              const char* constant,
+                              addr_t* rva);
+bool rekall_get_constant_rva( json_object* rekall_profile_json,
+                              const char* constant,
+                              addr_t* rva);
+
+bool drakvuf_get_struct_size(drakvuf_t drakvuf,
+                             const char* struct_name,
+                             size_t* size);
+bool rekall_get_struct_size( json_object* rekall_profile_json,
+                             const char* struct_name,
+                             size_t* size);
+
+bool drakvuf_get_struct_member_rva(drakvuf_t drakvuf,
+                                   const char* struct_name,
+                                   const char* symbol,
+                                   addr_t* rva);
+bool rekall_get_struct_member_rva( json_object* rekall_profile_json,
+                                   const char* struct_name,
+                                   const char* symbol,
+                                   addr_t* rva);
+
+bool drakvuf_get_struct_members_array_rva(
+    drakvuf_t drakvuf,
+    const char* struct_name_subsymbol_array[][2],
+    addr_t array_size,
+    addr_t* rva);
+bool rekall_get_struct_members_array_rva(
+    json_object* rekall_profile_json,
+    const char* struct_name_subsymbol_array[][2],
+    addr_t array_size,
+    addr_t* rva);
+
+int drakvuf_get_os_build_date(drakvuf_t drakvuf);
+
+//---- end of paired drakvuf_* and rekall_* functions ----
+
 typedef void (*drakvuf_trap_free_t)(drakvuf_trap_t* trap);
 
 typedef void (*event_cb_t) (int fd, void* data);
@@ -317,6 +348,7 @@ os_t drakvuf_get_os_type(drakvuf_t drakvuf);
 page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf);
 int drakvuf_get_address_width(drakvuf_t drakvuf);
 const char* drakvuf_get_rekall_profile(drakvuf_t drakvuf);
+json_object* drakvuf_get_rekall_profile_json(drakvuf_t drakvuf);
 
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf);
 
@@ -455,6 +487,13 @@ typedef enum
 // Printf helpers for timestamp.
 #define FORMAT_TIMEVAL "%" PRId64 ".%06" PRId64
 #define UNPACK_TIMEVAL(t) (t).tv_sec, (t).tv_usec
+
+#define eprint_current_time(...) \
+    do { \
+        GTimeVal current_time; \
+        g_get_current_time (&current_time); \
+        fprintf(stderr, FORMAT_TIMEVAL " ", UNPACK_TIMEVAL(current_time)); \
+    } while (0)
 
 #pragma GCC visibility pop
 

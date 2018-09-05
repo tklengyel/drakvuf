@@ -232,7 +232,7 @@ static bool find_kernbase(drakvuf_t drakvuf)
         return 0;
     }
 
-    if ( !drakvuf_get_constant_rva(drakvuf->rekall_profile, "PsInitialSystemProcess", &sysproc_rva) )
+    if ( !drakvuf_get_constant_rva(drakvuf, "PsInitialSystemProcess", &sysproc_rva) )
     {
         fprintf(stderr, "Failed to get PsInitialSystemProcess RVA from Rekall profile!\n");
         return 0;
@@ -289,7 +289,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     if ( !drakvuf->sizes )
         return 0;
 
-    if ( !drakvuf_get_struct_size(drakvuf->rekall_profile, "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY]) )
+    if ( !drakvuf_get_struct_size(drakvuf, "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY]) )
         return 0;
 
     drakvuf->osi.get_current_thread = win_get_current_thread;

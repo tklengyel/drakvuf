@@ -113,6 +113,7 @@
 #include <signal.h>
 #include <inttypes.h>
 #include <glib.h>
+#include <json-c/json.h>
 
 #include "libdrakvuf/libdrakvuf.h"
 #include <libinjector/libinjector.h>
@@ -130,7 +131,6 @@ struct injector
     // Internal:
     drakvuf_t drakvuf;
     vmi_instance_t vmi;
-    const char* rekall_profile;
     bool is32bit, hijacked;
     injection_method_t method;
     addr_t exec_func;
@@ -1056,7 +1056,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             g_free((void*)injector->binary);
 
             // Get address of PspCallProcessNotifyRoutines() from the rekall profile
-            if ( !drakvuf_get_function_rva(injector->rekall_profile, "PspCallProcessNotifyRoutines", &process_notify_rva) )
+            if ( !drakvuf_get_function_rva(injector->drakvuf, "PspCallProcessNotifyRoutines", &process_notify_rva) )
             {
                 PRINT_DEBUG("[-] Error getting PspCallProcessNotifyRoutines RVA\n");
                 return 0;
@@ -1323,7 +1323,6 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
     struct injector injector = { 0 };
     injector.drakvuf = drakvuf;
     injector.vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    injector.rekall_profile = drakvuf_get_rekall_profile(drakvuf);
     injector.target_pid = pid;
     injector.target_tid = tid;
     injector.target_file = file;
@@ -1341,15 +1340,8 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
     }
 
     // Get the offsets from the Rekall profile
-    unsigned int i;
-    for (i = 0; i < OFFSET_MAX; i++)
-    {
-        if ( !drakvuf_get_struct_member_rva(injector.rekall_profile, offset_names[i][0], offset_names[i][1], &injector.offsets[i]))
-        {
-            PRINT_DEBUG("Failed to find offset for %s:%s\n", offset_names[i][0],
-                        offset_names[i][1]);
-        }
-    }
+    if ( !drakvuf_get_struct_members_array_rva(injector.drakvuf, offset_names, OFFSET_MAX, injector.offsets) )
+        PRINT_DEBUG("Failed to find one of offsets.\n");
 
     PRINT_DEBUG("Target PID %u with DTB 0x%lx to start '%s'\n", pid,
                 injector.target_cr3, file);
@@ -1375,7 +1367,7 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
         {
             // Check for Windows 10 version 1803 or higher
             int build_1803 = 20180410;
-            if ( drakvuf_get_os_build_date(injector.rekall_profile) < build_1803 )
+            if ( drakvuf_get_os_build_date(injector.drakvuf) < build_1803 )
             {
                 PRINT_DEBUG("This injection method requires Windows 10 version 1803 or higher!\n");
                 goto done;
@@ -1436,5 +1428,7 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
 done:
     PRINT_DEBUG("Finished with injection. Ret: %i\n", injector.rc);
     drakvuf_release_vmi(drakvuf);
+    g_free((void*)injector.binary);
+    g_free((void*)injector.payload);
     return injector.rc;
 }

@@ -56,11 +56,11 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
     return 0;
 }
 
-static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const char* syscall_name,
+static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
                            drakvuf_trap_t* trap,
                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
-    if ( !drakvuf_get_function_rva( rekall_profile, syscall_name, &trap->breakpoint.rva) ) throw -1;
+    if ( !drakvuf_get_function_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
 
     trap->name = syscall_name;
     trap->cb   = hook_cb;
@@ -70,14 +70,13 @@ static void register_trap( drakvuf_t drakvuf, const char* rekall_profile, const 
 
 delaymon::delaymon(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
-    const char* rekall_profile = (const char*)config;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->pm = vmi_get_page_mode(vmi, 0);
     this->winver = vmi_get_winver(vmi);
     drakvuf_release_vmi(drakvuf);
     this->format = output;
 
-    register_trap(drakvuf, rekall_profile, "NtDelayExecution", &trap, trap_NtDelayExecution_cb);
+    register_trap(drakvuf, "NtDelayExecution", &trap, trap_NtDelayExecution_cb);
 }
 
 delaymon::~delaymon()

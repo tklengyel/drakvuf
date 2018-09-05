@@ -129,7 +129,10 @@ extern bool verbose;
 
 #define PRINT_DEBUG(...) \
     do { \
-        if(verbose) fprintf (stderr, __VA_ARGS__); \
+        if(verbose) { \
+            eprint_current_time(); \
+            fprintf (stderr, __VA_ARGS__); \
+        }\
     } while (0)
 
 #else
@@ -153,6 +156,7 @@ struct drakvuf
     char* dom_name;
     domid_t domID;
     char* rekall_profile;
+    json_object* rekall_profile_json;
     os_t os;
 
     xen_interface_t* xen;
