@@ -159,7 +159,7 @@ sources += procmon/procmon.cpp
 endif
 
 if PLUGIN_BSODMON
-sources += bsodmon/bsodmon.cpp
+sources += bsodmon/bsodmon.cpp bsodmon/bugcheck.cpp
 endif
 
 ###############################################################################
