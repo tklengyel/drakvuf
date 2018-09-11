@@ -187,6 +187,9 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 done:
     drakvuf_release_vmi(drakvuf);
 
+    if ( f->abort_on_bsod )
+        drakvuf_interrupt( drakvuf, -1);
+
     return 0;
 }
 
@@ -203,6 +206,8 @@ void bsodmon::register_trap(drakvuf_t drakvuf, const char* syscall_name,
 bsodmon::bsodmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     : format(output)
 {
+    this->abort_on_bsod = *(bool*)config;
+
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     is32bit = vmi_get_page_mode(vmi, 0) != VMI_PM_IA32E;
 

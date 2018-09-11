@@ -152,6 +152,7 @@ int main(int argc, char** argv)
     char const* syscalls_filter_file = NULL;
     bool dump_modified_files = false;
     bool filedelete_use_injector = false;
+    bool abort_on_bsod = false;
 
     eprint_current_time();
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -198,11 +199,14 @@ int main(int argc, char** argv)
 #ifdef ENABLE_PLUGIN_SYSCALLS
                 "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
 #endif
+#ifdef ENABLE_PLUGIN_BSODMON
+                "\t -b                        Exit from execution as soon as a BSoD is detected\n"
+#endif
                );
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:Mc:n")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:Mc:nb")) != -1)
         switch (c)
         {
             case 'r':
@@ -280,6 +284,9 @@ int main(int argc, char** argv)
             case 'n':
                 filedelete_use_injector = true;
                 break;
+            case 'b':
+                abort_on_bsod = true;
+                break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
                 return rc;
@@ -342,7 +349,7 @@ int main(int argc, char** argv)
 
     PRINT_DEBUG("Starting plugins\n");
 
-    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, syscalls_filter_file) < 0 )
+    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, syscalls_filter_file, abort_on_bsod) < 0 )
         goto exit;
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");
