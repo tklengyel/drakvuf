@@ -106,12 +106,12 @@
 
 #include "bsodmon.h"
 
-/* 
+/*
  * Bugcheck code list:
- *     https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/bug-check-code-reference2 
+ *     https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/bug-check-code-reference2
  */
 
-void init_bugcheck_win7( bsodmon *monitor )
+void init_bugcheck_win7( bsodmon* monitor )
 {
     monitor->bugcheck_map[ 0x00000001 ] = "APC_INDEX_MISMATCH";
     monitor->bugcheck_map[ 0x00000002 ] = "DEVICE_QUEUE_NOT_BUSY";
@@ -482,8 +482,7 @@ void init_bugcheck_win7( bsodmon *monitor )
 
 
 
-void init_bugcheck_map( bsodmon *monitor, drakvuf_t drakvuf )
+void init_bugcheck_map( bsodmon* monitor, drakvuf_t drakvuf )
 {
     init_bugcheck_win7( monitor );
 }
-
