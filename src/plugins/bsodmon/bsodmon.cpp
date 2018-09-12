@@ -105,6 +105,8 @@
 #include <libdrakvuf/libdrakvuf.h>
 
 #include "bsodmon.h"
+#include "bugcheck.h"
+
 
 static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -118,6 +120,7 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     uint64_t code = 0;
     uint64_t params[4] = { 0 };
+    const char* bugcheck_name = "UNKNOWN_CODE" ;
 
     if (f->is32bit)
     {
@@ -153,33 +156,39 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             goto done;
     }
 
+    if ( f->bugcheck_map.find( code ) != f->bugcheck_map.end() )
+        bugcheck_name = f->bugcheck_map[ code ];
+
     switch (f->format)
     {
         case OUTPUT_CSV:
             printf("bsodmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%" PRIx64
-                   ",%" PRIx64 ",%" PRIx64 ",%" PRIx64 ",%" PRIx64 "\n",
+                   ",\"%s\",%" PRIx64 ",%" PRIx64 ",%" PRIx64 ",%" PRIx64 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, code, params[0], params[1], params[2], params[3]);
+                   info->proc_data.userid, code, bugcheck_name, params[0], params[1], params[2], params[3]);
             break;
         case OUTPUT_KV:
             printf("bsodmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",BugCheckCode=%" PRIx64
-                   ",BugCheckParameter1=%" PRIx64 ",BugCheckParameter2=%" PRIx64 ",BugCheckParameter2=%" PRIx64
+                   ",BugCheckName=\"%s\",BugCheckParameter1=%" PRIx64 ",BugCheckParameter2=%" PRIx64 ",BugCheckParameter2=%" PRIx64
                    ",BugCheckParameter4=%" PRIx64 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, code, params[0], params[1], params[2], params[3]);
+                   info->proc_data.name, code, bugcheck_name, params[0], params[1], params[2], params[3]);
             break;
         default:
         case OUTPUT_DEFAULT:
             printf("[BSODMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64
-                   " BugCheckCode:%" PRIx64 " BugCheckParameter1:%" PRIx64 " BugCheckParameter2:%" PRIx64
+                   " BugCheckCode:%" PRIx64 " BugCheckName:%s BugCheckParameter1:%" PRIx64 " BugCheckParameter2:%" PRIx64
                    " BugCheckParameter3:%" PRIx64 " BugCheckParameter4:%" PRIx64 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, code, params[0], params[1], params[2], params[3]);
+                   USERIDSTR(drakvuf), info->proc_data.userid, code, bugcheck_name, params[0], params[1], params[2], params[3]);
             break;
     }
 
 done:
     drakvuf_release_vmi(drakvuf);
+
+    if ( f->abort_on_bsod )
+        drakvuf_interrupt( drakvuf, -1);
 
     return 0;
 }
@@ -197,12 +206,14 @@ void bsodmon::register_trap(drakvuf_t drakvuf, const char* syscall_name,
 bsodmon::bsodmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     : format(output)
 {
+    this->abort_on_bsod = *(bool*)config;
+
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     is32bit = vmi_get_page_mode(vmi, 0) != VMI_PM_IA32E;
+
+    init_bugcheck_map( this, drakvuf );
+
     drakvuf_release_vmi(drakvuf);
 
-    if (is32bit)
-        register_trap(drakvuf, "KeBugCheck2", &trap, hook_cb);
-    else
-        register_trap(drakvuf, "KeBugCheckEx", &trap, hook_cb);
+    register_trap(drakvuf, "KeBugCheck2", &trap, hook_cb);
 }

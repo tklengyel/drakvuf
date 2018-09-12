@@ -108,11 +108,15 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
+#include <map>
+
 class bsodmon : public plugin
 {
 public:
     const output_format_t format;
     bool is32bit;
+    std::map<int, const char*> bugcheck_map;
+    bool abort_on_bsod;
 
     bsodmon(drakvuf_t drakvuf, const void* config, output_format_t output);
 

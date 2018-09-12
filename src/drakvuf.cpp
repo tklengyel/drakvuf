@@ -133,7 +133,8 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                              bool filedelete_use_injector,     // PLUGIN_FILEDELETE
                              bool cpuid_stealth,               // PLUGIN_CPUIDMON
                              const char* tcpip_profile,        // PLUGIN_SOCKETMON
-                             const char* syscalls_filter_file) // PLUGIN_SYSCALLS
+                             const char* syscalls_filter_file, // PLUGIN_SYSCALLS
+                             bool abort_on_bsod )              // PLUGIN_BSODMON
 {
     int i, rc;
 
@@ -180,6 +181,10 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     rc = this->plugins->start((drakvuf_plugin_t)i, &c);
                     break;
                 }
+
+                case PLUGIN_BSODMON:
+                    rc = this->plugins->start((drakvuf_plugin_t)i, &abort_on_bsod);
+                    break;
 
                 default:
                     rc = this->plugins->start((drakvuf_plugin_t)i, NULL);
