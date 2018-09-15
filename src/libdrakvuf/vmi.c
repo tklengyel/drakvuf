@@ -847,7 +847,7 @@ void remove_trap(drakvuf_t drakvuf,
 
     switch (trap->type)
     {
-        case PRIVCALL:
+        case PRIVCALL_DBL_SMC: // intentional fall-through
         case BREAKPOINT:
         {
             struct wrapper* container =
@@ -903,7 +903,7 @@ void remove_trap(drakvuf_t drakvuf,
                 remove_trap(drakvuf, &container->breakpoint.guard);
                 remove_trap(drakvuf, &container->breakpoint.guard2);
 
-                if ( trap->type == PRIVCALL )
+                if ( trap->type == PRIVCALL_DBL_SMC )
                 {
                     uint32_t backup_dsmc;
 
@@ -1157,7 +1157,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         if (rc < 0)
             goto err_exit;
 
-        if (trap->type == PRIVCALL)
+        if (trap->type == PRIVCALL_DBL_SMC)
         {
             remapped_gfn->step_view = ++(drakvuf->max_gpfn);
 
@@ -1194,7 +1194,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             goto err_exit;
         }
 
-        if ( trap->type == PRIVCALL )
+        if ( trap->type == PRIVCALL_DBL_SMC )
         {
             if ( VMI_SUCCESS == vmi_write_pa(drakvuf->vmi, remapped_gfn->step_view << 12, VMI_PS_4KB, &backup, NULL) )
                 PRINT_DEBUG("Copied trapped page to new location (second remapped gfn)\n");
@@ -1217,7 +1217,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID,
                              drakvuf->altp2m_idr, remapped_gfn->r, drakvuf->zero_page_gfn);
 
-        if ( trap->type == PRIVCALL )
+        if ( trap->type == PRIVCALL_DBL_SMC )
         {
             xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID,
                                  drakvuf->altp2m_ids, current_gfn, remapped_gfn->step_view);
@@ -1252,7 +1252,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         goto err_exit;
     }
 
-    if ( trap->type == PRIVCALL )
+    if ( trap->type == PRIVCALL_DBL_SMC )
     {
         container->breakpoint.step_guard.type = MEMACCESS;
         container->breakpoint.step_guard.memaccess.access = VMI_MEMACCESS_RWX;
@@ -1291,7 +1291,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             goto err_exit;
         }
         addr_t rpa1 =0;
-        if ( trap->type == PRIVCALL )
+        if ( trap->type == PRIVCALL_DBL_SMC )
         {
             rpa1 = (remapped_gfn->step_view<<12) + ((container->breakpoint.pa & VMI_BIT_MASK(0,11)) + 4);
             if ( VMI_FAILURE == vmi_write_32_pa(vmi, rpa1, &sw_trap) )

@@ -393,7 +393,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 #if defined (I386) || defined(X86_64)
     traptype = BREAKPOINT;
 #elif defined (ARM64)
-    traptype = PRIVCALL;
+    traptype = PRIVCALL_DBL_SMC;
 #endif
 
     PRINT_DEBUG("Received %lu symbols\n", symbols->count);
