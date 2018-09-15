@@ -1589,7 +1589,7 @@ bool init_vmi(drakvuf_t drakvuf)
      * The idx view is used primarily during DRAKVUF execution. In this view all breakpointed
      * pages will have their shadow copies activated.
      */
-    rc = xc_altp2m_create_view( drakvuf->xen->xc, drakvuf->domID, 0, &drakvuf->altp2m_idx );
+    rc = xc_altp2m_create_view( drakvuf->xen->xc, drakvuf->domID, 0, &drakvuf->altp2m_idx, 1 );
     PRINT_DEBUG("Altp2m view X created? %i with ID %u\n", rc, drakvuf->altp2m_idx);
     if (rc < 0)
         return 0;
@@ -1602,7 +1602,7 @@ bool init_vmi(drakvuf_t drakvuf)
      * the shadow pages from the first execute view have been executed.
      */
 #if defined(ARM64)
-    rc = xc_altp2m_create_view( drakvuf->xen->xc, drakvuf->domID, 0, &drakvuf->altp2m_ids );
+    rc = xc_altp2m_create_view( drakvuf->xen->xc, drakvuf->domID, 0, &drakvuf->altp2m_ids, 1 );
     PRINT_DEBUG("Altp2m step view created? %i with ID %u\n", rc, drakvuf->altp2m_ids);
     if (rc < 0)
         return 0;
@@ -1616,7 +1616,7 @@ bool init_vmi(drakvuf_t drakvuf)
      * be avoided if we cache all pages separately that have been written to and use emulate with
      * custom read data to only return the change in the page on the gfn it was written to.
      */
-    rc = xc_altp2m_create_view( drakvuf->xen->xc, drakvuf->domID, 0, &drakvuf->altp2m_idr );
+    rc = xc_altp2m_create_view( drakvuf->xen->xc, drakvuf->domID, 0, &drakvuf->altp2m_idr, 1 );
     PRINT_DEBUG("Altp2m view R created? %i with ID %u\n", rc, drakvuf->altp2m_idr);
     if (rc < 0)
         return 0;
