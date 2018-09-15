@@ -534,6 +534,8 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     drakvuf->in_callback = 1;
 
+    trap_type_t traptype = __INVALID_TRAP_TYPE;
+
     GSList* loop = s->traps;
     while (loop)
     {
@@ -546,6 +548,8 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
             .vcpu = event->vcpu_id,
         };
 
+	traptype = trap->type;
+
         loop = loop->next;
         rsp |= trap->cb(drakvuf, &trap_info);
     }
@@ -555,12 +559,25 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
     // Check if we have traps still active on this breakpoint
     if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa) )
     {
-        PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u - %i SMC executed\n", event->vcpu_id, event->slat_id);
-        if ( event->slat_id == drakvuf->altp2m_idx )
-            event->slat_id = drakvuf->altp2m_ids;
+	if (traptype == PRIVCALL_HW_SS)
+	{
+	    PRINT_DEBUG("Switching altp2m HW-singlestep on vcpu %u - step view %i\n", event->vcpu_id, event->slat_id);
+	    event->slat_id = drakvuf->altp2m_idr;
+	    rsp |= VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP;
+	}
+	else if (traptype == PRIVCALL_DBL_SMC)
+	{
+	    PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u - %i SMC executed\n", event->vcpu_id, event->slat_id);
+	    if ( event->slat_id == drakvuf->altp2m_idx )
+		event->slat_id = drakvuf->altp2m_ids;
+	}
+	else
+	{
+	    PRINT_DEBUG("Unknown trap type\n");
+	    return 0;
+	}
 
-        return rsp |
-               VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+        return rsp | VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
     }
 
     return rsp;
@@ -847,7 +864,8 @@ void remove_trap(drakvuf_t drakvuf,
 
     switch (trap->type)
     {
-        case PRIVCALL_DBL_SMC: // intentional fall-through
+        case PRIVCALL_HW_SS: // intentional fall-through
+        case PRIVCALL_DBL_SMC:
         case BREAKPOINT:
         {
             struct wrapper* container =

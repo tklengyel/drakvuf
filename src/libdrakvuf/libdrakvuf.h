@@ -180,6 +180,7 @@ typedef enum trap_type
     REGISTER,
     DEBUG,
     CPUID,
+    PRIVCALL_HW_SS,
     PRIVCALL_DBL_SMC
 } trap_type_t;
 
