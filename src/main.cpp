@@ -150,6 +150,7 @@ int main(int argc, char** argv)
     char const* syscalls_filter_file = NULL;
     bool dump_modified_files = false;
     bool filedelete_use_injector = false;
+    trap_type_t traptype;
 
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
 
@@ -191,12 +192,13 @@ int main(int argc, char** argv)
 #endif
 #ifdef ENABLE_PLUGIN_SYSCALLS
                 "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
+		"\t -a <analysis method>      Option which selects the preffered analysis technique; for x86: BKP (1); for ARM: DBL-SMC-SS (6)"
 #endif
                );
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:Mc:n")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:Mc:na:")) != -1)
         switch (c)
         {
             case 'r':
@@ -266,6 +268,9 @@ int main(int argc, char** argv)
             case 'n':
                 filedelete_use_injector = true;
                 break;
+            case 'a':
+                traptype = (trap_type_t)atoi(optarg);
+                break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
                 return rc;
@@ -282,6 +287,25 @@ int main(int argc, char** argv)
         fprintf(stderr, "No Rekall profile specified (-r)!\n");
         return rc;
     }
+
+#ifdef ENABLE_PLUGIN_SYSCALLS
+    if (!traptype ||
+#if defined (I386) || defined(X86_64)
+        (traptype != BREAKPOINT)
+#elif defined (ARM64)
+	(traptype != PRIVCALL_DBL_SMC)
+#endif
+	)
+    {
+        fprintf(stderr, "Invalid analysis method (-a)!");
+#if defined (I386) || defined(X86_64)
+	fprintf(stderr, "Available options for x86: BK (1)\n");
+#elif defined (ARM64)
+	fprintf(stderr, "Available options for ARM: DBL-SMC (6)\n");
+#endif
+        return rc; 
+    }
+#endif
 
     PRINT_DEBUG("Starting DRAKVUF initialization\n");
 
@@ -322,7 +346,7 @@ int main(int argc, char** argv)
 
     PRINT_DEBUG("Starting plugins\n");
 
-    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, syscalls_filter_file) < 0 )
+    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, syscalls_filter_file, (trap_type_t)traptype) < 0 )
         goto exit;
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");

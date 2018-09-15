@@ -174,7 +174,8 @@ public:
                       bool filedelete_use_injector,
                       bool cpuid_stealth,
                       const char* tcpip_profile,
-                      const char* syscalls_filter_file);
+                      const char* syscalls_filter_file,
+		      trap_type_t traptype);
     bool wait_for_process(const char* processname);
 
 };

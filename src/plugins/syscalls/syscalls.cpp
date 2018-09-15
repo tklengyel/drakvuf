@@ -384,17 +384,11 @@ exit:
     return 0;
 }
 
-static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* symbols, const char* rekall_profile)
+static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* symbols, const char* rekall_profile, trap_type_t traptype)
 {
 
     GSList* ret = NULL;
     unsigned long i,j;
-    trap_type_t traptype;
-#if defined (I386) || defined(X86_64)
-    traptype = BREAKPOINT;
-#elif defined (ARM64)
-    traptype = PRIVCALL_DBL_SMC;
-#endif
 
     PRINT_DEBUG("Received %lu symbols\n", symbols->count);
 
@@ -594,7 +588,7 @@ syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output
     }
 
     this->os = drakvuf_get_os_type(drakvuf);
-    this->traps = create_trap_config(drakvuf, this, symbols, c->rekall_profile);
+    this->traps = create_trap_config(drakvuf, this, symbols, c->rekall_profile, c->traptype);
     this->format = output;
 
     if ( !this->traps )

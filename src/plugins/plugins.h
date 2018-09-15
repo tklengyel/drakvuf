@@ -130,6 +130,7 @@ struct syscalls_config
 {
     const char* rekall_profile;
     const char* syscalls_filter_file;
+    trap_type_t traptype;
 };
 
 /***************************************************************************/
