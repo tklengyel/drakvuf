@@ -134,7 +134,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    info->trap->breakpoint.module, info->trap->name);
 #elif defined (ARM64)
-            printf("[SYSCALL] vCPU:%" PRIu32 " PC:%" PRIx64 " CPSR:%" PRIx32 " TTBR0:0x%" PRIx64 " TTBR1:0x%" PRIx64 ", %s: %s!%s\n",
+            PRINT_DEBUG("[SYSCALL] vCPU:%" PRIu32 " PC:%" PRIx64 " CPSR:%" PRIx32 " TTBR0:0x%" PRIx64 " TTBR1:0x%" PRIx64 ", %s: %s!%s\n",
                    info->vcpu, info->arm_regs->pc, info->arm_regs->cpsr,
                    info->arm_regs->ttbr0, info->arm_regs->ttbr1,
                    USERIDSTR(drakvuf),

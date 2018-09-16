@@ -494,8 +494,12 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
     event_response_t rsp = 0;
     drakvuf_t drakvuf = event->data;
     drakvuf->arm_regs[event->vcpu_id] = event->arm_regs;
-
+    
     addr_t pa = (event->privcall_event.gfn << 12) + event->privcall_event.offset;
+	
+	PRINT_DEBUG("SMC event vCPU %u altp2m:%u PA=0x%"PRIx64" PC=0x%"PRIx64" offset=0x%"PRIx64".\n",
+                event->vcpu_id, event->slat_id, pa,
+                event->arm_regs->pc, event->privcall_event.offset);
 
     struct wrapper* s = g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
     if (!s)
@@ -509,6 +513,7 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
             addr_t pa_first_smc = pa - 4;
             if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa_first_smc) )
             {
+				PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u - %i SMC executed\n", event->vcpu_id, event->slat_id);
                 event->slat_id = drakvuf->altp2m_idx;
                 return rsp |
                        VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
@@ -526,11 +531,6 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
 
         return 0;
     }
-
-
-    PRINT_DEBUG("SMC event vCPU %u altp2m:%u PA=0x%"PRIx64" PC=0x%"PRIx64" offset=0x%"PRIx64".\n",
-                event->vcpu_id, event->slat_id, pa,
-                event->arm_regs->pc, event->privcall_event.offset);
 
     drakvuf->in_callback = 1;
 
@@ -558,27 +558,32 @@ event_response_t smc_cb(vmi_instance_t vmi, vmi_event_t* event)
     process_free_requests(drakvuf);
     // Check if we have traps still active on this breakpoint
     if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa) )
-    {
-	if (traptype == PRIVCALL_HW_SS)
 	{
-	    PRINT_DEBUG("Switching altp2m HW-singlestep on vcpu %u - step view %i\n", event->vcpu_id, event->slat_id);
-	    event->slat_id = drakvuf->altp2m_idr;
-	    rsp |= VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP;
-	}
-	else if (traptype == PRIVCALL_DBL_SMC)
-	{
-	    PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u - %i SMC executed\n", event->vcpu_id, event->slat_id);
-	    if ( event->slat_id == drakvuf->altp2m_idx )
-		event->slat_id = drakvuf->altp2m_ids;
-	}
-	else
-	{
-	    PRINT_DEBUG("Unknown trap type\n");
-	    return 0;
-	}
+		if (traptype == PRIVCALL_HW_SS)
+		{
+			PRINT_DEBUG("Switching altp2m HW-singlestep on vcpu %u - step view %i\n", event->vcpu_id, event->slat_id);
+			event->slat_id = 0;
+			rsp |= VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP;
+		}
+		else if (traptype == PRIVCALL_DBL_SMC)
+		{
+			PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u - %i SMC executed\n", event->vcpu_id, event->slat_id);
+			if ( event->slat_id == drakvuf->altp2m_idx )
+					event->slat_id = drakvuf->altp2m_ids;	
+		}
+		else if (traptype == __INVALID_TRAP_TYPE)
+		{
+			PRINT_DEBUG("Invalid trap type\n");
+			return 0;
+		}
+		else
+		{
+			PRINT_DEBUG("Unknown trap type\n");
+			return 0;
+		}
 
-        return rsp | VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
-    }
+		return rsp | VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+	}
 
     return rsp;
 }
@@ -1308,7 +1313,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             PRINT_DEBUG("FAILED TO INJECT TRAP @ 0x%lx !\n", container->breakpoint.pa);
             goto err_exit;
         }
-        addr_t rpa1 =0;
+		addr_t rpa1 =0;
         if ( trap->type == PRIVCALL_DBL_SMC )
         {
             rpa1 = (remapped_gfn->step_view<<12) + ((container->breakpoint.pa & VMI_BIT_MASK(0,11)) + 4);
