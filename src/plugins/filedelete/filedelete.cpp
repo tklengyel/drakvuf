@@ -645,7 +645,7 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         injector->ntreadfile_info.bytes_read = 0UL;
 
-        if (inject_readfile(drakvuf, info, vmi, injector))
+        if (inject_allocate_pool(drakvuf, info, vmi, injector))
         {
             response = VMI_EVENT_RESPONSE_SET_REGISTERS;
             goto done;

@@ -237,6 +237,9 @@ bool inject_waitobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instanc
 
 bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
 {
+    if (!injector->pool)
+        return false;
+
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = injector->saved_regs.rsp;
 
@@ -249,7 +252,6 @@ bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_
     struct argument args[9] = { {0} };
     struct _LARGE_INTEGER byte_offset = { .QuadPart = injector->ntreadfile_info.bytes_read };
     const union IO_STATUS_BLOCK io_status_block = { { 0 } };
-    const uint8_t buffer[BYTES_TO_READ] = { 0 };
     uint64_t null = 0;
 
     const size_t int_size = injector->is32bit ? sizeof (uint32_t) : sizeof (uint64_t);
@@ -259,7 +261,7 @@ bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_
     init_argument(&args[2], ARGUMENT_INT, int_size, (void*)null);
     init_argument(&args[3], ARGUMENT_INT, int_size, (void*)null);
     init_argument(&args[4], ARGUMENT_STRUCT, sizeof(union IO_STATUS_BLOCK), (void*)&io_status_block);
-    init_argument(&args[5], ARGUMENT_STRUCT, BYTES_TO_READ, (void*)buffer);
+    init_argument(&args[5], ARGUMENT_INT, int_size, (void*)injector->pool);
     init_argument(&args[6], ARGUMENT_INT, int_size, (void*)BYTES_TO_READ);
     init_argument(&args[7], ARGUMENT_STRUCT, sizeof(byte_offset), (void*)&byte_offset);
     init_argument(&args[8], ARGUMENT_INT, int_size, (void*)null);

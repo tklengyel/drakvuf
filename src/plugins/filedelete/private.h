@@ -199,7 +199,7 @@ struct FILE_FS_DEVICE_INFORMATION
     uint32_t characteristics;
 } __attribute__((packed));
 
-static const uint64_t BYTES_TO_READ = 0x1000;
+static const uint64_t BYTES_TO_READ = 0x10000;
 
 /**************************************
  * ## Callbacks for injected functions
