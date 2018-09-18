@@ -119,7 +119,7 @@ sources += filetracer/filetracer.cpp
 endif
 
 if PLUGIN_FILEDELETE
-sources += filedelete/filedelete.cpp
+sources += filedelete/filedelete.cpp filedelete/filedelete2_helpers.cpp
 endif
 
 if PLUGIN_OBJMON

@@ -134,74 +134,6 @@ const char* offset_names[__OFFSET_MAX][2] =
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
 };
 
-namespace
-{
-
-struct wrapper_t
-{
-    filedelete* f;
-    bool is32bit;
-
-    handle_t handle;
-
-    reg_t target_cr3;
-    uint32_t target_thread_id;
-    addr_t eprocess_base;
-
-    x86_registers_t saved_regs;
-
-    int curr_sequence_number;
-
-    union
-    {
-        struct
-        {
-            addr_t out;
-            size_t size;
-        } ntqueryobject_info;
-
-        struct
-        {
-            size_t bytes_read;
-            addr_t out;
-            addr_t io_status_block;
-        } ntreadfile_info;
-    };
-
-    drakvuf_trap_t* bp;
-};
-
-// On x86 system it is not possible to allocate big buffer on stack (?)
-static const uint64_t BYTES_TO_READ = 0x1000;
-
-union IO_STATUS_BLOCK
-{
-    struct
-    {
-        uint32_t status;
-        uint32_t info;
-    } x86;
-
-    struct
-    {
-        uint64_t status;
-        uint64_t info;
-    } amd64;
-} __attribute__((packed));
-
-struct _LARGE_INTEGER
-{
-    uint64_t QuadPart;
-} __attribute__((packed));
-
-struct FILE_FS_DEVICE_INFORMATION
-{
-    uint32_t device_type;
-    uint32_t characteristics;
-} __attribute__((packed));
-
-}
-
 static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_t vmi,
                                  drakvuf_trap_info_t* info,
                                  addr_t handle,
@@ -415,6 +347,7 @@ static void extract_file(filedelete* f,
 
 static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* filename)
 {
+    return; // TODO Debug-only
     switch (f->format)
     {
         case OUTPUT_CSV:
@@ -471,14 +404,6 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
     }
 }
 
-static event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-static event_response_t waitobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    // Handle error codes there
-    return readfile_cb(drakvuf, info);
-}
-
 static bool save_file_chunk(filedelete* f, int file_sequence_number, void* buffer, size_t size)
 {
     char* file = nullptr;
@@ -495,10 +420,38 @@ static bool save_file_chunk(filedelete* f, int file_sequence_number, void* buffe
     return success;
 }
 
-constexpr static uint32_t STATUS_SUCCESS = 0;
-constexpr static uint32_t STATUS_PENDING = 0x103;
+static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi)
+{
+    wrapper_t* injector = (wrapper_t*)info->trap->data;
 
-static event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    if (injector->pool && inject_free_pool(drakvuf, info, vmi, injector))
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+
+    free_resources(drakvuf, info);
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+}
+
+event_response_t exfreepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+
+    wrapper_t* injector = (wrapper_t*)info->trap->data;
+    injector->pool = 0;
+
+    free_resources(drakvuf, info);
+
+    drakvuf_release_vmi(drakvuf);
+
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+}
+
+event_response_t waitobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    // Handle error codes there
+    return readfile_cb(drakvuf, info);
+}
+
+event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
     filedelete* f = injector->f;
@@ -567,98 +520,41 @@ static event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
         if (BYTES_TO_READ == isb_size)
         {
-            // Remove stack arguments and home space from previous injection
-            info->regs->rsp = injector->saved_regs.rsp;
-
-            ctx.addr = info->regs->rsp;
-
-            struct argument args[9] = { {0} };
-            struct _LARGE_INTEGER byte_offset = { .QuadPart = injector->ntreadfile_info.bytes_read };
-            const union IO_STATUS_BLOCK io_status_block = { { 0 } };
-            const uint8_t buffer[BYTES_TO_READ] = { 0 };
-            uint64_t null = 0;
-            const size_t int_size = injector->is32bit ? sizeof (uint32_t) : sizeof (uint64_t);
-
-            init_argument(&args[0], ARGUMENT_INT, int_size, (void*)injector->handle);
-            init_argument(&args[1], ARGUMENT_INT, int_size, (void*)null);
-            init_argument(&args[2], ARGUMENT_INT, int_size, (void*)null);
-            init_argument(&args[3], ARGUMENT_INT, int_size, (void*)null);
-            init_argument(&args[4], ARGUMENT_STRUCT, sizeof(union IO_STATUS_BLOCK), (void*)&io_status_block);
-            init_argument(&args[5], ARGUMENT_STRUCT, BYTES_TO_READ, (void*)buffer);
-            init_argument(&args[6], ARGUMENT_INT, int_size, (void*)BYTES_TO_READ);
-            init_argument(&args[7], ARGUMENT_STRUCT, sizeof(byte_offset), (void*)&byte_offset);
-            init_argument(&args[8], ARGUMENT_INT, int_size, (void*)null);
-
-            bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 9) : setup_stack_64(vmi, info, &ctx, args, 9);
-            if ( !stack_ok )
+            if (inject_readfile(drakvuf, info, vmi, injector))
+            {
+                response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+                goto done;
+            }
+            else
+            {
                 goto err;
-
-            injector->ntreadfile_info.io_status_block = args[4].data_on_stack;
-            injector->ntreadfile_info.out = args[5].data_on_stack;
-
-            info->regs->rip = f->readfile_va;
-
-            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-
-            goto done;
+            }
         }
     }
     else if (STATUS_PENDING == status) // STATUS_PENDING
     {
-        // Preserve "local" variables from previous ReadFile injection
-        // info->regs->rsp = injector->saved_regs.rsp;
-
-        ctx.addr = info->regs->rsp;
-
-        struct argument args[3] = { {0} };
-        uint64_t null = 0;
-        const size_t int_size = injector->is32bit ? sizeof (uint32_t) : sizeof (uint64_t);
-
-        init_argument(&args[0], ARGUMENT_INT, int_size, (void*)injector->handle);
-        init_argument(&args[1], ARGUMENT_INT, int_size, (void*)null);
-        init_argument(&args[2], ARGUMENT_INT, int_size, (void*)null);
-
-        bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 3) : setup_stack_64(vmi, info, &ctx, args, 3);
-        if ( !stack_ok )
+        if (inject_waitobject(drakvuf, info, vmi, injector))
+        {
+            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            goto done;
+        }
+        else
+        {
             goto err;
-
-        info->regs->rip = f->waitobject_va;
-
-        injector->bp->name = "WaitForSingleObject ret";
-        injector->bp->cb = waitobject_cb;
-
-        response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-
-        goto done;
+        }
     }
     else
         PRINT_DEBUG("[FILEDELETE2] [ReadFile] Failed to read %s with status 0x%lx and IO_STATUS_BLOCK = { Status 0x%x; Size 0x%lx} .\n",
                     f->files[std::make_pair(info->proc_data.pid, injector->handle)].c_str(), info->regs->rax, isb_status, isb_size);
 
-    f->closing_handles[std::make_pair(info->regs->cr3, thread_id)] = true;
-    f->files.erase(std::make_pair(info->proc_data.pid, injector->handle));
-
-    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
-    response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-
-    drakvuf_remove_trap(drakvuf, injector->bp, (drakvuf_trap_free_t)free);
-
-    g_free(injector);
-
-    goto done;
+    goto handled;
 
 err:
     PRINT_DEBUG("[FILEDELETE2] [ReadFile] Error. Stop processing (CR3 0x%lx, TID %d, FileName '%s', status 0x%lx).\n",
                 info->regs->cr3, thread_id, f->files[std::make_pair(info->proc_data.pid, injector->handle)].c_str(), info->regs->rax);
 
-    f->closing_handles[std::make_pair(info->regs->cr3, thread_id)] = true;
-
-    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
-    response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-
-    drakvuf_remove_trap(drakvuf, injector->bp, (drakvuf_trap_free_t)free);
-
-    g_free(injector);
+handled:
+    response = finish_readfile(drakvuf, info, vmi);
 
 done:
     drakvuf_release_vmi(drakvuf);
@@ -666,10 +562,53 @@ done:
     return response;
 }
 
-static event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+
+    wrapper_t* injector = (wrapper_t*)info->trap->data;
+
+    auto response = 0;
+    uint32_t thread_id = 0;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    if (info->regs->cr3 != injector->target_cr3)
+        goto done;
+
+    if ( !drakvuf_get_current_thread_id(drakvuf, info->vcpu, &thread_id) ||
+            !injector->target_thread_id || thread_id != injector->target_thread_id )
+        goto done;
+
+    if (info->regs->rax)
+    {
+        injector->pool = info->regs->rax;
+
+        if (inject_readfile(drakvuf, info, vmi, injector))
+        {
+            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            goto done;
+        }
+        else
+        {
+            goto err;
+        }
+    }
+
+err:
+    PRINT_DEBUG("[FILEDELETE2] [ExAllocatePoolWithTag] Error. Stop processing (CR3 0x%lx, TID %d).\n",
+                info->regs->cr3, thread_id);
+
+    response = finish_readfile(drakvuf, info, vmi);
+
+done:
+    drakvuf_release_vmi(drakvuf);
+
+    return response;
+}
+
+event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
-    filedelete* f = injector->f;
 
     auto response = 0;
     uint32_t thread_id = 0;
@@ -706,61 +645,23 @@ static event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
         injector->ntreadfile_info.bytes_read = 0UL;
 
+        if (inject_readfile(drakvuf, info, vmi, injector))
         {
-            // Remove stack arguments and home space from previous injection
-            info->regs->rsp = injector->saved_regs.rsp;
-
-            ctx.addr = info->regs->rsp;
-
-            struct argument args[9] = { {0} };
-            struct _LARGE_INTEGER byte_offset = { .QuadPart = 0 };
-            const union IO_STATUS_BLOCK io_status_block = { { 0 } };
-            const uint8_t buffer[BYTES_TO_READ] = { 0 };
-            uint64_t null = 0;
-            const size_t int_size = injector->is32bit ? sizeof (uint32_t) : sizeof (uint64_t);
-
-            init_argument(&args[0], ARGUMENT_INT, int_size, (void*)injector->handle);
-            init_argument(&args[1], ARGUMENT_INT, int_size, (void*)null);
-            init_argument(&args[2], ARGUMENT_INT, int_size, (void*)null);
-            init_argument(&args[3], ARGUMENT_INT, int_size, (void*)null);
-            init_argument(&args[4], ARGUMENT_STRUCT, sizeof(union IO_STATUS_BLOCK), (void*)&io_status_block);
-            init_argument(&args[5], ARGUMENT_STRUCT, BYTES_TO_READ, (void*)buffer);
-            init_argument(&args[6], ARGUMENT_INT, int_size, (void*)BYTES_TO_READ);
-            init_argument(&args[7], ARGUMENT_STRUCT, sizeof(byte_offset), (void*)&byte_offset);
-            init_argument(&args[8], ARGUMENT_INT, int_size, (void*)null);
-
-            bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 9) : setup_stack_64(vmi, info, &ctx, args, 9);
-            if ( !stack_ok )
-                goto err;
-
-            injector->ntreadfile_info.io_status_block = args[4].data_on_stack;
-            injector->ntreadfile_info.out = args[5].data_on_stack;
+            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            goto done;
         }
-
-        info->regs->rip = f->readfile_va;
-
-        injector->bp->name = "ReadFile ret";
-        injector->bp->cb = readfile_cb;
-
-        response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-
-        goto done;
+        else
+        {
+            goto err;
+        }
     }
-
 
 err:
     PRINT_DEBUG("[FILEDELETE2] [QueryObject] Error. Stop processing (CR3 0x%lx, TID %d).\n",
                 info->regs->cr3, thread_id);
 
 handled:
-    f->closing_handles[std::make_pair(info->regs->cr3, thread_id)] = true;
-
-    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
-    response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-
-    drakvuf_remove_trap(drakvuf, injector->bp, (drakvuf_trap_free_t)free);
-
-    g_free(injector);
+    response = finish_readfile(drakvuf, info, vmi);
 
 done:
     drakvuf_release_vmi(drakvuf);
@@ -775,52 +676,43 @@ static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 {
     filedelete* f = (filedelete*)info->trap->data;
 
-    auto response = 0;
-    bool restore_regs = false;
-
     print_filedelete_information(f, drakvuf, info, filename ?: "");
 
-    wrapper_t* injector = (wrapper_t*)g_malloc0(sizeof(wrapper_t));
-    injector->f = f;
-    injector->handle = handle;
-    injector->is32bit = (f->pm != VMI_PM_IA32E);
-    injector->target_cr3 = info->regs->cr3;
-    injector->curr_sequence_number = -1;
-
-    injector->eprocess_base = info->proc_data.base_addr;
-    if ( 0 == injector->eprocess_base )
+    if ( 0 == info->proc_data.base_addr )
     {
         PRINT_DEBUG("[FILEDELETE2] Failed to get process base on vCPU 0x%d\n",
                     info->vcpu);
-        goto err;
+        return 0;
     }
 
-    if ( !drakvuf_get_current_thread_id(drakvuf, info->vcpu, &injector->target_thread_id) ||
-            !injector->target_thread_id )
+    uint32_t target_thread_id = 0;
+    if ( !drakvuf_get_current_thread_id(drakvuf, info->vcpu, &target_thread_id) ||
+            !target_thread_id )
     {
         PRINT_DEBUG("[FILEDELETE2] Failed to get Thread ID\n");
-        goto err;
+        return 0;
     }
 
     /*
      * Check if process/thread is being processed. If so skip it. Add it into
      * regestry otherwise.
      */
+    auto thread = std::make_pair(info->regs->cr3, target_thread_id);
+    auto thread_it = f->closing_handles.find(thread);
+    auto map_end = f->closing_handles.end();
+    if (map_end != thread_it)
     {
-        auto thread = std::make_pair(info->regs->cr3, injector->target_thread_id);
-        auto thread_it = f->closing_handles.find(thread);
-        auto map_end = f->closing_handles.end();
-        if (map_end != thread_it)
+        bool handled = thread_it->second;
+        if (handled)
         {
-            bool handled = thread_it->second;
-            if (handled)
-                f->closing_handles.erase(thread);
-
-            goto err;
+            f->files.erase(std::make_pair(info->proc_data.pid, handle));
+            f->closing_handles.erase(thread);
         }
-        else
-            f->closing_handles[thread] = false;
+
+        return 0;
     }
+    else
+        f->closing_handles[thread] = false;
 
     /*
      * Real function body.
@@ -828,69 +720,32 @@ static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
      * Now we are sure this is new call to NtClose (not result of function injection) and
      * the Handle have been modified in NtWriteFile. So we should save it on the host.
      */
-    memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
-    restore_regs = true;
-
-    {
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = info->regs->rsp,
-        };
-
-        struct argument args[5] = { {0} };
-        const union IO_STATUS_BLOCK io_status_block = { { 0 } };
-        struct FILE_FS_DEVICE_INFORMATION dev_info = { 0 };
-        const size_t int_size = injector->is32bit ? sizeof (uint32_t) : sizeof (uint64_t);
-
-        init_argument(&args[0], ARGUMENT_INT, int_size, (void*)handle);
-        init_argument(&args[1], ARGUMENT_STRUCT, sizeof(union IO_STATUS_BLOCK), (void*)&io_status_block);
-        init_argument(&args[2], ARGUMENT_STRUCT, sizeof(struct FILE_FS_DEVICE_INFORMATION), (void*)&dev_info);
-        init_argument(&args[3], ARGUMENT_INT, int_size, (void*)sizeof(struct FILE_FS_DEVICE_INFORMATION));
-        init_argument(&args[4], ARGUMENT_INT, int_size, (void*)4); // FileFsDeviceInformation
-
-        bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 5) : setup_stack_64(vmi, info, &ctx, args, 5);
-        if ( !stack_ok )
-            goto err;
-
-        injector->ntqueryobject_info.out = args[2].data_on_stack;
-    }
+    wrapper_t* injector = (wrapper_t*)g_malloc0(sizeof(wrapper_t));
+    if (!injector)
+        return 0;
 
     injector->bp = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
     if (!injector->bp)
-        goto err;
-
-    injector->bp->type = BREAKPOINT;
-    injector->bp->name = "QueryObject ret";
-    injector->bp->cb = queryobject_cb;
-    injector->bp->data = injector;
-    injector->bp->breakpoint.lookup_type = LOOKUP_DTB;
-    injector->bp->breakpoint.dtb = info->regs->cr3;
-    injector->bp->breakpoint.addr_type = ADDR_VA;
-    injector->bp->breakpoint.addr = info->regs->rip;
-
-    if ( !drakvuf_add_trap(drakvuf, injector->bp) )
     {
-        PRINT_DEBUG("Failed to trap return location of injected function call @ 0x%lx!\n",
-                    injector->bp->breakpoint.addr);
-        g_free(injector->bp);
-        goto err;
+        g_free(injector);
+        return 0;
     }
 
-    info->regs->rip = f->queryobject_va;
+    injector->f = f;
+    injector->handle = handle;
+    injector->is32bit = (f->pm != VMI_PM_IA32E);
+    injector->target_cr3 = info->regs->cr3;
+    injector->curr_sequence_number = -1;
+    injector->eprocess_base = info->proc_data.base_addr;
+    injector->target_thread_id = target_thread_id;
 
-    response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+    memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
-    return response;
+    if (inject_queryobject(drakvuf, info, vmi, injector))
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
 
-err:
-    if (restore_regs)
-        memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
-
-    g_free(injector);
-
-    return response;
+    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+    return 0;
 }
 
 /*
@@ -1066,6 +921,7 @@ static addr_t get_function_va(drakvuf_t drakvuf, const char* lib, const char* fu
 
 filedelete::filedelete(drakvuf_t drakvuf, const void* config, output_format_t output)
     : sequence_number()
+    , readfile_buffer(0)
 {
     const struct filedelete_config* c = (const struct filedelete_config*)config;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -1092,6 +948,8 @@ filedelete::filedelete(drakvuf_t drakvuf, const void* config, output_format_t ou
         this->queryobject_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryVolumeInformationFile");
         this->readfile_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwReadFile");
         this->waitobject_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwWaitForSingleObject");
+        this->exallocatepool_va = get_function_va(drakvuf, "ntoskrnl.exe", "ExAllocatePoolWithTag");
+        this->exfreepool_va = get_function_va(drakvuf, "ntoskrnl.exe", "ExFreePoolWithTag");
 
         assert(sizeof(traps)/sizeof(traps[0]) > 3);
         register_trap(drakvuf, "NtSetInformationFile", &traps[0], setinformation_cb);

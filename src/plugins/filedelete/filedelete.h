@@ -150,6 +150,11 @@ public:
     addr_t queryobject_va;
     addr_t readfile_va;
     addr_t waitobject_va;
+    addr_t exallocatepool_va;
+    addr_t exfreepool_va;
+
+    addr_t readfile_buffer;
+
     std::map<std::pair<addr_t, uint32_t>, handled_t> closing_handles;
 };
 
