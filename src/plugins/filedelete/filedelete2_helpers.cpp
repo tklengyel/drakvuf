@@ -138,7 +138,7 @@ bool inject_free_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance
     init_argument(&args[0], ARGUMENT_INT, int_size, (void*)injector->pool);
     init_argument(&args[1], ARGUMENT_INT, int_size, (void*)'SMTP'); // TODO Debug-only
 
-    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 1) : setup_stack_64(vmi, info, &ctx, args, 1);
+    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 2) : setup_stack_64(vmi, info, &ctx, args, 2);
     if (!stack_ok)
         return false;
 
@@ -171,35 +171,12 @@ bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_inst
 
     bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 3) : setup_stack_64(vmi, info, &ctx, args, 3);
     if ( !stack_ok )
-    {
-        g_free(injector);
-    }
-
-    injector->bp = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
-    if (!injector->bp)
-    {
-        g_free(injector);
-    }
-
-    injector->bp->type = BREAKPOINT;
-    injector->bp->name = "QueryObject ret";
-    injector->bp->cb = exallocatepool_cb;
-    injector->bp->data = injector;
-    injector->bp->breakpoint.lookup_type = LOOKUP_DTB;
-    injector->bp->breakpoint.dtb = info->regs->cr3;
-    injector->bp->breakpoint.addr_type = ADDR_VA;
-    injector->bp->breakpoint.addr = info->regs->rip;
-
-    if ( !drakvuf_add_trap(drakvuf, injector->bp) )
-    {
-        PRINT_DEBUG("Failed to trap return location of injected function call @ 0x%lx!\n",
-                    injector->bp->breakpoint.addr);
-        g_free(injector->bp);
-        g_free(injector);
-        return false;
-    }
+	return false;
 
     info->regs->rip = injector->f->exallocatepool_va;
+
+    injector->bp->name = "ExAllocatePoolWithTag ret";
+    injector->bp->cb = exallocatepool_cb;
 
     return true;
 }
@@ -225,7 +202,7 @@ bool inject_waitobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instanc
 
     bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 3) : setup_stack_64(vmi, info, &ctx, args, 3);
     if ( !stack_ok )
-        return true;
+        return false;
 
     info->regs->rip = injector->f->waitobject_va;
 
