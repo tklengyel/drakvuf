@@ -149,8 +149,6 @@ struct wrapper_t
 
     int curr_sequence_number;
 
-    addr_t pool;
-
     union
     {
         struct

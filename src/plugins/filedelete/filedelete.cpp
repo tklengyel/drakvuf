@@ -350,22 +350,22 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakv
     return; // TODO Debug-only
     switch (f->format)
     {
-        case OUTPUT_CSV:
-            printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, filename);
-            break;
-        case OUTPUT_KV:
-            printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, filename);
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, filename);
-            break;
+    case OUTPUT_CSV:
+        printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\"\n",
+               UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+               info->proc_data.userid, filename);
+        break;
+    case OUTPUT_KV:
+        printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\"\n",
+               UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+               info->trap->name, filename);
+        break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\"\n",
+               UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+               USERIDSTR(drakvuf), info->proc_data.userid, filename);
+        break;
     }
 }
 
@@ -424,8 +424,8 @@ static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
 
-    if (injector->pool && inject_free_pool(drakvuf, info, vmi, injector))
-        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    if (!injector->f->pool.is_free)
+        injector->f->pool.is_free = true;
 
     free_resources(drakvuf, info);
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -436,7 +436,8 @@ event_response_t exfreepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     drakvuf_lock_and_get_vmi(drakvuf);
 
     wrapper_t* injector = (wrapper_t*)info->trap->data;
-    injector->pool = 0;
+    injector->f->pool.va = 0;
+    injector->f->pool.is_free = false;
 
     free_resources(drakvuf, info);
 
@@ -520,6 +521,9 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         if (BYTES_TO_READ == isb_size)
         {
+            // Allow subsequent ReadFile
+            injector->f->pool.is_free = true;
+
             if (inject_readfile(drakvuf, info, vmi, injector))
             {
                 response = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -581,7 +585,8 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if (info->regs->rax)
     {
-        injector->pool = info->regs->rax;
+        injector->f->pool.va = info->regs->rax;
+        injector->f->pool.is_free = true;
 
         if (inject_readfile(drakvuf, info, vmi, injector))
         {
@@ -645,20 +650,27 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         injector->ntreadfile_info.bytes_read = 0UL;
 
-        if (inject_allocate_pool(drakvuf, info, vmi, injector))
+        if (!injector->f->pool.va)
         {
-            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            goto done;
+            if (inject_allocate_pool(drakvuf, info, vmi, injector))
+            {
+                response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+                goto done;
+            }
         }
-        else
+        else if (injector->f->pool.is_free)
         {
-            goto err;
+            if (inject_readfile(drakvuf, info, vmi, injector))
+            {
+                response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+                goto done;
+            }
         }
     }
 
 err:
-    PRINT_DEBUG("[FILEDELETE2] [QueryObject] Error. Stop processing (CR3 0x%lx, TID %d).\n",
-                info->regs->cr3, thread_id);
+    PRINT_DEBUG("[FILEDELETE2] [QueryObject] Error. Stop processing (CR3 0x%lx, TID %d). Buffer is %s.\n",
+                info->regs->cr3, thread_id, injector->f->pool.is_free ? "FREE" : "BUSY");
 
 handled:
     response = finish_readfile(drakvuf, info, vmi);
@@ -921,12 +933,13 @@ static addr_t get_function_va(drakvuf_t drakvuf, const char* lib, const char* fu
 
 filedelete::filedelete(drakvuf_t drakvuf, const void* config, output_format_t output)
     : sequence_number()
-    , readfile_buffer(0)
 {
     const struct filedelete_config* c = (const struct filedelete_config*)config;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->pm = vmi_get_page_mode(vmi, 0);
     this->domid = vmi_get_vmid(vmi);
+    this->pool.va = 0;
+    this->pool.is_free = false;
     drakvuf_release_vmi(drakvuf);
 
     this->dump_folder = c->dump_folder;

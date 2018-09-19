@@ -153,7 +153,11 @@ public:
     addr_t exallocatepool_va;
     addr_t exfreepool_va;
 
-    addr_t readfile_buffer;
+    struct
+    {
+        addr_t va;
+        bool   is_free;
+    } pool;
 
     std::map<std::pair<addr_t, uint32_t>, handled_t> closing_handles;
 };
