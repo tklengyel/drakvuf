@@ -136,7 +136,7 @@ bool inject_free_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance
     const size_t int_size = injector->is32bit ? sizeof (uint32_t) : sizeof (uint64_t);
 
     init_argument(&args[0], ARGUMENT_INT, int_size, (void*)injector->f->pool.va);
-    init_argument(&args[1], ARGUMENT_INT, int_size, (void*)'SMTP'); // TODO Debug-only
+    init_argument(&args[1], ARGUMENT_INT, int_size, (void*)0);
 
     bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 2) : setup_stack_64(vmi, info, &ctx, args, 2);
     if (!stack_ok)
@@ -167,7 +167,7 @@ bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_inst
 
     init_argument(&args[0], ARGUMENT_INT, int_size, (void*)null); // NonPagedPool
     init_argument(&args[1], ARGUMENT_INT, int_size, (void*)BYTES_TO_READ);
-    init_argument(&args[2], ARGUMENT_INT, int_size, (void*)'SMTP'); // Tag value TODO Debug-only
+    init_argument(&args[2], ARGUMENT_INT, int_size, (void*)0);
 
     bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 3) : setup_stack_64(vmi, info, &ctx, args, 3);
     if ( !stack_ok )

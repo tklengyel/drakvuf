@@ -347,7 +347,6 @@ static void extract_file(filedelete* f,
 
 static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* filename)
 {
-    return; // TODO Debug-only
     switch (f->format)
     {
     case OUTPUT_CSV:
