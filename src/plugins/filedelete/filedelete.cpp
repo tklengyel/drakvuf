@@ -431,27 +431,6 @@ static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
-event_response_t exfreepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    drakvuf_lock_and_get_vmi(drakvuf);
-
-    wrapper_t* injector = (wrapper_t*)info->trap->data;
-    injector->f->pool.va = 0;
-    injector->f->pool.is_free = false;
-
-    free_resources(drakvuf, info);
-
-    drakvuf_release_vmi(drakvuf);
-
-    return VMI_EVENT_RESPONSE_SET_REGISTERS;
-}
-
-event_response_t waitobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    // Handle error codes there
-    return readfile_cb(drakvuf, info);
-}
-
 event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
@@ -533,18 +512,6 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             {
                 goto err;
             }
-        }
-    }
-    else if (STATUS_PENDING == status) // STATUS_PENDING
-    {
-        if (inject_waitobject(drakvuf, info, vmi, injector))
-        {
-            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            goto done;
-        }
-        else
-        {
-            goto err;
         }
     }
     else

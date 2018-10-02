@@ -122,34 +122,6 @@ void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     g_free(injector);
 }
 
-bool inject_free_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
-{
-    // Remove stack arguments and home space from previous injection
-    info->regs->rsp = injector->saved_regs.rsp;
-
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
-    struct argument args[2] = { {0} };
-    const size_t int_size = injector->is32bit ? sizeof (uint32_t) : sizeof (uint64_t);
-
-    init_argument(&args[0], ARGUMENT_INT, int_size, (void*)injector->f->pool.va);
-    init_argument(&args[1], ARGUMENT_INT, int_size, (void*)0);
-
-    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 2) : setup_stack_64(vmi, info, &ctx, args, 2);
-    if (!stack_ok)
-        return false;
-
-    info->regs->rip = injector->f->exfreepool_va;
-
-    injector->bp->name = "ExFreePool ret";
-    injector->bp->cb = exfreepool_cb;
-
-    return true;
-}
-
 bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
 {
     // Remove stack arguments and home space from previous injection
@@ -171,43 +143,12 @@ bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_inst
 
     bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 3) : setup_stack_64(vmi, info, &ctx, args, 3);
     if ( !stack_ok )
-	return false;
+        return false;
 
     info->regs->rip = injector->f->exallocatepool_va;
 
     injector->bp->name = "ExAllocatePoolWithTag ret";
     injector->bp->cb = exallocatepool_cb;
-
-    return true;
-}
-
-bool inject_waitobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
-{
-    // Preserve stack to read buffer contents after wait
-
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp,
-    };
-
-    struct argument args[3] = { {0} };
-    uint64_t null = 0;
-    const size_t int_size = injector->is32bit ? sizeof (uint32_t) : sizeof (uint64_t);
-
-    init_argument(&args[0], ARGUMENT_INT, int_size, (void*)injector->handle);
-    init_argument(&args[1], ARGUMENT_INT, int_size, (void*)null);
-    init_argument(&args[2], ARGUMENT_INT, int_size, (void*)null);
-
-    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 3) : setup_stack_64(vmi, info, &ctx, args, 3);
-    if ( !stack_ok )
-        return false;
-
-    info->regs->rip = injector->f->waitobject_va;
-
-    injector->bp->name = "WaitForSingleObject ret";
-    injector->bp->cb = waitobject_cb;
 
     return true;
 }
