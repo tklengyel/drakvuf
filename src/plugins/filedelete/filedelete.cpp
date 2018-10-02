@@ -117,6 +117,7 @@
 const char* offset_names[__OFFSET_MAX][2] =
 {
     [FILE_OBJECT_TYPE] = {"_FILE_OBJECT", "Type"},
+    [FILE_OBJECT_FLAGS] = {"_FILE_OBJECT", "Flags"},
     [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
     [FILE_OBJECT_SECTIONOBJECTPOINTER] = {"_FILE_OBJECT", "SectionObjectPointer"},
     [SECTIONOBJECTPOINTER_DATASECTIONOBJECT] = {"_SECTION_OBJECT_POINTERS", "DataSectionObject"},
@@ -680,11 +681,38 @@ done:
     return response;
 }
 
+static bool is_synchronous(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle)
+{
+    filedelete* f = (filedelete*)info->trap->data;
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    if (!obj)
+        return false; // Break operatioin to not crash VM
+
+    addr_t file = obj + f->offsets[OBJECT_HEADER_BODY];
+    addr_t fileflags = file + f->offsets[FILE_OBJECT_FLAGS];
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.addr = fileflags;
+    ctx.dtb = info->regs->cr3;
+
+    uint64_t flags = 0;
+    if (VMI_SUCCESS == vmi_read_64(vmi, &ctx, &flags) &&
+            (flags & 2)) // FO_SYNCHRONOUS_IO
+        return true;
+
+    return false;
+}
+
 /*
  * Drakvuf must be locked/unlocked in the caller
  */
 static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle, const char* filename)
 {
+    if (!is_synchronous(drakvuf, info, vmi, handle))
+        return 0;
+
     filedelete* f = (filedelete*)info->trap->data;
 
     print_filedelete_information(f, drakvuf, info, filename ?: "");
