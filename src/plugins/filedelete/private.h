@@ -167,6 +167,8 @@ struct wrapper_t
     };
 
     drakvuf_trap_t* bp;
+
+    addr_t pool;
 };
 
 union IO_STATUS_BLOCK
@@ -222,5 +224,7 @@ bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instan
  *  ## Other helpers
  ********************/
 void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+void free_pool(std::map<addr_t, bool>& pools, addr_t va);
+addr_t find_pool(std::map<addr_t, bool>& pools);
 
 #endif // FILEDELETE_PRIVATE_H

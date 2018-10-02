@@ -422,11 +422,6 @@ static bool save_file_chunk(filedelete* f, int file_sequence_number, void* buffe
 
 static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi)
 {
-    wrapper_t* injector = (wrapper_t*)info->trap->data;
-
-    if (!injector->f->pool.is_free)
-        injector->f->pool.is_free = true;
-
     free_resources(drakvuf, info);
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
@@ -500,9 +495,6 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         if (BYTES_TO_READ == isb_size)
         {
-            // Allow subsequent ReadFile
-            injector->f->pool.is_free = true;
-
             if (inject_readfile(drakvuf, info, vmi, injector))
             {
                 response = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -552,9 +544,9 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if (info->regs->rax)
     {
-        injector->f->pool.va = info->regs->rax;
-        injector->f->pool.is_free = true;
+        injector->f->pools[info->regs->rax] = true;
 
+        injector->pool = info->regs->rax;
         if (inject_readfile(drakvuf, info, vmi, injector))
         {
             response = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -617,7 +609,8 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         injector->ntreadfile_info.bytes_read = 0UL;
 
-        if (!injector->f->pool.va)
+        addr_t pool = find_pool(injector->f->pools);
+        if (!pool)
         {
             if (inject_allocate_pool(drakvuf, info, vmi, injector))
             {
@@ -625,8 +618,9 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 goto done;
             }
         }
-        else if (injector->f->pool.is_free)
+        else
         {
+            injector->pool = pool;
             if (inject_readfile(drakvuf, info, vmi, injector))
             {
                 response = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -636,8 +630,8 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
 err:
-    PRINT_DEBUG("[FILEDELETE2] [QueryObject] Error. Stop processing (CR3 0x%lx, TID %d). Buffer is %s.\n",
-                info->regs->cr3, thread_id, injector->f->pool.is_free ? "FREE" : "BUSY");
+    PRINT_DEBUG("[FILEDELETE2] [QueryObject] Error. Stop processing (CR3 0x%lx, TID %d).\n",
+                info->regs->cr3, thread_id);
 
 handled:
     response = finish_readfile(drakvuf, info, vmi);
@@ -932,8 +926,6 @@ filedelete::filedelete(drakvuf_t drakvuf, const void* config, output_format_t ou
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->pm = vmi_get_page_mode(vmi, 0);
     this->domid = vmi_get_vmid(vmi);
-    this->pool.va = 0;
-    this->pool.is_free = false;
     drakvuf_release_vmi(drakvuf);
 
     this->dump_folder = c->dump_folder;

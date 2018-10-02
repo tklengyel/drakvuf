@@ -108,12 +108,35 @@
 
 #include <libinjector/libinjector.h>
 
+void free_pool(std::map<addr_t, bool>& pools, addr_t va)
+{
+    for (auto pool: pools)
+        if (va == pool.first)
+        {
+            pool.second = true;
+            return;
+        }
+}
+
+addr_t find_pool(std::map<addr_t, bool>& pools)
+{
+    for (auto pool: pools)
+        if (pool.second)
+        {
+            pool.second = false;
+            return pool.first;
+        }
+
+    return 0;
+}
+
 void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
     filedelete* f = injector->f;
 
     f->closing_handles[std::make_pair(info->regs->cr3, injector->target_thread_id)] = true;
+    free_pool(f->pools, injector->pool);
 
     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
 
@@ -155,11 +178,6 @@ bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_inst
 
 bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
 {
-    if (!injector->f->pool.va || !injector->f->pool.is_free)
-        return false;
-
-    injector->f->pool.is_free = false;
-
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = injector->saved_regs.rsp;
 
@@ -181,7 +199,7 @@ bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_
     init_argument(&args[2], ARGUMENT_INT, int_size, (void*)null);
     init_argument(&args[3], ARGUMENT_INT, int_size, (void*)null);
     init_argument(&args[4], ARGUMENT_STRUCT, sizeof(union IO_STATUS_BLOCK), (void*)&io_status_block);
-    init_argument(&args[5], ARGUMENT_INT, int_size, (void*)injector->f->pool.va);
+    init_argument(&args[5], ARGUMENT_INT, int_size, (void*)injector->pool);
     init_argument(&args[6], ARGUMENT_INT, int_size, (void*)BYTES_TO_READ);
     init_argument(&args[7], ARGUMENT_STRUCT, sizeof(byte_offset), (void*)&byte_offset);
     init_argument(&args[8], ARGUMENT_INT, int_size, (void*)null);
