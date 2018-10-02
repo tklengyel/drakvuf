@@ -110,6 +110,7 @@
 enum offset
 {
     FILE_OBJECT_TYPE,
+    FILE_OBJECT_FLAGS,
     FILE_OBJECT_FILENAME,
     FILE_OBJECT_SECTIONOBJECTPOINTER,
     SECTIONOBJECTPOINTER_DATASECTIONOBJECT,
@@ -129,5 +130,101 @@ enum offset
 };
 
 extern const char* offset_names[__OFFSET_MAX][2];
+
+/************************
+ * # For filedelete 2
+ ************************/
+
+struct wrapper_t
+{
+    filedelete* f;
+    bool is32bit;
+
+    handle_t handle;
+
+    reg_t target_cr3;
+    uint32_t target_thread_id;
+    addr_t eprocess_base;
+
+    x86_registers_t saved_regs;
+
+    int curr_sequence_number;
+
+    union
+    {
+        struct
+        {
+            addr_t out;
+            size_t size;
+        } ntqueryobject_info;
+
+        struct
+        {
+            size_t bytes_read;
+            addr_t out;
+            addr_t io_status_block;
+        } ntreadfile_info;
+    };
+
+    drakvuf_trap_t* bp;
+
+    addr_t pool;
+};
+
+union IO_STATUS_BLOCK
+{
+    struct
+    {
+        uint32_t status;
+        uint32_t info;
+    } x86;
+
+    struct
+    {
+        uint64_t status;
+        uint64_t info;
+    } amd64;
+} __attribute__((packed));
+
+constexpr static uint32_t STATUS_SUCCESS = 0;
+constexpr static uint32_t STATUS_PENDING = 0x103;
+
+struct _LARGE_INTEGER
+{
+    uint64_t QuadPart;
+} __attribute__((packed));
+
+struct FILE_FS_DEVICE_INFORMATION
+{
+    uint32_t device_type;
+    uint32_t characteristics;
+} __attribute__((packed));
+
+static const uint64_t BYTES_TO_READ = 0x10000;
+
+/**************************************
+ * ## Callbacks for injected functions
+ *************************************/
+event_response_t exfreepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t waitobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+/***************************
+ * ## Helpers for injection
+ ***************************/
+bool inject_free_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
+bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
+bool inject_waitobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
+bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
+bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
+
+/********************
+ *  ## Other helpers
+ ********************/
+void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+void free_pool(std::map<addr_t, bool>& pools, addr_t va);
+addr_t find_pool(std::map<addr_t, bool>& pools);
 
 #endif // FILEDELETE_PRIVATE_H
