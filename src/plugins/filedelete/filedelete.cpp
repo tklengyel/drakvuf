@@ -350,22 +350,22 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakv
 {
     switch (f->format)
     {
-    case OUTPUT_CSV:
-        printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\"\n",
-               UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-               info->proc_data.userid, filename);
-        break;
-    case OUTPUT_KV:
-        printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\"\n",
-               UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-               info->trap->name, filename);
-        break;
-    default:
-    case OUTPUT_DEFAULT:
-        printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\"\n",
-               UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-               USERIDSTR(drakvuf), info->proc_data.userid, filename);
-        break;
+        case OUTPUT_CSV:
+            printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, filename);
+            break;
+        case OUTPUT_KV:
+            printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   info->trap->name, filename);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid, filename);
+            break;
     }
 }
 
