@@ -1415,7 +1415,7 @@ bool init_vmi(drakvuf_t drakvuf)
     if (rc < 0)
         return 0;
 
-    SETUP_INTERRUPT_EVENT(&drakvuf->interrupt_event, 0, int3_cb);
+    SETUP_INTERRUPT_EVENT(&drakvuf->interrupt_event, int3_cb);
     drakvuf->interrupt_event.data = drakvuf;
 
     if (VMI_FAILURE == vmi_register_event(drakvuf->vmi, &drakvuf->interrupt_event))
