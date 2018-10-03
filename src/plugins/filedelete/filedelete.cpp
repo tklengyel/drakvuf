@@ -420,8 +420,16 @@ static bool save_file_chunk(filedelete* f, int file_sequence_number, void* buffe
     return success;
 }
 
-static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi)
+static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, bool is_success = false)
 {
+    if (!is_success)
+    {
+        wrapper_t* injector = (wrapper_t*)info->trap->data;
+        filedelete* f = injector->f;
+
+        grab_file_by_handle(f, drakvuf, vmi, info, injector->handle);
+    }
+
     free_resources(drakvuf, info);
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
@@ -446,6 +454,7 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     uint32_t isb_status = 0; // `isb` is `IO_STATUS_BLOCK`
     size_t isb_size = 0;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    bool is_success = false;
 
     if (info->regs->cr3 != injector->target_cr3)
         goto done;
@@ -507,9 +516,13 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
     else
+    {
         PRINT_DEBUG("[FILEDELETE2] [ReadFile] Failed to read %s with status 0x%lx and IO_STATUS_BLOCK = { Status 0x%x; Size 0x%lx} .\n",
                     f->files[std::make_pair(info->proc_data.pid, injector->handle)].c_str(), info->regs->rax, isb_status, isb_size);
+        goto err;
+    }
 
+    is_success = true;
     goto handled;
 
 err:
@@ -517,7 +530,7 @@ err:
                 info->regs->cr3, thread_id, f->files[std::make_pair(info->proc_data.pid, injector->handle)].c_str(), info->regs->rax);
 
 handled:
-    response = finish_readfile(drakvuf, info, vmi);
+    response = finish_readfile(drakvuf, info, vmi, is_success);
 
 done:
     drakvuf_release_vmi(drakvuf);
