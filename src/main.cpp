@@ -153,6 +153,7 @@ int main(int argc, char** argv)
     bool dump_modified_files = false;
     bool filedelete_use_injector = false;
     bool abort_on_bsod = false;
+    bool initialize_plugins_before_inject = false;
 
     eprint_current_time();
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -182,6 +183,7 @@ int main(int argc, char** argv)
                 "\t -x <plugin>               Don't activate the specified plugin\n"
                 "\t -p                        Leave domain paused after DRAKVUF exits\n"
                 "\t -w <process name>         Wait with plugin start until process name is detected\n"
+                "\t -J                        Initialize plugins before injection\n"
 #ifdef ENABLE_PLUGIN_FILEDELETE
                 "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
                 "\t -M                        Dump new or modified files also (requires -D)\n"
@@ -206,7 +208,7 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:Mc:nb")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:P:B:T:S:Mc:nbJ")) != -1)
         switch (c)
         {
             case 'r':
@@ -266,6 +268,9 @@ int main(int argc, char** argv)
                 break;
             case 'w':
                 start_process_name = optarg;
+                break;
+            case 'J':
+                initialize_plugins_before_inject = true;
                 break;
             case 'T':
                 tcpip = optarg;
@@ -333,6 +338,22 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
+#define INITIALIZE_PLUGINS \
+    do \
+    { \
+        PRINT_DEBUG("Starting plugins\n"); \
+         \
+        if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, \
+                                    cpuid_stealth, tcpip, syscalls_filter_file, abort_on_bsod) < 0 ) \
+            goto exit; \
+    } \
+    while (0)
+
+    if ( initialize_plugins_before_inject )
+    {
+        INITIALIZE_PLUGINS;
+    }
+
     if ( injection_pid > 0 && inject_file )
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
@@ -347,10 +368,12 @@ int main(int argc, char** argv)
             goto exit;
     }
 
-    PRINT_DEBUG("Starting plugins\n");
+    if ( !initialize_plugins_before_inject )
+    {
+        INITIALIZE_PLUGINS;
+    }
 
-    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, syscalls_filter_file, abort_on_bsod) < 0 )
-        goto exit;
+#undef INITIALIZE_PLUGINS
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");
 
