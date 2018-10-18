@@ -274,76 +274,17 @@ void drakvuf_c::resume()
     drakvuf_resume(this->drakvuf);
 }
 
-int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, const char* cwd, injection_method_t method, output_format_t format, const char* binary_path, const char* target_process)
+int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, const char* cwd, injection_method_t method, output_format_t format, const char* binary_path, const char* target_process, bool wait_for_process)
 {
-    int rc = injector_start_app(this->drakvuf, injection_pid, injection_tid, inject_cmd, cwd, method, format, binary_path, target_process);
+    int rc = 0;
+    this->injector = injector_start_app(this->drakvuf, injection_pid, injection_tid, inject_cmd, cwd, method, format, binary_path, target_process, wait_for_process, &rc);
+
     if (!rc)
         fprintf(stderr, "Process startup failed\n");
     return rc;
 }
 
-static gpointer timer2(gpointer data)
+void drakvuf_c::inject_cmd_cleanup(void)
 {
-    drakvuf_c* drakvuf = (drakvuf_c*)data;
-
-    /* Wait for the loop to start */
-    g_mutex_lock(&drakvuf->loop_signal2);
-    g_mutex_unlock(&drakvuf->loop_signal2);
-
-    while (drakvuf->process_start_timeout && !drakvuf->interrupted)
-    {
-        sleep(1);
-        --drakvuf->process_start_timeout;
-    }
-
-    if (!drakvuf->interrupted)
-    {
-        drakvuf->interrupt(-1);
-    }
-
-    g_thread_exit(NULL);
-    return NULL;
-}
-
-static event_response_t wait_for_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    UNUSED(drakvuf);
-    drakvuf_c* dc = (drakvuf_c*)info->trap->data;
-
-    const char* begin_name = strrchr(info->proc_data.name, '\\');
-
-    if ( !strcmp(begin_name ? begin_name + 1 : info->proc_data.name, dc->process_start_name) )
-    {
-        dc->interrupt(-1);
-        dc->process_start_detected = 1;
-    }
-
-    return 0;
-}
-
-bool drakvuf_c::wait_for_process(const char* processname)
-{
-    drakvuf_trap_t trap =
-    {
-        .cb = wait_for_process_cb,
-        .type = REGISTER,
-        .reg = CR3,
-        .data = (void*)this
-    };
-
-    if ( !drakvuf_add_trap(this->drakvuf,&trap) )
-        return 0;
-
-    this->timeout_thread2 = g_thread_new(NULL, timer2, (void*)this);
-
-    this->process_start_name = processname;
-
-    g_mutex_unlock(&this->loop_signal2);
-    drakvuf_loop(this->drakvuf);
-
-    drakvuf_remove_trap(this->drakvuf, &trap, NULL);
-
-    g_thread_join(this->timeout_thread2);
-
-    return this->process_start_detected;
+    injector_cleanup(this->injector);
 }
