@@ -137,7 +137,7 @@ int main(int argc, char** argv)
     char* domain = NULL;
     char* rekall_profile = NULL;
     char* dump_folder = NULL;
-    char* start_process_name = NULL;
+    bool wait_for_process;
     char* tcpip = NULL;
     char* binary_path = NULL;
     char* target_process = NULL;
@@ -177,11 +177,11 @@ int main(int argc, char** argv)
                 "\t -m <inject_method>        The injection method (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
                 "\t [-B] <path>               The host path of the windows binary to inject (requires -m doppelganging)\n"
                 "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
+                "\t -w                        Wait with plugin start until injected process name is detected\n"
                 "\t -t <timeout>              Timeout (in seconds)\n"
                 "\t -o <format>               Output format (default or csv)\n"
                 "\t -x <plugin>               Don't activate the specified plugin\n"
                 "\t -p                        Leave domain paused after DRAKVUF exits\n"
-                "\t -w <process name>         Wait with plugin start until process name is detected\n"
 #ifdef ENABLE_PLUGIN_FILEDELETE
                 "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
                 "\t -M                        Dump new or modified files also (requires -D)\n"
@@ -265,7 +265,7 @@ int main(int argc, char** argv)
                 leave_paused = 1;
                 break;
             case 'w':
-                start_process_name = optarg;
+                wait_for_process = optarg;
                 break;
             case 'T':
                 tcpip = optarg;
@@ -336,14 +336,8 @@ int main(int argc, char** argv)
     if ( injection_pid > 0 && inject_file )
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process);
+        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, wait_for_process);
         if (!ret)
-            goto exit;
-    }
-
-    if ( start_process_name )
-    {
-        if ( !drakvuf->wait_for_process(start_process_name) )
             goto exit;
     }
 
@@ -351,6 +345,11 @@ int main(int argc, char** argv)
 
     if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, syscalls_filter_file, abort_on_bsod) < 0 )
         goto exit;
+
+    if ( injection_pid > 0 && inject_file )
+    {
+        drakvuf->inject_cmd_cleanup();
+    }
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");
 

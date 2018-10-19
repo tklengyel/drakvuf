@@ -170,21 +170,24 @@ static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t epr
                                    image_file_name_addr + drakvuf->offsets[OBJECTNAMEINFORMATION_NAME], 0);
 }
 
-char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base)
+char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath)
 {
-    unicode_string_t* fullname = win_get_process_full_name( drakvuf, eprocess_base );
-
-    if (fullname && fullname->contents && strlen((const char*)fullname->contents) > 0)
+    if ( fullpath )
     {
-        // Replace 'proc_data->name' with 'fullname->contents'
-        // Moving ownership of fullname->contents to name for later cleanup
-        char* name = (char*)fullname->contents;
-        g_free( (gpointer)fullname );
-        return name;
-    }
+        unicode_string_t* fullname = win_get_process_full_name( drakvuf, eprocess_base );
 
-    if (fullname)
-        vmi_free_unicode_str(fullname);
+        if (fullname && fullname->contents && strlen((const char*)fullname->contents) > 0)
+        {
+            // Replace 'proc_data->name' with 'fullname->contents'
+            // Moving ownership of fullname->contents to name for later cleanup
+            char* name = (char*)fullname->contents;
+            g_free( (gpointer)fullname );
+            return name;
+        }
+
+        if (fullname)
+            vmi_free_unicode_str(fullname);
+    }
 
     return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
 }
@@ -195,9 +198,9 @@ status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t*
     return vmi_read_32_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)pid);
 }
 
-char* win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id)
+char* win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath)
 {
-    return win_get_process_name(drakvuf, win_get_current_process(drakvuf, vcpu_id));
+    return win_get_process_name(drakvuf, win_get_current_process(drakvuf, vcpu_id), fullpath);
 }
 
 int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
@@ -446,7 +449,7 @@ bool win_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_dat
             if ( win_get_process_ppid( drakvuf, proc_data->base_addr, &proc_data->ppid ) == VMI_SUCCESS )
             {
                 proc_data->userid = win_get_process_userid( drakvuf, proc_data->base_addr );
-                proc_data->name   = win_get_process_name( drakvuf, proc_data->base_addr );
+                proc_data->name   = win_get_process_name( drakvuf, proc_data->base_addr, 1 );
 
                 if ( proc_data->name )
                     return true ;

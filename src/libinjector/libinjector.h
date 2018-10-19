@@ -113,6 +113,8 @@ extern "C" {
 
 #include <libdrakvuf/libdrakvuf.h>
 
+typedef struct injector* injector_t;
+
 typedef enum
 {
     INJECT_METHOD_CREATEPROC,
@@ -177,15 +179,19 @@ bool setup_stack_64(vmi_instance_t vmi,
                     struct argument args[],
                     int nb_args);
 
-int injector_start_app(drakvuf_t drakvuf,
-                       vmi_pid_t pid,
-                       uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-                       const char* app,
-                       const char* cwd,
-                       injection_method_t method,
-                       output_format_t format,
-                       const char* binary_path,     // if -m = doppelganging
-                       const char* target_process); // if -m = doppelganging
+injector_t injector_start_app(drakvuf_t drakvuf,
+                              vmi_pid_t pid,
+                              uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
+                              const char* app,
+                              const char* cwd,
+                              injection_method_t method,
+                              output_format_t format,
+                              const char* binary_path,     // if -m = doppelganging
+                              const char* target_process,  // if -m = doppelganging
+                              bool wait_for_process,
+                              int* ret);
+
+void injector_cleanup(injector_t injector);
 
 #pragma GCC visibility pop
 
