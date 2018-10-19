@@ -113,11 +113,11 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id);
 
 addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id);
 
-char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base);
+char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
 
 status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
 
-char* win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id);
+char* win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath);
 
 int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base);
 

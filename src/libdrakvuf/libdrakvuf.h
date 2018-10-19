@@ -364,7 +364,8 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
 
 /* Caller must free the returned string */
 char* drakvuf_get_process_name(drakvuf_t drakvuf,
-                               addr_t process_base);
+                               addr_t process_base,
+                               bool fullpath);
 
 status_t drakvuf_get_process_pid( drakvuf_t drakvuf,
                                   addr_t process_base,

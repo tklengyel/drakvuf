@@ -139,6 +139,7 @@ private:
     bool leave_paused;
     drakvuf_t drakvuf;
     drakvuf_plugins* plugins;
+    injector_t injector;
     GThread* timeout_thread = NULL;
     GThread* timeout_thread2 = NULL;
     os_t os;
@@ -166,7 +167,16 @@ public:
     void loop();
     void pause();
     void resume();
-    int inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, const char* cwd, injection_method_t method, output_format_t format, const char* binary_path, const char* target_process);
+    int inject_cmd(vmi_pid_t injection_pid,
+                   uint32_t injection_tid,
+                   const char* inject_cmd,
+                   const char* cwd,
+                   injection_method_t method,
+                   output_format_t format,
+                   const char* binary_path,
+                   const char* target_process,
+                   bool wait_for_process);
+    void inject_cmd_cleanup();
     int start_plugins(const bool* plugin_list,
                       const char* dump_folder,
                       bool dump_modified_files,

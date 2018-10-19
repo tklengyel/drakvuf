@@ -144,10 +144,10 @@ addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
     return 0;
 }
 
-char* drakvuf_get_process_name(drakvuf_t drakvuf, addr_t process_base)
+char* drakvuf_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpath)
 {
     if ( drakvuf->osi.get_process_name )
-        return drakvuf->osi.get_process_name(drakvuf, process_base);
+        return drakvuf->osi.get_process_name(drakvuf, process_base, fullpath);
 
     return NULL;
 }
@@ -160,10 +160,10 @@ status_t drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid
     return VMI_FAILURE;
 }
 
-char* drakvuf_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id)
+char* drakvuf_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath)
 {
     if ( drakvuf->osi.get_current_process_name )
-        return drakvuf->osi.get_current_process_name(drakvuf, vcpu_id);
+        return drakvuf->osi.get_current_process_name(drakvuf, vcpu_id, fullpath);
 
     return NULL;
 }

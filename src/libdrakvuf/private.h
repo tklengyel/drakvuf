@@ -276,7 +276,8 @@ struct memcb_pass
 void drakvuf_force_resume (drakvuf_t drakvuf);
 
 char* drakvuf_get_current_process_name(drakvuf_t drakvuf,
-                                       uint64_t vcpu_id);
+                                       uint64_t vcpu_id,
+                                       bool fullpath);
 
 int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf,
         uint64_t vcpu_id);

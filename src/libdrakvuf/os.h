@@ -114,10 +114,10 @@ typedef struct os_interface
     (drakvuf_t drakvuf, uint64_t vcpu_id);
 
     char* (*get_process_name)
-    (drakvuf_t drakvuf, addr_t process_base);
+    (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
 
     char* (*get_current_process_name)
-    (drakvuf_t drakvuf, uint64_t vcpu_id);
+    (drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath);
 
     int64_t (*get_process_userid)
     (drakvuf_t drakvuf, addr_t process_base);

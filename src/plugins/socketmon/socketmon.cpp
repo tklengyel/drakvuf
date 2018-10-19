@@ -254,7 +254,7 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
         ipv6_to_str(&lip, localip);
     }
 
-    owner = drakvuf_get_process_name(drakvuf, udpa.owner);
+    owner = drakvuf_get_process_name(drakvuf, udpa.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, udpa.owner);
 
     switch (s->format)
@@ -369,7 +369,7 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
         ipv6_to_str(&lip, localip);
     }
 
-    owner = drakvuf_get_process_name(drakvuf, udpa.owner);
+    owner = drakvuf_get_process_name(drakvuf, udpa.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, udpa.owner);
 
     switch (s->format)
@@ -485,7 +485,7 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
         ipv6_to_str(&lip, localip);
     }
 
-    owner = drakvuf_get_process_name(drakvuf, udpa.owner);
+    owner = drakvuf_get_process_name(drakvuf, udpa.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, udpa.owner);
 
     switch (s->format)
@@ -629,7 +629,7 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
         ipv6_to_str(&rip, remoteip);
     }
 
-    owner = drakvuf_get_process_name(drakvuf, tcpe.owner);
+    owner = drakvuf_get_process_name(drakvuf, tcpe.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, tcpe.owner);
 
     switch (s->format)
@@ -757,7 +757,7 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
         ipv6_to_str(&rip, remoteip);
     }
 
-    owner = drakvuf_get_process_name(drakvuf, tcpe.owner);
+    owner = drakvuf_get_process_name(drakvuf, tcpe.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, tcpe.owner);
 
     switch (s->format)
@@ -886,7 +886,7 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         ipv6_to_str(&rip, remoteip);
     }
 
-    owner = drakvuf_get_process_name(drakvuf, tcpe.owner);
+    owner = drakvuf_get_process_name(drakvuf, tcpe.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, tcpe.owner);
 
     switch (s->format)
@@ -1015,7 +1015,7 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
         ipv6_to_str(&lip, localip);
     }
 
-    owner = drakvuf_get_process_name(drakvuf, tcpl.owner);
+    owner = drakvuf_get_process_name(drakvuf, tcpl.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, tcpl.owner);
 
     switch (s->format)
@@ -1131,7 +1131,7 @@ static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
         ipv6_to_str(&lip, localip);
     }
 
-    owner = drakvuf_get_process_name(drakvuf, tcpl.owner);
+    owner = drakvuf_get_process_name(drakvuf, tcpl.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, tcpl.owner);
 
     switch (s->format)
@@ -1247,7 +1247,7 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
         ipv6_to_str(&lip, localip);
     }
 
-    owner = drakvuf_get_process_name(drakvuf, tcpl.owner);
+    owner = drakvuf_get_process_name(drakvuf, tcpl.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, tcpl.owner);
 
     switch (s->format)

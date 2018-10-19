@@ -162,8 +162,9 @@ addr_t linux_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
     return linux_get_current_process(drakvuf, vcpu_id);
 }
 
-char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base)
+char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpath)
 {
+    UNUSED(fullpath);
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -190,8 +191,9 @@ status_t linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t
     return vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)pid);
 }
 
-char* linux_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id)
+char* linux_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath)
 {
+    UNUSED(fullpath);
     addr_t process_base = linux_get_current_process(drakvuf, vcpu_id);
     if ( !process_base )
         return NULL;
@@ -316,7 +318,7 @@ bool linux_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_d
     {
         if ( linux_get_process_pid( drakvuf, proc_data->base_addr, &proc_data->pid ) == VMI_SUCCESS )
         {
-            proc_data->name = linux_get_process_name( drakvuf, proc_data->base_addr );
+            proc_data->name = linux_get_process_name( drakvuf, proc_data->base_addr, 1 );
 
             if ( proc_data->name )
             {
