@@ -209,9 +209,7 @@ objmon::objmon(drakvuf_t drakvuf, const void* config, output_format_t output)
         throw -1;
 
     this->trap.cb = cb;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->pm = vmi_get_page_mode(vmi, 0);
-    drakvuf_release_vmi(drakvuf);
+    this->pm = drakvuf_get_page_mode(drakvuf);
 
     this->format = output;
     if ( !drakvuf_add_trap(drakvuf, &this->trap) )

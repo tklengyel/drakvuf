@@ -180,9 +180,9 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const void* config, output_format_t output)
         throw -1;
     }
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    page_mode_t pm = vmi_get_page_mode(vmi, 0);
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
 
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     if ( VMI_FAILURE == vmi_translate_kv2p(vmi, kernbase + kiservicetable_rva, &this->kiservicetable) )
         throw -1;
 

@@ -1650,8 +1650,8 @@ static event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
     const struct socketmon_config* c = (const struct socketmon_config*)config;
+    this->pm = drakvuf_get_page_mode(drakvuf);
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->pm = vmi_get_page_mode(vmi, 0);
     this->winver = vmi_get_winver(vmi);
     drakvuf_release_vmi(drakvuf);
     this->format = output;
