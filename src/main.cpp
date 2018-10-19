@@ -206,7 +206,7 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spw:T:S:Mc:nb")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spwT:S:Mc:nb")) != -1)
         switch (c)
         {
             case 'r':
@@ -265,7 +265,7 @@ int main(int argc, char** argv)
                 leave_paused = 1;
                 break;
             case 'w':
-                wait_for_process = optarg;
+                wait_for_process = 1;
                 break;
             case 'T':
                 tcpip = optarg;

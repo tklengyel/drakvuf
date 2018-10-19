@@ -850,7 +850,9 @@ event_response_t cr3_catch_create_proc(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     if ( info->proc_data.ppid == injector->target_pid )
     {
         char* pname = drakvuf_get_process_name(drakvuf, info->proc_data.base_addr, 0);
-        if ( !strcmp(pname, injector->target_pname) )
+        gchar* pname_utf8 = g_utf8_casefold(pname, -1);
+
+        if ( !strncmp(pname_utf8, injector->target_pname, 8) )
         {
             drakvuf_interrupt(drakvuf, -1);
             drakvuf_pause(drakvuf);
@@ -859,6 +861,9 @@ event_response_t cr3_catch_create_proc(drakvuf_t drakvuf, drakvuf_trap_info_t* i
             injector->rc = 1;
             injector->target_running = 1;
         }
+
+        g_free(pname);
+        g_free(pname_utf8);
     }
 
     return 0;
@@ -1470,18 +1475,10 @@ done:
 void injector_cleanup(injector_t injector)
 {
     while ( !injector->restored )
-    {
-        printf("waiting for injector cleanup\n");
         drakvuf_loop(injector->drakvuf);
-        printf("done\n");
-    }
 
     while ( injector->rc && injector->wait_for_process && !injector->target_running )
-    {
-        printf("waiting for injector cleanup2\n");
         drakvuf_loop(injector->drakvuf);
-        printf("done\n");
-    }
 
     drakvuf_remove_trap(injector->drakvuf, &injector->cr3_event, NULL);
 
