@@ -329,9 +329,7 @@ exmon::exmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     this->offsets = (addr_t*)g_malloc0(__OFFSET_MAX*sizeof(addr_t));
     this->ktrap_frame_size = 0;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->pm = vmi_get_page_mode(vmi, 0);
-    drakvuf_release_vmi(drakvuf);
+    this->pm = drakvuf_get_page_mode(drakvuf);
 
     int i;
     for (i=0; i<__OFFSET_MAX; i++)

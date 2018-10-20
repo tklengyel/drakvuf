@@ -122,7 +122,9 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     uint64_t params[4] = { 0 };
     const char* bugcheck_name = "UNKNOWN_CODE" ;
 
-    if (f->is32bit)
+    bool is32bit = drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E;
+
+    if (is32bit)
     {
         ctx.addr = info->regs->rsp + 4;
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&code) )
@@ -208,12 +210,7 @@ bsodmon::bsodmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
     this->abort_on_bsod = *(bool*)config;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    is32bit = vmi_get_page_mode(vmi, 0) != VMI_PM_IA32E;
-
     init_bugcheck_map( this, drakvuf );
-
-    drakvuf_release_vmi(drakvuf);
 
     register_trap(drakvuf, "KeBugCheck2", &trap, hook_cb);
 }

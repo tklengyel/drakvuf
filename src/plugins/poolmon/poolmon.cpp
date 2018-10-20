@@ -139,8 +139,7 @@ static GTree* pooltag_build_tree()
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     poolmon* p = (poolmon*)info->trap->data;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    page_mode_t pm = vmi_get_page_mode(vmi, 0);
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
     reg_t pool_type, size;
     char tag[5] = { [0 ... 4] = '\0' };
     struct pooltag* s = NULL;
@@ -158,17 +157,20 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     else
     {
+        vmi_lock_guard vmi_lg(drakvuf);
+        vmi_instance_t& vmi = vmi_lg.vmi;
+
         ctx.addr = info->regs->rsp+12;
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)tag) )
-            goto done;
+            return 0;
 
         ctx.addr = info->regs->rsp+8;
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&size) )
-            goto done;
+            return 0;
 
         ctx.addr = info->regs->rsp+4;
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&pool_type) )
-            goto done;
+            return 0;
     }
 
     s = (struct pooltag*)g_tree_lookup(p->pooltag_tree, tag);
@@ -207,8 +209,6 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     printf("\n");
 
-done:
-    drakvuf_release_vmi(drakvuf);
     return 0;
 }
 
