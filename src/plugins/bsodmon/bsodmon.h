@@ -114,7 +114,6 @@ class bsodmon : public plugin
 {
 public:
     const output_format_t format;
-    bool is32bit;
     std::map<int, const char*> bugcheck_map;
     bool abort_on_bsod;
 
