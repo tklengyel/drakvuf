@@ -333,6 +333,9 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     drakvuf_get_current_process_data( drakvuf, event->vcpu_id, &proc_data );
 
+    GTimeVal timestamp;
+    g_get_current_time(&timestamp);
+
     GSList* loop = s->traps;
     drakvuf->in_callback = 1;
     while (loop)
@@ -350,12 +353,11 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                 .proc_data.pid       = proc_data.pid,
                 .proc_data.ppid      = proc_data.ppid,
                 .proc_data.userid    = proc_data.userid,
+                .timestamp           = timestamp,
                 .trap_pa = pa,
                 .regs = event->x86_regs,
                 .vcpu = event->vcpu_id,
             };
-
-            g_get_current_time(&trap_info.timestamp);
 
             rsp |= trap->cb(drakvuf, &trap_info);
         }
@@ -385,12 +387,11 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                     .proc_data.pid       = proc_data.pid,
                     .proc_data.ppid      = proc_data.ppid,
                     .proc_data.userid    = proc_data.userid,
+                    .timestamp           = timestamp,
                     .trap_pa = pa,
                     .regs = event->x86_regs,
                     .vcpu = event->vcpu_id,
                 };
-
-                g_get_current_time(&trap_info.timestamp);
 
                 loop = loop->next;
                 rsp |= trap->cb(drakvuf, &trap_info);
@@ -520,6 +521,9 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     drakvuf_get_current_process_data(drakvuf, event->vcpu_id, &proc_data);
 
+    GTimeVal timestamp;
+    g_get_current_time(&timestamp);
+
     drakvuf->in_callback = 1;
     GSList* loop = s->traps;
     while (loop)
@@ -533,12 +537,11 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
             .proc_data.pid       = proc_data.pid,
             .proc_data.ppid      = proc_data.ppid,
             .proc_data.userid    = proc_data.userid,
+            .timestamp           = timestamp,
             .trap_pa = pa,
             .regs = event->x86_regs,
             .vcpu = event->vcpu_id,
         };
-
-        g_get_current_time(&trap_info.timestamp);
 
         loop = loop->next;
         rsp |= trap->cb(drakvuf, &trap_info);
@@ -602,6 +605,9 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     drakvuf_get_current_process_data( drakvuf, event->vcpu_id, &proc_data );
 
+    GTimeVal timestamp;
+    g_get_current_time(&timestamp);
+
     drakvuf->in_callback = 1;
     GSList* loop = drakvuf->cr3;
     while (loop)
@@ -615,11 +621,10 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
             .proc_data.pid       = proc_data.pid,
             .proc_data.ppid      = proc_data.ppid,
             .proc_data.userid    = proc_data.userid,
+            .timestamp           = timestamp,
             .regs = event->x86_regs,
             .vcpu = event->vcpu_id,
         };
-
-        g_get_current_time(&trap_info.timestamp);
 
         loop = loop->next;
         rsp |= trap->cb(drakvuf, &trap_info);
@@ -651,6 +656,9 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     drakvuf_get_current_process_data( drakvuf, event->vcpu_id, &proc_data );
 
+    GTimeVal timestamp;
+    g_get_current_time(&timestamp);
+
     drakvuf->in_callback = 1;
     GSList* loop = drakvuf->debug;
     while (loop)
@@ -664,12 +672,11 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
             .proc_data.pid       = proc_data.pid,
             .proc_data.ppid      = proc_data.ppid,
             .proc_data.userid    = proc_data.userid,
+            .timestamp           = timestamp,
             .regs = event->x86_regs,
             .vcpu = event->vcpu_id,
             .debug = &event->debug_event
         };
-
-        g_get_current_time(&trap_info.timestamp);
 
         loop = loop->next;
         rsp |= trap->cb(drakvuf, &trap_info);
@@ -701,6 +708,9 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     drakvuf_get_current_process_data( drakvuf, event->vcpu_id, &proc_data );
 
+    GTimeVal timestamp;
+    g_get_current_time(&timestamp);
+
     drakvuf->in_callback = 1;
     GSList* loop = drakvuf->cpuid;
     while (loop)
@@ -714,12 +724,11 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
             .proc_data.pid       = proc_data.pid,
             .proc_data.ppid      = proc_data.ppid,
             .proc_data.userid    = proc_data.userid,
+            .timestamp           = timestamp,
             .regs = event->x86_regs,
             .vcpu = event->vcpu_id,
             .cpuid = &event->cpuid_event
         };
-
-        g_get_current_time(&trap_info.timestamp);
 
         loop = loop->next;
         rsp |= trap->cb(drakvuf, &trap_info);
