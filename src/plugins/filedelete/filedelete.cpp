@@ -261,9 +261,6 @@ static void extract_ca_file(filedelete* f,
         if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &base) )
             break;
 
-        if ( !(base & VMI_BIT_MASK(0,11)) )
-            break;
-
         ctx->addr = subsection + f->offsets[SUBSECTION_PTESINSUBSECTION];
         if ( VMI_FAILURE == vmi_read_32(vmi, ctx, &ptes) )
             break;
