@@ -272,6 +272,15 @@ AC_ARG_ENABLE([debug],
   [debug="no"])
 AM_CONDITIONAL([DEBUG], [test x$debug = xyes])
 
+AC_ARG_ENABLE([doppelganging],
+  [AS_HELP_STRING([--enable-doppelganging-injection],
+    [Enable doppelganging injection @<:@no@:>@])],
+  [doppelganging="$enableval"],
+  [doppelganging="no"])
+if test x$doppelganging = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_DOPPELGANGING, 1, "")
+fi
+
 AC_ARG_WITH([stdlib],
   [AS_HELP_STRING([--with-stdlib=LIB], [specify the C++ standard library to use [default=system]])],
   [], [with_stdlib=system])
