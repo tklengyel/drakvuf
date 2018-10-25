@@ -140,8 +140,8 @@ private:
     drakvuf_t drakvuf;
     drakvuf_plugins* plugins;
     injector_t injector;
-    GThread* timeout_thread = NULL;
-    GThread* timeout_thread2 = NULL;
+    GThread* timeout_thread = nullptr;
+    GThread* timeout_thread2 = nullptr;
     os_t os;
 
 public:

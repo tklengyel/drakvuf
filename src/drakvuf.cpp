@@ -123,8 +123,8 @@ static gpointer timer(gpointer data)
         drakvuf->interrupt(-1);
     }
 
-    g_thread_exit(NULL);
-    return NULL;
+    g_thread_exit(nullptr);
+    return nullptr;
 }
 
 int drakvuf_c::start_plugins(const bool* plugin_list,
@@ -187,7 +187,7 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     break;
 
                 default:
-                    rc = plugins->start((drakvuf_plugin_t)i, NULL);
+                    rc = plugins->start((drakvuf_plugin_t)i, nullptr);
                     break;
             };
 
@@ -206,7 +206,7 @@ drakvuf_c::drakvuf_c(const char* domain,
                      bool verbose,
                      bool leave_paused)
 {
-    drakvuf = NULL;
+    drakvuf = nullptr;
     interrupted = 0;
     this->timeout = timeout;
     process_start_timeout = timeout;
@@ -224,7 +224,7 @@ drakvuf_c::drakvuf_c(const char* domain,
     g_mutex_lock(&loop_signal2);
 
     if (timeout > 0)
-        timeout_thread = g_thread_new(NULL, timer, (void*)this);
+        timeout_thread = g_thread_new(nullptr, timer, (void*)this);
 
     plugins = new drakvuf_plugins(drakvuf, output, os);
 }
