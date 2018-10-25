@@ -201,10 +201,10 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
 
 drakvuf_c::drakvuf_c(const char* domain,
                      const char* rekall_profile,
-                     const output_format_t output,
-                     const int timeout,
-                     const bool verbose,
-                     const bool leave_paused)
+                     output_format_t output,
+                     int timeout,
+                     bool verbose,
+                     bool leave_paused)
 {
     this->drakvuf = NULL;
     this->interrupted = 0;
