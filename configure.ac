@@ -387,8 +387,8 @@ AC_CHECK_LIB(vmi, [vmi_events_version], [], [AC_ERROR([LibVMI doesn't have requi
 AC_CHECK_LIB(json-c, json_object_get_int64,, [AC_ERROR([libjson-c-dev is missing])])
 AC_CHECK_HEADERS([json-c/json.h], [], [AC_ERROR([libjson-c-dev is missing])])
 
-AC_CHECK_HEADERS([libxl_utils.h], [], [AC_ERROR([Xenlight (libxl) headers are not usable])])
-AC_CHECK_LIB(xenlight, libxl_name_to_domid, [], [AC_ERROR([Xenlight does not have required features!])])
+AC_CHECK_LIB([xencall], [xencall_buffers_never_fault])
+AC_CHECK_LIB([xenforeignmemory], [xenforeignmemory_map_resource])
 
 #AC_CHECK_HEADER([xenstore.h])
 #AC_CHECK_LIB(xenstore, [xc_read, xs_transaction_start], [], [AC_ERROR([Xenstore not found!])])
@@ -403,6 +403,9 @@ AC_CHECK_LIB([xenctrl],
 AC_CHECK_LIB([xenctrl],
 	[xc_memshr_control, xc_memshr_nominate_gfn, xc_memshr_share_gfns],
 	[], [AC_ERROR([XenCtrl is unusable! Do you have Xen 4.2+ installed?])])
+
+AC_CHECK_HEADERS([libxl_utils.h], [], [AC_ERROR([Xenlight (libxl) headers are not usable])])
+AC_CHECK_LIB(xenlight, libxl_name_to_domid, [], [AC_ERROR([Xenlight does not have required features!])])
 
 AC_CHECK_LIB([xentoollog], [xtl_logger_destroy])
 
