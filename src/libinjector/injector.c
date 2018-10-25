@@ -139,9 +139,11 @@ struct injector
     addr_t payload, payload_addr, memset;
     size_t binary_size, payload_size;
     uint32_t status;
+
     // For process doppelganging shellcode
     addr_t binary, binary_addr, saved_bp;
     addr_t process_notify;
+
     const char* binary_path;
     const char* target_process;
 
@@ -541,6 +543,7 @@ err:
     return 0;
 }
 
+#ifdef ENABLE_DOPPELGANGING
 static int patch_payload(struct injector* injector, unsigned char* addr)
 {
     // First byte at which each variable instanciation start in the shellcode.
@@ -596,6 +599,7 @@ static int patch_payload(struct injector* injector, unsigned char* addr)
 
     return 0;
 }
+#endif
 
 static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 {
@@ -1073,6 +1077,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     // Execute the payload
     if ( !injector->is32bit && info->regs->rip == injector->bp.breakpoint.addr && STATUS_PHYS_ALLOC_OK == injector->status)
     {
+#ifdef ENABLE_DOPPELGANGING
         // If we are doing process doppelganging we need to write the binary to
         // inject in memory too (in addition to the shellcode), since it is not
         // present in the guest's filesystem.
@@ -1109,6 +1114,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             PRINT_DEBUG("Patching the shellcode with user inputs..\n");
             patch_payload(injector, (unsigned char*)injector->payload);
         }
+#endif
 
         // Write payload into guest's memory
         ctx.addr = injector->payload_addr;
@@ -1136,6 +1142,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         // this function will make NtCreateThreadEx() to fail and the binary we
         // want to inject will never run. We want to place a breakpoint on it to
         // bypass this call.
+#ifdef ENABLE_DOPPELGANGING
         if (INJECT_METHOD_DOPP == injector->method)
         {
             // Save breakpoint address to restore it latter
@@ -1150,6 +1157,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             injector->status = STATUS_BP_HIT;
         }
         else
+#endif
         {
             injector->hijacked = 1;
 
