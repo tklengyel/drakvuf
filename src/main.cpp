@@ -174,14 +174,16 @@ int main(int argc, char** argv)
                 "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
                 "\t -e <inject_file>          The executable to start with injection\n"
                 "\t -c <current_working_dir>  The current working directory for injected executable\n"
-                "\t -m <inject_method>        The injection method (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
-                "\t [-B] <path>               The host path of the windows binary to inject (requires -m doppelganging)\n"
-                "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
+                "\t -m <inject_method>        The injection method: createproc, shellexec, shellcode, doppelganging\n"
                 "\t -w                        Wait with plugin start until injected process name is detected\n"
                 "\t -t <timeout>              Timeout (in seconds)\n"
                 "\t -o <format>               Output format (default or csv)\n"
                 "\t -x <plugin>               Don't activate the specified plugin\n"
                 "\t -p                        Leave domain paused after DRAKVUF exits\n"
+#ifdef ENABLE_DOPPELGANGING
+                "\t -B <path>                 The host path of the windows binary to inject (requires -m doppelganging)\n"
+                "\t -P <target>               The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
+#endif
 #ifdef ENABLE_PLUGIN_FILEDELETE
                 "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
                 "\t -M                        Dump new or modified files also (requires -D)\n"
@@ -235,14 +237,23 @@ int main(int argc, char** argv)
                 if (!strncmp(optarg,"shellcode",9))
                     injection_method = INJECT_METHOD_SHELLCODE;
                 if (!strncmp(optarg,"doppelganging",13))
+#ifdef ENABLE_DOPPELGANGING
                     injection_method = INJECT_METHOD_DOPP;
+#else
+                {
+                    fprintf(stderr, "Doppelganging is not available, you need to re-run ./configure!\n");
+                    return rc;
+                }
+#endif
                 break;
+#ifdef ENABLE_DOPPELGANGING
             case 'B':
                 binary_path = optarg;
                 break;
             case 'P':
                 target_process = optarg;
                 break;
+#endif
             case 't':
                 timeout = atoi(optarg);
                 break;
