@@ -136,7 +136,7 @@ int main(int argc, char** argv)
     char* domain = nullptr;
     char* rekall_profile = nullptr;
     char* dump_folder = nullptr;
-    bool wait_for_process;
+    bool wait_for_process = false;
     char* tcpip = nullptr;
     char* binary_path = nullptr;
     char* target_process = nullptr;
