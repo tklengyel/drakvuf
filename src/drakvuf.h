@@ -137,20 +137,20 @@ class drakvuf_c
 {
 private:
     bool leave_paused;
-    drakvuf_t drakvuf;
+    drakvuf_t drakvuf { nullptr };
     drakvuf_plugins* plugins;
     injector_t injector;
-    GThread* timeout_thread = nullptr;
-    GThread* timeout_thread2 = nullptr;
+    GThread* timeout_thread { nullptr };
+    GThread* timeout_thread2 { nullptr };
     os_t os;
 
 public:
     int timeout;
-    int interrupted;
+    int interrupted { 0 };
     GMutex loop_signal;
 
     const char* process_start_name;
-    bool process_start_detected;
+    bool process_start_detected { false };
     int process_start_timeout;
     GMutex loop_signal2;
 

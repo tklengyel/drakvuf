@@ -205,14 +205,9 @@ drakvuf_c::drakvuf_c(const char* domain,
                      int timeout,
                      bool verbose,
                      bool leave_paused)
+    : leave_paused{ leave_paused }, timeout{ timeout },
+      process_start_timeout{ timeout }
 {
-    drakvuf = nullptr;
-    interrupted = 0;
-    this->timeout = timeout;
-    process_start_timeout = timeout;
-    this->leave_paused = leave_paused;
-    process_start_detected = 0;
-
     if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose))
         throw -1;
 
