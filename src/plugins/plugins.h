@@ -190,7 +190,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
 class plugin
 {
 public:
-    virtual ~plugin() {};
+    virtual ~plugin() = default;
 };
 
 class drakvuf_plugins
