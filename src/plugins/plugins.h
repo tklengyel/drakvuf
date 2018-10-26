@@ -199,7 +199,7 @@ private:
     drakvuf_t drakvuf;
     output_format_t output;
     os_t os;
-    plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = NULL };
+    plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = nullptr };
 
 public:
     drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
