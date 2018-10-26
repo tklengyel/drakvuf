@@ -126,10 +126,8 @@ drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output
 
 drakvuf_plugins::~drakvuf_plugins()
 {
-    int i;
-    for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
-        if ( plugins[i] )
-            delete plugins[i];
+    for (int i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
+        delete plugins[i];
 }
 
 int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
