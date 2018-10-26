@@ -122,10 +122,9 @@ void close_handler(int signal)
 
 static inline void disable_plugin(char* optarg, bool* plugin_list)
 {
-    int i;
-    for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
+    for (int i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
         if (!strcmp(optarg, drakvuf_plugin_names[i]))
-            plugin_list[i] = 0;
+            plugin_list[i] = false;
 }
 
 int main(int argc, char** argv)
@@ -146,9 +145,9 @@ int main(int argc, char** argv)
     struct sigaction act;
     output_format_t output = OUTPUT_DEFAULT;
     bool plugin_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 1};
-    bool verbose = 0;
-    bool cpuid_stealth = 0;
-    bool leave_paused = 0;
+    bool verbose = false;
+    bool cpuid_stealth = false;
+    bool leave_paused = false;
     char const* syscalls_filter_file = nullptr;
     bool dump_modified_files = false;
     bool filedelete_use_injector = false;
@@ -270,20 +269,20 @@ int main(int argc, char** argv)
                 disable_plugin(optarg, plugin_list);
                 break;
             case 's':
-                cpuid_stealth = 1;
+                cpuid_stealth = true;
                 break;
             case 'p':
-                leave_paused = 1;
+                leave_paused = true;
                 break;
             case 'w':
-                wait_for_process = 1;
+                wait_for_process = true;
                 break;
             case 'T':
                 tcpip = optarg;
                 break;
 #ifdef DRAKVUF_DEBUG
             case 'v':
-                verbose = 1;
+                verbose = true;
                 break;
 #endif
             case 'S':
