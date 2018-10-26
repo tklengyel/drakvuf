@@ -109,6 +109,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <glib.h>
+#include <exception>
 
 #include "drakvuf.h"
 
@@ -326,9 +327,9 @@ int main(int argc, char** argv)
     {
         drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose, leave_paused);
     }
-    catch (int e)
+    catch (const std::exception& e)
     {
-        fprintf(stderr, "Failed to initialize DRAKVUF\n");
+        fprintf(stderr, "Failed to initialize DRAKVUF: %s\n", e.what());
         return rc;
     }
 

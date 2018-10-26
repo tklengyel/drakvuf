@@ -103,6 +103,7 @@
  ***************************************************************************/
 
 #include "drakvuf.h"
+#include <stdexcept>
 
 static gpointer timer(gpointer data)
 {
@@ -209,7 +210,7 @@ drakvuf_c::drakvuf_c(const char* domain,
       process_start_timeout{ timeout }
 {
     if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose))
-        throw -1;
+        throw std::runtime_error("drakvuf_init() failed");
 
     os = drakvuf_get_os_type(drakvuf);
 
