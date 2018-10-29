@@ -137,29 +137,29 @@ class drakvuf_c
 {
 private:
     bool leave_paused;
-    drakvuf_t drakvuf;
+    drakvuf_t drakvuf { nullptr };
     drakvuf_plugins* plugins;
     injector_t injector;
-    GThread* timeout_thread = NULL;
-    GThread* timeout_thread2 = NULL;
+    GThread* timeout_thread { nullptr };
+    GThread* timeout_thread2 { nullptr };
     os_t os;
 
 public:
     int timeout;
-    int interrupted;
+    int interrupted { 0 };
     GMutex loop_signal;
 
     const char* process_start_name;
-    bool process_start_detected;
+    bool process_start_detected { false };
     int process_start_timeout;
     GMutex loop_signal2;
 
     drakvuf_c(const char* domain,
               const char* rekall_profile,
-              const output_format_t output,
-              const int timeout,
-              const bool verbose,
-              const bool leave_paused);
+              output_format_t output,
+              int timeout,
+              bool verbose,
+              bool leave_paused);
     ~drakvuf_c();
 
     int is_initialized();
