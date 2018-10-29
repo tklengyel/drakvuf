@@ -106,10 +106,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
-#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 #include <glib.h>
+#include <exception>
 
 #include "drakvuf.h"
 
@@ -122,34 +122,33 @@ void close_handler(int signal)
 
 static inline void disable_plugin(char* optarg, bool* plugin_list)
 {
-    int i;
-    for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
+    for (int i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
         if (!strcmp(optarg, drakvuf_plugin_names[i]))
-            plugin_list[i] = 0;
+            plugin_list[i] = false;
 }
 
 int main(int argc, char** argv)
 {
     int c, rc = 1, timeout = 0;
-    char const* inject_file = NULL;
-    char const* inject_cwd = NULL;
+    char const* inject_file = nullptr;
+    char const* inject_cwd = nullptr;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
-    char* domain = NULL;
-    char* rekall_profile = NULL;
-    char* dump_folder = NULL;
-    bool wait_for_process;
-    char* tcpip = NULL;
-    char* binary_path = NULL;
-    char* target_process = NULL;
+    char* domain = nullptr;
+    char* rekall_profile = nullptr;
+    char* dump_folder = nullptr;
+    bool wait_for_process = false;
+    char* tcpip = nullptr;
+    char* binary_path = nullptr;
+    char* target_process = nullptr;
     vmi_pid_t injection_pid = -1;
     uint32_t injection_thread = 0;
     struct sigaction act;
     output_format_t output = OUTPUT_DEFAULT;
     bool plugin_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 1};
-    bool verbose = 0;
-    bool cpuid_stealth = 0;
-    bool leave_paused = 0;
-    char const* syscalls_filter_file = NULL;
+    bool verbose = false;
+    bool cpuid_stealth = false;
+    bool leave_paused = false;
+    char const* syscalls_filter_file = nullptr;
     bool dump_modified_files = false;
     bool filedelete_use_injector = false;
     bool abort_on_bsod = false;
@@ -270,20 +269,20 @@ int main(int argc, char** argv)
                 disable_plugin(optarg, plugin_list);
                 break;
             case 's':
-                cpuid_stealth = 1;
+                cpuid_stealth = true;
                 break;
             case 'p':
-                leave_paused = 1;
+                leave_paused = true;
                 break;
             case 'w':
-                wait_for_process = 1;
+                wait_for_process = true;
                 break;
             case 'T':
                 tcpip = optarg;
                 break;
 #ifdef DRAKVUF_DEBUG
             case 'v':
-                verbose = 1;
+                verbose = true;
                 break;
 #endif
             case 'S':
@@ -327,9 +326,9 @@ int main(int argc, char** argv)
     {
         drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose, leave_paused);
     }
-    catch (int e)
+    catch (const std::exception& e)
     {
-        fprintf(stderr, "Failed to initialize DRAKVUF\n");
+        fprintf(stderr, "Failed to initialize DRAKVUF: %s\n", e.what());
         return rc;
     }
 
@@ -339,10 +338,10 @@ int main(int argc, char** argv)
     act.sa_handler = close_handler;
     act.sa_flags = 0;
     sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
-    sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
-    sigaction(SIGALRM, &act, NULL);
+    sigaction(SIGHUP, &act, nullptr);
+    sigaction(SIGTERM, &act, nullptr);
+    sigaction(SIGINT, &act, nullptr);
+    sigaction(SIGALRM, &act, nullptr);
 
     if ( injection_pid > 0 && inject_file )
     {

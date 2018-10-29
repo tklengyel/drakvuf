@@ -190,7 +190,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
 class plugin
 {
 public:
-    virtual ~plugin() {};
+    virtual ~plugin() = default;
 };
 
 class drakvuf_plugins
@@ -199,7 +199,7 @@ private:
     drakvuf_t drakvuf;
     output_format_t output;
     os_t os;
-    plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = NULL };
+    plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = nullptr };
 
 public:
     drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
@@ -211,13 +211,13 @@ public:
 
 struct vmi_lock_guard
 {
-    vmi_lock_guard(drakvuf_t drakvuf_) : drakvuf(drakvuf_), vmi( drakvuf_lock_and_get_vmi(this->drakvuf) )
+    vmi_lock_guard(drakvuf_t drakvuf_) : drakvuf{ drakvuf_ }, vmi{ drakvuf_lock_and_get_vmi(drakvuf_) }
     {
     }
 
     ~vmi_lock_guard()
     {
-        drakvuf_release_vmi(this->drakvuf);
+        drakvuf_release_vmi(drakvuf);
     }
 
     drakvuf_t drakvuf;

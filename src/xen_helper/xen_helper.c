@@ -178,11 +178,15 @@ void xen_free_interface(xen_interface_t* xen)
 int get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
                  char** name)
 {
-
-    uint32_t _domID = ~0U;
+    uint32_t _domID;
     char* _name = NULL;
+    char* endptr = NULL;
 
-    sscanf(input, "%u", &_domID);
+    errno = 0;
+    _domID = strtol(input, &endptr, 10);
+
+    if (errno || !endptr || (endptr && *endptr))
+        _domID = ~0U;
 
     if (_domID == ~0U)
     {

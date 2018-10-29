@@ -103,6 +103,7 @@
  ***************************************************************************/
 
 #include "drakvuf.h"
+#include <stdexcept>
 
 static gpointer timer(gpointer data)
 {
@@ -123,8 +124,8 @@ static gpointer timer(gpointer data)
         drakvuf->interrupt(-1);
     }
 
-    g_thread_exit(NULL);
-    return NULL;
+    g_thread_exit(nullptr);
+    return nullptr;
 }
 
 int drakvuf_c::start_plugins(const bool* plugin_list,
@@ -153,12 +154,12 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                         .filedelete_use_injector = filedelete_use_injector,
                     };
 
-                    rc = this->plugins->start((drakvuf_plugin_t)i, &c);
+                    rc = plugins->start((drakvuf_plugin_t)i, &c);
                     break;
                 }
 
                 case PLUGIN_CPUIDMON:
-                    rc = this->plugins->start((drakvuf_plugin_t)i, &cpuid_stealth);
+                    rc = plugins->start((drakvuf_plugin_t)i, &cpuid_stealth);
                     break;
 
                 case PLUGIN_SOCKETMON:
@@ -168,7 +169,7 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                         .tcpip_profile = tcpip_profile,
                         .tcpip_profile_json = json_object_from_file(tcpip_profile)
                     };
-                    rc = this->plugins->start((drakvuf_plugin_t)i, &c);
+                    rc = plugins->start((drakvuf_plugin_t)i, &c);
                     break;
                 }
 
@@ -178,16 +179,16 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     {
                         .syscalls_filter_file = syscalls_filter_file
                     };
-                    rc = this->plugins->start((drakvuf_plugin_t)i, &c);
+                    rc = plugins->start((drakvuf_plugin_t)i, &c);
                     break;
                 }
 
                 case PLUGIN_BSODMON:
-                    rc = this->plugins->start((drakvuf_plugin_t)i, &abort_on_bsod);
+                    rc = plugins->start((drakvuf_plugin_t)i, &abort_on_bsod);
                     break;
 
                 default:
-                    rc = this->plugins->start((drakvuf_plugin_t)i, NULL);
+                    rc = plugins->start((drakvuf_plugin_t)i, nullptr);
                     break;
             };
 
@@ -201,83 +202,78 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
 
 drakvuf_c::drakvuf_c(const char* domain,
                      const char* rekall_profile,
-                     const output_format_t output,
-                     const int timeout,
-                     const bool verbose,
-                     const bool leave_paused)
+                     output_format_t output,
+                     int timeout,
+                     bool verbose,
+                     bool leave_paused)
+    : leave_paused{ leave_paused }, timeout{ timeout },
+      process_start_timeout{ timeout }
 {
-    this->drakvuf = NULL;
-    this->interrupted = 0;
-    this->timeout = timeout;
-    this->process_start_timeout = timeout;
-    this->leave_paused = leave_paused;
-    this->process_start_detected = 0;
+    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose))
+        throw std::runtime_error("drakvuf_init() failed");
 
-    if (!drakvuf_init(&this->drakvuf, domain, rekall_profile, verbose))
-        throw -1;
+    os = drakvuf_get_os_type(drakvuf);
 
-    this->os = drakvuf_get_os_type(this->drakvuf);
-
-    g_mutex_init(&this->loop_signal);
-    g_mutex_lock(&this->loop_signal);
-    g_mutex_init(&this->loop_signal2);
-    g_mutex_lock(&this->loop_signal2);
+    g_mutex_init(&loop_signal);
+    g_mutex_lock(&loop_signal);
+    g_mutex_init(&loop_signal2);
+    g_mutex_lock(&loop_signal2);
 
     if (timeout > 0)
-        this->timeout_thread = g_thread_new(NULL, timer, (void*)this);
+        timeout_thread = g_thread_new(nullptr, timer, (void*)this);
 
-    this->plugins = new drakvuf_plugins(this->drakvuf, output, this->os);
+    plugins = new drakvuf_plugins(drakvuf, output, os);
 }
 
 drakvuf_c::~drakvuf_c()
 {
-    if ( !this->interrupted )
-        this->interrupt(-1);
+    if ( !interrupted )
+        interrupt(-1);
 
-    g_mutex_trylock(&this->loop_signal);
-    g_mutex_unlock(&this->loop_signal);
-    g_mutex_clear(&this->loop_signal);
-    g_mutex_trylock(&this->loop_signal2);
-    g_mutex_unlock(&this->loop_signal2);
-    g_mutex_clear(&this->loop_signal2);
+    g_mutex_trylock(&loop_signal);
+    g_mutex_unlock(&loop_signal);
+    g_mutex_clear(&loop_signal);
+    g_mutex_trylock(&loop_signal2);
+    g_mutex_unlock(&loop_signal2);
+    g_mutex_clear(&loop_signal2);
 
-    if (this->drakvuf)
-        drakvuf_close(this->drakvuf, this->leave_paused);
+    if (drakvuf)
+        drakvuf_close(drakvuf, leave_paused);
 
-    if (this->plugins)
-        delete this->plugins;
+    if (plugins)
+        delete plugins;
 
-    if (this->timeout_thread)
-        g_thread_join(this->timeout_thread);
+    if (timeout_thread)
+        g_thread_join(timeout_thread);
 }
 
 void drakvuf_c::interrupt(int signal)
 {
-    this->interrupted = signal;
-    drakvuf_interrupt(this->drakvuf, signal);
+    interrupted = signal;
+    drakvuf_interrupt(drakvuf, signal);
 }
 
 void drakvuf_c::loop()
 {
-    this->interrupted = 0;
-    g_mutex_unlock(&this->loop_signal);
-    drakvuf_loop(this->drakvuf);
+    interrupted = 0;
+    g_mutex_unlock(&loop_signal);
+    drakvuf_loop(drakvuf);
 }
 
 void drakvuf_c::pause()
 {
-    drakvuf_pause(this->drakvuf);
+    drakvuf_pause(drakvuf);
 }
 
 void drakvuf_c::resume()
 {
-    drakvuf_resume(this->drakvuf);
+    drakvuf_resume(drakvuf);
 }
 
 int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, const char* cwd, injection_method_t method, output_format_t format, const char* binary_path, const char* target_process, bool wait_for_process)
 {
     int rc = 0;
-    this->injector = injector_start_app(this->drakvuf, injection_pid, injection_tid, inject_cmd, cwd, method, format, binary_path, target_process, wait_for_process, &rc);
+    injector = injector_start_app(drakvuf, injection_pid, injection_tid, inject_cmd, cwd, method, format, binary_path, target_process, wait_for_process, &rc);
 
     if (!rc)
         fprintf(stderr, "Process startup failed\n");
@@ -286,5 +282,5 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const
 
 void drakvuf_c::inject_cmd_cleanup(void)
 {
-    injector_cleanup(this->injector);
+    injector_cleanup(injector);
 }
