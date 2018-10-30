@@ -147,38 +147,42 @@ modlist_sym2va(drakvuf_t drakvuf, addr_t list_head, access_context_t* ctx,
 
         ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
         unicode_string_t* us = vmi_read_unicode_str(vmi, ctx);
-        unicode_string_t out = { .contents = NULL };
 
-        if (us && VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8"))
+        if ( us )
         {
+            unicode_string_t out = { .contents = NULL };
 
-            PRINT_DEBUG("Found module %s\n", out.contents);
-
-            if (!strcasecmp((char*) out.contents, mod_name))
+            if ( VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8"))
             {
+                PRINT_DEBUG("Found module %s\n", out.contents);
 
-                addr_t dllbase;
+                if (!strcasecmp((char*) out.contents, mod_name))
+                {
+                    status_t ret ;
+                    addr_t dllbase;
 
-                ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
-                if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &dllbase) )
-                    return VMI_FAILURE;
+                    ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
+                    ret = vmi_read_addr(vmi, ctx, &dllbase);
 
-                ctx->addr = dllbase;
-                if ( VMI_FAILURE == vmi_translate_sym2v(vmi, ctx, (char*) symbol, va) )
-                    return VMI_FAILURE;
+                    if ( ret == VMI_SUCCESS )
+                    {
+                        ctx->addr = dllbase;
 
-                PRINT_DEBUG("\t%s @ 0x%lx\n", symbol, *va);
+                        ret = vmi_translate_sym2v(vmi, ctx, (char*) symbol, va);
+                        if ( ret == VMI_SUCCESS )
+                            PRINT_DEBUG("\t%s @ 0x%lx\n", symbol, *va);
+                    }
 
-                free(out.contents);
-                vmi_free_unicode_str(us);
-                return VMI_SUCCESS;
+                    g_free(out.contents);
+                    vmi_free_unicode_str(us);
+                    return ret ;
+                }
+
+                g_free(out.contents);
             }
 
-            free(out.contents);
-        }
-
-        if (us)
             vmi_free_unicode_str(us);
+        }
 
         next_module = tmp_next;
     }
@@ -234,21 +238,26 @@ addr_t ksym2va(drakvuf_t drakvuf, vmi_pid_t pid, const char* proc_name, const ch
             break;
 
         unicode_string_t* us = vmi_read_unicode_str_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
-        unicode_string_t out = { .contents = NULL };
 
         if (us)
         {
-            status_t status = vmi_convert_str_encoding(us, &out, "UTF-8");
-            if (VMI_SUCCESS == status)
+            unicode_string_t out = { .contents = NULL };
+            addr_t ret_addr = 0 ;
+
+            if (VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8") )
+            {
                 PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", out.contents, dllbase);
 
-            vmi_free_unicode_str(us);
-        }
+                if ( !strcmp((char*)out.contents, mod_name) )
+                    ret_addr =  dllbase + rva;
 
-        if (out.contents && !strcmp((char*)out.contents, mod_name))
-        {
-            g_free(out.contents);
-            return dllbase + rva;
+                g_free(out.contents);
+            }
+
+            vmi_free_unicode_str(us);
+
+            if ( ret_addr )
+                return ret_addr;
         }
 
         next_module = tmp_next;
