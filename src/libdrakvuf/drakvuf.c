@@ -142,6 +142,12 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
         xen_free_interface(drakvuf->xen);
     }
 
+    if (drakvuf->rekall_profile_json)
+    {
+        json_object_put(drakvuf->rekall_profile_json);
+        drakvuf->rekall_profile_json = NULL;
+    }
+
     g_free(drakvuf->offsets);
     g_free(drakvuf->sizes);
     g_mutex_clear(&drakvuf->vmi_lock);
