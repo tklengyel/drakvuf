@@ -123,7 +123,6 @@ struct filedelete_config
 struct socketmon_config
 {
     const char* tcpip_profile;
-    json_object* tcpip_profile_json;
 };
 struct syscalls_config
 {

@@ -109,8 +109,6 @@
 #include "plugins/plugins.h"
 #include "private.h"
 
-#include <vector>
-
 class socketmon: public plugin
 {
 public:
@@ -118,7 +116,7 @@ public:
     output_format_t format;
     win_ver_t winver;
 
-    drakvuf_trap_t trap[7] =
+    drakvuf_trap_t tcpip_traps[7] =
     {
         [0 ... 6] = {
             .breakpoint.lookup_type = LOOKUP_PID,
@@ -130,9 +128,16 @@ public:
         }
     };
 
-    std::vector<socketmon_trapinfo> traps;
-    unsigned long traps_set = 0;
-    unsigned long cr3_count = 0;
+    drakvuf_trap_t dnsapi_traps[6] =
+    {
+        [0 ... 5] = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.addr_type = ADDR_VA,
+            .breakpoint.module = "dnsapi.dll",
+            .type = BREAKPOINT,
+            .data = (void*)this
+        }
+    };
 
     socketmon(drakvuf_t drakvuf, const void* config, output_format_t output);
     ~socketmon();

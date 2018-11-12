@@ -166,61 +166,70 @@ bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap,
     return 0;
 }
 
-bool win_get_module_base_addr( drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out )
+bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out)
 {
-    addr_t base_addr ;
-    size_t name_len = strlen( module_name );
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t next_module = module_list_head;
-    int limit = 100, counter = 0;
-
-    while ( counter < limit )
+    /* walk the module list */
+    while (1)
     {
+        /* follow the next pointer */
         addr_t tmp_next = 0;
-
-        if ( vmi_read_addr_va( vmi, next_module, 4, &tmp_next ) != VMI_SUCCESS )
+        ctx->addr = next_module;
+        if (VMI_FAILURE == vmi_read_addr(vmi, ctx, &tmp_next))
             break;
 
-        if ( module_list_head == tmp_next )
-            break;
-
-        base_addr = 0 ;
-
-        if ( vmi_read_addr_va( vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], 4, &base_addr ) != VMI_SUCCESS )
-            break;
-
-        if ( ! base_addr )
-            break;
-
-        unicode_string_t* us = vmi_read_unicode_str_va( vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4 );
-
-        if ( us )
+        /* if we are back at the list head, we are done */
+        if (module_list_head == tmp_next || !tmp_next)
         {
-            unicode_string_t out = { 0 };
-            if ( VMI_FAILURE == vmi_convert_str_encoding( us, &out, "UTF-8" ) )
-            {
-                vmi_free_unicode_str(us);
-                break;
-            }
+            break;
+        }
 
-            if ( ! strncasecmp( (char*)out.contents, module_name, name_len ) )
-            {
-                free( out.contents );
-                vmi_free_unicode_str( us );
-                *base_addr_out = base_addr ;
-                return true ;
-            }
+        addr_t dllbase;
+        ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
+        if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &dllbase) )
+            break;
 
-            free( out.contents );
-            vmi_free_unicode_str( us );
+        bool found = false;
+
+        ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
+        unicode_string_t* us = vmi_read_unicode_str(vmi, ctx);
+
+        if (us)
+        {
+            unicode_string_t out = { .contents = NULL };
+            if (VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8"))
+            {
+                PRINT_DEBUG("Found module %s at 0x%lx\n", out.contents, dllbase);
+                found = !strcasecmp((char*) out.contents, module_name);
+            }
+            free(out.contents);
+
+            vmi_free_unicode_str(us);
+        }
+
+        if (found)
+        {
+            *base_addr_out = dllbase;
+            return true;
         }
 
         next_module = tmp_next;
-        counter++;
     }
 
     PRINT_DEBUG("Failed to find %s in list starting at 0x%lx\n", module_name, module_list_head);
-    return false ;
+    return false;
+}
+
+bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out)
+{
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4,
+    };
+
+    return win_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, module_name, base_addr_out);
 }
 
 static bool find_kernbase(drakvuf_t drakvuf)
@@ -315,6 +324,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_registry_keyhandle_path = win_reg_keyhandle_path;
     drakvuf->osi.get_filename_from_handle = win_get_filename_from_handle;
     drakvuf->osi.get_function_argument = win_get_function_argument;
+    drakvuf->osi.enumerate_processes_with_module = win_enumerate_processes_with_module;
 
     return true;
 }

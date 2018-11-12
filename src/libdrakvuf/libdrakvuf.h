@@ -409,6 +409,11 @@ bool drakvuf_find_process(drakvuf_t drakvuf,
                           const char* find_procname,
                           addr_t* process_addr);
 
+bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf,
+        const char* module_name,
+        bool (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess_addr, void* visitor_ctx),
+        void* visitor_ctx);
+
 bool drakvuf_get_module_list(drakvuf_t drakvuf,
                              addr_t process_base,
                              addr_t* module_list);

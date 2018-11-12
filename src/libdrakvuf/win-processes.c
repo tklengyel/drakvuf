@@ -113,6 +113,7 @@
 
 #include "private.h"
 #include "win-offsets.h"
+#include "win.h"
 
 typedef enum dispatcher_object
 {
@@ -375,20 +376,34 @@ bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module
     return true;
 }
 
-bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* eprocess_addr)
+static bool win_find_process_list(drakvuf_t drakvuf, addr_t* list_head)
 {
-    addr_t current_process, next_list_entry;
     vmi_instance_t vmi = drakvuf->vmi;
 
+    addr_t current_process;
     status_t status = vmi_read_addr_ksym(vmi, "PsInitialSystemProcess", &current_process);
     if ( VMI_FAILURE == status )
         return false;
 
-    addr_t list_head = current_process + drakvuf->offsets[EPROCESS_TASKS];
-    addr_t current_list_entry = list_head;
+    *list_head = current_process + drakvuf->offsets[EPROCESS_TASKS];
+    return true;
+}
 
-    status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
-    if ( VMI_FAILURE == status )
+static bool win_find_next_process_list_entry(drakvuf_t drakvuf, addr_t current_list_entry, addr_t* next_list_entry)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+    status_t status = vmi_read_addr_va(vmi, current_list_entry, 0, next_list_entry);
+    return VMI_FAILURE != status;
+}
+
+bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* eprocess_addr)
+{
+    addr_t list_head;
+    if (!win_find_process_list(drakvuf, &list_head))
+        return false;
+    addr_t current_list_entry = list_head;
+    addr_t next_list_entry;
+    if (!win_find_next_process_list_entry(drakvuf, current_list_entry, &next_list_entry))
     {
         PRINT_DEBUG("Failed to read next pointer at 0x%"PRIx64" before entering loop\n", current_list_entry);
         return false;
@@ -397,16 +412,16 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_p
     do
     {
         vmi_pid_t pid;
-        current_process = current_list_entry - drakvuf->offsets[EPROCESS_TASKS] ;
+        addr_t current_process = current_list_entry - drakvuf->offsets[EPROCESS_TASKS] ;
 
-        status = vmi_read_32_va(vmi, current_process + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)&pid);
+        status_t status = win_get_process_pid(drakvuf, current_process, &pid);
         if ( VMI_FAILURE == status )
         {
             PRINT_DEBUG("Failed to read PID of process at %"PRIx64"\n", current_process);
             return false;
         }
 
-        char* procname = vmi_read_str_va(vmi, current_process + drakvuf->offsets[EPROCESS_PNAME], 0);
+        char* procname = win_get_process_name(drakvuf, current_process, false);
 
         if ((find_pid != ~0 && pid == find_pid) || (find_procname && procname && !strcasecmp(procname, find_procname)))
         {
@@ -420,13 +435,60 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_p
 
         current_list_entry = next_list_entry;
 
-        status = vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry);
-        if ( VMI_FAILURE == status )
+        if (!win_find_next_process_list_entry(drakvuf, current_list_entry, &next_list_entry))
         {
             PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
             return false;
         }
 
+    }
+    while (next_list_entry != list_head);
+
+    return false;
+}
+
+bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess_addr, void* visitor_ctx), void* visitor_ctx)
+{
+    addr_t list_head;
+    if (!win_find_process_list(drakvuf, &list_head))
+        return false;
+    addr_t current_list_entry = list_head;
+    addr_t next_list_entry;
+    if (!win_find_next_process_list_entry(drakvuf, current_list_entry, &next_list_entry))
+    {
+        PRINT_DEBUG("Failed to read next pointer at 0x%"PRIx64" before entering loop\n", current_list_entry);
+        return false;
+    }
+
+    do
+    {
+        addr_t current_process = current_list_entry - drakvuf->offsets[EPROCESS_TASKS];
+
+        vmi_pid_t pid;
+        addr_t module_list_head;
+        if ((win_get_process_pid(drakvuf, current_process, &pid) == VMI_SUCCESS) &&
+                win_get_module_list(drakvuf, current_process, &module_list_head))
+        {
+            addr_t dllbase;
+            access_context_t ctx =
+            {
+                .translate_mechanism = VMI_TM_PROCESS_PID,
+                .pid = pid,
+            };
+            if (win_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, module_name, &dllbase))
+            {
+                if (visitor_func(drakvuf, current_process, visitor_ctx))
+                    return true;
+            }
+        }
+
+        current_list_entry = next_list_entry;
+
+        if (!win_find_next_process_list_entry(drakvuf, current_list_entry, &next_list_entry))
+        {
+            PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
+            return false;
+        }
     }
     while (next_list_entry != list_head);
 
