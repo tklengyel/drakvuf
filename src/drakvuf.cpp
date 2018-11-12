@@ -167,7 +167,6 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     struct socketmon_config c =
                     {
                         .tcpip_profile = tcpip_profile,
-                        .tcpip_profile_json = json_object_from_file(tcpip_profile)
                     };
                     rc = plugins->start((drakvuf_plugin_t)i, &c);
                     break;
@@ -240,8 +239,7 @@ drakvuf_c::~drakvuf_c()
     if (drakvuf)
         drakvuf_close(drakvuf, leave_paused);
 
-    if (plugins)
-        delete plugins;
+    delete plugins;
 
     if (timeout_thread)
         g_thread_join(timeout_thread);
