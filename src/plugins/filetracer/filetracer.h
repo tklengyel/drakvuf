@@ -115,6 +115,7 @@ public:
 
     addr_t objattr_name;
     addr_t objattr_root;
+    addr_t objattr_attr;
     addr_t newfile_name_offset;
     addr_t newfile_name_length_offset;
     addr_t newfile_root_offset;

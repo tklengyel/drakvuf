@@ -163,6 +163,15 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         return 0;
     }
 
+    uint32_t file_attr = 0;
+    ctx.addr = attr + f->objattr_attr;
+    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &file_attr) )
+    {
+        g_free(file_root);
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
+
     char* file_path = g_strdup_printf("%s%s%s",
                                       file_root ?: "",
                                       file_root ? "\\" : "",
@@ -174,21 +183,21 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     switch (f->format)
     {
         case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, file_path);
+            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,0x%" PRIu32 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, file_path, file_attr);
             break;
 
         case OUTPUT_KV:
-            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\"\n",
+            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\",Attributes=0x%x\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   syscall_name, file_path);
+                   syscall_name, file_path, file_attr);
             break;
 
         default:
         case OUTPUT_DEFAULT:
-            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s\n",
+            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,0x%" PRIu32 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, file_path);
+                   USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, file_path, file_attr);
             break;
     }
 
@@ -351,6 +360,8 @@ filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t ou
     if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
         throw -1;
     if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
+        throw -1;
+    if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "Attributes", &this->objattr_attr) )
         throw -1;
     // Offset of the RootDirectory field in _FILE_RENAME_INFORMATION structure
     this->newfile_root_offset = addr_size;
