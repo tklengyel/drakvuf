@@ -1231,9 +1231,6 @@ void drakvuf_vmi_event_callback (int fd, void* data)
         PRINT_DEBUG("Error waiting for events or timeout, quitting...\n");
         drakvuf->interrupted = -1;
     }
-
-    if ( !xen_unmask_evtchn(drakvuf->xen) )
-        drakvuf->interrupted = -1;
 }
 
 void drakvuf_loop(drakvuf_t drakvuf)
