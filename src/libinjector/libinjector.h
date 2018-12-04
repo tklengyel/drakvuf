@@ -169,13 +169,11 @@ void init_argument(
 
 bool setup_stack_32(vmi_instance_t vmi,
                     drakvuf_trap_info_t* info,
-                    access_context_t* ctx,
                     struct argument args[],
                     int nb_args);
 
 bool setup_stack_64(vmi_instance_t vmi,
                     drakvuf_trap_info_t* info,
-                    access_context_t* ctx,
                     struct argument args[],
                     int nb_args);
 
