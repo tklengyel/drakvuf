@@ -653,7 +653,10 @@ static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
             init_argument(&args[4], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
             init_argument(&args[5], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
             init_argument(&args[6], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
-            init_argument(&args[7], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
+            if (injector->cwd)
+                init_argument(&args[7], ARGUMENT_STRING, strlen(injector->cwd), (void*)injector->cwd);
+            else
+                init_argument(&args[7], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
             init_argument(&args[8], ARGUMENT_STRUCT, sizeof(struct startup_info_32),
                           (void*)&si);
             init_argument(&args[9], ARGUMENT_STRUCT, sizeof(struct process_information_32),
@@ -682,7 +685,11 @@ static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
                           (void*)injector->target_file);
             init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&(args[5]), ARGUMENT_INT, sizeof(uint64_t), (void*)show_cmd);
+            if (injector->cwd)
+                init_argument(&args[4], ARGUMENT_STRING, strlen(injector->cwd), (void*)injector->cwd);
+            else
+                init_argument(&args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+            init_argument(&args[5], ARGUMENT_INT, sizeof(uint64_t), (void*)show_cmd);
 
             if ( !setup_stack_64(vmi, info, args, 6) )
                 goto err;
@@ -706,7 +713,10 @@ static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
             init_argument(&args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&args[5], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&args[6], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[7], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
+            if (injector->cwd)
+                init_argument(&args[7], ARGUMENT_STRING, strlen(injector->cwd), (void*)injector->cwd);
+            else
+                init_argument(&args[7], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&args[8], ARGUMENT_STRUCT, sizeof(struct startup_info_64),
                           (void*)&si);
             init_argument(&args[9], ARGUMENT_STRUCT, sizeof(struct process_information_64),
@@ -1418,8 +1428,8 @@ injector_t injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, co
     if ( !drakvuf_get_struct_members_array_rva(injector->drakvuf, offset_names, OFFSET_MAX, injector->offsets) )
         PRINT_DEBUG("Failed to find one of offsets.\n");
 
-    printf("Target PID %u with DTB 0x%lx to start '%s' ['%s']\n", pid,
-           injector->target_cr3, file, injector->target_pname);
+    PRINT_DEBUG("Target PID %u with DTB 0x%lx to start '%s' ['%s']\n", pid,
+                injector->target_cr3, file, injector->target_pname);
 
     addr_t eprocess_base = 0;
     if ( !drakvuf_find_process(injector->drakvuf, pid, NULL, &eprocess_base) )
