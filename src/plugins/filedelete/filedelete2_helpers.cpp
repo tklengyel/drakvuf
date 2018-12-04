@@ -150,12 +150,6 @@ bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_inst
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = injector->saved_regs.rsp;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp,
-    };
     struct argument args[3] = { {0} };
     uint64_t null = 0;
     const size_t int_size = injector->is32bit ? sizeof (uint32_t) : sizeof (uint64_t);
@@ -164,7 +158,7 @@ bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_inst
     init_argument(&args[1], ARGUMENT_INT, int_size, (void*)BYTES_TO_READ);
     init_argument(&args[2], ARGUMENT_INT, int_size, (void*)0);
 
-    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 3) : setup_stack_64(vmi, info, &ctx, args, 3);
+    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, args, 3) : setup_stack_64(vmi, info, args, 3);
     if ( !stack_ok )
         return false;
 
@@ -181,12 +175,6 @@ bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = injector->saved_regs.rsp;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp,
-    };
     struct argument args[9] = { {0} };
     struct _LARGE_INTEGER byte_offset = { .QuadPart = injector->ntreadfile_info.bytes_read };
     const union IO_STATUS_BLOCK io_status_block = { { 0 } };
@@ -204,7 +192,7 @@ bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_
     init_argument(&args[7], ARGUMENT_STRUCT, sizeof(byte_offset), (void*)&byte_offset);
     init_argument(&args[8], ARGUMENT_INT, int_size, (void*)null);
 
-    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 9) : setup_stack_64(vmi, info, &ctx, args, 9);
+    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, args, 9) : setup_stack_64(vmi, info, args, 9);
     if ( !stack_ok )
         return false;
 
@@ -221,13 +209,6 @@ bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_
 
 bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
 {
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp,
-    };
-
     struct argument args[5] = { {0} };
     const union IO_STATUS_BLOCK io_status_block = { { 0 } };
     struct FILE_FS_DEVICE_INFORMATION dev_info = { 0 };
@@ -239,7 +220,7 @@ bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instan
     init_argument(&args[3], ARGUMENT_INT, int_size, (void*)sizeof(struct FILE_FS_DEVICE_INFORMATION));
     init_argument(&args[4], ARGUMENT_INT, int_size, (void*)4); // FileFsDeviceInformation
 
-    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, &ctx, args, 5) : setup_stack_64(vmi, info, &ctx, args, 5);
+    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, args, 5) : setup_stack_64(vmi, info, args, 5);
     if ( !stack_ok )
         return false;
 
