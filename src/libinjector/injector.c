@@ -302,7 +302,7 @@ struct kapc_64
     uint8_t inserted;
 };
 
-static addr_t place_string_on_stack_32(vmi_instance_t vmi, access_context_t* ctx, addr_t addr, char const* str)
+static addr_t place_string_on_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, char const* str)
 {
     if (!str)
         return 0;
@@ -314,24 +314,33 @@ static addr_t place_string_on_stack_32(vmi_instance_t vmi, access_context_t* ctx
     // for special instructions operating on strings to work correctly
     // this string has to be aligned as well!
     addr -= len + string_align - (len % string_align);
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write(vmi, ctx, len, (void*) str, NULL))
-        goto err;
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = addr,
+    };
+
+    if (VMI_FAILURE == vmi_write(vmi, &ctx, len, (void*) str, NULL))
+        return 0;
 
     return addr;
-
-err:
-    return 0;
 }
 
 bool setup_stack_32(
     vmi_instance_t vmi,
     drakvuf_trap_info_t* info,
-    access_context_t* ctx,
     struct argument args[],
     int nb_args)
 {
     const uint32_t stack_align = 64;
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
 
     addr_t addr = info->regs->rsp;
 
@@ -342,7 +351,7 @@ bool setup_stack_32(
         {
             case ARGUMENT_STRING:
             {
-                addr = place_string_on_stack_32(vmi, ctx, addr, (const char*)args[i].data);
+                addr = place_string_on_stack_32(vmi, info, addr, (const char*)args[i].data);
                 if ( !addr ) goto err;
                 args[i].data_on_stack = addr;
                 break;
@@ -352,10 +361,10 @@ bool setup_stack_32(
                 size_t len = args[i].size;
                 addr -= len;
                 addr -= addr % stack_align;
-                ctx->addr = addr;
                 args[i].data_on_stack = addr;
 
-                if (VMI_FAILURE == vmi_write(vmi, ctx, len, args[i].data, NULL))
+                ctx.addr = addr;
+                if (VMI_FAILURE == vmi_write(vmi, &ctx, len, args[i].data, NULL))
                     goto err;
                 break;
             }
@@ -373,15 +382,15 @@ bool setup_stack_32(
     for (int i = nb_args-1; i >= 0; i--)
     {
         addr -= 0x4;
-        ctx->addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, ctx, (uint32_t*)&(args[i].data_on_stack)) )
+        ctx.addr = addr;
+        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*)&(args[i].data_on_stack)) )
             goto err;
     }
 
     // save the return address
     addr -= 0x4;
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_32(vmi, ctx, (uint32_t*) &info->regs->rip))
+    ctx.addr = addr;
+    if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*) &info->regs->rip))
         goto err;
 
     // grow the stack
@@ -393,7 +402,7 @@ err:
     return 0;
 }
 
-static addr_t place_string_on_stack_64(vmi_instance_t vmi, access_context_t* ctx, addr_t addr, char const* str)
+static addr_t place_string_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, char const* str)
 {
     if (!str) return addr;
     // String length with null terminator
@@ -408,8 +417,14 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, access_context_t* ctx
     void* buf = g_malloc0(buf_len);
     g_stpcpy(buf, str);
 
-    ctx->addr = addr;
-    status_t status = vmi_write(vmi, ctx, buf_len, buf, NULL);
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = addr,
+    };
+
+    status_t status = vmi_write(vmi, &ctx, buf_len, buf, NULL);
     g_free(buf);
 
     return status == VMI_FAILURE ? 0 : addr;
@@ -418,11 +433,16 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, access_context_t* ctx
 bool setup_stack_64(
     vmi_instance_t vmi,
     drakvuf_trap_info_t* info,
-    access_context_t* ctx,
     struct argument args[],
     int nb_args)
 {
     uint64_t nul64 = 0;
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
 
     addr_t addr = info->regs->rsp;
 
@@ -435,7 +455,7 @@ bool setup_stack_64(
             {
                 case ARGUMENT_STRING:
                 {
-                    addr = place_string_on_stack_64(vmi, ctx, addr, (const char*)args[i].data);
+                    addr = place_string_on_stack_64(vmi, info, addr, (const char*)args[i].data);
                     if ( !addr ) goto err;
                     args[i].data_on_stack = addr;
                     break;
@@ -449,10 +469,10 @@ bool setup_stack_64(
                     size_t len = args[i].size;
                     addr -= len;
                     addr &= ~0xf; // Align stack
-                    ctx->addr = addr;
                     args[i].data_on_stack = addr;
 
-                    if (VMI_FAILURE == vmi_write(vmi, ctx, len, args[i].data, NULL))
+                    ctx.addr = addr;
+                    if (VMI_FAILURE == vmi_write(vmi, &ctx, len, args[i].data, NULL))
                         goto err;
                     break;
                 }
@@ -476,8 +496,8 @@ bool setup_stack_64(
         if (nb_args % 2)
         {
             addr -= 0x8;
-            ctx->addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
                 goto err;
         }
 
@@ -491,8 +511,8 @@ bool setup_stack_64(
         for (int i = nb_args-1; i > 3; i--)
         {
             addr -= 0x8;
-            ctx->addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, ctx, &(args[i].data_on_stack)) )
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &(args[i].data_on_stack)) )
                 goto err;
         }
 
@@ -523,15 +543,15 @@ bool setup_stack_64(
     for (int i = 0; i < 4; i++)
     {
         addr -= 0x8;
-        ctx->addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, ctx, &nul64))
+        ctx.addr = addr;
+        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
             goto err;
     }
 
     // save the return address
     addr -= 0x8;
-    ctx->addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, ctx, &info->regs->rip))
+    ctx.addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &info->regs->rip))
         goto err;
 
     // grow the stack
@@ -603,29 +623,7 @@ static int patch_payload(struct injector* injector, unsigned char* addr)
 
 static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 {
-    reg_t fsgs;
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
-
-    addr_t stack_base, stack_limit;
-
-    if (injector->is32bit)
-        fsgs = info->regs->fs_base;
-    else
-        fsgs = info->regs->gs_base;
-
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
-
-    ctx.addr = fsgs + injector->offsets[NT_TIB_STACKBASE];
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &stack_base))
-        goto err;
-
-    ctx.addr = fsgs + injector->offsets[NT_TIB_STACKLIMIT];
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &stack_limit))
-        goto err;
 
     //Push input arguments on the stack
 
@@ -661,7 +659,7 @@ static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
             init_argument(&args[9], ARGUMENT_STRUCT, sizeof(struct process_information_32),
                           (void*)&pi);
 
-            if ( !setup_stack_32(vmi, info, &ctx, args, 10) )
+            if ( !setup_stack_32(vmi, info, args, 10) )
                 goto err;
 
             injector->process_info = args[9].data_on_stack;
@@ -686,7 +684,7 @@ static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
             init_argument(&args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&(args[5]), ARGUMENT_INT, sizeof(uint64_t), (void*)show_cmd);
 
-            if ( !setup_stack_64(vmi, info, &ctx, args, 6) )
+            if ( !setup_stack_64(vmi, info, args, 6) )
                 goto err;
         }
         else if (INJECT_METHOD_CREATEPROC == injector->method)
@@ -714,7 +712,7 @@ static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
             init_argument(&args[9], ARGUMENT_STRUCT, sizeof(struct process_information_64),
                           (void*)&pi);
 
-            if ( !setup_stack_64(vmi, info, &ctx, args, 10) )
+            if ( !setup_stack_64(vmi, info, args, 10) )
                 goto err;
 
             injector->process_info = args[9].data_on_stack;
@@ -737,7 +735,7 @@ static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
             init_argument(&args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)allocation_type);
             init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)protect);
 
-            if ( !setup_stack_64(vmi, info, &ctx, args, 4) )
+            if ( !setup_stack_64(vmi, info, args, 4) )
                 goto err;
 
         }
@@ -757,12 +755,12 @@ static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
             init_argument(&args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)size);
             init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
 
-            if ( !setup_stack_64(vmi, info, &ctx, args, 4) )
+            if ( !setup_stack_64(vmi, info, args, 4) )
                 goto err;
         }
         else if ( (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method) && STATUS_PHYS_ALLOC_OK == injector->status)
         {
-            if ( !setup_stack_64(vmi, info, &ctx, NULL, 4) )
+            if ( !setup_stack_64(vmi, info, NULL, 4) )
                 goto err;
         }
     }
