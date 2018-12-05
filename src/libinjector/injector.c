@@ -122,12 +122,12 @@
 struct injector
 {
     // Inputs:
-    const char* target_file;
+    unicode_string_t* target_file_us;
     const char* target_pname;
     reg_t target_cr3;
     vmi_pid_t target_pid;
     uint32_t target_tid;
-    const char* cwd;
+    unicode_string_t* cwd_us;
 
     // Internal:
     drakvuf_t drakvuf;
@@ -302,13 +302,12 @@ struct kapc_64
     uint8_t inserted;
 };
 
-static addr_t place_string_on_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, char const* str)
+static addr_t place_string_on_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void const* str, size_t str_len)
 {
-    if (!str)
-        return 0;
+    if (!str) return 0;
 
     const uint32_t string_align = 64;
-    const size_t len = strlen(str) + 1;// null terminated string
+    const size_t len = str_len + 2;// null terminated string
 
     // the stack has to be aligned _not_ to 0x4 but to 64
     // for special instructions operating on strings to work correctly
@@ -351,7 +350,7 @@ bool setup_stack_32(
         {
             case ARGUMENT_STRING:
             {
-                addr = place_string_on_stack_32(vmi, info, addr, (const char*)args[i].data);
+                addr = place_string_on_stack_32(vmi, info, addr, args[i].data, args[i].size);
                 if ( !addr ) goto err;
                 args[i].data_on_stack = addr;
                 break;
@@ -402,11 +401,11 @@ err:
     return 0;
 }
 
-static addr_t place_string_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, char const* str)
+static addr_t place_string_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void const* str, size_t str_len)
 {
     if (!str) return addr;
     // String length with null terminator
-    size_t len = strlen(str) + 1;
+    size_t len = str_len + 2;
     addr_t orig_addr = addr;
 
     addr -= len;
@@ -415,7 +414,8 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* 
 
     size_t buf_len = orig_addr - addr;
     void* buf = g_malloc0(buf_len);
-    g_stpcpy(buf, str);
+    if (!buf) return 0;
+    memcpy(buf, str, str_len);
 
     access_context_t ctx =
     {
@@ -455,7 +455,7 @@ bool setup_stack_64(
             {
                 case ARGUMENT_STRING:
                 {
-                    addr = place_string_on_stack_64(vmi, info, addr, (const char*)args[i].data);
+                    addr = place_string_on_stack_64(vmi, info, addr, args[i].data, args[i].size);
                     if ( !addr ) goto err;
                     args[i].data_on_stack = addr;
                     break;
@@ -621,6 +621,34 @@ static int patch_payload(struct injector* injector, unsigned char* addr)
 }
 #endif
 
+static unicode_string_t* convert_utf8_to_utf16(char const* str)
+{
+    if (!str) return NULL;
+
+    unicode_string_t us =
+    {
+        .contents = (void*)g_strdup(str),
+        .length = strlen(str),
+        .encoding = "UTF-8",
+    };
+
+    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+    if (!out)
+    {
+        g_free(us.contents);
+        return NULL;
+    }
+
+    status_t rc = vmi_convert_str_encoding(&us, out, "UTF-16LE");
+    g_free(us.contents);
+
+    if (VMI_SUCCESS == rc)
+        return out;
+
+    g_free(out);
+    return NULL;
+}
+
 static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
@@ -646,15 +674,16 @@ static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 
             // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
             init_argument(&args[0], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
-            init_argument(&args[1], ARGUMENT_STRING, strlen(injector->target_file),
-                          (void*)injector->target_file);
+            init_argument(&args[1], ARGUMENT_STRING, injector->target_file_us->length,
+                          injector->target_file_us->contents);
             init_argument(&args[2], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
             init_argument(&args[3], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
             init_argument(&args[4], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
             init_argument(&args[5], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
             init_argument(&args[6], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
-            if (injector->cwd)
-                init_argument(&args[7], ARGUMENT_STRING, strlen(injector->cwd), (void*)injector->cwd);
+            if (injector->cwd_us)
+                init_argument(&args[7], ARGUMENT_STRING, injector->cwd_us->length,
+                              injector->cwd_us->contents);
             else
                 init_argument(&args[7], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
             init_argument(&args[8], ARGUMENT_STRUCT, sizeof(struct startup_info_32),
@@ -667,7 +696,6 @@ static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 
             injector->process_info = args[9].data_on_stack;
         }
-
     }
     else
     {
@@ -681,12 +709,13 @@ static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
             // ShellExecute(NULL, NULL, &FilePath, NULL, NULL, SW_SHOWNORMAL)
             init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[2], ARGUMENT_STRING, strlen(injector->target_file),
-                          (void*)injector->target_file);
+            init_argument(&args[2], ARGUMENT_STRING, injector->target_file_us->length,
+                          injector->target_file_us->contents);
             init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            if (injector->cwd)
-                init_argument(&args[4], ARGUMENT_STRING, strlen(injector->cwd), (void*)injector->cwd);
+            if (injector->cwd_us)
+                init_argument(&args[4], ARGUMENT_STRING, injector->cwd_us->length,
+                              injector->cwd_us->contents);
             else
                 init_argument(&args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&args[5], ARGUMENT_INT, sizeof(uint64_t), (void*)show_cmd);
@@ -706,15 +735,16 @@ static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
 
             // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
             init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[1], ARGUMENT_STRING, strlen(injector->target_file),
-                          (void*)injector->target_file);
+            init_argument(&args[1], ARGUMENT_STRING, injector->target_file_us->length,
+                          injector->target_file_us->contents);
             init_argument(&args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&args[5], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&args[6], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            if (injector->cwd)
-                init_argument(&args[7], ARGUMENT_STRING, strlen(injector->cwd), (void*)injector->cwd);
+            if (injector->cwd_us)
+                init_argument(&args[7], ARGUMENT_STRING, injector->cwd_us->length,
+                              injector->cwd_us->contents);
             else
                 init_argument(&args[7], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
             init_argument(&args[8], ARGUMENT_STRUCT, sizeof(struct startup_info_64),
@@ -1217,7 +1247,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if ( !injector->hijacked || info->regs->rip != injector->bp.breakpoint.addr || threadid != injector->target_tid )
         return 0;
 
-    // We are now in the return path from CreateProcessA
+    // We are now in the return path from CreateProcessW
 
     drakvuf_remove_trap(drakvuf, &injector->bp, NULL);
     injector->restored = 1;
@@ -1405,8 +1435,11 @@ injector_t injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, co
     injector->drakvuf = drakvuf;
     injector->target_pid = pid;
     injector->target_tid = tid;
-    injector->target_file = file;
-    injector->cwd = cwd;
+
+    injector->target_file_us = convert_utf8_to_utf16(file);
+    injector->cwd_us = cwd ? convert_utf8_to_utf16(cwd) : NULL;
+    if (!injector->target_file_us || (cwd && !injector->cwd_us))
+        goto done;
 
     gchar* target_pname = g_strrstr(file, "\\");
     injector->target_pname = target_pname ? ++target_pname : file;
@@ -1436,11 +1469,11 @@ injector_t injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, co
         goto done;
 
     char* lib = "kernel32.dll";
-    char* fun = "CreateProcessA";
+    char* fun = "CreateProcessW";
     if (INJECT_METHOD_SHELLEXEC == method)
     {
         lib = "shell32.dll";
-        fun = "ShellExecuteA";
+        fun = "ShellExecuteW";
     }
     else if (INJECT_METHOD_SHELLCODE == method || INJECT_METHOD_DOPP == method)
     {
@@ -1525,6 +1558,11 @@ void injector_cleanup(injector_t injector)
         drakvuf_loop(injector->drakvuf);
 
     drakvuf_remove_trap(injector->drakvuf, &injector->cr3_event, NULL);
+
+    if (injector->target_file_us)
+        vmi_free_unicode_str(injector->target_file_us);
+    if (injector->cwd_us)
+        vmi_free_unicode_str(injector->cwd_us);
 
     g_free((void*)injector->binary);
     g_free((void*)injector->payload);
