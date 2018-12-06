@@ -343,25 +343,25 @@ static void extract_file(filedelete* f,
         extract_ca_file(f, drakvuf, info, vmi, imagesection, ctx, filename);
 }
 
-static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* filename)
+static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* filename, size_t bytes_read = 0)
 {
     switch (f->format)
     {
         case OUTPUT_CSV:
-            printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\"\n",
+            printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIu64 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, filename);
+                   info->proc_data.userid, filename, bytes_read);
             break;
         case OUTPUT_KV:
-            printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\"\n",
+            printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\",Size=%ld\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, filename);
+                   info->trap->name, filename, bytes_read);
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\"\n",
+            printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" SIZE:%" PRIu64 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, filename);
+                   USERIDSTR(drakvuf), info->proc_data.userid, filename, bytes_read);
             break;
     }
 }
@@ -426,6 +426,10 @@ static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
         grab_file_by_handle(f, drakvuf, vmi, info, injector->handle);
     }
+
+    wrapper_t* injector = (wrapper_t*)info->trap->data;
+    filedelete* f = injector->f;
+    print_filedelete_information(f, drakvuf, info, f->files[std::make_pair(info->proc_data.pid, injector->target_thread_id)].c_str(), injector->ntreadfile_info.bytes_read);
 
     free_resources(drakvuf, info);
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -685,8 +689,6 @@ static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         return 0;
 
     filedelete* f = (filedelete*)info->trap->data;
-
-    print_filedelete_information(f, drakvuf, info, filename ?: "");
 
     if ( 0 == info->proc_data.base_addr )
     {
