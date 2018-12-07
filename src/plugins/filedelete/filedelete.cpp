@@ -232,6 +232,32 @@ static std::string fo_flags_to_string(uint64_t fo_flags)
     return str;
 }
 
+static bool is_synchronous(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle, uint64_t* flags)
+{
+    if (!flags)
+        return false;
+
+    filedelete* f = (filedelete*)info->trap->data;
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    if (!obj)
+        return false; // Break operatioin to not crash VM
+
+    addr_t file = obj + f->offsets[OBJECT_HEADER_BODY];
+    addr_t fileflags = file + f->offsets[FILE_OBJECT_FLAGS];
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.addr = fileflags;
+    ctx.dtb = info->regs->cr3;
+
+    if (VMI_SUCCESS == vmi_read_64(vmi, &ctx, flags) &&
+            (*flags & 2)) // FO_SYNCHRONOUS_IO
+        return true;
+
+    return false;
+}
+
 static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_t vmi,
                                  drakvuf_trap_info_t* info,
                                  addr_t handle,
@@ -314,7 +340,8 @@ static void extract_ca_file(filedelete* f,
                             vmi_instance_t vmi,
                             addr_t control_area,
                             access_context_t* ctx,
-                            const char* filename)
+                            const char* filename,
+                            uint64_t fo_flags)
 {
     addr_t subsection = control_area + f->control_area_size;
     addr_t segment = 0, test = 0, test2 = 0;
@@ -411,7 +438,7 @@ static void extract_ca_file(filedelete* f,
 
     fclose(fp);
 
-    save_file_metadata(f, info, curr_sequence_number, control_area, filename, filesize);
+    save_file_metadata(f, info, curr_sequence_number, control_area, filename, filesize, fo_flags);
 }
 
 static void extract_file(filedelete* f,
@@ -420,7 +447,8 @@ static void extract_file(filedelete* f,
                          vmi_instance_t vmi,
                          addr_t file_pa,
                          access_context_t* ctx,
-                         const char* filename)
+                         const char* filename,
+                         uint64_t fo_flags)
 {
     addr_t sop = 0;
     addr_t datasection = 0, sharedcachemap = 0, imagesection = 0;
@@ -434,7 +462,7 @@ static void extract_file(filedelete* f,
         return;
 
     if ( datasection )
-        extract_ca_file(f, drakvuf, info, vmi, datasection, ctx, filename);
+        extract_ca_file(f, drakvuf, info, vmi, datasection, ctx, filename, fo_flags);
 
     ctx->addr = sop + f->offsets[SECTIONOBJECTPOINTER_SHAREDCACHEMAP];
     if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &sharedcachemap) )
@@ -447,7 +475,7 @@ static void extract_file(filedelete* f,
         return;
 
     if ( imagesection != datasection )
-        extract_ca_file(f, drakvuf, info, vmi, imagesection, ctx, filename);
+        extract_ca_file(f, drakvuf, info, vmi, imagesection, ctx, filename, fo_flags);
 }
 
 static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* filename, size_t bytes_read = 0, uint64_t fo_flags = 0)
@@ -494,7 +522,10 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
     std::string filename = get_file_name(f, drakvuf, vmi, info, handle, &file, &filetype);
     if (filename.empty()) return;
 
-    print_filedelete_information(f, drakvuf, info, filename.c_str());
+    uint64_t fo_flags = 0;
+    is_synchronous(drakvuf, info, vmi, handle, &fo_flags);
+
+    print_filedelete_information(f, drakvuf, info, filename.c_str(), 0, fo_flags);
 
     if (f->dump_folder)
     {
@@ -504,7 +535,7 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
             .addr = filetype,
             .dtb = info->regs->cr3,
         };
-        extract_file(f, drakvuf, info, vmi, file, &ctx, filename.c_str());
+        extract_file(f, drakvuf, info, vmi, file, &ctx, filename.c_str(), fo_flags);
     }
 }
 
@@ -761,32 +792,6 @@ done:
     drakvuf_release_vmi(drakvuf);
 
     return response;
-}
-
-static bool is_synchronous(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle, uint64_t* flags)
-{
-    if (!flags)
-        return false;
-
-    filedelete* f = (filedelete*)info->trap->data;
-
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
-    if (!obj)
-        return false; // Break operatioin to not crash VM
-
-    addr_t file = obj + f->offsets[OBJECT_HEADER_BODY];
-    addr_t fileflags = file + f->offsets[FILE_OBJECT_FLAGS];
-
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.addr = fileflags;
-    ctx.dtb = info->regs->cr3;
-
-    if (VMI_SUCCESS == vmi_read_64(vmi, &ctx, flags) &&
-            (*flags & 2)) // FO_SYNCHRONOUS_IO
-        return true;
-
-    return false;
 }
 
 /*
