@@ -299,7 +299,8 @@ static void extract_ca_file(filedelete* f,
                 if ( VMI_FAILURE == vmi_read_pa(vmi, VMI_BIT_MASK(12,48) & pte, 4096, &page, NULL) )
                     continue;
 
-                if ( !fseek ( fp, fileoffset, SEEK_SET ) ) {
+                if ( !fseek ( fp, fileoffset, SEEK_SET ) )
+                {
                     if ( fwrite(page, 4096, 1, fp) )
                         filesize = fileoffset + 4096;
                 }

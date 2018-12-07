@@ -364,7 +364,10 @@ static event_response_t log_reg_set_value_hook_cb( drakvuf_t drakvuf, drakvuf_tr
                         // Read current wchar string
                         multiple_strings.emplace_back(
                             drakvuf_read_wchar_string(vmi_lg.vmi, &ctx),
-                        [](unicode_string_t* p) { vmi_free_unicode_str(p); }
+                            [](unicode_string_t* p)
+                        {
+                            vmi_free_unicode_str(p);
+                        }
                         );
                         ctx.addr = data_addr + i + 2;
                     }
