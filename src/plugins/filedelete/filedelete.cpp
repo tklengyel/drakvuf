@@ -183,7 +183,8 @@ static void save_file_metadata(filedelete* f,
                                const drakvuf_trap_info_t* info,
                                int sequence_number,
                                addr_t control_area,
-                               const char* filename)
+                               const char* filename,
+                               size_t bytes_read = 0)
 {
     char* file = NULL;
     if ( asprintf(&file, "%s/file.%06d.metadata", f->dump_folder, sequence_number) < 0 )
@@ -196,6 +197,8 @@ static void save_file_metadata(filedelete* f,
 
     if (filename)
         fprintf(fp, "FileName: \"%s\"\n", filename);
+    if (bytes_read)
+        fprintf(fp, "FileSize: %ld\n", bytes_read);
     fprintf(fp, "SequenceNumber: %d\n", sequence_number);
     fprintf(fp, "ControlArea: 0x%lx\n", control_area);
     fprintf(fp, "PID: %" PRIu64 "\n", static_cast<uint64_t>(info->proc_data.pid));
@@ -215,6 +218,7 @@ static void extract_ca_file(filedelete* f,
 {
     addr_t subsection = control_area + f->control_area_size;
     addr_t segment = 0, test = 0, test2 = 0;
+    size_t filesize = 0;
 
     /* Check whether subsection points back to the control area */
     ctx->addr = control_area + f->offsets[CONTROL_AREA_SEGMENT];
@@ -292,8 +296,10 @@ static void extract_ca_file(filedelete* f,
                 if ( VMI_FAILURE == vmi_read_pa(vmi, VMI_BIT_MASK(12,48) & pte, 4096, &page, NULL) )
                     continue;
 
-                if ( !fseek ( fp, fileoffset, SEEK_SET ) )
-                    fwrite(page, 4096, 1, fp);
+                if ( !fseek ( fp, fileoffset, SEEK_SET ) ) {
+                    if ( fwrite(page, 4096, 1, fp) )
+                        filesize = fileoffset + 4096;
+                }
             }
         }
 
@@ -304,7 +310,7 @@ static void extract_ca_file(filedelete* f,
 
     fclose(fp);
 
-    save_file_metadata(f, info, curr_sequence_number, control_area, filename);
+    save_file_metadata(f, info, curr_sequence_number, control_area, filename, filesize);
 }
 
 static void extract_file(filedelete* f,
@@ -485,7 +491,7 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         const int curr_sequence_number = injector->curr_sequence_number;
 
         auto filename = f->files[std::make_pair(info->proc_data.pid, injector->handle)];
-        save_file_metadata(f, info, curr_sequence_number, 0, filename.c_str());
+        save_file_metadata(f, info, curr_sequence_number, 0, filename.c_str(), injector->ntreadfile_info.bytes_read);
 
         void* buffer = g_malloc0(isb_size);
 
