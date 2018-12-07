@@ -141,6 +141,7 @@ struct wrapper_t
     bool is32bit;
 
     handle_t handle;
+    uint64_t fo_flags;
 
     reg_t target_cr3;
     uint32_t target_thread_id;

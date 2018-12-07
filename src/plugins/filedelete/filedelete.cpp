@@ -184,7 +184,8 @@ static void save_file_metadata(filedelete* f,
                                int sequence_number,
                                addr_t control_area,
                                const char* filename,
-                               size_t bytes_read = 0)
+                               size_t bytes_read = 0,
+                               uint64_t fo_flags = 0)
 {
     char* file = NULL;
     if ( asprintf(&file, "%s/file.%06d.metadata", f->dump_folder, sequence_number) < 0 )
@@ -199,6 +200,8 @@ static void save_file_metadata(filedelete* f,
         fprintf(fp, "FileName: \"%s\"\n", filename);
     if (bytes_read)
         fprintf(fp, "FileSize: %ld\n", bytes_read);
+    if (fo_flags)
+        fprintf(fp, "_FILE_OBJECT.Flags: 0x%lx\n", fo_flags);
     fprintf(fp, "SequenceNumber: %d\n", sequence_number);
     fprintf(fp, "ControlArea: 0x%lx\n", control_area);
     fprintf(fp, "PID: %" PRIu64 "\n", static_cast<uint64_t>(info->proc_data.pid));
@@ -349,25 +352,25 @@ static void extract_file(filedelete* f,
         extract_ca_file(f, drakvuf, info, vmi, imagesection, ctx, filename);
 }
 
-static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* filename, size_t bytes_read = 0)
+static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* filename, size_t bytes_read = 0, uint64_t fo_flags = 0)
 {
     switch (f->format)
     {
         case OUTPUT_CSV:
-            printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIu64 "\n",
+            printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIu64 ",%" PRIx64 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, filename, bytes_read);
+                   info->proc_data.userid, filename, bytes_read, fo_flags);
             break;
         case OUTPUT_KV:
-            printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\",Size=%ld\n",
+            printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\",Size=%ld,FO_FLAGS=0x%lx\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, filename, bytes_read);
+                   info->trap->name, filename, bytes_read, fo_flags);
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" SIZE:%" PRIu64 "\n",
+            printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" SIZE:%" PRIu64 " FO_FLAGS:0x%" PRIx64 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, filename, bytes_read);
+                   USERIDSTR(drakvuf), info->proc_data.userid, filename, bytes_read, fo_flags);
             break;
     }
 }
@@ -435,7 +438,7 @@ static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
     wrapper_t* injector = (wrapper_t*)info->trap->data;
     filedelete* f = injector->f;
-    print_filedelete_information(f, drakvuf, info, f->files[std::make_pair(info->proc_data.pid, injector->target_thread_id)].c_str(), injector->ntreadfile_info.bytes_read);
+    print_filedelete_information(f, drakvuf, info, f->files[std::make_pair(info->proc_data.pid, injector->target_thread_id)].c_str(), injector->ntreadfile_info.bytes_read, injector->fo_flags);
 
     free_resources(drakvuf, info);
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -491,7 +494,7 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         const int curr_sequence_number = injector->curr_sequence_number;
 
         auto filename = f->files[std::make_pair(info->proc_data.pid, injector->handle)];
-        save_file_metadata(f, info, curr_sequence_number, 0, filename.c_str(), injector->ntreadfile_info.bytes_read);
+        save_file_metadata(f, info, curr_sequence_number, 0, filename.c_str(), injector->ntreadfile_info.bytes_read, injector->fo_flags);
 
         void* buffer = g_malloc0(isb_size);
 
@@ -662,8 +665,11 @@ done:
     return response;
 }
 
-static bool is_synchronous(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle)
+static bool is_synchronous(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle, uint64_t* flags)
 {
+    if (!flags)
+        return false;
+
     filedelete* f = (filedelete*)info->trap->data;
 
     addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
@@ -678,9 +684,8 @@ static bool is_synchronous(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_ins
     ctx.addr = fileflags;
     ctx.dtb = info->regs->cr3;
 
-    uint64_t flags = 0;
-    if (VMI_SUCCESS == vmi_read_64(vmi, &ctx, &flags) &&
-            (flags & 2)) // FO_SYNCHRONOUS_IO
+    if (VMI_SUCCESS == vmi_read_64(vmi, &ctx, flags) &&
+            (*flags & 2)) // FO_SYNCHRONOUS_IO
         return true;
 
     return false;
@@ -691,7 +696,8 @@ static bool is_synchronous(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_ins
  */
 static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle, const char* filename)
 {
-    if (!is_synchronous(drakvuf, info, vmi, handle))
+    uint64_t fo_flags = 0;
+    if (!is_synchronous(drakvuf, info, vmi, handle, &fo_flags))
         return 0;
 
     filedelete* f = (filedelete*)info->trap->data;
@@ -751,6 +757,7 @@ static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     injector->f = f;
     injector->handle = handle;
+    injector->fo_flags = fo_flags;
     injector->is32bit = (f->pm != VMI_PM_IA32E);
     injector->target_cr3 = info->regs->cr3;
     injector->curr_sequence_number = -1;
