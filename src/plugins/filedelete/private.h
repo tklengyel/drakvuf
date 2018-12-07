@@ -135,6 +135,39 @@ extern const char* offset_names[__OFFSET_MAX][2];
  * # For filedelete 2
  ************************/
 
+enum file_object_flags
+{
+    FO_FILE_OPEN                    = 0x00000001,
+    FO_SYNCHRONOUS_IO               = 0x00000002,
+    FO_ALERTABLE_IO                 = 0x00000004,
+    FO_NO_INTERMEDIATE_BUFFERING    = 0x00000008,
+    FO_WRITE_THROUGH                = 0x00000010,
+    FO_SEQUENTIAL_ONLY              = 0x00000020,
+    FO_CACHE_SUPPORTED              = 0x00000040,
+    FO_NAMED_PIPE                   = 0x00000080,
+    FO_STREAM_FILE                  = 0x00000100,
+    FO_MAILSLOT                     = 0x00000200,
+    FO_GENERATE_AUDIT_ON_CLOSE      = 0x00000400,
+    FO_DIRECT_DEVICE_OPEN           = 0x00000800,
+    FO_FILE_MODIFIED                = 0x00001000,
+    FO_FILE_SIZE_CHANGED            = 0x00002000,
+    FO_CLEANUP_COMPLETE             = 0x00004000,
+    FO_TEMPORARY_FILE               = 0x00008000,
+    FO_DELETE_ON_CLOSE              = 0x00010000,
+    FO_OPENED_CASE_SENSITIVE        = 0x00020000,
+    FO_HANDLE_CREATED               = 0x00040000,
+    FO_FILE_FAST_IO_READ            = 0x00080000,
+    FO_RANDOM_ACCESS                = 0x00100000,
+    FO_FILE_OPEN_CANCELLED          = 0x00200000,
+    FO_VOLUME_OPEN                  = 0x00400000,
+    FO_REMOTE_ORIGIN                = 0x01000000,
+    FO_DISALLOW_EXCLUSIVE           = 0x02000000,
+    FO_SKIP_SET_EVENT               = 0x04000000,
+    FO_SKIP_SET_FAST_IO             = 0x08000000,
+    FO_INDIRECT_WAIT_OBJECT         = 0x10000000,
+    FO_SECTION_MINSTORE_TREATMENT   = 0x20000000,
+};
+
 struct wrapper_t
 {
     filedelete* f;

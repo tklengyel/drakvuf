@@ -135,6 +135,103 @@ const char* offset_names[__OFFSET_MAX][2] =
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
 };
 
+static std::string fo_flags_to_string(uint64_t fo_flags)
+{
+    std::string str("");
+
+    if (FO_FILE_OPEN & fo_flags)
+        str += "FO_FILE_OPEN | ";
+
+    if (FO_SYNCHRONOUS_IO & fo_flags)
+        str += "FO_SYNCHRONOUS_IO | ";
+
+    if (FO_ALERTABLE_IO & fo_flags)
+        str += "FO_ALERTABLE_IO | ";
+
+    if (FO_NO_INTERMEDIATE_BUFFERING & fo_flags)
+        str += "FO_NO_INTERMEDIATE_BUFFERING | ";
+
+    if (FO_WRITE_THROUGH & fo_flags)
+        str += "FO_WRITE_THROUGH | ";
+
+    if (FO_SEQUENTIAL_ONLY & fo_flags)
+        str += "FO_SEQUENTIAL_ONLY | ";
+
+    if (FO_CACHE_SUPPORTED & fo_flags)
+        str += "FO_CACHE_SUPPORTED | ";
+
+    if (FO_NAMED_PIPE & fo_flags)
+        str += "FO_NAMED_PIPE | ";
+
+    if (FO_STREAM_FILE & fo_flags)
+        str += "FO_STREAM_FILE | ";
+
+    if (FO_MAILSLOT & fo_flags)
+        str += "FO_MAILSLOT | ";
+
+    if (FO_GENERATE_AUDIT_ON_CLOSE & fo_flags)
+        str += "FO_GENERATE_AUDIT_ON_CLOSE | ";
+
+    if (FO_DIRECT_DEVICE_OPEN & fo_flags)
+        str += "FO_DIRECT_DEVICE_OPEN | ";
+
+    if (FO_FILE_MODIFIED & fo_flags)
+        str += "FO_FILE_MODIFIED | ";
+
+    if (FO_FILE_SIZE_CHANGED & fo_flags)
+        str += "FO_FILE_SIZE_CHANGED | ";
+
+    if (FO_CLEANUP_COMPLETE & fo_flags)
+        str += "FO_CLEANUP_COMPLETE | ";
+
+    if (FO_TEMPORARY_FILE & fo_flags)
+        str += "FO_TEMPORARY_FILE | ";
+
+    if (FO_DELETE_ON_CLOSE & fo_flags)
+        str += "FO_DELETE_ON_CLOSE | ";
+
+    if (FO_OPENED_CASE_SENSITIVE & fo_flags)
+        str += "FO_OPENED_CASE_SENSITIVE | ";
+
+    if (FO_HANDLE_CREATED & fo_flags)
+        str += "FO_HANDLE_CREATED | ";
+
+    if (FO_FILE_FAST_IO_READ & fo_flags)
+        str += "FO_FILE_FAST_IO_READ | ";
+
+    if (FO_RANDOM_ACCESS & fo_flags)
+        str += "FO_RANDOM_ACCESS | ";
+
+    if (FO_FILE_OPEN_CANCELLED & fo_flags)
+        str += "FO_FILE_OPEN_CANCELLED | ";
+
+    if (FO_VOLUME_OPEN & fo_flags)
+        str += "FO_VOLUME_OPEN | ";
+
+    if (FO_REMOTE_ORIGIN & fo_flags)
+        str += "FO_REMOTE_ORIGIN | ";
+
+    if (FO_DISALLOW_EXCLUSIVE & fo_flags)
+        str += "FO_DISALLOW_EXCLUSIVE | ";
+
+    if (FO_SKIP_SET_EVENT & fo_flags)
+        str += "FO_SKIP_SET_EVENT | ";
+
+    if (FO_SKIP_SET_FAST_IO & fo_flags)
+        str += "FO_SKIP_SET_FAST_IO | ";
+
+    if (FO_INDIRECT_WAIT_OBJECT & fo_flags)
+        str += "FO_INDIRECT_WAIT_OBJECT | ";
+
+    if (FO_SECTION_MINSTORE_TREATMENT & fo_flags)
+        str += "FO_SECTION_MINSTORE_TREATMENT | ";
+
+    if (str.size() >= 3)
+        str.resize(str.size() - 3);
+
+    return str;
+}
+
 static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_t vmi,
                                  drakvuf_trap_info_t* info,
                                  addr_t handle,
@@ -201,7 +298,7 @@ static void save_file_metadata(filedelete* f,
     if (bytes_read)
         fprintf(fp, "FileSize: %ld\n", bytes_read);
     if (fo_flags)
-        fprintf(fp, "_FILE_OBJECT.Flags: 0x%lx\n", fo_flags);
+        fprintf(fp, "_FILE_OBJECT.Flags: 0x%lx (%s)\n", fo_flags, fo_flags_to_string(fo_flags).c_str());
     fprintf(fp, "SequenceNumber: %d\n", sequence_number);
     fprintf(fp, "ControlArea: 0x%lx\n", control_area);
     fprintf(fp, "PID: %" PRIu64 "\n", static_cast<uint64_t>(info->proc_data.pid));
@@ -358,20 +455,20 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakv
     switch (f->format)
     {
         case OUTPUT_CSV:
-            printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIu64 ",%" PRIx64 "\n",
+            printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIu64 ",%" PRIx64 "(%s)\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, filename, bytes_read, fo_flags);
+                   info->proc_data.userid, filename, bytes_read, fo_flags, fo_flags_to_string(fo_flags).c_str());
             break;
         case OUTPUT_KV:
-            printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\",Size=%ld,FO_FLAGS=0x%lx\n",
+            printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\",Size=%ld,FO_FLAGS=0x%lx(%s)\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, filename, bytes_read, fo_flags);
+                   info->trap->name, filename, bytes_read, fo_flags, fo_flags_to_string(fo_flags).c_str());
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" SIZE:%" PRIu64 " FO_FLAGS:0x%" PRIx64 "\n",
+            printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" SIZE:%" PRIu64 " FO_FLAGS:0x%" PRIx64 "(%s)\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, filename, bytes_read, fo_flags);
+                   USERIDSTR(drakvuf), info->proc_data.userid, filename, bytes_read, fo_flags, fo_flags_to_string(fo_flags).c_str());
             break;
     }
 }
