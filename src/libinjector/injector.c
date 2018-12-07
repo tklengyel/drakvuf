@@ -1015,7 +1015,6 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 new_trap->memaccess.access = VMI_MEMACCESS_X;
                 new_trap->memaccess.type = POST;
                 new_trap->memaccess.gfn = page->paddr >> 12;
-                injector->memtraps = g_slist_prepend(injector->memtraps, new_trap);
                 if ( drakvuf_add_trap(injector->drakvuf, new_trap) )
                     injector->memtraps = g_slist_prepend(injector->memtraps, new_trap);
                 else
