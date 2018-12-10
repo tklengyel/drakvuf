@@ -232,12 +232,10 @@ static std::string fo_flags_to_string(uint64_t fo_flags)
     return str;
 }
 
-static bool is_synchronous(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle, uint64_t* flags)
+static bool is_synchronous(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, filedelete* f, handle_t handle, uint64_t* flags)
 {
     if (!flags)
         return false;
-
-    filedelete* f = (filedelete*)info->trap->data;
 
     addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
     if (!obj)
@@ -523,7 +521,7 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
     if (filename.empty()) return;
 
     uint64_t fo_flags = 0;
-    is_synchronous(drakvuf, info, vmi, handle, &fo_flags);
+    is_synchronous(drakvuf, info, vmi, f, handle, &fo_flags);
 
     print_filedelete_information(f, drakvuf, info, filename.c_str(), 0, fo_flags);
 
@@ -799,11 +797,11 @@ done:
  */
 static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle, const char* filename)
 {
-    uint64_t fo_flags = 0;
-    if (!is_synchronous(drakvuf, info, vmi, handle, &fo_flags))
-        return 0;
-
     filedelete* f = (filedelete*)info->trap->data;
+
+    uint64_t fo_flags = 0;
+    if (!is_synchronous(drakvuf, info, vmi, f, handle, &fo_flags))
+        return 0;
 
     if ( 0 == info->proc_data.base_addr )
     {
