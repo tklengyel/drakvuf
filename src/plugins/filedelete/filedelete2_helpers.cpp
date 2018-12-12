@@ -164,7 +164,6 @@ bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_inst
 
     info->regs->rip = injector->f->exallocatepool_va;
 
-    injector->bp->name = "ExAllocatePoolWithTag ret";
     injector->bp->cb = exallocatepool_cb;
 
     return true;
@@ -201,7 +200,6 @@ bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_
 
     info->regs->rip = injector->f->readfile_va;
 
-    injector->bp->name = "ReadFile ret";
     injector->bp->cb = readfile_cb;
 
     return true;
@@ -227,7 +225,6 @@ bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instan
     injector->ntqueryobject_info.out = args[2].data_on_stack;
 
     injector->bp->type = BREAKPOINT;
-    injector->bp->name = "QueryObject ret";
     injector->bp->cb = queryobject_cb;
     injector->bp->data = injector;
     injector->bp->breakpoint.lookup_type = LOOKUP_DTB;

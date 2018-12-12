@@ -879,6 +879,7 @@ static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     }
 
     injector->f = f;
+    injector->bp->name = info->trap->name;
     injector->handle = handle;
     injector->fo_flags = fo_flags;
     injector->is32bit = (f->pm != VMI_PM_IA32E);
