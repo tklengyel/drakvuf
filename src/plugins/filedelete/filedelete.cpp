@@ -587,7 +587,8 @@ static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
     wrapper_t* injector = (wrapper_t*)info->trap->data;
     filedelete* f = injector->f;
-    print_filedelete_information(f, drakvuf, info, f->files[std::make_pair(info->proc_data.pid, injector->target_thread_id)].c_str(), injector->ntreadfile_info.bytes_read, injector->fo_flags);
+    auto filename = f->files[std::make_pair(info->proc_data.pid, injector->handle)];
+    print_filedelete_information(f, drakvuf, info, filename.c_str(), injector->ntreadfile_info.bytes_read, injector->fo_flags);
 
     free_resources(drakvuf, info);
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
