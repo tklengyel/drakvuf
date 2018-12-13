@@ -141,6 +141,8 @@ typedef enum
     STATUS_WRITE_OK,
     STATUS_EXEC_OK,
     STATUS_BP_HIT,
+    STATUS_CREATE_OK,
+    STATUS_RESUME_OK,
     __STATUS_MAX
 } status_type_t;
 
@@ -152,20 +154,20 @@ struct argument
     void* data;
 };
 
-static inline
-void init_argument(
-    struct argument* arg,
-    argument_type_t type,
-    size_t size,
-    void* data)
-{
-    arg->type = type;
-    arg->size = size;
 
-    arg->data = data;
+void init_argument(struct argument* arg,
+                   argument_type_t type,
+                   size_t size,
+                   void* data);
 
-    arg->data_on_stack = 0;
-}
+void init_int_argument(struct argument* arg,
+                       uint64_t value);
+
+void init_unicode_argument(struct argument* arg,
+                           unicode_string_t* us);
+
+#define init_struct_argument(arg, sv) \
+    init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
 
 bool setup_stack_32(vmi_instance_t vmi,
                     drakvuf_trap_info_t* info,
@@ -177,19 +179,20 @@ bool setup_stack_64(vmi_instance_t vmi,
                     struct argument args[],
                     int nb_args);
 
-injector_t injector_start_app(drakvuf_t drakvuf,
-                              vmi_pid_t pid,
-                              uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-                              const char* app,
-                              const char* cwd,
-                              injection_method_t method,
-                              output_format_t format,
-                              const char* binary_path,     // if -m = doppelganging
-                              const char* target_process,  // if -m = doppelganging
-                              bool wait_for_process,
-                              int* ret);
+bool setup_stack(drakvuf_t drakvuf,
+                 drakvuf_trap_info_t* info,
+                 struct argument args[],
+                 int nb_args);
 
-void injector_cleanup(injector_t injector);
+int injector_start_app(drakvuf_t drakvuf,
+                       vmi_pid_t pid,
+                       uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
+                       const char* app,
+                       const char* cwd,
+                       injection_method_t method,
+                       output_format_t format,
+                       const char* binary_path,     // if -m = doppelganging
+                       const char* target_process); // if -m = doppelganging
 
 #pragma GCC visibility pop
 
