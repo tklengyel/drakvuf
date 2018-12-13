@@ -659,9 +659,6 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         injector->ntreadfile_info.bytes_read += isb_size;
 
-        auto filename = f->files[std::make_pair(info->proc_data.pid, injector->handle)];
-        save_file_metadata(f, info, curr_sequence_number, 0, filename.c_str(), injector->ntreadfile_info.bytes_read, injector->fo_flags);
-
         if (BYTES_TO_READ == isb_size)
         {
             if (inject_readfile(drakvuf, info, vmi, injector))
@@ -673,6 +670,12 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             {
                 goto err;
             }
+        }
+        else
+        {
+            auto filename = f->files[std::make_pair(info->proc_data.pid, injector->handle)];
+            save_file_metadata(f, info, curr_sequence_number, 0, filename.c_str(), injector->ntreadfile_info.bytes_read, injector->fo_flags);
+
         }
     }
     else
