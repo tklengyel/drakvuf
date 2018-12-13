@@ -103,7 +103,7 @@
 #*************************************************************************#
 
 h_sources = libinjector.h private.h
-c_sources = injector.c
+c_sources = injector.c injector_stack.c
 
 AM_CFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CFLAGS += $(CFLAGS)
