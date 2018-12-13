@@ -643,9 +643,6 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         if (injector->curr_sequence_number < 0) injector->curr_sequence_number = ++f->sequence_number;
         const int curr_sequence_number = injector->curr_sequence_number;
 
-        auto filename = f->files[std::make_pair(info->proc_data.pid, injector->handle)];
-        save_file_metadata(f, info, curr_sequence_number, 0, filename.c_str(), injector->ntreadfile_info.bytes_read, injector->fo_flags);
-
         void* buffer = g_malloc0(isb_size);
 
         ctx.addr = injector->ntreadfile_info.out;
@@ -673,6 +670,12 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             {
                 goto err;
             }
+        }
+        else
+        {
+            auto filename = f->files[std::make_pair(info->proc_data.pid, injector->handle)];
+            save_file_metadata(f, info, curr_sequence_number, 0, filename.c_str(), injector->ntreadfile_info.bytes_read, injector->fo_flags);
+
         }
     }
     else
