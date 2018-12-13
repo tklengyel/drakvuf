@@ -136,7 +136,6 @@ int main(int argc, char** argv)
     char* domain = nullptr;
     char* rekall_profile = nullptr;
     char* dump_folder = nullptr;
-    bool wait_for_process = false;
     char* tcpip = nullptr;
     char* binary_path = nullptr;
     char* target_process = nullptr;
@@ -174,7 +173,6 @@ int main(int argc, char** argv)
                 "\t -e <inject_file>          The executable to start with injection\n"
                 "\t -c <current_working_dir>  The current working directory for injected executable\n"
                 "\t -m <inject_method>        The injection method: createproc, shellexec, shellcode, doppelganging\n"
-                "\t -w                        Wait with plugin start until injected process name is detected\n"
                 "\t -t <timeout>              Timeout (in seconds)\n"
                 "\t -o <format>               Output format (default or csv)\n"
                 "\t -x <plugin>               Don't activate the specified plugin\n"
@@ -207,7 +205,7 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spwT:S:Mc:nb")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nb")) != -1)
         switch (c)
         {
             case 'r':
@@ -273,9 +271,6 @@ int main(int argc, char** argv)
                 break;
             case 'p':
                 leave_paused = true;
-                break;
-            case 'w':
-                wait_for_process = true;
                 break;
             case 'T':
                 tcpip = optarg;
@@ -346,7 +341,7 @@ int main(int argc, char** argv)
     if ( injection_pid > 0 && inject_file )
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, wait_for_process);
+        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process);
         if (!ret)
             goto exit;
     }
@@ -355,11 +350,6 @@ int main(int argc, char** argv)
 
     if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, syscalls_filter_file, abort_on_bsod) < 0 )
         goto exit;
-
-    if ( injection_pid > 0 && inject_file )
-    {
-        drakvuf->inject_cmd_cleanup();
-    }
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");
 

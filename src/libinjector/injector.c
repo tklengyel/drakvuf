@@ -123,7 +123,6 @@ struct injector
 {
     // Inputs:
     unicode_string_t* target_file_us;
-    const char* target_pname;
     reg_t target_cr3;
     vmi_pid_t target_pid;
     uint32_t target_tid;
@@ -131,9 +130,12 @@ struct injector
 
     // Internal:
     drakvuf_t drakvuf;
-    bool is32bit, hijacked, wait_for_process, target_running, restored;
+    bool is32bit, hijacked, resumed, detected;
     injection_method_t method;
     addr_t exec_func;
+
+    // For create process
+    addr_t resume_thread;
 
     // For shellcode execution
     addr_t payload, payload_addr, memset;
@@ -150,23 +152,54 @@ struct injector
     addr_t process_info;
     x86_registers_t saved_regs;
 
-    drakvuf_trap_t bp, cr3_event;
+    drakvuf_trap_t bp;
     GSList* memtraps;
 
     size_t offsets[OFFSET_MAX];
 
     // Results:
-    reg_t cr3;
     int rc;
     uint32_t pid, tid;
-    uint32_t hProc, hThr;
+    uint64_t hProc, hThr;
 };
 
-#define SW_SHOWDEFAULT  10
+static void free_memtraps(injector_t injector)
+{
+    GSList* loop = injector->memtraps;
+    injector->memtraps = NULL;
+
+    while (loop)
+    {
+        drakvuf_remove_trap(injector->drakvuf, loop->data, (drakvuf_trap_free_t)free);
+        loop = loop->next;
+    }
+    g_slist_free(loop);
+}
+
+static void free_injector(injector_t injector)
+{
+    if (!injector) return;
+
+    PRINT_DEBUG("Injector freed\n");
+
+    free_memtraps(injector);
+
+    if (injector->target_file_us)
+        vmi_free_unicode_str(injector->target_file_us);
+    if (injector->cwd_us)
+        vmi_free_unicode_str(injector->cwd_us);
+
+    g_free((void*)injector->binary);
+    g_free((void*)injector->payload);
+    g_free((void*)injector);
+}
+
+#define SW_SHOWNORMAL   1
 #define MEM_COMMIT      0x00001000
 #define MEM_RESERVE     0x00002000
 #define MEM_PHYSICAL    0x00400000
 #define PAGE_EXECUTE_READWRITE  0x40
+#define CREATE_SUSPENDED 0x00000004
 
 struct startup_info_32
 {
@@ -228,343 +261,8 @@ struct process_information_64
     uint32_t dwThreadId;
 } __attribute__ ((packed));
 
-struct list_entry_32
-{
-    uint32_t flink;
-    uint32_t blink;
-} __attribute__ ((packed));
-
-struct list_entry_64
-{
-    uint64_t flink;
-    uint64_t blink;
-} __attribute__ ((packed));
-
-struct kapc_state_32
-{
-    // apc_list_head[0] = kernel apc list
-    // apc_list_head[1] = user apc list
-    struct list_entry_32 apc_list_head[2];
-    uint32_t process;
-    uint8_t kernel_apc_in_progress;
-    uint8_t kernel_apc_pending;
-    uint8_t user_apc_pending;
-} __attribute__ ((packed));
-
-struct kapc_state_64
-{
-    // apc_list_head[0] = kernel apc list
-    // apc_list_head[1] = user apc list
-    struct list_entry_64 apc_list_head[2];
-    uint64_t process;
-    uint8_t kernel_apc_in_progress;
-    uint8_t kernel_apc_pending;
-    uint8_t user_apc_pending;
-};
-
-struct kapc_32
-{
-    uint8_t type;
-    uint8_t spare_byte0;
-    uint8_t size;
-    uint8_t spare_byte1;
-    uint32_t spare_long0;
-    uint32_t thread;
-    struct list_entry_32 apc_list_entry;
-    uint32_t kernel_routine;
-    uint32_t rundown_routine;
-    uint32_t normal_routine;
-    uint32_t normal_context;
-    uint32_t system_argument_1;
-    uint32_t system_argument_2;
-    uint8_t apc_state_index;
-    uint8_t apc_mode;
-    uint8_t inserted;
-} __attribute__ ((packed));
-
-struct kapc_64
-{
-    uint8_t type;
-    uint8_t spare_byte0;
-    uint8_t size;
-    uint8_t spare_byte1;
-    uint32_t spare_long0;
-    uint64_t thread;
-    struct list_entry_64 apc_list_entry;
-    uint64_t kernel_routine;
-    uint64_t rundown_routine;
-    uint64_t normal_routine;
-    uint64_t normal_context;
-    uint64_t system_argument_1;
-    uint64_t system_argument_2;
-    uint8_t apc_state_index;
-    uint8_t apc_mode;
-    uint8_t inserted;
-};
-
-static addr_t place_string_on_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void const* str, size_t str_len)
-{
-    if (!str) return 0;
-
-    const uint32_t string_align = 64;
-    const size_t len = str_len + 2;// null terminated string
-
-    // the stack has to be aligned _not_ to 0x4 but to 64
-    // for special instructions operating on strings to work correctly
-    // this string has to be aligned as well!
-    addr -= len + string_align - (len % string_align);
-
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = addr,
-    };
-
-    if (VMI_FAILURE == vmi_write(vmi, &ctx, len, (void*) str, NULL))
-        return 0;
-
-    return addr;
-}
-
-bool setup_stack_32(
-    vmi_instance_t vmi,
-    drakvuf_trap_info_t* info,
-    struct argument args[],
-    int nb_args)
-{
-    const uint32_t stack_align = 64;
-
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
-
-    addr_t addr = info->regs->rsp;
-
-    // make room for strings and structs into guest's stack
-    for (int i = 0; i < nb_args; i++)
-    {
-        switch (args[i].type)
-        {
-            case ARGUMENT_STRING:
-            {
-                addr = place_string_on_stack_32(vmi, info, addr, args[i].data, args[i].size);
-                if ( !addr ) goto err;
-                args[i].data_on_stack = addr;
-                break;
-            }
-            case ARGUMENT_STRUCT:
-            {
-                size_t len = args[i].size;
-                addr -= len;
-                addr -= addr % stack_align;
-                args[i].data_on_stack = addr;
-
-                ctx.addr = addr;
-                if (VMI_FAILURE == vmi_write(vmi, &ctx, len, args[i].data, NULL))
-                    goto err;
-                break;
-            }
-            case ARGUMENT_INT:
-            {
-                args[i].data_on_stack = (uint64_t)args[i].data;
-                break;
-            }
-            default:
-                goto err;
-        }
-    }
-
-    // write parameters into guest's stack
-    for (int i = nb_args-1; i >= 0; i--)
-    {
-        addr -= 0x4;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*)&(args[i].data_on_stack)) )
-            goto err;
-    }
-
-    // save the return address
-    addr -= 0x4;
-    ctx.addr = addr;
-    if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*) &info->regs->rip))
-        goto err;
-
-    // grow the stack
-    info->regs->rsp = addr;
-
-    return 1;
-
-err:
-    return 0;
-}
-
-static addr_t place_string_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void const* str, size_t str_len)
-{
-    if (!str) return addr;
-    // String length with null terminator
-    size_t len = str_len + 2;
-    addr_t orig_addr = addr;
-
-    addr -= len;
-    // Align string address on 32B boundary (for SSE2 instructions).
-    addr &= ~0x1f;
-
-    size_t buf_len = orig_addr - addr;
-    void* buf = g_malloc0(buf_len);
-    if (!buf) return 0;
-    memcpy(buf, str, str_len);
-
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = addr,
-    };
-
-    status_t status = vmi_write(vmi, &ctx, buf_len, buf, NULL);
-    g_free(buf);
-
-    return status == VMI_FAILURE ? 0 : addr;
-}
-
-bool setup_stack_64(
-    vmi_instance_t vmi,
-    drakvuf_trap_info_t* info,
-    struct argument args[],
-    int nb_args)
-{
-    uint64_t nul64 = 0;
-
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
-
-    addr_t addr = info->regs->rsp;
-
-    if ( args )
-    {
-        // make room for strings and structs into guest's stack
-        for (int i = 0; i < nb_args; i++)
-        {
-            switch (args[i].type)
-            {
-                case ARGUMENT_STRING:
-                {
-                    addr = place_string_on_stack_64(vmi, info, addr, args[i].data, args[i].size);
-                    if ( !addr ) goto err;
-                    args[i].data_on_stack = addr;
-                    break;
-                }
-                case ARGUMENT_STRUCT:
-                {
-                    /* According to Microsoft Doc "Building C/C++ Programs":
-                     * > The alignment of the beginning of a structure or a union is the maximum
-                     * > alignment of any individual member.
-                     */
-                    size_t len = args[i].size;
-                    addr -= len;
-                    addr &= ~0xf; // Align stack
-                    args[i].data_on_stack = addr;
-
-                    ctx.addr = addr;
-                    if (VMI_FAILURE == vmi_write(vmi, &ctx, len, args[i].data, NULL))
-                        goto err;
-                    break;
-                }
-                case ARGUMENT_INT:
-                {
-                    args[i].data_on_stack = (uint64_t)args[i].data;
-                    break;
-                }
-                default:
-                    goto err;
-            }
-        }
-
-        /* According to Microsoft Doc "Building C/C++ Programs":
-         * > The stack will always be maintained 16-byte aligned, except within the prolog
-         * > (for example, after the return address is pushed), and except where indicated
-         * > in Function Types for a certain class of frame functions.
-         *
-         * So place one extra argument to achieve alignment just before CALL instruction.
-         */
-        if (nb_args % 2)
-        {
-            addr -= 0x8;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-                goto err;
-        }
-
-        // http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
-        //
-        // First 4 parameters to functions are always passed in registers
-        // P1=rcx, P2=rdx, P3=r8, P4=r9
-        // 5th parameter onwards (if any) passed via the stack
-
-        // write parameters (5th onwards) into guest's stack
-        for (int i = nb_args-1; i > 3; i--)
-        {
-            addr -= 0x8;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &(args[i].data_on_stack)) )
-                goto err;
-        }
-
-        switch (nb_args)
-        {
-            default:
-                // p4
-                info->regs->r9 = args[3].data_on_stack;
-            // fall through
-            case 3:
-                // p3
-                info->regs->r8 = args[2].data_on_stack;
-            // fall through
-            case 2:
-                // p2
-                info->regs->rdx = args[1].data_on_stack;
-            // fall through
-            case 1:
-                // p1
-                info->regs->rcx = args[0].data_on_stack;
-            // fall through
-            case 0:
-                break;
-        }
-    }
-
-    // allocate 0x20 "homing space"
-    for (int i = 0; i < 4; i++)
-    {
-        addr -= 0x8;
-        ctx.addr = addr;
-        if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-            goto err;
-    }
-
-    // save the return address
-    addr -= 0x8;
-    ctx.addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &info->regs->rip))
-        goto err;
-
-    // grow the stack
-    info->regs->rsp = addr;
-
-    return 1;
-
-err:
-    return 0;
-}
-
 #ifdef ENABLE_DOPPELGANGING
-static int patch_payload(struct injector* injector, unsigned char* addr)
+static int patch_payload(injector_t injector, unsigned char* addr)
 {
     // First byte at which each variable instanciation start in the shellcode.
     addr_t offset_target_process = 0xa;
@@ -649,174 +347,182 @@ static unicode_string_t* convert_utf8_to_utf16(char const* str)
     return NULL;
 }
 
-static bool pass_inputs(struct injector* injector, drakvuf_trap_info_t* info)
+static bool setup_create_process_stack_32(injector_t injector, drakvuf_trap_info_t* info)
 {
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
+    struct argument args[10] = { {0} };
+    struct startup_info_32 si = { 0 };
+    struct process_information_32 pi = { 0 };
 
-    //Push input arguments on the stack
+    // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
+    init_int_argument(&args[0], 0);
+    init_unicode_argument(&args[1], injector->target_file_us);
+    init_int_argument(&args[2], 0);
+    init_int_argument(&args[3], 0);
+    init_int_argument(&args[4], 0);
+    init_int_argument(&args[5], CREATE_SUSPENDED);
+    init_int_argument(&args[6], 0);
+    init_unicode_argument(&args[7], injector->cwd_us);
+    init_struct_argument(&args[8], si);
+    init_struct_argument(&args[9], pi);
+
+    bool success = setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+    injector->process_info = args[9].data_on_stack;
+    return success;
+}
+
+static bool setup_create_process_stack_64(injector_t injector, drakvuf_trap_info_t* info)
+{
+    struct argument args[10] = { {0} };
+    struct startup_info_64 si = { 0 };
+    struct process_information_64 pi = { 0 };
+
+    // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
+    init_int_argument(&args[0], 0);
+    init_unicode_argument(&args[1], injector->target_file_us);
+    init_int_argument(&args[2], 0);
+    init_int_argument(&args[3], 0);
+    init_int_argument(&args[4], 0);
+    init_int_argument(&args[5], CREATE_SUSPENDED);
+    init_int_argument(&args[6], 0);
+    init_unicode_argument(&args[7], injector->cwd_us);
+    init_struct_argument(&args[8], si);
+    init_struct_argument(&args[9], pi);
+
+    bool success = setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+    injector->process_info = args[9].data_on_stack;
+    return success;
+}
+
+static bool setup_create_process_stack(injector_t injector, drakvuf_trap_info_t* info)
+{
+    if (injector->is32bit)
+        return setup_create_process_stack_32(injector, info);
+    return setup_create_process_stack_64(injector, info);
+}
+
+static bool setup_resume_thread_stack(injector_t injector, drakvuf_trap_info_t* info)
+{
+    struct argument args[1] = { {0} };
+    init_int_argument(&args[0], injector->hThr);
+
+    return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+}
+
+static bool setup_shell_execute_stack(injector_t injector, drakvuf_trap_info_t* info)
+{
+    struct argument args[6] = { {0} };
+
+    // ShellExecute(NULL, NULL, &FilePath, NULL, NULL, SW_SHOWNORMAL)
+    init_int_argument(&args[0], 0);
+    init_unicode_argument(&args[1], NULL);
+    init_unicode_argument(&args[2], injector->target_file_us);
+    init_unicode_argument(&args[3], NULL);
+    init_unicode_argument(&args[4], injector->cwd_us);
+    init_int_argument(&args[5], SW_SHOWNORMAL);
+
+    return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+}
+
+static bool setup_virtual_alloc_stack(injector_t injector, drakvuf_trap_info_t* info)
+{
+    struct argument args[4] = { {0} };
+
+    // VirtualAlloc(NULL, size, allocation_type, protect);
+    init_int_argument(&args[0], 0);
+    // Allocate enough space for the shellcode and the binary at once
+    init_int_argument(&args[1], injector->payload_size + injector->binary_size);
+    init_int_argument(&args[2], MEM_COMMIT | MEM_RESERVE);
+    init_int_argument(&args[3], PAGE_EXECUTE_READWRITE);
+
+    return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+}
+
+static bool setup_memset_stack(injector_t injector, drakvuf_trap_info_t* info)
+{
+    struct argument args[4] = { {0} };
+
+    // memset(payload_addr, c, payload_size);
+    init_int_argument(&args[0], injector->payload_addr);
+    init_int_argument(&args[1], 0);
+    init_int_argument(&args[2], injector->payload_size + injector->binary_size);
+    init_int_argument(&args[3], 0);
+
+    return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+}
+
+static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info)
+{
+    if (!injector->target_tid)
+    {
+        uint32_t threadid = 0;
+        if (!drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, &threadid) || !threadid)
+            return false;
+
+        injector->target_tid = threadid;
+    }
+
+    injector->hijacked = true;
+
+    return true;
+}
+
+static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info)
+{
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = injector->process_info,
+    };
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
 
     if (injector->is32bit)
     {
-        if (INJECT_METHOD_SHELLEXEC == injector->method)
+        struct process_information_32 pip = { 0 };
+        if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct process_information_32), &pip, NULL) )
         {
-            // TODO Implement
-            goto err;
-        }
-        else
-        {
-            struct argument args[10] = { {0} };
-            struct startup_info_32 si;
-            struct process_information_32 pi;
-            uint64_t null32 = 0;
-
-            memset(&si, 0, sizeof(struct startup_info_32));
-            memset(&pi, 0, sizeof(struct process_information_32));
-
-            // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
-            init_argument(&args[0], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
-            init_argument(&args[1], ARGUMENT_STRING, injector->target_file_us->length,
-                          injector->target_file_us->contents);
-            init_argument(&args[2], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
-            init_argument(&args[3], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
-            init_argument(&args[4], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
-            init_argument(&args[5], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
-            init_argument(&args[6], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
-            if (injector->cwd_us)
-                init_argument(&args[7], ARGUMENT_STRING, injector->cwd_us->length,
-                              injector->cwd_us->contents);
-            else
-                init_argument(&args[7], ARGUMENT_INT, sizeof(uint32_t), (void*)null32);
-            init_argument(&args[8], ARGUMENT_STRUCT, sizeof(struct startup_info_32),
-                          (void*)&si);
-            init_argument(&args[9], ARGUMENT_STRUCT, sizeof(struct process_information_32),
-                          (void*)&pi);
-
-            if ( !setup_stack_32(vmi, info, args, 10) )
-                goto err;
-
-            injector->process_info = args[9].data_on_stack;
+            injector->pid = pip.dwProcessId;
+            injector->tid = pip.dwThreadId;
+            injector->hProc = pip.hProcess;
+            injector->hThr = pip.hThread;
         }
     }
     else
     {
-
-        if (INJECT_METHOD_SHELLEXEC == injector->method)
+        struct process_information_64 pip = { 0 };
+        if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct process_information_64), &pip, NULL) )
         {
-            struct argument args[6] = { {0} };
-            uint64_t null64 = 0;
-            uint64_t show_cmd = 1;
-
-            // ShellExecute(NULL, NULL, &FilePath, NULL, NULL, SW_SHOWNORMAL)
-            init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[2], ARGUMENT_STRING, injector->target_file_us->length,
-                          injector->target_file_us->contents);
-            init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            if (injector->cwd_us)
-                init_argument(&args[4], ARGUMENT_STRING, injector->cwd_us->length,
-                              injector->cwd_us->contents);
-            else
-                init_argument(&args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[5], ARGUMENT_INT, sizeof(uint64_t), (void*)show_cmd);
-
-            if ( !setup_stack_64(vmi, info, args, 6) )
-                goto err;
-        }
-        else if (INJECT_METHOD_CREATEPROC == injector->method)
-        {
-            struct argument args[10] = { {0} };
-            struct startup_info_64 si;
-            struct process_information_64 pi;
-            uint64_t null64 = 0;
-
-            memset(&si, 0, sizeof(struct startup_info_64));
-            memset(&pi, 0, sizeof(struct process_information_64));
-
-            // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
-            init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[1], ARGUMENT_STRING, injector->target_file_us->length,
-                          injector->target_file_us->contents);
-            init_argument(&args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[4], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[5], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[6], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            if (injector->cwd_us)
-                init_argument(&args[7], ARGUMENT_STRING, injector->cwd_us->length,
-                              injector->cwd_us->contents);
-            else
-                init_argument(&args[7], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[8], ARGUMENT_STRUCT, sizeof(struct startup_info_64),
-                          (void*)&si);
-            init_argument(&args[9], ARGUMENT_STRUCT, sizeof(struct process_information_64),
-                          (void*)&pi);
-
-            if ( !setup_stack_64(vmi, info, args, 10) )
-                goto err;
-
-            injector->process_info = args[9].data_on_stack;
-        }
-        else if ( (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method) && STATUS_NULL == injector->status)
-        {
-            struct argument args[4] = { {0} };
-            uint64_t null64 = 0;
-            uint64_t allocation_type = MEM_COMMIT | MEM_RESERVE;
-            uint64_t protect = PAGE_EXECUTE_READWRITE;
-            size_t size = injector->payload_size;
-
-            // Allocate enough space for the shellcode and the binary at once
-            if (INJECT_METHOD_DOPP == injector->method)
-                size += injector->binary_size;
-
-            // VirtualAlloc(NULL, size, allocation_type, protect);
-            init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-            init_argument(&args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)size);
-            init_argument(&args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)allocation_type);
-            init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)protect);
-
-            if ( !setup_stack_64(vmi, info, args, 4) )
-                goto err;
-
-        }
-        else if ( (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method) && STATUS_ALLOC_OK == injector->status)
-        {
-            struct argument args[4] = { {0} };
-            uint64_t c = 0;
-            uint64_t null64 = 0;
-            size_t size = injector->payload_size;
-
-            if (INJECT_METHOD_DOPP == injector->method)
-                size += injector->binary_size;
-
-            // memset(payload_addr, c, payload_size);
-            init_argument(&args[0], ARGUMENT_INT, sizeof(uint64_t), (void*)injector->payload_addr);
-            init_argument(&args[1], ARGUMENT_INT, sizeof(uint64_t), (void*)c);
-            init_argument(&args[2], ARGUMENT_INT, sizeof(uint64_t), (void*)size);
-            init_argument(&args[3], ARGUMENT_INT, sizeof(uint64_t), (void*)null64);
-
-            if ( !setup_stack_64(vmi, info, args, 4) )
-                goto err;
-        }
-        else if ( (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method) && STATUS_PHYS_ALLOC_OK == injector->status)
-        {
-            if ( !setup_stack_64(vmi, info, NULL, 4) )
-                goto err;
+            injector->pid = pip.dwProcessId;
+            injector->tid = pip.dwThreadId;
+            injector->hProc = pip.hProcess;
+            injector->hThr = pip.hThread;
         }
     }
 
     drakvuf_release_vmi(injector->drakvuf);
-    return 1;
-
-err:
-    drakvuf_release_vmi(injector->drakvuf);
-    PRINT_DEBUG("Failed to pass inputs to hijacked function!\n");
-    return 0;
 }
 
-event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+static bool setup_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
 {
-    struct injector* injector = info->trap->data;
+    injector->bp.type = BREAKPOINT;
+    injector->bp.name = "entry";
+    injector->bp.cb = injector_int3_cb;
+    injector->bp.data = injector;
+    injector->bp.breakpoint.lookup_type = LOOKUP_DTB;
+    injector->bp.breakpoint.dtb = info->regs->cr3;
+    injector->bp.breakpoint.addr_type = ADDR_VA;
+    injector->bp.breakpoint.addr = bp_addr;
+
+    return drakvuf_add_trap(injector->drakvuf, &injector->bp);
+}
+
+static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    (void)drakvuf;
+    injector_t injector = info->trap->data;
 
     if ( info->regs->cr3 != injector->target_cr3 )
     {
@@ -831,104 +537,55 @@ event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (injector->hijacked)
         return 0;
 
-    GSList* loop = injector->memtraps;
-    while (loop)
-    {
-        drakvuf_remove_trap(drakvuf, loop->data, (drakvuf_trap_free_t)free);
-        loop=loop->next;
-    }
-    g_slist_free(injector->memtraps);
-    injector->memtraps = NULL;
+    free_memtraps(injector);
 
     memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
-    if (!pass_inputs(injector, info))
+    bool success = false;
+    if (injector->method == INJECT_METHOD_CREATEPROC)
+        success = setup_create_process_stack(injector, info);
+    else if (injector->method == INJECT_METHOD_SHELLEXEC)
+        success = setup_shell_execute_stack(injector, info);
+
+    if (!success)
     {
         PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
         return 0;
     }
 
-    injector->bp.type = BREAKPOINT;
-    injector->bp.name = "ret";
-    injector->bp.cb = injector_int3_cb;
-    injector->bp.data = injector;
-    injector->bp.breakpoint.lookup_type = LOOKUP_DTB;
-    injector->bp.breakpoint.dtb = info->regs->cr3;
-    injector->bp.breakpoint.addr_type = ADDR_VA;
-    injector->bp.breakpoint.addr = info->regs->rip;
-
-    if ( !drakvuf_add_trap(drakvuf, &injector->bp) )
+    if (!setup_int3_trap(injector, info, info->regs->rip))
     {
         fprintf(stderr, "Failed to trap return location of injected function call @ 0x%lx!\n",
-                injector->bp.breakpoint.addr);
+                info->regs->rip);
         return 0;
     }
 
-    if ( !injector->target_tid )
-    {
-        uint32_t threadid = 0;
-        if ( !drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, &threadid) || !threadid )
-            return 0;
-
-        injector->target_tid = threadid;
-    }
+    if (!injector_set_hijacked(injector, info))
+        return 0;
 
     PRINT_DEBUG("Stack setup finished and return trap added @ 0x%" PRIx64 "\n",
-                injector->bp.breakpoint.addr);
+                info->regs->rip);
 
     info->regs->rip = injector->exec_func;
-    injector->hijacked = 1;
+    injector->status = STATUS_CREATE_OK;
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
-event_response_t cr3_catch_create_proc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    struct injector* injector = info->trap->data;
-    (void)drakvuf;
-
-    PRINT_DEBUG("CR3 in catcher changed to 0x%" PRIx64 ". PID: %u PPID: %u\n",
-                info->regs->cr3, info->proc_data.pid, info->proc_data.ppid);
-
-    if ( info->proc_data.ppid == injector->target_pid )
-    {
-        char* pname = drakvuf_get_process_name(drakvuf, info->proc_data.base_addr, 0);
-        gchar* pname_utf8 = g_utf8_casefold(pname, -1);
-
-        if ( !strncmp(pname_utf8, injector->target_pname, 8) )
-        {
-            drakvuf_interrupt(drakvuf, -1);
-            drakvuf_pause(drakvuf);
-            injector->pid = info->proc_data.pid;
-            drakvuf_get_current_thread_id(drakvuf, info->vcpu, &injector->tid);
-            injector->rc = 1;
-            injector->target_running = 1;
-        }
-
-        g_free(pname);
-        g_free(pname_utf8);
-    }
-
-    return 0;
-}
-
-event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    struct injector* injector = info->trap->data;
-    addr_t thread = 0;
-    reg_t cr3 = info->regs->cr3;
-    status_t status;
+    injector_t injector = info->trap->data;
 
     PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". PID: %u PPID: %u\n",
                 info->regs->cr3, info->proc_data.pid, info->proc_data.ppid);
 
-    if (cr3 != injector->target_cr3)
+    if (info->regs->cr3 != injector->target_cr3)
         return 0;
 
-    thread = drakvuf_get_current_thread(drakvuf, info->vcpu);
+    addr_t thread = drakvuf_get_current_thread(drakvuf, info->vcpu);
     if (!thread)
     {
-        PRINT_DEBUG("cr3_cb: Failed to find current thread\n");
+        PRINT_DEBUG("Failed to find current thread\n");
         return 0;
     }
 
@@ -938,7 +595,7 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     PRINT_DEBUG("Thread @ 0x%lx. ThreadID: %u\n", thread, threadid);
 
-    if ( injector->target_tid && injector->target_tid != threadid)
+    if (injector->target_tid && injector->target_tid != threadid)
         return 0;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -960,6 +617,7 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!injector->is32bit)
     {
         addr_t trapframe = 0;
+        status_t status;
         status = vmi_read_addr_va(vmi,
                                   thread + injector->offsets[KTHREAD_TRAPFRAME],
                                   0, &trapframe);
@@ -970,39 +628,34 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             goto done;
         }
 
+        addr_t bp_addr;
         status = vmi_read_addr_va(vmi,
                                   trapframe + injector->offsets[KTRAP_FRAME_RIP],
-                                  0, &injector->bp.breakpoint.addr);
+                                  0, &bp_addr);
 
-        if (status == VMI_FAILURE || !injector->bp.breakpoint.addr)
+        if (status == VMI_FAILURE || !bp_addr)
         {
             PRINT_DEBUG("Failed to read RIP from trapframe or RIP is NULL!\n");
             goto done;
         }
 
-        injector->bp.type = BREAKPOINT;
-        injector->bp.name = "entry";
-        injector->bp.cb = injector_int3_cb;
-        injector->bp.data = injector;
-        injector->bp.breakpoint.lookup_type = LOOKUP_DTB;
-        injector->bp.breakpoint.dtb = cr3;
-        injector->bp.breakpoint.addr_type = ADDR_VA;
-
-        if ( drakvuf_add_trap(drakvuf, &injector->bp) )
+        if (setup_int3_trap(injector, info, bp_addr))
         {
             PRINT_DEBUG("Got return address 0x%lx from trapframe and it's now trapped!\n",
-                        injector->bp.breakpoint.addr);
+                        bp_addr);
 
-            info->trap->cb = cr3_catch_create_proc;
+            // Unsubscribe from the CR3 trap
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
         }
         else
             fprintf(stderr, "Failed to trap trapframe return address\n");
     }
     else
     {
+        drakvuf_pause(drakvuf);
+
         GSList* va_pages = vmi_get_va_pages(vmi, info->regs->cr3);
         GSList* loop = va_pages;
-        drakvuf_pause(drakvuf);
         while (loop)
         {
             page_info_t* page = loop->data;
@@ -1025,7 +678,9 @@ event_response_t cr3_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
         g_slist_free(va_pages);
 
-        info->trap->cb = cr3_catch_create_proc;
+        // Unsubscribe from the CR3 trap
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+
         drakvuf_resume(drakvuf);
     }
 
@@ -1034,46 +689,303 @@ done:
     return 0;
 }
 
-event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    struct injector* injector = info->trap->data;
-    reg_t cr3 = info->regs->cr3;
+    injector_t injector = info->trap->data;
 
+    // Stop the loop and pause VM on first execution of injected process
+    if (injector->pid == (uint32_t)info->proc_data.pid)
+    {
+        drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+        drakvuf_interrupt(drakvuf, -1);
+
+        injector->rc = 1;
+        injector->detected = true;
+        PRINT_DEBUG("Process start detected\n");
+    }
+
+    return 0;
+}
+
+// Setup callback for waiting for first occurence of resumed thread
+static bool setup_wait_for_injected_process_trap(injector_t injector)
+{
+    drakvuf_trap_t* trap = g_malloc0(sizeof(drakvuf_trap_t));
+    trap->type = REGISTER;
+    trap->reg = CR3;
+    trap->cb = wait_for_injected_process_cb;
+    trap->data = injector;
+    if (!drakvuf_add_trap(injector->drakvuf, trap))
+    {
+        PRINT_DEBUG("Failed to setup wait_for_injected_process trap!\n");
+        return false;
+    }
+    PRINT_DEBUG("Waiting for injected process\n");
+    return true;
+}
+
+static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+
+#ifdef ENABLE_DOPPELGANGING
+    // If we are doing process doppelganging we need to write the binary to
+    // inject in memory too (in addition to the shellcode), since it is not
+    // present in the guest's filesystem.
+    if (INJECT_METHOD_DOPP == injector->method)
+    {
+        addr_t kernbase = 0, process_notify_rva = 0;
+
+        injector->binary_addr = injector->payload_addr + injector->payload_size;
+
+        access_context_t ctx =
+        {
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = injector->binary_addr,
+        };
+
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+        bool success = ( VMI_SUCCESS == vmi_write(vmi, &ctx, injector->binary_size, (void*)injector->binary, NULL) );
+        drakvuf_release_vmi(drakvuf);
+
+        if (!success)
+        {
+            PRINT_DEBUG("Failed to write the binary into memory!\n");
+            return 0;
+        }
+        g_free((void*)injector->binary);
+
+        // Get address of PspCallProcessNotifyRoutines() from the rekall profile
+        if ( !drakvuf_get_function_rva(drakvuf, "PspCallProcessNotifyRoutines", &process_notify_rva) )
+        {
+            PRINT_DEBUG("[-] Error getting PspCallProcessNotifyRoutines RVA\n");
+            return 0;
+        }
+
+        kernbase = drakvuf_get_kernel_base(drakvuf);
+        injector->process_notify = kernbase + process_notify_rva;
+
+        // Patch payload
+        PRINT_DEBUG("Patching the shellcode with user inputs..\n");
+        patch_payload(injector, (unsigned char*)injector->payload);
+    }
+#endif
+
+    // Write payload into guest's memory
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = cr3,
+        .dtb = info->regs->cr3,
+        .addr = injector->payload_addr,
     };
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    bool success = ( VMI_SUCCESS == vmi_write(vmi, &ctx, injector->payload_size, (void*)injector->payload, NULL) );
+    drakvuf_release_vmi(drakvuf);
 
-    PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx.\n",
-                info->regs->rip, cr3);
+    if ( !success )
+    {
+        PRINT_DEBUG("Failed to write the payload into memory!\n");
+        return 0;
+    }
+    g_free((void*)injector->payload);
 
-    if ( cr3 != injector->target_cr3 )
+    if (!setup_stack(injector->drakvuf, info, NULL, 4))
+    {
+        PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+        return 0;
+    }
+
+    info->regs->rip = injector->payload_addr;
+
+    // At some point the shellcode will call NtCreateThreadEx() wich in turn
+    // will cause a call to PspCallProcessNotifyRoutines(). In our case,
+    // this function will make NtCreateThreadEx() to fail and the binary we
+    // want to inject will never run. We want to place a breakpoint on it to
+    // bypass this call.
+#ifdef ENABLE_DOPPELGANGING
+    if (INJECT_METHOD_DOPP == injector->method)
+    {
+        // Save breakpoint address to restore it latter
+        injector->saved_bp = injector->bp.breakpoint.addr;
+        injector->bp.breakpoint.addr = injector->process_notify;
+
+        if ( drakvuf_add_trap(drakvuf, &injector->bp) )
+        {
+            PRINT_DEBUG("BP placed on PspCallProcessNotifyRoutines() at: 0x%lx\n", injector->bp.breakpoint.addr);
+        }
+
+        injector->status = STATUS_BP_HIT;
+    }
+    else
+#endif
+    {
+        if (!injector_set_hijacked(injector, info))
+            return 0;
+        injector->status = STATUS_EXEC_OK;
+    }
+
+    PRINT_DEBUG("Executing the payload..\n");
+
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+}
+
+static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+
+    PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx.\n", info->regs->rip, info->regs->cr3);
+
+    if ( info->regs->cr3 != injector->target_cr3 )
     {
         PRINT_DEBUG("INT3 received but CR3 (0x%lx) doesn't match target process (0x%lx)\n",
-                    cr3, injector->target_cr3);
+                    info->regs->cr3, injector->target_cr3);
         PRINT_DEBUG("INT3 received from PID: %d [%s]\n",
                     info->proc_data.pid, info->proc_data.name);
         return 0;
     }
 
-    uint32_t threadid = 0;
-    if ( !drakvuf_get_current_thread_id(drakvuf, info->vcpu, &threadid) || !threadid )
+    if (info->regs->rip != info->trap->breakpoint.addr)
         return 0;
 
-    if ( !injector->is32bit && !injector->hijacked && info->regs->rip == injector->bp.breakpoint.addr && injector->status == STATUS_NULL )
+    if (injector->target_tid)
+    {
+        uint32_t threadid = 0;
+        if (!drakvuf_get_current_thread_id(drakvuf, info->vcpu, &threadid) || threadid != injector->target_tid)
+            return 0;
+    }
+
+    if (injector->is32bit && injector->status == STATUS_CREATE_OK)
+    {
+        PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
+
+        if (INJECT_METHOD_SHELLEXEC == injector->method)
+        {
+            // We are now in the return path from ShellExecuteW called from mem_callback
+
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_interrupt(drakvuf, -1);
+
+            // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND while
+            // successfully opening file. So check only for out of resources (0) error.
+            if (info->regs->rax)
+            {
+                // TODO Retrieve PID and TID
+                PRINT_DEBUG("Injected\n");
+                injector->rc = 1;
+            }
+
+            memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        }
+
+        if (INJECT_METHOD_CREATEPROC == injector->method)
+        {
+            // We are now in the return path from CreateProcessW called from mem_callback
+
+            if (info->regs->rax)
+                fill_created_process_info(injector, info);
+
+            if (injector->pid && injector->tid)
+            {
+                PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
+                injector->rc = info->regs->rax;
+
+                if (!setup_resume_thread_stack(injector, info))
+                {
+                    PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+                    return 0;
+                }
+
+                if (!setup_wait_for_injected_process_trap(injector))
+                    return 0;
+
+                info->regs->rip = injector->resume_thread;
+                injector->status = STATUS_RESUME_OK;
+
+                return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            }
+            else
+            {
+                PRINT_DEBUG("Failed to inject\n");
+                injector->rc = 0;
+
+                drakvuf_remove_trap(drakvuf, info->trap, NULL);
+                drakvuf_interrupt(drakvuf, -1);
+
+                memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+                return VMI_EVENT_RESPONSE_SET_REGISTERS;
+            }
+        }
+
+        return 0;
+    }
+
+    if (injector->status == STATUS_RESUME_OK)
+    {
+        PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
+
+        // We are now in the return path from ResumeThread
+
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+
+        if (info->regs->rax == 1)
+        {
+            PRINT_DEBUG("Resumed\n");
+            injector->rc = 1;
+            injector->resumed = true;
+        }
+        else
+        {
+            PRINT_DEBUG("Failed to resume\n");
+            injector->rc = 0;
+
+            drakvuf_interrupt(drakvuf, -1);
+        }
+
+        memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+
+        if (injector->detected)
+        {
+            // Resumed process was detected before ResumeThread was returned.
+            // We already returned from injector_start_app().
+            // We need cleanup resources.
+            free_injector(injector);
+        }
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+
+    if (!injector->is32bit && !injector->hijacked && injector->status == STATUS_NULL)
     {
         /* We just hit the RIP from the trapframe */
 
         memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
-        if ( !pass_inputs(injector, info) )
+        bool success = false;
+        switch (injector->method)
+        {
+            case INJECT_METHOD_CREATEPROC:
+                success = setup_create_process_stack(injector, info);
+                break;
+            case INJECT_METHOD_SHELLEXEC:
+                success = setup_shell_execute_stack(injector, info);
+                break;
+            case INJECT_METHOD_SHELLCODE:
+            case INJECT_METHOD_DOPP:
+                success = setup_virtual_alloc_stack(injector, info);
+                break;
+            default:
+                // TODO Implement
+                success = false;
+                break;
+        }
+
+        if (!success)
         {
             PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
             return 0;
         }
-
-        info->regs->rip = injector->exec_func;
 
         if (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method)
         {
@@ -1081,22 +993,24 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
         else
         {
-            injector->hijacked = 1;
-
-            if ( !injector->target_tid )
-                injector->target_tid = threadid;
+            if (!injector_set_hijacked(injector, info))
+                return 0;
+            injector->status = STATUS_CREATE_OK;
         }
+
+        info->regs->rip = injector->exec_func;
 
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
     // Chain the injection with a second function
-    if ( !injector->is32bit && info->regs->rip == injector->bp.breakpoint.addr && STATUS_ALLOC_OK == injector->status)
+    if ( !injector->is32bit && STATUS_ALLOC_OK == injector->status)
     {
         PRINT_DEBUG("Writing to allocated virtual memory to allocate physical memory..\n");
 
         injector->payload_addr = info->regs->rax;
-        if ( !pass_inputs(injector, info) )
+
+        if (!setup_memset_stack(injector, info))
         {
             PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
             return 0;
@@ -1112,110 +1026,23 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     // Execute the payload
-    if ( !injector->is32bit && info->regs->rip == injector->bp.breakpoint.addr && STATUS_PHYS_ALLOC_OK == injector->status)
+    if ( !injector->is32bit && STATUS_PHYS_ALLOC_OK == injector->status)
     {
-#ifdef ENABLE_DOPPELGANGING
-        // If we are doing process doppelganging we need to write the binary to
-        // inject in memory too (in addition to the shellcode), since it is not
-        // present in the guest's filesystem.
-        if (INJECT_METHOD_DOPP == injector->method)
-        {
-            addr_t kernbase = 0, process_notify_rva = 0;
-
-            injector->binary_addr = injector->payload_addr + injector->payload_size;
-
-            ctx.addr = injector->binary_addr;
-            vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            bool success = ( VMI_SUCCESS == vmi_write(vmi, &ctx, injector->binary_size, (void*)injector->binary, NULL) );
-            drakvuf_release_vmi(drakvuf);
-
-            if (!success)
-            {
-                PRINT_DEBUG("Failed to write the binary into memory!\n");
-                return 0;
-            }
-            g_free((void*)injector->binary);
-
-
-            // Get address of PspCallProcessNotifyRoutines() from the rekall profile
-            if ( !drakvuf_get_function_rva(drakvuf, "PspCallProcessNotifyRoutines", &process_notify_rva) )
-            {
-                PRINT_DEBUG("[-] Error getting PspCallProcessNotifyRoutines RVA\n");
-                return 0;
-            }
-
-            kernbase = drakvuf_get_kernel_base(drakvuf);
-            injector->process_notify = kernbase + process_notify_rva;
-
-            // Patch payload
-            PRINT_DEBUG("Patching the shellcode with user inputs..\n");
-            patch_payload(injector, (unsigned char*)injector->payload);
-        }
-#endif
-
-        // Write payload into guest's memory
-        ctx.addr = injector->payload_addr;
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        bool success = ( VMI_SUCCESS == vmi_write(vmi, &ctx, injector->payload_size, (void*)injector->payload, NULL) );
-        drakvuf_release_vmi(drakvuf);
-
-        if ( !success )
-        {
-            PRINT_DEBUG("Failed to write the payload into memory!\n");
-            return 0;
-        }
-        g_free((void*)injector->payload);
-
-        if ( !pass_inputs(injector, info) )
-        {
-            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-            return 0;
-        }
-
-        info->regs->rip = injector->payload_addr;
-
-        // At some point the shellcode will call NtCreateThreadEx() wich in turn
-        // will cause a call to PspCallProcessNotifyRoutines(). In our case,
-        // this function will make NtCreateThreadEx() to fail and the binary we
-        // want to inject will never run. We want to place a breakpoint on it to
-        // bypass this call.
-#ifdef ENABLE_DOPPELGANGING
-        if (INJECT_METHOD_DOPP == injector->method)
-        {
-            // Save breakpoint address to restore it latter
-            injector->saved_bp = injector->bp.breakpoint.addr;
-            injector->bp.breakpoint.addr = injector->process_notify;
-
-            if ( drakvuf_add_trap(drakvuf, &injector->bp) )
-            {
-                PRINT_DEBUG("BP placed on PspCallProcessNotifyRoutines() at: 0x%lx\n", injector->bp.breakpoint.addr);
-            }
-
-            injector->status = STATUS_BP_HIT;
-        }
-        else
-#endif
-        {
-            injector->hijacked = 1;
-
-            if ( !injector->target_tid )
-                injector->target_tid = threadid;
-
-            injector->status = STATUS_EXEC_OK;
-        }
-
-        PRINT_DEBUG("Executing the payload..\n");
-
-        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        return inject_payload(drakvuf, info);
     }
 
     // Handle breakpoint on PspCallProcessNotifyRoutines()
-    if ( !injector->is32bit && info->regs->rip == injector->bp.breakpoint.addr && STATUS_BP_HIT == injector->status)
+    if ( !injector->is32bit && STATUS_BP_HIT == injector->status)
     {
         addr_t saved_rip = 0;
 
         // Get saved RIP from the stack
-        ctx.addr = info->regs->rsp;
+        access_context_t ctx =
+        {
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = info->regs->rsp,
+        };
         vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
         bool success = (VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(addr_t), &saved_rip, NULL));
         drakvuf_release_vmi(drakvuf);
@@ -1230,10 +1057,8 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         info->regs->rip = saved_rip;
         info->regs->rsp += 0x8;
 
-        injector->hijacked = 1;
-
-        if ( !injector->target_tid )
-            injector->target_tid = threadid;
+        if (!injector_set_hijacked(injector, info))
+            return 0;
 
         // Restore original value of the breakpoint
         injector->bp.breakpoint.addr = injector->saved_bp;
@@ -1243,53 +1068,36 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
-    if ( !injector->hijacked || info->regs->rip != injector->bp.breakpoint.addr || threadid != injector->target_tid )
+    if (!injector->hijacked)
         return 0;
-
-    // We are now in the return path from CreateProcessW
-
-    drakvuf_remove_trap(drakvuf, &injector->bp, NULL);
-    injector->restored = 1;
-
-    drakvuf_interrupt(drakvuf, -1);
 
     PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
 
-    if (INJECT_METHOD_CREATEPROC == injector->method && info->regs->rax)
+    if (INJECT_METHOD_CREATEPROC == injector->method && injector->status == STATUS_CREATE_OK)
     {
-        ctx.addr = injector->process_info;
+        // We are now in the return path from CreateProcessW
 
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-        if (injector->is32bit)
-        {
-            struct process_information_32 pip = { 0 };
-            if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct process_information_32), &pip, NULL) )
-            {
-                injector->pid = pip.dwProcessId;
-                injector->tid = pip.dwThreadId;
-                injector->hProc = pip.hProcess;
-                injector->hThr = pip.hThread;
-            }
-        }
-        else
-        {
-            struct process_information_64 pip = { 0 };
-            if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct process_information_64), &pip, NULL) )
-            {
-                injector->pid = pip.dwProcessId;
-                injector->tid = pip.dwThreadId;
-                injector->hProc = pip.hProcess;
-                injector->hThr = pip.hThread;
-            }
-        }
-
-        drakvuf_release_vmi(drakvuf);
+        if (info->regs->rax)
+            fill_created_process_info(injector, info);
 
         if (injector->pid && injector->tid)
         {
             PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
             injector->rc = info->regs->rax;
+
+            if (!setup_resume_thread_stack(injector, info))
+            {
+                PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+                return 0;
+            }
+
+            if (!setup_wait_for_injected_process_trap(injector))
+                return 0;
+
+            info->regs->rip = injector->resume_thread;
+            injector->status = STATUS_RESUME_OK;
+
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         else
         {
@@ -1308,51 +1116,80 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     else if ( (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method) && STATUS_EXEC_OK == injector->status)
     {
         PRINT_DEBUG("Shellcode executed\n");
-
         injector->rc = 1;
     }
+
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    drakvuf_interrupt(drakvuf, -1);
 
     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
-static status_t file_to_memory(addr_t* output, size_t* size, const char* file)
+static bool inject(drakvuf_t drakvuf, injector_t injector)
+{
+    injector->hijacked = 0;
+    injector->status = STATUS_NULL;
+
+    drakvuf_trap_t trap =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .cb = wait_for_target_process_cb,
+        .data = injector,
+    };
+    if (!drakvuf_add_trap(drakvuf, &trap))
+        return false;
+
+    PRINT_DEBUG("Starting injection loop\n");
+    drakvuf_loop(drakvuf);
+
+    free_memtraps(injector);
+
+    drakvuf_remove_trap(drakvuf, &trap, NULL);
+
+    return true;
+}
+
+static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 {
     size_t bytes_read = 0;
     size_t mem_size = 4096, payload_size = 0;
-    unsigned char* shellcode = NULL, *tmp = NULL;
-    unsigned char buffer[4096] = { '\0' };
-    FILE* fp = NULL;
+    unsigned char* data = NULL;
+    unsigned char buffer[4096];
+    FILE* fp = fopen(file, "rb");
 
-    if ( !(fp = fopen(file, "rb")) )
-        return VMI_FAILURE;
+    if (!fp)
+        return false;
 
-    shellcode = g_malloc0(sizeof(char) * mem_size);
+    data = g_malloc0(sizeof(char) * mem_size);
 
-    tmp = shellcode;
-    while ( (bytes_read = fread(buffer, 1, 4096, fp)) )
+    while ( (bytes_read = fread(buffer, 1, sizeof(buffer), fp)) )
     {
         if (bytes_read + payload_size > mem_size)
         {
             mem_size *= 2;
-            shellcode = g_realloc(shellcode, mem_size);
-            tmp = shellcode;
-            tmp += payload_size;
+            unsigned char* new_data = g_realloc(data, mem_size);
+            if (!new_data)
+            {
+                g_free(data);
+                return false;
+            }
+            data = new_data;
         }
 
-        memcpy(tmp, buffer, bytes_read);
+        memcpy(data + payload_size, buffer, bytes_read);
         payload_size += bytes_read;
-        tmp += bytes_read;
     }
 
-    *output = (addr_t)shellcode;
+    *output = (addr_t)data;
     *size = payload_size;
 
-    PRINT_DEBUG("Size of file read: %lu\n", *size);
+    PRINT_DEBUG("Size of file read: %lu\n", payload_size);
 
     fclose(fp);
 
-    return VMI_SUCCESS;
+    return true;
 }
 
 static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t dtb, const char* file, vmi_pid_t injected_pid, uint32_t injected_tid)
@@ -1424,146 +1261,108 @@ static bool get_dtb_for_pid(drakvuf_t drakvuf, vmi_pid_t pid, reg_t* p_target_cr
     return success;
 }
 
-injector_t injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, const char* cwd, injection_method_t method, output_format_t format, const char* binary_path, const char* target_process, bool wait_for_process, int* ret)
+static addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib, char const* fun)
 {
+    addr_t addr = drakvuf_exportsym_to_va(drakvuf, eprocess_base, lib, fun);
+    if (!addr)
+        PRINT_DEBUG("Failed to get address of %s!%s\n", lib, fun);
+    return addr;
+}
+
+static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector, const char* file, const char* binary_path)
+{
+    addr_t eprocess_base = 0;
+    if ( !drakvuf_find_process(drakvuf, injector->target_pid, NULL, &eprocess_base) )
+        return false;
+
+    // Get the offsets from the Rekall profile
+    if ( !drakvuf_get_struct_members_array_rva(drakvuf, offset_names, OFFSET_MAX, injector->offsets) )
+        PRINT_DEBUG("Failed to find one of offsets.\n");
+
+    if (INJECT_METHOD_CREATEPROC == injector->method)
+    {
+        injector->resume_thread = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "ResumeThread");
+        if (!injector->resume_thread) return false;
+        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateProcessW");
+    }
+    else if (INJECT_METHOD_SHELLEXEC == injector->method)
+    {
+        injector->exec_func = get_function_va(drakvuf, eprocess_base, "shell32.dll", "ShellExecuteW");
+    }
+    else if (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method)
+    {
+        // Read shellcode from a file
+        if ( !load_file_to_memory(&injector->payload, &injector->payload_size, file) )
+            return false;
+
+        if (INJECT_METHOD_DOPP == injector->method)
+        {
+            // Check for Windows 10 version 1803 or higher
+            int build_1803 = 20180410;
+            if ( drakvuf_get_os_build_date(drakvuf) < build_1803 )
+            {
+                PRINT_DEBUG("This injection method requires Windows 10 version 1803 or higher!\n");
+                return false;
+            }
+
+            // Read binary to inject from a file
+            if ( !load_file_to_memory(&injector->binary, &injector->binary_size, binary_path) )
+                return false;
+        }
+
+        injector->memset = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "memset");
+        if (!injector->memset) return false;
+        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc");
+    }
+
+    return injector->exec_func != 0;
+}
+
+int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, const char* cwd, injection_method_t method, output_format_t format, const char* binary_path, const char* target_process)
+{
+    int rc = 0;
+    addr_t cr3;
+    if (!get_dtb_for_pid(drakvuf, pid, &cr3))
+    {
+        PRINT_DEBUG("Unable to find target PID's DTB\n");
+        return 0;
+    }
+
+    PRINT_DEBUG("Target PID %u with DTB 0x%lx to start '%s'\n", pid, cr3, file);
 
     injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
-    if ( !injector )
-        return NULL;
+    if (!injector)
+        return 0;
 
     injector->drakvuf = drakvuf;
     injector->target_pid = pid;
     injector->target_tid = tid;
+    injector->target_cr3 = cr3;
 
     injector->target_file_us = convert_utf8_to_utf16(file);
     injector->cwd_us = cwd ? convert_utf8_to_utf16(cwd) : NULL;
     if (!injector->target_file_us || (cwd && !injector->cwd_us))
         goto done;
 
-    gchar* target_pname = g_strrstr(file, "\\");
-    injector->target_pname = target_pname ? ++target_pname : file;
-
     injector->method = method;
     injector->binary_path = binary_path;
     injector->target_process = target_process;
-    injector->wait_for_process = wait_for_process;
-
-    injector->is32bit = (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E) ? 0 : 1;
-
-    if ( !get_dtb_for_pid(drakvuf, pid, &injector->target_cr3) )
-    {
-        PRINT_DEBUG("Unable to find target PID's DTB\n");
-        goto done;
-    }
-
-    // Get the offsets from the Rekall profile
-    if ( !drakvuf_get_struct_members_array_rva(injector->drakvuf, offset_names, OFFSET_MAX, injector->offsets) )
-        PRINT_DEBUG("Failed to find one of offsets.\n");
-
-    PRINT_DEBUG("Target PID %u with DTB 0x%lx to start '%s' ['%s']\n", pid,
-                injector->target_cr3, file, injector->target_pname);
-
-    addr_t eprocess_base = 0;
-    if ( !drakvuf_find_process(injector->drakvuf, pid, NULL, &eprocess_base) )
-        goto done;
-
-    char* lib = "kernel32.dll";
-    char* fun = "CreateProcessW";
-    if (INJECT_METHOD_SHELLEXEC == method)
-    {
-        lib = "shell32.dll";
-        fun = "ShellExecuteW";
-    }
-    else if (INJECT_METHOD_SHELLCODE == method || INJECT_METHOD_DOPP == method)
-    {
-        // Read shellcode from a file
-        if ( VMI_SUCCESS != file_to_memory(&(injector->payload), &(injector->payload_size), file) )
-            goto done;
-
-        if (INJECT_METHOD_DOPP == method)
-        {
-            // Check for Windows 10 version 1803 or higher
-            int build_1803 = 20180410;
-            if ( drakvuf_get_os_build_date(injector->drakvuf) < build_1803 )
-            {
-                PRINT_DEBUG("This injection method requires Windows 10 version 1803 or higher!\n");
-                goto done;
-            }
-
-            // Read binary to inject from a file
-            if ( VMI_SUCCESS != file_to_memory(&(injector->binary), &(injector->binary_size), binary_path) )
-                goto done;
-        }
-
-        lib = "ntdll.dll";
-        fun = "memset";
-        injector->memset= drakvuf_exportsym_to_va(injector->drakvuf, eprocess_base, lib, fun);
-        if (!injector->memset)
-        {
-            PRINT_DEBUG("Failed to get address of %s!%s\n", lib, fun);
-            goto done;
-        }
-
-        lib = "kernel32.dll";
-        fun = "VirtualAlloc";
-    }
-
     injector->status = STATUS_NULL;
-    injector->exec_func = drakvuf_exportsym_to_va(injector->drakvuf, eprocess_base, lib, fun);
-    if (!injector->exec_func)
-    {
-        PRINT_DEBUG("Failed to get address of %s!%s\n", lib, fun);
-        goto done;
-    }
+    injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
 
-    injector->cr3_event.type = REGISTER;
-    injector->cr3_event.reg = CR3;
-    injector->cr3_event.cb = cr3_callback;
-    injector->cr3_event.data = injector;
-    if ( !drakvuf_add_trap(drakvuf, &injector->cr3_event) )
+    if (!initialize_injector_functions(drakvuf, injector, file, binary_path))
         goto done;
 
-    PRINT_DEBUG("Starting injection loop\n");
-    drakvuf_loop(drakvuf);
+    if (!inject(drakvuf, injector))
+        goto done;
 
-    if (injector->is32bit)
-    {
-        GSList* loop = injector->memtraps;
-        while (loop)
-        {
-            drakvuf_remove_trap(drakvuf, loop->data, (drakvuf_trap_free_t)free);
-            loop=loop->next;
-        }
-        g_slist_free(loop);
-    }
-
-    if ( !injector->rc || !injector->wait_for_process || injector->target_running )
-        drakvuf_remove_trap(drakvuf, &injector->cr3_event, NULL);
-
-    print_injection_info(format, pid, injector->target_cr3, file, injector->pid, injector->tid);
+    print_injection_info(format, injector->target_pid, injector->target_cr3, file, injector->pid, injector->tid);
 
 done:
-    PRINT_DEBUG("Finished with injection. Ret: %i\n", injector->rc);
-    *ret = injector->rc;
-    return injector;
-}
+    rc = injector->rc;
+    if ((!injector->detected && !injector->resumed) || (injector->detected && injector->resumed))
+        free_injector(injector);
 
-void injector_cleanup(injector_t injector)
-{
-    while ( !injector->restored )
-        drakvuf_loop(injector->drakvuf);
-
-    while ( injector->rc && injector->wait_for_process && !injector->target_running )
-        drakvuf_loop(injector->drakvuf);
-
-    drakvuf_remove_trap(injector->drakvuf, &injector->cr3_event, NULL);
-
-    if (injector->target_file_us)
-        vmi_free_unicode_str(injector->target_file_us);
-    if (injector->cwd_us)
-        vmi_free_unicode_str(injector->cwd_us);
-
-    g_free((void*)injector->binary);
-    g_free((void*)injector->payload);
-    g_free(injector);
+    PRINT_DEBUG("Finished with injection. Ret: %i\n", rc);
+    return rc;
 }
