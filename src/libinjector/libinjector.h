@@ -169,20 +169,16 @@ void init_unicode_argument(struct argument* arg,
 #define init_struct_argument(arg, sv) \
     init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
 
-bool setup_stack_32(vmi_instance_t vmi,
-                    drakvuf_trap_info_t* info,
-                    struct argument args[],
-                    int nb_args);
-
-bool setup_stack_64(vmi_instance_t vmi,
-                    drakvuf_trap_info_t* info,
-                    struct argument args[],
-                    int nb_args);
-
 bool setup_stack(drakvuf_t drakvuf,
                  drakvuf_trap_info_t* info,
                  struct argument args[],
                  int nb_args);
+
+bool setup_stack_locked(drakvuf_t drakvuf,
+                        vmi_instance_t vmi,
+                        drakvuf_trap_info_t* info,
+                        struct argument args[],
+                        int nb_args);
 
 int injector_start_app(drakvuf_t drakvuf,
                        vmi_pid_t pid,

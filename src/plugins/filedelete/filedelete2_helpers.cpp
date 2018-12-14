@@ -151,15 +151,11 @@ bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_inst
     info->regs->rsp = injector->saved_regs.rsp;
 
     struct argument args[3] = { {0} };
-    uint64_t null = 0;
-    const size_t int_size = injector->is32bit ? sizeof (uint32_t) : sizeof (uint64_t);
+    init_int_argument(&args[0], 0); // NonPagedPool
+    init_int_argument(&args[1], BYTES_TO_READ);
+    init_int_argument(&args[2], 0);
 
-    init_argument(&args[0], ARGUMENT_INT, int_size, (void*)null); // NonPagedPool
-    init_argument(&args[1], ARGUMENT_INT, int_size, (void*)BYTES_TO_READ);
-    init_argument(&args[2], ARGUMENT_INT, int_size, (void*)0);
-
-    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, args, 3) : setup_stack_64(vmi, info, args, 3);
-    if ( !stack_ok )
+    if (!setup_stack_locked(drakvuf, vmi, info, args, 3))
         return false;
 
     info->regs->rip = injector->f->exallocatepool_va;
@@ -176,23 +172,23 @@ bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_
 
     struct argument args[9] = { {0} };
     struct _LARGE_INTEGER byte_offset = { .QuadPart = injector->ntreadfile_info.bytes_read };
-    const union IO_STATUS_BLOCK io_status_block = { { 0 } };
-    uint64_t null = 0;
+    struct IO_STATUS_BLOCK_32 io_status_block_32 = { 0 };
+    struct IO_STATUS_BLOCK_64 io_status_block_64 = { 0 };
 
-    const size_t int_size = injector->is32bit ? sizeof (uint32_t) : sizeof (uint64_t);
+    init_int_argument(&args[0], injector->handle);
+    init_int_argument(&args[1], 0);
+    init_int_argument(&args[2], 0);
+    init_int_argument(&args[3], 0);
+    if (injector->is32bit)
+        init_struct_argument(&args[4], io_status_block_32);
+    else
+        init_struct_argument(&args[4], io_status_block_64);
+    init_int_argument(&args[5], injector->pool);
+    init_int_argument(&args[6], BYTES_TO_READ);
+    init_struct_argument(&args[7], byte_offset);
+    init_int_argument(&args[8], 0);
 
-    init_argument(&args[0], ARGUMENT_INT, int_size, (void*)injector->handle);
-    init_argument(&args[1], ARGUMENT_INT, int_size, (void*)null);
-    init_argument(&args[2], ARGUMENT_INT, int_size, (void*)null);
-    init_argument(&args[3], ARGUMENT_INT, int_size, (void*)null);
-    init_argument(&args[4], ARGUMENT_STRUCT, sizeof(union IO_STATUS_BLOCK), (void*)&io_status_block);
-    init_argument(&args[5], ARGUMENT_INT, int_size, (void*)injector->pool);
-    init_argument(&args[6], ARGUMENT_INT, int_size, (void*)BYTES_TO_READ);
-    init_argument(&args[7], ARGUMENT_STRUCT, sizeof(byte_offset), (void*)&byte_offset);
-    init_argument(&args[8], ARGUMENT_INT, int_size, (void*)null);
-
-    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, args, 9) : setup_stack_64(vmi, info, args, 9);
-    if ( !stack_ok )
+    if (!setup_stack_locked(drakvuf, vmi, info, args, 9))
         return false;
 
     injector->ntreadfile_info.io_status_block = args[4].data_on_stack;
@@ -208,18 +204,20 @@ bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_
 bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
 {
     struct argument args[5] = { {0} };
-    const union IO_STATUS_BLOCK io_status_block = { { 0 } };
+    struct IO_STATUS_BLOCK_32 io_status_block_32 = { 0 };
+    struct IO_STATUS_BLOCK_64 io_status_block_64 = { 0 };
     struct FILE_FS_DEVICE_INFORMATION dev_info = { 0 };
-    const size_t int_size = injector->is32bit ? sizeof (uint32_t) : sizeof (uint64_t);
 
-    init_argument(&args[0], ARGUMENT_INT, int_size, (void*)injector->handle);
-    init_argument(&args[1], ARGUMENT_STRUCT, sizeof(union IO_STATUS_BLOCK), (void*)&io_status_block);
-    init_argument(&args[2], ARGUMENT_STRUCT, sizeof(struct FILE_FS_DEVICE_INFORMATION), (void*)&dev_info);
-    init_argument(&args[3], ARGUMENT_INT, int_size, (void*)sizeof(struct FILE_FS_DEVICE_INFORMATION));
-    init_argument(&args[4], ARGUMENT_INT, int_size, (void*)4); // FileFsDeviceInformation
+    init_int_argument(&args[0], injector->handle);
+    if (injector->is32bit)
+        init_struct_argument(&args[1], io_status_block_32);
+    else
+        init_struct_argument(&args[1], io_status_block_64);
+    init_struct_argument(&args[2], dev_info);
+    init_int_argument(&args[3], sizeof(dev_info));
+    init_int_argument(&args[4], 4); // FileFsDeviceInformation
 
-    bool stack_ok = injector->is32bit ? setup_stack_32(vmi, info, args, 5) : setup_stack_64(vmi, info, args, 5);
-    if ( !stack_ok )
+    if (!setup_stack_locked(drakvuf, vmi, info, args, 5))
         return false;
 
     injector->ntqueryobject_info.out = args[2].data_on_stack;

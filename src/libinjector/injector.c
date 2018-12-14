@@ -347,57 +347,37 @@ static unicode_string_t* convert_utf8_to_utf16(char const* str)
     return NULL;
 }
 
-static bool setup_create_process_stack_32(injector_t injector, drakvuf_trap_info_t* info)
-{
-    struct argument args[10] = { {0} };
-    struct startup_info_32 si = { 0 };
-    struct process_information_32 pi = { 0 };
-
-    // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
-    init_int_argument(&args[0], 0);
-    init_unicode_argument(&args[1], injector->target_file_us);
-    init_int_argument(&args[2], 0);
-    init_int_argument(&args[3], 0);
-    init_int_argument(&args[4], 0);
-    init_int_argument(&args[5], CREATE_SUSPENDED);
-    init_int_argument(&args[6], 0);
-    init_unicode_argument(&args[7], injector->cwd_us);
-    init_struct_argument(&args[8], si);
-    init_struct_argument(&args[9], pi);
-
-    bool success = setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
-    injector->process_info = args[9].data_on_stack;
-    return success;
-}
-
-static bool setup_create_process_stack_64(injector_t injector, drakvuf_trap_info_t* info)
-{
-    struct argument args[10] = { {0} };
-    struct startup_info_64 si = { 0 };
-    struct process_information_64 pi = { 0 };
-
-    // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
-    init_int_argument(&args[0], 0);
-    init_unicode_argument(&args[1], injector->target_file_us);
-    init_int_argument(&args[2], 0);
-    init_int_argument(&args[3], 0);
-    init_int_argument(&args[4], 0);
-    init_int_argument(&args[5], CREATE_SUSPENDED);
-    init_int_argument(&args[6], 0);
-    init_unicode_argument(&args[7], injector->cwd_us);
-    init_struct_argument(&args[8], si);
-    init_struct_argument(&args[9], pi);
-
-    bool success = setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
-    injector->process_info = args[9].data_on_stack;
-    return success;
-}
-
 static bool setup_create_process_stack(injector_t injector, drakvuf_trap_info_t* info)
 {
+    struct argument args[10] = { {0} };
+    struct startup_info_32 si_32 = { 0 };
+    struct process_information_32 pi_32 = { 0 };
+    struct startup_info_64 si_64 = { 0 };
+    struct process_information_64 pi_64 = { 0 };
+
+    // CreateProcess(NULL, TARGETPROC, NULL, NULL, 0, 0, NULL, NULL, &si, pi))
+    init_int_argument(&args[0], 0);
+    init_unicode_argument(&args[1], injector->target_file_us);
+    init_int_argument(&args[2], 0);
+    init_int_argument(&args[3], 0);
+    init_int_argument(&args[4], 0);
+    init_int_argument(&args[5], CREATE_SUSPENDED);
+    init_int_argument(&args[6], 0);
+    init_unicode_argument(&args[7], injector->cwd_us);
     if (injector->is32bit)
-        return setup_create_process_stack_32(injector, info);
-    return setup_create_process_stack_64(injector, info);
+    {
+        init_struct_argument(&args[8], si_32);
+        init_struct_argument(&args[9], pi_32);
+    }
+    else
+    {
+        init_struct_argument(&args[8], si_64);
+        init_struct_argument(&args[9], pi_64);
+    }
+
+    bool success = setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+    injector->process_info = args[9].data_on_stack;
+    return success;
 }
 
 static bool setup_resume_thread_stack(injector_t injector, drakvuf_trap_info_t* info)
