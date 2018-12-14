@@ -265,8 +265,8 @@ static bool get_file_object_flags(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
     ctx.addr = fileflags;
     ctx.dtb = info->regs->cr3;
 
-    uint64_t flags_value;
-    bool success = (VMI_SUCCESS == vmi_read_64(vmi, &ctx, &flags_value));
+    uint32_t flags_value;
+    bool success = (VMI_SUCCESS == vmi_read_32(vmi, &ctx, &flags_value));
     if (success && flags) *flags = flags_value;
     return success;
 }
