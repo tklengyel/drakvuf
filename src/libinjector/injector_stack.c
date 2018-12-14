@@ -191,16 +191,48 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* 
     return status == VMI_FAILURE ? 0 : addr;
 }
 
-bool setup_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct argument args[], int nb_args)
+static addr_t place_struct_on_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void* data, size_t size)
 {
     const uint32_t stack_align = 64;
+
+    addr -= size;
+    addr -= addr % stack_align;
 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
+        .addr = addr,
     };
 
+    status_t status = vmi_write(vmi, &ctx, size, data, NULL);
+
+    return status == VMI_FAILURE ? 0 : addr;
+}
+
+static addr_t place_struct_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void* data, size_t size)
+{
+    /* According to Microsoft Doc "Building C/C++ Programs":
+     * > The alignment of the beginning of a structure or a union is the maximum
+     * > alignment of any individual member.
+     */
+    addr -= size;
+    addr &= ~0xf; // Align stack
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = addr,
+    };
+
+    status_t status = vmi_write(vmi, &ctx, size, data, NULL);
+
+    return status == VMI_FAILURE ? 0 : addr;
+}
+
+static bool setup_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct argument args[], int nb_args)
+{
     addr_t addr = info->regs->rsp;
 
     // make room for strings and structs into guest's stack
@@ -217,14 +249,9 @@ bool setup_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct argume
             }
             case ARGUMENT_STRUCT:
             {
-                size_t len = args[i].size;
-                addr -= len;
-                addr -= addr % stack_align;
+                addr = place_struct_on_stack_32(vmi, info, addr, args[i].data, args[i].size);
+                if ( !addr ) goto err;
                 args[i].data_on_stack = addr;
-
-                ctx.addr = addr;
-                if (VMI_FAILURE == vmi_write(vmi, &ctx, len, args[i].data, NULL))
-                    goto err;
                 break;
             }
             case ARGUMENT_INT:
@@ -236,6 +263,12 @@ bool setup_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct argume
                 goto err;
         }
     }
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
 
     // write parameters into guest's stack
     for (int i = nb_args-1; i >= 0; i--)
@@ -261,7 +294,7 @@ err:
     return 0;
 }
 
-bool setup_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct argument args[], int nb_args)
+static bool setup_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct argument args[], int nb_args)
 {
     uint64_t nul64 = 0;
 
@@ -289,18 +322,9 @@ bool setup_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct argume
                 }
                 case ARGUMENT_STRUCT:
                 {
-                    /* According to Microsoft Doc "Building C/C++ Programs":
-                     * > The alignment of the beginning of a structure or a union is the maximum
-                     * > alignment of any individual member.
-                     */
-                    size_t len = args[i].size;
-                    addr -= len;
-                    addr &= ~0xf; // Align stack
+                    addr = place_struct_on_stack_64(vmi, info, addr, args[i].data, args[i].size);
+                    if ( !addr ) goto err;
                     args[i].data_on_stack = addr;
-
-                    ctx.addr = addr;
-                    if (VMI_FAILURE == vmi_write(vmi, &ctx, len, args[i].data, NULL))
-                        goto err;
                     break;
                 }
                 case ARGUMENT_INT:
@@ -390,15 +414,25 @@ err:
     return 0;
 }
 
+bool setup_stack_locked(
+    drakvuf_t drakvuf,
+    vmi_instance_t vmi,
+    drakvuf_trap_info_t* info,
+    struct argument args[],
+    int nb_args)
+{
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    return is32bit ? setup_stack_32(vmi, info, args, nb_args) : setup_stack_64(vmi, info, args, nb_args);
+}
+
 bool setup_stack(
     drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     struct argument args[],
     int nb_args)
 {
-    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    bool success = is32bit ? setup_stack_32(vmi, info, args, nb_args) : setup_stack_64(vmi, info, args, nb_args);
+    bool success = setup_stack_locked(drakvuf, vmi, info, args, nb_args);
     drakvuf_release_vmi(drakvuf);
     return success;
 }

@@ -251,11 +251,8 @@ static std::string fo_flags_to_string(uint64_t fo_flags, output_format_t format 
     return str;
 }
 
-static bool is_synchronous(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, filedelete* f, handle_t handle, uint64_t* flags)
+static bool get_file_object_flags(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, filedelete* f, handle_t handle, uint64_t* flags)
 {
-    if (!flags)
-        return false;
-
     addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
     if (!obj)
         return false; // Break operatioin to not crash VM
@@ -268,11 +265,10 @@ static bool is_synchronous(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_ins
     ctx.addr = fileflags;
     ctx.dtb = info->regs->cr3;
 
-    if (VMI_SUCCESS == vmi_read_64(vmi, &ctx, flags) &&
-            (*flags & 2)) // FO_SYNCHRONOUS_IO
-        return true;
-
-    return false;
+    uint64_t flags_value;
+    bool success = (VMI_SUCCESS == vmi_read_64(vmi, &ctx, &flags_value));
+    if (success && flags) *flags = flags_value;
+    return success;
 }
 
 static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_t vmi,
@@ -324,8 +320,8 @@ static void save_file_metadata(filedelete* f,
                                int sequence_number,
                                addr_t control_area,
                                const char* filename,
-                               size_t bytes_read = 0,
-                               uint64_t fo_flags = 0)
+                               size_t file_size,
+                               uint64_t fo_flags)
 {
     char* file = NULL;
     if ( asprintf(&file, "%s/file.%06d.metadata", f->dump_folder, sequence_number) < 0 )
@@ -336,12 +332,9 @@ static void save_file_metadata(filedelete* f,
     if (!fp)
         return;
 
-    if (filename)
-        fprintf(fp, "FileName: \"%s\"\n", filename);
-    if (bytes_read)
-        fprintf(fp, "FileSize: %ld\n", bytes_read);
-    if (fo_flags)
-        fprintf(fp, "_FILE_OBJECT.Flags: 0x%lx (%s)\n", fo_flags, fo_flags_to_string(fo_flags).c_str());
+    fprintf(fp, "FileName: \"%s\"\n", filename ?: "<UNKNOWN>");
+    fprintf(fp, "FileSize: %zu\n", file_size);
+    fprintf(fp, "FileFlags: 0x%lx (%s)\n", fo_flags, fo_flags_to_string(fo_flags).c_str());
     fprintf(fp, "SequenceNumber: %d\n", sequence_number);
     fprintf(fp, "ControlArea: 0x%lx\n", control_area);
     fprintf(fp, "PID: %" PRIu64 "\n", static_cast<uint64_t>(info->proc_data.pid));
@@ -543,7 +536,7 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
     if (filename.empty()) return;
 
     uint64_t fo_flags = 0;
-    is_synchronous(drakvuf, info, vmi, f, handle, &fo_flags);
+    get_file_object_flags(drakvuf, info, vmi, f, handle, &fo_flags);
 
     print_filedelete_information(f, drakvuf, info, filename.c_str(), 0, fo_flags);
 
@@ -599,43 +592,49 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     wrapper_t* injector = (wrapper_t*)info->trap->data;
     filedelete* f = injector->f;
 
-    auto response = 0;
+    if (info->regs->cr3 != injector->target_cr3)
+        return 0;
+
     uint32_t thread_id = 0;
+    if (!drakvuf_get_current_thread_id(drakvuf, info->vcpu, &thread_id))
+        return 0;
+
+    if (thread_id != injector->target_thread_id)
+        return 0;
+
+    auto response = 0;
 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
+        .addr = injector->ntreadfile_info.io_status_block,
     };
 
-    union IO_STATUS_BLOCK io_status_block = { { 0 } };
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     const uint32_t status = info->regs->rax;
     uint32_t isb_status = 0; // `isb` is `IO_STATUS_BLOCK`
     size_t isb_size = 0;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     bool is_success = false;
-
-    if (info->regs->cr3 != injector->target_cr3)
-        goto done;
-
-    if ( !drakvuf_get_current_thread_id(drakvuf, info->vcpu, &thread_id) ||
-            !injector->target_thread_id || thread_id != injector->target_thread_id )
-        goto done;
-
-    ctx.addr = injector->ntreadfile_info.io_status_block;
-    if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(union IO_STATUS_BLOCK), &io_status_block, NULL)))
-        goto err;
 
     if (injector->is32bit)
     {
-        isb_status = io_status_block.x86.status;
-        isb_size = io_status_block.x86.info;
+        struct IO_STATUS_BLOCK_32 io_status_block;
+        if ((VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(io_status_block), &io_status_block, NULL)))
+            goto err;
+
+        isb_status = io_status_block.status;
+        isb_size = io_status_block.info;
     }
     else
     {
-        isb_status = io_status_block.amd64.status;
-        isb_size = io_status_block.amd64.info;
+        struct IO_STATUS_BLOCK_64 io_status_block;
+        if ((VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(io_status_block), &io_status_block, NULL)))
+            goto err;
+
+        isb_status = io_status_block.status;
+        isb_size = io_status_block.info;
     }
 
     if ( STATUS_SUCCESS == status && isb_size )
@@ -826,7 +825,11 @@ static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     filedelete* f = (filedelete*)info->trap->data;
 
     uint64_t fo_flags = 0;
-    if (!is_synchronous(drakvuf, info, vmi, f, handle, &fo_flags))
+    if (!get_file_object_flags(drakvuf, info, vmi, f, handle, &fo_flags))
+        return 0;
+
+    bool is_synchronous = (fo_flags & FO_SYNCHRONOUS_IO);
+    if (!is_synchronous)
         return 0;
 
     if ( 0 == info->proc_data.base_addr )
