@@ -205,19 +205,16 @@ struct wrapper_t
     addr_t pool;
 };
 
-union IO_STATUS_BLOCK
+struct IO_STATUS_BLOCK_32
 {
-    struct
-    {
-        uint32_t status;
-        uint32_t info;
-    } x86;
+    uint32_t status;
+    uint32_t info;
+} __attribute__((packed));
 
-    struct
-    {
-        uint64_t status;
-        uint64_t info;
-    } amd64;
+struct IO_STATUS_BLOCK_64
+{
+    uint64_t status;
+    uint64_t info;
 } __attribute__((packed));
 
 constexpr static uint32_t STATUS_SUCCESS = 0;
