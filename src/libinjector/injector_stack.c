@@ -241,24 +241,18 @@ static bool setup_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct
         switch (args[i].type)
         {
             case ARGUMENT_STRING:
-            {
                 addr = place_string_on_stack_32(vmi, info, addr, args[i].data, args[i].size);
                 if ( !addr ) goto err;
                 args[i].data_on_stack = addr;
                 break;
-            }
             case ARGUMENT_STRUCT:
-            {
                 addr = place_struct_on_stack_32(vmi, info, addr, args[i].data, args[i].size);
                 if ( !addr ) goto err;
                 args[i].data_on_stack = addr;
                 break;
-            }
             case ARGUMENT_INT:
-            {
                 args[i].data_on_stack = (uint64_t)args[i].data;
                 break;
-            }
             default:
                 goto err;
         }
@@ -314,24 +308,18 @@ static bool setup_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct
             switch (args[i].type)
             {
                 case ARGUMENT_STRING:
-                {
                     addr = place_string_on_stack_64(vmi, info, addr, args[i].data, args[i].size);
                     if ( !addr ) goto err;
                     args[i].data_on_stack = addr;
                     break;
-                }
                 case ARGUMENT_STRUCT:
-                {
                     addr = place_struct_on_stack_64(vmi, info, addr, args[i].data, args[i].size);
                     if ( !addr ) goto err;
                     args[i].data_on_stack = addr;
                     break;
-                }
                 case ARGUMENT_INT:
-                {
                     args[i].data_on_stack = (uint64_t)args[i].data;
                     break;
-                }
                 default:
                     goto err;
             }
