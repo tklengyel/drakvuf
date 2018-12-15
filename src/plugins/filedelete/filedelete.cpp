@@ -150,94 +150,44 @@ static std::string fo_flags_to_string(uint64_t fo_flags, output_format_t format 
 {
     std::string str("");
 
-    if (FO_FILE_OPEN & fo_flags)
-        str += fo_flag_to_string("FO_FILE_OPEN", format);
+#define FLAG_HELPER(FLAG) \
+    if (FLAG & fo_flags) \
+        str += fo_flag_to_string(#FLAG, format)
 
-    if (FO_SYNCHRONOUS_IO & fo_flags)
-        str += fo_flag_to_string("FO_SYNCHRONOUS_IO", format);
+    FLAG_HELPER(FO_FILE_OPEN);
+    FLAG_HELPER(FO_SYNCHRONOUS_IO);
+    FLAG_HELPER(FO_ALERTABLE_IO);
+    FLAG_HELPER(FO_NO_INTERMEDIATE_BUFFERING);
+    FLAG_HELPER(FO_WRITE_THROUGH);
+    FLAG_HELPER(FO_SEQUENTIAL_ONLY);
+    FLAG_HELPER(FO_CACHE_SUPPORTED);
+    FLAG_HELPER(FO_NAMED_PIPE);
+    FLAG_HELPER(FO_STREAM_FILE);
+    FLAG_HELPER(FO_MAILSLOT);
+    FLAG_HELPER(FO_GENERATE_AUDIT_ON_CLOSE);
+    FLAG_HELPER(FO_DIRECT_DEVICE_OPEN);
+    FLAG_HELPER(FO_FILE_MODIFIED);
+    FLAG_HELPER(FO_FILE_SIZE_CHANGED);
+    FLAG_HELPER(FO_CLEANUP_COMPLETE);
+    FLAG_HELPER(FO_TEMPORARY_FILE);
+    FLAG_HELPER(FO_DELETE_ON_CLOSE);
+    FLAG_HELPER(FO_OPENED_CASE_SENSITIVE);
+    FLAG_HELPER(FO_HANDLE_CREATED);
+    FLAG_HELPER(FO_FILE_FAST_IO_READ);
+    FLAG_HELPER(FO_RANDOM_ACCESS);
+    FLAG_HELPER(FO_FILE_OPEN_CANCELLED);
+    FLAG_HELPER(FO_VOLUME_OPEN);
+    FLAG_HELPER(FO_REMOTE_ORIGIN);
+    FLAG_HELPER(FO_DISALLOW_EXCLUSIVE);
+    FLAG_HELPER(FO_SKIP_SET_EVENT);
+    FLAG_HELPER(FO_SKIP_SET_FAST_IO);
+    FLAG_HELPER(FO_INDIRECT_WAIT_OBJECT);
+    FLAG_HELPER(FO_SECTION_MINSTORE_TREATMENT);
 
-    if (FO_ALERTABLE_IO & fo_flags)
-        str += fo_flag_to_string("FO_ALERTABLE_IO", format);
-
-    if (FO_NO_INTERMEDIATE_BUFFERING & fo_flags)
-        str += fo_flag_to_string("FO_NO_INTERMEDIATE_BUFFERING", format);
-
-    if (FO_WRITE_THROUGH & fo_flags)
-        str += fo_flag_to_string("FO_WRITE_THROUGH", format);
-
-    if (FO_SEQUENTIAL_ONLY & fo_flags)
-        str += fo_flag_to_string("FO_SEQUENTIAL_ONLY", format);
-
-    if (FO_CACHE_SUPPORTED & fo_flags)
-        str += fo_flag_to_string("FO_CACHE_SUPPORTED", format);
-
-    if (FO_NAMED_PIPE & fo_flags)
-        str += fo_flag_to_string("FO_NAMED_PIPE", format);
-
-    if (FO_STREAM_FILE & fo_flags)
-        str += fo_flag_to_string("FO_STREAM_FILE", format);
-
-    if (FO_MAILSLOT & fo_flags)
-        str += fo_flag_to_string("FO_MAILSLOT", format);
-
-    if (FO_GENERATE_AUDIT_ON_CLOSE & fo_flags)
-        str += fo_flag_to_string("FO_GENERATE_AUDIT_ON_CLOSE", format);
-
-    if (FO_DIRECT_DEVICE_OPEN & fo_flags)
-        str += fo_flag_to_string("FO_DIRECT_DEVICE_OPEN", format);
-
-    if (FO_FILE_MODIFIED & fo_flags)
-        str += fo_flag_to_string("FO_FILE_MODIFIED", format);
-
-    if (FO_FILE_SIZE_CHANGED & fo_flags)
-        str += fo_flag_to_string("FO_FILE_SIZE_CHANGED", format);
-
-    if (FO_CLEANUP_COMPLETE & fo_flags)
-        str += fo_flag_to_string("FO_CLEANUP_COMPLETE", format);
-
-    if (FO_TEMPORARY_FILE & fo_flags)
-        str += fo_flag_to_string("FO_TEMPORARY_FILE", format);
-
-    if (FO_DELETE_ON_CLOSE & fo_flags)
-        str += fo_flag_to_string("FO_DELETE_ON_CLOSE", format);
-
-    if (FO_OPENED_CASE_SENSITIVE & fo_flags)
-        str += fo_flag_to_string("FO_OPENED_CASE_SENSITIVE", format);
-
-    if (FO_HANDLE_CREATED & fo_flags)
-        str += fo_flag_to_string("FO_HANDLE_CREATED", format);
-
-    if (FO_FILE_FAST_IO_READ & fo_flags)
-        str += fo_flag_to_string("FO_FILE_FAST_IO_READ", format);
-
-    if (FO_RANDOM_ACCESS & fo_flags)
-        str += fo_flag_to_string("FO_RANDOM_ACCESS", format);
-
-    if (FO_FILE_OPEN_CANCELLED & fo_flags)
-        str += fo_flag_to_string("FO_FILE_OPEN_CANCELLED", format);
-
-    if (FO_VOLUME_OPEN & fo_flags)
-        str += fo_flag_to_string("FO_VOLUME_OPEN", format);
-
-    if (FO_REMOTE_ORIGIN & fo_flags)
-        str += fo_flag_to_string("FO_REMOTE_ORIGIN", format);
-
-    if (FO_DISALLOW_EXCLUSIVE & fo_flags)
-        str += fo_flag_to_string("FO_DISALLOW_EXCLUSIVE", format);
-
-    if (FO_SKIP_SET_EVENT & fo_flags)
-        str += fo_flag_to_string("FO_SKIP_SET_EVENT", format);
-
-    if (FO_SKIP_SET_FAST_IO & fo_flags)
-        str += fo_flag_to_string("FO_SKIP_SET_FAST_IO", format);
-
-    if (FO_INDIRECT_WAIT_OBJECT & fo_flags)
-        str += fo_flag_to_string("FO_INDIRECT_WAIT_OBJECT", format);
-
-    if (FO_SECTION_MINSTORE_TREATMENT & fo_flags)
-        str += fo_flag_to_string("FO_SECTION_MINSTORE_TREATMENT", format);
+#undef FLAG_HELPER
 
     if (!str.empty())
+    {
         switch (format)
         {
             case OUTPUT_KV:
@@ -247,6 +197,7 @@ static std::string fo_flags_to_string(uint64_t fo_flags, output_format_t format 
                 str.resize(str.size() - 3);
                 break;
         }
+    }
 
     return str;
 }
@@ -344,6 +295,54 @@ static void save_file_metadata(filedelete* f,
     fclose(fp);
 }
 
+static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* filename, size_t bytes_read, uint64_t fo_flags)
+{
+    std::string flags = fo_flags_to_string(fo_flags, f->format);
+    switch (f->format)
+    {
+        case OUTPUT_CSV:
+            printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIu64 ",0x%" PRIx64 "(%s)\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, filename, bytes_read, fo_flags, flags.c_str());
+            break;
+        case OUTPUT_KV:
+            printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\",Size=%ld,Flags=0x%" PRIx64 "%s%s\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   info->trap->name, filename, bytes_read, fo_flags, (flags.empty() ? "" : ","), flags.c_str());
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" SIZE:%" PRIu64 " FO_FLAGS:0x%" PRIx64 "(%s)\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid, filename, bytes_read, fo_flags, flags.c_str());
+            break;
+    }
+}
+
+static void print_extraction_information(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t const* info, const char* filename, size_t bytes_read, uint64_t fo_flags, int seq_number)
+{
+    std::string flags = fo_flags_to_string(fo_flags, f->format);
+    switch (f->format)
+    {
+        case OUTPUT_CSV:
+            printf("fileextractor," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIu64 ",0x%" PRIx64 "(%s),%d\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, filename, bytes_read, fo_flags, flags.c_str(), seq_number);
+            break;
+        case OUTPUT_KV:
+            printf("fileextractor Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\",Size=%ld,Flags=0x%" PRIx64 "%s%s,SN=%d\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   info->trap->name, filename, bytes_read, fo_flags, (flags.empty() ? "" : ","), flags.c_str(), seq_number);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[FILEEXTRACTOR] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" SIZE:%" PRIu64 " FO_FLAGS:0x%" PRIx64 "(%s) SN:%d\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid, filename, bytes_read, fo_flags, flags.c_str(), seq_number);
+            break;
+    }
+}
+
 static void extract_ca_file(filedelete* f,
                             drakvuf_t drakvuf,
                             const drakvuf_trap_info_t* info,
@@ -436,7 +435,7 @@ static void extract_ca_file(filedelete* f,
                 if ( !fseek ( fp, fileoffset, SEEK_SET ) )
                 {
                     if ( fwrite(page, 4096, 1, fp) )
-                        filesize = fileoffset + 4096;
+                        filesize = MAX(filesize, fileoffset + 4096);
                 }
             }
         }
@@ -448,6 +447,7 @@ static void extract_ca_file(filedelete* f,
 
     fclose(fp);
 
+    print_extraction_information(f, drakvuf, info, filename, filesize, fo_flags, curr_sequence_number);
     save_file_metadata(f, info, curr_sequence_number, control_area, filename, filesize, fo_flags);
 }
 
@@ -488,32 +488,6 @@ static void extract_file(filedelete* f,
         extract_ca_file(f, drakvuf, info, vmi, imagesection, ctx, filename, fo_flags);
 }
 
-static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* filename, size_t bytes_read = 0, uint64_t fo_flags = 0)
-{
-    std::string flags = fo_flags_to_string(fo_flags, f->format);
-    switch (f->format)
-    {
-        case OUTPUT_CSV:
-            printf("filedelete," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIu64 ",0x%" PRIx64 "(%s)\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, filename, bytes_read, fo_flags, flags.c_str());
-            break;
-        case OUTPUT_KV:
-            if (!flags.empty())
-                flags = "," + flags;
-            printf("filedelete Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\",Size=%ld%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, filename, bytes_read, flags.c_str());
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" SIZE:%" PRIu64 " FO_FLAGS:0x%" PRIx64 "(%s)\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, filename, bytes_read, fo_flags, flags.c_str());
-            break;
-    }
-}
-
 /*
  * The approach where the system process list es enumerated looking for
  * the matching cr3 value in each _EPROCESS struct is not going to work
@@ -538,7 +512,7 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
     uint64_t fo_flags = 0;
     get_file_object_flags(drakvuf, info, vmi, f, handle, &fo_flags);
 
-    print_filedelete_information(f, drakvuf, info, filename.c_str(), 0, fo_flags);
+    print_filedelete_information(f, drakvuf, info, filename.c_str(), 0 /*TODO: print file size*/, fo_flags);
 
     if (f->dump_folder)
     {
@@ -568,7 +542,7 @@ static bool save_file_chunk(filedelete* f, int file_sequence_number, void* buffe
     return success;
 }
 
-static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, bool is_success = false)
+static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, bool is_success)
 {
     if (!is_success)
     {
@@ -673,8 +647,9 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         else
         {
             auto filename = f->files[std::make_pair(info->proc_data.pid, injector->handle)];
-            save_file_metadata(f, info, curr_sequence_number, 0, filename.c_str(), injector->ntreadfile_info.bytes_read, injector->fo_flags);
-
+            auto filesize = injector->ntreadfile_info.bytes_read;
+            print_extraction_information(f, drakvuf, info, filename.c_str(), filesize, injector->fo_flags, curr_sequence_number);
+            save_file_metadata(f, info, curr_sequence_number, 0, filename.c_str(), filesize, injector->fo_flags);
         }
     }
     else
@@ -737,7 +712,7 @@ err:
     PRINT_DEBUG("[FILEDELETE2] [ExAllocatePoolWithTag] Error. Stop processing (CR3 0x%lx, TID %d).\n",
                 info->regs->cr3, thread_id);
 
-    response = finish_readfile(drakvuf, info, vmi);
+    response = finish_readfile(drakvuf, info, vmi, false);
 
 done:
     drakvuf_release_vmi(drakvuf);
@@ -752,14 +727,14 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     auto response = 0;
     uint32_t thread_id = 0;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
     if (info->regs->cr3 != injector->target_cr3)
-        goto done;
+        return 0;
 
     if ( !drakvuf_get_current_thread_id(drakvuf, info->vcpu, &thread_id) ||
             !injector->target_thread_id || thread_id != injector->target_thread_id )
-        goto done;
+        return 0;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     if (info->regs->rax)
         goto handled;
@@ -809,7 +784,7 @@ err:
                 info->regs->cr3, thread_id);
 
 handled:
-    response = finish_readfile(drakvuf, info, vmi);
+    response = finish_readfile(drakvuf, info, vmi, false);
 
 done:
     drakvuf_release_vmi(drakvuf);
