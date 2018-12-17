@@ -551,6 +551,39 @@ int drakvuf_get_address_width(drakvuf_t drakvuf)
     return drakvuf->address_width;
 }
 
+
+/**
+
+unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
+{
+    if ( !addr )
+        return NULL;
+
+    vmi_instance_t vmi = drakvuf->vmi;
+    access_context_t ctx =
+    {
+        .addr = addr,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    return drakvuf_read_unicode_common(vmi, &ctx);
+}
+**/
+
+char* drakvuf_read_ascii_str(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
+{
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = addr,
+    };
+
+    return vmi_read_str(drakvuf->vmi, &ctx);
+}
+
+
 static unicode_string_t* drakvuf_read_unicode_common(vmi_instance_t vmi, const access_context_t* ctx)
 {
     unicode_string_t* us = vmi_read_unicode_str(vmi, ctx);

@@ -116,6 +116,8 @@ extern "C" {
 #include <libvmi/events.h>
 #include <json-c/json.h>
 
+#define NUMBER_OF(x) ( sizeof(x) / sizeof(x[0]) )
+
 /*---------------------------------------------------------
  * DRAKVUF functions
  */
@@ -425,6 +427,8 @@ bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
                                addr_t handle,
                                object_manager_object_t obj_type_arg,
                                addr_t* obj_body_addr);
+
+char* drakvuf_read_ascii_str(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr);
 
 unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr);
 
