@@ -219,6 +219,7 @@ struct IO_STATUS_BLOCK_64
 
 constexpr static uint32_t STATUS_SUCCESS = 0;
 constexpr static uint32_t STATUS_PENDING = 0x103;
+constexpr static uint32_t STATUS_END_OF_FILE = 0xC0000011;
 
 struct _LARGE_INTEGER
 {
