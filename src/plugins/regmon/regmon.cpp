@@ -160,26 +160,28 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 }
 
 static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                                      addr_t key_handle_addr,
+                                      addr_t key_handle,
                                       addr_t value_name_addr, bool with_value_name,
                                       unicode_string_t* data_us = nullptr)
 {
-    if ( key_handle_addr )
+    if ( !key_handle ) return 0;
+
+    gchar* key_path = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle );
+    unicode_string_t* value_name_us = nullptr;
+    char const* value_name = nullptr;
+    if (with_value_name)
     {
-        gchar* key_path = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle_addr, 0 );
-
-        unicode_string_t* value_name_us = drakvuf_read_unicode( drakvuf, info, value_name_addr );
-        char const* value_name = (value_name_us && value_name_us->length > 0) ? reinterpret_cast<char const*>(value_name_us->contents) : "(Default)";
-        char const* data = data_us ? (char const*)data_us->contents : nullptr;
-
-        if ( key_path )
-            print_registry_call_info(drakvuf, info, key_path, with_value_name ? value_name : nullptr, data);
-
-        if (data_us) vmi_free_unicode_str(data_us);
-        if (value_name_us) vmi_free_unicode_str(value_name_us);
-        g_free( key_path );
-
+        value_name_us = drakvuf_read_unicode( drakvuf, info, value_name_addr );
+        value_name = (value_name_us && value_name_us->length > 0) ? reinterpret_cast<char const*>(value_name_us->contents) : "(Default)";
     }
+    char const* data = data_us ? (char const*)data_us->contents : nullptr;
+
+    if ( key_path )
+        print_registry_call_info(drakvuf, info, key_path, value_name, data);
+
+    if (data_us) vmi_free_unicode_str(data_us);
+    if (value_name_us) vmi_free_unicode_str(value_name_us);
+    g_free( key_path );
 
     return 0;
 }
@@ -204,14 +206,15 @@ static event_response_t log_reg_objattr_hook(drakvuf_t drakvuf, drakvuf_trap_inf
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
+    addr_t key_handle;
     ctx.addr = attr + reg->objattr_root;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &key_handle) )
     {
         drakvuf_release_vmi(drakvuf);
         return 0;
     }
 
-    gchar* key_root_p = drakvuf_reg_keyhandle_path( drakvuf, info, ctx.addr, 0 );
+    gchar* key_root_p = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle );
 
     ctx.addr = attr + reg->objattr_name;
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
