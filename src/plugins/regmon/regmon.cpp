@@ -118,6 +118,47 @@
 
 #define PLUGIN_NAME "[REGMON]"
 
+static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char const* key_name, char const* value_name, char const* value)
+{
+    regmon* reg = (regmon*)info->trap->data;
+
+    switch ( reg->format )
+    {
+        case OUTPUT_CSV:
+            printf("regmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->name, key_name );
+            if (value_name)
+                printf(",%s", value_name);
+            if (value)
+                printf(",\"%s\"", value);
+            printf("\n");
+            break;
+
+        case OUTPUT_KV:
+            printf("regmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Key=\"%s\"",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   info->trap->name, key_name);
+            if (value_name)
+                printf(",ValueName=\"%s\"", value_name);
+            if (value)
+                printf(",Value=\"%s\"", value);
+            printf("\n");
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[REGMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64 ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s:%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr, info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, key_name );
+            if (value_name)
+                printf(",%s", value_name);
+            if (value)
+                printf(", VALUE:\"%s\"", value);
+            printf("\n");
+            break;
+    }
+}
+
 static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
                                       addr_t key_handle_addr,
                                       addr_t value_name_addr, bool with_value_name,
@@ -125,56 +166,16 @@ static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* in
 {
     if ( key_handle_addr )
     {
-        const char* syscall_name = info->trap->name;
         gchar* key_path = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle_addr, 0 );
 
         unicode_string_t* value_name_us = drakvuf_read_unicode( drakvuf, info, value_name_addr );
         char const* value_name = (value_name_us && value_name_us->length > 0) ? reinterpret_cast<char const*>(value_name_us->contents) : "(Default)";
+        char const* data = data_us ? (char const*)data_us->contents : nullptr;
 
         if ( key_path )
-        {
-            regmon* reg = (regmon*)info->trap->data;
+            print_registry_call_info(drakvuf, info, key_path, with_value_name ? value_name : nullptr, data);
 
-            switch ( reg->format )
-            {
-                case OUTPUT_CSV:
-                    printf("regmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s",
-                           UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, key_path );
-                    if (with_value_name)
-                        printf(",%s", value_name);
-                    if (data_us)
-                        printf(",\"%s\"", data_us->contents);
-                    printf("\n");
-                    break;
-
-                case OUTPUT_KV:
-                    printf("regmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Key=\"%s\"",
-                           UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                           info->trap->name, key_path);
-                    if (with_value_name)
-                        printf(",ValueName=\"%s\"", value_name);
-                    if (data_us)
-                        printf(",Value=\"%s\"", data_us->contents);
-                    printf("\n");
-                    break;
-
-                default:
-                case OUTPUT_DEFAULT:
-                    printf("[REGMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64 ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s:%s",
-                           UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr, info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                           USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, key_path );
-                    if (with_value_name)
-                        printf(",%s", value_name);
-                    if (data_us)
-                        printf(", VALUE:\"%s\"", data_us->contents);
-                    printf("\n");
-                    break;
-            }
-
-            if (data_us)
-                vmi_free_unicode_str(data_us);
-        }
-
+        if (data_us) vmi_free_unicode_str(data_us);
         if (value_name_us) vmi_free_unicode_str(value_name_us);
         g_free( key_path );
 
@@ -196,7 +197,6 @@ static event_response_t log_reg_objattr_hook(drakvuf_t drakvuf, drakvuf_trap_inf
         return 0;
     }
 
-    const char* syscall_name = info->trap->name;
     regmon* reg = (regmon*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -233,32 +233,15 @@ static event_response_t log_reg_objattr_hook(drakvuf_t drakvuf, drakvuf_trap_inf
 
     if (VMI_SUCCESS == vmi_convert_str_encoding(us, &str2, "UTF-8"))
     {
-        const char* key_root = key_root_p ?: "";
-        const char* key_name = (const char*)str2.contents ?: "";
-        const char* key_sep = key_root_p ? "\\" : "";
+        char* key_path = g_strdup_printf("%s%s%s",
+                                         key_root_p ?: "",
+                                         key_root_p ? "\\" : "",
+                                         (const char*)str2.contents ?: "");
 
-        switch ( reg->format )
-        {
-            case OUTPUT_CSV:
-                printf("regmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s%s%s\n",
-                       UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, syscall_name, key_root, key_sep, key_name );
-                break;
-
-            case OUTPUT_KV:
-                printf("regmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Key=\"%s%s%s\"\n",
-                       UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                       info->trap->name, key_root, key_sep, key_name );
-                break;
-
-            default:
-            case OUTPUT_DEFAULT:
-                printf("[REGMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64 ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s:%s%s%s\n",
-                       UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr, info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                       USERIDSTR(drakvuf), info->proc_data.userid, syscall_name, key_root, key_sep, key_name );
-                break;
-        }
+        print_registry_call_info(drakvuf, info, key_path, nullptr, nullptr);
 
         g_free(str2.contents);
+        g_free(key_path);
     }
 
     g_free(key_root_p);
