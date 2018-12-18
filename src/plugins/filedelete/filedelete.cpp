@@ -272,7 +272,8 @@ static void save_file_metadata(filedelete* f,
                                addr_t control_area,
                                const char* filename,
                                size_t file_size,
-                               uint64_t fo_flags)
+                               uint64_t fo_flags,
+                               uint32_t ntstatus = 0)
 {
     char* file = NULL;
     if ( asprintf(&file, "%s/file.%06d.metadata", f->dump_folder, sequence_number) < 0 )
@@ -291,6 +292,8 @@ static void save_file_metadata(filedelete* f,
     fprintf(fp, "PID: %" PRIu64 "\n", static_cast<uint64_t>(info->proc_data.pid));
     fprintf(fp, "PPID: %" PRIu64 "\n", static_cast<uint64_t>(info->proc_data.ppid));
     fprintf(fp, "ProcessName: \"%s\"\n", info->proc_data.name);
+    if (ntstatus)
+        fprintf(fp, "WARNING: The file have been read partially with status 0x%x\n", ntstatus);
 
     fclose(fp);
 }
@@ -591,6 +594,7 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     uint32_t isb_status = 0; // `isb` is `IO_STATUS_BLOCK`
     size_t isb_size = 0;
     bool is_success = false;
+    auto filename = f->files[std::make_pair(info->proc_data.pid, injector->handle)];
 
     if (injector->is32bit)
     {
@@ -646,15 +650,16 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
         else
         {
-            auto filename = f->files[std::make_pair(info->proc_data.pid, injector->handle)];
             auto filesize = injector->ntreadfile_info.bytes_read;
             print_extraction_information(f, drakvuf, info, filename.c_str(), filesize, injector->fo_flags, curr_sequence_number);
             save_file_metadata(f, info, curr_sequence_number, 0, filename.c_str(), filesize, injector->fo_flags);
         }
     }
-    else
+    else if (STATUS_END_OF_FILE != status)
     {
-        PRINT_DEBUG("[FILEDELETE2] [ReadFile] Failed to read %s with status 0x%lx and IO_STATUS_BLOCK = { Status 0x%x; Size 0x%lx} .\n",
+        if (injector->ntreadfile_info.bytes_read)
+            save_file_metadata(f, info, injector->curr_sequence_number, 0, filename.c_str(), injector->ntreadfile_info.bytes_read, injector->fo_flags, status);
+        PRINT_DEBUG("[FILEDELETE2] [ReadFile] Failed to read %s with status 0x%lx and IO_STATUS_BLOCK = { Status 0x%x; Size 0x%lx} \n",
                     f->files[std::make_pair(info->proc_data.pid, injector->handle)].c_str(), info->regs->rax, isb_status, isb_size);
         goto err;
     }
