@@ -227,27 +227,22 @@ static gchar* win_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info
 }
 
 
-gchar* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t key_handle, addr_t process_arg )
+gchar* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle )
 {
-    addr_t process = process_arg ;
+    addr_t process = info->proc_data.base_addr;
 
-    if ( ! process )
-        process = drakvuf_get_current_process( drakvuf, info->vcpu );
+    if ( !process ) return NULL;
 
-    if ( process )
+    addr_t obj = drakvuf_get_obj_by_handle( drakvuf, process, key_handle );
+
+    if ( obj )
     {
-        addr_t obj = drakvuf_get_obj_by_handle( drakvuf, process, key_handle );
+        // TODO: Check if object type is REG_KEY
+        addr_t p_key_body = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
 
-        if ( obj )
-        {
-            // TODO: Check if object type is REG_KEY
-            addr_t p_key_body = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
-
-            if ( p_key_body )
-                return win_reg_keybody_path( drakvuf, info, p_key_body );
-        }
+        if ( p_key_body )
+            return win_reg_keybody_path( drakvuf, info, p_key_body );
     }
 
-    return NULL ;
+    return NULL;
 }
-
