@@ -1295,32 +1295,36 @@ bool init_vmi(drakvuf_t drakvuf)
     }
     PRINT_DEBUG("init_vmi: initializing vmi done\n");
 
-    GHashTable* config = g_hash_table_new(g_str_hash, g_str_equal);
-    g_hash_table_insert(config, "rekall_profile", drakvuf->rekall_profile);
-
-    switch (drakvuf->os)
+    os_t os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL);
+    if (VMI_OS_UNKNOWN == os)
     {
-        case VMI_OS_WINDOWS:
-            g_hash_table_insert(config, "os_type", "Windows");
-            flags = VMI_PM_INITFLAG_TRANSITION_PAGES;
-            break;
-        case VMI_OS_LINUX:
-            g_hash_table_insert(config, "os_type", "Linux");
-            break;
-        default:
-            break;
-    };
+        GHashTable* config = g_hash_table_new(g_str_hash, g_str_equal);
+        g_hash_table_insert(config, "rekall_profile", drakvuf->rekall_profile);
 
-    if (VMI_PM_UNKNOWN == vmi_init_paging(drakvuf->vmi, flags) )
-    {
-        printf("Failed to init LibVMI paging.\n");
+        switch (drakvuf->os)
+        {
+            case VMI_OS_WINDOWS:
+                g_hash_table_insert(config, "os_type", "Windows");
+                flags = VMI_PM_INITFLAG_TRANSITION_PAGES;
+                break;
+            case VMI_OS_LINUX:
+                g_hash_table_insert(config, "os_type", "Linux");
+                break;
+            default:
+                break;
+        };
+
+        if (VMI_PM_UNKNOWN == vmi_init_paging(drakvuf->vmi, flags) )
+        {
+            printf("Failed to init LibVMI paging.\n");
+            g_hash_table_destroy(config);
+            return 1;
+        }
+
+        os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GHASHTABLE, config, NULL);
+
         g_hash_table_destroy(config);
-        return 1;
     }
-
-    os_t os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GHASHTABLE, config, NULL);
-
-    g_hash_table_destroy(config);
 
     if ( os != drakvuf->os )
     {
