@@ -118,9 +118,8 @@
 #define HANDLE_MULTIPLIER   4
 #define EX_FAST_REF_MASK    7
 
-addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t handle)
+static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, uint64_t handle)
 {
-
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t handletable = 0, tablecode = 0, obj = 0;
 
@@ -142,7 +141,7 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
         case 1:
         {
             addr_t table = 0;
-            size_t psize = (drakvuf->pm == VMI_PM_IA32E) ? 8 : 4;
+            size_t psize = drakvuf->address_width;
             uint32_t low_count = VMI_PS_4KB / drakvuf->sizes[HANDLE_TABLE_ENTRY];
             uint32_t j, i = handle % (low_count * HANDLE_MULTIPLIER);
 
@@ -158,7 +157,7 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
         case 2:
         {
             addr_t table = 0, table2 = 0;
-            size_t psize = (drakvuf->pm == VMI_PM_IA32E) ? 8 : 4;
+            size_t psize = drakvuf->address_width;
             uint32_t low_count = VMI_PS_4KB / drakvuf->sizes[HANDLE_TABLE_ENTRY];
             uint32_t mid_count = VMI_PS_4KB / psize;
             uint32_t k, j, i = handle % (low_count * HANDLE_MULTIPLIER);
@@ -173,7 +172,7 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
                 vmi_read_addr_va(vmi, table2 + i * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj);
             break;
         }
-    };
+    }
 
     switch (vmi_get_winver(vmi))
     {
@@ -194,6 +193,19 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
     };
 }
 
+addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t handle)
+{
+    if (VMI_GET_BIT(handle, 31))
+    {
+        // This is Kernel Mode handle
+        if (!drakvuf_find_process(drakvuf, 4, NULL, &process))
+            return 0;
+        handle = handle & VMI_BIT_MASK(0,30);
+        return drakvuf_get_obj_by_handle_impl(drakvuf, process, handle);
+    }
+
+    return drakvuf_get_obj_by_handle_impl(drakvuf, process, handle);
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
