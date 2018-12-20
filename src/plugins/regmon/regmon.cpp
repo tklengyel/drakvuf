@@ -112,11 +112,27 @@
 #include "regmon.h"
 
 #include <vector>
-#include <memory>
-#include <functional>
-#include <cstring>
+#include <string>
+#include <sstream>
+#include <iomanip>
 
-#define PLUGIN_NAME "[REGMON]"
+enum RegistryValueTypes
+{
+    REG_NONE = 0,
+    REG_SZ,
+    REG_EXPAND_SZ,
+    REG_BINARY,
+    REG_DWORD,
+    REG_DWORD_LITTLE_ENDIAN = REG_DWORD,
+    REG_DWORD_BIG_ENDIAN,
+    REG_LINK,
+    REG_MULTI_SZ,
+    REG_RESOURCE_LIST,
+    REG_FULL_RESOURCE_DESCRIPTOR,
+    REG_RESOURCE_REQUIREMENTS_LIST,
+    REG_QWORD,
+    REG_QWORD_LITTLE_ENDIAN = REG_QWORD
+};
 
 static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char const* key_name, char const* value_name, char const* value)
 {
@@ -159,245 +175,456 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     }
 }
 
-static event_response_t log_reg_hook( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                                      addr_t key_handle,
-                                      addr_t value_name_addr, bool with_value_name,
-                                      unicode_string_t* data_us = nullptr)
+static event_response_t log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                                      uint64_t key_handle,
+                                      char const* value_name,
+                                      char const* data )
 {
-    if ( !key_handle ) return 0;
+    if (!key_handle) return 0;
 
     gchar* key_path = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle );
-    unicode_string_t* value_name_us = nullptr;
-    char const* value_name = nullptr;
-    if (with_value_name)
-    {
-        value_name_us = drakvuf_read_unicode( drakvuf, info, value_name_addr );
-        value_name = (value_name_us && value_name_us->length > 0) ? reinterpret_cast<char const*>(value_name_us->contents) : "(Default)";
-    }
-    char const* data = data_us ? (char const*)data_us->contents : nullptr;
 
     if ( key_path )
         print_registry_call_info(drakvuf, info, key_path, value_name, data);
 
-    if (data_us) vmi_free_unicode_str(data_us);
-    if (value_name_us) vmi_free_unicode_str(value_name_us);
     g_free( key_path );
 
     return 0;
 }
 
-static event_response_t log_reg_hook_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+static char const* get_value_name(unicode_string_t* us)
 {
-    addr_t key_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
-    return log_reg_hook( drakvuf, info, key_handle_addr, 0L, false );
+    return (us && us->length > 0) ? reinterpret_cast<char const*>(us->contents) : "(Default)";
 }
 
-static event_response_t log_reg_objattr_hook(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
+static event_response_t log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                                      uint64_t key_handle,
+                                      addr_t value_name_addr, bool with_value_name,
+                                      char const* data )
 {
-    if ( !attr )
+    unicode_string_t* value_name_us = nullptr;
+    char const* value_name = nullptr;
+    if (with_value_name)
     {
-        return 0;
+        value_name_us = drakvuf_read_unicode(drakvuf, info, value_name_addr);
+        value_name = get_value_name(value_name_us);
     }
 
-    regmon* reg = (regmon*)info->trap->data;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    auto status = log_reg_impl(drakvuf, info, key_handle, value_name, data);
 
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
+    if (value_name_us) vmi_free_unicode_str(value_name_us);
+
+    return status;
+}
+
+static event_response_t log_reg_key( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                                     uint64_t key_handle)
+{
+    return log_reg_impl(drakvuf, info, key_handle, 0L, false, nullptr);
+}
+
+static event_response_t log_reg_key_value( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+        uint64_t key_handle, addr_t value_name_addr )
+{
+    return log_reg_impl(drakvuf, info, key_handle, value_name_addr, true, nullptr);
+}
+
+static char* get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
+{
+    regmon* reg = (regmon*)info->trap->data;
+
+    if (!attr) return nullptr;
+
+    vmi_lock_guard vmi_lg(drakvuf);
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
 
     addr_t key_handle;
     ctx.addr = attr + reg->objattr_root;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &key_handle) )
-    {
-        drakvuf_release_vmi(drakvuf);
-        return 0;
-    }
+    if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &key_handle) )
+        return nullptr;
+
+    addr_t key_name_addr;
+    ctx.addr = attr + reg->objattr_name;
+    if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &key_name_addr) )
+        return nullptr;
 
     gchar* key_root_p = drakvuf_reg_keyhandle_path( drakvuf, info, key_handle );
-
-    ctx.addr = attr + reg->objattr_name;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
-    {
-        g_free(key_root_p);
-        drakvuf_release_vmi(drakvuf);
-        return 0;
-    }
-
-    unicode_string_t* us = vmi_read_unicode_str(vmi, &ctx);
+    unicode_string_t* us = drakvuf_read_unicode( drakvuf, info, key_name_addr );
     if ( !us )
     {
         g_free(key_root_p);
-        drakvuf_release_vmi(drakvuf);
-        return 0;
+        return nullptr;
     }
 
-    unicode_string_t str2 = { .contents = NULL };
-
-    if (VMI_SUCCESS == vmi_convert_str_encoding(us, &str2, "UTF-8"))
-    {
-        char* key_path = g_strdup_printf("%s%s%s",
-                                         key_root_p ?: "",
-                                         key_root_p ? "\\" : "",
-                                         (const char*)str2.contents ?: "");
-
-        print_registry_call_info(drakvuf, info, key_path, nullptr, nullptr);
-
-        g_free(str2.contents);
-        g_free(key_path);
-    }
-
+    char* key_path = g_strdup_printf("%s%s%s",
+                                     key_root_p ?: "",
+                                     key_root_p ? "\\" : "",
+                                     (const char*)us->contents ?: "");
     g_free(key_root_p);
     vmi_free_unicode_str(us);
-    drakvuf_release_vmi(drakvuf);
+
+    return key_path;
+}
+
+static event_response_t log_reg_objattr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
+{
+    char* key_path = get_key_path_from_attr(drakvuf, info, attr);
+
+    if (key_path)
+        print_registry_call_info(drakvuf, info, key_path, nullptr, nullptr);
+
+    g_free(key_path);
 
     return 0;
 }
 
-static event_response_t log_reg_objattr_hook_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+        uint32_t type, addr_t data_addr, size_t data_size )
 {
-    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
-    return log_reg_objattr_hook( drakvuf, info, objattr_addr );
-}
-
-static event_response_t log_reg_value_hook_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
-{
-    addr_t key_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
-    addr_t value_name_addr = drakvuf_get_function_argument(drakvuf, info, 2);
-    return log_reg_hook( drakvuf, info, key_handle_addr, value_name_addr, true );
-}
-
-static event_response_t log_reg_set_value_hook_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
-{
-
-    enum RegistryValueTypes
+    access_context_t ctx =
     {
-        REG_NONE = 0
-        ,REG_SZ
-        ,REG_EXPAND_SZ
-        ,REG_BINARY
-        ,REG_DWORD
-        ,REG_DWORD_LITTLE_ENDIAN = REG_DWORD
-        ,REG_DWORD_BIG_ENDIAN
-        ,REG_LINK
-        ,REG_MULTI_SZ
-        ,REG_RESOURCE_LIST
-        ,REG_FULL_RESOURCE_DESCRIPTOR
-        ,REG_RESOURCE_REQUIREMENTS_LIST
-        ,REG_QWORD
-        ,REG_QWORD_LITTLE_ENDIAN = REG_QWORD
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = data_addr,
     };
 
-    addr_t key_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
+    vmi_lock_guard vmi_lg(drakvuf);
 
-    if (!key_handle_addr)
-        return 0;
+    if ((type == REG_SZ) || (type == REG_LINK) || (type == REG_EXPAND_SZ))
+        return drakvuf_read_wchar_string(vmi_lg.vmi, &ctx);
 
+    std::vector<uint8_t> data_bytes(data_size, 0);
+
+    size_t bytes_read = 0;
+    vmi_read(vmi_lg.vmi, &ctx, data_size, data_bytes.data(), &bytes_read);
+
+    if (bytes_read != data_size)
+    {
+        PRINT_DEBUG("[REGMON] Error reading data, expected %zu bytes, but actually read %zu\n", data_size, bytes_read);
+        return nullptr;
+    }
+
+    std::ostringstream rs;
+
+    if (type == REG_MULTI_SZ) // double-zero terminated Unicode strings array
+    {
+        ctx.addr = data_addr;
+        for (size_t i = 0 ; i < data_bytes.size() ; i += 2)
+        {
+            uint16_t value_word = *(reinterpret_cast<uint16_t*>(&data_bytes[i]));
+            uint32_t value_dword = *(reinterpret_cast<uint32_t*>(&data_bytes[i]));
+
+            if (value_word == 0)
+            {
+                // Read current wchar string
+                unicode_string_t* us = drakvuf_read_wchar_string(vmi_lg.vmi, &ctx);
+                if (us)
+                {
+                    rs << "'" << us->contents << "',";
+                    vmi_free_unicode_str(us);
+                }
+                ctx.addr = data_addr + i + 2;
+            }
+
+            if ((value_dword == 0) && ((i + 4) >= data_bytes.size()))
+                break;
+        }
+    }
+    else
+    {
+        for (size_t i = 0; i < data_bytes.size(); ++i)
+        {
+            rs << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(data_bytes[i]) << ' ';
+        }
+    }
+
+    std::string result = rs.str();
+    if (!result.empty()) result.erase(result.size() - 1);
+
+    unicode_string_t* data_us = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+    data_us->encoding = "UTF-8";
+    data_us->contents = (uint8_t*)g_strdup(result.c_str());
+    data_us->length = result.size() + 1;
+
+    return data_us;
+}
+
+static event_response_t log_reg_key_value_data( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+        uint64_t key_handle, addr_t value_name_addr,
+        uint32_t type, addr_t data_addr, size_t data_size )
+{
+    unicode_string_t* data_us = get_data_as_string(drakvuf, info, type, data_addr, data_size);
+    char const* data = data_us ? (char const*)data_us->contents : nullptr;
+
+    auto status = log_reg_impl( drakvuf, info, key_handle, value_name_addr, true, data );
+
+    if (data_us) vmi_free_unicode_str(data_us);
+
+    return status;
+}
+
+static event_response_t log_reg_key_value_entries( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+        uint64_t key_handle, addr_t value_entries_addr, size_t value_entries_count )
+{
+    /*
+    typedef struct _KEY_VALUE_ENTRY {
+      PUNICODE_STRING ValueName;
+      ULONG           DataLength;
+      ULONG           DataOffset;
+      ULONG           Type;
+    } KEY_VALUE_ENTRY, *PKEY_VALUE_ENTRY;
+    */
+
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    size_t KEY_VALUE_ENTRY_sizeof = drakvuf_get_address_width(drakvuf) + 3 * sizeof(uint32_t) + (is32bit ? 0 : 4 /*padding*/);
+
+    std::ostringstream ss;
+    for (size_t i = 0; i < value_entries_count; ++i)
+    {
+        vmi_lock_guard vmi_lg(drakvuf);
+
+        access_context_t ctx =
+        {
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = value_entries_addr + i * KEY_VALUE_ENTRY_sizeof,
+        };
+
+        addr_t value_name_addr;
+        if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &value_name_addr) )
+            continue;
+
+        unicode_string_t* value_name_us = drakvuf_read_unicode(drakvuf, info, value_name_addr);
+        char const* value_name = get_value_name(value_name_us);
+        ss << value_name << ",";
+        if (value_name_us) vmi_free_unicode_str(value_name_us);
+    }
+    std::string value_names = ss.str();
+    if (!value_names.empty()) value_names.erase(value_names.size() - 1);
+
+    return log_reg_impl(drakvuf, info, key_handle, value_names.c_str(), nullptr);
+}
+
+static event_response_t delete_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwDeleteKey(
+      HANDLE KeyHandle
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    return log_reg_key( drakvuf, info, key_handle );
+}
+
+static event_response_t set_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwSetValueKey(
+      HANDLE          KeyHandle,
+      PUNICODE_STRING ValueName,
+      ULONG           TitleIndex,
+      ULONG           Type,
+      PVOID           Data,
+      ULONG           DataSize
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t value_name_addr = drakvuf_get_function_argument(drakvuf, info, 2);
     uint32_t type = drakvuf_get_function_argument(drakvuf, info, 4);
     addr_t data_addr = drakvuf_get_function_argument(drakvuf, info, 5);
     uint32_t data_size = drakvuf_get_function_argument(drakvuf, info, 6);
+    return log_reg_key_value_data( drakvuf, info, key_handle, value_name_addr, type, data_addr, data_size );
+}
 
-    unicode_string_t* data_us = nullptr;
+static event_response_t delete_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwDeleteValueKey(
+      HANDLE          KeyHandle,
+      PUNICODE_STRING ValueName
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t value_name_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+    return log_reg_key_value( drakvuf, info, key_handle, value_name_addr );
+}
 
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-    ctx.addr = data_addr;
+static event_response_t create_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwCreateKey(
+      PHANDLE            KeyHandle,
+      ACCESS_MASK        DesiredAccess,
+      POBJECT_ATTRIBUTES ObjectAttributes,
+      ULONG              TitleIndex,
+      PUNICODE_STRING    Class,
+      ULONG              CreateOptions,
+      PULONG             Disposition
+    );
+    */
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    return log_reg_objattr( drakvuf, info, objattr_addr );
+}
 
-    if ((type == REG_SZ) || (type == REG_LINK) || (type == REG_EXPAND_SZ))
-    {
-        vmi_lock_guard vmi_lg(drakvuf);
-        data_us = drakvuf_read_wchar_string(vmi_lg.vmi, &ctx);
-    }
-    else
-    {
-        std::vector<uint8_t> data_bytes(data_size, 0);
+static event_response_t create_key_transacted_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwCreateKeyTransacted(
+      PHANDLE            KeyHandle,
+      ACCESS_MASK        DesiredAccess,
+      POBJECT_ATTRIBUTES ObjectAttributes,
+      ULONG              TitleIndex,
+      PUNICODE_STRING    Class,
+      ULONG              CreateOptions,
+      HANDLE             TransactionHandle,
+      PULONG             Disposition
+    );
+    */
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    return log_reg_objattr( drakvuf, info, objattr_addr );
+}
 
-        {
-            size_t bytes_read = 0;
-            vmi_lock_guard vmi_lg(drakvuf);
-            vmi_read(vmi_lg.vmi, &ctx, data_size, data_bytes.data(), &bytes_read);
+static event_response_t enumerate_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwEnumerateKey(
+      HANDLE                KeyHandle,
+      ULONG                 Index,
+      KEY_INFORMATION_CLASS KeyInformationClass,
+      PVOID                 KeyInformation,
+      ULONG                 Length,
+      PULONG                ResultLength
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    return log_reg_key( drakvuf, info, key_handle );
+}
 
-            if (bytes_read != data_size)
-            {
-                fprintf(stderr, PLUGIN_NAME "  Error, reading data, expected %" PRIu32 " bytes, but actually read %zu \n", data_size, bytes_read );
-                return log_reg_hook( drakvuf, info, key_handle_addr, value_name_addr, true, nullptr );
-            }
-        }
+static event_response_t enumerate_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwEnumerateValueKey(
+      HANDLE                      KeyHandle,
+      ULONG                       Index,
+      KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass,
+      PVOID                       KeyValueInformation,
+      ULONG                       Length,
+      PULONG                      ResultLength
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    return log_reg_key( drakvuf, info, key_handle );
+}
 
-        char** strings;
-        size_t number_of_strings = 0;
-        const char* spacer;
+static event_response_t open_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwOpenKey(
+      PHANDLE            KeyHandle,
+      ACCESS_MASK        DesiredAccess,
+      POBJECT_ATTRIBUTES ObjectAttributes
+    );
+    */
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    return log_reg_objattr( drakvuf, info, objattr_addr );
+}
 
-        data_us = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
-        data_us->encoding = "UTF-8";
+static event_response_t open_key_ex_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwOpenKeyEx(
+      PHANDLE            KeyHandle,
+      ACCESS_MASK        DesiredAccess,
+      POBJECT_ATTRIBUTES ObjectAttributes,
+      ULONG              OpenOptions
+    );
+    */
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    return log_reg_objattr( drakvuf, info, objattr_addr );
+}
 
-        if (type == REG_MULTI_SZ) // double-zero terminated Unicode strings array
-        {
-            std::vector< std::unique_ptr<unicode_string_t, std::function<void(unicode_string_t*)>> > multiple_strings;
-            multiple_strings.reserve(100); // allocate space for 100 string pointers at once
-            {
-                vmi_lock_guard vmi_lg(drakvuf);
-                ctx.addr = data_addr;
-                for (uint32_t i = 0 ; i < data_bytes.size() ; i += 2)
-                {
-                    uint16_t& value_word = *(reinterpret_cast<uint16_t*>(&data_bytes[i]));
-                    const uint32_t value_dword = *(reinterpret_cast<uint32_t*>(&data_bytes[i]));
+static event_response_t open_key_transacted_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwOpenKeyTransacted(
+      PHANDLE            KeyHandle,
+      ACCESS_MASK        DesiredAccess,
+      POBJECT_ATTRIBUTES ObjectAttributes,
+      HANDLE             TransactionHandle
+    );
+    */
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    return log_reg_objattr( drakvuf, info, objattr_addr );
+}
 
-                    if (value_word == 0)
-                    {
-                        // Read current wchar string
-                        multiple_strings.emplace_back(
-                            drakvuf_read_wchar_string(vmi_lg.vmi, &ctx),
-                            [](unicode_string_t* p)
-                        {
-                            vmi_free_unicode_str(p);
-                        }
-                        );
-                        ctx.addr = data_addr + i + 2;
-                    }
+static event_response_t open_key_transacted_ex_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwOpenKeyTransactedEx(
+      PHANDLE            KeyHandle,
+      ACCESS_MASK        DesiredAccess,
+      POBJECT_ATTRIBUTES ObjectAttributes,
+      ULONG              OpenOptions,
+      HANDLE             TransactionHandle
+    );
+    */
+    addr_t objattr_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    return log_reg_objattr( drakvuf, info, objattr_addr );
+}
 
-                    if ((value_dword == 0) && ((i + 4) >= data_bytes.size()))
-                        break;
-                }
-            }
+static event_response_t query_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwQueryKey(
+      HANDLE                KeyHandle,
+      KEY_INFORMATION_CLASS KeyInformationClass,
+      PVOID                 KeyInformation,
+      ULONG                 Length,
+      PULONG                ResultLength
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    return log_reg_key( drakvuf, info, key_handle );
+}
 
-            number_of_strings = multiple_strings.size() + 1;
-            strings = (char**)g_malloc0(sizeof(char*) * number_of_strings);
+static event_response_t query_multiple_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    __kernel_entry NTSTATUS NtQueryMultipleValueKey(
+      HANDLE           KeyHandle,
+      PKEY_VALUE_ENTRY ValueEntries,
+      ULONG            EntryCount,
+      PVOID            ValueBuffer,
+      PULONG           BufferLength,
+      PULONG           RequiredBufferLength
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t value_entries_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+    size_t value_entries_count = drakvuf_get_function_argument(drakvuf, info, 3);
+    return log_reg_key_value_entries( drakvuf, info, key_handle, value_entries_addr, value_entries_count );
+}
 
-            for (size_t i = 0; i < multiple_strings.size(); ++i)
-            {
-                size_t quoted_str_len = multiple_strings[i]->length + 3;
-                strings[i] = (char*)g_malloc0(quoted_str_len);
-                snprintf(strings[i], quoted_str_len, "'%s'", multiple_strings[i]->contents);
-            }
-            spacer = ",";
-        }
-        else
-        {
-            const size_t bytes_an_item = 2;
-            number_of_strings = data_bytes.size() + 1;
-            strings = (char**)g_malloc0(sizeof(char*) * number_of_strings);
-
-            for (size_t i = 0; i < data_bytes.size(); ++i)
-            {
-                strings[i] = (char*)g_malloc0(bytes_an_item + 1);
-                snprintf(strings[i], bytes_an_item + 1, "%02x", (int)(data_bytes[i] & 0xff));
-            }
-            spacer = " ";
-        }
-
-        data_us->contents = (uint8_t*)g_strjoinv(spacer, strings);
-        data_us->length = std::strlen((char*)data_us->contents) + 1;
-
-        for (size_t i = 0; i < number_of_strings; ++i)
-            if (strings[i])
-                g_free(strings[i]);
-        g_free(strings);
-    }
-
-    return log_reg_hook( drakvuf, info, key_handle_addr, value_name_addr, true, data_us );
+static event_response_t query_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info_t* info )
+{
+    /*
+    NTSYSAPI NTSTATUS ZwQueryValueKey(
+      HANDLE                      KeyHandle,
+      PUNICODE_STRING             ValueName,
+      KEY_VALUE_INFORMATION_CLASS KeyValueInformationClass,
+      PVOID                       KeyValueInformation,
+      ULONG                       Length,
+      PULONG                      ResultLength
+    );
+    */
+    uint64_t key_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t value_name_addr = drakvuf_get_function_argument(drakvuf, info, 2);
+    return log_reg_key_value( drakvuf, info, key_handle, value_name_addr );
 }
 
 static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
@@ -412,7 +639,6 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }
 
-
 regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
 {
     this->format = output;
@@ -423,20 +649,20 @@ regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
         throw -1;
 
     assert(sizeof(traps) / sizeof(traps[0]) > 13);
-    register_trap(drakvuf, "NtDeleteKey",            &traps[0], log_reg_hook_cb);
-    register_trap(drakvuf, "NtSetValueKey",          &traps[1], log_reg_set_value_hook_cb);
-    register_trap(drakvuf, "NtDeleteValueKey",       &traps[2], log_reg_value_hook_cb);
-    register_trap(drakvuf, "NtCreateKey",            &traps[3], log_reg_objattr_hook_cb);
-    register_trap(drakvuf, "NtCreateKeyTransacted",  &traps[4], log_reg_objattr_hook_cb);
-    register_trap(drakvuf, "NtEnumerateKey",         &traps[5], log_reg_hook_cb);
-    register_trap(drakvuf, "NtEnumerateValueKey",    &traps[6], log_reg_hook_cb);
-    register_trap(drakvuf, "NtOpenKey",              &traps[7], log_reg_objattr_hook_cb);
-    register_trap(drakvuf, "NtOpenKeyEx",            &traps[8], log_reg_objattr_hook_cb);
-    register_trap(drakvuf, "NtOpenKeyTransacted",    &traps[9], log_reg_objattr_hook_cb);
-    register_trap(drakvuf, "NtOpenKeyTransactedEx",  &traps[10], log_reg_objattr_hook_cb);
-    register_trap(drakvuf, "NtQueryKey",             &traps[11], log_reg_hook_cb);
-    register_trap(drakvuf, "NtQueryMultipleValueKey",&traps[12], log_reg_hook_cb);
-    register_trap(drakvuf, "NtQueryValueKey",        &traps[13], log_reg_value_hook_cb);
+    register_trap(drakvuf, "NtDeleteKey",            &traps[0],  delete_key_cb);
+    register_trap(drakvuf, "NtSetValueKey",          &traps[1],  set_value_key_cb);
+    register_trap(drakvuf, "NtDeleteValueKey",       &traps[2],  delete_value_key_cb);
+    register_trap(drakvuf, "NtCreateKey",            &traps[3],  create_key_cb);
+    register_trap(drakvuf, "NtCreateKeyTransacted",  &traps[4],  create_key_transacted_cb);
+    register_trap(drakvuf, "NtEnumerateKey",         &traps[5],  enumerate_key_cb);
+    register_trap(drakvuf, "NtEnumerateValueKey",    &traps[6],  enumerate_value_key_cb);
+    register_trap(drakvuf, "NtOpenKey",              &traps[7],  open_key_cb);
+    register_trap(drakvuf, "NtOpenKeyEx",            &traps[8],  open_key_ex_cb);
+    register_trap(drakvuf, "NtOpenKeyTransacted",    &traps[9],  open_key_transacted_cb);
+    register_trap(drakvuf, "NtOpenKeyTransactedEx",  &traps[10], open_key_transacted_ex_cb);
+    register_trap(drakvuf, "NtQueryKey",             &traps[11], query_key_cb);
+    register_trap(drakvuf, "NtQueryMultipleValueKey",&traps[12], query_multiple_value_key_cb);
+    register_trap(drakvuf, "NtQueryValueKey",        &traps[13], query_value_key_cb);
 }
 
 regmon::~regmon(void) {}
