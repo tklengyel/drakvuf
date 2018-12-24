@@ -120,9 +120,9 @@ public:
     addr_t newfile_name_length_offset;
     addr_t newfile_root_offset;
 
-    drakvuf_trap_t trap[10] =
+    drakvuf_trap_t trap[7] =
     {
-        [0 ... 9] = {
+        [0 ... 6] = {
             .breakpoint.lookup_type = LOOKUP_PID,
             .breakpoint.pid = 4,
             .breakpoint.addr_type = ADDR_RVA,
