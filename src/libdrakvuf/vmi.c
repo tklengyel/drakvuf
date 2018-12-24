@@ -1278,7 +1278,7 @@ bool init_vmi(drakvuf_t drakvuf)
 {
 
     int rc;
-    uint64_t flags = 0;
+    uint64_t flags = VMI_OS_WINDOWS == drakvuf->os ? VMI_PM_INITFLAG_TRANSITION_PAGES : 0;
 
     PRINT_DEBUG("Init VMI on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
 
@@ -1295,6 +1295,12 @@ bool init_vmi(drakvuf_t drakvuf)
     }
     PRINT_DEBUG("init_vmi: initializing vmi done\n");
 
+    if (VMI_PM_UNKNOWN == vmi_init_paging(drakvuf->vmi, flags) )
+    {
+        printf("Failed to init LibVMI paging.\n");
+        return 0;
+    }
+
     os_t os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL);
     if (VMI_OS_UNKNOWN == os)
     {
@@ -1305,7 +1311,6 @@ bool init_vmi(drakvuf_t drakvuf)
         {
             case VMI_OS_WINDOWS:
                 g_hash_table_insert(config, "os_type", "Windows");
-                flags = VMI_PM_INITFLAG_TRANSITION_PAGES;
                 break;
             case VMI_OS_LINUX:
                 g_hash_table_insert(config, "os_type", "Linux");
@@ -1313,13 +1318,6 @@ bool init_vmi(drakvuf_t drakvuf)
             default:
                 break;
         };
-
-        if (VMI_PM_UNKNOWN == vmi_init_paging(drakvuf->vmi, flags) )
-        {
-            printf("Failed to init LibVMI paging.\n");
-            g_hash_table_destroy(config);
-            return 1;
-        }
 
         os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GHASHTABLE, config, NULL);
 
