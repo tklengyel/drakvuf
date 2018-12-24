@@ -250,6 +250,38 @@ static char* get_parent_folder(char const* file_name)
 }
 
 
+static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, addr_t fileinfo)
+{
+    const char* syscall_name = info->trap->name;
+    const char* operation_name = "FileDispositionInformation";
+    filetracer* f = (filetracer*)info->trap->data;
+    char* file = drakvuf_get_filename_from_handle(drakvuf, info, handle);
+    if ( !file )
+        return;
+
+    switch (f->format)
+    {
+        case OUTPUT_CSV:
+            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,%s\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
+                   syscall_name, operation_name, file);
+            break;
+
+        case OUTPUT_KV:
+            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Operation=%s,File=\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   syscall_name, operation_name, file);
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,%s\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
+                   syscall_name, operation_name, file);
+            break;
+    }
+}
+
 static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t src_file_handle, addr_t fileinfo)
 {
     filetracer* f = (filetracer*)info->trap->data;
@@ -394,6 +426,7 @@ static event_response_t query_attributes_file_cb(drakvuf_t drakvuf, drakvuf_trap
 }
 
 #define FILE_RENAME_INFORMATION 10
+#define FILE_DISPOSITION_INFORMATION 13
 
 static event_response_t set_information_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -405,6 +438,13 @@ static event_response_t set_information_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     {
         vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
         print_rename_file_info(vmi, drakvuf, info, handle, fileinfo);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    if (fileinfoclass == FILE_DISPOSITION_INFORMATION)
+    {
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+        print_delete_file_info(vmi, drakvuf, info, handle, fileinfo);
         drakvuf_release_vmi(drakvuf);
     }
 
