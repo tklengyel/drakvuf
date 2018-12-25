@@ -128,6 +128,7 @@ static inline void print_help(void)
             "\t -i <injection pid>        The PID of the process to hijack for injection\n"
             "\t -e <inject_file>          The executable to start with injection\n"
             "Optional inputs:\n"
+            "\t -l                        Use libvmi.conf\n"
             "\t -m <inject_method>        The injection method (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
             "\t [-B] <path>               The host path of the windows binary to inject (requires -m doppelganging)\n"
             "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
@@ -153,6 +154,7 @@ int main(int argc, char** argv)
     char* target_process = NULL;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     bool verbose = 0;
+    bool libvmi_conf = false;
 
     if (argc < 4)
     {
@@ -160,7 +162,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:v")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:vl")) != -1)
         switch (c)
         {
             case 'r':
@@ -207,6 +209,9 @@ int main(int argc, char** argv)
                 verbose = 1;
                 break;
 #endif
+            case 'l':
+                libvmi_conf = true;
+                break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
                 return rc;
@@ -233,7 +238,7 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose))
+    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose, libvmi_conf))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
         return 1;

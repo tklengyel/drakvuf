@@ -1274,7 +1274,7 @@ void drakvuf_loop(drakvuf_t drakvuf)
     PRINT_DEBUG("DRAKVUF loop finished\n");
 }
 
-bool init_vmi(drakvuf_t drakvuf)
+bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
 {
 
     int rc;
@@ -1301,7 +1301,11 @@ bool init_vmi(drakvuf_t drakvuf)
         return 0;
     }
 
-    os_t os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL);
+    os_t os = VMI_OS_UNKNOWN;
+
+    if (libvmi_conf)
+        os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL);
+
     if (VMI_OS_UNKNOWN == os)
     {
         GHashTable* config = g_hash_table_new(g_str_hash, g_str_equal);

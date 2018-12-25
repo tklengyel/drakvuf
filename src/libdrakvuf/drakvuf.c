@@ -156,7 +156,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     g_free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_profile, bool _verbose)
+bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_profile, bool _verbose, bool libvmi_conf)
 {
 
     if ( !domain || !rekall_profile )
@@ -188,7 +188,7 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
 
     drakvuf_pause(*drakvuf);
 
-    if (!init_vmi(*drakvuf))
+    if (!init_vmi(*drakvuf, libvmi_conf))
     {
         drakvuf_resume(*drakvuf);
         goto err;
