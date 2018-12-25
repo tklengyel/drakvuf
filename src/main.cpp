@@ -151,6 +151,7 @@ int main(int argc, char** argv)
     bool dump_modified_files = false;
     bool filedelete_use_injector = false;
     bool abort_on_bsod = false;
+    bool libvmi_conf = false;
 
     eprint_current_time();
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -168,6 +169,7 @@ int main(int argc, char** argv)
                 "\t -r <rekall profile>       The Rekall profile of the OS kernel\n"
                 "\t -d <domain ID or name>    The domain's ID or name\n"
                 "Optional inputs:\n"
+                "\t -l                        Use libvmi.conf\n"
                 "\t -i <injection pid>        The PID of the process to hijack for injection\n"
                 "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
                 "\t -e <inject_file>          The executable to start with injection\n"
@@ -205,7 +207,7 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nb")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nbl")) != -1)
         switch (c)
         {
             case 'r':
@@ -292,6 +294,9 @@ int main(int argc, char** argv)
             case 'b':
                 abort_on_bsod = true;
                 break;
+            case 'l':
+                libvmi_conf = true;
+                break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
                 return rc;
@@ -319,7 +324,7 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose, leave_paused);
+        drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose, leave_paused, libvmi_conf);
     }
     catch (const std::exception& e)
     {

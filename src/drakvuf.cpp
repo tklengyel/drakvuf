@@ -204,11 +204,12 @@ drakvuf_c::drakvuf_c(const char* domain,
                      output_format_t output,
                      int timeout,
                      bool verbose,
-                     bool leave_paused)
+                     bool leave_paused,
+                     bool libvmi_conf)
     : leave_paused{ leave_paused }, timeout{ timeout },
       process_start_timeout{ timeout }
 {
-    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose))
+    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose, libvmi_conf))
         throw std::runtime_error("drakvuf_init() failed");
 
     os = drakvuf_get_os_type(drakvuf);
