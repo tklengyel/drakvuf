@@ -1274,11 +1274,11 @@ void drakvuf_loop(drakvuf_t drakvuf)
     PRINT_DEBUG("DRAKVUF loop finished\n");
 }
 
-bool init_vmi(drakvuf_t drakvuf)
+bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
 {
 
     int rc;
-    uint64_t flags = 0;
+    uint64_t flags = VMI_OS_WINDOWS == drakvuf->os ? VMI_PM_INITFLAG_TRANSITION_PAGES : 0;
 
     PRINT_DEBUG("Init VMI on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
 
@@ -1295,32 +1295,38 @@ bool init_vmi(drakvuf_t drakvuf)
     }
     PRINT_DEBUG("init_vmi: initializing vmi done\n");
 
-    GHashTable* config = g_hash_table_new(g_str_hash, g_str_equal);
-    g_hash_table_insert(config, "rekall_profile", drakvuf->rekall_profile);
-
-    switch (drakvuf->os)
-    {
-        case VMI_OS_WINDOWS:
-            g_hash_table_insert(config, "os_type", "Windows");
-            flags = VMI_PM_INITFLAG_TRANSITION_PAGES;
-            break;
-        case VMI_OS_LINUX:
-            g_hash_table_insert(config, "os_type", "Linux");
-            break;
-        default:
-            break;
-    };
-
     if (VMI_PM_UNKNOWN == vmi_init_paging(drakvuf->vmi, flags) )
     {
         printf("Failed to init LibVMI paging.\n");
-        g_hash_table_destroy(config);
-        return 1;
+        return 0;
     }
 
-    os_t os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GHASHTABLE, config, NULL);
+    os_t os = VMI_OS_UNKNOWN;
 
-    g_hash_table_destroy(config);
+    if (libvmi_conf)
+        os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL);
+
+    if (VMI_OS_UNKNOWN == os)
+    {
+        GHashTable* config = g_hash_table_new(g_str_hash, g_str_equal);
+        g_hash_table_insert(config, "rekall_profile", drakvuf->rekall_profile);
+
+        switch (drakvuf->os)
+        {
+            case VMI_OS_WINDOWS:
+                g_hash_table_insert(config, "os_type", "Windows");
+                break;
+            case VMI_OS_LINUX:
+                g_hash_table_insert(config, "os_type", "Linux");
+                break;
+            default:
+                break;
+        };
+
+        os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GHASHTABLE, config, NULL);
+
+        g_hash_table_destroy(config);
+    }
 
     if ( os != drakvuf->os )
     {

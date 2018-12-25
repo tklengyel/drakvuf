@@ -157,7 +157,8 @@ public:
               output_format_t output,
               int timeout,
               bool verbose,
-              bool leave_paused);
+              bool leave_paused,
+              bool libvmi_conf);
     ~drakvuf_c();
 
     int is_initialized();

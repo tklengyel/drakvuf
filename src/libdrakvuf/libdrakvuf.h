@@ -324,7 +324,8 @@ typedef void (*event_cb_t) (int fd, void* data);
 bool drakvuf_init (drakvuf_t* drakvuf,
                    const char* domain,
                    const char* rekall_profile,
-                   const bool verbose);
+                   const bool verbose,
+                   const bool libvmi_conf);
 void drakvuf_close (drakvuf_t drakvuf, const bool pause);
 bool drakvuf_add_trap(drakvuf_t drakvuf,
                       drakvuf_trap_t* trap);
