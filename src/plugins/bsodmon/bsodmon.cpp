@@ -121,6 +121,7 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     uint64_t code = 0;
     uint64_t params[4] = { 0 };
     const char* bugcheck_name = "UNKNOWN_CODE" ;
+    char * escaped_pname = NULL;
 
     bool is32bit = drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E;
 
@@ -176,6 +177,31 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
                    info->proc_data.name, code, bugcheck_name, params[0], params[1], params[2], params[3]);
             break;
+        case OUTPUT_JSON:
+	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+	    printf( "{" 
+		    "\"Plugin\" : \"bsodmon\","
+		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+		    "\"VCPU\": %" PRIu32 ","
+		    "\"CR3\": %" PRIu64 ","
+		    "\"ProcessName\": \"%s\","
+		    "\"UserId\": %" PRIu64 ","
+		    "\"PID\" : %d,"
+		    "\"PPID\": %d,"
+		    "\"BugCheckCode\": %" PRIu64 ","
+		    "\"BugCheckName\": \"%s\","
+		    "\"BugCheckParameter1\": %" PRIu64 ","
+		    "\"BugCheckParameter2\": %" PRIu64 ","
+		    "\"BugCheckParameter3\": %" PRIu64 ","
+		    "\"BugCheckParameter4\": %" PRIu64
+		    "}\n",
+		    UNPACK_TIMEVAL(info->timestamp),
+		    info->vcpu, info->regs->cr3, escaped_pname,
+		    info->proc_data.userid,
+		    info->proc_data.pid, info->proc_data.ppid,
+		    code, bugcheck_name, params[0], params[1], params[2], params[3]);
+	    g_free(escaped_pname);
+	    break;
         default:
         case OUTPUT_DEFAULT:
             printf("[BSODMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64

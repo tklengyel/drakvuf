@@ -115,6 +115,7 @@ extern "C" {
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
 #include <json-c/json.h>
+#include <string.h>
 
 /*---------------------------------------------------------
  * DRAKVUF functions
@@ -497,6 +498,10 @@ size_t drakvuf_wchar_string_length(vmi_instance_t vmi, const access_context_t* c
 // Reads null-terminated string of UTF_16 charachters, automatically determining length, into unicode_string_t object with UTF_8 encoding
 unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_context_t* ctx);
 
+// Escapes '\' chars with "\\" (for JSON output)
+char * drakvuf_escape_backslashes(const char * input);
+
+
 addr_t drakvuf_get_function_argument(drakvuf_t drakvuf,
                                      drakvuf_trap_info_t* info,
                                      int argument_number);
@@ -522,6 +527,7 @@ typedef enum
     OUTPUT_DEFAULT,
     OUTPUT_CSV,
     OUTPUT_KV,
+    OUTPUT_JSON,
     __OUTPUT_MAX
 } output_format_t;
 

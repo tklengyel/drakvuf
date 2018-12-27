@@ -142,6 +142,7 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
 
     debugmon* s = (debugmon*)info->trap->data;
+    char * escaped_pname = NULL;
 
     switch (s->format)
     {
@@ -158,7 +159,31 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                    info->regs->rip, info->debug->type, debug_type[info->debug->type]);
             break;
 
-        default:
+        case OUTPUT_JSON:
+	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+	    printf( "{" 
+		    "\"Plugin\" : \"poolmon\","
+		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+		    "\"VCPU\": %" PRIu32 ","
+		    "\"CR3\": %" PRIu64 ","
+		    "\"ProcessName\": \"%s\","
+		    "\"UserName\": \"%s\","
+		    "\"UserId\": %" PRIu64 ","
+		    "\"PID\" : %d,"
+		    "\"PPID\": %d,"
+		    "\"RIP\" : %" PRIu64","
+		    "\"DebugType\" : %" PRIi32 ","
+		    "\"DebugTypeStr\": \"%s\""
+		    "}\n", 
+		    UNPACK_TIMEVAL(info->timestamp),
+		    info->vcpu, info->regs->cr3, escaped_pname,
+		    USERIDSTR(drakvuf), info->proc_data.userid,
+		    info->proc_data.pid, info->proc_data.ppid,
+		    info->regs->rip, info->debug->type, debug_type[info->debug->type]);
+	    g_free(escaped_pname);
+	    break;
+
+    default:
         case OUTPUT_DEFAULT:
             printf("[DEBUGMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64". "
                    "RIP: 0x%" PRIx64". Debug type: %" PRIi32 ",%s\n",

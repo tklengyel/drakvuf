@@ -124,7 +124,7 @@
 
 event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-
+    char * escaped_pname = NULL;
     ssdtmon* s = (ssdtmon*)info->trap->data;
 
     if ( info->trap_pa > s->kiservicetable - 8 && info->trap_pa <= s->kiservicetable + s->ulongs * s->kiservicelimit + s->ulongs - 1 )
@@ -141,6 +141,26 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 printf("ssdtmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",TableIndex=%" PRIi64 "\n",
                        UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name, table_index);
                 break;
+
+            case OUTPUT_JSON:
+		escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+		printf( "{" 
+			"\"Plugin\" : \"ssdtmon\","
+			"\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+			"\"ProcessName\": \"%s\","
+			"\"UserName\": \"%s\","
+			"\"UserId\": %" PRIu64 ","
+			"\"PID\" : %d,"
+			"\"PPID\": %d,"
+			"\"TableIndex\": %" PRIi64 ","
+			"}\n",
+			UNPACK_TIMEVAL(info->timestamp),
+			escaped_pname,
+			USERIDSTR(drakvuf), info->proc_data.userid,
+			info->proc_data.pid, info->proc_data.ppid,
+			table_index);
+		g_free(escaped_pname);
+		break;
 
             default:
             case OUTPUT_DEFAULT:

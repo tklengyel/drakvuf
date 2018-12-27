@@ -152,6 +152,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     struct ckey ckey = {};
 
+    char * escaped_pname = NULL;
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
@@ -183,6 +184,25 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
             break;
+
+        case OUTPUT_JSON:
+	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+	    printf( "{" 
+		    "\"Plugin\" : \"obmon\","
+		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+		    "\"ProcessName\": \"%s\","
+		    "\"UserId\": %" PRIu64 ","
+		    "\"PID\" : %d,"
+		    "\"PPID\": %d,"
+		    "\"Key\" : \"%c%c%c%c\","
+		    "}",
+		    UNPACK_TIMEVAL(info->timestamp),
+		    escaped_pname,
+		    info->proc_data.userid,
+		    info->proc_data.pid, info->proc_data.ppid,
+		    ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
+	    g_free(escaped_pname);
+	    break;
 
         default:
         case OUTPUT_DEFAULT:

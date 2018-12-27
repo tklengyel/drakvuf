@@ -672,6 +672,49 @@ unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_con
     return drakvuf_read_wchar_array(vmi, ctx, strlen);
 }
 
+/**
+ * Replace all occurances of '\' in orig with "\\" so JSON parsers
+ * like it. Caller must g_free() the result. 
+ */
+char * drakvuf_escape_backslashes(const char * input)
+{
+    size_t outsize = 0;
+    const char * linput = input;
+    char * res = NULL;
+    char * inpat = (char *) "\\"; // 1 backslash
+    char * outpat = (char *) "\\\\"; // 2 backslashes
+
+    // use this to iterate over the output
+    size_t resoffset = 0;
+
+    char *needle;
+
+    if (NULL == input || 0 == strlen(input))
+	return NULL;
+    
+    outsize = strlen(input) * 2;
+    res = (char *) g_malloc0(outsize);
+
+    
+    while ((needle = strstr(linput, inpat)) != NULL) {
+        // copy everything up to the pattern
+        memcpy(res + resoffset, linput, needle - linput);
+        resoffset += needle - linput;
+
+        // skip the pattern in the input-string
+        linput = needle + strlen(inpat);
+
+        // copy the pattern
+        memcpy(res + resoffset, outpat, strlen(outpat));
+        resoffset += strlen(outpat);
+    }
+
+    // copy the remaining input
+    strcpy(res + resoffset, linput);
+
+    return res;
+}
+
 static void drakvuf_event_fd_generate(drakvuf_t drakvuf)
 {
     /* event_fds and fd_info_lookup are both generated based off of
