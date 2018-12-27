@@ -125,7 +125,8 @@ event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
 
     cpuidmon* s = (cpuidmon*)info->trap->data;
-
+    char * escaped_pname = NULL;
+    
     switch (s->format)
     {
         case OUTPUT_CSV:
@@ -142,7 +143,35 @@ event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                    info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx);
             break;
 
-        default:
+            case OUTPUT_JSON:
+	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+	    printf( "{" 
+		    "\"Plugin\" : \"cpuidmon\","
+		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+		    "\"VCPU\": %" PRIu32 ","
+		    "\"CR3\": %" PRIu64 ","
+		    "\"ProcessName\": \"%s\","
+		    "\"UserName\": \"%s\","
+		    "\"UserId\": %" PRIu64 ","
+		    "\"PID\" : %d,"
+		    "\"PPID\": %d,"
+		    "\"Leaf\": %" PRIu32 "\","
+		    "\"Subleaf\": %" PRIu32 "\","
+		    "\"RAX\": %" PRIu64 "\","
+		    "\"RBX\": %" PRIu64 "\","
+		    "\"RCX\": %" PRIu64 "\","
+		    "\"RDX\": %" PRIu64 "\""
+		    "}\n",
+		    UNPACK_TIMEVAL(info->timestamp),
+		    info->vcpu, info->regs->cr3, escaped_pname,
+		    USERIDSTR(drakvuf), info->proc_data.userid,
+		    info->proc_data.pid, info->proc_data.ppid,
+		    info->cpuid->leaf, info->cpuid->subleaf,
+		    info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx);
+	    g_free(escaped_pname);
+	    break;
+
+    default:
         case OUTPUT_DEFAULT:
             printf("[CPUIDMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64". "
                    "Leaf: 0x%" PRIx32 ". Subleaf: 0x%" PRIx32". "

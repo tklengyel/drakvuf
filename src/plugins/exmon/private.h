@@ -113,12 +113,21 @@
 #define CSV_FORMAT32 "exmon," FORMAT_TIMEVAL ",%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x"
 #define CSV_FORMAT64 "exmon," FORMAT_TIMEVAL ",%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x,%x"
 
+// Starts JSON doc
+#define JSON_FORMAT32 "{\"Plugin\" : \"exmon\", \"TimeStamp\":\"" FORMAT_TIMEVAL "\",\"RSP\":%ld,\"ExceptionRecord\":%ld,\"ExceptionCode\":%ld,\"FirstChance\":%ld,\"EIP\":%ld,\"EAX\":%ld,\"EBX\":%ld,\"ECX\":%ld,\"EDX\":%ld,\"EDI\":%ld,\"ESI\":%ld,\"EBP\":%ld,\"ESP\":%ld"
+#define JSON_FORMAT64 "{\"Plugin\" : \"exmon\",\"TimeStamp\":\"" FORMAT_TIMEVAL "\",\"ExceptionRecord\":%ld,\"ExceptionCode\":%ld,\"FirstChance\":%ld,\"RIP\":%ld,\"RAX\":%ld,\"RBX\":%ld,\"RCX\":%ld,\"RDX\":%ld,\"RSP\":%ld,\"RBP\":%ld\"RSI\":%ld,\"RDI\":%ld,\"R8\":%ld,\"R9\":%ld,\"R10\":%ld,\"R11\":%ld"
+
+
+
 #define DEFAULT_FORMAT32 "[EXMON] TIME:" FORMAT_TIMEVAL " RSP: %x EXCEPTION_RECORD: %x EXCEPTION_CODE: %x FIRST_CHANCE: %x EIP: %x EAX: %x EBX: %x ECX: %x EDX: %x EDI: %x ESI: %x EBP: %x ESP: %x"
 #define DEFAULT_FORMAT64 "[EXMON] TIME:" FORMAT_TIMEVAL " EXCEPTION_RECORD: %x EXCEPTION_CODE: %x FIRST_CHANCE: %x RIP: %x RAX: %x RBX: %x RCX: %x RDX: %x RSP: %x RBP: %x RSI: %x RDI: %x R8: %x R9: %x R10: %x R11: %x"
 
 #define CSV_FORMAT_USER ",%d,%d,%s\n"
 
 #define KV_FORMAT_USER ",PID=%d,PPID=%d,Name=\"%s\"\n"
+
+// Ends JSON doc
+#define JSON_FORMAT_USER ",\"PID\":%ld,\"PPID\":%d,\"Name\":=\"%s\"}\n"
 
 #define DEFAULT_FORMAT_USER " PID: %d PPID: %d NAME: %s\n"
 

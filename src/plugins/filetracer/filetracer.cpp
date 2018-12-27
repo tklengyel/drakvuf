@@ -252,6 +252,8 @@ static char* get_parent_folder(char const* file_name)
 
 static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, addr_t fileinfo)
 {
+    char * escaped_pname = NULL;
+    char * escaped_fname = NULL;
     const char* syscall_name = info->trap->name;
     const char* operation_name = "FileDispositionInformation";
     filetracer* f = (filetracer*)info->trap->data;
@@ -273,7 +275,32 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
                    syscall_name, operation_name, file);
             break;
 
-        default:
+        case OUTPUT_JSON:
+	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+	    escaped_fname = drakvuf_escape_backslashes(file);
+	    printf( "{" 
+		    "\"Plugin\" : \"filetracer\","
+		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+		    "\"ProcessName\": \"%s\","
+		    "\"UserName\": \"%s\","
+		    "\"UserId\": %" PRIu64 ","
+		    "\"PID\" : %d,"
+		    "\"PPID\": %d,"
+		    "\"Method\" : \"%s\","
+		    "\"Operation\" : \"%s\","
+		    "\"FileName\" : \"%s\","
+		    "}\n",
+		    UNPACK_TIMEVAL(info->timestamp),
+		    escaped_pname,
+		    USERIDSTR(drakvuf), info->proc_data.userid,
+		    info->proc_data.pid, info->proc_data.ppid,
+		    syscall_name, operation_name, escaped_fname);
+
+	    g_free(escaped_fname);
+	    g_free(escaped_pname);
+	    break;
+
+    default:
         case OUTPUT_DEFAULT:
             printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
@@ -284,6 +311,10 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
 
 static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t src_file_handle, addr_t fileinfo)
 {
+    char * escaped_pname = NULL;
+    char * escaped_fname_src = NULL;
+    char * escaped_fname_dst = NULL;
+
     filetracer* f = (filetracer*)info->trap->data;
     const char* syscall_name = info->trap->name;
     const char* operation_name = "FileRenameInformation";
@@ -350,6 +381,33 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
                    syscall_name, operation_name,
                    src_file, dst_file_p);
             break;
+        case OUTPUT_JSON:
+	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+	    escaped_fname_src = drakvuf_escape_backslashes(src_file);
+	    escaped_fname_dst = drakvuf_escape_backslashes(dst_file_p);
+	    printf( "{" 
+		    "\"Plugin\" : \"filetracer\","
+		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+		    "\"ProcessName\": \"%s\","
+		    "\"UserName\": \"%s\","
+		    "\"UserId\": %" PRIu64 ","
+		    "\"PID\" : %d,"
+		    "\"PPID\": %d,"
+		    "\"Method\" : \"%s\","
+		    "\"Operation\" : \"%s\","
+		    "\"SrcFileName\" : \"%s\","
+		    "\"DstFileName\" : \"%s\","
+		    "}\n",
+		    UNPACK_TIMEVAL(info->timestamp),
+		    escaped_pname,
+		    USERIDSTR(drakvuf), info->proc_data.userid,
+		    info->proc_data.pid, info->proc_data.ppid,
+		    syscall_name, operation_name, escaped_fname_src, escaped_fname_dst );
+
+	    g_free(escaped_fname_dst);
+	    g_free(escaped_fname_src);
+	    g_free(escaped_pname);
+	    break;
 
         default:
         case OUTPUT_DEFAULT:
