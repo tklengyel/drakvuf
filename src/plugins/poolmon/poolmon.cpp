@@ -153,7 +153,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         pool_type = info->regs->rcx;
         size = info->regs->rdx;
-        *(reg_t*)tag = info->regs->r8;
+        *(uint32_t*)tag = (uint32_t) info->regs->r8;
     }
     else
     {
