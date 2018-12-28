@@ -128,7 +128,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             break;
         case OUTPUT_JSON:
 	    // Place single EOL at end of JSON doc to simplify parsing on other end
-	    printf( "{" 
+	    printf( "{"
 		    "\"Plugin\" : \"syscall\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"VCPU\": %" PRIu32 ","
@@ -203,7 +203,7 @@ static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvu
         case OUTPUT_JSON:
 	    // print_footer() puts single EOL at end of JSON doc to simplify parsing on other end
 	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    printf( "{"
 		    "\"Plugin\" : \"syscall\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"VCPU\": %" PRIu32 ","
@@ -215,7 +215,7 @@ static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvu
 		    "\"PPID\": %d,"
 		    "\"Module\": \"%s\","
 		    "\"Method\": \"%s\","
-		    "\"Args\": {",
+		    "\"Args\": [ ",
 		    UNPACK_TIMEVAL(info->timestamp),
 		    info->vcpu, info->regs->cr3, escaped_pname,
 		    USERIDSTR(drakvuf), info->proc_data.userid,
@@ -282,20 +282,26 @@ static void print_kv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* in
 }
 
 
-static void print_json_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const char* str)
+static void print_json_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_syscall_t * wsc, size_t i, addr_t val, const char* str)
 {
+    const win_arg_t & arg = wsc->args[i];
+
     if ( str )
     {
 	char * escaped = drakvuf_escape_backslashes(str);
-        printf("{\"%s\" : \"%s\"},", arg.name, escaped);
+	printf("{\"%s\" : \"%s\"}", arg.name, escaped);
 	g_free(escaped);
-        return;
+    }
+    else
+    {
+	if ( 4 == s->reg_size )
+	    printf("{\"%s\" :%"  PRIu32 "}", arg.name, static_cast<uint32_t>(val));
+	else
+	    printf("{\"%s\" :%" PRIu64 "}", arg.name, static_cast<uint64_t>(val));
     }
 
-    if ( 4 == s->reg_size )
-	printf("{\"%s\" : 0x%" PRIx32 "},", arg.name, static_cast<uint32_t>(val));
-    else
-	printf("{\"%s\" : 0x%" PRIx64 "},", arg.name, static_cast<uint64_t>(val));
+    if (i < wsc->num_args-1)
+	printf(",");
 }
 
 static void print_default_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const char* str)
@@ -335,7 +341,7 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
                 print_kv_arg(s, drakvuf, info, wsc->args[i], val, str);
                 break;
             case OUTPUT_JSON:
-                print_json_arg(s, drakvuf, info, wsc->args[i], val, str);
+                print_json_arg(s, drakvuf, info, wsc, i, val, str);
                 break;
             default:
             case OUTPUT_DEFAULT:
@@ -359,7 +365,7 @@ static void print_footer(output_format_t format, uint32_t nargs)
             break;
         case OUTPUT_JSON:
 	    // close JSON args array and document
-	    printf("} }\n");
+	    printf("] }\n");
             break;
         default:
         case OUTPUT_DEFAULT:

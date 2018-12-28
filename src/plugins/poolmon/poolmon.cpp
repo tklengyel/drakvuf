@@ -116,6 +116,7 @@
 #include <dirent.h>
 #include <glib.h>
 #include <err.h>
+#include <ctype.h>
 
 #include <libvmi/libvmi.h>
 #include "../plugins.h"
@@ -198,8 +199,14 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             break;
 
         case OUTPUT_JSON:
+	    // Remove non-ascii characters from tag
+	    for (size_t i = 0; i < sizeof(tag); ++i) {
+		if (!isascii(tag[i]))
+		    tag[i] = '?';
+	    }
+
 	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    printf( "{"
 		    "\"Plugin\" : \"poolmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"VCPU\": %" PRIu32 ","

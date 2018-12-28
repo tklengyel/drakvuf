@@ -674,28 +674,48 @@ unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_con
 
 /**
  * Replace all occurances of '\' in orig with "\\" so JSON parsers
- * like it. Caller must g_free() the result. 
+ * like it. Caller must g_free() the result.
  */
 char * drakvuf_escape_backslashes(const char * input)
 {
     size_t outsize = 0;
     const char * linput = input;
     char * res = NULL;
-    char * inpat = (char *) "\\"; // 1 backslash
-    char * outpat = (char *) "\\\\"; // 2 backslashes
+#define PATTERN_COUNT 2
+    char * inpat[PATTERN_COUNT] = { (char *) "\\",   // 1 backslash
+				    (char *) "\"" }; // 1 quote
+    char * outpat[PATTERN_COUNT] = { (char *) "\\\\",   // escaped backslash
+				     (char *) "\\\"" }; // escaped quote
+
+//    char * inpat = (char *) "\\"; // 1 backslash
+//    char * outpat = (char *) "\\\\"; // 2 backslashes
 
     // use this to iterate over the output
     size_t resoffset = 0;
-
     char *needle;
 
     if (NULL == input || 0 == strlen(input))
 	return NULL;
-    
+
     outsize = strlen(input) * 2;
     res = (char *) g_malloc0(outsize);
 
-    
+    for (int i = 0; i < PATTERN_COUNT; ++i) {
+	while ((needle = strstr(linput, inpat[i])) != NULL) {
+	    // copy everything up to the pattern
+	    memcpy(res + resoffset, linput, needle - linput);
+	    resoffset += needle - linput;
+
+	    // skip the pattern in the input-string
+	    linput = needle + strlen(inpat[i]);
+
+	    // copy the pattern
+	    memcpy(res + resoffset, outpat[i], strlen(outpat[i]));
+	    resoffset += strlen(outpat[i]);
+	}
+    }
+
+    /*
     while ((needle = strstr(linput, inpat)) != NULL) {
         // copy everything up to the pattern
         memcpy(res + resoffset, linput, needle - linput);
@@ -708,7 +728,7 @@ char * drakvuf_escape_backslashes(const char * input)
         memcpy(res + resoffset, outpat, strlen(outpat));
         resoffset += strlen(outpat);
     }
-
+    */
     // copy the remaining input
     strcpy(res + resoffset, linput);
 
