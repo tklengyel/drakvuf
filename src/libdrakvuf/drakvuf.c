@@ -680,50 +680,117 @@ unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_con
 char * drakvuf_escape_backslashes(const char * input)
 {
     size_t outsize = 0;
-    const char * linput = input;
+    char * orig = (char *) input;
     char * res = NULL;
 #define PATTERN_COUNT 2
-    char * inpat[PATTERN_COUNT] = { (char *) "\\",   // 1 backslash
-				    (char *) "\"" }; // 1 quote
-    char * outpat[PATTERN_COUNT] = { (char *) "\\\\",   // escaped backslash
-				     (char *) "\\\"" }; // escaped quote
+//    char * inpat = "\\\"";
+
+    char * inpat = (char *) "\\\"";
+//    char * inpat[PATTERN_COUNT] = { (char *) "\\",   // 1 backslash
+//				    (char *) "\"" }; // 1 quote
+//    char * outpat[PATTERN_COUNT] = { (char *) "\\\\",   // escaped backslash
+//				     (char *) "\\\"" }; // escaped quote
 
 //    char * inpat = (char *) "\\"; // 1 backslash
 //    char * outpat = (char *) "\\\\"; // 2 backslashes
 
     // use this to iterate over the output
     size_t resoffset = 0;
-    char *needle;
+    char * needle;
 
     if (NULL == input || 0 == strlen(input))
 	return NULL;
 
     outsize = strlen(input) * 2;
     res = (char *) g_malloc0(outsize);
+/*
+    while ((needle = strsep(&orig, inpat)) != NULL) {
+	// copy everything up to the pattern
+	memcpy( &res[resoffset], orig, needle - orig);
+	resoffset += needle - orig;
 
-    for (int i = 0; i < PATTERN_COUNT; ++i) {
-	while ((needle = strstr(linput, inpat[i])) != NULL) {
+	// skip the escaped char in the input-string
+	//orig = needle + sizeof(char);
+
+	// put the escaped character into the output string
+	res[resoffset++] = '\\';
+	res[resoffset++] = needle[0];
+    }
+*/
+
+    // Escape the illegal characters serially
+    for (size_t i = 0; i < strlen(inpat); ++i) {
+
+	while ((needle = strchr(orig, inpat[i])) != NULL) {
 	    // copy everything up to the pattern
-	    memcpy(res + resoffset, linput, needle - linput);
-	    resoffset += needle - linput;
+	    memcpy( &res[resoffset], orig, needle - orig);
+	    resoffset += needle - orig;
 
 	    // skip the pattern in the input-string
-	    linput = needle + strlen(inpat[i]);
+	    orig = needle + sizeof(char);
+
+	    // copy the pattern
+
+	    // put the escaped character into the output string
+	    res[resoffset++] = '\\';
+	    res[resoffset++] = inpat[i];
+
+	    //memcpy(res + resoffset, outpat[i], strlen(outpat[i]));
+	    //resoffset += strlen(outpat[i]);
+	}
+
+	// copy the rest of the string
+	strcpy (&res[resoffset], orig);
+
+	// second (and future) iterations shoud process res
+	orig = res;
+    }
+
+
+
+    /*
+    while (1) {
+	// Find first instance of a needle (inpat)
+	char * first = NULL;
+
+	for (int i = 0; i < PATTERN_COUNT; ++i) {
+	    needle = strstr(orig, inpat[i]);
+	    if (needle != NULL) {
+		if (NULL == first)
+		    first = needle;
+		else if (first > needle)
+		    first = needle
+	    }
+	    if (NULL == first) // no inpat found
+		break;
+
+	    // copy everything up to the pattern
+	    memcpy(res + resoffset, orig, first - orig);
+	    resoffset += first - orig;
+
+	    // skip the pattern in the input-string
+	    orig = first + strlen(inpat[i]);
 
 	    // copy the pattern
 	    memcpy(res + resoffset, outpat[i], strlen(outpat[i]));
 	    resoffset += strlen(outpat[i]);
-	}
+
+
+
+	while ((needle = strstr(orig, inpat[i])) != NULL) {
+
+
     }
+    */
 
     /*
-    while ((needle = strstr(linput, inpat)) != NULL) {
+    while ((needle = strstr(orig, inpat)) != NULL) {
         // copy everything up to the pattern
-        memcpy(res + resoffset, linput, needle - linput);
-        resoffset += needle - linput;
+        memcpy(res + resoffset, orig, needle - orig);
+        resoffset += needle - orig;
 
         // skip the pattern in the input-string
-        linput = needle + strlen(inpat);
+        orig = needle + strlen(inpat);
 
         // copy the pattern
         memcpy(res + resoffset, outpat, strlen(outpat));
@@ -731,7 +798,12 @@ char * drakvuf_escape_backslashes(const char * input)
     }
     */
     // copy the remaining input
-    strcpy(res + resoffset, linput);
+//    strcpy(res + resoffset, orig);
+
+
+    if (strchr(orig, '\"')) {
+	printf("{\"orig\": \"%s\", \"new\": \"%s\"}\n", orig, res);
+    }
 
     return res;
 }
