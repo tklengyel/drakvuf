@@ -139,7 +139,7 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     regmon* reg = (regmon*)info->trap->data;
     char * escaped_pname = NULL;
     char * escaped_key = NULL;
-    
+
     switch ( reg->format )
     {
         case OUTPUT_CSV:
@@ -167,7 +167,7 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
      	    escaped_key   = drakvuf_escape_backslashes(key_name);
 
-	    printf( "{" 
+	    printf( "{"
 		    "\"Plugin\" : \"regmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -185,6 +185,7 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 		    escaped_key);
             if (value_name) {
 		char * escaped_vname = drakvuf_escape_backslashes(value_name);
+		printf(",\"OrigValueName\":\"%s\"", value_name);
                 printf(",\"ValueName\":\"%s\"", escaped_vname);
 		g_free(escaped_vname);
 	    }
