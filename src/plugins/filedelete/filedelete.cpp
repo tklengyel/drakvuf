@@ -320,7 +320,7 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakv
         case OUTPUT_JSON:
 	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
 	    escaped_fname = drakvuf_escape_backslashes(filename);
-	    printf( "{" 
+	    printf( "{"
 		    "\"Plugin\" : \"filedelete\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -332,7 +332,7 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakv
 		    "\"FileName\" : \"%s\","
 		    "\"Size\" : %ld,"
 		    "\"Flags\" : %" PRIu64 ","
-		    "\"FlagsExpanded\" : %s"
+		    "\"FlagsExpanded\" : \"%s\""
 		    "}\n",
 		    UNPACK_TIMEVAL(info->timestamp),
 		    escaped_pname,
@@ -374,7 +374,7 @@ static void print_extraction_information(filedelete* f, drakvuf_t drakvuf, drakv
         case OUTPUT_JSON:
 	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
 	    escaped_fname = drakvuf_escape_backslashes(filename);
-	    printf( "{" 
+	    printf( "{"
 		    "\"Plugin\" : \"fileextractor\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","

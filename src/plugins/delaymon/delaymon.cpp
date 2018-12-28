@@ -11,7 +11,7 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
     addr_t delay_addr = drakvuf_get_function_argument(drakvuf, info, 2);
     int64_t delay = 0; // in hundreds of nanoseconds
     char * escaped_pname = NULL;
-    
+
     {
         access_context_t ctx;
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -47,7 +47,7 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
 
         case OUTPUT_JSON:
 	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    printf( "{"
 		    "\"Plugin\" : \"delaymon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"VCPU\": %" PRIu32 ","
@@ -57,7 +57,7 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
 		    "\"UserId\": %" PRIu64 ","
 		    "\"PID\" : %d,"
 		    "\"PPID\": %d,"
-		    "\"DelayIntervalMs\": %.4f\n"
+		    "\"DelayIntervalMs\": %.4f"
 		    "}\n",
 		    UNPACK_TIMEVAL(info->timestamp),
 		    info->vcpu, info->regs->cr3, escaped_pname,

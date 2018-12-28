@@ -126,6 +126,8 @@
 static void print_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char const* file_path, bool with_attr, uint32_t file_attr)
 {
     filetracer* f = (filetracer*)info->trap->data;
+    char * escaped_pname = NULL;
+    char * escaped_fname = NULL;
 
     switch (f->format)
     {
@@ -145,6 +147,36 @@ static void print_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char c
                 printf(",Attributes=0x%x", file_attr);
             printf("\n");
             break;
+
+
+        case OUTPUT_JSON:
+	    escaped_fname = drakvuf_escape_backslashes(file_path);
+	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+
+	    printf( "{"
+		    "\"Plugin\" : \"filetracer\","
+		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+		    "\"ProcessName\": \"%s\","
+		    "\"UserName\": \"%s\","
+		    "\"UserId\": %" PRIu64 ","
+		    "\"PID\" : %d,"
+		    "\"PPID\": %d,"
+		    "\"Method\": \"%s\","
+		    "\"FileName\": \"%s\"",
+		    UNPACK_TIMEVAL(info->timestamp),
+		    escaped_pname,
+		    USERIDSTR(drakvuf), info->proc_data.userid,
+		    info->proc_data.pid, info->proc_data.ppid,
+		    info->trap->name, escaped_fname);
+
+	    if (with_attr)
+		printf(",\"Attributes\": %" PRIu32, file_attr);
+
+	    printf("}\n");
+	    g_free(escaped_fname);
+	    g_free(escaped_pname);
+	    break;
+
 
         default:
         case OUTPUT_DEFAULT:
@@ -278,7 +310,7 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
         case OUTPUT_JSON:
 	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
 	    escaped_fname = drakvuf_escape_backslashes(file);
-	    printf( "{" 
+	    printf( "{"
 		    "\"Plugin\" : \"filetracer\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -288,7 +320,7 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
 		    "\"PPID\": %d,"
 		    "\"Method\" : \"%s\","
 		    "\"Operation\" : \"%s\","
-		    "\"FileName\" : \"%s\","
+		    "\"FileName\" : \"%s\""
 		    "}\n",
 		    UNPACK_TIMEVAL(info->timestamp),
 		    escaped_pname,
@@ -385,7 +417,7 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
 	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
 	    escaped_fname_src = drakvuf_escape_backslashes(src_file);
 	    escaped_fname_dst = drakvuf_escape_backslashes(dst_file_p);
-	    printf( "{" 
+	    printf( "{"
 		    "\"Plugin\" : \"filetracer\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -396,7 +428,7 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
 		    "\"Method\" : \"%s\","
 		    "\"Operation\" : \"%s\","
 		    "\"SrcFileName\" : \"%s\","
-		    "\"DstFileName\" : \"%s\","
+		    "\"DstFileName\" : \"%s\""
 		    "}\n",
 		    UNPACK_TIMEVAL(info->timestamp),
 		    escaped_pname,

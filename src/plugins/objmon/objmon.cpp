@@ -187,15 +187,15 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         case OUTPUT_JSON:
 	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
-		    "\"Plugin\" : \"obmon\","
+	    printf( "{"
+		    "\"Plugin\" : \"objmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
 		    "\"UserId\": %" PRIu64 ","
 		    "\"PID\" : %d,"
 		    "\"PPID\": %d,"
-		    "\"Key\" : \"%c%c%c%c\","
-		    "}",
+		    "\"Key\" : \"%c%c%c%c\""
+		    "}", // EOL below
 		    UNPACK_TIMEVAL(info->timestamp),
 		    escaped_pname,
 		    info->proc_data.userid,
