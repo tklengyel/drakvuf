@@ -676,16 +676,102 @@ unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_con
 /**
  * Replace all occurances of '\' in orig with "\\" so JSON parsers
  * like it. Caller must g_free() the result.
- */
+ */\
+
+
+char * drakvuf_escape_backslashes(const char * input)
+{
+    size_t outsize = 0;
+//    char * orig = (char *) input;
+    char * res = NULL;
+    char * tmp = NULL;
+    char * curr = NULL;
+
+    // \\\"\%[]{}
+    char * inpat = (char *) "\\\"\n\r\t";
+
+    // use this to iterate over the output
+    size_t resoffset = 0;
+    char * needle;
+    bool found = false;
+    //char found = 0;
+
+    if (NULL == input || 0 == strlen(input))
+	return NULL;
+
+    outsize = strlen(input) * 2 + 1;
+    res = (char *) g_malloc0(outsize);
+
+    // Only modify res; don't clobber input!
+    strcpy (res, input);
+
+    tmp = (char *) g_malloc0(outsize);
+
+    curr = res;
+
+    if (strchr(res, '{')) { asm("int $3"); }
+    // Escape the illegal characters serially
+    for (size_t i = 0; i < strlen(inpat); ++i) {
+
+	//if (found22 && inpat[i] == '{') asm("int $3");
+
+	// For each escapable character, start back at the beginning of the result string
+	resoffset = 0;
+
+	found = false;
+
+	while ((needle = strchr(curr, inpat[i])) != NULL) {
+	    found = true;
+
+	    // advance past the pattern
+	    resoffset += needle - curr;
+
+	    // make a copy of everything after the pattern
+	    strcpy (tmp, &needle[1]);
+
+	    // copy the char with a pre-pended backslash
+	    res[resoffset++] = '\\';
+	    res[resoffset++] = inpat[i];
+
+	    // copy everything after the pattern
+	    strcpy (&res[resoffset], tmp);
+
+	    // skip the pattern in the input-string
+	    //curr = &res[resoffset]; //needle + sizeof(char);
+	    //curr += (needle - curr) + 1;
+	    // skip the pattern in the output string
+	    curr = needle + 2 * sizeof(char);
+	}
+
+	// copy the rest of the string
+	if (found) {
+	    strcpy (&res[resoffset], tmp);
+	}
+
+	// feed the result of this iteration into next one
+	//orig = res;
+	curr = res;
+    }
+
+    g_free (tmp);
+
+    return res;
+}
+
+#if 0
 char * drakvuf_escape_backslashes(const char * input)
 {
     size_t outsize = 0;
     char * orig = (char *) input;
     char * res = NULL;
+    char * tmp = NULL;
+    char * curr = NULL;
+
 #define PATTERN_COUNT 2
 //    char * inpat = "\\\"";
 
-    char * inpat = (char *) "\\\"";
+    // What we're looking to replace: [\"%]
+    char * inpat = (char *) "\\\"\%[]{}";
 //    char * inpat[PATTERN_COUNT] = { (char *) "\\",   // 1 backslash
 //				    (char *) "\"" }; // 1 quote
 //    char * outpat[PATTERN_COUNT] = { (char *) "\\\\",   // escaped backslash
@@ -697,12 +783,16 @@ char * drakvuf_escape_backslashes(const char * input)
     // use this to iterate over the output
     size_t resoffset = 0;
     char * needle;
+//    bool found22 = false;
+    bool found = false;
 
     if (NULL == input || 0 == strlen(input))
 	return NULL;
 
-    outsize = strlen(input) * 2;
+    outsize = strlen(input) * 2 + 1;
     res = (char *) g_malloc0(outsize);
+
+    tmp = (char *) g_malloc0(outsize);
 /*
     while ((needle = strsep(&orig, inpat)) != NULL) {
 	// copy everything up to the pattern
@@ -718,33 +808,50 @@ char * drakvuf_escape_backslashes(const char * input)
     }
 */
 
+//    if (strstr(orig, "{")) { found22 = true; asm("int $3"); }
+
+    curr = orig;
+
     // Escape the illegal characters serially
     for (size_t i = 0; i < strlen(inpat); ++i) {
 
-	while ((needle = strchr(orig, inpat[i])) != NULL) {
+	//if (found22 && inpat[i] == '{') asm("int $3");
+
+	// For each escapable character, start back at the beginning of the result string
+	resoffset = 0;
+
+	found = false;
+
+	while ((needle = strchr(curr, inpat[i])) != NULL) {
+	    found = true;
 	    // copy everything up to the pattern
-	    memcpy( &res[resoffset], orig, needle - orig);
-	    resoffset += needle - orig;
+	    memcpy (&res[resoffset], curr, needle - curr);
+	    resoffset += needle - curr;
 
-	    // skip the pattern in the input-string
-	    orig = needle + sizeof(char);
+	    // make a copy of everything after the pattern
+	    strcpy (tmp, &needle[sizeof(char)]);
 
-	    // copy the pattern
-
-	    // put the escaped character into the output string
+	    // copy the char with a pre-pended backslash
 	    res[resoffset++] = '\\';
 	    res[resoffset++] = inpat[i];
 
-	    //memcpy(res + resoffset, outpat[i], strlen(outpat[i]));
-	    //resoffset += strlen(outpat[i]);
+	    // skip the pattern in the input-string
+	    //curr = &res[resoffset]; //needle + sizeof(char);
+	    //curr += (needle - curr) + 1;
+	    curr = needle + sizeof(char);
 	}
 
 	// copy the rest of the string
-	strcpy (&res[resoffset], orig);
+	if (found) {
+	    strcpy (&res[resoffset], tmp);
+	}
 
-	// second (and future) iterations shoud process res
-	orig = res;
+	// feed the result of this iteration into next one
+	//orig = res;
+	curr = res;
     }
+
+    g_free (tmp);
 
 
 
@@ -807,6 +914,8 @@ char * drakvuf_escape_backslashes(const char * input)
 
     return res;
 }
+#endif
+
 
 static void drakvuf_event_fd_generate(drakvuf_t drakvuf)
 {
