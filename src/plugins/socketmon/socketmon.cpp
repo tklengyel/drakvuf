@@ -279,8 +279,8 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    printf( "{"
 		    "\"Plugin\" : \"socketmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -303,7 +303,7 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 		    lip, udpa.port);
 	    g_free(escaped_pname);
 	    break;
-	    
+
         default:
         case OUTPUT_DEFAULT:
             printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s %s:%" PRIu16 "\n",
@@ -398,8 +398,8 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    printf( "{"
 		    "\"Plugin\" : \"socketmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -517,8 +517,8 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    printf( "{"
 		    "\"Plugin\" : \"socketmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -657,8 +657,8 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    printf( "{"
 		    "\"Plugin\" : \"socketmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -787,8 +787,8 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    printf( "{"
 		    "\"Plugin\" : \"socketmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -918,8 +918,8 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    printf( "{"
 		    "\"Plugin\" : \"socketmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -1051,8 +1051,8 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    printf( "{"
 		    "\"Plugin\" : \"socketmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -1170,8 +1170,8 @@ static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    printf( "{"
 		    "\"Plugin\" : \"socketmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -1289,8 +1289,8 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    printf( "{"
 		    "\"Plugin\" : \"socketmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","
@@ -1456,8 +1456,8 @@ static void print_dns_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                    info->proc_data.name, dns_name, function_name);
             break;
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    printf( "{"
 		    "\"Plugin\" : \"socketmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"ProcessName\": \"%s\","

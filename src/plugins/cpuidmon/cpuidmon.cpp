@@ -144,7 +144,7 @@ event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             break;
 
             case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
 	    printf( "{"
 		    "\"Plugin\" : \"cpuidmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","

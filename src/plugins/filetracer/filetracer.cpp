@@ -150,8 +150,8 @@ static void print_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char c
 
 
         case OUTPUT_JSON:
-	    escaped_fname = drakvuf_escape_backslashes(file_path);
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+	    escaped_fname = drakvuf_escape_str(file_path);
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
 
 	    printf( "{"
 		    "\"Plugin\" : \"filetracer\","
@@ -308,8 +308,8 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    escaped_fname = drakvuf_escape_backslashes(file);
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    escaped_fname = drakvuf_escape_str(file);
 	    printf( "{"
 		    "\"Plugin\" : \"filetracer\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
@@ -416,9 +416,9 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
                    src_file, dst_file_p);
             break;
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    escaped_fname_src = drakvuf_escape_backslashes(src_file);
-	    escaped_fname_dst = drakvuf_escape_backslashes(dst_file_p);
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    escaped_fname_src = drakvuf_escape_str(src_file);
+	    escaped_fname_dst = drakvuf_escape_str(dst_file_p);
 	    printf( "{"
 		    "\"Plugin\" : \"filetracer\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","

@@ -202,7 +202,7 @@ static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvu
             break;
         case OUTPUT_JSON:
 	    // print_footer() puts single EOL at end of JSON doc to simplify parsing on other end
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
 	    printf( "{"
 		    "\"Plugin\" : \"syscall\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
@@ -288,7 +288,7 @@ static void print_json_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
     if ( str )
     {
-	char * escaped = drakvuf_escape_backslashes(str);
+	char * escaped = drakvuf_escape_str(str);
 	printf("{\"%s\" : \"%s\"}", arg.name, escaped);
 	g_free(escaped);
     }
