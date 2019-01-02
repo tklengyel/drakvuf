@@ -160,8 +160,8 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    printf( "{"
 		    "\"Plugin\" : \"poolmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"VCPU\": %" PRIu32 ","
@@ -174,7 +174,7 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 		    "\"RIP\" : %" PRIu64","
 		    "\"DebugType\" : %" PRIi32 ","
 		    "\"DebugTypeStr\": \"%s\""
-		    "}\n", 
+		    "}\n",
 		    UNPACK_TIMEVAL(info->timestamp),
 		    info->vcpu, info->regs->cr3, escaped_pname,
 		    USERIDSTR(drakvuf), info->proc_data.userid,

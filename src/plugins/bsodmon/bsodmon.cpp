@@ -178,8 +178,8 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                    info->proc_data.name, code, bugcheck_name, params[0], params[1], params[2], params[3]);
             break;
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-	    printf( "{" 
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+	    printf( "{"
 		    "\"Plugin\" : \"bsodmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
 		    "\"VCPU\": %" PRIu32 ","

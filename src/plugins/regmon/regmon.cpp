@@ -164,8 +164,8 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
-     	    escaped_key   = drakvuf_escape_backslashes(key_name);
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
+     	    escaped_key   = drakvuf_escape_str(key_name);
 
 	    printf( "{"
 		    "\"Plugin\" : \"regmon\","
@@ -184,13 +184,12 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 		    info->trap->name,
 		    escaped_key);
             if (value_name) {
-		char * escaped_vname = drakvuf_escape_backslashes(value_name);
-		printf(",\"OrigValueName\":\"%s\"", value_name);
+		char * escaped_vname = drakvuf_escape_str(value_name);
                 printf(",\"ValueName\":\"%s\"", escaped_vname);
 		g_free(escaped_vname);
 	    }
             if (value){
-		char * escaped_val = drakvuf_escape_backslashes(value);
+		char * escaped_val = drakvuf_escape_str(value);
                 printf(",\"Value\":\"%s\"", escaped_val);
 		g_free(escaped_val);
 	    }

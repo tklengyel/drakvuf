@@ -46,7 +46,7 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
 	    printf( "{"
 		    "\"Plugin\" : \"delaymon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","

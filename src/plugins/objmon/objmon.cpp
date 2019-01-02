@@ -186,7 +186,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_backslashes(info->proc_data.name);
+	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
 	    printf( "{"
 		    "\"Plugin\" : \"objmon\","
 		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
