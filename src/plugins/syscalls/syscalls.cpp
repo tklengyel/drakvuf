@@ -339,9 +339,9 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if ( VMI_FAILURE == vmi_read(vmi, &ctx, size, buf, NULL) )
                 goto exit;
         }
-
-        if ( 8 == s->reg_size )
+        else
         {
+            // 64 bit os
             uint64_t* buf64 = (uint64_t*)buf;
             if ( nargs > 0 )
                 buf64[0] = info->regs->rcx;

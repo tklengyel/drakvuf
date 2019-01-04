@@ -465,8 +465,8 @@ void drakvuf_free_symbols(symbols_t* symbols)
 
     for (i=0; i < symbols->count; i++)
     {
-        free((char*)symbols->symbols[i].name);
+        g_free((gchar*)symbols->symbols[i].name);
     }
-    free(symbols->symbols);
-    free(symbols);
+    g_free(symbols->symbols);
+    g_free(symbols);
 }
