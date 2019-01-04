@@ -446,25 +446,33 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             const struct symbol* symbol = &symbols->symbols[i];
 
             /* Looking for system calls */
-            if (strncmp(symbol->name, "sys_", 4))
-                continue;
+            if (!strncmp(symbol->name, "sys_", 4) )
+            {
+                /* This is the address of the table itself so skip it */
+                if (!strcmp(symbol->name, "sys_call_table"))
+                    continue;
 
-            /* This is the address of the table itself so skip it */
-            if (!strcmp(symbol->name, "sys_call_table"))
-                continue;
+                /* This is a variable used by gettimeofday not a syscall */
+                if (!strcmp(symbol->name, "sys_tz"))
+                    continue;
 
-            /* This is a variable used by gettimeofday not a syscall */
-            if (!strcmp(symbol->name, "sys_tz"))
-                continue;
+                /* These are all variables, not syscalls */
+                if (!strncmp(symbol->name, "sys_dmi", 7) )
+                    continue;
 
-            /* These are all variables, not syscalls */
-            if (!strncmp(symbol->name, "sys_dmi", 7) )
-                continue;
+                if (!strcmp(symbol->name, "sys_tracepoint_refcount"))
+                    continue;
 
-            if (!strcmp(symbol->name, "sys_tracepoint_refcount"))
-                continue;
+                if (!strcmp(symbol->name, "sys_table"))
+                    continue;
 
-            if (!strcmp(symbol->name, "sys_table"))
+                if (!strcmp(symbol->name, "sys_perf_refcount_enter"))
+                    continue;
+
+                if (!strcmp(symbol->name, "sys_perf_refcount_exit"))
+                    continue;
+            }
+            else if ( strncmp(symbol->name, "__x64_sys_", 10) )
                 continue;
 
             PRINT_DEBUG("[SYSCALLS] Adding trap to %s at 0x%lx (kaslr 0x%lx)\n", symbol->name, symbol->rva + kaslr, kaslr);
