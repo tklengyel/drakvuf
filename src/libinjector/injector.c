@@ -1144,15 +1144,16 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 
     data = g_malloc0(sizeof(char) * mem_size);
 
-    while ( (bytes_read = fread(buffer, 1, sizeof(buffer), fp)) )
+    while ( (bytes_read = fread(buffer, 4096, sizeof(unsigned char), fp)) )
     {
         if (bytes_read + payload_size > mem_size)
         {
-            mem_size *= 2;
+            mem_size += 4096;
             unsigned char* new_data = g_realloc(data, mem_size);
             if (!new_data)
             {
                 g_free(data);
+                fclose(fp);
                 return false;
             }
             data = new_data;
