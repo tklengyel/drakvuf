@@ -1280,7 +1280,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     int rc;
     uint64_t flags = VMI_OS_WINDOWS == drakvuf->os ? VMI_PM_INITFLAG_TRANSITION_PAGES : 0;
 
-    PRINT_DEBUG("Init VMI on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
+    PRINT_DEBUG("init_vmi on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
 
     /* initialize the libvmi library */
     if (VMI_FAILURE == vmi_init(&drakvuf->vmi,
@@ -1300,6 +1300,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         printf("Failed to init LibVMI paging.\n");
         return 0;
     }
+    PRINT_DEBUG("init_vmi: initializing vmi paging done\n");
 
     os_t os = VMI_OS_UNKNOWN;
 
@@ -1334,6 +1335,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         drakvuf->vmi = NULL;
         return 0;
     }
+    PRINT_DEBUG("init_vmi: initializing vmi OS done\n");
 
     drakvuf->pm = vmi_get_page_mode(drakvuf->vmi, 0);
     drakvuf->address_width = vmi_get_address_width(drakvuf->vmi);
@@ -1471,6 +1473,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         return 0;
     }
 
+    PRINT_DEBUG("init_vmi finished\n");
     return 1;
 }
 
@@ -1478,7 +1481,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
 
 void close_vmi(drakvuf_t drakvuf)
 {
-    PRINT_DEBUG("starting close_vmi_drakvuf\n");
+    PRINT_DEBUG("close_vmi starting\n");
 
     drakvuf_pause(drakvuf);
 
@@ -1572,5 +1575,5 @@ void close_vmi(drakvuf_t drakvuf)
 
     drakvuf_resume(drakvuf);
 
-    PRINT_DEBUG("close_vmi_drakvuf finished\n");
+    PRINT_DEBUG("close_vmi finished\n");
 }
