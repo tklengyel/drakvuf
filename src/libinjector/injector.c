@@ -133,6 +133,7 @@ struct injector
     bool is32bit, hijacked, resumed, detected;
     injection_method_t method;
     addr_t exec_func;
+    reg_t target_rsp;
 
     // For create process
     addr_t resume_thread;
@@ -523,7 +524,10 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     bool success = false;
     if (injector->method == INJECT_METHOD_CREATEPROC)
+    {
         success = setup_create_process_stack(injector, info);
+        injector->target_rsp = info->regs->rsp;
+    }
     else if (injector->method == INJECT_METHOD_SHELLEXEC)
         success = setup_shell_execute_stack(injector, info);
 
@@ -835,6 +839,13 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             return 0;
     }
 
+    if (injector->target_rsp && info->regs->rsp <= injector->target_rsp)
+    {
+        PRINT_DEBUG("INT3 received but RSP (0x%lx) doesn't match target rsp (0x%lx)\n",
+                    info->regs->rsp, injector->target_rsp);
+        return 0;
+    }
+
     if (injector->is32bit && injector->status == STATUS_CREATE_OK)
     {
         PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
@@ -866,16 +877,20 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             if (info->regs->rax)
                 fill_created_process_info(injector, info);
 
+            injector->rc = info->regs->rax;
+            memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+
             if (injector->pid && injector->tid)
             {
                 PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
-                injector->rc = info->regs->rax;
 
                 if (!setup_resume_thread_stack(injector, info))
                 {
                     PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
                     return 0;
                 }
+
+                injector->target_rsp = info->regs->rsp;
 
                 if (!setup_wait_for_injected_process_trap(injector))
                     return 0;
@@ -893,7 +908,6 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                 drakvuf_remove_trap(drakvuf, info->trap, NULL);
                 drakvuf_interrupt(drakvuf, -1);
 
-                memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
                 return VMI_EVENT_RESPONSE_SET_REGISTERS;
             }
         }
@@ -909,10 +923,12 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
 
-        if (info->regs->rax == 1)
+        injector->rc = info->regs->rax;
+        memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+
+        if (injector->rc == 1)
         {
             PRINT_DEBUG("Resumed\n");
-            injector->rc = 1;
             injector->resumed = true;
         }
         else
@@ -922,8 +938,6 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
             drakvuf_interrupt(drakvuf, -1);
         }
-
-        memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
 
         if (injector->detected)
         {
@@ -947,6 +961,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         {
             case INJECT_METHOD_CREATEPROC:
                 success = setup_create_process_stack(injector, info);
+                injector->target_rsp = info->regs->rsp;
                 break;
             case INJECT_METHOD_SHELLEXEC:
                 success = setup_shell_execute_stack(injector, info);
@@ -1060,16 +1075,20 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         if (info->regs->rax)
             fill_created_process_info(injector, info);
 
+        injector->rc = info->regs->rax;
+        memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+
         if (injector->pid && injector->tid)
         {
             PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
-            injector->rc = info->regs->rax;
 
             if (!setup_resume_thread_stack(injector, info))
             {
                 PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
                 return 0;
             }
+
+            injector->target_rsp = info->regs->rsp;
 
             if (!setup_wait_for_injected_process_trap(injector))
                 return 0;
