@@ -1,4 +1,4 @@
-dist: trusty
+dist: xenial
 language: c
 sudo: false
 compiler: clang
@@ -30,10 +30,6 @@ matrix:
     - env:
         - TEST="astyle"
       sudo: required
-      before_install:
-        - sudo add-apt-repository "deb mirror://mirrors.ubuntu.com/mirrors.txt xenial main restricted universe multiverse" -y
-        - sudo apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 3B4FE6ACC0B21F32
-        - sudo apt-get update -qq
       install:
         - sudo apt-get install astyle
       script:
@@ -140,7 +136,7 @@ matrix:
         apt:
             sources:
                 - ubuntu-toolchain-r-test
-                - llvm-toolchain-trusty-5.0
+                - llvm-toolchain-xenial-7
             packages:
                 - bison
                 - flex
@@ -151,7 +147,6 @@ matrix:
                 - uuid-dev
                 - libpixman-1-dev
                 - libaio-dev
-                - clang-5.0
       before_install:
         - dpkg -x test-packages/xentools_4.7-drakvuf1-1_amd64.deb .
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
@@ -159,7 +154,6 @@ matrix:
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
         - export LDFLAGS="-L$PWD/usr/local/lib"
         - export CFLAGS="-I$PWD/usr/local/include"
-        - export PATH=$PATH:/usr/local/clang-5.0.0/bin
         - git submodule update --init libvmi
         - cd libvmi
         - ./autogen.sh
@@ -170,11 +164,11 @@ matrix:
       install:
         - ./autogen.sh
       script:
-        - scan-build --status-bugs --use-cc=clang-5.0 ./configure --enable-debug
-        - cd src/libdrakvuf && scan-build --status-bugs --use-cc=clang-5.0 make && cd ../..
-        - cd src/xen_helper && scan-build --status-bugs --use-cc=clang-5.0 make && cd ../..
-        - cd src/libinjector && scan-build --status-bugs --use-cc=clang-5.0 make && cd ../..
-        - cd src/dirwatch && scan-build --status-bugs --use-cc=clang-5.0 make && cd ../..
+        - scan-build --status-bugs --use-cc=clang ./configure --enable-debug
+        - cd src/libdrakvuf && scan-build --status-bugs --use-cc=clang make && cd ../..
+        - cd src/xen_helper && scan-build --status-bugs --use-cc=clang make && cd ../..
+        - cd src/libinjector && scan-build --status-bugs --use-cc=clang make && cd ../..
+        - cd src/dirwatch && scan-build --status-bugs --use-cc=clang make && cd ../..
 
 #
 # SonarCloud
@@ -185,7 +179,7 @@ matrix:
         apt:
             sources:
                 - ubuntu-toolchain-r-test
-                - llvm-toolchain-trusty-5.0
+                - llvm-toolchain-xenial-7
             packages:
                 - bison
                 - flex
@@ -196,7 +190,6 @@ matrix:
                 - uuid-dev
                 - libpixman-1-dev
                 - libaio-dev
-                - clang-5.0
         sonarcloud:
             organization: "drakvuf"
             token:
@@ -208,7 +201,6 @@ matrix:
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
         - export LDFLAGS="-L$PWD/usr/local/lib"
         - export CFLAGS="-I$PWD/usr/local/include"
-        - export PATH=$PATH:/usr/local/clang-5.0.0/bin
         - git submodule update --init libvmi
         - cd libvmi
         - ./autogen.sh
