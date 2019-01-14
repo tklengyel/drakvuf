@@ -306,6 +306,16 @@ if test x$plugin_librarymon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_LIBRARYMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_dkommon],
+  [AS_HELP_STRING([--disable-plugin-dkommon],
+    [Enable the windows DKOM attacks watching plugin @<:@yes@:>@])],
+  [plugin_dkommon="$enableval"],
+  [plugin_dkommon="yes"])
+AM_CONDITIONAL([PLUGIN_DKOMMON], [test x$plugin_dkommon = xyes])
+if test x$plugin_dkommon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_DKOMMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -484,4 +494,5 @@ CrashMon:     $plugin_crashmon
 ClipboardMon: $plugin_clipboardmon
 WindowMon:    $plugin_windowmon
 LibraryMon:   $plugin_librarymon
+DKOMmon:      $plugin_dkommon
 -------------------------------------------------------------------------------])

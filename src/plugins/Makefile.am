@@ -182,6 +182,10 @@ if PLUGIN_LIBRARYMON
 sources += librarymon/librarymon.cpp
 endif
 
+if PLUGIN_DKOMMON
+sources += dkommon/dkommon.cpp
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h
 
