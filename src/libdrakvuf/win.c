@@ -232,6 +232,82 @@ bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const 
     return win_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, module_name, base_addr_out);
 }
 
+
+module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name )
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t next_module = module_list_head;
+
+    /* walk the module list */
+    while (1)
+    {
+        /* follow the next pointer */
+        addr_t tmp_next = 0;
+        ctx->addr = next_module;
+        if (VMI_FAILURE == vmi_read_addr(vmi, ctx, &tmp_next))
+            break;
+
+        /* if we are back at the list head, we are done */
+        if (module_list_head == tmp_next || !tmp_next)
+        {
+            break;
+        }
+
+        module_info_t* ret_module_info = (module_info_t*)g_malloc0( sizeof( module_info_t ) );
+
+        if ( ret_module_info )
+        {
+            ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
+            if ( vmi_read_addr( vmi, ctx, &ret_module_info->base_addr ) == VMI_SUCCESS )
+            {
+                unicode_string_t* aux;
+
+                ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
+                aux = vmi_read_unicode_str( vmi, ctx );
+
+                if ( aux )
+                {
+                    if ( vmi_convert_str_encoding( aux, &ret_module_info->base_name, "UTF-8" ) == VMI_SUCCESS )
+                    {
+                        PRINT_DEBUG("Found module %s at 0x%lx\n", ret_module_info->base_name.contents, ret_module_info->base_addr );
+
+                        if ( !strcasecmp( (char*)ret_module_info->base_name.contents, module_name ) )
+                        {
+                            unicode_string_t* aux2 ;
+
+                            ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
+                            aux2 = vmi_read_unicode_str( vmi, ctx );
+
+                            if ( aux2 )
+                            {
+                                if ( vmi_convert_str_encoding( aux2, &ret_module_info->full_name, "UTF-8" ) == VMI_FAILURE )
+                                    memset( (void*)&ret_module_info->full_name, 0, sizeof( unicode_string_t ) );
+
+                                vmi_free_unicode_str( aux2 );
+                            }
+
+                            vmi_free_unicode_str( aux );
+
+                            return ret_module_info ;
+                        }
+                    }
+
+                    g_free( ret_module_info->base_name.contents  );
+
+                    vmi_free_unicode_str( aux );
+                }
+            }
+            g_free( ret_module_info );
+        }
+
+        next_module = tmp_next;
+    }
+
+    PRINT_DEBUG("Failed to find %s in list starting at 0x%lx\n", module_name, module_list_head);
+
+    return NULL;
+}
+
 static bool find_kernbase(drakvuf_t drakvuf)
 {
     addr_t sysproc_rva, sysproc;

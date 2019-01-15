@@ -447,7 +447,7 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_p
     return false;
 }
 
-bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess_addr, void* visitor_ctx), void* visitor_ctx)
+bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx)
 {
     addr_t list_head;
     if (!win_find_process_list(drakvuf, &list_head))
@@ -466,19 +466,34 @@ bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_n
 
         vmi_pid_t pid;
         addr_t module_list_head;
+
         if ((win_get_process_pid(drakvuf, current_process, &pid) == VMI_SUCCESS) &&
                 win_get_module_list(drakvuf, current_process, &module_list_head))
         {
-            addr_t dllbase;
-            access_context_t ctx =
+            access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB };
+
+            if ( vmi_pid_to_dtb( drakvuf->vmi, pid, &ctx.dtb ) == VMI_SUCCESS )
             {
-                .translate_mechanism = VMI_TM_PROCESS_PID,
-                .pid = pid,
-            };
-            if (win_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, module_name, &dllbase))
-            {
-                if (visitor_func(drakvuf, current_process, visitor_ctx))
-                    return true;
+                module_info_t* module_info = win_get_module_info_ctx( drakvuf, module_list_head, &ctx, module_name );
+
+                if ( module_info )
+                {
+                    bool ret ;
+
+                    module_info->eprocess_addr = current_process ;
+                    module_info->dtb           = ctx.dtb ;
+                    module_info->pid           = pid ;
+
+                    ret = visitor_func( drakvuf, module_info, visitor_ctx );
+
+                    g_free( module_info->full_name.contents  );
+                    g_free( module_info->base_name.contents );
+
+                    g_free( module_info );
+
+                    if ( ret )
+                        return true;
+                }
             }
         }
 
@@ -494,6 +509,8 @@ bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_n
 
     return false;
 }
+
+////////////////////////////////////////////////////////////////
 
 status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid )
 {
