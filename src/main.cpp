@@ -103,6 +103,8 @@
  ***************************************************************************/
 
 #include <config.h>
+#include <ctype.h>
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -166,7 +168,8 @@ int main(int argc, char** argv)
     if (argc < 4)
     {
         fprintf(stderr, "Required input:\n"
-                "\t -r <rekall profile>       The Rekall profile of the OS kernel\n"
+                "\t -r, --rekall-kernel <rekall profile>\n"
+                "\t                           The Rekall profile of the OS kernel\n"
                 "\t -d <domain ID or name>    The domain's ID or name\n"
                 "Optional inputs:\n"
                 "\t -l                        Use libvmi.conf\n"
@@ -189,13 +192,14 @@ int main(int argc, char** argv)
                 "\t -n                        Use extraction method based on function injection (requires -D)\n"
 #endif
 #ifdef ENABLE_PLUGIN_SOCKETMON
-                "\t -T <rekall profile>       The Rekall profile for tcpip.sys\n"
+                "\t -T, --rekall-tcpip <rekall profile>\n"
+                "\t                           The Rekall profile for tcpip.sys\n"
 #endif
 #ifdef ENABLE_PLUGIN_CPUIDMON
                 "\t -s                        Hide Hypervisor bits and signature in CPUID\n"
 #endif
 #ifdef DRAKVUF_DEBUG
-                "\t -v                        Turn on verbose (debug) output\n"
+                "\t -v, --verbose             Turn on verbose (debug) output\n"
 #endif
 #ifdef ENABLE_PLUGIN_SYSCALLS
                 "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
@@ -207,7 +211,15 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nbl")) != -1)
+    int long_index = 0;
+    const option long_opts[] = {
+        {"rekall-kernel", required_argument, NULL, 'r'},
+        {"rekall-tcpip", required_argument, NULL, 'T'},
+        {"verbose", no_argument, NULL, 'v'},
+    };
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nbl";
+
+    while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
         {
             case 'r':
@@ -298,7 +310,10 @@ int main(int argc, char** argv)
                 libvmi_conf = true;
                 break;
             default:
-                fprintf(stderr, "Unrecognized option: %c\n", c);
+                if (isalnum(c))
+                    fprintf(stderr, "Unrecognized option: %c\n", c);
+                else
+                    fprintf(stderr, "Unrecognized option: %s\n", long_opts[long_index].name);
                 return rc;
         }
 
