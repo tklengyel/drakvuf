@@ -212,9 +212,10 @@ int main(int argc, char** argv)
     }
 
     int long_index = 0;
-    const option long_opts[] = {
-        {"rekall-kernel", required_argument, NULL, 'r'},
-        {"rekall-tcpip", required_argument, NULL, 'T'},
+    const option long_opts[] =
+    {
+        {"rekall-kernel", optional_argument, NULL, 'r'},
+        {"rekall-tcpip", optional_argument, NULL, 'T'},
         {"verbose", no_argument, NULL, 'v'},
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nbl";
