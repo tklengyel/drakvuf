@@ -340,7 +340,7 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose, leave_paused, libvmi_conf);
+        drakvuf = new drakvuf_c(domain, rekall_profile, output, verbose, leave_paused, libvmi_conf);
     }
     catch (const std::exception& e)
     {
@@ -375,7 +375,7 @@ int main(int argc, char** argv)
     PRINT_DEBUG("Beginning DRAKVUF loop\n");
 
     /* Start the event listener */
-    drakvuf->loop();
+    drakvuf->loop(timeout);
     rc = 0;
 
     PRINT_DEBUG("Finished DRAKVUF loop\n");

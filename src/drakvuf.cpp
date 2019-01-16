@@ -105,13 +105,9 @@
 #include "drakvuf.h"
 #include <stdexcept>
 
-static gpointer timer(gpointer data)
+gpointer timer(gpointer data)
 {
     drakvuf_c* drakvuf = (drakvuf_c*)data;
-
-    /* Wait for the loop to start */
-    g_mutex_lock(&drakvuf->loop_signal);
-    g_mutex_unlock(&drakvuf->loop_signal);
 
     while (drakvuf->timeout && !drakvuf->interrupted)
     {
@@ -202,27 +198,15 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
 drakvuf_c::drakvuf_c(const char* domain,
                      const char* rekall_profile,
                      output_format_t output,
-                     int timeout,
                      bool verbose,
                      bool leave_paused,
                      bool libvmi_conf)
-    : leave_paused{ leave_paused }, timeout{ timeout },
-      process_start_timeout{ timeout }
+    : leave_paused{ leave_paused }
 {
     if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose, libvmi_conf))
         throw std::runtime_error("drakvuf_init() failed");
 
-    os = drakvuf_get_os_type(drakvuf);
-
-    g_mutex_init(&loop_signal);
-    g_mutex_lock(&loop_signal);
-    g_mutex_init(&loop_signal2);
-    g_mutex_lock(&loop_signal2);
-
-    if (timeout > 0)
-        timeout_thread = g_thread_new(nullptr, timer, (void*)this);
-
-    plugins = new drakvuf_plugins(drakvuf, output, os);
+    plugins = new drakvuf_plugins(drakvuf, output, drakvuf_get_os_type(drakvuf));
 }
 
 drakvuf_c::~drakvuf_c()
@@ -230,20 +214,10 @@ drakvuf_c::~drakvuf_c()
     if ( !interrupted )
         interrupt(-1);
 
-    g_mutex_trylock(&loop_signal);
-    g_mutex_unlock(&loop_signal);
-    g_mutex_clear(&loop_signal);
-    g_mutex_trylock(&loop_signal2);
-    g_mutex_unlock(&loop_signal2);
-    g_mutex_clear(&loop_signal2);
-
     if (drakvuf)
         drakvuf_close(drakvuf, leave_paused);
 
     delete plugins;
-
-    if (timeout_thread)
-        g_thread_join(timeout_thread);
 }
 
 void drakvuf_c::interrupt(int signal)
@@ -252,11 +226,19 @@ void drakvuf_c::interrupt(int signal)
     drakvuf_interrupt(drakvuf, signal);
 }
 
-void drakvuf_c::loop()
+void drakvuf_c::loop(int duration)
 {
     interrupted = 0;
-    g_mutex_unlock(&loop_signal);
+    timeout = duration;
+
+    GThread* timeout_thread = nullptr;
+    if (duration > 0)
+        timeout_thread = g_thread_new(nullptr, timer, (void*)this);
+
     drakvuf_loop(drakvuf);
+
+    if (timeout_thread)
+        g_thread_join(timeout_thread);
 }
 
 void drakvuf_c::pause()

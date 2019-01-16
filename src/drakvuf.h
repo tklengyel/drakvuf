@@ -139,23 +139,16 @@ private:
     bool leave_paused;
     drakvuf_t drakvuf { nullptr };
     drakvuf_plugins* plugins;
-    GThread* timeout_thread { nullptr };
-    os_t os;
+
+    friend gpointer timer(gpointer data);
+    int timeout { 0 };
+    int interrupted { 0 };
 
 public:
-    int timeout;
-    int interrupted { 0 };
-    GMutex loop_signal;
-
-    const char* process_start_name;
-    bool process_start_detected { false };
-    int process_start_timeout;
-    GMutex loop_signal2;
 
     drakvuf_c(const char* domain,
               const char* rekall_profile,
               output_format_t output,
-              int timeout,
               bool verbose,
               bool leave_paused,
               bool libvmi_conf);
@@ -163,7 +156,7 @@ public:
 
     int is_initialized();
     void interrupt(int signal);
-    void loop();
+    void loop(int duration);
     void pause();
     void resume();
     int inject_cmd(vmi_pid_t injection_pid,
@@ -182,8 +175,6 @@ public:
                       const char* tcpip_profile,
                       const char* syscalls_filter_file,
                       bool abort_on_bsod );
-    bool wait_for_process(const char* processname);
-
 };
 
 #endif
