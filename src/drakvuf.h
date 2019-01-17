@@ -140,11 +140,9 @@ private:
     drakvuf_t drakvuf { nullptr };
     drakvuf_plugins* plugins;
 
-    friend gpointer timer(gpointer data);
+public:
     int timeout { 0 };
     int interrupted { 0 };
-
-public:
 
     drakvuf_c(const char* domain,
               const char* rekall_profile,
@@ -166,7 +164,8 @@ public:
                    injection_method_t method,
                    output_format_t format,
                    const char* binary_path,
-                   const char* target_process);
+                   const char* target_process,
+                   int timeout);
     int start_plugins(const bool* plugin_list,
                       const char* dump_folder,
                       bool dump_modified_files,

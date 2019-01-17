@@ -121,6 +121,10 @@ extern bool verbose;
 
 #define ARRAY_SIZE(arr) sizeof((arr)) / sizeof((arr)[0])
 
+#ifdef __clang_analyzer__
+#define vmi_free_unicode_str g_free
+#endif
+
 enum offset
 {
     KTHREAD_TRAPFRAME,
