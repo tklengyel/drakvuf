@@ -1280,15 +1280,25 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     int rc;
     uint64_t flags = VMI_OS_WINDOWS == drakvuf->os ? VMI_PM_INITFLAG_TRANSITION_PAGES : 0;
 
+    vmi_init_data_t* init_data = g_malloc0(sizeof(vmi_init_data_t) + sizeof(vmi_init_data_entry_t));
+    if ( !init_data )
+        return 0;
+
+    init_data->count = 1;
+    init_data->entry[0].type = VMI_INIT_DATA_XEN_EVTCHN;
+    init_data->entry[0].data = (void*) drakvuf->xen->evtchn;
+
     PRINT_DEBUG("init_vmi on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
 
     /* initialize the libvmi library */
-    if (VMI_FAILURE == vmi_init(&drakvuf->vmi,
-                                VMI_XEN,
-                                &drakvuf->domID,
-                                VMI_INIT_XEN_EVTCHN | VMI_INIT_DOMAINID | VMI_INIT_EVENTS,
-                                (void*) drakvuf->xen->evtchn,
-                                NULL))
+    status_t status = vmi_init(&drakvuf->vmi,
+                               VMI_XEN,
+                               &drakvuf->domID,
+                               VMI_INIT_DOMAINID | VMI_INIT_EVENTS,
+                               (void*)init_data,
+                               NULL);
+    g_free(init_data);
+    if ( VMI_FAILURE == status )
     {
         printf("Failed to init LibVMI library.\n");
         return 0;
