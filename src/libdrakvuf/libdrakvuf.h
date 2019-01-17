@@ -410,9 +410,19 @@ bool drakvuf_find_process(drakvuf_t drakvuf,
                           const char* find_procname,
                           addr_t* process_addr);
 
+typedef struct _module_info
+{
+    addr_t eprocess_addr ;       /* EPROCESS to which the module is currently loaded           */
+    addr_t dtb ;                 /* DTB for the process where the module is currently loaded   */
+    vmi_pid_t pid ;              /* PID of the process where the module is currently is loaded */
+    addr_t base_addr ;           /* Module base address                                        */
+    unicode_string_t full_name ; /* Module full name                                           */
+    unicode_string_t base_name ; /* Module base name                                           */
+} module_info_t ;
+
 bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf,
         const char* module_name,
-        bool (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess_addr, void* visitor_ctx),
+        bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
         void* visitor_ctx);
 
 bool drakvuf_get_module_list(drakvuf_t drakvuf,

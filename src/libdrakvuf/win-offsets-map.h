@@ -128,6 +128,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
     [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
     [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
+    [LDR_DATA_TABLE_ENTRY_FULLDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "FullDllName" },
     [HANDLE_TABLE_TABLECODE] = {"_HANDLE_TABLE", "TableCode" },
     [KPCR_PRCB] = {"_KPCR", "Prcb" },
     [KPCR_PRCBDATA] = {"_KPCR", "PrcbData" },

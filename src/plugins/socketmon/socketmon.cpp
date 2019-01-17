@@ -1608,12 +1608,27 @@ struct module_trap_context_t
 
 }
 
-static bool module_trap_visitor(drakvuf_t drakvuf, addr_t eprocess_base, void* visitor_ctx)
+static bool module_trap_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx )
 {
     module_trap_context_t const* data = reinterpret_cast<module_trap_context_t*>(visitor_ctx);
+    status_t ret ;
+    vmi_instance_t vmi;
+    addr_t exec_func ;
+    access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB,
+                             .dtb                 = module_info->dtb,
+                             .addr                = module_info->base_addr
+                           };
 
-    addr_t exec_func = drakvuf_exportsym_to_va(drakvuf, eprocess_base, data->module_name, data->function_name);
-    if (!exec_func)
+    PRINT_DEBUG("[SOCKETMON] trap_visitor: CR3[0x%lX] pid[0x%X] base_name[%s] load_address[0x%lX] full_name[%s]\n",
+                module_info->dtb, module_info->pid, module_info->base_name.contents, module_info->base_addr, module_info->full_name.contents );
+
+    vmi = drakvuf_lock_and_get_vmi( drakvuf );
+
+    ret = vmi_translate_sym2v( vmi, &ctx, data->function_name, &exec_func );
+
+    drakvuf_release_vmi( drakvuf );
+
+    if ( ret == VMI_FAILURE )
     {
         PRINT_DEBUG("[SOCKETMON] Failed to get address of %s!%s\n", data->module_name, data->function_name);
         return false;
@@ -1621,16 +1636,9 @@ static bool module_trap_visitor(drakvuf_t drakvuf, addr_t eprocess_base, void* v
 
     PRINT_DEBUG("[SOCKETMON] Address of %s!%s is 0x%lx\n", data->module_name, data->function_name, exec_func);
 
-    vmi_pid_t pid;
-    if (VMI_FAILURE == drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
-    {
-        PRINT_DEBUG("[SOCKETMON] Failed to get pid of process\n");
-        return false;
-    }
-
     data->trap->breakpoint.module = data->module_name;
-    data->trap->breakpoint.pid = pid;
-    data->trap->breakpoint.addr = exec_func;
+    data->trap->breakpoint.pid    = module_info->pid;
+    data->trap->breakpoint.addr   = exec_func;
 
     data->trap->name = data->function_name;
     data->trap->cb   = data->hook_cb;
