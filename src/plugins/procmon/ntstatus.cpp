@@ -176,10 +176,10 @@ const char* ntstatus_format_string(ntstatus_t status, char* buffer, unsigned buf
     unsigned code     = (status & 0x0000FFFFL);
 
     snprintf(buffer, buf_size, "%s:%d:%s:0x%x",
-            severities[severity],
-            customer,
-            facility < FACILITY_MAXIMUM_VALUE ? facilities[facility] : "UNKNOWN",
-            code);
+             severities[severity],
+             customer,
+             facility < FACILITY_MAXIMUM_VALUE ? facilities[facility] : "UNKNOWN",
+             code);
 
     return buffer;
 }
