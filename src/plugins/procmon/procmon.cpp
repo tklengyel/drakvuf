@@ -349,9 +349,9 @@ static event_response_t terminate_process_hook(
 
     char exit_status_buf[NTSTATUS_MAX_FORMAT_STR_SIZE] = {0};
     const char* exit_status_str = ntstatus_to_string(ntstatus_t(exit_status));
-    if (!exit_status_str) {
+    if (!exit_status_str)
         exit_status_str = ntstatus_format_string(ntstatus_t(exit_status), exit_status_buf, sizeof(exit_status_buf));
-    }
+
     switch ( f->format )
     {
         case OUTPUT_CSV:
