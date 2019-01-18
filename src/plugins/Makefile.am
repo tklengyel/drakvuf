@@ -155,7 +155,7 @@ sources += regmon/regmon.cpp
 endif
 
 if PLUGIN_PROCMON
-sources += procmon/procmon.cpp
+sources += procmon/procmon.cpp procmon/ntstatus.cpp
 endif
 
 if PLUGIN_BSODMON
