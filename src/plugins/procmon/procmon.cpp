@@ -109,6 +109,7 @@
 #include <assert.h>
 
 #include "../plugins.h"
+#include "ntstatus.h"
 #include "procmon.h"
 
 namespace
@@ -346,28 +347,33 @@ static event_response_t terminate_process_hook(
 
     vmi_pid_t exit_pid = get_pid_from_handle(f, drakvuf, info, process_handle);
 
+    char exit_status_buf[NTSTATUS_MAX_FORMAT_STR_SIZE] = {0};
+    const char* exit_status_str = ntstatus_to_string(ntstatus_t(exit_status));
+    if (!exit_status_str)
+        exit_status_str = ntstatus_format_string(ntstatus_t(exit_status), exit_status_buf, sizeof(exit_status_buf));
+
     switch ( f->format )
     {
         case OUTPUT_CSV:
-            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%d,0x%" PRIx64 "\n",
+            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%d,0x%" PRIx64 ",%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name, exit_pid, exit_status);
+                   info->proc_data.userid, info->trap->name, exit_pid, exit_status, exit_status_str);
             break;
 
         case OUTPUT_KV:
             printf("procmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
-                   "Method=%s,ExitPid=%d,ExitStatus=0x%" PRIx64 "\n",
+                   "Method=%s,ExitPid=%d,ExitStatus=0x%" PRIx64 ",ExitStatusStr=%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, exit_pid, exit_status);
+                   info->trap->name, exit_pid, exit_status, exit_status_str);
             break;
 
         default:
         case OUTPUT_DEFAULT:
             printf("[PROCMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64
-                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s:%d:0x%" PRIx64 "\n",
+                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s:%d:0x%" PRIx64 ":%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr,
                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, exit_pid, exit_status);
+                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, exit_pid, exit_status, exit_status_str);
             break;
     }
 
