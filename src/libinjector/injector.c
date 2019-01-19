@@ -127,6 +127,7 @@ struct injector
     vmi_pid_t target_pid;
     uint32_t target_tid;
     unicode_string_t* cwd_us;
+    bool break_loop_on_detection;
 
     // Internal:
     drakvuf_t drakvuf;
@@ -326,10 +327,12 @@ static unicode_string_t* convert_utf8_to_utf16(char const* str)
 
     unicode_string_t us =
     {
-        .contents = (void*)g_strdup(str),
+        .contents = (uint8_t*)g_strdup(str),
         .length = strlen(str),
         .encoding = "UTF-8",
     };
+
+    if (!us.contents) return NULL;
 
     unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
     if (!out)
@@ -681,7 +684,9 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
     if (injector->pid == (uint32_t)info->proc_data.pid)
     {
         drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
-        drakvuf_interrupt(drakvuf, -1);
+
+        if (injector->break_loop_on_detection)
+            drakvuf_interrupt(drakvuf, -1);
 
         injector->rc = 1;
         injector->detected = true;
@@ -738,7 +743,6 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
             PRINT_DEBUG("Failed to write the binary into memory!\n");
             return 0;
         }
-        g_free((void*)injector->binary);
 
         // Get address of PspCallProcessNotifyRoutines() from the rekall profile
         if ( !drakvuf_get_function_rva(drakvuf, "PspCallProcessNotifyRoutines", &process_notify_rva) )
@@ -772,7 +776,6 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         PRINT_DEBUG("Failed to write the payload into memory!\n");
         return 0;
     }
-    g_free((void*)injector->payload);
 
     if (!setup_stack(injector->drakvuf, info, NULL, 4))
     {
@@ -929,7 +932,6 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         if (injector->rc == 1)
         {
             PRINT_DEBUG("Resumed\n");
-            injector->resumed = true;
         }
         else
         {
@@ -939,7 +941,9 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             drakvuf_interrupt(drakvuf, -1);
         }
 
-        if (injector->detected)
+        injector->resumed = true;
+
+        if (injector->detected && injector->break_loop_on_detection)
         {
             // Resumed process was detected before ResumeThread was returned.
             // We already returned from injector_start_app().
@@ -1140,8 +1144,11 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     if (!drakvuf_add_trap(drakvuf, &trap))
         return false;
 
-    PRINT_DEBUG("Starting injection loop\n");
-    drakvuf_loop(drakvuf);
+    if (!drakvuf_is_interrupted(drakvuf))
+    {
+        PRINT_DEBUG("Starting injection loop\n");
+        drakvuf_loop(drakvuf);
+    }
 
     free_memtraps(injector);
 
@@ -1318,7 +1325,17 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
     return injector->exec_func != 0;
 }
 
-int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, const char* cwd, injection_method_t method, output_format_t format, const char* binary_path, const char* target_process)
+int injector_start_app(
+    drakvuf_t drakvuf,
+    vmi_pid_t pid,
+    uint32_t tid,
+    const char* file,
+    const char* cwd,
+    injection_method_t method,
+    output_format_t format,
+    const char* binary_path,
+    const char* target_process,
+    bool break_loop_on_detection)
 {
     int rc = 0;
     addr_t cr3;
@@ -1330,39 +1347,62 @@ int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const cha
 
     PRINT_DEBUG("Target PID %u with DTB 0x%lx to start '%s'\n", pid, cr3, file);
 
+    unicode_string_t* target_file_us = convert_utf8_to_utf16(file);
+    if (!target_file_us)
+    {
+        PRINT_DEBUG("Unable to convert file path from utf8 to utf16\n");
+        return 0;
+    }
+
+    unicode_string_t* cwd_us = NULL;
+    if (cwd)
+    {
+        cwd_us = convert_utf8_to_utf16(cwd);
+        if (!cwd_us)
+        {
+            PRINT_DEBUG("Unable to convert cwd from utf8 to utf16\n");
+            vmi_free_unicode_str(target_file_us);
+            return 0;
+        }
+    }
+
     injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
     if (!injector)
+    {
+        vmi_free_unicode_str(target_file_us);
+        if (cwd_us)
+            vmi_free_unicode_str(cwd_us);
         return 0;
+    }
 
     injector->drakvuf = drakvuf;
     injector->target_pid = pid;
     injector->target_tid = tid;
     injector->target_cr3 = cr3;
-
-    injector->target_file_us = convert_utf8_to_utf16(file);
-    injector->cwd_us = cwd ? convert_utf8_to_utf16(cwd) : NULL;
-    if (!injector->target_file_us || (cwd && !injector->cwd_us))
-        goto done;
-
+    injector->target_file_us = target_file_us;
+    injector->cwd_us = cwd_us;
     injector->method = method;
     injector->binary_path = binary_path;
     injector->target_process = target_process;
     injector->status = STATUS_NULL;
     injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    injector->break_loop_on_detection = break_loop_on_detection;
 
     if (!initialize_injector_functions(drakvuf, injector, file, binary_path))
-        goto done;
+    {
+        PRINT_DEBUG("Unable to initialize injector functions\n");
+        free_injector(injector);
+        return 0;
+    }
 
-    if (!inject(drakvuf, injector))
-        goto done;
+    if (inject(drakvuf, injector))
+        print_injection_info(format, injector->target_pid, injector->target_cr3, file, injector->pid, injector->tid);
 
-    print_injection_info(format, injector->target_pid, injector->target_cr3, file, injector->pid, injector->tid);
-
-done:
     rc = injector->rc;
+    PRINT_DEBUG("Finished with injection. Ret: %i\n", rc);
+
     if ((!injector->detected && !injector->resumed) || (injector->detected && injector->resumed))
         free_injector(injector);
 
-    PRINT_DEBUG("Finished with injection. Ret: %i\n", rc);
     return rc;
 }

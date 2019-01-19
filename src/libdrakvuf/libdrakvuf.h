@@ -335,6 +335,7 @@ void drakvuf_remove_trap (drakvuf_t drakvuf,
 void drakvuf_loop (drakvuf_t drakvuf);
 void drakvuf_interrupt (drakvuf_t drakvuf,
                         int sig);
+int drakvuf_is_interrupted(drakvuf_t drakvuf);
 void drakvuf_pause (drakvuf_t drakvuf);
 void drakvuf_resume (drakvuf_t drakvuf);
 

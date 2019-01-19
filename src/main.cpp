@@ -135,6 +135,7 @@ int main(int argc, char** argv)
     char const* inject_file = nullptr;
     char const* inject_cwd = nullptr;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
+    int injection_timeout = 0;
     char* domain = nullptr;
     char* rekall_profile = nullptr;
     char* dump_folder = nullptr;
@@ -178,6 +179,8 @@ int main(int argc, char** argv)
                 "\t -e <inject_file>          The executable to start with injection\n"
                 "\t -c <current_working_dir>  The current working directory for injected executable\n"
                 "\t -m <inject_method>        The injection method: createproc, shellexec, shellcode, doppelganging\n"
+                "\t -j, --injection-timeout <seconds>\n"
+                "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
                 "\t -t <timeout>              Timeout (in seconds)\n"
                 "\t -o <format>               Output format (default or csv)\n"
                 "\t -x <plugin>               Don't activate the specified plugin\n"
@@ -214,11 +217,12 @@ int main(int argc, char** argv)
     int long_index = 0;
     const option long_opts[] =
     {
-        {"rekall-kernel", optional_argument, NULL, 'r'},
-        {"rekall-tcpip", optional_argument, NULL, 'T'},
+        {"rekall-kernel", required_argument, NULL, 'r'},
+        {"rekall-tcpip", required_argument, NULL, 'T'},
+        {"injection-timeout", required_argument, NULL, 'j'},
         {"verbose", no_argument, NULL, 'v'},
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nbl";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nblj:";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
@@ -240,6 +244,9 @@ int main(int argc, char** argv)
                 break;
             case 'c':
                 inject_cwd = optarg;
+                break;
+            case 'j':
+                injection_timeout = atoi(optarg);
                 break;
             case 'm':
                 if (!strncmp(optarg,"shellexec",9))
@@ -362,7 +369,7 @@ int main(int argc, char** argv)
     if ( injection_pid > 0 && inject_file )
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process);
+        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout);
         if (!ret)
             goto exit;
     }

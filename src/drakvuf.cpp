@@ -105,7 +105,12 @@
 #include "drakvuf.h"
 #include <stdexcept>
 
-gpointer timer(gpointer data)
+enum
+{
+    TIMEOUT_OCCURED_SIG = -2,
+};
+
+static gpointer timer(gpointer data)
 {
     drakvuf_c* drakvuf = (drakvuf_c*)data;
 
@@ -117,11 +122,33 @@ gpointer timer(gpointer data)
 
     if (!drakvuf->interrupted)
     {
-        drakvuf->interrupt(-1);
+        drakvuf->interrupt(TIMEOUT_OCCURED_SIG);
     }
 
     g_thread_exit(nullptr);
     return nullptr;
+}
+
+static GThread* startup_timer(drakvuf_c* drakvuf, int timeout)
+{
+    drakvuf->interrupted = 0;
+    drakvuf->timeout = timeout;
+
+    GThread* timeout_thread = nullptr;
+    if (drakvuf->timeout > 0)
+        timeout_thread = g_thread_new("timer", timer, (void*)drakvuf);
+    return timeout_thread;
+}
+
+static void cleanup_timer(drakvuf_c* drakvuf, GThread* timeout_thread)
+{
+    if (timeout_thread)
+    {
+        // Force stop timeout thread
+        if (drakvuf->timeout && !drakvuf->interrupted)
+            drakvuf->interrupted = -1;
+        g_thread_join(timeout_thread);
+    }
 }
 
 int drakvuf_c::start_plugins(const bool* plugin_list,
@@ -228,17 +255,9 @@ void drakvuf_c::interrupt(int signal)
 
 void drakvuf_c::loop(int duration)
 {
-    interrupted = 0;
-    timeout = duration;
-
-    GThread* timeout_thread = nullptr;
-    if (duration > 0)
-        timeout_thread = g_thread_new(nullptr, timer, (void*)this);
-
+    GThread* timeout_thread = startup_timer(this, duration);
     drakvuf_loop(drakvuf);
-
-    if (timeout_thread)
-        g_thread_join(timeout_thread);
+    cleanup_timer(this, timeout_thread);
 }
 
 void drakvuf_c::pause()
@@ -251,11 +270,36 @@ void drakvuf_c::resume()
     drakvuf_resume(drakvuf);
 }
 
-int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, const char* cwd, injection_method_t method, output_format_t format, const char* binary_path, const char* target_process)
+int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
+                          uint32_t injection_tid,
+                          const char* inject_cmd,
+                          const char* cwd,
+                          injection_method_t method,
+                          output_format_t format,
+                          const char* binary_path,
+                          const char* target_process,
+                          int timeout)
 {
-    int rc = injector_start_app(drakvuf, injection_pid, injection_tid, inject_cmd, cwd, method, format, binary_path, target_process);
+    GThread* timeout_thread = startup_timer(this, timeout);
+    int rc = injector_start_app(drakvuf,
+                                injection_pid,
+                                injection_tid,
+                                inject_cmd,
+                                cwd,
+                                method,
+                                format,
+                                binary_path,
+                                target_process,
+                                true);
 
     if (!rc)
-        fprintf(stderr, "Process startup failed\n");
+    {
+        if (interrupted == TIMEOUT_OCCURED_SIG)
+            fprintf(stderr, "Process startup failed: timeout occured\n");
+        else
+            fprintf(stderr, "Process startup failed\n");
+    }
+
+    cleanup_timer(this, timeout_thread);
     return rc;
 }

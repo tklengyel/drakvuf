@@ -227,6 +227,11 @@ void drakvuf_interrupt(drakvuf_t drakvuf, int sig)
     drakvuf->interrupted = sig;
 }
 
+int drakvuf_is_interrupted(drakvuf_t drakvuf)
+{
+    return drakvuf->interrupted;
+}
+
 bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
 
