@@ -1233,6 +1233,31 @@ void drakvuf_vmi_event_callback (int fd, void* data)
     }
 }
 
+static void drakvuf_poll(drakvuf_t drakvuf, unsigned int timeout)
+{
+    int rc = poll(drakvuf->event_fds, drakvuf->event_fd_cnt, timeout);
+
+    if (rc == 0)
+        return;
+
+    else if (rc < 0)
+    {
+        PRINT_DEBUG("DRAKVUF loop broke unexpectedly\n");
+        drakvuf->interrupted = -1;
+        return;
+    }
+
+    /* check and process each fd if it was raised */
+    for (int poll_ix=0; poll_ix<drakvuf->event_fd_cnt; poll_ix++)
+    {
+        if ( !(drakvuf->event_fds[poll_ix].revents & (POLLIN | POLLERR)) )
+            continue;
+
+        fd_info_t fd_info = &drakvuf->fd_info_lookup[poll_ix];
+        fd_info->event_cb(fd_info->fd, fd_info->data);
+    }
+}
+
 void drakvuf_loop(drakvuf_t drakvuf)
 {
 
@@ -1242,33 +1267,13 @@ void drakvuf_loop(drakvuf_t drakvuf)
     drakvuf_force_resume(drakvuf);
 
     while (!drakvuf->interrupted)
-    {
-        int rc = poll(drakvuf->event_fds, drakvuf->event_fd_cnt, 1000);
-        if (rc == 0)
-        {
-            continue;
-        }
-        else if (rc < 0)
-        {
-            PRINT_DEBUG("DRAKVUF loop broke unexpectedly\n");
-            drakvuf->interrupted = -1;
-            break;
-        }
-
-        /* check and process each fd if it was raised */
-        for (int poll_ix=0; poll_ix<drakvuf->event_fd_cnt; poll_ix++)
-        {
-            if ( !(drakvuf->event_fds[poll_ix].revents & (POLLIN | POLLERR)) )
-            {
-                continue;
-            }
-
-            fd_info_t fd_info = &drakvuf->fd_info_lookup[poll_ix];
-            fd_info->event_cb(fd_info->fd, fd_info->data);
-        }
-    }
+        drakvuf_poll(drakvuf, 1000);
 
     vmi_pause_vm(drakvuf->vmi);
+
+    // Ensures all events are processed from the ring
+    drakvuf_poll(drakvuf, 0);
+
     //print_sharing_info(drakvuf->xen, drakvuf->domID);
 
     PRINT_DEBUG("DRAKVUF loop finished\n");
