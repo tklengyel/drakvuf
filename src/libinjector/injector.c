@@ -943,14 +943,6 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         injector->resumed = true;
 
-        if (injector->detected && injector->break_loop_on_detection)
-        {
-            // Resumed process was detected before ResumeThread was returned.
-            // We already returned from injector_start_app().
-            // We need cleanup resources.
-            free_injector(injector);
-        }
-
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
@@ -1401,8 +1393,7 @@ int injector_start_app(
     rc = injector->rc;
     PRINT_DEBUG("Finished with injection. Ret: %i\n", rc);
 
-    if ((!injector->detected && !injector->resumed) || (injector->detected && injector->resumed))
-        free_injector(injector);
+    free_injector(injector);
 
     return rc;
 }
