@@ -113,6 +113,9 @@ typedef struct os_interface
     addr_t (*get_current_process)
     (drakvuf_t drakvuf, uint64_t vcpu_id);
 
+    status_t (*get_last_error)
+    (drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str);
+
     char* (*get_process_name)
     (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
 

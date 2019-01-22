@@ -136,6 +136,14 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
     return 0;
 }
 
+status_t drakvuf_get_last_error(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str)
+{
+    if ( drakvuf->osi.get_last_error )
+        return drakvuf->osi.get_last_error(drakvuf, vcpu_id, err, err_str);
+
+    return VMI_FAILURE;
+}
+
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
 {
     if ( drakvuf->osi.get_current_process )
