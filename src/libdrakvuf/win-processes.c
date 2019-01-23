@@ -583,7 +583,7 @@ bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_n
     return false;
 }
 
-bool win_is_crashreporter(drakvuf_t drakvuf __attribute__ ((unused)), drakvuf_trap_info_t* info, vmi_pid_t* pid)
+bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid)
 {
     if (sizeof("WerFault.exe") - 1 > strlen(info->proc_data.name))
     {
@@ -594,7 +594,34 @@ bool win_is_crashreporter(drakvuf_t drakvuf __attribute__ ((unused)), drakvuf_tr
     if (!strstr(info->proc_data.name, "WerFault.exe"))
         return false;
 
-    *pid = info->proc_data.ppid;
+    addr_t eprocess = 0;
+    if (!win_find_eprocess(drakvuf, info->proc_data.pid, NULL, &eprocess))
+    {
+        PRINT_DEBUG("Error. Failed to get EPROCESS\n");
+        return false;
+    }
+
+    char* cmdline = win_get_process_commandline(drakvuf, info, eprocess);
+    if (!cmdline)
+    {
+        PRINT_DEBUG("Error. Failed to get command line\n");
+        return false;
+    }
+
+    char* param = strstr(cmdline, "-p ");
+    if (!param)
+    {
+        PRINT_DEBUG("Error. Failed to get param\n");
+        return false;
+    }
+
+    char* end = NULL;
+    *pid = strtoul(param + 3, &end, 10);
+    if (ERANGE == errno)
+    {
+        PRINT_DEBUG("Error. Failed to parse PID: the value is out of range\n");
+        return false;
+    }
 
     return true;
 }
