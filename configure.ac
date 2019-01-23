@@ -256,6 +256,16 @@ if test x$plugin_bsodmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_BSODMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_crashmon],
+  [AS_HELP_STRING([--disable-plugin-crashmon],
+    [Enable the windows error reporting tool WerFault.exe watching plugin @<:@yes@:>@])],
+  [plugin_crashmon="$enableval"],
+  [plugin_crashmon="yes"])
+AM_CONDITIONAL([PLUGIN_CRASHMON], [test x$plugin_crashmon = xyes])
+if test x$plugin_crashmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_CRASHMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -443,4 +453,5 @@ Socketmon:  $plugin_socketmon
 Regmon:     $plugin_regmon
 Procmon:    $plugin_procmon
 BSODmon:    $plugin_bsodmon
+CrashMmon:  $plugin_crashmon
 -------------------------------------------------------------------------------])

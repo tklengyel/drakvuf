@@ -102,216 +102,26 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "drakvuf.h"
-#include <stdexcept>
+#ifndef CRASHMON_H
+#define CRASHMON_H
 
-enum
+#include "plugins/private.h"
+#include "plugins/plugins.h"
+
+class crashmon: public plugin
 {
-    TIMEOUT_OCCURED_SIG = -2,
+public:
+    const output_format_t format;
+
+    crashmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+
+private:
+    drakvuf_trap_t trap =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .data = this
+    };
 };
 
-static gpointer timer(gpointer data)
-{
-    drakvuf_c* drakvuf = (drakvuf_c*)data;
-
-    while (drakvuf->timeout && !drakvuf->interrupted)
-    {
-        sleep(1);
-        --drakvuf->timeout;
-    }
-
-    if (!drakvuf->interrupted)
-    {
-        drakvuf->interrupt(TIMEOUT_OCCURED_SIG);
-    }
-
-    g_thread_exit(nullptr);
-    return nullptr;
-}
-
-static GThread* startup_timer(drakvuf_c* drakvuf, int timeout)
-{
-    drakvuf->interrupted = 0;
-    drakvuf->timeout = timeout;
-
-    GThread* timeout_thread = nullptr;
-    if (drakvuf->timeout > 0)
-        timeout_thread = g_thread_new("timer", timer, (void*)drakvuf);
-    return timeout_thread;
-}
-
-static void cleanup_timer(drakvuf_c* drakvuf, GThread* timeout_thread)
-{
-    if (timeout_thread)
-    {
-        // Force stop timeout thread
-        if (drakvuf->timeout && !drakvuf->interrupted)
-            drakvuf->interrupted = -1;
-        g_thread_join(timeout_thread);
-    }
-}
-
-int drakvuf_c::start_plugins(const bool* plugin_list,
-                             const char* dump_folder,          // PLUGIN_FILEDELETE
-                             bool dump_modified_files,         // PLUGIN_FILEDELETE
-                             bool filedelete_use_injector,     // PLUGIN_FILEDELETE
-                             bool cpuid_stealth,               // PLUGIN_CPUIDMON
-                             const char* tcpip_profile,        // PLUGIN_SOCKETMON
-                             const char* syscalls_filter_file, // PLUGIN_SYSCALLS
-                             bool abort_on_bsod )              // PLUGIN_BSODMON
-{
-    int i, rc;
-
-    for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
-    {
-        if (plugin_list[i])
-        {
-            switch ((drakvuf_plugin_t)i)
-            {
-                case PLUGIN_FILEDELETE:
-                {
-                    struct filedelete_config c =
-                    {
-                        .dump_folder = dump_folder,
-                        .dump_modified_files = dump_modified_files,
-                        .filedelete_use_injector = filedelete_use_injector,
-                    };
-
-                    rc = plugins->start((drakvuf_plugin_t)i, &c);
-                    break;
-                }
-
-                case PLUGIN_CPUIDMON:
-                    rc = plugins->start((drakvuf_plugin_t)i, &cpuid_stealth);
-                    break;
-
-                case PLUGIN_SOCKETMON:
-                {
-                    struct socketmon_config c =
-                    {
-                        .tcpip_profile = tcpip_profile,
-                    };
-                    rc = plugins->start((drakvuf_plugin_t)i, &c);
-                    break;
-                }
-
-                case PLUGIN_SYSCALLS:
-                {
-                    struct syscalls_config c =
-                    {
-                        .syscalls_filter_file = syscalls_filter_file
-                    };
-                    rc = plugins->start((drakvuf_plugin_t)i, &c);
-                    break;
-                }
-
-                case PLUGIN_BSODMON:
-                    rc = plugins->start((drakvuf_plugin_t)i, &abort_on_bsod);
-                    break;
-
-                case PLUGIN_CRASHMON:
-                    rc = plugins->start((drakvuf_plugin_t)i, nullptr);
-                    break;
-
-                default:
-                    rc = plugins->start((drakvuf_plugin_t)i, nullptr);
-                    break;
-            };
-
-            if ( rc < 0 )
-                return rc;
-        }
-    }
-
-    return 1;
-}
-
-drakvuf_c::drakvuf_c(const char* domain,
-                     const char* rekall_profile,
-                     output_format_t output,
-                     bool verbose,
-                     bool leave_paused,
-                     bool libvmi_conf)
-    : leave_paused{ leave_paused }
-{
-    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose, libvmi_conf))
-        throw std::runtime_error("drakvuf_init() failed");
-
-    plugins = new drakvuf_plugins(drakvuf, output, drakvuf_get_os_type(drakvuf));
-}
-
-drakvuf_c::~drakvuf_c()
-{
-    if ( !interrupted )
-        interrupt(-1);
-
-    if (drakvuf)
-        drakvuf_close(drakvuf, leave_paused);
-
-    delete plugins;
-}
-
-void drakvuf_c::interrupt(int signal)
-{
-    interrupted = signal;
-    drakvuf_interrupt(drakvuf, signal);
-}
-
-void drakvuf_c::loop(int duration)
-{
-    GThread* timeout_thread = startup_timer(this, duration);
-    drakvuf_loop(drakvuf);
-    cleanup_timer(this, timeout_thread);
-}
-
-void drakvuf_c::pause()
-{
-    drakvuf_pause(drakvuf);
-}
-
-void drakvuf_c::resume()
-{
-    drakvuf_resume(drakvuf);
-}
-
-int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
-                          uint32_t injection_tid,
-                          const char* inject_cmd,
-                          const char* cwd,
-                          injection_method_t method,
-                          output_format_t format,
-                          const char* binary_path,
-                          const char* target_process,
-                          int timeout)
-{
-    GThread* timeout_thread = startup_timer(this, timeout);
-    int rc = injector_start_app(drakvuf,
-                                injection_pid,
-                                injection_tid,
-                                inject_cmd,
-                                cwd,
-                                method,
-                                format,
-                                binary_path,
-                                target_process,
-                                true);
-
-    if (!rc)
-    {
-        if (interrupted == TIMEOUT_OCCURED_SIG)
-        {
-            fprintf(stderr, "Process startup failed: timeout occured\n");
-        }
-        else
-        {
-            uint32_t err = 0;
-            const char* err_str = "<UNKNOWN>";
-            if (VMI_SUCCESS != drakvuf_get_last_error(drakvuf, 0, &err, &err_str))
-                err = -1;
-            fprintf(stderr, "Process startup failed. Last error is '%s' (%d)\n", err_str, err);
-        }
-    }
-
-    cleanup_timer(this, timeout_thread);
-    return rc;
-}
+#endif
