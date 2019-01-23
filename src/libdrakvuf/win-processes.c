@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -113,6 +113,7 @@
 
 #include "private.h"
 #include "win-offsets.h"
+#include "win-error-codes.h"
 #include "win.h"
 
 typedef enum dispatcher_object
@@ -152,6 +153,46 @@ addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
     }
 
     return process;
+}
+
+status_t win_get_last_error(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str)
+{
+    if (!err || !err_str)
+        return VMI_FAILURE;
+
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    addr_t eprocess = win_get_current_process(drakvuf, vcpu_id);
+    addr_t cr3 = 0;
+    vmi_pid_t pid = 0;
+    if (eprocess && VMI_SUCCESS == win_get_process_pid(drakvuf, eprocess, &pid))
+        if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, pid, &cr3))
+            return VMI_FAILURE;
+
+    addr_t kthread = win_get_current_thread(drakvuf, vcpu_id);
+    if (!kthread)
+        return VMI_FAILURE;
+
+    addr_t teb = 0;
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, kthread + drakvuf->offsets[KTHREAD_TEB], 0, &teb))
+        return VMI_FAILURE;
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = cr3,
+        .addr = teb + drakvuf->offsets[TEB_LASTERRORVALUE],
+    };
+
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, err))
+        return VMI_FAILURE;
+
+    if (*err >= __WIN_ERROR_CODES_MAX)
+        return VMI_FAILURE;
+
+    *err_str = win_error_code_names[*err];
+
+    return VMI_SUCCESS;
 }
 
 static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t eprocess_base)
@@ -447,7 +488,7 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_p
     return false;
 }
 
-bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess_addr, void* visitor_ctx), void* visitor_ctx)
+bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx)
 {
     addr_t list_head;
     if (!win_find_process_list(drakvuf, &list_head))
@@ -466,19 +507,34 @@ bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_n
 
         vmi_pid_t pid;
         addr_t module_list_head;
+
         if ((win_get_process_pid(drakvuf, current_process, &pid) == VMI_SUCCESS) &&
                 win_get_module_list(drakvuf, current_process, &module_list_head))
         {
-            addr_t dllbase;
-            access_context_t ctx =
+            access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB };
+
+            if ( vmi_pid_to_dtb( drakvuf->vmi, pid, &ctx.dtb ) == VMI_SUCCESS )
             {
-                .translate_mechanism = VMI_TM_PROCESS_PID,
-                .pid = pid,
-            };
-            if (win_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, module_name, &dllbase))
-            {
-                if (visitor_func(drakvuf, current_process, visitor_ctx))
-                    return true;
+                module_info_t* module_info = win_get_module_info_ctx( drakvuf, module_list_head, &ctx, module_name );
+
+                if ( module_info )
+                {
+                    bool ret ;
+
+                    module_info->eprocess_addr = current_process ;
+                    module_info->dtb           = ctx.dtb ;
+                    module_info->pid           = pid ;
+
+                    ret = visitor_func( drakvuf, module_info, visitor_ctx );
+
+                    g_free( module_info->full_name.contents  );
+                    g_free( module_info->base_name.contents );
+
+                    g_free( module_info );
+
+                    if ( ret )
+                        return true;
+                }
             }
         }
 
@@ -494,6 +550,8 @@ bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_n
 
     return false;
 }
+
+////////////////////////////////////////////////////////////////
 
 status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid )
 {

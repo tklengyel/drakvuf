@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -465,8 +465,8 @@ void drakvuf_free_symbols(symbols_t* symbols)
 
     for (i=0; i < symbols->count; i++)
     {
-        free((char*)symbols->symbols[i].name);
+        g_free((gchar*)symbols->symbols[i].name);
     }
-    free(symbols->symbols);
-    free(symbols);
+    g_free(symbols->symbols);
+    g_free(symbols);
 }

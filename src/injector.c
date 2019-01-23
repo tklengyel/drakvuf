@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -246,13 +246,27 @@ int main(int argc, char** argv)
 
     printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
 
-    int injection_result = injector_start_app(drakvuf, injection_pid, injection_thread, inject_file, inject_cwd, injection_method, OUTPUT_DEFAULT, binary_path, target_process);
+    int injection_result = injector_start_app(
+                               drakvuf,
+                               injection_pid,
+                               injection_thread,
+                               inject_file,
+                               inject_cwd,
+                               injection_method,
+                               OUTPUT_DEFAULT,
+                               binary_path,
+                               target_process,
+                               false);
 
     if (injection_result)
         printf("Process startup success\n");
     else
     {
-        printf("Process startup failed\n");
+        uint32_t err = 0;
+        const char* err_str = "<UNKNOWN>";
+        if (VMI_SUCCESS != drakvuf_get_last_error(drakvuf, 0, &err, &err_str))
+            err = -1;
+        printf("Process startup failed. Last error is '%s' (%d)\n", err_str, err);
         rc = 1;
     }
 

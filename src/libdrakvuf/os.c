@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -134,6 +134,14 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
         return drakvuf->osi.get_current_thread(drakvuf, vcpu_id);
 
     return 0;
+}
+
+status_t drakvuf_get_last_error(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str)
+{
+    if ( drakvuf->osi.get_last_error )
+        return drakvuf->osi.get_last_error(drakvuf, vcpu_id, err, err_str);
+
+    return VMI_FAILURE;
 }
 
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
@@ -317,7 +325,7 @@ addr_t drakvuf_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     return 0;
 }
 
-bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess_addr, void* visitor_ctx), void* visitor_ctx)
+bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx)
 {
     if ( drakvuf->osi.enumerate_processes_with_module )
         return drakvuf->osi.enumerate_processes_with_module( drakvuf, module_name, visitor_func, visitor_ctx );

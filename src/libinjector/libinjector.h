@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -188,7 +188,8 @@ int injector_start_app(drakvuf_t drakvuf,
                        injection_method_t method,
                        output_format_t format,
                        const char* binary_path,     // if -m = doppelganging
-                       const char* target_process); // if -m = doppelganging
+                       const char* target_process,  // if -m = doppelganging
+                       bool break_loop_on_detection);
 
 #pragma GCC visibility pop
 

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -103,6 +103,8 @@
  ***************************************************************************/
 
 #include <config.h>
+#include <ctype.h>
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -133,6 +135,7 @@ int main(int argc, char** argv)
     char const* inject_file = nullptr;
     char const* inject_cwd = nullptr;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
+    int injection_timeout = 0;
     char* domain = nullptr;
     char* rekall_profile = nullptr;
     char* dump_folder = nullptr;
@@ -166,7 +169,8 @@ int main(int argc, char** argv)
     if (argc < 4)
     {
         fprintf(stderr, "Required input:\n"
-                "\t -r <rekall profile>       The Rekall profile of the OS kernel\n"
+                "\t -r, --rekall-kernel <rekall profile>\n"
+                "\t                           The Rekall profile of the OS kernel\n"
                 "\t -d <domain ID or name>    The domain's ID or name\n"
                 "Optional inputs:\n"
                 "\t -l                        Use libvmi.conf\n"
@@ -175,6 +179,8 @@ int main(int argc, char** argv)
                 "\t -e <inject_file>          The executable to start with injection\n"
                 "\t -c <current_working_dir>  The current working directory for injected executable\n"
                 "\t -m <inject_method>        The injection method: createproc, shellexec, shellcode, doppelganging\n"
+                "\t -j, --injection-timeout <seconds>\n"
+                "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
                 "\t -t <timeout>              Timeout (in seconds)\n"
                 "\t -o <format>               Output format (default, csv, or json)\n"
                 "\t -x <plugin>               Don't activate the specified plugin\n"
@@ -189,13 +195,14 @@ int main(int argc, char** argv)
                 "\t -n                        Use extraction method based on function injection (requires -D)\n"
 #endif
 #ifdef ENABLE_PLUGIN_SOCKETMON
-                "\t -T <rekall profile>       The Rekall profile for tcpip.sys\n"
+                "\t -T, --rekall-tcpip <rekall profile>\n"
+                "\t                           The Rekall profile for tcpip.sys\n"
 #endif
 #ifdef ENABLE_PLUGIN_CPUIDMON
                 "\t -s                        Hide Hypervisor bits and signature in CPUID\n"
 #endif
 #ifdef DRAKVUF_DEBUG
-                "\t -v                        Turn on verbose (debug) output\n"
+                "\t -v, --verbose             Turn on verbose (debug) output\n"
 #endif
 #ifdef ENABLE_PLUGIN_SYSCALLS
                 "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
@@ -207,7 +214,17 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nbl")) != -1)
+    int long_index = 0;
+    const option long_opts[] =
+    {
+        {"rekall-kernel", required_argument, NULL, 'r'},
+        {"rekall-tcpip", required_argument, NULL, 'T'},
+        {"injection-timeout", required_argument, NULL, 'j'},
+        {"verbose", no_argument, NULL, 'v'},
+    };
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nblj:";
+
+    while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
         {
             case 'r':
@@ -227,6 +244,9 @@ int main(int argc, char** argv)
                 break;
             case 'c':
                 inject_cwd = optarg;
+                break;
+            case 'j':
+                injection_timeout = atoi(optarg);
                 break;
             case 'm':
                 if (!strncmp(optarg,"shellexec",9))
@@ -300,7 +320,10 @@ int main(int argc, char** argv)
                 libvmi_conf = true;
                 break;
             default:
-                fprintf(stderr, "Unrecognized option: %c\n", c);
+                if (isalnum(c))
+                    fprintf(stderr, "Unrecognized option: %c\n", c);
+                else
+                    fprintf(stderr, "Unrecognized option: %s\n", long_opts[long_index].name);
                 return rc;
         }
 
@@ -326,7 +349,7 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = new drakvuf_c(domain, rekall_profile, output, timeout, verbose, leave_paused, libvmi_conf);
+        drakvuf = new drakvuf_c(domain, rekall_profile, output, verbose, leave_paused, libvmi_conf);
     }
     catch (const std::exception& e)
     {
@@ -348,7 +371,7 @@ int main(int argc, char** argv)
     if ( injection_pid > 0 && inject_file )
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process);
+        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout);
         if (!ret)
             goto exit;
     }
@@ -361,7 +384,7 @@ int main(int argc, char** argv)
     PRINT_DEBUG("Beginning DRAKVUF loop\n");
 
     /* Start the event listener */
-    drakvuf->loop();
+    drakvuf->loop(timeout);
     rc = 0;
 
     PRINT_DEBUG("Finished DRAKVUF loop\n");

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -113,6 +113,9 @@ typedef struct os_interface
     addr_t (*get_current_process)
     (drakvuf_t drakvuf, uint64_t vcpu_id);
 
+    status_t (*get_last_error)
+    (drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str);
+
     char* (*get_process_name)
     (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
 
@@ -177,7 +180,7 @@ typedef struct os_interface
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg);
 
     bool (*enumerate_processes_with_module)
-    (drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess_addr, void* visitor_ctx), void* visitor_ctx);
+    (drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
 
 } os_interface_t;
 

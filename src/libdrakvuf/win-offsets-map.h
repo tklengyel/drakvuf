@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -128,6 +128,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
     [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
     [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
+    [LDR_DATA_TABLE_ENTRY_FULLDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "FullDllName" },
     [HANDLE_TABLE_TABLECODE] = {"_HANDLE_TABLE", "TableCode" },
     [KPCR_PRCB] = {"_KPCR", "Prcb" },
     [KPCR_PRCBDATA] = {"_KPCR", "PrcbData" },
@@ -135,6 +136,8 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
     [KTHREAD_PREVIOUSMODE] = { "_KTHREAD", "PreviousMode" },
     [KTHREAD_HEADER] = { "_KTHREAD", "Header" },
+    [KTHREAD_TEB] = { "_KTHREAD", "Teb" },
+    [TEB_LASTERRORVALUE] = { "_TEB", "LastErrorValue" },
     [ETHREAD_CID] = {"_ETHREAD", "Cid" },
     [ETHREAD_TCB] = { "_ETHREAD", "Tcb" },
     [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },

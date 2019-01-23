@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -1233,6 +1233,31 @@ void drakvuf_vmi_event_callback (int fd, void* data)
     }
 }
 
+static void drakvuf_poll(drakvuf_t drakvuf, unsigned int timeout)
+{
+    int rc = poll(drakvuf->event_fds, drakvuf->event_fd_cnt, timeout);
+
+    if (rc == 0)
+        return;
+
+    else if (rc < 0)
+    {
+        PRINT_DEBUG("DRAKVUF loop broke unexpectedly\n");
+        drakvuf->interrupted = -1;
+        return;
+    }
+
+    /* check and process each fd if it was raised */
+    for (int poll_ix=0; poll_ix<drakvuf->event_fd_cnt; poll_ix++)
+    {
+        if ( !(drakvuf->event_fds[poll_ix].revents & (POLLIN | POLLERR)) )
+            continue;
+
+        fd_info_t fd_info = &drakvuf->fd_info_lookup[poll_ix];
+        fd_info->event_cb(fd_info->fd, fd_info->data);
+    }
+}
+
 void drakvuf_loop(drakvuf_t drakvuf)
 {
 
@@ -1242,33 +1267,13 @@ void drakvuf_loop(drakvuf_t drakvuf)
     drakvuf_force_resume(drakvuf);
 
     while (!drakvuf->interrupted)
-    {
-        int rc = poll(drakvuf->event_fds, drakvuf->event_fd_cnt, 1000);
-        if (rc == 0)
-        {
-            continue;
-        }
-        else if (rc < 0)
-        {
-            PRINT_DEBUG("DRAKVUF loop broke unexpectedly\n");
-            drakvuf->interrupted = -1;
-            break;
-        }
-
-        /* check and process each fd if it was raised */
-        for (int poll_ix=0; poll_ix<drakvuf->event_fd_cnt; poll_ix++)
-        {
-            if ( !(drakvuf->event_fds[poll_ix].revents & (POLLIN | POLLERR)) )
-            {
-                continue;
-            }
-
-            fd_info_t fd_info = &drakvuf->fd_info_lookup[poll_ix];
-            fd_info->event_cb(fd_info->fd, fd_info->data);
-        }
-    }
+        drakvuf_poll(drakvuf, 1000);
 
     vmi_pause_vm(drakvuf->vmi);
+
+    // Ensures all events are processed from the ring
+    drakvuf_poll(drakvuf, 0);
+
     //print_sharing_info(drakvuf->xen, drakvuf->domID);
 
     PRINT_DEBUG("DRAKVUF loop finished\n");
@@ -1280,15 +1285,25 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     int rc;
     uint64_t flags = VMI_OS_WINDOWS == drakvuf->os ? VMI_PM_INITFLAG_TRANSITION_PAGES : 0;
 
-    PRINT_DEBUG("Init VMI on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
+    vmi_init_data_t* init_data = g_malloc0(sizeof(vmi_init_data_t) + sizeof(vmi_init_data_entry_t));
+    if ( !init_data )
+        return 0;
+
+    init_data->count = 1;
+    init_data->entry[0].type = VMI_INIT_DATA_XEN_EVTCHN;
+    init_data->entry[0].data = (void*) drakvuf->xen->evtchn;
+
+    PRINT_DEBUG("init_vmi on domID %u -> %s\n", drakvuf->domID, drakvuf->dom_name);
 
     /* initialize the libvmi library */
-    if (VMI_FAILURE == vmi_init(&drakvuf->vmi,
-                                VMI_XEN,
-                                &drakvuf->domID,
-                                VMI_INIT_XEN_EVTCHN | VMI_INIT_DOMAINID | VMI_INIT_EVENTS,
-                                (void*) drakvuf->xen->evtchn,
-                                NULL))
+    status_t status = vmi_init(&drakvuf->vmi,
+                               VMI_XEN,
+                               &drakvuf->domID,
+                               VMI_INIT_DOMAINID | VMI_INIT_EVENTS,
+                               (void*)init_data,
+                               NULL);
+    g_free(init_data);
+    if ( VMI_FAILURE == status )
     {
         printf("Failed to init LibVMI library.\n");
         return 0;
@@ -1300,6 +1315,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         printf("Failed to init LibVMI paging.\n");
         return 0;
     }
+    PRINT_DEBUG("init_vmi: initializing vmi paging done\n");
 
     os_t os = VMI_OS_UNKNOWN;
 
@@ -1334,6 +1350,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         drakvuf->vmi = NULL;
         return 0;
     }
+    PRINT_DEBUG("init_vmi: initializing vmi OS done\n");
 
     drakvuf->pm = vmi_get_page_mode(drakvuf->vmi, 0);
     drakvuf->address_width = vmi_get_address_width(drakvuf->vmi);
@@ -1471,6 +1488,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         return 0;
     }
 
+    PRINT_DEBUG("init_vmi finished\n");
     return 1;
 }
 
@@ -1478,7 +1496,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
 
 void close_vmi(drakvuf_t drakvuf)
 {
-    PRINT_DEBUG("starting close_vmi_drakvuf\n");
+    PRINT_DEBUG("close_vmi starting\n");
 
     drakvuf_pause(drakvuf);
 
@@ -1572,5 +1590,5 @@ void close_vmi(drakvuf_t drakvuf)
 
     drakvuf_resume(drakvuf);
 
-    PRINT_DEBUG("close_vmi_drakvuf finished\n");
+    PRINT_DEBUG("close_vmi finished\n");
 }
