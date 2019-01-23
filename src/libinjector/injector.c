@@ -559,6 +559,23 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
+static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+
+    vmi_pid_t crashed_pid = 0;
+    if (drakvuf_is_crashreporter(drakvuf, info, &crashed_pid) && crashed_pid == injector->target_pid)
+    {
+        injector->rc = 0;
+        injector->detected = false;
+        PRINT_DEBUG("Target process crash detected\n");
+
+        drakvuf_interrupt(drakvuf, -1);
+    }
+
+    return 0;
+}
+
 static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
@@ -1136,6 +1153,16 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     if (!drakvuf_add_trap(drakvuf, &trap))
         return false;
 
+    drakvuf_trap_t trap_crashreporter =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .cb = wait_for_crash_of_target_process,
+        .data = injector,
+    };
+    if (!drakvuf_add_trap(drakvuf, &trap_crashreporter))
+        return false;
+
     if (!drakvuf_is_interrupted(drakvuf))
     {
         PRINT_DEBUG("Starting injection loop\n");
@@ -1145,6 +1172,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     free_memtraps(injector);
 
     drakvuf_remove_trap(drakvuf, &trap, NULL);
+    drakvuf_remove_trap(drakvuf, &trap_crashreporter, NULL);
 
     return true;
 }
