@@ -234,6 +234,38 @@ char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpat
     return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
 }
 
+char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    addr_t peb = 0;
+    ctx.addr = eprocess_base + drakvuf->offsets[EPROCESS_PEB];
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &peb))
+        return NULL;
+
+    addr_t proc_params = 0;
+    ctx.addr = peb + drakvuf->offsets[PEB_PROCESSPARAMETERS];
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &proc_params))
+        return NULL;
+
+    addr_t cmdline_va = proc_params + drakvuf->offsets[RTL_USER_PROCESS_PARAMETERS_COMMANDLINE];
+
+    unicode_string_t* cmdline_us = drakvuf_read_unicode(drakvuf, info, cmdline_va);
+    if (!cmdline_us)
+        return NULL;
+
+    char* cmdline = (char*)cmdline_us->contents;
+    g_free( (gpointer)cmdline_us );
+
+    return cmdline;
+}
+
 status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t* pid)
 {
 

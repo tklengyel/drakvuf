@@ -160,6 +160,14 @@ char* drakvuf_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool full
     return NULL;
 }
 
+char* drakvuf_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base)
+{
+    if ( drakvuf->osi.get_process_commandline )
+        return drakvuf->osi.get_process_commandline(drakvuf, info, eprocess_base);
+
+    return NULL;
+}
+
 status_t drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid)
 {
     if ( drakvuf->osi.get_process_pid )

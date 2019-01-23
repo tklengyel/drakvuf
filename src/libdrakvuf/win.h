@@ -117,6 +117,8 @@ status_t win_get_last_error(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, 
 
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
 
+char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
+
 status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
 
 char* win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath);

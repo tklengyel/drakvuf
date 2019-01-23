@@ -119,6 +119,9 @@ typedef struct os_interface
     char* (*get_process_name)
     (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
 
+    char* (*get_process_commandline)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
+
     char* (*get_current_process_name)
     (drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath);
 
