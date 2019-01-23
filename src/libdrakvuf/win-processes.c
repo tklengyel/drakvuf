@@ -551,6 +551,22 @@ bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_n
     return false;
 }
 
+bool win_is_crashreporter(drakvuf_t drakvuf __attribute__ ((unused)), drakvuf_trap_info_t* info, vmi_pid_t* pid)
+{
+    if (sizeof("WerFault.exe") - 1 > strlen(info->proc_data.name))
+    {
+        PRINT_DEBUG("Error. Too short process name\n");
+        return false;
+    }
+
+    if (!strstr(info->proc_data.name, "WerFault.exe"))
+        return false;
+
+    *pid = info->proc_data.ppid;
+
+    return true;
+}
+
 ////////////////////////////////////////////////////////////////
 
 status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid )

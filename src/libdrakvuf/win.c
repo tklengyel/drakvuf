@@ -402,6 +402,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_filename_from_handle = win_get_filename_from_handle;
     drakvuf->osi.get_function_argument = win_get_function_argument;
     drakvuf->osi.enumerate_processes_with_module = win_enumerate_processes_with_module;
+    drakvuf->osi.is_crashreporter = win_is_crashreporter;
 
     return true;
 }

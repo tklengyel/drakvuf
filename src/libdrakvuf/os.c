@@ -332,3 +332,13 @@ bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf, const char* modu
 
     return false;
 }
+
+bool drakvuf_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid)
+{
+    *pid = 0;
+
+    if ( drakvuf->osi.is_crashreporter )
+        return drakvuf->osi.is_crashreporter( drakvuf, info, pid );
+
+    return false;
+}

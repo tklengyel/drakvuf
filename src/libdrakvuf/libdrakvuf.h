@@ -430,6 +430,10 @@ bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf,
         bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
         void* visitor_ctx);
 
+bool drakvuf_is_crashreporter(drakvuf_t drakvuf,
+                              drakvuf_trap_info_t* info,
+                              vmi_pid_t* pid);
+
 bool drakvuf_get_module_list(drakvuf_t drakvuf,
                              addr_t process_base,
                              addr_t* module_list);
