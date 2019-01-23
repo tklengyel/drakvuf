@@ -453,5 +453,5 @@ Socketmon:  $plugin_socketmon
 Regmon:     $plugin_regmon
 Procmon:    $plugin_procmon
 BSODmon:    $plugin_bsodmon
-CrashMmon:  $plugin_crashmon
+CrashMon:   $plugin_crashmon
 -------------------------------------------------------------------------------])

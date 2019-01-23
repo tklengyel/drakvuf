@@ -144,11 +144,11 @@ static event_response_t check_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info
                 name = tmp;
 
             if (VMI_FAILURE == drakvuf_get_process_ppid(drakvuf, eprocess, &ppid))
-                PRINT_DEBUG("[CRASHMON] Failed to get PPID for crached process with PID %d\n", pid);
+                PRINT_DEBUG("[CRASHMON] Failed to get PPID for crashed process with PID %d\n", pid);
         }
         else
         {
-            PRINT_DEBUG("[CRASHMON] Failed to get EPROCESS for crached process with PID %d\n", pid);
+            PRINT_DEBUG("[CRASHMON] Failed to get EPROCESS for crashed process with PID %d\n", pid);
         }
 
         print_crashed_process_information(drakvuf, info, pid, ppid, name);
