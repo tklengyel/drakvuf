@@ -113,6 +113,8 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id);
 
 addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id);
 
+status_t win_get_last_error(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str);
+
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
 
 status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
