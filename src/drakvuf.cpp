@@ -295,9 +295,17 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
     if (!rc)
     {
         if (interrupted == TIMEOUT_OCCURED_SIG)
+        {
             fprintf(stderr, "Process startup failed: timeout occured\n");
+        }
         else
-            fprintf(stderr, "Process startup failed\n");
+        {
+            uint32_t err = 0;
+            const char* err_str = "<UNKNOWN>";
+            if (VMI_SUCCESS != drakvuf_get_last_error(drakvuf, 0, &err, &err_str))
+                err = -1;
+            fprintf(stderr, "Process startup failed. Last error is '%s' (%d)\n", err_str, err);
+        }
     }
 
     cleanup_timer(this, timeout_thread);

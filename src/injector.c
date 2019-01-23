@@ -262,7 +262,11 @@ int main(int argc, char** argv)
         printf("Process startup success\n");
     else
     {
-        printf("Process startup failed\n");
+        uint32_t err = 0;
+        const char* err_str = "<UNKNOWN>";
+        if (VMI_SUCCESS != drakvuf_get_last_error(drakvuf, 0, &err, &err_str))
+            err = -1;
+        printf("Process startup failed. Last error is '%s' (%d)\n", err_str, err);
         rc = 1;
     }
 

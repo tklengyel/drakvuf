@@ -363,6 +363,10 @@ addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
                                    uint64_t vcpu_id);
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
                                   uint64_t vcpu_id);
+status_t drakvuf_get_last_error(drakvuf_t drakvuf,
+                                uint64_t vcpu_id,
+                                uint32_t* err,
+                                const char** err_str);
 
 /* Caller must free the returned string */
 char* drakvuf_get_process_name(drakvuf_t drakvuf,

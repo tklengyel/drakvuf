@@ -113,6 +113,7 @@
 
 #include "private.h"
 #include "win-offsets.h"
+#include "win-error-codes.h"
 #include "win.h"
 
 typedef enum dispatcher_object
@@ -152,6 +153,46 @@ addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
     }
 
     return process;
+}
+
+status_t win_get_last_error(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str)
+{
+    if (!err || !err_str)
+        return VMI_FAILURE;
+
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    addr_t eprocess = win_get_current_process(drakvuf, vcpu_id);
+    addr_t cr3 = 0;
+    vmi_pid_t pid = 0;
+    if (eprocess && VMI_SUCCESS == win_get_process_pid(drakvuf, eprocess, &pid))
+        if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, pid, &cr3))
+            return VMI_FAILURE;
+
+    addr_t kthread = win_get_current_thread(drakvuf, vcpu_id);
+    if (!kthread)
+        return VMI_FAILURE;
+
+    addr_t teb = 0;
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, kthread + drakvuf->offsets[KTHREAD_TEB], 0, &teb))
+        return VMI_FAILURE;
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = cr3,
+        .addr = teb + drakvuf->offsets[TEB_LASTERRORVALUE],
+    };
+
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, err))
+        return VMI_FAILURE;
+
+    if (*err >= __WIN_ERROR_CODES_MAX)
+        return VMI_FAILURE;
+
+    *err_str = win_error_code_names[*err];
+
+    return VMI_SUCCESS;
 }
 
 static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t eprocess_base)
