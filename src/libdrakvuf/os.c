@@ -160,6 +160,14 @@ char* drakvuf_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool full
     return NULL;
 }
 
+char* drakvuf_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base)
+{
+    if ( drakvuf->osi.get_process_commandline )
+        return drakvuf->osi.get_process_commandline(drakvuf, info, eprocess_base);
+
+    return NULL;
+}
+
 status_t drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid)
 {
     if ( drakvuf->osi.get_process_pid )
@@ -329,6 +337,16 @@ bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf, const char* modu
 {
     if ( drakvuf->osi.enumerate_processes_with_module )
         return drakvuf->osi.enumerate_processes_with_module( drakvuf, module_name, visitor_func, visitor_ctx );
+
+    return false;
+}
+
+bool drakvuf_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid)
+{
+    *pid = 0;
+
+    if ( drakvuf->osi.is_crashreporter )
+        return drakvuf->osi.is_crashreporter( drakvuf, info, pid );
 
     return false;
 }

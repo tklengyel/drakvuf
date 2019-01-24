@@ -119,6 +119,9 @@ typedef struct os_interface
     char* (*get_process_name)
     (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
 
+    char* (*get_process_commandline)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
+
     char* (*get_current_process_name)
     (drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath);
 
@@ -181,6 +184,9 @@ typedef struct os_interface
 
     bool (*enumerate_processes_with_module)
     (drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
+
+    bool (*is_crashreporter)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
 
 } os_interface_t;
 
