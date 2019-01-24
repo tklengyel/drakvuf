@@ -139,7 +139,7 @@ static event_response_t check_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info
 
         if (drakvuf_find_process(drakvuf, pid, nullptr, &eprocess))
         {
-            char* tmp = drakvuf_get_process_name(drakvuf, eprocess, false);
+            char* tmp = drakvuf_get_process_name(drakvuf, eprocess, true);
             if (tmp)
                 name = tmp;
 
