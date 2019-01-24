@@ -119,9 +119,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
         return;
 
     if (drakvuf->vmi)
-    {
         close_vmi(drakvuf);
-    }
 
     g_free(drakvuf->event_fds);
     g_free(drakvuf->fd_info_lookup);
@@ -135,7 +133,6 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
 
     if (drakvuf->xen)
     {
-
         if ( !pause )
             drakvuf_force_resume(drakvuf);
 
@@ -189,10 +186,7 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
     drakvuf_pause(*drakvuf);
 
     if (!init_vmi(*drakvuf, libvmi_conf))
-    {
-        drakvuf_resume(*drakvuf);
         goto err;
-    }
 
     switch ((*drakvuf)->os)
     {

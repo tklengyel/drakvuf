@@ -1015,6 +1015,9 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     if ( !remapped_gfn )
     {
         remapped_gfn = g_malloc0(sizeof(struct remapped_gfn));
+        if ( !remapped_gfn )
+            goto err_exit;
+
         remapped_gfn->o = current_gfn;
 
         int rc;
@@ -1028,7 +1031,10 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
         PRINT_DEBUG("Physmap populated? %i\n", rc);
         if (rc < 0)
+        {
+            g_free(remapped_gfn);
             goto err_exit;
+        }
 
         g_hash_table_insert(drakvuf->remapped_gfns,
                             &remapped_gfn->o,
@@ -1138,8 +1144,9 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     return 1;
 
 err_exit:
+    if ( container->traps )
+        g_slist_free(container->traps);
     g_free(container);
-    g_free(remapped_gfn);
     return 0;
 }
 
@@ -1347,7 +1354,6 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     if ( os != drakvuf->os )
     {
         PRINT_DEBUG("Failed to init LibVMI library.\n");
-        drakvuf->vmi = NULL;
         return 0;
     }
     PRINT_DEBUG("init_vmi: initializing vmi OS done\n");
