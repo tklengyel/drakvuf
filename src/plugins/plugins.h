@@ -147,6 +147,7 @@ typedef enum drakvuf_plugin
     PLUGIN_REGMON,
     PLUGIN_PROCMON,
     PLUGIN_BSODMON,
+    PLUGIN_CRASHMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -166,6 +167,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_REGMON] = "regmon",
     [PLUGIN_PROCMON] = "procmon",
     [PLUGIN_BSODMON] = "bsodmon",
+    [PLUGIN_CRASHMON] = "crashmon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -184,6 +186,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_REGMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_PROCMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_BSODMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_CRASHMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
 class plugin

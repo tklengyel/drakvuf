@@ -381,6 +381,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_current_process = win_get_current_process;
     drakvuf->osi.get_last_error = win_get_last_error;
     drakvuf->osi.get_process_name = win_get_process_name;
+    drakvuf->osi.get_process_commandline = win_get_process_commandline;
     drakvuf->osi.get_current_process_name = win_get_current_process_name;
     drakvuf->osi.get_process_userid = win_get_process_userid;
     drakvuf->osi.get_current_process_userid = win_get_current_process_userid;
@@ -402,6 +403,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_filename_from_handle = win_get_filename_from_handle;
     drakvuf->osi.get_function_argument = win_get_function_argument;
     drakvuf->osi.enumerate_processes_with_module = win_enumerate_processes_with_module;
+    drakvuf->osi.is_crashreporter = win_is_crashreporter;
 
     return true;
 }

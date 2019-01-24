@@ -123,6 +123,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [KPROCESS_HEADER] = { "_KPROCESS", "Header" },
     [PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
     [PEB_LDR] = { "_PEB", "Ldr" },
+    [PEB_PROCESSPARAMETERS] = { "_PEB", "ProcessParameters" },
     [PEB_SESSIONID] = { "_PEB", "SessionId" },
     [PEB_LDR_DATA_INLOADORDERMODULELIST] = {"_PEB_LDR_DATA", "InLoadOrderModuleList" },
     [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
@@ -159,6 +160,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [OBJECTNAMEINFORMATION_NAME] = { "_OBJECT_NAME_INFORMATION", "Name" },
 
     [FILEOBJECT_NAME] = { "_FILE_OBJECT", "FileName" },
+    [RTL_USER_PROCESS_PARAMETERS_COMMANDLINE] = { "_RTL_USER_PROCESS_PARAMETERS", "CommandLine" },
 
 };
 

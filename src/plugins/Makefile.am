@@ -162,6 +162,10 @@ if PLUGIN_BSODMON
 sources += bsodmon/bsodmon.cpp bsodmon/bugcheck.cpp
 endif
 
+if PLUGIN_CRASHMON
+sources += crashmon/crashmon.cpp
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h
 

@@ -117,6 +117,8 @@ status_t win_get_last_error(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, 
 
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
 
+char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
+
 status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
 
 char* win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath);
@@ -146,6 +148,8 @@ module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_he
 bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* eprocess_addr);
 
 bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
+
+bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
 
 status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, int32_t* ppid );
 
