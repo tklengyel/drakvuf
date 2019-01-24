@@ -152,32 +152,36 @@ void free_wrapper (drakvuf_trap_t* trap)
 
 static inline void ipv4_to_str(char** str, uint8_t ipv4[4])
 {
-    *str = (char*)g_malloc0(snprintf(NULL, 0, "%u.%u.%u.%u",
-                                     ipv4[0], ipv4[1], ipv4[2], ipv4[3]) + 1);
+    size_t size = snprintf(NULL, 0, "%u.%u.%u.%u",
+                           ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
+
+    *str = (char*)g_malloc0(size + 1);
     if ( !(*str) )
         return;
 
-    sprintf(*str, "%u.%u.%u.%u", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
+    snprintf(*str, size, "%u.%u.%u.%u", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
 }
 
 static inline void ipv6_to_str(char** str, uint8_t ipv6[16])
 {
-    *str = (char*)g_malloc0(snprintf(NULL, 0,
-                                     "%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
-                                     ipv6[0], ipv6[1], ipv6[2], ipv6[3],
-                                     ipv6[4], ipv6[5], ipv6[6], ipv6[7],
-                                     ipv6[8], ipv6[9], ipv6[10], ipv6[11],
-                                     ipv6[12], ipv6[13], ipv6[14], ipv6[15]) + 1);
+    size_t size = snprintf(NULL, 0,
+                           "%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
+                           ipv6[0], ipv6[1], ipv6[2], ipv6[3],
+                           ipv6[4], ipv6[5], ipv6[6], ipv6[7],
+                           ipv6[8], ipv6[9], ipv6[10], ipv6[11],
+                           ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
+
+    *str = (char*)g_malloc0(size + 1);
 
     if ( !(*str) )
         return;
 
-    sprintf(*str,
-            "%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
-            ipv6[0], ipv6[1], ipv6[2], ipv6[3],
-            ipv6[4], ipv6[5], ipv6[6], ipv6[7],
-            ipv6[8], ipv6[9], ipv6[10], ipv6[11],
-            ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
+    snprintf(*str, size,
+             "%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
+             ipv6[0], ipv6[1], ipv6[2], ipv6[3],
+             ipv6[4], ipv6[5], ipv6[6], ipv6[7],
+             ipv6[8], ipv6[9], ipv6[10], ipv6[11],
+             ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
 }
 
 static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)

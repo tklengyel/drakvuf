@@ -186,10 +186,8 @@ static void free_injector(injector_t injector)
 
     free_memtraps(injector);
 
-    if (injector->target_file_us)
-        vmi_free_unicode_str(injector->target_file_us);
-    if (injector->cwd_us)
-        vmi_free_unicode_str(injector->cwd_us);
+    vmi_free_unicode_str(injector->target_file_us);
+    vmi_free_unicode_str(injector->cwd_us);
 
     g_free((void*)injector->binary);
     g_free((void*)injector->payload);
@@ -1179,34 +1177,30 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
 
 static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 {
-    size_t bytes_read = 0;
-    size_t mem_size = 4096, payload_size = 0;
+    size_t payload_size = 0;
     unsigned char* data = NULL;
-    unsigned char buffer[4096];
     FILE* fp = fopen(file, "rb");
 
     if (!fp)
         return false;
 
-    data = g_malloc0(sizeof(char) * mem_size);
+    // obtain file size:
+    fseek (fp, 0, SEEK_END);
+    payload_size = ftell (fp);
+    rewind (fp);
 
-    while ( (bytes_read = fread(buffer, 4096, sizeof(unsigned char), fp)) )
+    data = g_malloc0(payload_size);
+    if ( !data )
     {
-        if (bytes_read + payload_size > mem_size)
-        {
-            mem_size += 4096;
-            unsigned char* new_data = g_realloc(data, mem_size);
-            if (!new_data)
-            {
-                g_free(data);
-                fclose(fp);
-                return false;
-            }
-            data = new_data;
-        }
+        fclose(fp);
+        return false;
+    }
 
-        memcpy(data + payload_size, buffer, bytes_read);
-        payload_size += bytes_read;
+    if ( payload_size != fread(data, payload_size, 1, fp) )
+    {
+        g_free(data);
+        fclose(fp);
+        return false;
     }
 
     *output = (addr_t)data;
@@ -1390,8 +1384,7 @@ int injector_start_app(
     if (!injector)
     {
         vmi_free_unicode_str(target_file_us);
-        if (cwd_us)
-            vmi_free_unicode_str(cwd_us);
+        vmi_free_unicode_str(cwd_us);
         return 0;
     }
 
