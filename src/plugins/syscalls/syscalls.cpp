@@ -622,9 +622,14 @@ syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output
         {
             drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
             drakvuf_remove_trap(drakvuf, trap, NULL);
+            g_free(trap->data);
+            g_free((gpointer)trap->name);
             g_free(trap);
             loop = loop->next;
         }
+
+        g_slist_free(this->traps);
+        this->traps = NULL;
 
         throw -1;
     }

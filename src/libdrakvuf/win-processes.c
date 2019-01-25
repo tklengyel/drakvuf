@@ -586,22 +586,12 @@ bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_n
 bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid)
 {
     if (sizeof("WerFault.exe") - 1 > strlen(info->proc_data.name))
-    {
-        PRINT_DEBUG("Error. Too short process name\n");
         return false;
-    }
 
     if (!strstr(info->proc_data.name, "WerFault.exe"))
         return false;
 
-    addr_t eprocess = 0;
-    if (!win_find_eprocess(drakvuf, info->proc_data.pid, NULL, &eprocess))
-    {
-        PRINT_DEBUG("Error. Failed to get EPROCESS\n");
-        return false;
-    }
-
-    char* cmdline = win_get_process_commandline(drakvuf, info, eprocess);
+    char* cmdline = win_get_process_commandline(drakvuf, info, info->proc_data.base_addr);
     if (!cmdline)
     {
         PRINT_DEBUG("Error. Failed to get command line\n");
