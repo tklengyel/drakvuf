@@ -1295,12 +1295,43 @@ static bool get_dtb_for_pid(drakvuf_t drakvuf, vmi_pid_t pid, reg_t* p_target_cr
     return success;
 }
 
+struct module_context
+{
+    const char* lib;
+    const char* fun;
+    addr_t addr;
+};
+
+static bool module_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* ctx )
+{
+    struct module_context* data = (struct module_context*)ctx;
+
+    data->addr = drakvuf_exportsym_to_va(drakvuf, module_info->eprocess_addr, data->lib, data->fun);
+    if (data->addr)
+        return true;
+
+    return false;
+}
+
 static addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib, char const* fun)
 {
     addr_t addr = drakvuf_exportsym_to_va(drakvuf, eprocess_base, lib, fun);
-    if (!addr)
+    if (addr)
+        return addr;
+
+    struct module_context ctx =
+    {
+        .lib = lib,
+        .fun = fun,
+        .addr = 0
+    };
+
+    drakvuf_enumerate_processes_with_module(drakvuf, lib, module_visitor, &ctx);
+
+    if (!ctx.addr)
         PRINT_DEBUG("Failed to get address of %s!%s\n", lib, fun);
-    return addr;
+
+    return ctx.addr;
 }
 
 static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector, const char* file, const char* binary_path)
