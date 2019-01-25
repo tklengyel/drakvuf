@@ -213,10 +213,17 @@ static gchar* win_reg_keybody_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info
         {
             GSList* iterator;
             buf_ret = "";
+            bool first_iteration = 1;
             for ( iterator = key_path_list; iterator ; iterator = iterator->next )
             {
-                buf_ret = g_strconcat( buf_ret, "\\", (char*)iterator->data, NULL );
+                gchar* new_buf_ret = g_strconcat( buf_ret, "\\", (gchar*)iterator->data, NULL );
                 g_free( iterator->data );
+
+                if ( !first_iteration )
+                    g_free(buf_ret);
+
+                buf_ret = new_buf_ret;
+                first_iteration = 0;
             }
         }
 
