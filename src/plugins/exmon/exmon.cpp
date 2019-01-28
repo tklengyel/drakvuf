@@ -163,11 +163,12 @@ static const char* offset_names[__OFFSET_MAX][2] =
 
 static void print_program_info(uint8_t previous_mode, char const* user_format, drakvuf_trap_info_t* info)
 {
+    exmon* e = (exmon*)info->trap->data;
     if (previous_mode == 1)
     {
         if (info->proc_data.base_addr)
         {
-            char * escaped_pname = info->proc_data.name;
+            char * escaped_pname = NULL;
             if (e->format == OUTPUT_JSON) {
                 escaped_pname = drakvuf_escape_str (info->proc_data.name);
             }
@@ -180,7 +181,6 @@ static void print_program_info(uint8_t previous_mode, char const* user_format, d
     }
     else
     {
-	exmon* e = (exmon*)info->trap->data;
 	if (e->format == OUTPUT_JSON)
 	    printf("}");
 

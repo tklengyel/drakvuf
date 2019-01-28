@@ -148,7 +148,6 @@ static void print_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char c
             printf("\n");
             break;
 
-
         case OUTPUT_JSON:
 	    escaped_fname = drakvuf_escape_str(file_path);
 	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
@@ -176,7 +175,6 @@ static void print_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char c
 	    g_free(escaped_fname);
 	    g_free(escaped_pname);
 	    break;
-
 
         default:
         case OUTPUT_DEFAULT:
