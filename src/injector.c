@@ -256,7 +256,8 @@ int main(int argc, char** argv)
                                OUTPUT_DEFAULT,
                                binary_path,
                                target_process,
-                               false);
+                               false,
+                               NULL);
 
     if (injection_result)
         printf("Process startup success\n");

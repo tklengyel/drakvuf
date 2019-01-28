@@ -189,7 +189,8 @@ int injector_start_app(drakvuf_t drakvuf,
                        output_format_t format,
                        const char* binary_path,     // if -m = doppelganging
                        const char* target_process,  // if -m = doppelganging
-                       bool break_loop_on_detection);
+                       bool break_loop_on_detection,
+                       injector_t* injector_to_be_freed); // out: iff break_loop_on_detection is set
 
 #pragma GCC visibility pop
 

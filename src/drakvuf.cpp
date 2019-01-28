@@ -245,6 +245,8 @@ drakvuf_c::~drakvuf_c()
     if ( !interrupted )
         interrupt(-1);
 
+    g_free(injector_to_be_freed);
+
     if (drakvuf)
         drakvuf_close(drakvuf, leave_paused);
 
@@ -294,7 +296,8 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                                 format,
                                 binary_path,
                                 target_process,
-                                true);
+                                true,
+                                &injector_to_be_freed);
 
     if (!rc)
     {
