@@ -374,6 +374,12 @@ char* drakvuf_get_process_name(drakvuf_t drakvuf,
                                addr_t process_base,
                                bool fullpath);
 
+/* Caller must free the returned string */
+char* drakvuf_get_process_commandline(drakvuf_t drakvuf,
+                                      drakvuf_trap_info_t* info,
+                                      addr_t eprocess_base);
+
+
 status_t drakvuf_get_process_pid( drakvuf_t drakvuf,
                                   addr_t process_base,
                                   vmi_pid_t* pid);
@@ -430,6 +436,10 @@ bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf,
         const char* module_name,
         bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
         void* visitor_ctx);
+
+bool drakvuf_is_crashreporter(drakvuf_t drakvuf,
+                              drakvuf_trap_info_t* info,
+                              vmi_pid_t* pid);
 
 bool drakvuf_get_module_list(drakvuf_t drakvuf,
                              addr_t process_base,

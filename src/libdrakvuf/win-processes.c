@@ -234,6 +234,38 @@ char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpat
     return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
 }
 
+char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    addr_t peb = 0;
+    ctx.addr = eprocess_base + drakvuf->offsets[EPROCESS_PEB];
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &peb))
+        return NULL;
+
+    addr_t proc_params = 0;
+    ctx.addr = peb + drakvuf->offsets[PEB_PROCESSPARAMETERS];
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &proc_params))
+        return NULL;
+
+    addr_t cmdline_va = proc_params + drakvuf->offsets[RTL_USER_PROCESS_PARAMETERS_COMMANDLINE];
+
+    unicode_string_t* cmdline_us = drakvuf_read_unicode(drakvuf, info, cmdline_va);
+    if (!cmdline_us)
+        return NULL;
+
+    char* cmdline = (char*)cmdline_us->contents;
+    g_free( (gpointer)cmdline_us );
+
+    return cmdline;
+}
+
 status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t* pid)
 {
 
@@ -549,6 +581,39 @@ bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_n
     while (next_list_entry != list_head);
 
     return false;
+}
+
+bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid)
+{
+    if (sizeof("WerFault.exe") - 1 > strlen(info->proc_data.name))
+        return false;
+
+    if (!strstr(info->proc_data.name, "WerFault.exe"))
+        return false;
+
+    char* cmdline = win_get_process_commandline(drakvuf, info, info->proc_data.base_addr);
+    if (!cmdline)
+    {
+        PRINT_DEBUG("Error. Failed to get command line\n");
+        return false;
+    }
+
+    char* param = strstr(cmdline, "-p ");
+    if (!param)
+    {
+        PRINT_DEBUG("Error. Failed to get param\n");
+        return false;
+    }
+
+    char* end = NULL;
+    *pid = strtoul(param + 3, &end, 10);
+    if (ERANGE == errno)
+    {
+        PRINT_DEBUG("Error. Failed to parse PID: the value is out of range\n");
+        return false;
+    }
+
+    return true;
 }
 
 ////////////////////////////////////////////////////////////////

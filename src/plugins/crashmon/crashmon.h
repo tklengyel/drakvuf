@@ -102,97 +102,26 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef OS_H
-#define OS_H
+#ifndef CRASHMON_H
+#define CRASHMON_H
 
-typedef struct os_interface
+#include "plugins/private.h"
+#include "plugins/plugins.h"
+
+class crashmon: public plugin
 {
-    addr_t (*get_current_thread)
-    (drakvuf_t drakvuf, uint64_t vcpu_id);
+public:
+    const output_format_t format;
 
-    addr_t (*get_current_process)
-    (drakvuf_t drakvuf, uint64_t vcpu_id);
+    crashmon(drakvuf_t drakvuf, const void* config, output_format_t output);
 
-    status_t (*get_last_error)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str);
-
-    char* (*get_process_name)
-    (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
-
-    char* (*get_process_commandline)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
-
-    char* (*get_current_process_name)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath);
-
-    int64_t (*get_process_userid)
-    (drakvuf_t drakvuf, addr_t process_base);
-
-    status_t (*get_process_pid)
-    (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid);
-
-    int64_t (*get_current_process_userid)
-    (drakvuf_t drakvuf, uint64_t vcpu_id);
-
-    bool (*get_current_thread_id)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* thread_id);
-
-    bool (*get_thread_previous_mode)
-    (drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
-
-    bool (*get_current_thread_previous_mode)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, privilege_mode_t* previous_mode);
-
-    bool (*is_process)
-    (drakvuf_t drakvuf, addr_t dtb, addr_t process_addr);
-
-    bool (*is_thread)
-    (drakvuf_t drakvuf, addr_t dtb, addr_t thread_addr);
-
-    bool (*get_module_list)
-    (drakvuf_t drakvuf, addr_t process_base, addr_t* module_list);
-
-    bool (*find_process)
-    (drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* process_addr);
-
-    bool (*inject_traps_modules)
-    (drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
-
-    bool (*get_module_base_addr)
-    (drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
-
-    addr_t (*exportksym_to_va)
-    (drakvuf_t drakvuf, const vmi_pid_t pid, const char* proc_name, const char* mod_name, addr_t rva);
-
-    addr_t (*exportsym_to_va)
-    (drakvuf_t drakvuf, addr_t process_addr, const char* module, const char* sym);
-
-    status_t (*get_process_ppid)
-    (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid);
-
-    bool (*get_current_process_data)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t* proc_data);
-
-    gchar* (*get_registry_keyhandle_path)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle);
-
-    char* (*get_filename_from_handle)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
-
-    addr_t (*get_function_argument)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg);
-
-    bool (*enumerate_processes_with_module)
-    (drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
-
-    bool (*is_crashreporter)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
-
-} os_interface_t;
-
-bool set_os_windows(drakvuf_t drakvuf);
-bool set_os_linux(drakvuf_t drakvuf);
-
-bool fill_offsets_from_rekall(drakvuf_t drakvuf, size_t size, const char* names [][2]);
+private:
+    drakvuf_trap_t trap =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .data = this
+    };
+};
 
 #endif

@@ -1015,6 +1015,9 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     if ( !remapped_gfn )
     {
         remapped_gfn = g_malloc0(sizeof(struct remapped_gfn));
+        if ( !remapped_gfn )
+            goto err_exit;
+
         remapped_gfn->o = current_gfn;
 
         int rc;
@@ -1028,7 +1031,10 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
         PRINT_DEBUG("Physmap populated? %i\n", rc);
         if (rc < 0)
+        {
+            g_free(remapped_gfn);
             goto err_exit;
+        }
 
         g_hash_table_insert(drakvuf->remapped_gfns,
                             &remapped_gfn->o,
@@ -1138,8 +1144,10 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     return 1;
 
 err_exit:
+    if ( container->traps )
+        g_slist_free(container->traps);
     g_free(container);
-    g_free(remapped_gfn);
+    g_hash_table_remove(drakvuf->remapped_gfns, &remapped_gfn->o);
     return 0;
 }
 
@@ -1347,7 +1355,6 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     if ( os != drakvuf->os )
     {
         PRINT_DEBUG("Failed to init LibVMI library.\n");
-        drakvuf->vmi = NULL;
         return 0;
     }
     PRINT_DEBUG("init_vmi: initializing vmi OS done\n");
@@ -1373,7 +1380,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     drakvuf->memaccess_lookup_trap =
         g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
     drakvuf->remapped_gfns =
-        g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free);
+        g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, g_free);
     drakvuf->remove_traps =
         g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
 
@@ -1512,6 +1519,7 @@ void close_vmi(drakvuf_t drakvuf)
             g_slist_free(s->traps);
             s->traps = NULL;
         }
+        // gets freed later
     }
 
     remove_trap(drakvuf, &drakvuf->guard0);
@@ -1530,6 +1538,7 @@ void close_vmi(drakvuf_t drakvuf)
         ghashtable_foreach(drakvuf->breakpoint_lookup_gfn, i, key, list)
         g_slist_free(list);
         g_hash_table_destroy(drakvuf->breakpoint_lookup_gfn);
+        drakvuf->breakpoint_lookup_gfn = NULL;
     }
 
     if (drakvuf->breakpoint_lookup_pa)
@@ -1540,6 +1549,7 @@ void close_vmi(drakvuf_t drakvuf)
         ghashtable_foreach(drakvuf->breakpoint_lookup_pa, i, key, s)
         g_slist_free(s->traps);
         g_hash_table_destroy(drakvuf->breakpoint_lookup_pa);
+        drakvuf->breakpoint_lookup_pa = NULL;
     }
 
     if (drakvuf->remapped_gfns)
@@ -1554,12 +1564,15 @@ void close_vmi(drakvuf_t drakvuf)
             xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &remapped_gfn->r);
         }
         g_hash_table_destroy(drakvuf->remapped_gfns);
+        drakvuf->remapped_gfns = NULL;
     };
 
     if (drakvuf->debug)
         g_slist_free(drakvuf->debug);
     if (drakvuf->cpuid)
         g_slist_free(drakvuf->cpuid);
+    if (drakvuf->cr3)
+        g_slist_free(drakvuf->cr3);
     if (drakvuf->memaccess_lookup_gfn)
         g_hash_table_destroy(drakvuf->memaccess_lookup_gfn);
     if (drakvuf->memaccess_lookup_trap)
@@ -1569,12 +1582,20 @@ void close_vmi(drakvuf_t drakvuf)
     if (drakvuf->remove_traps)
         g_hash_table_destroy(drakvuf->remove_traps);
 
+    drakvuf->debug = NULL;
+    drakvuf->cpuid = NULL;
+    drakvuf->cr3 = NULL;
+    drakvuf->memaccess_lookup_gfn = NULL;
+    drakvuf->breakpoint_lookup_trap = NULL;
+    drakvuf->remove_traps = NULL;
+
     unsigned int i;
     for (i = 0; i < drakvuf->vcpus; i++)
     {
         if ( drakvuf->step_event[i] && drakvuf->step_event[i]->data != drakvuf )
             g_free(drakvuf->step_event[i]->data);
         g_free(drakvuf->step_event[i]);
+        drakvuf->step_event[i] = NULL;
     }
 
     xc_altp2m_switch_to_view(drakvuf->xen->xc, drakvuf->domID, 0);
@@ -1587,6 +1608,10 @@ void close_vmi(drakvuf_t drakvuf)
     if (drakvuf->zero_page_gfn)
         xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &drakvuf->zero_page_gfn);
     xc_domain_setmaxmem(drakvuf->xen->xc, drakvuf->domID, drakvuf->init_memsize);
+
+    drakvuf->altp2m_idx = 0;
+    drakvuf->altp2m_idr = 0;
+    drakvuf->zero_page_gfn = 0;
 
     drakvuf_resume(drakvuf);
 

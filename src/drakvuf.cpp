@@ -209,6 +209,10 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     rc = plugins->start((drakvuf_plugin_t)i, &abort_on_bsod);
                     break;
 
+                case PLUGIN_CRASHMON:
+                    rc = plugins->start((drakvuf_plugin_t)i, nullptr);
+                    break;
+
                 default:
                     rc = plugins->start((drakvuf_plugin_t)i, nullptr);
                     break;
@@ -240,6 +244,8 @@ drakvuf_c::~drakvuf_c()
 {
     if ( !interrupted )
         interrupt(-1);
+
+    g_free(injector_to_be_freed);
 
     if (drakvuf)
         drakvuf_close(drakvuf, leave_paused);
@@ -290,7 +296,8 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                                 format,
                                 binary_path,
                                 target_process,
-                                true);
+                                true,
+                                &injector_to_be_freed);
 
     if (!rc)
     {
