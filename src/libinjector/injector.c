@@ -1299,12 +1299,16 @@ struct module_context
 {
     const char* lib;
     const char* fun;
+    addr_t module_addr;
     addr_t addr;
 };
 
 static bool module_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* ctx )
 {
     struct module_context* data = (struct module_context*)ctx;
+
+    if (module_info->base_addr != data->module_addr)
+        return false;
 
     data->addr = drakvuf_exportsym_to_va(drakvuf, module_info->eprocess_addr, data->lib, data->fun);
     if (data->addr)
@@ -1315,23 +1319,33 @@ static bool module_visitor(drakvuf_t drakvuf, const module_info_t* module_info, 
 
 static addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib, char const* fun)
 {
+    // First check current process for function
     addr_t addr = drakvuf_exportsym_to_va(drakvuf, eprocess_base, lib, fun);
     if (addr)
         return addr;
 
-    struct module_context ctx =
+    // If function is not mapped into the processes address space search it in other processes
+    struct module_context module_ctx =
     {
         .lib = lib,
         .fun = fun,
         .addr = 0
     };
 
-    drakvuf_enumerate_processes_with_module(drakvuf, lib, module_visitor, &ctx);
+    // First get modules load address to search for other process with same address
+    access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_PID, };
+    addr_t module_list_head;
+    if (VMI_SUCCESS == drakvuf_get_process_pid(drakvuf, eprocess_base, &ctx.pid) &&
+            drakvuf_get_module_list(drakvuf, eprocess_base, &module_list_head) &&
+            drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, lib, &module_ctx.module_addr))
+    {
+        drakvuf_enumerate_processes_with_module(drakvuf, lib, module_visitor, &module_ctx);
+    }
 
-    if (!ctx.addr)
+    if (!module_ctx.addr)
         PRINT_DEBUG("Failed to get address of %s!%s\n", lib, fun);
 
-    return ctx.addr;
+    return module_ctx.addr;
 }
 
 static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector, const char* file, const char* binary_path)
