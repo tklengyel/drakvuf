@@ -405,12 +405,6 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB, .dtb = info->regs->cr3 };
 
-    // PHANDLE ProcessHandle
-    uint32_t process_handle = 0;
-    ctx.addr = drakvuf_get_function_argument(drakvuf, info, 1);
-    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &process_handle))
-        PRINT_DEBUG("[PROCMON] Failed to read Handle\n");
-
     // ACCESS_MASK DesiredAccess
     uint32_t desired_access = drakvuf_get_function_argument(drakvuf, info, 2);
     // POBJECT_ATTRIBUTES ObjectAttributes
@@ -421,6 +415,15 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     ctx.addr = drakvuf_get_function_argument(drakvuf, info, 4);
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&pid))
         PRINT_DEBUG("[PROCMON] Failed to read PID\n");
+    if (!pid)
+        pid = info->proc_data.pid;
+
+    char* name = nullptr;
+    addr_t client_process = 0;
+    if (drakvuf_find_process(drakvuf, pid, nullptr, &client_process))
+        name = drakvuf_get_process_name(drakvuf, client_process, true);
+    if (!name)
+        name = g_strdup("<UNKHOWN>");
 
     drakvuf_release_vmi(drakvuf);
 
@@ -428,27 +431,29 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     switch ( f->format )
     {
         case OUTPUT_CSV:
-            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%d,0x%" PRIx32 "0x%" PRIx64 "%d"  "\n",
+            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,0x%" PRIx32 "0x%" PRIx64 "%d,\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name, process_handle, desired_access, object_attributes, pid);
+                   info->proc_data.userid, info->trap->name, desired_access, object_attributes, pid, name);
             break;
 
         case OUTPUT_KV:
             printf("procmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
-                   "Method=%s,ProcessHandle=%d,DesiredAccess=0x%" PRIx32 ",ObjectAttributes=0x%" PRIx64 ",ClientID=%d\n",
+                   "Method=%s,DesiredAccess=0x%" PRIx32 ",ObjectAttributes=0x%" PRIx64 ",ClientID=%d,ClientName=\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, process_handle, desired_access, object_attributes, pid);
+                   info->trap->name, desired_access, object_attributes, pid, name);
             break;
 
         default:
         case OUTPUT_DEFAULT:
             printf("[PROCMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64
-                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s:%d:0x%" PRIx32 ":0x%" PRIx64 ":%d\n",
+                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s:0x%" PRIx32 ":0x%" PRIx64 ":%d:\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr,
                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, process_handle, desired_access, object_attributes, pid);
+                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, desired_access, object_attributes, pid, name);
             break;
     }
+
+    g_free(name);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
