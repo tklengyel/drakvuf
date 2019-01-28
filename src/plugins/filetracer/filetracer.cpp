@@ -280,6 +280,8 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
                    syscall_name, operation_name, file);
             break;
     }
+
+    g_free(file);
 }
 
 static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t src_file_handle, addr_t fileinfo)
