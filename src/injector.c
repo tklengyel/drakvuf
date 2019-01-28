@@ -150,6 +150,7 @@ int main(int argc, char** argv)
     char* domain = NULL;
     char* inject_file = NULL;
     char* inject_cwd = NULL;
+    bool injection_global_search = false;
     char* binary_path = NULL;
     char* target_process = NULL;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
@@ -162,7 +163,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:vl")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:vlg")) != -1)
         switch (c)
         {
             case 'r':
@@ -197,6 +198,9 @@ int main(int argc, char** argv)
                     fprintf(stderr, "Unrecognized injection method\n");
                     return rc;
                 }
+                break;
+            case 'g':
+                injection_global_search = true;
                 break;
             case 'B':
                 binary_path = optarg;
@@ -257,7 +261,8 @@ int main(int argc, char** argv)
                                binary_path,
                                target_process,
                                false,
-                               NULL);
+                               NULL,
+                               injection_global_search);
 
     if (injection_result)
         printf("Process startup success\n");
