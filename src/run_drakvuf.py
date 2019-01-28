@@ -13,9 +13,20 @@
 import os
 import sys
 import signal
-import subprocess
+
 import json
 import logging
+
+import subprocess # ???
+
+if not (sys.version_info.major >= 3 and sys.version_info.minor >= 6):
+    print("This script required Python 3.6+")
+    sys.exit(1)
+
+import curio
+import curio.subprocess # ???
+import asyncio
+import selectors
 
 
 proc = None # handle to DRAKVUF process
@@ -83,38 +94,83 @@ def get_event(outpipe):
             import pdb;pdb.set_trace()
             continue
             # break
-        yield j
+        return j
 
     # all done...
-    yield None
+    return None
 
 def parse_event(event):
     global i
 
+    i += 1
     if i % 1000 == 0:
         print("Parsed {} events".format(i))
+
+def handle_output(outpipe):
+    json = get_event(outpipe)
+    print(json)
+    parse_event(json)
+
+def read_nop(outpipe):
+    line = outpipe.readline()
+    try:
+        dline = line.decode("utf-8")
+    except UnicodeDecodeError as e:
+        logging.warning("Failed to decode message %d [%s...]: %s", i, line[:40], e)
+        import pdb;pdb.set_trace()
+        return
+
+    print("Error: {}".format(dline))
+    return True
 
 def spawn_drakvuf(profile, domid):
     global proc
 
-    #fmt = 'json'
-    fmt = 'kv'
+    fmt = 'json'
+    #fmt = 'kv'
 
     cmd  = ['drakvuf', '-r', profile, '-d', domid, '-o', fmt]
     #cmd.append('-v')
 
     logging.info("Running %s", ' '.join(cmd))
 
+    # proc = curio.subprocess.Popen(cmd,
+    #                               stdout=curio.subprocess.PIPE,
+    #                               stderr=curio.subprocess.PIPE)
+
     proc = subprocess.Popen(cmd,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE)
 
-    #for e in get_event(proc.stdout):
-    for e in get_event_nojson(proc.stdout):
-        if not e:
-            break
+    stdout, stderr = proc.stdout, proc.stderr
 
-        parse_event(e)
+    #stdout.setblocking(False)
+    #stderr.setblocking(False)
+
+    sel = selectors.DefaultSelector()
+    sel.register(stdout, selectors.EVENT_READ, handle_output)
+    sel.register(stderr, selectors.EVENT_READ, read_nop)
+
+    process = True
+    while process:
+        import pdb;pdb.set_trace()
+        events = sel.select()
+        import pdb;pdb.set_trace()
+        for key, mask in events:
+            #import pdb;pdb.set_trace()
+            callback = key.data
+            val = callback(key.fileobj)
+            if val is None:
+                # fall out of outer loop
+                process = False
+                break
+
+    # #for e in get_event(proc.stdout):
+    # for e in get_event_nojson(proc.stdout):
+    #     if not e:
+    #         break
+
+    #     parse_event(e)
 
     # No more input...
     rc = proc.wait()
