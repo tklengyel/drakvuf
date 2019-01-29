@@ -275,6 +275,14 @@ bool drakvuf_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, co
     return 0;
 }
 
+bool drakvuf_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out)
+{
+    if ( drakvuf->osi.get_module_base_addr_ctx )
+        return drakvuf->osi.get_module_base_addr_ctx(drakvuf, module_list_head, ctx, module_name, base_addr_out);
+
+    return 0;
+}
+
 addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf, const vmi_pid_t pid, const char* proc_name,
                                 const char* mod_name, addr_t rva)
 {

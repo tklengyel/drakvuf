@@ -284,7 +284,8 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                           output_format_t format,
                           const char* binary_path,
                           const char* target_process,
-                          int timeout)
+                          int timeout,
+                          bool global_search)
 {
     GThread* timeout_thread = startup_timer(this, timeout);
     int rc = injector_start_app(drakvuf,
@@ -297,7 +298,8 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                                 binary_path,
                                 target_process,
                                 true,
-                                &injector_to_be_freed);
+                                &injector_to_be_freed,
+                                global_search);
 
     if (!rc)
     {

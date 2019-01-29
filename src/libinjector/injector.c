@@ -133,6 +133,7 @@ struct injector
     drakvuf_t drakvuf;
     bool is32bit, hijacked, resumed, detected;
     injection_method_t method;
+    bool global_search;
     addr_t exec_func;
     reg_t target_rsp;
 
@@ -1295,12 +1296,60 @@ static bool get_dtb_for_pid(drakvuf_t drakvuf, vmi_pid_t pid, reg_t* p_target_cr
     return success;
 }
 
-static addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib, char const* fun)
+struct module_context
 {
+    const char* lib;
+    const char* fun;
+    addr_t module_addr;
+    addr_t addr;
+};
+
+static bool module_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* ctx )
+{
+    struct module_context* data = (struct module_context*)ctx;
+
+    if (module_info->base_addr != data->module_addr)
+        return false;
+
+    data->addr = drakvuf_exportsym_to_va(drakvuf, module_info->eprocess_addr, data->lib, data->fun);
+    if (data->addr)
+        return true;
+
+    return false;
+}
+
+static addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib, char const* fun, bool global_search)
+{
+    // First check current process for function
     addr_t addr = drakvuf_exportsym_to_va(drakvuf, eprocess_base, lib, fun);
-    if (!addr)
+    if (addr)
+        return addr;
+
+    // If function is not mapped into the processes address space search it in other processes
+    struct module_context module_ctx =
+    {
+        .lib = lib,
+        .fun = fun,
+        .addr = 0
+    };
+
+    if (global_search)
+    {
+        // First get modules load address to search for other process with same address
+        access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_PID, };
+        addr_t module_list_head;
+        if (VMI_SUCCESS == drakvuf_get_process_pid(drakvuf, eprocess_base, &ctx.pid) &&
+                drakvuf_get_module_list(drakvuf, eprocess_base, &module_list_head) &&
+                drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, lib, &module_ctx.module_addr))
+        {
+            drakvuf_enumerate_processes_with_module(drakvuf, lib, module_visitor, &module_ctx);
+        }
+    }
+
+    if (!module_ctx.addr)
         PRINT_DEBUG("Failed to get address of %s!%s\n", lib, fun);
-    return addr;
+
+    return module_ctx.addr;
 }
 
 static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector, const char* file, const char* binary_path)
@@ -1315,13 +1364,13 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
 
     if (INJECT_METHOD_CREATEPROC == injector->method)
     {
-        injector->resume_thread = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "ResumeThread");
+        injector->resume_thread = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "ResumeThread", injector->global_search);
         if (!injector->resume_thread) return false;
-        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateProcessW");
+        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateProcessW", injector->global_search);
     }
     else if (INJECT_METHOD_SHELLEXEC == injector->method)
     {
-        injector->exec_func = get_function_va(drakvuf, eprocess_base, "shell32.dll", "ShellExecuteW");
+        injector->exec_func = get_function_va(drakvuf, eprocess_base, "shell32.dll", "ShellExecuteW", injector->global_search);
     }
     else if (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method)
     {
@@ -1344,9 +1393,9 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
                 return false;
         }
 
-        injector->memset = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "memset");
+        injector->memset = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "memset", injector->global_search);
         if (!injector->memset) return false;
-        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc");
+        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc", injector->global_search);
     }
 
     return injector->exec_func != 0;
@@ -1363,7 +1412,8 @@ int injector_start_app(
     const char* binary_path,
     const char* target_process,
     bool break_loop_on_detection,
-    injector_t* to_be_freed_later)
+    injector_t* to_be_freed_later,
+    bool global_search)
 {
     int rc = 0;
     addr_t cr3;
@@ -1409,6 +1459,7 @@ int injector_start_app(
     injector->target_file_us = target_file_us;
     injector->cwd_us = cwd_us;
     injector->method = method;
+    injector->global_search = global_search;
     injector->binary_path = binary_path;
     injector->target_process = target_process;
     injector->status = STATUS_NULL;
