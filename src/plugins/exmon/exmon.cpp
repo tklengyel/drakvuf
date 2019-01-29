@@ -168,13 +168,13 @@ static void print_program_info(uint8_t previous_mode, char const* user_format, d
     {
         if (info->proc_data.base_addr)
         {
-            char * escaped_pname = NULL;
+            const char * escaped_pname = info->proc_data.name;
             if (e->format == OUTPUT_JSON) {
-                escaped_pname = drakvuf_escape_str (info->proc_data.name);
+                escaped_pname = (const char *)drakvuf_escape_str (info->proc_data.name);
             }
             printf(user_format, info->proc_data.pid, info->proc_data.ppid, escaped_pname);
             if (e->format == OUTPUT_JSON) {
-                g_free (escaped_pname);
+                g_free ((void*) escaped_pname);
             }
         }
         else printf(user_format, 0, 0, "NOPROC");

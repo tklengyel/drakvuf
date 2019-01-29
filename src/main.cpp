@@ -184,7 +184,7 @@ int main(int argc, char** argv)
                 "\t -j, --injection-timeout <seconds>\n"
                 "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
                 "\t -t <timeout>              Timeout (in seconds)\n"
-                "\t -o <format>               Output format (default, csv, or json)\n"
+                "\t -o <format>               Output format (default, csv, kv, or json)\n"
                 "\t -x <plugin>               Don't activate the specified plugin\n"
                 "\t -p                        Leave domain paused after DRAKVUF exits\n"
 #ifdef ENABLE_DOPPELGANGING

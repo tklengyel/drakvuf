@@ -115,7 +115,6 @@ extern "C" {
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
 #include <json-c/json.h>
-#include <string.h>
 
 /*---------------------------------------------------------
  * DRAKVUF functions
