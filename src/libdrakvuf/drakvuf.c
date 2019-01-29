@@ -104,6 +104,7 @@
 
 #include <glib.h>
 #include <ctype.h>
+#include <string.h>
 #include "../xen_helper/xen_helper.h"
 
 #include "libdrakvuf.h"
@@ -674,72 +675,100 @@ unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_con
 }
 
 /**
- * Replace all occurances of '\' in orig with "\\" so JSON parsers
- * like it. Caller must g_free() the result.
+ * Escapes all escapable characters in orig, returns new, escaped string.
+ * The output string should be JSON-compatible.
+ * Caller must g_free() the result.
  *
- * TODO: is there a faster algorithm than this?
+ * Works on one JSON-escaped character at a time. Iteratively shifts
+ * delimiter-separated chunks over to the right, one by one, and
+ * backfilling cavities with NULL characters. Finally, places escape
+ * character at each remaining NULL character. For instance, here's
+ * how backslashes are escaped in a string (- is a NULL character):
+ *
+ * \A\B\c    (input string with 3 escapeable chars)
+ * \A\B----c (c shifted right 3)
+ * \A---B--c (B shifted right 2)
+ * --A--B--c (A shifted right 1)
+ * \\A\\B\\c (output string: NULLs filled in with \ chars)
+ *
+ * TODO: Handle non-ASCII character sets
  *
  * See https://www.freeformatter.com/json-escape.html
  */
 char * drakvuf_escape_str(const char * input)
 {
     size_t outsize = 0;
-    char * res = NULL;
+    // holds output; only this is modified
     char * curr = NULL;
 
-    // \,",\n,\r,\t
+    // input escaped characters: \,",\n,\r,\t
     char * inpat = (char *) "\\\"\n\r\t";
-
-    // use this to iterate over the output
-    size_t res_ofs = 0;
-    char * needle;
+    // output escaped characters in same order as above
+    char * outpat = (char *) "\\\"nrt";
 
     if (NULL == input || 0 == strlen(input))
 	return NULL;
 
     outsize = strlen(input) * 2 + 1;
-    res = (char *) g_malloc0(outsize);
+    curr = (char *) g_malloc0(outsize);
 
-    // Only modify res; don't clobber input!
-    strcpy (res, input);
-
-    curr = res;
+    strcpy (curr, input);
 
     // Read through the string multiple times, each time working on one escapable char
     for (size_t i = 0; i < strlen(inpat); ++i) {
+	size_t origlen = strlen(curr);
+        char in = inpat[i];
+        char out = outpat[i];
 
-	// For each escapable character, start back at the beginning of the result string
-	res_ofs = 0;
-
-	while ((needle = strchr(curr, inpat[i])) != NULL) {
-	    // advance to the pattern
-	    res_ofs += needle - curr;
-
-            // copy the prepending backslash; this clobbers the escaped char
-	    res[res_ofs++] = '\\';
-
-            // shift the rest of the string back (to the right) by one (N.B. mem overlaps)
-            memmove (&res[res_ofs+1], &res[res_ofs], strlen(&res[res_ofs]));
-
-	    res[res_ofs++] = inpat[i];
-
-            // start the next search past the insertion
-	    curr = &res[res_ofs]; // needle + 2 * sizeof(char);
+        // count occurances of input pattern
+	size_t tokct = 0;
+	for (size_t j = 0; j < origlen; ++j) {
+	    if (curr[j] == in) {
+		++tokct;
+	    }
 	}
 
-        // Done with this char, reset to beginning of string
-	curr = res;
-    }
+	size_t orig_tokct = tokct;
+	char * needle;
+
+	if (0 == tokct) {
+	    continue;
+	}
+
+	// Walk through current backwards and re-write it by shifting chunks to the right
+	while ((needle = strrchr (curr, in)) != NULL) {
+	    // Since we're NULLing out the end of each chunk, the
+	    // chunk size is from the current needle to the end
+	    size_t chunk_len = strlen (needle);
+
+	    // First move chunk to the right, without original escaped char
+	    memmove (needle + tokct + 1, needle + 1, chunk_len - 1);
+            // Put the escaped character in the correct location
+            needle[tokct] = out;
+	    // Backfill entire cavity with NULL characters.
+	    memset (needle, 0, tokct);
+
+	    --tokct;
+	}
+
+	// There should be an escape \ every place there's a NULL character
+	for (size_t j = 0; j < origlen + orig_tokct; ++j) {
+	    if (curr[j] == 0) {
+		curr[j] = '\\';
+	    }
+	}
+    } // for
 
     // finally, purge non-ASCII characters...
     // FIXME: really, we want to purge characters that JSON can't handle
-    for (size_t i = 0; i < strlen(res); ++i) {
-        if (!isprint(res[i])) {
-            res[i] = '?';
+    for (size_t i = 0; i < strlen(curr); ++i) {
+	char c = curr[i];
+        if (!isprint(c) && !isspace(c)) {
+            curr[i] = '?';
         }
     }
 
-    return res;
+    return curr;
 }
 
 static void drakvuf_event_fd_generate(drakvuf_t drakvuf)
