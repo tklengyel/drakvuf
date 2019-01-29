@@ -461,6 +461,12 @@ bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
                                    const char* module_name,
                                    addr_t* base_addr );
 
+bool drakvuf_get_module_base_addr_ctx( drakvuf_t drakvuf,
+                                       addr_t module_list_head,
+                                       access_context_t* ctx,
+                                       const char* module_name,
+                                       addr_t* base_addr_out );
+
 status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
                                    addr_t process_base,
                                    vmi_pid_t* ppid );

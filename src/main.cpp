@@ -136,6 +136,7 @@ int main(int argc, char** argv)
     char const* inject_cwd = nullptr;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     int injection_timeout = 0;
+    bool injection_global_search = false;
     char* domain = nullptr;
     char* rekall_profile = nullptr;
     char* dump_folder = nullptr;
@@ -179,6 +180,7 @@ int main(int argc, char** argv)
                 "\t -e <inject_file>          The executable to start with injection\n"
                 "\t -c <current_working_dir>  The current working directory for injected executable\n"
                 "\t -m <inject_method>        The injection method: createproc, shellexec, shellcode, doppelganging\n"
+                "\t -g                        Search required for injection functions in all processes\n"
                 "\t -j, --injection-timeout <seconds>\n"
                 "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
                 "\t -t <timeout>              Timeout (in seconds)\n"
@@ -222,7 +224,7 @@ int main(int argc, char** argv)
         {"injection-timeout", required_argument, NULL, 'j'},
         {"verbose", no_argument, NULL, 'v'},
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nblj:";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nblgj:";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
@@ -244,6 +246,9 @@ int main(int argc, char** argv)
                 break;
             case 'c':
                 inject_cwd = optarg;
+                break;
+            case 'g':
+                injection_global_search = true;
                 break;
             case 'j':
                 injection_timeout = atoi(optarg);
@@ -371,7 +376,7 @@ int main(int argc, char** argv)
     if ( injection_pid > 0 && inject_file )
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout);
+        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout, injection_global_search);
         if (!ret)
             goto exit;
     }

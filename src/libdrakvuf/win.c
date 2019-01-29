@@ -389,6 +389,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_thread_previous_mode = win_get_thread_previous_mode;
     drakvuf->osi.get_current_thread_previous_mode = win_get_current_thread_previous_mode;
     drakvuf->osi.get_module_base_addr = win_get_module_base_addr;
+    drakvuf->osi.get_module_base_addr_ctx = win_get_module_base_addr_ctx;
     drakvuf->osi.is_process = win_is_eprocess;
     drakvuf->osi.is_thread = win_is_ethread;
     drakvuf->osi.get_module_list = win_get_module_list;

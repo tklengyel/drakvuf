@@ -166,7 +166,8 @@ public:
                    output_format_t format,
                    const char* binary_path,
                    const char* target_process,
-                   int timeout);
+                   int timeout,
+                   bool global_search);
     int start_plugins(const bool* plugin_list,
                       const char* dump_folder,
                       bool dump_modified_files,
