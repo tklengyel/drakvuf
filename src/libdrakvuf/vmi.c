@@ -445,6 +445,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             if (event->mem_event.out_access & VMI_MEMACCESS_W)
             {
                 g_free(pass);
+                g_free( (gpointer)proc_data.name );
                 PRINT_DEBUG("Somebody try to write to the shadow page, let's emulate it instead\n");
                 return rsp | VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
             }
@@ -1593,7 +1594,11 @@ void close_vmi(drakvuf_t drakvuf)
     for (i = 0; i < drakvuf->vcpus; i++)
     {
         if ( drakvuf->step_event[i] && drakvuf->step_event[i]->data != drakvuf )
-            g_free(drakvuf->step_event[i]->data);
+        {
+            struct memcb_pass* pass = (struct memcb_pass*)drakvuf->step_event[i]->data;
+            g_free((gpointer)pass->proc_data.name);
+            g_free((gpointer)pass);
+        }
         g_free(drakvuf->step_event[i]);
         drakvuf->step_event[i] = NULL;
     }
