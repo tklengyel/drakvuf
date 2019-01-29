@@ -161,6 +161,9 @@ typedef struct os_interface
     bool (*get_module_base_addr)
     (drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
 
+    bool (*get_module_base_addr_ctx)
+    (drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
+
     addr_t (*exportksym_to_va)
     (drakvuf_t drakvuf, const vmi_pid_t pid, const char* proc_name, const char* mod_name, addr_t rva);
 
