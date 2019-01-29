@@ -496,10 +496,10 @@ procmon::procmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_HEADER", "Body", &this->object_header_body) )
         throw -1;
 
-    assert(sizeof(traps) / sizeof(traps[0]) > 1);
+    assert(sizeof(traps) / sizeof(traps[0]) > 2);
     register_trap(drakvuf, "NtCreateUserProcess", &traps[0], create_user_process_hook_cb);
     register_trap(drakvuf, "NtTerminateProcess", &traps[1], terminate_process_hook_cb);
-    register_trap(drakvuf, "NtOpenProcess", &traps[1], open_process_hook_cb);
+    register_trap(drakvuf, "NtOpenProcess", &traps[2], open_process_hook_cb);
 }
 
 procmon::~procmon()
