@@ -183,7 +183,7 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             g_free(escaped_pname);
             break;
 
-    default:
+        default:
         case OUTPUT_DEFAULT:
             printf("[DEBUGMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64". "
                    "RIP: 0x%" PRIx64". Debug type: %" PRIi32 ",%s\n",

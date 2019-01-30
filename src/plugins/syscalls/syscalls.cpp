@@ -285,9 +285,9 @@ static void print_kv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* in
 }
 
 
-static void print_json_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_syscall_t * wsc, size_t i, addr_t val, const char* str)
+static void print_json_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_syscall_t* wsc, size_t i, addr_t val, const char* str)
 {
-    const win_arg_t & arg = wsc->args[i];
+    const win_arg_t& arg = wsc->args[i];
 
     if ( str )
     {
