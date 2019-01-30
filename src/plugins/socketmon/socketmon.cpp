@@ -285,30 +285,30 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"socketmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Owner\": \"%s\","
-		    "\"OwnerId\": %" PRIi64 ","
-		    "\"Protocol\": \"%s\","
-		    "\"LocalIp\": \"%s\","
-		    "\"LocalPort\": %" PRIu16 ""
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    owner, ownerid,
-		    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-		    lip, udpa.port);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Owner\": \"%s\","
+                    "\"OwnerId\": %" PRIi64 ","
+                    "\"Protocol\": \"%s\","
+                    "\"LocalIp\": \"%s\","
+                    "\"LocalPort\": %" PRIu16 ""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    owner, ownerid,
+                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
+                    lip, udpa.port);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:
@@ -428,30 +428,30 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"socketmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Owner\": %s"
-		    "\"OwnerId\": %" PRIi64 ","
-		    "\"Protocol\": %s,"
-		    "\"LocalIp\": %s,"
-		    "\"LocalPort\": %" PRIu16 ""
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    owner, ownerid,
-		    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-		    lip, udpa.port);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Owner\": %s"
+                    "\"OwnerId\": %" PRIi64 ","
+                    "\"Protocol\": %s,"
+                    "\"LocalIp\": %s,"
+                    "\"LocalPort\": %" PRIu16 ""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    owner, ownerid,
+                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
+                    lip, udpa.port);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:
@@ -572,30 +572,30 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"socketmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Owner\": \"%s\""
-		    "\"OwnerId\": %" PRIi64 ","
-		    "\"Protocol\": \"%s\","
-		    "\"LocalIp\": \"%s\","
-		    "\"LocalPort\": %" PRIu16 ""
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    owner, ownerid,
-		    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-		    lip, udpa.port);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Owner\": \"%s\""
+                    "\"OwnerId\": %" PRIi64 ","
+                    "\"Protocol\": \"%s\","
+                    "\"LocalIp\": \"%s\","
+                    "\"LocalPort\": %" PRIu16 ""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    owner, ownerid,
+                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
+                    lip, udpa.port);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:
@@ -745,32 +745,32 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"socketmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Owner\": \"%s\""
-		    "\"OwnerId\": %" PRIi64 ","
-		    "\"Protocol\": \"%s\","
-		    "\"LocalIp\": \"%s\","
-		    "\"LocalPort\": %" PRIu16 ""
-		    "\"RemoteIp\": \"%s\","
-		    "\"RemotePort\": %" PRIu16 ""
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    owner, ownerid,
-		    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-		    lip, tcpe.localport, rip, tcpe.remoteport);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Owner\": \"%s\""
+                    "\"OwnerId\": %" PRIi64 ","
+                    "\"Protocol\": \"%s\","
+                    "\"LocalIp\": \"%s\","
+                    "\"LocalPort\": %" PRIu16 ""
+                    "\"RemoteIp\": \"%s\","
+                    "\"RemotePort\": %" PRIu16 ""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    owner, ownerid,
+                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+                    lip, tcpe.localport, rip, tcpe.remoteport);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:
@@ -902,32 +902,32 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"socketmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Owner\": \"%s\""
-		    "\"OwnerId\": %" PRIi64 ","
-		    "\"Protocol\": \"%s\","
-		    "\"LocalIp\": \"%s\","
-		    "\"LocalPort\": %" PRIu16 ","
-		    "\"RemoteIp\": \"%s\","
-		    "\"RemotePort\": %" PRIu16 ""
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    owner, ownerid,
-		    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-		    lip, tcpe.localport, rip, tcpe.remoteport);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Owner\": \"%s\""
+                    "\"OwnerId\": %" PRIi64 ","
+                    "\"Protocol\": \"%s\","
+                    "\"LocalIp\": \"%s\","
+                    "\"LocalPort\": %" PRIu16 ","
+                    "\"RemoteIp\": \"%s\","
+                    "\"RemotePort\": %" PRIu16 ""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    owner, ownerid,
+                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+                    lip, tcpe.localport, rip, tcpe.remoteport);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:
@@ -1060,34 +1060,34 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"socketmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Owner\": %s"
-		    "\"OwnerId\": %" PRIi64 ","
-		    "\"Protocol\": \"%s\","
-		    "\"TcpState\": \"%s\","
-		    "\"LocalIp\": \"%s\","
-		    "\"LocalPort\": %" PRIu16 ","
-		    "\"RemoteIp\": \"%s\","
-		    "\"RemotePort\": %" PRIu16 ""
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    owner, ownerid,
-		    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-		    tcp_state_str[tcpe.state],
-		    lip, tcpe.localport, rip, tcpe.remoteport);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Owner\": %s"
+                    "\"OwnerId\": %" PRIi64 ","
+                    "\"Protocol\": \"%s\","
+                    "\"TcpState\": \"%s\","
+                    "\"LocalIp\": \"%s\","
+                    "\"LocalPort\": %" PRIu16 ","
+                    "\"RemoteIp\": \"%s\","
+                    "\"RemotePort\": %" PRIu16 ""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    owner, ownerid,
+                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
+                    tcp_state_str[tcpe.state],
+                    lip, tcpe.localport, rip, tcpe.remoteport);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:
@@ -1217,30 +1217,30 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"socketmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Owner\": \"%s\""
-		    "\"OwnerId\": %" PRIi64 ","
-		    "\"Protocol\": \"%s\","
-		    "\"LocalIp\": \"%s\","
-		    "\"LocalPort\": %" PRIu16
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    owner, ownerid,
-		    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-		    lip, tcpl.port);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Owner\": \"%s\""
+                    "\"OwnerId\": %" PRIi64 ","
+                    "\"Protocol\": \"%s\","
+                    "\"LocalIp\": \"%s\","
+                    "\"LocalPort\": %" PRIu16
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    owner, ownerid,
+                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
+                    lip, tcpl.port);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:
@@ -1360,30 +1360,30 @@ static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"socketmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Owner\": \"%s\""
-		    "\"OwnerId\": %" PRIi64 ","
-		    "\"Protocol\": \"%s\","
-		    "\"LocalIp\": \"%s\","
-		    "\"LocalPort\": %" PRIu16 ""
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    owner, ownerid,
-		    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-		    lip, tcpl.port);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Owner\": \"%s\""
+                    "\"OwnerId\": %" PRIi64 ","
+                    "\"Protocol\": \"%s\","
+                    "\"LocalIp\": \"%s\","
+                    "\"LocalPort\": %" PRIu16 ""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    owner, ownerid,
+                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+                    lip, tcpl.port);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:
@@ -1503,30 +1503,30 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"socketmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Owner\": \"%s\""
-		    "\"OwnerId\": %" PRIi64 ","
-		    "\"Protocol\": \"%s\","
-		    "\"LocalIp\": \"%s\","
-		    "\"LocalPort\": %" PRIu16 ""
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    owner, ownerid,
-		    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-		    lip, tcpl.port);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Owner\": \"%s\""
+                    "\"OwnerId\": %" PRIi64 ","
+                    "\"Protocol\": \"%s\","
+                    "\"LocalIp\": \"%s\","
+                    "\"LocalPort\": %" PRIu16 ""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    owner, ownerid,
+                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
+                    lip, tcpl.port);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:
@@ -1670,25 +1670,26 @@ static void print_dns_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                    info->proc_data.name, dns_name, function_name);
             break;
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"socketmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"DnsName\": \"%s\""
-		    "\"Method\": \"%s\","
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    dns_name, function_name);
-	    g_free(escaped_pname);
-	    break;
+             escaped_pname = drakvuf_escape_str(info->proc_data.name);
+             printf( "{"
+                     "\"Plugin\" : \"socketmon\","
+                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                     "\"ProcessName\": \"%s\","
+                     "\"UserName\": \"%s\","
+                     "\"UserId\": %" PRIu64 ","
+                     "\"PID\" : %d,"
+                     "\"PPID\": %d,"
+                     "\"DnsName\": \"%s\""
+                     "\"Method\": \"%s\","
+                     "}\n",
+                     UNPACK_TIMEVAL(info->timestamp),
+                     escaped_pname,
+                     USERIDSTR(drakvuf), info->proc_data.userid,
+                     info->proc_data.pid, info->proc_data.ppid,
+                     dns_name, function_name);
+             g_free(escaped_pname);
+             break;
+
         default:
         case OUTPUT_DEFAULT:
             printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" DNS_NAME:\"%s\" METHOD:\"%s\"\n",

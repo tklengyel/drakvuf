@@ -167,38 +167,38 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             escaped_pname = drakvuf_escape_str(info->proc_data.name);
             escaped_key   = drakvuf_escape_str(key_name);
 
-	    printf( "{"
-		    "\"Plugin\" : \"regmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Method\" : \"%s\","
-		    "\"Key\" : \"%s\"",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    info->trap->name,
-		    escaped_key);
+            printf( "{"
+                    "\"Plugin\" : \"regmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Method\" : \"%s\","
+                    "\"Key\" : \"%s\"",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    info->trap->name,
+                    escaped_key);
             if (value_name) {
-		char * escaped_vname = drakvuf_escape_str(value_name);
+                char * escaped_vname = drakvuf_escape_str(value_name);
                 printf(",\"ValueName\":\"%s\"", escaped_vname);
-		g_free(escaped_vname);
-	    }
+                g_free(escaped_vname);
+            }
             if (value){
-		char * escaped_val = drakvuf_escape_str(value);
+                char * escaped_val = drakvuf_escape_str(value);
                 printf(",\"Value\":\"%s\"", escaped_val);
-		g_free(escaped_val);
-	    }
+                g_free(escaped_val);
+            }
 
-	    printf("}\n");
+            printf("}\n");
 
-	    g_free(escaped_key);
-	    g_free(escaped_pname);
-	    break;
+            g_free(escaped_key);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:

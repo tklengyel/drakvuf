@@ -199,34 +199,34 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             break;
 
         case OUTPUT_JSON:
-	    // Remove non-ascii characters from tag
-	    for (size_t i = 0; i < sizeof(tag); ++i) {
-		if (!isascii(tag[i]))
-		    tag[i] = '?';
-	    }
+     // Remove non-ascii characters from tag
+            for (size_t i = 0; i < sizeof(tag); ++i) {
+                if (!isascii(tag[i]))
+                    tag[i] = '?';
+            }
 
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"poolmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"VCPU\": %" PRIu32 ","
-		    "\"CR3\": %" PRIu64 ","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Tag\": \"%s\","
-		    "\"PoolType\": \"%s\","
-		    "\"Size\": %" PRIu64  ""
-		    "}",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    info->vcpu, info->regs->cr3, escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    tag, pool_type_str, size);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"poolmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"VCPU\": %" PRIu32 ","
+                    "\"CR3\": %" PRIu64 ","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Tag\": \"%s\","
+                    "\"PoolType\": \"%s\","
+                    "\"Size\": %" PRIu64  ""
+                    "}",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    info->vcpu, info->regs->cr3, escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    tag, pool_type_str, size);
+            g_free(escaped_pname);
+            break;
         default:
         case OUTPUT_DEFAULT:
             printf("[POOLMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s (type: %s, size: %" PRIu64 ")",

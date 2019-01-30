@@ -181,8 +181,8 @@ static void print_program_info(uint8_t previous_mode, char const* user_format, d
     }
     else
     {
-	if (e->format == OUTPUT_JSON)
-	    printf("}");
+ if (e->format == OUTPUT_JSON)
+     printf("}");
 
         printf("\n");
     }
