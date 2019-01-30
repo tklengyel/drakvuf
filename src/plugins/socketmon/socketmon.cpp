@@ -1670,25 +1670,25 @@ static void print_dns_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                    info->proc_data.name, dns_name, function_name);
             break;
         case OUTPUT_JSON:
-             escaped_pname = drakvuf_escape_str(info->proc_data.name);
-             printf( "{"
-                     "\"Plugin\" : \"socketmon\","
-                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                     "\"ProcessName\": \"%s\","
-                     "\"UserName\": \"%s\","
-                     "\"UserId\": %" PRIu64 ","
-                     "\"PID\" : %d,"
-                     "\"PPID\": %d,"
-                     "\"DnsName\": \"%s\""
-                     "\"Method\": \"%s\","
-                     "}\n",
-                     UNPACK_TIMEVAL(info->timestamp),
-                     escaped_pname,
-                     USERIDSTR(drakvuf), info->proc_data.userid,
-                     info->proc_data.pid, info->proc_data.ppid,
-                     dns_name, function_name);
-             g_free(escaped_pname);
-             break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"DnsName\": \"%s\""
+                    "\"Method\": \"%s\","
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    dns_name, function_name);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:
