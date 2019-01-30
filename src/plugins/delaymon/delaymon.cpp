@@ -10,7 +10,7 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
 
     addr_t delay_addr = drakvuf_get_function_argument(drakvuf, info, 2);
     int64_t delay = 0; // in hundreds of nanoseconds
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
 
     {
         access_context_t ctx;

@@ -199,7 +199,7 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     struct wrapper* w = (struct wrapper*)info->trap->data;
     socketmon* s = w->s;
 
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
 
     struct udp_endpoint_x86 udpa;;
     struct inetaf_x86 inetaf;
@@ -341,7 +341,7 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     struct wrapper* w = (struct wrapper*)info->trap->data;
     socketmon* s = w->s;
 
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -483,7 +483,7 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     char* lip = NULL, *owner = NULL;
     struct wrapper* w = (struct wrapper*)info->trap->data;
     socketmon* s = w->s;
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -628,7 +628,7 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
     struct tcp_endpoint_x86 tcpe;
     struct inetaf_x86 inetaf;
     struct addr_info_x86 addrinfo;
@@ -803,7 +803,7 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
     struct tcp_endpoint_x64 tcpe;
     struct inetaf_x64 inetaf;
     struct addr_info_x64 addrinfo;
@@ -961,7 +961,7 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
     struct tcp_endpoint_win10_x64 tcpe;
     struct inetaf_win10_x64 inetaf;
     struct addr_info_x64 addrinfo;
@@ -1124,7 +1124,7 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
     struct tcp_listener_x86 tcpl;
     struct inetaf_x86 inetaf;
     struct local_address_x86 local;
@@ -1274,7 +1274,7 @@ static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
     struct tcp_listener_x64 tcpl;
     struct inetaf_x64 inetaf;
     struct local_address_x64 local;
@@ -1417,7 +1417,7 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
     struct tcp_listener_win10_x64 tcpl;
     struct inetaf_win10_x64 inetaf;
     struct local_address_x64 local;
@@ -1654,7 +1654,7 @@ static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 static void print_dns_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* sm, const char* function_name, const char* dns_name)
 {
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
 
     switch (sm->format)
     {

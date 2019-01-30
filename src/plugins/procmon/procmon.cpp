@@ -149,11 +149,11 @@ static void print_process_creation_result(
     unicode_string_t* imagepath_us = drakvuf_read_unicode(drakvuf, info, imagepath_addr);
     unicode_string_t* dllpath_us = drakvuf_read_unicode(drakvuf, info, dllpath_addr);
 
-    char * escaped_pname = NULL;
-    char * escaped_cmdline = NULL;
-    char * escaped_ipath = NULL;
-    char * escaped_dllpath = NULL;
-    char * escaped_curdir = NULL;
+    char* escaped_pname = NULL;
+    char* escaped_cmdline = NULL;
+    char* escaped_ipath = NULL;
+    char* escaped_dllpath = NULL;
+    char* escaped_curdir = NULL;
 
     char* curdir = drakvuf_get_filename_from_handle(drakvuf, info, curdir_handle_addr);
     if (!curdir)
@@ -390,7 +390,7 @@ static event_response_t terminate_process_hook(
     drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     addr_t process_handle, addr_t exit_status)
 {
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
     procmon* f = (procmon*)info->trap->data;
 
     vmi_pid_t exit_pid = get_pid_from_handle(f, drakvuf, info, process_handle);

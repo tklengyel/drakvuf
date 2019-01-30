@@ -715,15 +715,18 @@ char* drakvuf_escape_str(const char* input)
     strcpy (curr, input);
 
     // Read through the string multiple times, each time working on one escapable char
-    for (size_t i = 0; i < strlen(inpat); ++i) {
+    for (size_t i = 0; i < strlen(inpat); ++i)
+    {
         size_t origlen = strlen(curr);
         char in = inpat[i];
         char out = outpat[i];
 
         // count occurances of input pattern
         size_t tokct = 0;
-        for (size_t j = 0; j < origlen; ++j) {
-            if (curr[j] == in) {
+        for (size_t j = 0; j < origlen; ++j)
+        {
+            if (curr[j] == in)
+            {
                 ++tokct;
             }
         }
@@ -731,12 +734,14 @@ char* drakvuf_escape_str(const char* input)
         size_t orig_tokct = tokct;
         char* needle;
 
-        if (0 == tokct) {
+        if (0 == tokct)
+        {
             continue;
         }
 
         // Walk through current backwards and re-write it by shifting chunks to the right
-        while ((needle = strrchr (curr, in)) != NULL) {
+        while ((needle = strrchr (curr, in)) != NULL)
+        {
             // Since we're NULLing out the end of each chunk, the
             // chunk size is from the current needle to the end
             size_t chunk_len = strlen (needle);
@@ -752,8 +757,10 @@ char* drakvuf_escape_str(const char* input)
         }
 
         // There should be an escape \ every place there's a NULL character
-        for (size_t j = 0; j < origlen + orig_tokct; ++j) {
-            if (curr[j] == 0) {
+        for (size_t j = 0; j < origlen + orig_tokct; ++j)
+        {
+            if (curr[j] == 0)
+            {
                 curr[j] = '\\';
             }
         }
@@ -761,9 +768,11 @@ char* drakvuf_escape_str(const char* input)
 
     // finally, purge non-ASCII characters...
     // FIXME: really, we want to purge characters that JSON can't handle
-    for (size_t i = 0; i < strlen(curr); ++i) {
+    for (size_t i = 0; i < strlen(curr); ++i)
+    {
         char c = curr[i];
-        if (!isprint(c) && !isspace(c)) {
+        if (!isprint(c) && !isspace(c))
+        {
             curr[i] = '?';
         }
     }
