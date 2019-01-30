@@ -126,8 +126,8 @@
 static void print_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char const* file_path, bool with_attr, uint32_t file_attr)
 {
     filetracer* f = (filetracer*)info->trap->data;
-    char * escaped_pname = NULL;
-    char * escaped_fname = NULL;
+    char* escaped_pname = NULL;
+    char* escaped_fname = NULL;
 
     switch (f->format)
     {
@@ -282,8 +282,8 @@ static char* get_parent_folder(char const* file_name)
 
 static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, addr_t fileinfo)
 {
-    char * escaped_pname = NULL;
-    char * escaped_fname = NULL;
+    char* escaped_pname = NULL;
+    char* escaped_fname = NULL;
     const char* syscall_name = info->trap->name;
     const char* operation_name = "FileDispositionInformation";
     filetracer* f = (filetracer*)info->trap->data;
@@ -330,7 +330,7 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
             g_free(escaped_pname);
             break;
 
-    default:
+        default:
         case OUTPUT_DEFAULT:
             printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
@@ -343,9 +343,9 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
 
 static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t src_file_handle, addr_t fileinfo)
 {
-    char * escaped_pname = NULL;
-    char * escaped_fname_src = NULL;
-    char * escaped_fname_dst = NULL;
+    char* escaped_pname = NULL;
+    char* escaped_fname_src = NULL;
+    char* escaped_fname_dst = NULL;
 
     filetracer* f = (filetracer*)info->trap->data;
     const char* syscall_name = info->trap->name;

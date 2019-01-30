@@ -188,7 +188,7 @@ static char* extract_utf8_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, c
 
 static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
 {
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
 
     switch (format)
     {
@@ -291,20 +291,20 @@ static void print_json_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
     if ( str )
     {
- char * escaped = drakvuf_escape_str(str);
- printf("{\"%s\" : \"%s\"}", arg.name, escaped);
- g_free(escaped);
+        char* escaped = drakvuf_escape_str(str);
+        printf("{\"%s\" : \"%s\"}", arg.name, escaped);
+        g_free(escaped);
     }
     else
     {
- if ( 4 == s->reg_size )
-     printf("{\"%s\" :%"  PRIu32 "}", arg.name, static_cast<uint32_t>(val));
- else
-     printf("{\"%s\" :%" PRIu64 "}", arg.name, static_cast<uint64_t>(val));
+        if ( 4 == s->reg_size )
+            printf("{\"%s\" :%"  PRIu32 "}", arg.name, static_cast<uint32_t>(val));
+        else
+            printf("{\"%s\" :%" PRIu64 "}", arg.name, static_cast<uint64_t>(val));
     }
 
     if (i < wsc->num_args-1)
- printf(",");
+        printf(",");
 }
 
 static void print_default_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const win_arg_t& arg, addr_t val, const char* str)

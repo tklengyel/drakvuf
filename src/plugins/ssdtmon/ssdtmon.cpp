@@ -124,7 +124,7 @@
 
 event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
     ssdtmon* s = (ssdtmon*)info->trap->data;
 
     if ( info->trap_pa > s->kiservicetable - 8 && info->trap_pa <= s->kiservicetable + s->ulongs * s->kiservicelimit + s->ulongs - 1 )

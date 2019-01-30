@@ -125,7 +125,7 @@ event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
 
     cpuidmon* s = (cpuidmon*)info->trap->data;
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
 
     switch (s->format)
     {

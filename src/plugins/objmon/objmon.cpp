@@ -152,7 +152,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     struct ckey ckey = {};
 
-    char * escaped_pname = NULL;
+    char* escaped_pname = NULL;
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
