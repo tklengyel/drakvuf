@@ -318,31 +318,31 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakv
                    info->trap->name, filename, bytes_read, fo_flags, (flags.empty() ? "" : ","), flags.c_str());
             break;
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    escaped_fname = drakvuf_escape_str(filename);
-	    printf( "{"
-		    "\"Plugin\" : \"filedelete\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Method\" : \"%s\","
-		    "\"FileName\" : \"%s\","
-		    "\"Size\" : %ld,"
-		    "\"Flags\" : %" PRIu64 ","
-		    "\"FlagsExpanded\" : \"%s\""
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    info->trap->name, escaped_fname,
-		    bytes_read, fo_flags, flags.c_str());
-	    g_free(escaped_fname);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_fname = drakvuf_escape_str(filename);
+            printf( "{"
+                    "\"Plugin\" : \"filedelete\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Method\" : \"%s\","
+                    "\"FileName\" : \"%s\","
+                    "\"Size\" : %ld,"
+                    "\"Flags\" : %" PRIu64 ","
+                    "\"FlagsExpanded\" : \"%s\""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    info->trap->name, escaped_fname,
+                    bytes_read, fo_flags, flags.c_str());
+            g_free(escaped_fname);
+            g_free(escaped_pname);
+            break;
         default:
         case OUTPUT_DEFAULT:
             printf("[FILEDELETE] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" SIZE:%" PRIu64 " FO_FLAGS:0x%" PRIx64 "(%s)\n",
@@ -372,32 +372,32 @@ static void print_extraction_information(filedelete* f, drakvuf_t drakvuf, drakv
                    info->trap->name, filename, bytes_read, fo_flags, (flags.empty() ? "" : ","), flags.c_str(), seq_number);
             break;
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    escaped_fname = drakvuf_escape_str(filename);
-	    printf( "{"
-		    "\"Plugin\" : \"fileextractor\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Method\" : \"%s\","
-		    "\"FileName\" : \"%s\","
-		    "\"Size\" : %ld,"
-		    "\"Flags\" : %" PRIu64 ","
-		    "\"FlagsExpanded\" : \"%s\""
-		    "\"SeqNum\" : %d"
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    info->trap->name, escaped_fname,
-		    bytes_read, fo_flags, flags.c_str(), seq_number);
-	    g_free(escaped_fname);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_fname = drakvuf_escape_str(filename);
+            printf( "{"
+                    "\"Plugin\" : \"fileextractor\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Method\" : \"%s\","
+                    "\"FileName\" : \"%s\","
+                    "\"Size\" : %ld,"
+                    "\"Flags\" : %" PRIu64 ","
+                    "\"FlagsExpanded\" : \"%s\""
+                    "\"SeqNum\" : %d"
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    info->trap->name, escaped_fname,
+                    bytes_read, fo_flags, flags.c_str(), seq_number);
+            g_free(escaped_fname);
+            g_free(escaped_pname);
+            break;
         default:
         case OUTPUT_DEFAULT:
             printf("[FILEEXTRACTOR] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" SIZE:%" PRIu64 " FO_FLAGS:0x%" PRIx64 "(%s) SN:%d\n",

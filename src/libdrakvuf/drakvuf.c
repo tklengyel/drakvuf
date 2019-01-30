@@ -695,74 +695,74 @@ unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_con
  *
  * See https://www.freeformatter.com/json-escape.html
  */
-char * drakvuf_escape_str(const char * input)
+char* drakvuf_escape_str(const char* input)
 {
     size_t outsize = 0;
     // holds output; only this is modified
-    char * curr = NULL;
+    char* curr = NULL;
 
     // input escaped characters: \,",\n,\r,\t
-    char * inpat = (char *) "\\\"\n\r\t";
+    char* inpat = (char*) "\\\"\n\r\t";
     // output escaped characters in same order as above
-    char * outpat = (char *) "\\\"nrt";
+    char* outpat = (char*) "\\\"nrt";
 
     if (NULL == input || 0 == strlen(input))
-	return NULL;
+        return NULL;
 
     outsize = strlen(input) * 2 + 1;
-    curr = (char *) g_malloc0(outsize);
+    curr = (char*) g_malloc0(outsize);
 
     strcpy (curr, input);
 
     // Read through the string multiple times, each time working on one escapable char
     for (size_t i = 0; i < strlen(inpat); ++i) {
-	size_t origlen = strlen(curr);
+        size_t origlen = strlen(curr);
         char in = inpat[i];
         char out = outpat[i];
 
         // count occurances of input pattern
-	size_t tokct = 0;
-	for (size_t j = 0; j < origlen; ++j) {
-	    if (curr[j] == in) {
-		++tokct;
-	    }
-	}
+        size_t tokct = 0;
+        for (size_t j = 0; j < origlen; ++j) {
+            if (curr[j] == in) {
+                ++tokct;
+            }
+        }
 
-	size_t orig_tokct = tokct;
-	char * needle;
+        size_t orig_tokct = tokct;
+        char* needle;
 
-	if (0 == tokct) {
-	    continue;
-	}
+        if (0 == tokct) {
+            continue;
+        }
 
-	// Walk through current backwards and re-write it by shifting chunks to the right
-	while ((needle = strrchr (curr, in)) != NULL) {
-	    // Since we're NULLing out the end of each chunk, the
-	    // chunk size is from the current needle to the end
-	    size_t chunk_len = strlen (needle);
+        // Walk through current backwards and re-write it by shifting chunks to the right
+        while ((needle = strrchr (curr, in)) != NULL) {
+            // Since we're NULLing out the end of each chunk, the
+            // chunk size is from the current needle to the end
+            size_t chunk_len = strlen (needle);
 
-	    // First move chunk to the right, without original escaped char
-	    memmove (needle + tokct + 1, needle + 1, chunk_len - 1);
+            // First move chunk to the right, without original escaped char
+            memmove (needle + tokct + 1, needle + 1, chunk_len - 1);
             // Put the escaped character in the correct location
             needle[tokct] = out;
-	    // Backfill entire cavity with NULL characters.
-	    memset (needle, 0, tokct);
+            // Backfill entire cavity with NULL characters.
+            memset (needle, 0, tokct);
 
-	    --tokct;
-	}
+            --tokct;
+        }
 
-	// There should be an escape \ every place there's a NULL character
-	for (size_t j = 0; j < origlen + orig_tokct; ++j) {
-	    if (curr[j] == 0) {
-		curr[j] = '\\';
-	    }
-	}
+        // There should be an escape \ every place there's a NULL character
+        for (size_t j = 0; j < origlen + orig_tokct; ++j) {
+            if (curr[j] == 0) {
+                curr[j] = '\\';
+            }
+        }
     } // for
 
     // finally, purge non-ASCII characters...
     // FIXME: really, we want to purge characters that JSON can't handle
     for (size_t i = 0; i < strlen(curr); ++i) {
-	char c = curr[i];
+        char c = curr[i];
         if (!isprint(c) && !isspace(c)) {
             curr[i] = '?';
         }

@@ -186,23 +186,23 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"objmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Key\" : \"%c%c%c%c\""
-		    "}", // EOL below
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"objmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Key\" : \"%c%c%c%c\""
+                    "}", // EOL below
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:

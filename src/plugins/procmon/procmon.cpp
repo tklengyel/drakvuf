@@ -212,43 +212,43 @@ static void print_process_creation_result(
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-     	    escaped_cmdline = drakvuf_escape_str(cmdline);
-	    escaped_ipath   = drakvuf_escape_str(imagepath);
-	    escaped_dllpath = drakvuf_escape_str(dllpath);
-	    escaped_curdir  = drakvuf_escape_str(curdir);
-	    printf( "{"
-		    "\"Plugin\" : \"procmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"UserName\": \"%s\","
-		    "\"UserId\": %" PRIu64 ","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Method\" : \"%s\","
-		    "\"Status\" : %" PRIu64 ","
-		    "\"NewPid\" : %d,"
-		    "\"CmdLine\" : \"%s\","
-		    "\"ImagePathName\" : \"%s\","
-		    "\"DllPath\" : \"%s\","
-		    "\"CurDir\" : \"%s\""
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    USERIDSTR(drakvuf), info->proc_data.userid,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    info->trap->name, status, new_pid,
-		    escaped_cmdline,
-		    escaped_ipath,
-		    escaped_dllpath,
-		    escaped_curdir);
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_cmdline = drakvuf_escape_str(cmdline);
+            escaped_ipath   = drakvuf_escape_str(imagepath);
+            escaped_dllpath = drakvuf_escape_str(dllpath);
+            escaped_curdir  = drakvuf_escape_str(curdir);
+            printf( "{"
+                    "\"Plugin\" : \"procmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Method\" : \"%s\","
+                    "\"Status\" : %" PRIu64 ","
+                    "\"NewPid\" : %d,"
+                    "\"CmdLine\" : \"%s\","
+                    "\"ImagePathName\" : \"%s\","
+                    "\"DllPath\" : \"%s\","
+                    "\"CurDir\" : \"%s\""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    info->trap->name, status, new_pid,
+                    escaped_cmdline,
+                    escaped_ipath,
+                    escaped_dllpath,
+                    escaped_curdir);
 
-	    g_free(escaped_pname);
-	    g_free(escaped_curdir);
-	    g_free(escaped_dllpath);
-	    g_free(escaped_ipath);
-	    g_free(escaped_cmdline);
-	    break;
+            g_free(escaped_pname);
+            g_free(escaped_curdir);
+            g_free(escaped_dllpath);
+            g_free(escaped_ipath);
+            g_free(escaped_cmdline);
+            break;
 
         default:
         case OUTPUT_DEFAULT:
@@ -439,23 +439,23 @@ static event_response_t terminate_process_hook(
             break;
 
         case OUTPUT_JSON:
-	    escaped_pname = drakvuf_escape_str(info->proc_data.name);
-	    printf( "{"
-		    "\"Plugin\" : \"procmon\","
-		    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-		    "\"ProcessName\": \"%s\","
-		    "\"PID\" : %d,"
-		    "\"PPID\": %d,"
-		    "\"Method\" : \"%s\","
-		    "\"ExitStatus\" : %" PRIu64 ","
-		    "\"ExitPid\" : %d"
-		    "}\n",
-		    UNPACK_TIMEVAL(info->timestamp),
-		    escaped_pname,
-		    info->proc_data.pid, info->proc_data.ppid,
-		    info->trap->name, exit_status, exit_pid);
-	    g_free(escaped_pname);
-	    break;
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"procmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Method\" : \"%s\","
+                    "\"ExitStatus\" : %" PRIu64 ","
+                    "\"ExitPid\" : %d"
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    info->trap->name, exit_status, exit_pid);
+            g_free(escaped_pname);
+            break;
 
         default:
         case OUTPUT_DEFAULT:
