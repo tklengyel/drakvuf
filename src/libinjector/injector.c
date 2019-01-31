@@ -123,7 +123,6 @@ struct injector
 {
     // Inputs:
     unicode_string_t* target_file_us;
-    reg_t target_cr3;
     vmi_pid_t target_pid;
     uint32_t target_tid;
     unicode_string_t* cwd_us;
@@ -507,10 +506,10 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     (void)drakvuf;
     injector_t injector = info->trap->data;
 
-    if ( info->regs->cr3 != injector->target_cr3 )
+    if ( info->proc_data.pid != injector->target_pid )
     {
-        PRINT_DEBUG("MemX received but CR3 (0x%lx) doesn't match target process (0x%lx)\n",
-                    info->regs->cr3, injector->target_cr3);
+        PRINT_DEBUG("MemX received but PID (%u) doesn't match target process (%u)\n",
+                    info->proc_data.pid, injector->target_pid);
         return 0;
     }
 
@@ -582,7 +581,7 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
     PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". PID: %u PPID: %u\n",
                 info->regs->cr3, info->proc_data.pid, info->proc_data.ppid);
 
-    if (info->regs->cr3 != injector->target_cr3)
+    if (info->proc_data.pid != injector->target_pid)
         return 0;
 
     addr_t thread = drakvuf_get_current_thread(drakvuf, info->vcpu);
@@ -840,12 +839,10 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
     PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx.\n", info->regs->rip, info->regs->cr3);
 
-    if ( info->regs->cr3 != injector->target_cr3 )
+    if ( info->proc_data.pid != injector->target_pid )
     {
-        PRINT_DEBUG("INT3 received but CR3 (0x%lx) doesn't match target process (0x%lx)\n",
-                    info->regs->cr3, injector->target_cr3);
-        PRINT_DEBUG("INT3 received from PID: %d [%s]\n",
-                    info->proc_data.pid, info->proc_data.name);
+        PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
+                    info->proc_data.name, info->proc_data.pid, injector->target_pid);
         return 0;
     }
 
@@ -1227,7 +1224,7 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
     return true;
 }
 
-static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t dtb, const char* file, vmi_pid_t injected_pid, uint32_t injected_tid)
+static void print_injection_info(output_format_t format, vmi_pid_t pid, const char* file, vmi_pid_t injected_pid, uint32_t injected_tid)
 {
     GTimeVal t;
     g_get_current_time(&t);
@@ -1268,32 +1265,24 @@ static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t
     switch (format)
     {
         case OUTPUT_CSV:
-            printf("inject," FORMAT_TIMEVAL ",%u,0x%lx,\"%s\",\"%s\",%u,%u\n",
-                   UNPACK_TIMEVAL(t), pid, dtb, process_name, escaped_arguments, injected_pid, injected_tid);
+            printf("inject," FORMAT_TIMEVAL ",%u,\"%s\",\"%s\",%u,%u\n",
+                   UNPACK_TIMEVAL(t), pid, process_name, escaped_arguments, injected_pid, injected_tid);
             break;
 
         case OUTPUT_KV:
-            printf("inject Time=" FORMAT_TIMEVAL ",PID=%u,DTB=0x%lx,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
-                   UNPACK_TIMEVAL(t), pid, dtb, process_name, escaped_arguments, injected_pid, injected_tid);
+            printf("inject Time=" FORMAT_TIMEVAL ",PID=%u,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
+                   UNPACK_TIMEVAL(t), pid, process_name, escaped_arguments, injected_pid, injected_tid);
             break;
 
         default:
         case OUTPUT_DEFAULT:
-            printf("[INJECT] TIME:" FORMAT_TIMEVAL " PID:%u DTB:0x%lx FILE:\"%s\" ARGUMENTS:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
-                   UNPACK_TIMEVAL(t), pid, dtb, process_name, escaped_arguments, injected_pid, injected_tid);
+            printf("[INJECT] TIME:" FORMAT_TIMEVAL " PID:%u FILE:\"%s\" ARGUMENTS:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
+                   UNPACK_TIMEVAL(t), pid, process_name, escaped_arguments, injected_pid, injected_tid);
             break;
     }
 
     g_free(escaped_arguments);
     g_strfreev(split_results);
-}
-
-static bool get_dtb_for_pid(drakvuf_t drakvuf, vmi_pid_t pid, reg_t* p_target_cr3)
-{
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    bool success = ( VMI_FAILURE != vmi_pid_to_dtb(vmi, pid, p_target_cr3) );
-    drakvuf_release_vmi(drakvuf);
-    return success;
 }
 
 struct module_context
@@ -1416,14 +1405,7 @@ int injector_start_app(
     bool global_search)
 {
     int rc = 0;
-    addr_t cr3;
-    if (!get_dtb_for_pid(drakvuf, pid, &cr3))
-    {
-        PRINT_DEBUG("Unable to find target PID's DTB\n");
-        return 0;
-    }
-
-    PRINT_DEBUG("Target PID %u with DTB 0x%lx to start '%s'\n", pid, cr3, file);
+    PRINT_DEBUG("Target PID %u to start '%s'\n", pid, file);
 
     unicode_string_t* target_file_us = convert_utf8_to_utf16(file);
     if (!target_file_us)
@@ -1455,7 +1437,6 @@ int injector_start_app(
     injector->drakvuf = drakvuf;
     injector->target_pid = pid;
     injector->target_tid = tid;
-    injector->target_cr3 = cr3;
     injector->target_file_us = target_file_us;
     injector->cwd_us = cwd_us;
     injector->method = method;
@@ -1474,7 +1455,7 @@ int injector_start_app(
     }
 
     if (inject(drakvuf, injector))
-        print_injection_info(format, injector->target_pid, injector->target_cr3, file, injector->pid, injector->tid);
+        print_injection_info(format, injector->target_pid, file, injector->pid, injector->tid);
 
     rc = injector->rc;
     PRINT_DEBUG("Finished with injection. Ret: %i\n", rc);
