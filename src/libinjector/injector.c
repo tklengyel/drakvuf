@@ -119,6 +119,13 @@
 #include <libinjector/libinjector.h>
 #include "private.h"
 
+typedef enum
+{
+    INJECT_RESULT_SUCCESS,
+    INJECT_RESULT_TIMEOUT,
+    INJECT_RESULT_ERROR_CODE,
+} inject_result_t;
+
 struct injector
 {
     // Inputs:
@@ -161,6 +168,9 @@ struct injector
 
     // Results:
     int rc;
+    inject_result_t result;
+    uint32_t error_code;
+    const char* error_string;
     uint32_t pid, tid;
     uint64_t hProc, hThr;
 };
@@ -568,7 +578,7 @@ static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drak
         injector->detected = false;
         PRINT_DEBUG("Target process crash detected\n");
 
-        drakvuf_interrupt(drakvuf, -1);
+        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
     }
 
     return 0;
@@ -705,9 +715,9 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
     injector->detected = true;
 
     if ( injector->break_loop_on_detection )
-        drakvuf_interrupt(drakvuf, 1);
+        drakvuf_interrupt(drakvuf, SIGINT);
     else if ( injector->resumed )
-        drakvuf_interrupt(drakvuf, 1);
+        drakvuf_interrupt(drakvuf, SIGINT);
 
     return 0;
 }
@@ -872,7 +882,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             // We are now in the return path from ShellExecuteW called from mem_callback
 
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_interrupt(drakvuf, -1);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
             // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND while
             // successfully opening file. So check only for out of resources (0) error.
@@ -923,7 +933,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                 injector->rc = 0;
 
                 drakvuf_remove_trap(drakvuf, info->trap, NULL);
-                drakvuf_interrupt(drakvuf, -1);
+                drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
                 return VMI_EVENT_RESPONSE_SET_REGISTERS;
             }
@@ -952,7 +962,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             PRINT_DEBUG("Failed to resume\n");
             injector->rc = 0;
 
-            drakvuf_interrupt(drakvuf, -1);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
         }
 
         // If the injected process was already detected to be running but
@@ -965,7 +975,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         // outside the normal injection loop (ie. main drakvuf)
         // so we don't break the loop
         if ( injector->detected && !injector->break_loop_on_detection )
-            drakvuf_interrupt(drakvuf, 1);
+            drakvuf_interrupt(drakvuf, SIGINT);
 
         injector->resumed = true;
 
@@ -1141,7 +1151,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     }
 
     drakvuf_remove_trap(drakvuf, info->trap, NULL);
-    drakvuf_interrupt(drakvuf, -1);
+    drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -1224,7 +1234,7 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
     return true;
 }
 
-static void print_injection_info(output_format_t format, vmi_pid_t pid, const char* file, vmi_pid_t injected_pid, uint32_t injected_tid)
+static void print_injection_info(output_format_t format, const char* file, injector_t injector)
 {
     GTimeVal t;
     g_get_current_time(&t);
@@ -1262,22 +1272,65 @@ static void print_injection_info(output_format_t format, vmi_pid_t pid, const ch
 
     char* escaped_arguments = g_strescape(arguments, NULL);
 
-    switch (format)
+    switch (injector->result)
     {
-        case OUTPUT_CSV:
-            printf("inject," FORMAT_TIMEVAL ",%u,\"%s\",\"%s\",%u,%u\n",
-                   UNPACK_TIMEVAL(t), pid, process_name, escaped_arguments, injected_pid, injected_tid);
-            break;
+        case INJECT_RESULT_SUCCESS:
+            switch (format)
+            {
+                case OUTPUT_CSV:
+                    printf("inject," FORMAT_TIMEVAL ",Success,%u,\"%s\",\"%s\",%u,%u\n",
+                           UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                    break;
 
-        case OUTPUT_KV:
-            printf("inject Time=" FORMAT_TIMEVAL ",PID=%u,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
-                   UNPACK_TIMEVAL(t), pid, process_name, escaped_arguments, injected_pid, injected_tid);
-            break;
+                case OUTPUT_KV:
+                    printf("inject Time=" FORMAT_TIMEVAL ",Status=Success,PID=%u,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
+                           UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                    break;
 
+                default:
+                case OUTPUT_DEFAULT:
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:SUCCESS PID:%u FILE:\"%s\" ARGUMENTS:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
+                           UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                    break;
+            }
+            break;
+        case INJECT_RESULT_TIMEOUT:
+            switch (format)
+            {
+                case OUTPUT_CSV:
+                    printf("inject," FORMAT_TIMEVAL ",Timeout\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                case OUTPUT_KV:
+                    printf("inject Time=" FORMAT_TIMEVAL ",Status=Timeout\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                default:
+                case OUTPUT_DEFAULT:
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Timeout\n", UNPACK_TIMEVAL(t));
+                    break;
+            }
+            break;
         default:
-        case OUTPUT_DEFAULT:
-            printf("[INJECT] TIME:" FORMAT_TIMEVAL " PID:%u FILE:\"%s\" ARGUMENTS:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
-                   UNPACK_TIMEVAL(t), pid, process_name, escaped_arguments, injected_pid, injected_tid);
+        case INJECT_RESULT_ERROR_CODE:
+            switch (format)
+            {
+                case OUTPUT_CSV:
+                    printf("inject," FORMAT_TIMEVAL ",Error,%d,\"%s\"\n",
+                           UNPACK_TIMEVAL(t), injector->error_code, injector->error_string);
+                    break;
+
+                case OUTPUT_KV:
+                    printf("inject Time=" FORMAT_TIMEVAL ",Status=Error,ErrorCode=%d,Error=\"%s\"\n",
+                           UNPACK_TIMEVAL(t), injector->error_code, injector->error_string);
+                    break;
+
+                default:
+                case OUTPUT_DEFAULT:
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Error ERROR_CODE:%d ERROR:\"%s\"\n",
+                           UNPACK_TIMEVAL(t), injector->error_code, injector->error_string);
+                    break;
+            }
             break;
     }
 
@@ -1454,8 +1507,31 @@ int injector_start_app(
         return 0;
     }
 
-    if (inject(drakvuf, injector))
-        print_injection_info(format, injector->target_pid, file, injector->pid, injector->tid);
+    if (inject(drakvuf, injector) && injector->rc)
+    {
+        injector->result = INJECT_RESULT_SUCCESS;
+        print_injection_info(format, file, injector);
+    }
+    else
+    {
+        if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
+        {
+            injector->result = INJECT_RESULT_TIMEOUT;
+            print_injection_info(format, file, injector);
+        }
+        else
+        {
+            uint32_t err = 0;
+            const char* err_str = "<UNKNOWN>";
+            if (VMI_SUCCESS != drakvuf_get_last_error(drakvuf, 0, &err, &err_str))
+                err = -1;
+
+            injector->result = INJECT_RESULT_ERROR_CODE;
+            injector->error_code = err;
+            injector->error_string = err_str;
+            print_injection_info(format, file, injector);
+        }
+    }
 
     rc = injector->rc;
     PRINT_DEBUG("Finished with injection. Ret: %i\n", rc);

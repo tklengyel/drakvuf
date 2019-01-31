@@ -105,11 +105,6 @@
 #include "drakvuf.h"
 #include <stdexcept>
 
-enum
-{
-    TIMEOUT_OCCURED_SIG = -2,
-};
-
 static gpointer timer(gpointer data)
 {
     drakvuf_c* drakvuf = (drakvuf_c*)data;
@@ -122,7 +117,7 @@ static gpointer timer(gpointer data)
 
     if (!drakvuf->interrupted)
     {
-        drakvuf->interrupt(TIMEOUT_OCCURED_SIG);
+        drakvuf->interrupt(SIGDRAKVUFTIMEOUT);
     }
 
     g_thread_exit(nullptr);
@@ -243,7 +238,7 @@ drakvuf_c::drakvuf_c(const char* domain,
 drakvuf_c::~drakvuf_c()
 {
     if ( !interrupted )
-        interrupt(-1);
+        interrupt(SIGDRAKVUFERROR);
 
     g_free(injector_to_be_freed);
 
@@ -302,20 +297,7 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                                 global_search);
 
     if (!rc)
-    {
-        if (interrupted == TIMEOUT_OCCURED_SIG)
-        {
-            fprintf(stderr, "Process startup failed: timeout occured\n");
-        }
-        else
-        {
-            uint32_t err = 0;
-            const char* err_str = "<UNKNOWN>";
-            if (VMI_SUCCESS != drakvuf_get_last_error(drakvuf, 0, &err, &err_str))
-                err = -1;
-            fprintf(stderr, "Process startup failed. Last error is '%s' (%d)\n", err_str, err);
-        }
-    }
+        fprintf(stderr, "Process startup failed\n");
 
     cleanup_timer(this, timeout_thread);
     return rc;
