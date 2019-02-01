@@ -104,6 +104,7 @@
 
 #include "json.hpp"
 #include <glib.h>
+#include <string>
 
 /**
  * Escapes all escapable characters in orig, returns new, escaped string.
@@ -120,23 +121,19 @@ extern "C"
 const gchar* drakvuf_escape_str(const char* input)
 {
     gchar* result = NULL;
+    std::string s;
 
     // store a string in a JSON value
     nlohmann::json j_string = input;
 
-    // retrieve the string value
-    auto cpp_string = j_string.get<std::string>();
-
     // retrieve the serialized value (explicit JSON serialization)
-    std::string s;
-
     try
     {
         s = j_string.dump();
     }
-    catch (nlohmann::json::exception e)
+    catch (nlohmann::json::exception& e)
     {
-        printf("Error: %s\n", e.what());
+        fprintf(stderr, "JSON error: %s\n", e.what());
         s = "JSON_CONVERSION_FAILED";
     }
 
