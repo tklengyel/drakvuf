@@ -107,11 +107,17 @@ c_sources = drakvuf.c rekall-profile.c os.c vmi.c \
             win.c win-exports.c win-handles.c win-processes.c win-registry.c \
             win-files.c \
             linux.c linux-processes.c
+cpp_sources = drakvufpp.cpp
 
 AM_CFLAGS = -I$(top_srcdir)
 AM_CFLAGS += $(CFLAGS)
 AM_CFLAGS += $(VMI_CFLAGS)
 AM_CFLAGS += $(GLIB_CFLAGS)
+
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/json/single_include/nlohmann
+AM_CPPFLAGS += $(CPPFLAGS)
+AM_CPPFLAGS += $(VMI_CFLAGS)
+AM_CPPFLAGS += $(GLIB_CFLAGS)
 
 if HARDENING
 AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
@@ -128,5 +134,5 @@ endif
 endif
 
 noinst_LTLIBRARIES= libdrakvuf.la
-libdrakvuf_la_SOURCES= $(h_sources) $(c_sources)
+libdrakvuf_la_SOURCES= $(h_sources) $(c_sources) $(cpp_sources)
 libdrakvuf_la_LIBADD= ../xen_helper/libxenhelper.la
