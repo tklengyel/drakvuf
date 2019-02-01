@@ -118,7 +118,7 @@
  * Export as C symbol to incorporate this function into C-based library.
  */
 extern "C"
-const gchar* drakvuf_escape_str(const char* input)
+gchar* drakvuf_escape_str(const char* input)
 {
     gchar* result = NULL;
     std::string s;
