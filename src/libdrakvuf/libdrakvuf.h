@@ -497,8 +497,8 @@ size_t drakvuf_wchar_string_length(vmi_instance_t vmi, const access_context_t* c
 // Reads null-terminated string of UTF_16 charachters, automatically determining length, into unicode_string_t object with UTF_8 encoding
 unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_context_t* ctx);
 
-// Escapes '\' chars with "\\" (for JSON output)
-char* drakvuf_escape_str(const char* input);
+// Returns JSON-compliant copy of input string
+gchar* drakvuf_escape_str(const char* input);
 
 
 addr_t drakvuf_get_function_argument(drakvuf_t drakvuf,
