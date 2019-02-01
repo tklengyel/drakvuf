@@ -119,7 +119,7 @@
 extern "C"
 const gchar* drakvuf_escape_str(const char* input)
 {
-    gchar * result = NULL;
+    gchar* result = NULL;
 
     // store a string in a JSON value
     nlohmann::json j_string = input;
@@ -132,17 +132,19 @@ const gchar* drakvuf_escape_str(const char* input)
 
     try
     {
-	s = j_string.dump();
-    } catch(nlohmann::json::exception e) {
-	printf("Error: %s\n", e.what());
-	s = "JSON_CONVERSION_FAILED";
+        s = j_string.dump();
+    }
+    catch (nlohmann::json::exception e)
+    {
+        printf("Error: %s\n", e.what());
+        s = "JSON_CONVERSION_FAILED";
     }
 
     result = g_strdup(s.c_str());
     if ( NULL == result)
     {
-	fprintf(stderr, "g_strdup() failed!\n");
+        fprintf(stderr, "g_strdup() failed!\n");
     }
-    
+
     return result;
 }
