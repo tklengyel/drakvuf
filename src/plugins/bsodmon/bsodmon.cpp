@@ -216,7 +216,7 @@ done:
     drakvuf_release_vmi(drakvuf);
 
     if ( f->abort_on_bsod )
-        drakvuf_interrupt( drakvuf, -1);
+        drakvuf_interrupt( drakvuf, SIGDRAKVUFERROR);
 
     return 0;
 }
