@@ -128,5 +128,5 @@ endif
 endif
 
 noinst_LTLIBRARIES= libdrakvuf.la
-libdrakvuf_la_SOURCES= $(h_sources) $(c_sources) $(cpp_sources)
+libdrakvuf_la_SOURCES= $(h_sources) $(c_sources)
 libdrakvuf_la_LIBADD= ../xen_helper/libxenhelper.la
