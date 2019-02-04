@@ -521,6 +521,8 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     drakvuf_release_vmi(drakvuf);
 
+    gchar* escaped_pname = NULL;
+    gchar* escaped_client_name = NULL;
     char* name = nullptr;
     addr_t client_process = 0;
     if (drakvuf_find_process(drakvuf, wrapper->client_id, nullptr, &client_process))
@@ -541,6 +543,28 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
                    "Method=%s,ProcessHandle=0x%" PRIx64 ",DesiredAccess=0x%" PRIx32 ",ObjectAttributes=0x%" PRIx64 ",ClientID=%d,ClientName=\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    info->trap->name, process_handle, wrapper->desired_access, wrapper->object_attributes_addr, wrapper->client_id, name);
+            break;
+
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_client_name = drakvuf_escape_str(name);
+            printf( "{"
+                    "\"Plugin\" : \"procmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"ProcessName\": %s,"
+                    "\"Method\" : \"%s\","
+                    "\"DesiredAccess\" : %" PRIu32 ","
+                    "\"ObjectAttributes\" : %" PRIu64 ","
+                    "\"ClientID\" : %d,"
+                    "\"ClientName\": %s"
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    info->proc_data.pid, info->proc_data.ppid, escaped_pname,
+                    info->trap->name, desired_access, object_attributes, pid, escaped_client_name);
+            g_free(escaped_client_name);
+            g_free(escaped_pname);
             break;
 
         default:

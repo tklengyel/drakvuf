@@ -125,7 +125,7 @@
 #define KV_FORMAT_USER ",PID=%d,PPID=%d,Name=\"%s\"\n"
 
 // Optionally ends JSON doc
-#define JSON_FORMAT_USER ",\"PID\":%ld,\"PPID\":%d,\"Name\":\"%s\"}\n"
+#define JSON_FORMAT_USER ",\"PID\":%ld,\"PPID\":%d,\"Name\":%s}\n"
 
 #define DEFAULT_FORMAT_USER " PID: %d PPID: %d NAME: %s\n"
 
