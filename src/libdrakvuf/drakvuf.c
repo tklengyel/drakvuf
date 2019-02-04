@@ -677,6 +677,7 @@ unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_con
 gchar* drakvuf_escape_str(const char* input)
 {
     char* result = NULL;
+    struct json_object* obj = NULL;
 
     if (NULL == input)
     {
@@ -685,7 +686,7 @@ gchar* drakvuf_escape_str(const char* input)
         goto exit;
     }
 
-    struct json_object* obj = json_object_new_string(input);
+    obj = json_object_new_string(input);
     if (NULL == obj)
     {
         fprintf(stderr, "json_object_new_string() failed!\n");
@@ -706,7 +707,7 @@ gchar* drakvuf_escape_str(const char* input)
     }
 
 exit:
-    json_object_put(obj);
+    json_object_put(obj); // passing NULL is OK
     return result;
 }
 
