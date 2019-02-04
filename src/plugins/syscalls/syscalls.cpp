@@ -188,7 +188,7 @@ static char* extract_utf8_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, c
 
 static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
 {
-    char* escaped_pname = NULL;
+    gchar* escaped_pname = NULL;
 
     switch (format)
     {
@@ -210,7 +210,7 @@ static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvu
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
                     "\"VCPU\": %" PRIu32 ","
                     "\"CR3\": %" PRIu64 ","
-                    "\"ProcessName\": \"%s\","
+                    "\"ProcessName\": %s,"
                     "\"UserName\": \"%s\","
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
@@ -291,8 +291,8 @@ static void print_json_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
     if ( str )
     {
-        char* escaped = drakvuf_escape_str(str);
-        printf("{\"%s\" : \"%s\"}", arg.name, escaped);
+        gchar* escaped = drakvuf_escape_str(str);
+        printf("{\"%s\" : %s}", arg.name, escaped);
         g_free(escaped);
     }
     else

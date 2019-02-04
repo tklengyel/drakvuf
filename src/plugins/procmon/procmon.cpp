@@ -160,11 +160,11 @@ static void print_process_creation_result(
     unicode_string_t* imagepath_us = drakvuf_read_unicode(drakvuf, info, imagepath_addr);
     unicode_string_t* dllpath_us = drakvuf_read_unicode(drakvuf, info, dllpath_addr);
 
-    char* escaped_pname = NULL;
-    char* escaped_cmdline = NULL;
-    char* escaped_ipath = NULL;
-    char* escaped_dllpath = NULL;
-    char* escaped_curdir = NULL;
+    gchar* escaped_pname = NULL;
+    gchar* escaped_cmdline = NULL;
+    gchar* escaped_ipath = NULL;
+    gchar* escaped_dllpath = NULL;
+    gchar* escaped_curdir = NULL;
 
     vmi_lock_guard vmi_lg(drakvuf);
     access_context_t ctx =
@@ -192,7 +192,7 @@ static void print_process_creation_result(
             curdir = g_strdup("");
     }
 
-    char* cmdline = g_strescape(cmdline_us ? reinterpret_cast<char const*>(cmdline_us->contents) : "", NULL);
+    gchar* cmdline = g_strescape(cmdline_us ? reinterpret_cast<char const*>(cmdline_us->contents) : "", NULL);
     char const* imagepath = imagepath_us ? reinterpret_cast<char const*>(imagepath_us->contents) : "";
     char const* dllpath = dllpath_us ? reinterpret_cast<char const*>(dllpath_us->contents) : "";
 
@@ -220,7 +220,7 @@ static void print_process_creation_result(
             printf( "{"
                     "\"Plugin\" : \"procmon\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": \"%s\","
+                    "\"ProcessName\": %s,"
                     "\"UserName\": \"%s\","
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
@@ -228,10 +228,10 @@ static void print_process_creation_result(
                     "\"Method\" : \"%s\","
                     "\"Status\" : %" PRIu64 ","
                     "\"NewPid\" : %d,"
-                    "\"CmdLine\" : \"%s\","
-                    "\"ImagePathName\" : \"%s\","
-                    "\"DllPath\" : \"%s\","
-                    "\"CurDir\" : \"%s\""
+                    "\"CmdLine\" : %s,"
+                    "\"ImagePathName\" : %s,"
+                    "\"DllPath\" : %s,"
+                    "\"CurDir\" : %s"
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
@@ -413,7 +413,7 @@ static event_response_t terminate_process_hook(
     drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     addr_t process_handle, addr_t exit_status)
 {
-    char* escaped_pname = NULL;
+    gchar* escaped_pname = NULL;
     procmon* f = (procmon*)info->trap->data;
 
     vmi_pid_t exit_pid = get_pid_from_handle(f, drakvuf, info, process_handle);
@@ -443,7 +443,7 @@ static event_response_t terminate_process_hook(
             printf( "{"
                     "\"Plugin\" : \"procmon\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": \"%s\","
+                    "\"ProcessName\": %s,"
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
                     "\"Method\" : \"%s\","

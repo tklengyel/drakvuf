@@ -137,8 +137,8 @@ enum RegistryValueTypes
 static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char const* key_name, char const* value_name, char const* value)
 {
     regmon* reg = (regmon*)info->trap->data;
-    char* escaped_pname = NULL;
-    char* escaped_key = NULL;
+    gchar* escaped_pname = NULL;
+    gchar* escaped_key = NULL;
 
     switch ( reg->format )
     {
@@ -170,13 +170,13 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             printf( "{"
                     "\"Plugin\" : \"regmon\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": \"%s\","
+                    "\"ProcessName\": %s,"
                     "\"UserName\": \"%s\","
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
                     "\"Method\" : \"%s\","
-                    "\"Key\" : \"%s\"",
+                    "\"Key\" : %s",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
@@ -185,14 +185,14 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
                     escaped_key);
             if (value_name)
             {
-                char* escaped_vname = drakvuf_escape_str(value_name);
-                printf(",\"ValueName\":\"%s\"", escaped_vname);
+                gchar* escaped_vname = drakvuf_escape_str(value_name);
+                printf(",\"ValueName\":%s", escaped_vname);
                 g_free(escaped_vname);
             }
             if (value)
             {
-                char* escaped_val = drakvuf_escape_str(value);
-                printf(",\"Value\":\"%s\"", escaped_val);
+                gchar* escaped_val = drakvuf_escape_str(value);
+                printf(",\"Value\":%s", escaped_val);
                 g_free(escaped_val);
             }
 

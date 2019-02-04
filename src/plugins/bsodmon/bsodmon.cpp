@@ -121,7 +121,7 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     uint64_t code = 0;
     uint64_t params[4] = { 0 };
     const char* bugcheck_name = "UNKNOWN_CODE" ;
-    char* escaped_pname = NULL;
+    gchar* escaped_pname = NULL;
 
     bool is32bit = drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E;
 
@@ -184,7 +184,7 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
                     "\"VCPU\": %" PRIu32 ","
                     "\"CR3\": %" PRIu64 ","
-                    "\"ProcessName\": \"%s\","
+                    "\"ProcessName\": %s,"
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"

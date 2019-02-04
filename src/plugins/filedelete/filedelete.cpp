@@ -302,8 +302,8 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakv
 {
     std::string flags = fo_flags_to_string(fo_flags, f->format);
 
-    char* escaped_pname = NULL;
-    char* escaped_fname = NULL;
+    gchar* escaped_pname = NULL;
+    gchar* escaped_fname = NULL;
 
     switch (f->format)
     {
@@ -323,13 +323,13 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakv
             printf( "{"
                     "\"Plugin\" : \"filedelete\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": \"%s\","
+                    "\"ProcessName\": %s,"
                     "\"UserName\": \"%s\","
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
                     "\"Method\" : \"%s\","
-                    "\"FileName\" : \"%s\","
+                    "\"FileName\" : %s,"
                     "\"Size\" : %ld,"
                     "\"Flags\" : %" PRIu64 ","
                     "\"FlagsExpanded\" : \"%s\""
@@ -355,8 +355,8 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf, drakv
 
 static void print_extraction_information(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t const* info, const char* filename, size_t bytes_read, uint64_t fo_flags, int seq_number)
 {
-    char* escaped_pname = NULL;
-    char* escaped_fname = NULL;
+    gchar* escaped_pname = NULL;
+    gchar* escaped_fname = NULL;
 
     std::string flags = fo_flags_to_string(fo_flags, f->format);
     switch (f->format)
@@ -377,13 +377,13 @@ static void print_extraction_information(filedelete* f, drakvuf_t drakvuf, drakv
             printf( "{"
                     "\"Plugin\" : \"fileextractor\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": \"%s\","
+                    "\"ProcessName\": %s,"
                     "\"UserName\": \"%s\","
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
                     "\"Method\" : \"%s\","
-                    "\"FileName\" : \"%s\","
+                    "\"FileName\" : %s,"
                     "\"Size\" : %ld,"
                     "\"Flags\" : %" PRIu64 ","
                     "\"FlagsExpanded\" : \"%s\""

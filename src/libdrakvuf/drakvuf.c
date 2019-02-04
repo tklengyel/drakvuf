@@ -680,6 +680,13 @@ gchar* drakvuf_escape_str(const char* input)
 {
     char* result = NULL;
 
+    if (NULL == input)
+    {
+        // give caller result that can be freed
+        result = g_strdup("\"(null)\"");
+        goto exit;
+    }
+
     struct json_object* obj = json_object_new_string(input);
     if (NULL == obj)
     {
@@ -704,7 +711,6 @@ exit:
     json_object_put(obj);
     return result;
 }
-
 
 static void drakvuf_event_fd_generate(drakvuf_t drakvuf)
 {
