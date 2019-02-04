@@ -103,8 +103,6 @@
  ***************************************************************************/
 
 #include <glib.h>
-#include <ctype.h>
-#include <string.h>
 #include <json-c/json.h>
 #include "../xen_helper/xen_helper.h"
 
