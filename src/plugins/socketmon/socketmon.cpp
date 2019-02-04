@@ -1684,8 +1684,8 @@ static bool module_trap_visitor(drakvuf_t drakvuf, const module_info_t* module_i
                              .addr                = module_info->base_addr
                            };
 
-    PRINT_DEBUG("[SOCKETMON] trap_visitor: CR3[0x%lX] pid[0x%X] base_name[%s] load_address[0x%lX] full_name[%s]\n",
-                module_info->dtb, module_info->pid, module_info->base_name.contents, module_info->base_addr, module_info->full_name.contents );
+    PRINT_DEBUG("[SOCKETMON] trap_visitor: CR3[0x%lX] pid[0x%X %d] is_wow_process[%d]  is_wow_module[%d] base_name[%s] load_address[0x%lX] full_name[%s]\n",
+                module_info->dtb, module_info->pid, module_info->pid, module_info->is_wow_process, module_info->is_wow, module_info->base_name->contents, module_info->base_addr, module_info->full_name->contents );
 
     vmi = drakvuf_lock_and_get_vmi( drakvuf );
 

@@ -242,7 +242,7 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose, libvmi_conf))
+    if (!drakvuf_init(&drakvuf, domain, rekall_profile, NULL, verbose, libvmi_conf))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
         return 1;

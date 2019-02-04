@@ -147,6 +147,7 @@ public:
 
     drakvuf_c(const char* domain,
               const char* rekall_profile,
+              const char* rekall_wow_profile,
               output_format_t output,
               bool verbose,
               bool leave_paused,

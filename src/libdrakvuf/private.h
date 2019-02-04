@@ -158,6 +158,8 @@ struct drakvuf
     char* rekall_profile;
     json_object* rekall_profile_json;
     os_t os;
+    char* rekall_wow_profile;
+    json_object* rekall_wow_profile_json;
 
     xen_interface_t* xen;
     os_interface_t osi;
@@ -179,6 +181,8 @@ struct drakvuf
 
     size_t* offsets;
     size_t* sizes;
+
+    size_t* wow_offsets;
 
     // Processing trap removals in trap callbacks
     // is problematic so we save all such requests
