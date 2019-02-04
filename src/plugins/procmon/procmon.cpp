@@ -483,12 +483,14 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     if (!pid)
         pid = info->proc_data.pid;
 
+    gchar* escaped_pname = NULL;
+    gchar* escaped_client_name = NULL;
     char* name = nullptr;
     addr_t client_process = 0;
     if (drakvuf_find_process(drakvuf, pid, nullptr, &client_process))
         name = drakvuf_get_process_name(drakvuf, client_process, true);
     if (!name)
-        name = g_strdup("<UNKHOWN>");
+        name = g_strdup("<UNKNOWN>");
 
     drakvuf_release_vmi(drakvuf);
 
@@ -506,6 +508,28 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
                    "Method=%s,DesiredAccess=0x%" PRIx32 ",ObjectAttributes=0x%" PRIx64 ",ClientID=%d,ClientName=\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    info->trap->name, desired_access, object_attributes, pid, name);
+            break;
+
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_client_name = drakvuf_escape_str(name);
+            printf( "{"
+                    "\"Plugin\" : \"procmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"ProcessName\": %s,"
+                    "\"Method\" : \"%s\","
+                    "\"DesiredAccess\" : %" PRIu32 ","
+                    "\"ObjectAttributes\" : %" PRIu64 ","
+                    "\"ClientID\" : %d,"
+                    "\"ClientName\": %s"
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    info->proc_data.pid, info->proc_data.ppid, escaped_pname,
+                    info->trap->name, desired_access, object_attributes, pid, escaped_client_name);
+            g_free(escaped_client_name);
+            g_free(escaped_pname);
             break;
 
         default:
