@@ -144,49 +144,67 @@ struct wrapper
     addr_t obj;
 };
 
-void free_wrapper (drakvuf_trap_t* trap)
+static void free_wrapper (drakvuf_trap_t* trap)
 {
     g_free(trap->data);
     g_free(trap);
 }
 
-static inline void ipv4_to_str(char** str, uint8_t ipv4[4])
+static char* ipv4_to_str(uint8_t ipv4[4])
 {
-    size_t size = snprintf(NULL, 0, "%u.%u.%u.%u",
-                           ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
-
-    *str = (char*)g_malloc0(size + 1);
-    if ( !(*str) )
-        return;
-
-    snprintf(*str, size, "%u.%u.%u.%u", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
+    return g_strdup_printf("%u.%u.%u.%u", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
 }
 
-static inline void ipv6_to_str(char** str, uint8_t ipv6[16])
+static char* ipv6_to_str(uint8_t ipv6[16])
 {
-    size_t size = snprintf(NULL, 0,
-                           "%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
+    return g_strdup_printf("%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
                            ipv6[0], ipv6[1], ipv6[2], ipv6[3],
                            ipv6[4], ipv6[5], ipv6[6], ipv6[7],
                            ipv6[8], ipv6[9], ipv6[10], ipv6[11],
                            ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
+}
 
-    *str = (char*)g_malloc0(size + 1);
+static char* read_ipv4_string(vmi_instance_t vmi, access_context_t& ctx, addr_t addr)
+{
+    uint8_t ip[4]  = {0};
 
-    if ( !(*str) )
-        return;
+    if ( addr )
+    {
+        ctx.addr = addr;
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(ip), ip, NULL) )
+            return nullptr;
+    }
 
-    snprintf(*str, size,
-             "%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
-             ipv6[0], ipv6[1], ipv6[2], ipv6[3],
-             ipv6[4], ipv6[5], ipv6[6], ipv6[7],
-             ipv6[8], ipv6[9], ipv6[10], ipv6[11],
-             ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
+    return ipv4_to_str(ip);
+}
+
+static char* read_ipv6_string(vmi_instance_t vmi, access_context_t& ctx, addr_t addr)
+{
+    uint8_t ip[16]  = {0};
+
+    if ( addr )
+    {
+        ctx.addr = addr;
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(ip), ip, NULL) )
+            return nullptr;
+    }
+
+    return ipv6_to_str(ip);
+}
+
+static char* read_ip_string(vmi_instance_t vmi, access_context_t& ctx, addr_t addr, int addressfamily)
+{
+    if (addressfamily == AF_INET)
+        return read_ipv4_string(vmi, ctx, addr);
+
+    if (addressfamily == AF_INET6)
+        return read_ipv6_string(vmi, ctx, addr);
+
+    return nullptr;
 }
 
 static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
@@ -232,32 +250,8 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
             goto done;
     }
 
-    if ( inetaf.addressfamily == AF_INET )
-    {
-        uint8_t localip[4]  = {[0 ... 3] = 0};
-
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-                goto done;
-        }
-
-        ipv4_to_str(&lip, localip);
-    }
-    else if (inetaf.addressfamily == AF_INET6 )
-    {
-        uint8_t localip[16]  = {[0 ... 15] = 0};
-
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
-                goto done;
-        }
-
-        ipv6_to_str(&lip, localip);
-    }
+    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
+    if (!lip) goto done;
 
     owner = drakvuf_get_process_name(drakvuf, udpa.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, udpa.owner);
@@ -347,32 +341,8 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
             goto done;
     }
 
-    if ( inetaf.addressfamily == AF_INET )
-    {
-        uint8_t localip[4]  = {[0 ... 3] = 0};
-
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-                goto done;
-        }
-
-        ipv4_to_str(&lip, localip);
-    }
-    else if (inetaf.addressfamily == AF_INET6 )
-    {
-        uint8_t localip[16]  = {[0 ... 15] = 0};
-
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
-                goto done;
-        }
-
-        ipv6_to_str(&lip, localip);
-    }
+    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
+    if (!lip) goto done;
 
     owner = drakvuf_get_process_name(drakvuf, udpa.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, udpa.owner);
@@ -462,33 +432,8 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
             goto done;
     }
 
-    if ( inetaf.addressfamily == AF_INET )
-    {
-        uint8_t localip[4]  = {[0 ... 3] = 0};
-
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-                goto done;
-        }
-
-        ipv4_to_str(&lip, localip);
-    }
-    else if (inetaf.addressfamily == AF_INET6 )
-    {
-
-        uint8_t localip[16]  = {[0 ... 15] = 0};
-
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
-                goto done;
-        }
-
-        ipv6_to_str(&lip, localip);
-    }
+    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
+    if (!lip) goto done;
 
     owner = drakvuf_get_process_name(drakvuf, udpa.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, udpa.owner);
@@ -595,44 +540,11 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
             goto done;
     }
 
-    if ( inetaf.addressfamily == AF_INET )
-    {
-        uint8_t localip[4]  = {[0 ... 3] = 0};
-        uint8_t remoteip[4] = {[0 ... 3] = 0};
+    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
+    if (!lip) goto done;
 
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-                goto done;
-        }
-
-        if ( addrinfo.remote )
-        {
-            ctx.addr = addrinfo.remote;
-            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&remoteip[0]) )
-                goto done;
-        }
-
-        ipv4_to_str(&lip, localip);
-        ipv4_to_str(&rip, remoteip);
-    }
-    else if (inetaf.addressfamily == AF_INET6 )
-    {
-        uint8_t localip[16]  = {[0 ... 15] = 0};
-        uint8_t remoteip[16] = {[0 ... 15] = 0};
-
-        ctx.addr = p1;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
-            goto done;
-
-        ctx.addr = addrinfo.remote;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &remoteip[0], NULL) )
-            goto done;
-
-        ipv6_to_str(&lip, localip);
-        ipv6_to_str(&rip, remoteip);
-    }
+    rip = read_ip_string(vmi, ctx, addrinfo.remote, inetaf.addressfamily);
+    if (!rip) goto done;
 
     owner = drakvuf_get_process_name(drakvuf, tcpe.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, tcpe.owner);
@@ -729,38 +641,11 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
         goto done;
 
-    if ( inetaf.addressfamily == AF_INET )
-    {
-        uint8_t localip[4]  = {[0 ... 3] = 0};
-        uint8_t remoteip[4] = {[0 ... 3] = 0};
+    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
+    if (!lip) goto done;
 
-        ctx.addr = p1;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-            goto done;
-
-        ctx.addr = addrinfo.remote;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&remoteip[0]) )
-            goto done;
-
-        ipv4_to_str(&lip, localip);
-        ipv4_to_str(&rip, remoteip);
-    }
-    else if (inetaf.addressfamily == AF_INET6 )
-    {
-        uint8_t localip[16]  = {[0 ... 15] = 0};
-        uint8_t remoteip[16] = {[0 ... 15] = 0};
-
-        ctx.addr = p1;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
-            goto done;
-
-        ctx.addr = addrinfo.remote;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &remoteip[0], NULL) )
-            goto done;
-
-        ipv6_to_str(&lip, localip);
-        ipv6_to_str(&rip, remoteip);
-    }
+    rip = read_ip_string(vmi, ctx, addrinfo.remote, inetaf.addressfamily);
+    if (!rip) goto done;
 
     owner = drakvuf_get_process_name(drakvuf, tcpe.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, tcpe.owner);
@@ -858,38 +743,11 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
         goto done;
 
-    if ( inetaf.addressfamily == AF_INET )
-    {
-        uint8_t localip[4]  = {[0 ... 3] = 0};
-        uint8_t remoteip[4] = {[0 ... 3] = 0};
+    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
+    if (!lip) goto done;
 
-        ctx.addr = p1;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-            goto done;
-
-        ctx.addr = addrinfo.remote;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&remoteip[0]) )
-            goto done;
-
-        ipv4_to_str(&lip, localip);
-        ipv4_to_str(&rip, remoteip);
-    }
-    else if (inetaf.addressfamily == AF_INET6 )
-    {
-        uint8_t localip[16]  = {[0 ... 15] = 0};
-        uint8_t remoteip[16] = {[0 ... 15] = 0};
-
-        ctx.addr = p1;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
-            goto done;
-
-        ctx.addr = addrinfo.remote;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &remoteip[0], NULL) )
-            goto done;
-
-        ipv6_to_str(&lip, localip);
-        ipv6_to_str(&rip, remoteip);
-    }
+    rip = read_ip_string(vmi, ctx, addrinfo.remote, inetaf.addressfamily);
+    if (!rip) goto done;
 
     owner = drakvuf_get_process_name(drakvuf, tcpe.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, tcpe.owner);
@@ -993,32 +851,8 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
             goto done;
     }
 
-    if ( inetaf.addressfamily == AF_INET )
-    {
-        uint8_t localip[4]  = {[0 ... 3] = 0};
-
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-                goto done;
-        }
-
-        ipv4_to_str(&lip, localip);
-    }
-    else if (inetaf.addressfamily == AF_INET6 )
-    {
-        uint8_t localip[16]  = {[0 ... 15] = 0};
-
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
-                goto done;
-        }
-
-        ipv6_to_str(&lip, localip);
-    }
+    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
+    if (!lip) goto done;
 
     owner = drakvuf_get_process_name(drakvuf, tcpl.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, tcpl.owner);
@@ -1109,32 +943,8 @@ static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
             goto done;
     }
 
-    if ( inetaf.addressfamily == AF_INET )
-    {
-        uint8_t localip[4]  = {[0 ... 3] = 0};
-
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-                goto done;
-        }
-
-        ipv4_to_str(&lip, localip);
-    }
-    else if (inetaf.addressfamily == AF_INET6 )
-    {
-        uint8_t localip[16]  = {[0 ... 15] = 0};
-
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
-                goto done;
-        }
-
-        ipv6_to_str(&lip, localip);
-    }
+    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
+    if (!lip) goto done;
 
     owner = drakvuf_get_process_name(drakvuf, tcpl.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, tcpl.owner);
@@ -1225,32 +1035,8 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
             goto done;
     }
 
-    if ( inetaf.addressfamily == AF_INET )
-    {
-        uint8_t localip[4]  = {[0 ... 3] = 0};
-
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&localip[0]) )
-                goto done;
-        }
-
-        ipv4_to_str(&lip, localip);
-    }
-    else if (inetaf.addressfamily == AF_INET6 )
-    {
-        uint8_t localip[16]  = {[0 ... 15] = 0};
-
-        if ( p1 )
-        {
-            ctx.addr = p1;
-            if ( VMI_FAILURE == vmi_read(vmi, &ctx, 16, &localip[0], NULL) )
-                goto done;
-        }
-
-        ipv6_to_str(&lip, localip);
-    }
+    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
+    if (!lip) goto done;
 
     owner = drakvuf_get_process_name(drakvuf, tcpl.owner, 1);
     ownerid = drakvuf_get_process_userid(drakvuf, tcpl.owner);
