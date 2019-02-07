@@ -1,105 +1,105 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS**********************
-*                                                                         *
-* DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
-* Tamas K Lengyel is hereinafter referred to as the author.               *
-* This program is free software; you may redistribute and/or modify it    *
-* under the terms of the GNU General Public License as published by the   *
-* Free Software Foundation; Version 2 ("GPL"), BUT ONLY WITH ALL OF THE   *
-* CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
-* right to use, modify, and redistribute this software under certain      *
-* conditions.  If you wish to embed DRAKVUF technology into proprietary   *
-* software, alternative licenses can be aquired from the author.          *
-*                                                                         *
-* Note that the GPL places important restrictions on "derivative works",  *
-* yet it does not provide a detailed definition of that term.  To avoid   *
-* misunderstandings, we interpret that term as broadly as copyright law   *
-* allows.  For example, we consider an application to constitute a        *
-* derivative work for the purpose of this license if it does any of the   *
-* following with any software or content covered by this license          *
-* ("Covered Software"):                                                   *
-*                                                                         *
-* o Integrates source code from Covered Software.                         *
-*                                                                         *
-* o Reads or includes copyrighted data files.                             *
-*                                                                         *
-* o Is designed specifically to execute Covered Software and parse the    *
-* results (as opposed to typical shell or execution-menu apps, which will *
-* execute anything you tell them to).                                     *
-*                                                                         *
-* o Includes Covered Software in a proprietary executable installer.  The *
-* installers produced by InstallShield are an example of this.  Including *
-* DRAKVUF with other software in compressed or archival form does not     *
-* trigger this provision, provided appropriate open source decompression  *
-* or de-archiving software is widely available for no charge.  For the    *
-* purposes of this license, an installer is considered to include Covered *
-* Software even if it actually retrieves a copy of Covered Software from  *
-* another source during runtime (such as by downloading it from the       *
-* Internet).                                                              *
-*                                                                         *
-* o Links (statically or dynamically) to a library which does any of the  *
-* above.                                                                  *
-*                                                                         *
-* o Executes a helper program, module, or script to do any of the above.  *
-*                                                                         *
-* This list is not exclusive, but is meant to clarify our interpretation  *
-* of derived works with some common examples.  Other people may interpret *
-* the plain GPL differently, so we consider this a special exception to   *
-* the GPL that we apply to Covered Software.  Works which meet any of     *
-* these conditions must conform to all of the terms of this license,      *
-* particularly including the GPL Section 3 requirements of providing      *
-* source code and allowing free redistribution of the work as a whole.    *
-*                                                                         *
-* Any redistribution of Covered Software, including any derived works,    *
-* must obey and carry forward all of the terms of this license, including *
-* obeying all GPL rules and restrictions.  For example, source code of    *
-* the whole work must be provided and free redistribution must be         *
-* allowed.  All GPL references to "this License", are to be treated as    *
-* including the terms and conditions of this license text as well.        *
-*                                                                         *
-* Because this license imposes special exceptions to the GPL, Covered     *
-* Work may not be combined (even as part of a larger work) with plain GPL *
-* software.  The terms, conditions, and exceptions of this license must   *
-* be included as well.  This license is incompatible with some other open *
-* source licenses as well.  In some cases we can relicense portions of    *
-* DRAKVUF or grant special permissions to use it in other open source     *
-* software.  Please contact tamas.k.lengyel@gmail.com with any such       *
-* requests.  Similarly, we don't incorporate incompatible open source     *
-* software into Covered Software without special permission from the      *
-* copyright holders.                                                      *
-*                                                                         *
-* If you have any questions about the licensing restrictions on using     *
-* DRAKVUF in other works, are happy to help.  As mentioned above,         *
-* alternative license can be requested from the author to integrate       *
-* DRAKVUF into proprietary applications and appliances.  Please email     *
-* tamas.k.lengyel@gmail.com for further information.                      *
-*                                                                         *
-* If you have received a written license agreement or contract for        *
-* Covered Software stating terms other than these, you may choose to use  *
-* and redistribute Covered Software under those terms instead of these.   *
-*                                                                         *
-* Source is provided to this software because we believe users have a     *
-* right to know exactly what a program is going to do before they run it. *
-* This also allows you to audit the software for security holes.          *
-*                                                                         *
-* Source code also allows you to port DRAKVUF to new platforms, fix bugs, *
-* and add new features.  You are highly encouraged to submit your changes *
-* on https://github.com/tklengyel/drakvuf, or by other methods.           *
-* By sending these changes, it is understood (unless you specify          *
-* otherwise) that you are offering unlimited, non-exclusive right to      *
-* reuse, modify, and relicense the code.  DRAKVUF will always be          *
-* available Open Source, but this is important because the inability to   *
-* relicense code has caused devastating problems for other Free Software  *
-* projects (such as KDE and NASM).                                        *
-* To specify special license conditions of your contributions, just say   *
-* so when you send them.                                                  *
-*                                                                         *
-* This program is distributed in the hope that it will be useful, but     *
-* WITHOUT ANY WARRANTY; without even the implied warranty of              *
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the DRAKVUF   *
-* license file for more details (it's in a COPYING file included with     *
-* DRAKVUF, and also available from                                        *
-* https://github.com/tklengyel/drakvuf/COPYING)                           *
-*                                                                         *
+ *                                                                         *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
+ * Tamas K Lengyel is hereinafter referred to as the author.               *
+ * This program is free software; you may redistribute and/or modify it    *
+ * under the terms of the GNU General Public License as published by the   *
+ * Free Software Foundation; Version 2 ("GPL"), BUT ONLY WITH ALL OF THE   *
+ * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
+ * right to use, modify, and redistribute this software under certain      *
+ * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
+ * software, alternative licenses can be aquired from the author.          *
+ *                                                                         *
+ * Note that the GPL places important restrictions on "derivative works",  *
+ * yet it does not provide a detailed definition of that term.  To avoid   *
+ * misunderstandings, we interpret that term as broadly as copyright law   *
+ * allows.  For example, we consider an application to constitute a        *
+ * derivative work for the purpose of this license if it does any of the   *
+ * following with any software or content covered by this license          *
+ * ("Covered Software"):                                                   *
+ *                                                                         *
+ * o Integrates source code from Covered Software.                         *
+ *                                                                         *
+ * o Reads or includes copyrighted data files.                             *
+ *                                                                         *
+ * o Is designed specifically to execute Covered Software and parse the    *
+ * results (as opposed to typical shell or execution-menu apps, which will *
+ * execute anything you tell them to).                                     *
+ *                                                                         *
+ * o Includes Covered Software in a proprietary executable installer.  The *
+ * installers produced by InstallShield are an example of this.  Including *
+ * DRAKVUF with other software in compressed or archival form does not     *
+ * trigger this provision, provided appropriate open source decompression  *
+ * or de-archiving software is widely available for no charge.  For the    *
+ * purposes of this license, an installer is considered to include Covered *
+ * Software even if it actually retrieves a copy of Covered Software from  *
+ * another source during runtime (such as by downloading it from the       *
+ * Internet).                                                              *
+ *                                                                         *
+ * o Links (statically or dynamically) to a library which does any of the  *
+ * above.                                                                  *
+ *                                                                         *
+ * o Executes a helper program, module, or script to do any of the above.  *
+ *                                                                         *
+ * This list is not exclusive, but is meant to clarify our interpretation  *
+ * of derived works with some common examples.  Other people may interpret *
+ * the plain GPL differently, so we consider this a special exception to   *
+ * the GPL that we apply to Covered Software.  Works which meet any of     *
+ * these conditions must conform to all of the terms of this license,      *
+ * particularly including the GPL Section 3 requirements of providing      *
+ * source code and allowing free redistribution of the work as a whole.    *
+ *                                                                         *
+ * Any redistribution of Covered Software, including any derived works,    *
+ * must obey and carry forward all of the terms of this license, including *
+ * obeying all GPL rules and restrictions.  For example, source code of    *
+ * the whole work must be provided and free redistribution must be         *
+ * allowed.  All GPL references to "this License", are to be treated as    *
+ * including the terms and conditions of this license text as well.        *
+ *                                                                         *
+ * Because this license imposes special exceptions to the GPL, Covered     *
+ * Work may not be combined (even as part of a larger work) with plain GPL *
+ * software.  The terms, conditions, and exceptions of this license must   *
+ * be included as well.  This license is incompatible with some other open *
+ * source licenses as well.  In some cases we can relicense portions of    *
+ * DRAKVUF or grant special permissions to use it in other open source     *
+ * software.  Please contact tamas.k.lengyel@gmail.com with any such       *
+ * requests.  Similarly, we don't incorporate incompatible open source     *
+ * software into Covered Software without special permission from the      *
+ * copyright holders.                                                      *
+ *                                                                         *
+ * If you have any questions about the licensing restrictions on using     *
+ * DRAKVUF in other works, are happy to help.  As mentioned above,         *
+ * alternative license can be requested from the author to integrate       *
+ * DRAKVUF into proprietary applications and appliances.  Please email     *
+ * tamas.k.lengyel@gmail.com for further information.                      *
+ *                                                                         *
+ * If you have received a written license agreement or contract for        *
+ * Covered Software stating terms other than these, you may choose to use  *
+ * and redistribute Covered Software under those terms instead of these.   *
+ *                                                                         *
+ * Source is provided to this software because we believe users have a     *
+ * right to know exactly what a program is going to do before they run it. *
+ * This also allows you to audit the software for security holes.          *
+ *                                                                         *
+ * Source code also allows you to port DRAKVUF to new platforms, fix bugs, *
+ * and add new features.  You are highly encouraged to submit your changes *
+ * on https://github.com/tklengyel/drakvuf, or by other methods.           *
+ * By sending these changes, it is understood (unless you specify          *
+ * otherwise) that you are offering unlimited, non-exclusive right to      *
+ * reuse, modify, and relicense the code.  DRAKVUF will always be          *
+ * available Open Source, but this is important because the inability to   *
+ * relicense code has caused devastating problems for other Free Software  *
+ * projects (such as KDE and NASM).                                        *
+ * To specify special license conditions of your contributions, just say   *
+ * so when you send them.                                                  *
+ *                                                                         *
+ * This program is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of              *
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the DRAKVUF   *
+ * license file for more details (it's in a COPYING file included with     *
+ * DRAKVUF, and also available from                                        *
+ * https://github.com/tklengyel/drakvuf/COPYING)                           *
+ *                                                                         *
 ***************************************************************************/
 
 #include <libvmi/libvmi.h>
@@ -119,20 +119,29 @@
 #include <libinjector/libinjector.h>
 #include "private.h"
 
+typedef enum
+{
+    INJECT_RESULT_SUCCESS,
+    INJECT_RESULT_TIMEOUT,
+    INJECT_RESULT_ERROR_CODE,
+} inject_result_t;
+
 struct injector
 {
     // Inputs:
     unicode_string_t* target_file_us;
-    reg_t target_cr3;
     vmi_pid_t target_pid;
     uint32_t target_tid;
     unicode_string_t* cwd_us;
+    bool break_loop_on_detection;
 
     // Internal:
     drakvuf_t drakvuf;
     bool is32bit, hijacked, resumed, detected;
     injection_method_t method;
+    bool global_search;
     addr_t exec_func;
+    reg_t target_rsp;
 
     // For create process
     addr_t resume_thread;
@@ -159,6 +168,9 @@ struct injector
 
     // Results:
     int rc;
+    inject_result_t result;
+    uint32_t error_code;
+    const char* error_string;
     uint32_t pid, tid;
     uint64_t hProc, hThr;
 };
@@ -184,10 +196,8 @@ static void free_injector(injector_t injector)
 
     free_memtraps(injector);
 
-    if (injector->target_file_us)
-        vmi_free_unicode_str(injector->target_file_us);
-    if (injector->cwd_us)
-        vmi_free_unicode_str(injector->cwd_us);
+    vmi_free_unicode_str(injector->target_file_us);
+    vmi_free_unicode_str(injector->cwd_us);
 
     g_free((void*)injector->binary);
     g_free((void*)injector->payload);
@@ -325,10 +335,12 @@ static unicode_string_t* convert_utf8_to_utf16(char const* str)
 
     unicode_string_t us =
     {
-        .contents = (void*)g_strdup(str),
+        .contents = (uint8_t*)g_strdup(str),
         .length = strlen(str),
         .encoding = "UTF-8",
     };
+
+    if (!us.contents) return NULL;
 
     unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
     if (!out)
@@ -504,10 +516,10 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     (void)drakvuf;
     injector_t injector = info->trap->data;
 
-    if ( info->regs->cr3 != injector->target_cr3 )
+    if ( info->proc_data.pid != injector->target_pid )
     {
-        PRINT_DEBUG("MemX received but CR3 (0x%lx) doesn't match target process (0x%lx)\n",
-                    info->regs->cr3, injector->target_cr3);
+        PRINT_DEBUG("MemX received but PID (%u) doesn't match target process (%u)\n",
+                    info->proc_data.pid, injector->target_pid);
         return 0;
     }
 
@@ -523,7 +535,10 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     bool success = false;
     if (injector->method == INJECT_METHOD_CREATEPROC)
+    {
         success = setup_create_process_stack(injector, info);
+        injector->target_rsp = info->regs->rsp;
+    }
     else if (injector->method == INJECT_METHOD_SHELLEXEC)
         success = setup_shell_execute_stack(injector, info);
 
@@ -552,6 +567,23 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
+static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+
+    vmi_pid_t crashed_pid = 0;
+    if (drakvuf_is_crashreporter(drakvuf, info, &crashed_pid) && crashed_pid == injector->target_pid)
+    {
+        injector->rc = 0;
+        injector->detected = false;
+        PRINT_DEBUG("Target process crash detected\n");
+
+        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+    }
+
+    return 0;
+}
+
 static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
@@ -559,7 +591,7 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
     PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". PID: %u PPID: %u\n",
                 info->regs->cr3, info->proc_data.pid, info->proc_data.ppid);
 
-    if (info->regs->cr3 != injector->target_cr3)
+    if (info->proc_data.pid != injector->target_pid)
         return 0;
 
     addr_t thread = drakvuf_get_current_thread(drakvuf, info->vcpu);
@@ -673,16 +705,19 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
 {
     injector_t injector = info->trap->data;
 
-    // Stop the loop and pause VM on first execution of injected process
-    if (injector->pid == (uint32_t)info->proc_data.pid)
-    {
-        drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
-        drakvuf_interrupt(drakvuf, -1);
+    if (injector->pid != (uint32_t)info->proc_data.pid)
+        return 0;
 
-        injector->rc = 1;
-        injector->detected = true;
-        PRINT_DEBUG("Process start detected\n");
-    }
+    PRINT_DEBUG("Process start detected %i -> 0x%lx\n", injector->pid, info->regs->cr3);
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+
+    injector->rc = 1;
+    injector->detected = true;
+
+    if ( injector->break_loop_on_detection )
+        drakvuf_interrupt(drakvuf, SIGINT);
+    else if ( injector->resumed )
+        drakvuf_interrupt(drakvuf, SIGINT);
 
     return 0;
 }
@@ -734,7 +769,6 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
             PRINT_DEBUG("Failed to write the binary into memory!\n");
             return 0;
         }
-        g_free((void*)injector->binary);
 
         // Get address of PspCallProcessNotifyRoutines() from the rekall profile
         if ( !drakvuf_get_function_rva(drakvuf, "PspCallProcessNotifyRoutines", &process_notify_rva) )
@@ -768,7 +802,6 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         PRINT_DEBUG("Failed to write the payload into memory!\n");
         return 0;
     }
-    g_free((void*)injector->payload);
 
     if (!setup_stack(injector->drakvuf, info, NULL, 4))
     {
@@ -816,12 +849,10 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
     PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx.\n", info->regs->rip, info->regs->cr3);
 
-    if ( info->regs->cr3 != injector->target_cr3 )
+    if ( info->proc_data.pid != injector->target_pid )
     {
-        PRINT_DEBUG("INT3 received but CR3 (0x%lx) doesn't match target process (0x%lx)\n",
-                    info->regs->cr3, injector->target_cr3);
-        PRINT_DEBUG("INT3 received from PID: %d [%s]\n",
-                    info->proc_data.pid, info->proc_data.name);
+        PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
+                    info->proc_data.name, info->proc_data.pid, injector->target_pid);
         return 0;
     }
 
@@ -835,6 +866,13 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             return 0;
     }
 
+    if (injector->target_rsp && info->regs->rsp <= injector->target_rsp)
+    {
+        PRINT_DEBUG("INT3 received but RSP (0x%lx) doesn't match target rsp (0x%lx)\n",
+                    info->regs->rsp, injector->target_rsp);
+        return 0;
+    }
+
     if (injector->is32bit && injector->status == STATUS_CREATE_OK)
     {
         PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
@@ -844,7 +882,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             // We are now in the return path from ShellExecuteW called from mem_callback
 
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_interrupt(drakvuf, -1);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
             // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND while
             // successfully opening file. So check only for out of resources (0) error.
@@ -866,16 +904,20 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             if (info->regs->rax)
                 fill_created_process_info(injector, info);
 
+            injector->rc = info->regs->rax;
+            memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+
             if (injector->pid && injector->tid)
             {
                 PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
-                injector->rc = info->regs->rax;
 
                 if (!setup_resume_thread_stack(injector, info))
                 {
                     PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
                     return 0;
                 }
+
+                injector->target_rsp = info->regs->rsp;
 
                 if (!setup_wait_for_injected_process_trap(injector))
                     return 0;
@@ -891,9 +933,8 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                 injector->rc = 0;
 
                 drakvuf_remove_trap(drakvuf, info->trap, NULL);
-                drakvuf_interrupt(drakvuf, -1);
+                drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
-                memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
                 return VMI_EVENT_RESPONSE_SET_REGISTERS;
             }
         }
@@ -909,29 +950,34 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
 
-        if (info->regs->rax == 1)
+        injector->rc = info->regs->rax;
+        memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+
+        if (injector->rc == 1)
         {
             PRINT_DEBUG("Resumed\n");
-            injector->rc = 1;
-            injector->resumed = true;
         }
         else
         {
             PRINT_DEBUG("Failed to resume\n");
             injector->rc = 0;
 
-            drakvuf_interrupt(drakvuf, -1);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
         }
 
-        memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+        // If the injected process was already detected to be running but
+        // the loop is not broken on detection, that means that resumethread
+        // was the last remaining trap we were waiting for and it's time
+        // to break the loop now
+        //
+        // If the injected processwas already detected to be running and
+        // the loop is broken on detected, then we are now in a loop
+        // outside the normal injection loop (ie. main drakvuf)
+        // so we don't break the loop
+        if ( injector->detected && !injector->break_loop_on_detection )
+            drakvuf_interrupt(drakvuf, SIGINT);
 
-        if (injector->detected)
-        {
-            // Resumed process was detected before ResumeThread was returned.
-            // We already returned from injector_start_app().
-            // We need cleanup resources.
-            free_injector(injector);
-        }
+        injector->resumed = true;
 
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
@@ -947,6 +993,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         {
             case INJECT_METHOD_CREATEPROC:
                 success = setup_create_process_stack(injector, info);
+                injector->target_rsp = info->regs->rsp;
                 break;
             case INJECT_METHOD_SHELLEXEC:
                 success = setup_shell_execute_stack(injector, info);
@@ -1060,16 +1107,20 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         if (info->regs->rax)
             fill_created_process_info(injector, info);
 
+        injector->rc = info->regs->rax;
+        memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+
         if (injector->pid && injector->tid)
         {
             PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
-            injector->rc = info->regs->rax;
 
             if (!setup_resume_thread_stack(injector, info))
             {
                 PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
                 return 0;
             }
+
+            injector->target_rsp = info->regs->rsp;
 
             if (!setup_wait_for_injected_process_trap(injector))
                 return 0;
@@ -1100,7 +1151,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     }
 
     drakvuf_remove_trap(drakvuf, info->trap, NULL);
-    drakvuf_interrupt(drakvuf, -1);
+    drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -1121,45 +1172,56 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     if (!drakvuf_add_trap(drakvuf, &trap))
         return false;
 
-    PRINT_DEBUG("Starting injection loop\n");
-    drakvuf_loop(drakvuf);
+    drakvuf_trap_t trap_crashreporter =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .cb = wait_for_crash_of_target_process,
+        .data = injector,
+    };
+    if (!drakvuf_add_trap(drakvuf, &trap_crashreporter))
+        return false;
+
+    if (!drakvuf_is_interrupted(drakvuf))
+    {
+        PRINT_DEBUG("Starting injection loop\n");
+        drakvuf_loop(drakvuf);
+    }
 
     free_memtraps(injector);
 
     drakvuf_remove_trap(drakvuf, &trap, NULL);
+    drakvuf_remove_trap(drakvuf, &trap_crashreporter, NULL);
 
     return true;
 }
 
 static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 {
-    size_t bytes_read = 0;
-    size_t mem_size = 4096, payload_size = 0;
+    size_t payload_size = 0;
     unsigned char* data = NULL;
-    unsigned char buffer[4096];
     FILE* fp = fopen(file, "rb");
 
     if (!fp)
         return false;
 
-    data = g_malloc0(sizeof(char) * mem_size);
+    // obtain file size:
+    fseek (fp, 0, SEEK_END);
+    payload_size = ftell (fp);
+    rewind (fp);
 
-    while ( (bytes_read = fread(buffer, 1, sizeof(buffer), fp)) )
+    data = g_malloc0(payload_size);
+    if ( !data )
     {
-        if (bytes_read + payload_size > mem_size)
-        {
-            mem_size *= 2;
-            unsigned char* new_data = g_realloc(data, mem_size);
-            if (!new_data)
-            {
-                g_free(data);
-                return false;
-            }
-            data = new_data;
-        }
+        fclose(fp);
+        return false;
+    }
 
-        memcpy(data + payload_size, buffer, bytes_read);
-        payload_size += bytes_read;
+    if ( payload_size != fread(data, payload_size, 1, fp) )
+    {
+        g_free(data);
+        fclose(fp);
+        return false;
     }
 
     *output = (addr_t)data;
@@ -1172,7 +1234,7 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
     return true;
 }
 
-static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t dtb, const char* file, vmi_pid_t injected_pid, uint32_t injected_tid)
+static void print_injection_info(output_format_t format, const char* file, injector_t injector)
 {
     GTimeVal t;
     g_get_current_time(&t);
@@ -1210,22 +1272,65 @@ static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t
 
     char* escaped_arguments = g_strescape(arguments, NULL);
 
-    switch (format)
+    switch (injector->result)
     {
-        case OUTPUT_CSV:
-            printf("inject," FORMAT_TIMEVAL ",%u,0x%lx,\"%s\",\"%s\",%u,%u\n",
-                   UNPACK_TIMEVAL(t), pid, dtb, process_name, escaped_arguments, injected_pid, injected_tid);
-            break;
+        case INJECT_RESULT_SUCCESS:
+            switch (format)
+            {
+                case OUTPUT_CSV:
+                    printf("inject," FORMAT_TIMEVAL ",Success,%u,\"%s\",\"%s\",%u,%u\n",
+                           UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                    break;
 
-        case OUTPUT_KV:
-            printf("inject Time=" FORMAT_TIMEVAL ",PID=%u,DTB=0x%lx,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
-                   UNPACK_TIMEVAL(t), pid, dtb, process_name, escaped_arguments, injected_pid, injected_tid);
-            break;
+                case OUTPUT_KV:
+                    printf("inject Time=" FORMAT_TIMEVAL ",Status=Success,PID=%u,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
+                           UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                    break;
 
+                default:
+                case OUTPUT_DEFAULT:
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:SUCCESS PID:%u FILE:\"%s\" ARGUMENTS:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
+                           UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                    break;
+            }
+            break;
+        case INJECT_RESULT_TIMEOUT:
+            switch (format)
+            {
+                case OUTPUT_CSV:
+                    printf("inject," FORMAT_TIMEVAL ",Timeout\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                case OUTPUT_KV:
+                    printf("inject Time=" FORMAT_TIMEVAL ",Status=Timeout\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                default:
+                case OUTPUT_DEFAULT:
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Timeout\n", UNPACK_TIMEVAL(t));
+                    break;
+            }
+            break;
         default:
-        case OUTPUT_DEFAULT:
-            printf("[INJECT] TIME:" FORMAT_TIMEVAL " PID:%u DTB:0x%lx FILE:\"%s\" ARGUMENTS:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
-                   UNPACK_TIMEVAL(t), pid, dtb, process_name, escaped_arguments, injected_pid, injected_tid);
+        case INJECT_RESULT_ERROR_CODE:
+            switch (format)
+            {
+                case OUTPUT_CSV:
+                    printf("inject," FORMAT_TIMEVAL ",Error,%d,\"%s\"\n",
+                           UNPACK_TIMEVAL(t), injector->error_code, injector->error_string);
+                    break;
+
+                case OUTPUT_KV:
+                    printf("inject Time=" FORMAT_TIMEVAL ",Status=Error,ErrorCode=%d,Error=\"%s\"\n",
+                           UNPACK_TIMEVAL(t), injector->error_code, injector->error_string);
+                    break;
+
+                default:
+                case OUTPUT_DEFAULT:
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Error ERROR_CODE:%d ERROR:\"%s\"\n",
+                           UNPACK_TIMEVAL(t), injector->error_code, injector->error_string);
+                    break;
+            }
             break;
     }
 
@@ -1233,20 +1338,60 @@ static void print_injection_info(output_format_t format, vmi_pid_t pid, uint64_t
     g_strfreev(split_results);
 }
 
-static bool get_dtb_for_pid(drakvuf_t drakvuf, vmi_pid_t pid, reg_t* p_target_cr3)
+struct module_context
 {
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    bool success = ( VMI_FAILURE != vmi_pid_to_dtb(vmi, pid, p_target_cr3) );
-    drakvuf_release_vmi(drakvuf);
-    return success;
+    const char* lib;
+    const char* fun;
+    addr_t module_addr;
+    addr_t addr;
+};
+
+static bool module_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* ctx )
+{
+    struct module_context* data = (struct module_context*)ctx;
+
+    if (module_info->base_addr != data->module_addr)
+        return false;
+
+    data->addr = drakvuf_exportsym_to_va(drakvuf, module_info->eprocess_addr, data->lib, data->fun);
+    if (data->addr)
+        return true;
+
+    return false;
 }
 
-static addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib, char const* fun)
+static addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib, char const* fun, bool global_search)
 {
+    // First check current process for function
     addr_t addr = drakvuf_exportsym_to_va(drakvuf, eprocess_base, lib, fun);
-    if (!addr)
+    if (addr)
+        return addr;
+
+    // If function is not mapped into the processes address space search it in other processes
+    struct module_context module_ctx =
+    {
+        .lib = lib,
+        .fun = fun,
+        .addr = 0
+    };
+
+    if (global_search)
+    {
+        // First get modules load address to search for other process with same address
+        access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_PID, };
+        addr_t module_list_head;
+        if (VMI_SUCCESS == drakvuf_get_process_pid(drakvuf, eprocess_base, &ctx.pid) &&
+                drakvuf_get_module_list(drakvuf, eprocess_base, &module_list_head) &&
+                drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, lib, &module_ctx.module_addr))
+        {
+            drakvuf_enumerate_processes_with_module(drakvuf, lib, module_visitor, &module_ctx);
+        }
+    }
+
+    if (!module_ctx.addr)
         PRINT_DEBUG("Failed to get address of %s!%s\n", lib, fun);
-    return addr;
+
+    return module_ctx.addr;
 }
 
 static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector, const char* file, const char* binary_path)
@@ -1261,13 +1406,13 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
 
     if (INJECT_METHOD_CREATEPROC == injector->method)
     {
-        injector->resume_thread = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "ResumeThread");
+        injector->resume_thread = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "ResumeThread", injector->global_search);
         if (!injector->resume_thread) return false;
-        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateProcessW");
+        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateProcessW", injector->global_search);
     }
     else if (INJECT_METHOD_SHELLEXEC == injector->method)
     {
-        injector->exec_func = get_function_va(drakvuf, eprocess_base, "shell32.dll", "ShellExecuteW");
+        injector->exec_func = get_function_va(drakvuf, eprocess_base, "shell32.dll", "ShellExecuteW", injector->global_search);
     }
     else if (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method)
     {
@@ -1290,59 +1435,126 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
                 return false;
         }
 
-        injector->memset = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "memset");
+        injector->memset = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "memset", injector->global_search);
         if (!injector->memset) return false;
-        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc");
+        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc", injector->global_search);
     }
 
     return injector->exec_func != 0;
 }
 
-int injector_start_app(drakvuf_t drakvuf, vmi_pid_t pid, uint32_t tid, const char* file, const char* cwd, injection_method_t method, output_format_t format, const char* binary_path, const char* target_process)
+int injector_start_app(
+    drakvuf_t drakvuf,
+    vmi_pid_t pid,
+    uint32_t tid,
+    const char* file,
+    const char* cwd,
+    injection_method_t method,
+    output_format_t format,
+    const char* binary_path,
+    const char* target_process,
+    bool break_loop_on_detection,
+    injector_t* to_be_freed_later,
+    bool global_search)
 {
     int rc = 0;
-    addr_t cr3;
-    if (!get_dtb_for_pid(drakvuf, pid, &cr3))
+    PRINT_DEBUG("Target PID %u to start '%s'\n", pid, file);
+
+    unicode_string_t* target_file_us = convert_utf8_to_utf16(file);
+    if (!target_file_us)
     {
-        PRINT_DEBUG("Unable to find target PID's DTB\n");
+        PRINT_DEBUG("Unable to convert file path from utf8 to utf16\n");
         return 0;
     }
 
-    PRINT_DEBUG("Target PID %u with DTB 0x%lx to start '%s'\n", pid, cr3, file);
+    unicode_string_t* cwd_us = NULL;
+    if (cwd)
+    {
+        cwd_us = convert_utf8_to_utf16(cwd);
+        if (!cwd_us)
+        {
+            PRINT_DEBUG("Unable to convert cwd from utf8 to utf16\n");
+            vmi_free_unicode_str(target_file_us);
+            return 0;
+        }
+    }
 
     injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
     if (!injector)
+    {
+        vmi_free_unicode_str(target_file_us);
+        vmi_free_unicode_str(cwd_us);
         return 0;
+    }
 
     injector->drakvuf = drakvuf;
     injector->target_pid = pid;
     injector->target_tid = tid;
-    injector->target_cr3 = cr3;
-
-    injector->target_file_us = convert_utf8_to_utf16(file);
-    injector->cwd_us = cwd ? convert_utf8_to_utf16(cwd) : NULL;
-    if (!injector->target_file_us || (cwd && !injector->cwd_us))
-        goto done;
-
+    injector->target_file_us = target_file_us;
+    injector->cwd_us = cwd_us;
     injector->method = method;
+    injector->global_search = global_search;
     injector->binary_path = binary_path;
     injector->target_process = target_process;
     injector->status = STATUS_NULL;
     injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    injector->break_loop_on_detection = break_loop_on_detection;
 
     if (!initialize_injector_functions(drakvuf, injector, file, binary_path))
-        goto done;
-
-    if (!inject(drakvuf, injector))
-        goto done;
-
-    print_injection_info(format, injector->target_pid, injector->target_cr3, file, injector->pid, injector->tid);
-
-done:
-    rc = injector->rc;
-    if ((!injector->detected && !injector->resumed) || (injector->detected && injector->resumed))
+    {
+        PRINT_DEBUG("Unable to initialize injector functions\n");
         free_injector(injector);
+        return 0;
+    }
 
+    if (inject(drakvuf, injector) && injector->rc)
+    {
+        injector->result = INJECT_RESULT_SUCCESS;
+        print_injection_info(format, file, injector);
+    }
+    else
+    {
+        if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
+        {
+            injector->result = INJECT_RESULT_TIMEOUT;
+            print_injection_info(format, file, injector);
+        }
+        else
+        {
+            uint32_t err = 0;
+            const char* err_str = "<UNKNOWN>";
+            if (VMI_SUCCESS != drakvuf_get_last_error(drakvuf, 0, &err, &err_str))
+                err = -1;
+
+            injector->result = INJECT_RESULT_ERROR_CODE;
+            injector->error_code = err;
+            injector->error_string = err_str;
+            print_injection_info(format, file, injector);
+        }
+    }
+
+    rc = injector->rc;
     PRINT_DEBUG("Finished with injection. Ret: %i\n", rc);
+
+    switch (method)
+    {
+        case INJECT_METHOD_CREATEPROC:
+            if ( break_loop_on_detection )
+                if ( injector->resumed && injector->detected )
+                {
+                    free_injector(injector);
+                }
+                else
+                {
+                    *to_be_freed_later = injector;
+                }
+            else
+                free_injector(injector);
+            break;
+        default:
+            free_injector(injector);
+            break;
+    };
+
     return rc;
 }

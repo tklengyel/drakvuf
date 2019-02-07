@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -171,7 +171,9 @@ void xen_free_interface(xen_interface_t* xen)
         //if (xen->xsh) xs_close(xen->xsh);
         if (xen->xc)
             xc_interface_close(xen->xc);
-        free(xen);
+        if (xen->evtchn)
+            xc_evtchn_close(xen->evtchn);
+        g_free(xen);
     }
 }
 
@@ -334,22 +336,4 @@ void xen_force_resume(xen_interface_t* xen, domid_t domID)
 
     }
     while (1);
-}
-
-bool xen_unmask_evtchn(xen_interface_t* xen)
-{
-    int port = xc_evtchn_pending(xen->evtchn);
-    if ( -1 == port )
-    {
-        fprintf(stderr, "Error unmasking Xen event channel\n");
-        return 0;
-    }
-
-    if ( xc_evtchn_unmask(xen->evtchn, port) )
-    {
-        fprintf(stderr, "Error unmasking Xen event channel\n");
-        return 0;
-    }
-
-    return 1;
 }

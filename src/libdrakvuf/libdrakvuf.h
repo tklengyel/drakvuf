@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -121,6 +121,10 @@ extern "C" {
 /*---------------------------------------------------------
  * DRAKVUF functions
  */
+
+// Additional signal number constants for Drakvuf
+#define SIGDRAKVUFERROR -1
+#define SIGDRAKVUFTIMEOUT -2
 
 typedef enum lookup_type
 {
@@ -326,7 +330,8 @@ typedef void (*event_cb_t) (int fd, void* data);
 bool drakvuf_init (drakvuf_t* drakvuf,
                    const char* domain,
                    const char* rekall_profile,
-                   const bool verbose);
+                   const bool verbose,
+                   const bool libvmi_conf);
 void drakvuf_close (drakvuf_t drakvuf, const bool pause);
 bool drakvuf_add_trap(drakvuf_t drakvuf,
                       drakvuf_trap_t* trap);
@@ -336,6 +341,7 @@ void drakvuf_remove_trap (drakvuf_t drakvuf,
 void drakvuf_loop (drakvuf_t drakvuf);
 void drakvuf_interrupt (drakvuf_t drakvuf,
                         int sig);
+int drakvuf_is_interrupted(drakvuf_t drakvuf);
 void drakvuf_pause (drakvuf_t drakvuf);
 void drakvuf_resume (drakvuf_t drakvuf);
 
@@ -363,11 +369,21 @@ addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
                                    uint64_t vcpu_id);
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
                                   uint64_t vcpu_id);
+status_t drakvuf_get_last_error(drakvuf_t drakvuf,
+                                uint64_t vcpu_id,
+                                uint32_t* err,
+                                const char** err_str);
 
 /* Caller must free the returned string */
 char* drakvuf_get_process_name(drakvuf_t drakvuf,
                                addr_t process_base,
                                bool fullpath);
+
+/* Caller must free the returned string */
+char* drakvuf_get_process_commandline(drakvuf_t drakvuf,
+                                      drakvuf_trap_info_t* info,
+                                      addr_t eprocess_base);
+
 
 status_t drakvuf_get_process_pid( drakvuf_t drakvuf,
                                   addr_t process_base,
@@ -411,10 +427,24 @@ bool drakvuf_find_process(drakvuf_t drakvuf,
                           const char* find_procname,
                           addr_t* process_addr);
 
+typedef struct _module_info
+{
+    addr_t eprocess_addr ;       /* EPROCESS to which the module is currently loaded           */
+    addr_t dtb ;                 /* DTB for the process where the module is currently loaded   */
+    vmi_pid_t pid ;              /* PID of the process where the module is currently is loaded */
+    addr_t base_addr ;           /* Module base address                                        */
+    unicode_string_t full_name ; /* Module full name                                           */
+    unicode_string_t base_name ; /* Module base name                                           */
+} module_info_t ;
+
 bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf,
         const char* module_name,
-        bool (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess_addr, void* visitor_ctx),
+        bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
         void* visitor_ctx);
+
+bool drakvuf_is_crashreporter(drakvuf_t drakvuf,
+                              drakvuf_trap_info_t* info,
+                              vmi_pid_t* pid);
 
 bool drakvuf_get_module_list(drakvuf_t drakvuf,
                              addr_t process_base,
@@ -439,6 +469,12 @@ bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
                                    const char* module_name,
                                    addr_t* base_addr );
 
+bool drakvuf_get_module_base_addr_ctx( drakvuf_t drakvuf,
+                                       addr_t module_list_head,
+                                       access_context_t* ctx,
+                                       const char* module_name,
+                                       addr_t* base_addr_out );
+
 status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
                                    addr_t process_base,
                                    vmi_pid_t* ppid );
@@ -449,8 +485,7 @@ bool drakvuf_get_current_process_data( drakvuf_t drakvuf,
 
 gchar* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf,
                                   drakvuf_trap_info_t* info,
-                                  addr_t key_handle,
-                                  addr_t process_arg);
+                                  uint64_t key_handle);
 
 char* drakvuf_get_filename_from_handle( drakvuf_t drakvuf,
                                         drakvuf_trap_info_t* info,

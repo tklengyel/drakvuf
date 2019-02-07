@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -136,33 +136,26 @@ extern bool verbose;
 class drakvuf_c
 {
 private:
-    bool leave_paused;
+    bool leave_paused = { false };
     drakvuf_t drakvuf { nullptr };
-    drakvuf_plugins* plugins;
-    GThread* timeout_thread { nullptr };
-    os_t os;
+    drakvuf_plugins* plugins { nullptr };
+    injector_t injector_to_be_freed { nullptr };
 
 public:
-    int timeout;
+    int timeout { 0 };
     int interrupted { 0 };
-    GMutex loop_signal;
-
-    const char* process_start_name;
-    bool process_start_detected { false };
-    int process_start_timeout;
-    GMutex loop_signal2;
 
     drakvuf_c(const char* domain,
               const char* rekall_profile,
               output_format_t output,
-              int timeout,
               bool verbose,
-              bool leave_paused);
+              bool leave_paused,
+              bool libvmi_conf);
     ~drakvuf_c();
 
     int is_initialized();
     void interrupt(int signal);
-    void loop();
+    void loop(int duration);
     void pause();
     void resume();
     int inject_cmd(vmi_pid_t injection_pid,
@@ -172,7 +165,9 @@ public:
                    injection_method_t method,
                    output_format_t format,
                    const char* binary_path,
-                   const char* target_process);
+                   const char* target_process,
+                   int timeout,
+                   bool global_search);
     int start_plugins(const bool* plugin_list,
                       const char* dump_folder,
                       bool dump_modified_files,
@@ -181,8 +176,6 @@ public:
                       const char* tcpip_profile,
                       const char* syscalls_filter_file,
                       bool abort_on_bsod );
-    bool wait_for_process(const char* processname);
-
 };
 
 #endif

@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
 *                                                                         *
-* DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+* DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
 * Tamas K Lengyel is hereinafter referred to as the author.               *
 * This program is free software; you may redistribute and/or modify it    *
 * under the terms of the GNU General Public License as published by the   *
@@ -272,7 +272,8 @@ static void save_file_metadata(filedelete* f,
                                addr_t control_area,
                                const char* filename,
                                size_t file_size,
-                               uint64_t fo_flags)
+                               uint64_t fo_flags,
+                               uint32_t ntstatus = 0)
 {
     char* file = NULL;
     if ( asprintf(&file, "%s/file.%06d.metadata", f->dump_folder, sequence_number) < 0 )
@@ -291,6 +292,8 @@ static void save_file_metadata(filedelete* f,
     fprintf(fp, "PID: %" PRIu64 "\n", static_cast<uint64_t>(info->proc_data.pid));
     fprintf(fp, "PPID: %" PRIu64 "\n", static_cast<uint64_t>(info->proc_data.ppid));
     fprintf(fp, "ProcessName: \"%s\"\n", info->proc_data.name);
+    if (ntstatus)
+        fprintf(fp, "WARNING: The file have been read partially with status 0x%x\n", ntstatus);
 
     fclose(fp);
 }
@@ -591,6 +594,7 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     uint32_t isb_status = 0; // `isb` is `IO_STATUS_BLOCK`
     size_t isb_size = 0;
     bool is_success = false;
+    auto filename = f->files[std::make_pair(info->proc_data.pid, injector->handle)];
 
     if (injector->is32bit)
     {
@@ -646,15 +650,16 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
         else
         {
-            auto filename = f->files[std::make_pair(info->proc_data.pid, injector->handle)];
             auto filesize = injector->ntreadfile_info.bytes_read;
             print_extraction_information(f, drakvuf, info, filename.c_str(), filesize, injector->fo_flags, curr_sequence_number);
             save_file_metadata(f, info, curr_sequence_number, 0, filename.c_str(), filesize, injector->fo_flags);
         }
     }
-    else
+    else if (STATUS_END_OF_FILE != status)
     {
-        PRINT_DEBUG("[FILEDELETE2] [ReadFile] Failed to read %s with status 0x%lx and IO_STATUS_BLOCK = { Status 0x%x; Size 0x%lx} .\n",
+        if (injector->ntreadfile_info.bytes_read)
+            save_file_metadata(f, info, injector->curr_sequence_number, 0, filename.c_str(), injector->ntreadfile_info.bytes_read, injector->fo_flags, status);
+        PRINT_DEBUG("[FILEDELETE2] [ReadFile] Failed to read %s with status 0x%lx and IO_STATUS_BLOCK = { Status 0x%x; Size 0x%lx} \n",
                     f->files[std::make_pair(info->proc_data.pid, injector->handle)].c_str(), info->regs->rax, isb_status, isb_size);
         goto err;
     }
@@ -795,8 +800,9 @@ done:
 /*
  * Drakvuf must be locked/unlocked in the caller
  */
-static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle, const char* filename)
+static bool start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle, const char* filename, event_response_t* response)
 {
+    *response = VMI_EVENT_RESPONSE_NONE;
     filedelete* f = (filedelete*)info->trap->data;
 
     uint64_t fo_flags = 0;
@@ -873,7 +879,10 @@ static event_response_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
     if (inject_queryobject(drakvuf, info, vmi, injector))
-        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    {
+        *response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+        return 1;
+    }
 
     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
     return 0;
@@ -915,19 +924,10 @@ static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
         if (del)
         {
-            if (f->use_injector)
-            {
-                auto filename = get_file_name(f, drakvuf, vmi, info, handle, nullptr, nullptr);
-                if (filename.empty()) filename = "<UNKNOWN>";
+            auto filename = get_file_name(f, drakvuf, vmi, info, handle, nullptr, nullptr);
+            if (filename.empty()) filename = "<UNKNOWN>";
 
-                f->files[std::make_pair(info->proc_data.pid, handle)] = filename;
-
-                response = start_readfile(drakvuf, info, vmi, handle, filename.c_str());
-            }
-            else
-            {
-                grab_file_by_handle(f, drakvuf, vmi, info, handle);
-            }
+            f->files[std::make_pair(info->proc_data.pid, handle)] = filename;
         }
     }
 
@@ -965,7 +965,7 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
 
-    auto response = 0;
+    event_response_t response = 0;
     if (f->use_injector)
     {
         /*
@@ -973,20 +973,19 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
          */
         auto filename = f->files[std::make_pair(info->proc_data.pid, handle)];
         if (filename.empty())
-            goto err;
+            goto done;
 
-        response = start_readfile(drakvuf, info, vmi, handle, filename.c_str());
+        if ( start_readfile(drakvuf, info, vmi, handle, filename.c_str(), &response) )
+            goto done;
     }
-    else
+
+    if (f->files.erase(std::make_pair(info->proc_data.pid, handle)) > 0)
     {
-        if (f->files.erase(std::make_pair(info->proc_data.pid, handle)) > 0)
-        {
-            // We detect the fact of closing of the previously modified file.
-            grab_file_by_handle(f, drakvuf, vmi, info, handle);
-        }
+        // We detect the fact of closing of the previously modified file.
+        grab_file_by_handle(f, drakvuf, vmi, info, handle);
     }
 
-err:
+done:
     drakvuf_release_vmi(drakvuf);
     return response;
 }

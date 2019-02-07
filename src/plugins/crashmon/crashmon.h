@@ -102,14 +102,26 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_HANDLES_H
-#define WIN_HANDLES_H
+#ifndef CRASHMON_H
+#define CRASHMON_H
 
-#include <libvmi/libvmi.h>
-#include "libdrakvuf.h"
+#include "plugins/private.h"
+#include "plugins/plugins.h"
 
-addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
-                                 uint64_t vcpu_id,
-                                 uint64_t handle);
+class crashmon: public plugin
+{
+public:
+    const output_format_t format;
+
+    crashmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+
+private:
+    drakvuf_trap_t trap =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .data = this
+    };
+};
 
 #endif

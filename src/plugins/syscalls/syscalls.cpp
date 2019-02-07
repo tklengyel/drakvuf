@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -552,9 +552,9 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if ( VMI_FAILURE == vmi_read(vmi, &ctx, size, buf, NULL) )
                 goto exit;
         }
-
-        if ( 8 == s->reg_size )
+        else
         {
+            // 64 bit os
             uint64_t* buf64 = (uint64_t*)buf;
             if ( nargs > 0 )
                 buf64[0] = info->regs->rcx;
@@ -659,25 +659,33 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             const struct symbol* symbol = &symbols->symbols[i];
 
             /* Looking for system calls */
-            if (strncmp(symbol->name, "sys_", 4))
-                continue;
+            if (!strncmp(symbol->name, "sys_", 4) )
+            {
+                /* This is the address of the table itself so skip it */
+                if (!strcmp(symbol->name, "sys_call_table"))
+                    continue;
 
-            /* This is the address of the table itself so skip it */
-            if (!strcmp(symbol->name, "sys_call_table"))
-                continue;
+                /* This is a variable used by gettimeofday not a syscall */
+                if (!strcmp(symbol->name, "sys_tz"))
+                    continue;
 
-            /* This is a variable used by gettimeofday not a syscall */
-            if (!strcmp(symbol->name, "sys_tz"))
-                continue;
+                /* These are all variables, not syscalls */
+                if (!strncmp(symbol->name, "sys_dmi", 7) )
+                    continue;
 
-            /* These are all variables, not syscalls */
-            if (!strncmp(symbol->name, "sys_dmi", 7) )
-                continue;
+                if (!strcmp(symbol->name, "sys_tracepoint_refcount"))
+                    continue;
 
-            if (!strcmp(symbol->name, "sys_tracepoint_refcount"))
-                continue;
+                if (!strcmp(symbol->name, "sys_table"))
+                    continue;
 
-            if (!strcmp(symbol->name, "sys_table"))
+                if (!strcmp(symbol->name, "sys_perf_refcount_enter"))
+                    continue;
+
+                if (!strcmp(symbol->name, "sys_perf_refcount_exit"))
+                    continue;
+            }
+            else if ( strncmp(symbol->name, "__x64_sys_", 10) )
                 continue;
 
 
@@ -823,15 +831,38 @@ syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output
 
     drakvuf_free_symbols(symbols);
 
+    bool error = 0;
     GSList* loop = this->traps;
     while (loop)
     {
         drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
 
         if ( !drakvuf_add_trap(drakvuf, trap) )
-            throw -1;
+        {
+            error = 1;
+            break;
+        }
 
         loop = loop->next;
+    }
+
+    if ( error )
+    {
+        loop = this->traps;
+        while (loop)
+        {
+            drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
+            drakvuf_remove_trap(drakvuf, trap, NULL);
+            g_free(trap->data);
+            g_free((gpointer)trap->name);
+            g_free(trap);
+            loop = loop->next;
+        }
+
+        g_slist_free(this->traps);
+        this->traps = NULL;
+
+        throw -1;
     }
 }
 

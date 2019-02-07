@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -123,11 +123,13 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [KPROCESS_HEADER] = { "_KPROCESS", "Header" },
     [PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
     [PEB_LDR] = { "_PEB", "Ldr" },
+    [PEB_PROCESSPARAMETERS] = { "_PEB", "ProcessParameters" },
     [PEB_SESSIONID] = { "_PEB", "SessionId" },
     [PEB_LDR_DATA_INLOADORDERMODULELIST] = {"_PEB_LDR_DATA", "InLoadOrderModuleList" },
     [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
     [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
     [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
+    [LDR_DATA_TABLE_ENTRY_FULLDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "FullDllName" },
     [HANDLE_TABLE_TABLECODE] = {"_HANDLE_TABLE", "TableCode" },
     [KPCR_PRCB] = {"_KPCR", "Prcb" },
     [KPCR_PRCBDATA] = {"_KPCR", "PrcbData" },
@@ -135,6 +137,8 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
     [KTHREAD_PREVIOUSMODE] = { "_KTHREAD", "PreviousMode" },
     [KTHREAD_HEADER] = { "_KTHREAD", "Header" },
+    [KTHREAD_TEB] = { "_KTHREAD", "Teb" },
+    [TEB_LASTERRORVALUE] = { "_TEB", "LastErrorValue" },
     [ETHREAD_CID] = {"_ETHREAD", "Cid" },
     [ETHREAD_TCB] = { "_ETHREAD", "Tcb" },
     [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
@@ -156,6 +160,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [OBJECTNAMEINFORMATION_NAME] = { "_OBJECT_NAME_INFORMATION", "Name" },
 
     [FILEOBJECT_NAME] = { "_FILE_OBJECT", "FileName" },
+    [RTL_USER_PROCESS_PARAMETERS_COMMANDLINE] = { "_RTL_USER_PROCESS_PARAMETERS", "CommandLine" },
 
 };
 

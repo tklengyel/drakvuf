@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -109,10 +109,6 @@ static gpointer timer(gpointer data)
 {
     drakvuf_c* drakvuf = (drakvuf_c*)data;
 
-    /* Wait for the loop to start */
-    g_mutex_lock(&drakvuf->loop_signal);
-    g_mutex_unlock(&drakvuf->loop_signal);
-
     while (drakvuf->timeout && !drakvuf->interrupted)
     {
         sleep(1);
@@ -121,11 +117,33 @@ static gpointer timer(gpointer data)
 
     if (!drakvuf->interrupted)
     {
-        drakvuf->interrupt(-1);
+        drakvuf->interrupt(SIGDRAKVUFTIMEOUT);
     }
 
     g_thread_exit(nullptr);
     return nullptr;
+}
+
+static GThread* startup_timer(drakvuf_c* drakvuf, int timeout)
+{
+    drakvuf->interrupted = 0;
+    drakvuf->timeout = timeout;
+
+    GThread* timeout_thread = nullptr;
+    if (drakvuf->timeout > 0)
+        timeout_thread = g_thread_new("timer", timer, (void*)drakvuf);
+    return timeout_thread;
+}
+
+static void cleanup_timer(drakvuf_c* drakvuf, GThread* timeout_thread)
+{
+    if (timeout_thread)
+    {
+        // Force stop timeout thread
+        if (drakvuf->timeout && !drakvuf->interrupted)
+            drakvuf->interrupted = -1;
+        g_thread_join(timeout_thread);
+    }
 }
 
 int drakvuf_c::start_plugins(const bool* plugin_list,
@@ -186,6 +204,10 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     rc = plugins->start((drakvuf_plugin_t)i, &abort_on_bsod);
                     break;
 
+                case PLUGIN_CRASHMON:
+                    rc = plugins->start((drakvuf_plugin_t)i, nullptr);
+                    break;
+
                 default:
                     rc = plugins->start((drakvuf_plugin_t)i, nullptr);
                     break;
@@ -202,47 +224,28 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
 drakvuf_c::drakvuf_c(const char* domain,
                      const char* rekall_profile,
                      output_format_t output,
-                     int timeout,
                      bool verbose,
-                     bool leave_paused)
-    : leave_paused{ leave_paused }, timeout{ timeout },
-      process_start_timeout{ timeout }
+                     bool leave_paused,
+                     bool libvmi_conf)
+    : leave_paused{ leave_paused }
 {
-    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose))
+    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose, libvmi_conf))
         throw std::runtime_error("drakvuf_init() failed");
 
-    os = drakvuf_get_os_type(drakvuf);
-
-    g_mutex_init(&loop_signal);
-    g_mutex_lock(&loop_signal);
-    g_mutex_init(&loop_signal2);
-    g_mutex_lock(&loop_signal2);
-
-    if (timeout > 0)
-        timeout_thread = g_thread_new(nullptr, timer, (void*)this);
-
-    plugins = new drakvuf_plugins(drakvuf, output, os);
+    plugins = new drakvuf_plugins(drakvuf, output, drakvuf_get_os_type(drakvuf));
 }
 
 drakvuf_c::~drakvuf_c()
 {
     if ( !interrupted )
-        interrupt(-1);
+        interrupt(SIGDRAKVUFERROR);
 
-    g_mutex_trylock(&loop_signal);
-    g_mutex_unlock(&loop_signal);
-    g_mutex_clear(&loop_signal);
-    g_mutex_trylock(&loop_signal2);
-    g_mutex_unlock(&loop_signal2);
-    g_mutex_clear(&loop_signal2);
+    g_free(injector_to_be_freed);
 
     if (drakvuf)
         drakvuf_close(drakvuf, leave_paused);
 
     delete plugins;
-
-    if (timeout_thread)
-        g_thread_join(timeout_thread);
 }
 
 void drakvuf_c::interrupt(int signal)
@@ -251,11 +254,11 @@ void drakvuf_c::interrupt(int signal)
     drakvuf_interrupt(drakvuf, signal);
 }
 
-void drakvuf_c::loop()
+void drakvuf_c::loop(int duration)
 {
-    interrupted = 0;
-    g_mutex_unlock(&loop_signal);
+    GThread* timeout_thread = startup_timer(this, duration);
     drakvuf_loop(drakvuf);
+    cleanup_timer(this, timeout_thread);
 }
 
 void drakvuf_c::pause()
@@ -268,11 +271,34 @@ void drakvuf_c::resume()
     drakvuf_resume(drakvuf);
 }
 
-int drakvuf_c::inject_cmd(vmi_pid_t injection_pid, uint32_t injection_tid, const char* inject_cmd, const char* cwd, injection_method_t method, output_format_t format, const char* binary_path, const char* target_process)
+int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
+                          uint32_t injection_tid,
+                          const char* inject_cmd,
+                          const char* cwd,
+                          injection_method_t method,
+                          output_format_t format,
+                          const char* binary_path,
+                          const char* target_process,
+                          int timeout,
+                          bool global_search)
 {
-    int rc = injector_start_app(drakvuf, injection_pid, injection_tid, inject_cmd, cwd, method, format, binary_path, target_process);
+    GThread* timeout_thread = startup_timer(this, timeout);
+    int rc = injector_start_app(drakvuf,
+                                injection_pid,
+                                injection_tid,
+                                inject_cmd,
+                                cwd,
+                                method,
+                                format,
+                                binary_path,
+                                target_process,
+                                true,
+                                &injector_to_be_freed,
+                                global_search);
 
     if (!rc)
         fprintf(stderr, "Process startup failed\n");
+
+    cleanup_timer(this, timeout_thread);
     return rc;
 }

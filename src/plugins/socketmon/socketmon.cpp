@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -152,32 +152,36 @@ void free_wrapper (drakvuf_trap_t* trap)
 
 static inline void ipv4_to_str(char** str, uint8_t ipv4[4])
 {
-    *str = (char*)g_malloc0(snprintf(NULL, 0, "%u.%u.%u.%u",
-                                     ipv4[0], ipv4[1], ipv4[2], ipv4[3]) + 1);
+    size_t size = snprintf(NULL, 0, "%u.%u.%u.%u",
+                           ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
+
+    *str = (char*)g_malloc0(size + 1);
     if ( !(*str) )
         return;
 
-    sprintf(*str, "%u.%u.%u.%u", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
+    snprintf(*str, size, "%u.%u.%u.%u", ipv4[0], ipv4[1], ipv4[2], ipv4[3]);
 }
 
 static inline void ipv6_to_str(char** str, uint8_t ipv6[16])
 {
-    *str = (char*)g_malloc0(snprintf(NULL, 0,
-                                     "%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
-                                     ipv6[0], ipv6[1], ipv6[2], ipv6[3],
-                                     ipv6[4], ipv6[5], ipv6[6], ipv6[7],
-                                     ipv6[8], ipv6[9], ipv6[10], ipv6[11],
-                                     ipv6[12], ipv6[13], ipv6[14], ipv6[15]) + 1);
+    size_t size = snprintf(NULL, 0,
+                           "%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
+                           ipv6[0], ipv6[1], ipv6[2], ipv6[3],
+                           ipv6[4], ipv6[5], ipv6[6], ipv6[7],
+                           ipv6[8], ipv6[9], ipv6[10], ipv6[11],
+                           ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
+
+    *str = (char*)g_malloc0(size + 1);
 
     if ( !(*str) )
         return;
 
-    sprintf(*str,
-            "%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
-            ipv6[0], ipv6[1], ipv6[2], ipv6[3],
-            ipv6[4], ipv6[5], ipv6[6], ipv6[7],
-            ipv6[8], ipv6[9], ipv6[10], ipv6[11],
-            ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
+    snprintf(*str, size,
+             "%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x:%x%x",
+             ipv6[0], ipv6[1], ipv6[2], ipv6[3],
+             ipv6[4], ipv6[5], ipv6[6], ipv6[7],
+             ipv6[8], ipv6[9], ipv6[10], ipv6[11],
+             ipv6[12], ipv6[13], ipv6[14], ipv6[15]);
 }
 
 static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -1308,7 +1312,10 @@ static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     drakvuf_release_vmi(drakvuf);
 
     if ( !w->obj )
+    {
+        g_free(w);
         return 0;
+    }
 
     drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
     trap->breakpoint.lookup_type = LOOKUP_PID;
@@ -1331,7 +1338,10 @@ static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     };
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
+    {
         printf("Failed to trap return at 0x%lx\n", rsp);
+        g_free(w);
+    }
 
     return 0;
 }
@@ -1353,7 +1363,10 @@ static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     drakvuf_release_vmi(drakvuf);
 
     if ( !w->obj )
+    {
+        g_free(w);
         return 0;
+    }
 
     drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
     trap->breakpoint.lookup_type = LOOKUP_PID;
@@ -1376,7 +1389,10 @@ static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     };
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
+    {
         printf("Failed to trap return at 0x%lx\n", rsp);
+        g_free(w);
+    }
 
     return 0;
 }
@@ -1596,12 +1612,27 @@ struct module_trap_context_t
 
 }
 
-static bool module_trap_visitor(drakvuf_t drakvuf, addr_t eprocess_base, void* visitor_ctx)
+static bool module_trap_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx )
 {
     module_trap_context_t const* data = reinterpret_cast<module_trap_context_t*>(visitor_ctx);
+    status_t ret ;
+    vmi_instance_t vmi;
+    addr_t exec_func ;
+    access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB,
+                             .dtb                 = module_info->dtb,
+                             .addr                = module_info->base_addr
+                           };
 
-    addr_t exec_func = drakvuf_exportsym_to_va(drakvuf, eprocess_base, data->module_name, data->function_name);
-    if (!exec_func)
+    PRINT_DEBUG("[SOCKETMON] trap_visitor: CR3[0x%lX] pid[0x%X] base_name[%s] load_address[0x%lX] full_name[%s]\n",
+                module_info->dtb, module_info->pid, module_info->base_name.contents, module_info->base_addr, module_info->full_name.contents );
+
+    vmi = drakvuf_lock_and_get_vmi( drakvuf );
+
+    ret = vmi_translate_sym2v( vmi, &ctx, data->function_name, &exec_func );
+
+    drakvuf_release_vmi( drakvuf );
+
+    if ( ret == VMI_FAILURE )
     {
         PRINT_DEBUG("[SOCKETMON] Failed to get address of %s!%s\n", data->module_name, data->function_name);
         return false;
@@ -1609,16 +1640,9 @@ static bool module_trap_visitor(drakvuf_t drakvuf, addr_t eprocess_base, void* v
 
     PRINT_DEBUG("[SOCKETMON] Address of %s!%s is 0x%lx\n", data->module_name, data->function_name, exec_func);
 
-    vmi_pid_t pid;
-    if (VMI_FAILURE == drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
-    {
-        PRINT_DEBUG("[SOCKETMON] Failed to get pid of process\n");
-        return false;
-    }
-
     data->trap->breakpoint.module = data->module_name;
-    data->trap->breakpoint.pid = pid;
-    data->trap->breakpoint.addr = exec_func;
+    data->trap->breakpoint.pid    = module_info->pid;
+    data->trap->breakpoint.addr   = exec_func;
 
     data->trap->name = data->function_name;
     data->trap->cb   = data->hook_cb;

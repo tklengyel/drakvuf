@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -136,6 +136,14 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
     return 0;
 }
 
+status_t drakvuf_get_last_error(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str)
+{
+    if ( drakvuf->osi.get_last_error )
+        return drakvuf->osi.get_last_error(drakvuf, vcpu_id, err, err_str);
+
+    return VMI_FAILURE;
+}
+
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
 {
     if ( drakvuf->osi.get_current_process )
@@ -148,6 +156,14 @@ char* drakvuf_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool full
 {
     if ( drakvuf->osi.get_process_name )
         return drakvuf->osi.get_process_name(drakvuf, process_base, fullpath);
+
+    return NULL;
+}
+
+char* drakvuf_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base)
+{
+    if ( drakvuf->osi.get_process_commandline )
+        return drakvuf->osi.get_process_commandline(drakvuf, info, eprocess_base);
 
     return NULL;
 }
@@ -259,6 +275,14 @@ bool drakvuf_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, co
     return 0;
 }
 
+bool drakvuf_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out)
+{
+    if ( drakvuf->osi.get_module_base_addr_ctx )
+        return drakvuf->osi.get_module_base_addr_ctx(drakvuf, module_list_head, ctx, module_name, base_addr_out);
+
+    return 0;
+}
+
 addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf, const vmi_pid_t pid, const char* proc_name,
                                 const char* mod_name, addr_t rva)
 {
@@ -293,10 +317,10 @@ bool drakvuf_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc
     return false;
 }
 
-char* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t key_handle, addr_t process_arg )
+char* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle )
 {
     if ( drakvuf->osi.get_registry_keyhandle_path )
-        return drakvuf->osi.get_registry_keyhandle_path( drakvuf, info, key_handle, process_arg );
+        return drakvuf->osi.get_registry_keyhandle_path( drakvuf, info, key_handle );
 
     return NULL;
 }
@@ -317,10 +341,20 @@ addr_t drakvuf_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     return 0;
 }
 
-bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess_addr, void* visitor_ctx), void* visitor_ctx)
+bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx)
 {
     if ( drakvuf->osi.enumerate_processes_with_module )
         return drakvuf->osi.enumerate_processes_with_module( drakvuf, module_name, visitor_func, visitor_ctx );
+
+    return false;
+}
+
+bool drakvuf_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid)
+{
+    *pid = 0;
+
+    if ( drakvuf->osi.is_crashreporter )
+        return drakvuf->osi.is_crashreporter( drakvuf, info, pid );
 
     return false;
 }

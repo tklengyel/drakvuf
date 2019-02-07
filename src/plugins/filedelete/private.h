@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -219,6 +219,7 @@ struct IO_STATUS_BLOCK_64
 
 constexpr static uint32_t STATUS_SUCCESS = 0;
 constexpr static uint32_t STATUS_PENDING = 0x103;
+constexpr static uint32_t STATUS_END_OF_FILE = 0xC0000011;
 
 struct _LARGE_INTEGER
 {

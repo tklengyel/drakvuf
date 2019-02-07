@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -113,8 +113,14 @@ typedef struct os_interface
     addr_t (*get_current_process)
     (drakvuf_t drakvuf, uint64_t vcpu_id);
 
+    status_t (*get_last_error)
+    (drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str);
+
     char* (*get_process_name)
     (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
+
+    char* (*get_process_commandline)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
 
     char* (*get_current_process_name)
     (drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath);
@@ -155,6 +161,9 @@ typedef struct os_interface
     bool (*get_module_base_addr)
     (drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
 
+    bool (*get_module_base_addr_ctx)
+    (drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
+
     addr_t (*exportksym_to_va)
     (drakvuf_t drakvuf, const vmi_pid_t pid, const char* proc_name, const char* mod_name, addr_t rva);
 
@@ -168,7 +177,7 @@ typedef struct os_interface
     (drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t* proc_data);
 
     gchar* (*get_registry_keyhandle_path)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t key_handle, addr_t process_arg );
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle);
 
     char* (*get_filename_from_handle)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
@@ -177,7 +186,10 @@ typedef struct os_interface
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg);
 
     bool (*enumerate_processes_with_module)
-    (drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess_addr, void* visitor_ctx), void* visitor_ctx);
+    (drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
+
+    bool (*is_crashreporter)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
 
 } os_interface_t;
 

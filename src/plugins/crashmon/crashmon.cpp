@@ -102,115 +102,67 @@
 *                                                                         *
 ***************************************************************************/
 
-#include <libdrakvuf/libdrakvuf.h>
+#include <libvmi/libvmi.h>
 
-#include "bsodmon.h"
-#include "bugcheck.h"
+#include "crashmon.h"
 
-
-static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static void print_crashed_process_information(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, vmi_pid_t ppid, const char* name)
 {
-    bsodmon* f = static_cast<bsodmon*>(info->trap->data);
+    crashmon* d = static_cast<crashmon*>(info->trap->data);
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    uint64_t code = 0;
-    uint64_t params[4] = { 0 };
-    const char* bugcheck_name = "UNKNOWN_CODE" ;
-
-    bool is32bit = drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E;
-
-    if (is32bit)
-    {
-        ctx.addr = info->regs->rsp + 4;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&code) )
-            goto done;
-
-        ctx.addr = info->regs->rsp + 8;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[0]) )
-            goto done;
-
-        ctx.addr = info->regs->rsp + 0xc;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[1]) )
-            goto done;
-
-        ctx.addr = info->regs->rsp + 0x10;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[2]) )
-            goto done;
-
-        ctx.addr = info->regs->rsp + 0x14;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[3]) )
-            goto done;
-    }
-    else
-    {
-        code = info->regs->rcx;
-        params[0] = info->regs->rdx;
-        params[1] = info->regs->r8;
-        params[2] = info->regs->r9;
-
-        ctx.addr = info->regs->rsp + 0x20;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[3]) )
-            goto done;
-    }
-
-    if ( f->bugcheck_map.find( code ) != f->bugcheck_map.end() )
-        bugcheck_name = f->bugcheck_map[ code ];
-
-    switch (f->format)
+    switch (d->format)
     {
         case OUTPUT_CSV:
-            printf("bsodmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%" PRIx64
-                   ",\"%s\",%" PRIx64 ",%" PRIx64 ",%" PRIx64 ",%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, code, bugcheck_name, params[0], params[1], params[2], params[3]);
+            printf("crashmon," FORMAT_TIMEVAL ",%" PRIu32 ",%" PRIu32 ",\"%s\",%" PRIi64 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name, info->proc_data.userid);
             break;
         case OUTPUT_KV:
-            printf("bsodmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",BugCheckCode=%" PRIx64
-                   ",BugCheckName=\"%s\",BugCheckParameter1=%" PRIx64 ",BugCheckParameter2=%" PRIx64 ",BugCheckParameter2=%" PRIx64
-                   ",BugCheckParameter4=%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, code, bugcheck_name, params[0], params[1], params[2], params[3]);
+            printf("crashmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name);
             break;
-        default:
         case OUTPUT_DEFAULT:
-            printf("[BSODMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64
-                   " BugCheckCode:%" PRIx64 " BugCheckName:%s BugCheckParameter1:%" PRIx64 " BugCheckParameter2:%" PRIx64
-                   " BugCheckParameter3:%" PRIx64 " BugCheckParameter4:%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, code, bugcheck_name, params[0], params[1], params[2], params[3]);
+        default:
+            printf("[CRASHMON] TIME:" FORMAT_TIMEVAL " PID:%" PRIu32 " PPID:0x%" PRIu32 ",\"%s\" %s:%" PRIi64 "\n",
+                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name, USERIDSTR(drakvuf), info->proc_data.userid);
             break;
     }
+}
 
-done:
-    drakvuf_release_vmi(drakvuf);
+static event_response_t check_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    vmi_pid_t pid = 0;
+    if (drakvuf_is_crashreporter(drakvuf, info, &pid))
+    {
+        addr_t eprocess = 0;
+        vmi_pid_t ppid = 0;
+        const char* name = "<UNKNOWN>";
 
-    if ( f->abort_on_bsod )
-        drakvuf_interrupt( drakvuf, SIGDRAKVUFERROR);
+        if (drakvuf_find_process(drakvuf, pid, nullptr, &eprocess))
+        {
+            char* tmp = drakvuf_get_process_name(drakvuf, eprocess, true);
+            if (tmp)
+                name = tmp;
+
+            if (VMI_FAILURE == drakvuf_get_process_ppid(drakvuf, eprocess, &ppid))
+                PRINT_DEBUG("[CRASHMON] Failed to get PPID for crashed process with PID %d\n", pid);
+        }
+        else
+        {
+            PRINT_DEBUG("[CRASHMON] Failed to get EPROCESS for crashed process with PID %d\n", pid);
+        }
+
+        print_crashed_process_information(drakvuf, info, pid, ppid, name);
+    }
 
     return 0;
 }
 
-void bsodmon::register_trap(drakvuf_t drakvuf, const char* syscall_name,
-                            drakvuf_trap_t* trap,
-                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ))
-{
-    trap->name = syscall_name;
-    trap->cb   = hook_cb;
-    if ( !drakvuf_get_function_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
-    if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
-}
-
-bsodmon::bsodmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+crashmon::crashmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     : format(output)
 {
-    this->abort_on_bsod = *(bool*)config;
+    /* Setup trap for thread switch */
+    trap.cb = check_crashreporter;
 
-    init_bugcheck_map( this, drakvuf );
-
-    register_trap(drakvuf, "KeBugCheck2", &trap, hook_cb);
+    if (!drakvuf_add_trap(drakvuf, &trap))
+        throw -1;
 }

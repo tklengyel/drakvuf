@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2017 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -119,9 +119,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
         return;
 
     if (drakvuf->vmi)
-    {
         close_vmi(drakvuf);
-    }
 
     g_free(drakvuf->event_fds);
     g_free(drakvuf->fd_info_lookup);
@@ -135,7 +133,6 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
 
     if (drakvuf->xen)
     {
-
         if ( !pause )
             drakvuf_force_resume(drakvuf);
 
@@ -156,7 +153,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     g_free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_profile, bool _verbose)
+bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_profile, bool _verbose, bool libvmi_conf)
 {
 
     if ( !domain || !rekall_profile )
@@ -188,11 +185,8 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
 
     drakvuf_pause(*drakvuf);
 
-    if (!init_vmi(*drakvuf))
-    {
-        drakvuf_resume(*drakvuf);
+    if (!init_vmi(*drakvuf, libvmi_conf))
         goto err;
-    }
 
     switch ((*drakvuf)->os)
     {
@@ -225,6 +219,11 @@ err:
 void drakvuf_interrupt(drakvuf_t drakvuf, int sig)
 {
     drakvuf->interrupted = sig;
+}
+
+int drakvuf_is_interrupted(drakvuf_t drakvuf)
+{
+    return drakvuf->interrupted;
 }
 
 bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)

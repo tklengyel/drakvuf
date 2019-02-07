@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2016 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2019 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -128,6 +128,7 @@ static inline void print_help(void)
             "\t -i <injection pid>        The PID of the process to hijack for injection\n"
             "\t -e <inject_file>          The executable to start with injection\n"
             "Optional inputs:\n"
+            "\t -l                        Use libvmi.conf\n"
             "\t -m <inject_method>        The injection method (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
             "\t [-B] <path>               The host path of the windows binary to inject (requires -m doppelganging)\n"
             "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
@@ -149,10 +150,12 @@ int main(int argc, char** argv)
     char* domain = NULL;
     char* inject_file = NULL;
     char* inject_cwd = NULL;
+    bool injection_global_search = false;
     char* binary_path = NULL;
     char* target_process = NULL;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     bool verbose = 0;
+    bool libvmi_conf = false;
 
     if (argc < 4)
     {
@@ -160,7 +163,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:v")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:vlg")) != -1)
         switch (c)
         {
             case 'r':
@@ -196,6 +199,9 @@ int main(int argc, char** argv)
                     return rc;
                 }
                 break;
+            case 'g':
+                injection_global_search = true;
+                break;
             case 'B':
                 binary_path = optarg;
                 break;
@@ -207,6 +213,9 @@ int main(int argc, char** argv)
                 verbose = 1;
                 break;
 #endif
+            case 'l':
+                libvmi_conf = true;
+                break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
                 return rc;
@@ -233,7 +242,7 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose))
+    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose, libvmi_conf))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
         return 1;
@@ -241,7 +250,19 @@ int main(int argc, char** argv)
 
     printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
 
-    int injection_result = injector_start_app(drakvuf, injection_pid, injection_thread, inject_file, inject_cwd, injection_method, OUTPUT_DEFAULT, binary_path, target_process);
+    int injection_result = injector_start_app(
+                               drakvuf,
+                               injection_pid,
+                               injection_thread,
+                               inject_file,
+                               inject_cwd,
+                               injection_method,
+                               OUTPUT_DEFAULT,
+                               binary_path,
+                               target_process,
+                               false,
+                               NULL,
+                               injection_global_search);
 
     if (injection_result)
         printf("Process startup success\n");
