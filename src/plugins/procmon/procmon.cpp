@@ -562,7 +562,7 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     info->proc_data.pid, info->proc_data.ppid, escaped_pname,
-                    info->trap->name, desired_access, object_attributes, pid, escaped_client_name);
+                    info->trap->name, wrapper->desired_access, wrapper->object_attributes_addr, wrapper->client_id, escaped_client_name);
             g_free(escaped_client_name);
             g_free(escaped_pname);
             break;
