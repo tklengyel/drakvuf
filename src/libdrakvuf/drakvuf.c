@@ -103,6 +103,7 @@
  ***************************************************************************/
 
 #include <glib.h>
+#include <json-c/json.h>
 #include "../xen_helper/xen_helper.h"
 
 #include "libdrakvuf.h"
@@ -670,6 +671,44 @@ unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_con
 {
     size_t strlen = drakvuf_wchar_string_length(vmi, ctx);
     return drakvuf_read_wchar_array(vmi, ctx, strlen);
+}
+
+// Returns JSON-compliant copy of input string
+gchar* drakvuf_escape_str(const char* input)
+{
+    char* result = NULL;
+    struct json_object* obj = NULL;
+
+    if (NULL == input)
+    {
+        // give caller result that can be freed
+        result = g_strdup("\"(null)\"");
+        goto exit;
+    }
+
+    obj = json_object_new_string(input);
+    if (NULL == obj)
+    {
+        fprintf(stderr, "json_object_new_string() failed!\n");
+        goto exit;
+    }
+
+    const char* escaped = json_object_to_json_string(obj);
+    if (NULL == obj)
+    {
+        fprintf(stderr, "json_object_to_json_string() failed!\n");
+        goto exit;
+    }
+
+    result = g_strdup(escaped);
+    if (NULL == result)
+    {
+        fprintf(stderr, "g_strdup() failed!\n");
+    }
+
+exit:
+    json_object_put(obj); // passing NULL is OK
+    return result;
 }
 
 static void drakvuf_event_fd_generate(drakvuf_t drakvuf)
