@@ -1,0 +1,8 @@
+# vagrant
+.vagrant/
+
+# pip
+venv/
+
+# ansible
+*.retry

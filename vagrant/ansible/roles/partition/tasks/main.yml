@@ -1,0 +1,35 @@
+---
+- name: install parted
+  package:
+    name: "{{ item }}"
+  with_items:
+    - parted
+
+- name: create a new primary partition with free space left
+  shell: (echo n ; echo p; echo 2; echo ; echo ; echo w) | fdisk /dev/vda || true
+
+- name: reread partition table
+  command: partprobe
+
+- name: create ext4 filesystem
+  command: mkfs.ext4 /dev/vda2
+
+- name: create /data
+  file:
+    path: /data
+    state: directory
+
+- name: mount the new partition on /data
+  mount:
+    src: /dev/vda2
+    name: /data
+    state: mounted
+    fstype: ext4
+
+- name: force ownership of /data to vagrant
+  file:
+    path: /data
+    state: directory
+    owner: vagrant
+    group: vagrant
+

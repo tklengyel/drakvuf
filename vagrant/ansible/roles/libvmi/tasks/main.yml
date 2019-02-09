@@ -1,0 +1,44 @@
+---
+- name: install build tools
+  package:
+    name: "{{ item }}"
+  with_items:
+    - git
+    - build-essential
+    - gcc
+    - libtool
+    - automake
+    - pkg-config
+    - check
+    - libglib2.0-dev
+    - libvirt-dev
+    - bison
+    - flex
+    - python-dev
+    - libjson-c-dev
+
+- name: generate configure
+  command: ./autogen.sh
+  args:
+    chdir: /vagrant/libvmi
+  become: false
+
+- name: configure libvmi
+  command: ./configure --prefix=/usr --disable-kvm
+  args:
+    chdir: /vagrant/libvmi
+  become: false
+
+- name: build libvmi
+  command: make
+  args:
+    chdir: /vagrant/libvmi
+  become: false
+
+- name: install libvmi
+  command: make install
+  args:
+    chdir: /vagrant/libvmi
+
+- name: update ld
+  command: ldconfig

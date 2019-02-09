@@ -1,0 +1,39 @@
+- name: Install Libvirt
+  package:
+    name: "{{ item }}"
+  with_items:
+    - libvirt-daemon
+    - libvirt-daemon-xen
+    - libvirt-daemon-config-network
+    - libvirt-client
+
+- name: add user to libvirt group
+  user:
+    name: vagrant
+    groups: libvirt
+    append: yes
+
+- name: ensure libvirt daemon is started
+  service:
+    name: libvirtd
+    state: started
+
+- name: set default network as autostart
+  command: virsh -c xen:/// net-autostart default
+
+- name: ensure default libvirt network is started
+  command: virsh -c xen:/// net-start default
+  ignore_errors: yes
+
+- name: define libvirt pool
+  command: virsh -c xen:/// pool-define-as default --type dir --target /data
+
+- name: build libvirt pool
+  command: virsh -c xen:/// pool-build default
+
+- name: set libvirt pool as autostart
+  command: virsh -c xen:/// pool-autostart default
+
+- name: ensure libvirt pool is started
+  command: virsh -c xen:/// pool-start default
+  ignore_errors: yes

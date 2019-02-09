@@ -1,0 +1,11 @@
+---
+- hosts: default
+  become: true
+  pre_tasks:
+    - name: system upgrade
+      apt:
+        upgrade: dist
+        update_cache: yes
+  roles:
+    - partition
+    - xen

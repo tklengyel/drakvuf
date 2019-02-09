@@ -1,0 +1,30 @@
+---
+- name: download win7x64 image
+  get_url:
+    url: "https://www.dropbox.com/s/2affsti933237v3/win7x64.qcow2?dl=1"
+    dest: "/data/win7x64.qcow2"
+    checksum: "sha1:0c8d422053ef34109a53d067d71fd2c43435cb2f"
+
+- name: copy vm config file
+  copy:
+    src: 'files/win7x64.cfg'
+    dest: '/home/vagrant/win7x64.cfg'
+  become: false
+
+- name: install libvmi config entry
+  blockinfile:
+    path: '/etc/libvmi.conf'
+    block: "{{ lookup('file', 'files/win7x64.conf')}}"
+    marker: ""
+    state: present
+    create: yes
+
+- name: ensure libvmi config dir is present
+  file:
+    path: /etc/libvmi
+    state: directory
+
+- name: install vm rekall profile
+  copy:
+    src: "files/win7x64-profile.json"
+    dest: "/etc/libvmi/win7x64-profile.json"

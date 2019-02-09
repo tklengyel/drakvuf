@@ -1,0 +1,19 @@
+---
+- hosts: default
+  become: true
+  pre_tasks:
+    - name: test Xen hypervisor
+      slurp:
+        src: /sys/hypervisor/type
+      register: hypertype
+      failed_when: hypertype['content'] | b64decode | trim != "xen"
+
+    - name: run xen-detect
+      command: xen-detect
+      register: xen_detect
+
+    - name: display xen-detect
+      debug: var=xen_detect.stdout
+  roles:
+    - libvmi
+    - vm

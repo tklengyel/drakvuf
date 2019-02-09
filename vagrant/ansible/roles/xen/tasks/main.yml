@@ -1,0 +1,94 @@
+---
+- name: install Xen build dependencies
+  package:
+    name: "{{ item }}"
+  with_items:
+    - git
+    - bcc
+    - bin86
+    - gawk
+    - build-essential
+    - make
+    - gcc
+    - liblzma-dev
+    - python-dev
+    - gettext
+    - iasl
+    - uuid-dev
+    - libncurses5-dev
+    - pkg-config
+    - libglib2.0-dev
+    - libpixman-1-dev
+    - libyajl-dev
+    - libc6-dev-i386
+    - libsdl-dev
+
+- name: configure Xen
+  command: ./configure --enable-githttp
+  args:
+    chdir: /vagrant/xen
+  become: false
+
+- name: compile Xen
+  command: "{{ item }}"
+  args:
+    chdir: /vagrant/xen
+  with_items:
+    - 'make -j4 dist-xen'
+    - 'make -j4 dist-tools'
+  become: false
+
+- name: install Xen
+  command: "{{ item }}"
+  args:
+    chdir: /vagrant/xen
+  with_items:
+    - 'make -j4 install-xen'
+    - 'make -j4 install-tools'
+
+- name: configure Xen command line
+  lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_XEN_DEFAULT'
+    line: "GRUB_CMDLINE_XEN_DEFAULT=\"dom0_mem={{ memory }}M,max:{{ memory }}M dom0_max_vcpus={{ cpus }} dom0_vcpus_pin=true hap_1gb=false hap_2mb=false altp2m=1\""
+
+- name: boot on Xen kernel by default
+  lineinfile:
+    path: /etc/default/grub.d/xen.cfg
+    line: 'GRUB_DEFAULT="Debian GNU/Linux, with Xen hypervisor"'
+    create: yes
+
+- name: configure ld
+  lineinfile:
+    path: /etc/ld.so.conf.d/xen.conf
+    line: '/usr/local/lib'
+    create: yes
+
+- name: update ld
+  command: ldconfig
+
+- name: configure xenfs
+  mount:
+    src: none
+    path: /proc/xen
+    fstype: xenfs
+    opts: defaults,nofail
+    state: present
+
+- name: configure default modules
+  lineinfile:
+    path: /etc/modules
+    line: "{{ item }}"
+  with_items:
+    - xen-evtchn
+    - xen-privcmd
+
+- name: update daemons
+  command: "{{ item }}"
+  with_items:
+    - update-rc.d xencommons defaults 19 18
+    - update-rc.d xendomains defaults 21 20
+    - update-rc.d xen-watchdog defaults 22 23
+
+- name: update GRUB
+  command: update-grub
