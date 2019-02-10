@@ -111,6 +111,7 @@
 #include <glib.h>
 
 #include "private.h"
+#include "win.h"
 #include "win-offsets.h"
 
 
@@ -127,7 +128,7 @@ static char* win_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_
         .dtb = info->regs->cr3,
     };
 
-    vmi_status = vmi_read_addr( vmi, &ctx, (void*)&p_name_control_block );
+    vmi_status = vmi_read_addr(vmi, &ctx, &p_name_control_block);
 
     if ( ( vmi_status == VMI_SUCCESS ) && p_name_control_block )
     {

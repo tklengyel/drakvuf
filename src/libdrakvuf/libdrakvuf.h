@@ -259,7 +259,7 @@ typedef enum object_manager_object
 
 typedef struct symbol
 {
-    const char* name;
+    char* name;
     addr_t rva;
     uint8_t type;
     int inputs;
@@ -474,10 +474,6 @@ bool drakvuf_get_module_base_addr_ctx( drakvuf_t drakvuf,
 status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
                                    addr_t process_base,
                                    vmi_pid_t* ppid );
-
-bool drakvuf_get_current_process_data( drakvuf_t drakvuf,
-                                       uint64_t vcpu_id,
-                                       proc_data_t* proc_data );
 
 gchar* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf,
                                   drakvuf_trap_info_t* info,

@@ -262,12 +262,21 @@ struct remapped_gfn
     bool active;
 };
 
+typedef struct process_data_priv
+{
+    char* name;   /* Process name */
+    vmi_pid_t pid ;     /* Process pid */
+    vmi_pid_t ppid ;    /* Process parent pid */
+    addr_t base_addr ;  /* Process base address */
+    int64_t userid ;    /* Process SessionID/UID */
+} proc_data_priv_t ;
+
 struct memcb_pass
 {
     drakvuf_t drakvuf;
     uint64_t gfn;
     addr_t pa;
-    proc_data_t proc_data ;
+    proc_data_priv_t proc_data ;
     struct remapped_gfn* remapped_gfn;
     vmi_mem_access_t access;
     GSList* traps;
@@ -275,11 +284,27 @@ struct memcb_pass
 
 void drakvuf_force_resume (drakvuf_t drakvuf);
 
+bool drakvuf_get_current_process_data(drakvuf_t drakvuf,
+                                      uint64_t vcpu_id,
+                                      proc_data_priv_t* proc_data);
+
 char* drakvuf_get_current_process_name(drakvuf_t drakvuf,
                                        uint64_t vcpu_id,
                                        bool fullpath);
 
 int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf,
         uint64_t vcpu_id);
+
+bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap);
+bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap);
+bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t* trap);
+bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap);
+
+event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event);
+event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event);
+event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event);
+event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event);
+event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event);
+event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event);
 
 #endif

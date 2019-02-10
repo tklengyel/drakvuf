@@ -122,6 +122,12 @@ if DEBUG
 AM_CFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -g -ggdb3
 AM_CFLAGS += -Wno-missing-field-initializers
 AM_CFLAGS += -Werror
+AM_CFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
+             -Wpointer-arith -Winit-self -Wshadow \
+             -Wswitch-enum -Wstrict-prototypes \
+             -Wmissing-prototypes -Wredundant-decls \
+             -Wfloat-equal -Wundef -Wvla \
+             -Wc++-compat
 if !HARDENING
 AM_CFLAGS += -pg
 endif

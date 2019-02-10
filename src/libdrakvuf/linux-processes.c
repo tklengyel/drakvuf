@@ -112,6 +112,7 @@
 #include <limits.h>
 
 #include "private.h"
+#include "linux.h"
 #include "linux-offsets.h"
 
 #define STACK_SIZE_8K  0x1fff
@@ -310,7 +311,7 @@ status_t linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid
     return VMI_FAILURE ;
 }
 
-bool linux_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t* proc_data )
+bool linux_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_priv_t* proc_data )
 {
     proc_data->base_addr = linux_get_current_process( drakvuf, vcpu_id );
 

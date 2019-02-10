@@ -113,6 +113,7 @@
 
 #include "libdrakvuf.h"
 #include "private.h"
+#include "rekall-profile.h"
 
 static bool rekall_lookup_in_json(
     const char* symbol,
@@ -271,7 +272,10 @@ bool rekall_lookup_array(
 symbols_t* rekall_get_symbols_from_rekall(json_object* rekall_profile_json)
 {
 
-    symbols_t* ret = g_malloc0(sizeof(symbols_t));
+    symbols_t* ret = (symbols_t*)g_malloc0(sizeof(symbols_t));
+    if ( !ret )
+        return NULL;
+
     if (!rekall_profile_json)
     {
         fprintf(stderr, "Rekall profile couldn't be opened!\n");
@@ -290,7 +294,7 @@ symbols_t* rekall_get_symbols_from_rekall(json_object* rekall_profile_json)
     }
 
     ret->count = json_object_object_length(functions);
-    ret->symbols = g_malloc0(sizeof(symbol_t) * ret->count);
+    ret->symbols = (symbol_t*)g_malloc0(sizeof(symbol_t) * ret->count);
 
     PRINT_DEBUG("Rekall profile defines %lu symbols\n", ret->count);
 
