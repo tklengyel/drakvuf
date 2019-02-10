@@ -111,6 +111,7 @@
 #include "winscproto.h"
 #include "linuxscproto.h"
 
+static event_response_t win_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 static char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
@@ -315,6 +316,41 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
     }
 }
 
+static void print_ret_value(output_format_t format, int reg_size, addr_t val)
+{
+    switch (format)
+    {
+        case OUTPUT_CSV:
+            printf(",RETURN,");
+            if ( 4 == reg_size )
+                printf("0x%" PRIx32 ",", static_cast<uint32_t>(val));
+            else
+                printf("0x%" PRIx64 ",", static_cast<uint64_t>(val));
+            break;
+        case OUTPUT_KV:
+            if ( 4 == reg_size )
+                printf(",RETURN=0x%" PRIx32, static_cast<uint32_t>(val));
+            else
+                printf(",RETURN=0x%" PRIx64, static_cast<uint64_t>(val));
+            break;
+        case OUTPUT_JSON:
+            if ( 4 == reg_size )
+                printf(",{\"RETURN\" :%" PRIu32 "}", static_cast<uint32_t>(val));
+            else
+                printf(",{\"RETURN\" :%" PRIu64 "}", static_cast<uint64_t>(val));
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("\tRETURN: ");
+            if ( 4 == reg_size )
+                printf("0x%" PRIx32, static_cast<uint32_t>(val));
+            else
+                printf("0x%" PRIx64, static_cast<uint64_t>(val));
+            printf("\n");
+            break;
+    }
+}
+
 static void print_footer(output_format_t format, uint32_t nargs)
 {
     switch (format)
@@ -343,7 +379,7 @@ static int linux_build_argbuf(uint8_t* buf, vmi_instance_t vmi, drakvuf_trap_inf
     int nargs = 0;
     int rc = VMI_SUCCESS;
     syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
-    syscalls* s = wrapper->sc;
+    syscalls* s = wrapper->s;
 
     if (NULL == sc)
     {
@@ -432,13 +468,49 @@ exit:
     return rc;
 }
 
+static int catch_ret_value(drakvuf_t drakvuf, vmi_instance_t vmi, access_context_t* ctx, drakvuf_trap_info_t* info)
+{
+    syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
+    addr_t ret_addr = 0;
+
+    // read RSP to get the return address and add a trap on it
+    ctx->addr = info->regs->rsp;
+    if ( VMI_FAILURE == vmi_read(vmi, ctx, wrapper->s->reg_size, &ret_addr, NULL) )
+        return -1;
+
+    PRINT_DEBUG("Adding trap to return address 0x%lx\n", ret_addr);
+
+    // Most of the time the return address will be the same for a given syscall.
+    // If it is not, then we update the return address of that syscall and add a
+    // new trap.
+    if (ret_addr != wrapper->ret_addr)
+    {
+        wrapper->ret_addr = ret_addr;
+        drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+        trap->breakpoint.lookup_type = LOOKUP_PID;
+        trap->breakpoint.pid = info->trap->breakpoint.pid;
+        trap->breakpoint.addr_type = ADDR_VA;
+        trap->breakpoint.addr = wrapper->ret_addr;
+        trap->breakpoint.module = info->trap->breakpoint.module;
+        trap->name = g_strdup(info->trap->name);
+        trap->type = BREAKPOINT;
+        trap->cb = win_ret_cb;
+        trap->data = wrapper;
+
+        if ( !drakvuf_add_trap(drakvuf, trap) )
+            return -1;
+    }
+
+    return 0;
+}
+
 static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     unsigned int nargs = 0;
     uint8_t buf[sizeof(uint64_t) * 8] = {0};
 
     syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
-    syscalls* s = wrapper->sc;
+    syscalls* s = wrapper->s;
     const syscall_t* sc = NULL;
 
     if (wrapper->syscall_index>-1 )
@@ -469,6 +541,46 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
+static event_response_t win_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
+    syscalls* s = wrapper->s;
+    uint32_t thread_id = 0;
+
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+
+    if ( !s || !wrapper->args )
+        goto exit;
+
+    if ( info->trap->breakpoint.pid != wrapper->target_pid )
+    {
+        PRINT_DEBUG("Syscall return callback hit but PID (0x%x) doesn't match target process (0x%x)\n",
+                    info->trap->breakpoint.pid, wrapper->target_pid);
+        goto exit;
+    }
+
+    if ( !drakvuf_get_current_thread_id(drakvuf, info->vcpu, &thread_id) || thread_id != wrapper->target_tid )
+        goto exit;
+
+    print_header(s->format, drakvuf, info);
+    if ( wrapper->nargs )
+    {
+        print_nargs(s->format, wrapper->nargs);
+        print_args(s, drakvuf, info, wrapper->sc, wrapper->args);
+    }
+    print_ret_value(s->format, s->reg_size, info->regs->rax);
+    print_footer(s->format, wrapper->nargs);
+
+exit:
+    if (wrapper->args)
+    {
+        g_free(wrapper->args);
+        wrapper->args = NULL;
+    }
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     unsigned int nargs = 0;
@@ -476,7 +588,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     unsigned char* buf = NULL; // pointer to buffer to hold argument values
 
     syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
-    syscalls* s = wrapper->sc;
+    syscalls* s = wrapper->s;
     const syscall_t* sc = NULL;
 
     if (wrapper->syscall_index>-1 )
@@ -532,13 +644,18 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
-    print_header(s->format, drakvuf, info);
-    if ( nargs )
-    {
-        print_nargs(s->format, nargs);
-        print_args(s, drakvuf, info, sc, buf);
-    }
-    print_footer(s->format, nargs);
+    // store informations we need to pass to win_ret_cb()
+    wrapper->sc = sc;
+    wrapper->args = (unsigned char*)g_malloc(sizeof(char)*size);
+    memcpy(wrapper->args, buf, sizeof(char)*size);
+    wrapper->nargs = nargs;
+    wrapper->ret_addr = 0;
+    wrapper->target_pid = info->trap->breakpoint.pid;
+    if ( !drakvuf_get_current_thread_id(drakvuf, info->vcpu, &wrapper->target_tid) )
+        goto exit;
+
+    if ( catch_ret_value(drakvuf, vmi, &ctx, info) == -1 )
+        PRINT_DEBUG("Error adding trap on return address 0x%lx\n", wrapper->ret_addr);
 
 exit:
     g_free(buf);
@@ -574,7 +691,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             syscall_wrapper_t* wrapper = (syscall_wrapper_t*)g_malloc(sizeof(syscall_wrapper_t));
 
             wrapper->syscall_index = -1;
-            wrapper->sc=s;
+            wrapper->s=s;
 
             for (j=0; j<NUM_SYSCALLS_WIN; j++)
             {
@@ -650,7 +767,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 
             syscall_wrapper_t* wrapper = (syscall_wrapper_t*)g_malloc(sizeof(syscall_wrapper_t));
             wrapper->syscall_index = -1;
-            wrapper->sc = s;
+            wrapper->s = s;
             wrapper->flags = 0;
 
             /* Record symbol's index for faster lookup */
