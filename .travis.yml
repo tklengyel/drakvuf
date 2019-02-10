@@ -67,6 +67,7 @@ matrix:
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export CPLUS_INCLUDE_PATH=$PWD/usr/local/include
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
         - export LDFLAGS="-L$PWD/usr/local/lib"
         - export CFLAGS="-I$PWD/usr/local/include"
@@ -115,6 +116,7 @@ matrix:
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export CPLUS_INCLUDE_PATH=$PWD/usr/local/include
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
         - export LDFLAGS="-L$PWD/usr/local/lib"
         - export CFLAGS="-I$PWD/usr/local/include"
@@ -152,6 +154,7 @@ matrix:
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export CPLUS_INCLUDE_PATH=$PWD/usr/local/include
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
         - export LDFLAGS="-L$PWD/usr/local/lib"
         - export CFLAGS="-I$PWD/usr/local/include"
@@ -199,6 +202,7 @@ matrix:
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export CPLUS_INCLUDE_PATH=$PWD/usr/local/include
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
         - export LDFLAGS="-L$PWD/usr/local/lib"
         - export CFLAGS="-I$PWD/usr/local/include"

@@ -108,11 +108,18 @@ c_sources = drakvuf.c rekall-profile.c os.c vmi.c \
             win-files.c \
             linux.c linux-processes.c
 
-AM_CFLAGS = -I$(top_srcdir)
-AM_CFLAGS += $(CFLAGS)
-AM_CFLAGS += $(VMI_CFLAGS)
-AM_CFLAGS += $(GLIB_CFLAGS)
+AM_CPPFLAGS = -I$(top_srcdir)
+AM_CPPFLAGS += $(CPPFLAGS)
+AM_CPPFLAGS += $(VMI_CFLAGS)
+AM_CPPFLAGS += $(GLIB_CFLAGS)
+AM_CPPFLAGS += $(JSONC_CFLAGS)
 
+AM_LDFLAGS =  $(LDFLAGS)
+AM_LDFLAGS += $(GLIB_LIBS)
+AM_LDFLAGS += $(VMI_LIBS)
+AM_LDFLAGS += $(JSONC_LIBS)
+
+AM_CFLAGS =  $(CFLAGS)
 if HARDENING
 AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 endif

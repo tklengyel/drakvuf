@@ -105,11 +105,15 @@
 h_sources = libinjector.h private.h
 c_sources = injector.c injector_stack.c
 
-AM_CFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
-AM_CFLAGS += $(CFLAGS)
-AM_CFLAGS += $(VMI_CFLAGS)
-AM_CFLAGS += $(GLIB_CFLAGS)
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
+AM_CPPFLAGS += $(VMI_CFLAGS)
+AM_CPPFLAGS += $(GLIB_CFLAGS)
 
+AM_LDFLAGS =  $(LDFLAGS)
+AM_LDFLAGS += $(VMI_LIBS)
+AM_LDFLAGS += $(GLIB_LIBS)
+
+AM_CFLAGS = $(CFLAGS)
 if HARDENING
 AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 endif
