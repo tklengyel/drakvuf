@@ -219,33 +219,8 @@ disk = [ 'phy:/dev/vg/windows7-sp1,hda,w', 'file:/path/to/your/windows7.iso,hdc:
 Enter the LibVMI folder in the drakvuf folder and build it:
 
 <pre><code>cd ~/drakvuf/libvmi
-./autogen.sh
-./configure --disable-kvm
-</code></pre>
-
-Make sure the output is like the following:
-<pre><code>Feature         | Option
-----------------|---------------------------
-Xen Support     | --enable-xen=yes
-KVM Support     | --enable-kvm=no
-File Support    | --enable-file=yes
-Shm-snapshot    | --enable-shm-snapshot=no
-Rekall profiles | --enable-rekall-profiles=yes
-----------------|---------------------------
-
-OS              | Option
-----------------|---------------------------
-Windows         | --enable-windows=yes
-Linux           | --enable-linux=yes
-
-
-Tools           | Option                    | Reason
-----------------|---------------------------|----------------------------
-Examples        | --enable-examples=yes
-VMIFS           | --enable-vmifs=yes        | yes</code></pre>
-
-Build and install LibVMI:
-<pre><code>make
+cmake -DENABLE_KVM=OFF -DENABLE_FILE=OFF -DENABLE_BAREFLANK=OFF .
+make
 sudo make install
 sudo echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
 </code></pre>
