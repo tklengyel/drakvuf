@@ -404,15 +404,8 @@ AC_CHECK_LIB([xenforeignmemory], [xenforeignmemory_map_resource])
 #AC_CHECK_LIB(xenstore, [xc_read, xs_transaction_start], [], [AC_ERROR([Xenstore not found!])])
 
 # Check for Xenctrl
-AC_CHECK_HEADERS([xenctrl.h], [], [AC_ERROR([XenCtrl missing! Did you install Xen yet?])])
-AC_CHECK_LIB([xenctrl],
-	[xc_interface_open, xc_monitor_debug_exceptions],
-	[], [AC_ERROR([XenCtrl is unusable! Do you have Xen 4.7 installed?])])
-
-# Check for memsharing
-AC_CHECK_LIB([xenctrl],
-	[xc_memshr_control, xc_memshr_nominate_gfn, xc_memshr_share_gfns],
-	[], [AC_ERROR([XenCtrl is unusable! Do you have Xen 4.2+ installed?])])
+AC_CHECK_HEADERS([xenctrl.h], [], [AC_ERROR([XenCtrl missing! Did you install libxc yet?])])
+AC_CHECK_LIB([xenctrl], [xc_interface_open], [], [AC_ERROR([XenCtrl is unusable! Do you have libxc installed?])])
 
 AC_CHECK_HEADERS([libxl_utils.h], [], [AC_ERROR([Xenlight (libxl) headers are not usable])])
 AC_CHECK_LIB(xenlight, libxl_name_to_domid, [], [AC_ERROR([Xenlight does not have required features!])])

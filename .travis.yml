@@ -62,8 +62,9 @@ matrix:
                 - uuid-dev
                 - libpixman-1-dev
                 - libaio-dev
+                - libxen-dev
       before_install:
-        - dpkg -x test-packages/xentools_4.7-drakvuf1-1_amd64.deb .
+        - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
@@ -71,8 +72,7 @@ matrix:
         - export CFLAGS="-I$PWD/usr/local/include"
         - git submodule update --init libvmi
         - cd libvmi
-        - ./autogen.sh
-        - ./configure --disable-kvm --disable-examples --without-xenstore --prefix=$PWD/../usr/local || cat config.log
+        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DENABLE_KVM=OFF -DENABLE_FILE=OFF .
         - make
         - make install
         - cd ..
@@ -102,6 +102,7 @@ matrix:
                 - uuid-dev
                 - libpixman-1-dev
                 - libaio-dev
+                - libxen-dev
         coverity_scan:
             project:
                 name: "$COVERITY_PROJECT_NAME"
@@ -111,7 +112,7 @@ matrix:
             build_command:   "make"
             branch_pattern: $COVERITY_BRANCH_PATTERN
       before_install:
-        - dpkg -x test-packages/xentools_4.7-drakvuf1-1_amd64.deb .
+        - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
@@ -119,8 +120,7 @@ matrix:
         - export CFLAGS="-I$PWD/usr/local/include"
         - git submodule update --init libvmi
         - cd libvmi
-        - ./autogen.sh
-        - ./configure --disable-kvm --disable-examples --without-xenstore --prefix=$PWD/../usr/local
+        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DENABLE_KVM=OFF -DENABLE_FILE=OFF .
         - make
         - make install
         - cd ..
@@ -147,8 +147,9 @@ matrix:
                 - uuid-dev
                 - libpixman-1-dev
                 - libaio-dev
+                - libxen-dev
       before_install:
-        - dpkg -x test-packages/xentools_4.7-drakvuf1-1_amd64.deb .
+        - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
@@ -156,8 +157,7 @@ matrix:
         - export CFLAGS="-I$PWD/usr/local/include"
         - git submodule update --init libvmi
         - cd libvmi
-        - ./autogen.sh
-        - ./configure --disable-kvm --disable-examples --without-xenstore --prefix=$PWD/../usr/local
+        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DENABLE_KVM=OFF -DENABLE_FILE=OFF .
         - make
         - make install
         - cd ..
@@ -190,12 +190,13 @@ matrix:
                 - uuid-dev
                 - libpixman-1-dev
                 - libaio-dev
+                - libxen-dev
         sonarcloud:
             organization: "drakvuf"
             token:
                 secure: "$SONAR_TOKEN"
       before_install:
-        - dpkg -x test-packages/xentools_4.7-drakvuf1-1_amd64.deb .
+        - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
@@ -203,8 +204,7 @@ matrix:
         - export CFLAGS="-I$PWD/usr/local/include"
         - git submodule update --init libvmi
         - cd libvmi
-        - ./autogen.sh
-        - ./configure --disable-kvm --disable-examples --without-xenstore --prefix=$PWD/../usr/local
+        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DENABLE_KVM=OFF -DENABLE_FILE=OFF .
         - make
         - make install
         - cd ..
