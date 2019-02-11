@@ -134,7 +134,7 @@
 
 <p>The following packages are normally required to build Xen and DRAKVUF on Debian based Linux distros. The system has been mainly tested on Debian Stretch and Ubuntu 18.04 LTS.</p>
 
-<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev bzip2 pciutils-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool check libjson-c-dev libfuse-dev checkpolicy liblzma-dev autoconf-archive kpartx rekall-core python-dev
+<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev bzip2 pciutils-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool check libjson-c-dev libfuse-dev checkpolicy liblzma-dev autoconf-archive kpartx python-dev python-pip
 </code></pre>
 
 <pre><code>cd ~
@@ -224,6 +224,10 @@ make
 sudo make install
 sudo echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
 </code></pre>
+
+Install Rekall with Python pip:
+
+<pre><code>sudo pip install rekall-core</code></pre>
 
 Now we will create the Rekall profile for the Windows domain. First, we need to get the debug information for the Windows kernel via the LibVMI vmi-win-guid tool. For example, in the following my domain is named windows7-sp1-x86:
 
