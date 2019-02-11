@@ -110,30 +110,34 @@ drakvuf_SOURCES = main.cpp drakvuf.cpp
 xen_memclone_SOURCES  = xen_memclone.c
 injector_SOURCES = injector.c
 
-AM_CFLAGS = $(CFLAGS)
-AM_CFLAGS += $(VMI_CFLAGS)
-AM_CFLAGS += $(GLIB_CFLAGS)
-AM_CFLAGS += -I$(top_srcdir) -I$(srcdir)
-
 AM_CPPFLAGS = $(CPPFLAGS)
 AM_CPPFLAGS += $(VMI_CFLAGS)
 AM_CPPFLAGS += $(GLIB_CFLAGS)
+AM_CPPFLAGS += $(JSON_CFLAGS)
 AM_CPPFLAGS += -I$(top_srcdir) -I$(srcdir)
+
+AM_LDFLAGS =  $(LDFLAGS)
+AM_LDFLAGS += $(VMI_LIBS)
+AM_LDFLAGS += $(GLIB_LIBS)
+AM_LDFLAGS += $(JSONC_LIBS)
+
+AM_CFLAGS = $(CFLAGS)
+AM_CXXFLAGS = $(CXXFLAGS)
 
 if HARDENING
 AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
-AM_CPPFLAGS += $(HARDEN_CFLAGS) -DHARDENING
+AM_CXXFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 endif
 
 # Note that -pg is incompatible with HARDENING
 if DEBUG
 AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
 AM_CFLAGS += -Wno-missing-field-initializers
-AM_CPPFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
-AM_CPPFLAGS += -Wno-missing-field-initializers
+AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
+AM_CXXFLAGS += -Wno-missing-field-initializers
 if !HARDENING
 AM_CFLAGS += -pg
-AM_CPPFLAGS += -pg
+AM_CXXFLAGS += -pg
 endif
 endif
 

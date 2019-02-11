@@ -105,6 +105,8 @@
 #ifndef OS_H
 #define OS_H
 
+typedef struct process_data_priv proc_data_priv_t;
+
 typedef struct os_interface
 {
     addr_t (*get_current_thread)
@@ -174,7 +176,7 @@ typedef struct os_interface
     (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid);
 
     bool (*get_current_process_data)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t* proc_data);
+    (drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_priv_t* proc_data);
 
     gchar* (*get_registry_keyhandle_path)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle);

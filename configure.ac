@@ -387,15 +387,8 @@ AH_VERBATIM([__STDC_FORMAT_MACROS],
 AC_CHECK_LIB(pthread, pthread_create, [], [AC_ERROR([Pthread library is not functional!])])
 
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.28], [], [AC_ERROR([glib-2.0 (version 2.28+) has to be installed!])])
-AC_CHECK_LIB(glib-2.0, [g_malloc0, g_tree_lookup], [], [AC_ERROR([glib-2.0 library is not functional!])]) 
-
 PKG_CHECK_MODULES([VMI], [libvmi >= 0.11], [], [AC_ERROR([LibVMI not found])])
-AC_CHECK_HEADERS([libvmi/events.h], [], [AC_ERROR([LibVMI doesn't have events support.])], [#include <libvmi/libvmi.h>])
-AC_CHECK_LIB(vmi, [vmi_register_event], [], [AC_ERROR([LibVMI doesn't have required events support. Please update LibVMI!])])
-AC_CHECK_LIB(vmi, [vmi_events_version], [], [AC_ERROR([LibVMI doesn't have required events support. Please update LibVMI!])])
-
-AC_CHECK_LIB(json-c, json_object_get_int64,, [AC_ERROR([libjson-c-dev is missing])])
-AC_CHECK_HEADERS([json-c/json.h], [], [AC_ERROR([libjson-c-dev is missing])])
+PKG_CHECK_MODULES([JSONC], [json-c], [], [AC_ERROR([libjson-c not found])])
 
 AC_CHECK_LIB([xencall], [xencall_buffers_never_fault])
 AC_CHECK_LIB([xenforeignmemory], [xenforeignmemory_map_resource])
@@ -404,15 +397,8 @@ AC_CHECK_LIB([xenforeignmemory], [xenforeignmemory_map_resource])
 #AC_CHECK_LIB(xenstore, [xc_read, xs_transaction_start], [], [AC_ERROR([Xenstore not found!])])
 
 # Check for Xenctrl
-AC_CHECK_HEADERS([xenctrl.h], [], [AC_ERROR([XenCtrl missing! Did you install Xen yet?])])
-AC_CHECK_LIB([xenctrl],
-	[xc_interface_open, xc_monitor_debug_exceptions],
-	[], [AC_ERROR([XenCtrl is unusable! Do you have Xen 4.7 installed?])])
-
-# Check for memsharing
-AC_CHECK_LIB([xenctrl],
-	[xc_memshr_control, xc_memshr_nominate_gfn, xc_memshr_share_gfns],
-	[], [AC_ERROR([XenCtrl is unusable! Do you have Xen 4.2+ installed?])])
+AC_CHECK_HEADERS([xenctrl.h], [], [AC_ERROR([XenCtrl missing! Did you install libxc yet?])])
+AC_CHECK_LIB([xenctrl], [xc_interface_open], [], [AC_ERROR([XenCtrl is unusable! Do you have libxc installed?])])
 
 AC_CHECK_HEADERS([libxl_utils.h], [], [AC_ERROR([Xenlight (libxl) headers are not usable])])
 AC_CHECK_LIB(xenlight, libxl_name_to_domid, [], [AC_ERROR([Xenlight does not have required features!])])

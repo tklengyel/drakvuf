@@ -344,8 +344,6 @@ bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_
 {
     if ( kthread )
     {
-        *previous_mode = 0 ;
-
         if ( vmi_read_8_va( drakvuf->vmi, kthread + drakvuf->offsets[ KTHREAD_PREVIOUSMODE ], 0,
                             (uint8_t*)previous_mode ) == VMI_SUCCESS )
         {
@@ -372,7 +370,7 @@ bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
 
 bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 {
-    dispatcher_object_t dispatcher_type = 0 ;
+    dispatcher_object_t dispatcher_type;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -397,7 +395,7 @@ bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 
 bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
 {
-    dispatcher_object_t dispatcher_type = 0;
+    dispatcher_object_t dispatcher_type;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -623,7 +621,7 @@ status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t
     return vmi_read_32_va( drakvuf->vmi, process_base + drakvuf->offsets[EPROCESS_INHERITEDPID], 0, (uint32_t*)ppid );
 }
 
-bool win_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t* proc_data )
+bool win_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_priv_t* proc_data )
 {
     proc_data->base_addr = win_get_current_process( drakvuf, vcpu_id );
 
