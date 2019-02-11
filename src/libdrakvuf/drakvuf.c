@@ -164,7 +164,7 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
     verbose = _verbose;
 #endif
 
-    *drakvuf = g_malloc0(sizeof(struct drakvuf));
+    *drakvuf = (drakvuf_t)g_malloc0(sizeof(struct drakvuf));
 
     (*drakvuf)->rekall_profile_json = json_object_from_file(rekall_profile);
     (*drakvuf)->rekall_profile = g_strdup(rekall_profile);
@@ -199,6 +199,8 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
             if ( !set_os_linux(*drakvuf) )
                 goto err;
             break;
+        case VMI_OS_UNKNOWN: /* fall-through */
+        case VMI_OS_FREEBSD: /* fall-through */
         default:
             fprintf(stderr, "The Rekall profile describes an unknown operating system kernel!\n");
             goto err;
@@ -387,6 +389,7 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
         case CPUID:
             ret = inject_trap_cpuid(drakvuf, trap);
             break;
+        case __INVALID_TRAP_TYPE: /* fall-through */
         default:
             ret = 0;
             break;
@@ -401,12 +404,11 @@ void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap,
 {
     if ( drakvuf->in_callback)
     {
-        struct free_trap_wrapper* free_wrapper =
-            g_hash_table_lookup(drakvuf->remove_traps, &trap);
+        struct free_trap_wrapper* free_wrapper = (struct free_trap_wrapper*)g_hash_table_lookup(drakvuf->remove_traps, &trap);
 
         if (!free_wrapper)
         {
-            free_wrapper = g_malloc0(sizeof(struct free_trap_wrapper));
+            free_wrapper = (struct free_trap_wrapper*)g_malloc0(sizeof(struct free_trap_wrapper));
             free_wrapper->free_routine = free_routine;
             free_wrapper->trap = trap;
             g_hash_table_insert(drakvuf->remove_traps,

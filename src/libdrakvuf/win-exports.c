@@ -168,7 +168,7 @@ modlist_sym2va(drakvuf_t drakvuf, addr_t list_head, access_context_t* ctx,
                     {
                         ctx->addr = dllbase;
 
-                        ret = vmi_translate_sym2v(vmi, ctx, (char*) symbol, va);
+                        ret = vmi_translate_sym2v(vmi, ctx, symbol, va);
                         if ( ret == VMI_SUCCESS )
                             PRINT_DEBUG("\t%s @ 0x%lx\n", symbol, *va);
                     }

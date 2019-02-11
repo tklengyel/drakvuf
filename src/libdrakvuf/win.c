@@ -370,7 +370,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     if ( !fill_offsets_from_rekall(drakvuf, __WIN_OFFSETS_MAX, win_offset_names) )
         return 0;
 
-    drakvuf->sizes = g_malloc0(sizeof(size_t) * __WIN_SIZES_MAX);
+    drakvuf->sizes = (size_t*)g_malloc0(sizeof(size_t) * __WIN_SIZES_MAX);
     if ( !drakvuf->sizes )
         return 0;
 

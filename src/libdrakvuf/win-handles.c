@@ -176,6 +176,9 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
 
     switch (vmi_get_winver(vmi))
     {
+        case VMI_OS_WINDOWS_XP:     /* fall-through */
+        case VMI_OS_WINDOWS_VISTA:  /* fall-through */
+        case VMI_OS_WINDOWS_2008:   /* fall-through */
         case VMI_OS_WINDOWS_7:
             return obj & ~EX_FAST_REF_MASK;
         case VMI_OS_WINDOWS_8:
@@ -183,13 +186,18 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
                 return ((obj & VMI_BIT_MASK(19,63)) >> 16) | 0xFFFFE00000000000;
             else
                 return (obj & VMI_BIT_MASK(2,31));
-        default:
         case VMI_OS_WINDOWS_10:
             // We set Win10 as the default case as vmi_get_winver may not pinpoint it as VMI_OS_WINDOWS_10 if the buildid is not known
             if ( drakvuf->pm == VMI_PM_IA32E )
                 return ((obj & VMI_BIT_MASK(19,63)) >> 16) | 0xFFFF000000000000;
             else
                 return (obj & VMI_BIT_MASK(2,31));
+        case VMI_OS_WINDOWS_2000:       /* fall-through */
+        case VMI_OS_WINDOWS_2003:       /* fall-through */
+        case VMI_OS_WINDOWS_UNKNOWN:    /* fall-through */
+        case VMI_OS_WINDOWS_NONE:       /* fall-through */
+        default:
+            return 0;
     };
 }
 
