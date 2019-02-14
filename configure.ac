@@ -266,6 +266,16 @@ if test x$plugin_crashmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_CRASHMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_clipboardmon],
+  [AS_HELP_STRING([--disable-plugin-clipboardmon],
+    [Enable the clipboard tracing plugin @<:@yes@:>@])],
+  [plugin_clipboardmon="$enableval"],
+  [plugin_clipboardmon="yes"])
+AM_CONDITIONAL([PLUGIN_CLIPBOARDMON], [test x$plugin_clipboardmon = xyes])
+if test x$plugin_clipboardmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_CLIPBOARDMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -426,18 +436,19 @@ Build system type: $build
 Installation prefix: $prefix
 -------------------------------------------------------------------------------
 DRAKVUF Plugins
-Syscalls:   $plugin_syscalls
-Poolmon:    $plugin_poolmon
-Filetracer: $plugin_filetracer
-Filedelete: $plugin_filedelete
-Objmon:     $plugin_objmon
-Exmon:      $plugin_exmon
-SSDTmon:    $plugin_ssdtmon
-CPUIDmon:   $plugin_cpuidmon
-Debugmon:   $plugin_debugmon
-Socketmon:  $plugin_socketmon
-Regmon:     $plugin_regmon
-Procmon:    $plugin_procmon
-BSODmon:    $plugin_bsodmon
-CrashMon:   $plugin_crashmon
+Syscalls:     $plugin_syscalls
+Poolmon:      $plugin_poolmon
+Filetracer:   $plugin_filetracer
+Filedelete:   $plugin_filedelete
+Objmon:       $plugin_objmon
+Exmon:        $plugin_exmon
+SSDTmon:      $plugin_ssdtmon
+CPUIDmon:     $plugin_cpuidmon
+Debugmon:     $plugin_debugmon
+Socketmon:    $plugin_socketmon
+Regmon:       $plugin_regmon
+Procmon:      $plugin_procmon
+BSODmon:      $plugin_bsodmon
+CrashMon:     $plugin_crashmon
+ClipboardMon: $plugin_clipboardmon
 -------------------------------------------------------------------------------])
