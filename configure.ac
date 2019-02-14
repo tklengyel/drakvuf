@@ -276,6 +276,16 @@ if test x$plugin_clipboardmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_CLIPBOARDMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_windowmon],
+  [AS_HELP_STRING([--disable-plugin-windowmon],
+    [Enable the windows tracing plugin @<:@yes@:>@])],
+  [plugin_windowmon="$enableval"],
+  [plugin_windowmon="yes"])
+AM_CONDITIONAL([PLUGIN_WINDOWMON], [test x$plugin_windowmon = xyes])
+if test x$plugin_windowmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_WINDOWMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -451,4 +461,5 @@ Procmon:      $plugin_procmon
 BSODmon:      $plugin_bsodmon
 CrashMon:     $plugin_crashmon
 ClipboardMon: $plugin_clipboardmon
+WindowMon:    $plugin_windowmon
 -------------------------------------------------------------------------------])
