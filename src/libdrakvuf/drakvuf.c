@@ -146,15 +146,22 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
         drakvuf->rekall_profile_json = NULL;
     }
 
+    if (drakvuf->rekall_wow_profile_json)
+    {
+        json_object_put(drakvuf->rekall_wow_profile_json);
+        drakvuf->rekall_wow_profile_json = NULL;
+    }
+
     g_free(drakvuf->offsets);
     g_free(drakvuf->sizes);
     g_mutex_clear(&drakvuf->vmi_lock);
     g_free(drakvuf->dom_name);
     g_free(drakvuf->rekall_profile);
+    g_free(drakvuf->rekall_wow_profile);
     g_free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_profile, bool _verbose, bool libvmi_conf)
+bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_profile, const char* rekall_wow_profile, bool _verbose, bool libvmi_conf)
 {
 
     if ( !domain || !rekall_profile )
@@ -169,6 +176,17 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
     (*drakvuf)->rekall_profile_json = json_object_from_file(rekall_profile);
     (*drakvuf)->rekall_profile = g_strdup(rekall_profile);
     (*drakvuf)->os = rekall_get_os_type((*drakvuf)->rekall_profile_json);
+
+    if ( (*drakvuf)->os == VMI_OS_WINDOWS )
+    {
+        if ( rekall_wow_profile )
+        {
+            (*drakvuf)->rekall_wow_profile_json = json_object_from_file(rekall_wow_profile);
+            (*drakvuf)->rekall_wow_profile      = g_strdup(rekall_wow_profile);
+        }
+        else
+            PRINT_DEBUG("drakvuf_init: Rekall WoW64 profile not used\n");
+    }
 
     g_mutex_init(&(*drakvuf)->vmi_lock);
 
@@ -553,7 +571,7 @@ int drakvuf_get_address_width(drakvuf_t drakvuf)
     return drakvuf->address_width;
 }
 
-static unicode_string_t* drakvuf_read_unicode_common(vmi_instance_t vmi, const access_context_t* ctx)
+unicode_string_t* drakvuf_read_unicode_common(vmi_instance_t vmi, const access_context_t* ctx)
 {
     unicode_string_t* us = vmi_read_unicode_str(vmi, ctx);
     if ( !us )
@@ -603,6 +621,58 @@ unicode_string_t* drakvuf_read_unicode_va(vmi_instance_t vmi, addr_t vaddr, vmi_
     };
 
     return drakvuf_read_unicode_common(vmi, &ctx);
+}
+
+unicode_string_t* drakvuf_read_unicode32_common(vmi_instance_t vmi, const access_context_t* ctx)
+{
+    unicode_string_t* us = vmi_read_unicode_str_pm( vmi, ctx, VMI_PM_LEGACY );
+    if ( !us )
+        return NULL;
+
+    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+
+    if ( !out )
+    {
+        vmi_free_unicode_str(us);
+        return NULL;
+    }
+
+    status_t rc = vmi_convert_str_encoding(us, out, "UTF-8");
+    vmi_free_unicode_str(us);
+
+    if (VMI_SUCCESS == rc)
+        return out;
+
+    g_free(out);
+    return NULL;
+}
+
+unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
+{
+    if ( !addr )
+        return NULL;
+
+    vmi_instance_t vmi = drakvuf->vmi;
+    access_context_t ctx =
+    {
+        .addr = addr,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    return drakvuf_read_unicode32_common(vmi, &ctx);
+}
+
+unicode_string_t* drakvuf_read_unicode32_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid)
+{
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .addr = vaddr,
+        .pid = pid
+    };
+
+    return drakvuf_read_unicode32_common(vmi, &ctx);
 }
 
 size_t drakvuf_wchar_string_length(vmi_instance_t vmi, const access_context_t* ctx)

@@ -156,6 +156,7 @@ int main(int argc, char** argv)
     bool filedelete_use_injector = false;
     bool abort_on_bsod = false;
     bool libvmi_conf = false;
+    char* rekall_wow_profile = nullptr;
 
     eprint_current_time();
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -212,6 +213,8 @@ int main(int argc, char** argv)
 #ifdef ENABLE_PLUGIN_BSODMON
                 "\t -b                        Exit from execution as soon as a BSoD is detected\n"
 #endif
+                "\t -w, --rekall-wow <rekall profile>\n"
+                "\t                           The Rekall profile for WoW64 NTDLL\n"
                );
         return rc;
     }
@@ -223,8 +226,9 @@ int main(int argc, char** argv)
         {"rekall-tcpip", required_argument, NULL, 'T'},
         {"injection-timeout", required_argument, NULL, 'j'},
         {"verbose", no_argument, NULL, 'v'},
+        {"rekall-wow", required_argument, NULL, 'w'},
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nblgj:";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nblgj:w:";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
@@ -324,6 +328,9 @@ int main(int argc, char** argv)
             case 'l':
                 libvmi_conf = true;
                 break;
+            case 'w':
+                rekall_wow_profile = optarg;
+                break;
             default:
                 if (isalnum(c))
                     fprintf(stderr, "Unrecognized option: %c\n", c);
@@ -354,7 +361,7 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = new drakvuf_c(domain, rekall_profile, output, verbose, leave_paused, libvmi_conf);
+        drakvuf = new drakvuf_c(domain, rekall_profile, rekall_wow_profile, output, verbose, leave_paused, libvmi_conf);
     }
     catch (const std::exception& e)
     {

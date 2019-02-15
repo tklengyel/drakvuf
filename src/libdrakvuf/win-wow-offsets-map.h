@@ -102,94 +102,22 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_OFFSETS_H
-#define WIN_OFFSETS_H
+#ifndef WIN_WOW_OFFSETS_MAP_H
+#define WIN_WOW_OFFSETS_MAP_H
 
 /*
- * Easy-to-use structure offsets to be loaded from the Rekall profile.
- * Define actual mapping in win-offsets-map.h
+ * Map offset enums to actual structure+member or global variable/function names.
  */
-enum win_offsets
+static const char* win_wow_offset_names[__WIN_WOW_OFFSETS_MAX][2] =
 {
-    KIINITIALPCR,
+    [WOW_PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
+    [WOW_PEB_LDR] = { "_PEB", "Ldr" },
+    [WOW_PEB_LDR_DATA_INLOADORDERMODULELIST] = { "_PEB_LDR_DATA", "InLoadOrderModuleList" },
 
-    EPROCESS_PID,
-    EPROCESS_PDBASE,
-    EPROCESS_PNAME,
-    EPROCESS_PROCCREATIONINFO,
-    EPROCESS_TASKS,
-    EPROCESS_PEB,
-    EPROCESS_OBJECTTABLE,
-    EPROCESS_PCB,
-    EPROCESS_INHERITEDPID,
-    EPROCESS_WOW64PROCESS,
-    EPROCESS_WOW64PROCESS_WIN10,
-
-    KPROCESS_HEADER,
-
-    PEB_IMAGEBASADDRESS,
-    PEB_LDR,
-    PEB_PROCESSPARAMETERS,
-    PEB_SESSIONID,
-
-    PEB_LDR_DATA_INLOADORDERMODULELIST,
-
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
-
-    HANDLE_TABLE_TABLECODE,
-
-    KPCR_PRCB,
-    KPCR_PRCBDATA,
-    KPRCB_CURRENTTHREAD,
-
-    KTHREAD_PROCESS,
-    KTHREAD_PREVIOUSMODE,
-    KTHREAD_HEADER,
-    KTHREAD_TEB,
-
-    TEB_LASTERRORVALUE,
-
-    ETHREAD_CID,
-    ETHREAD_TCB,
-    CLIENT_ID_UNIQUETHREAD,
-
-    OBJECT_HEADER_TYPEINDEX,
-    OBJECT_HEADER_BODY,
-
-    POOL_HEADER_BLOCKSIZE,
-    POOL_HEADER_POOLTYPE,
-    POOL_HEADER_POOLTAG,
-
-    DISPATCHER_TYPE,
-
-    CM_KEY_CONTROL_BLOCK,
-    CM_KEY_NAMEBLOCK,
-    CM_KEY_NAMEBUFFER,
-    CM_KEY_NAMELENGTH,
-    CM_KEY_PARENTKCB,
-    CM_KEY_PROCESSID,
-
-    PROCCREATIONINFO_IMAGEFILENAME,
-
-    OBJECTNAMEINFORMATION_NAME,
-
-    FILEOBJECT_NAME,
-
-    RTL_USER_PROCESS_PARAMETERS_COMMANDLINE,
-
-    EWOW64PROCESS_PEB,
-
-    __WIN_OFFSETS_MAX
-};
-
-enum win_sizes
-{
-    HANDLE_TABLE_ENTRY,
-
-    __WIN_SIZES_MAX
+    [WOW_LDR_DATA_TABLE_ENTRY_DLLBASE]     = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
+    [WOW_LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
+    [WOW_LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
+    [WOW_LDR_DATA_TABLE_ENTRY_FULLDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "FullDllName" },
 };
 
 #endif
