@@ -120,6 +120,9 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [EPROCESS_OBJECTTABLE] = {"_EPROCESS", "ObjectTable" },
     [EPROCESS_PCB] = { "_EPROCESS", "Pcb" },
     [EPROCESS_INHERITEDPID] = { "_EPROCESS", "InheritedFromUniqueProcessId" },
+    [EPROCESS_WOW64PROCESS] = { "_EPROCESS", "Wow64Process" },
+    [EPROCESS_WOW64PROCESS_WIN10] = { "_EPROCESS", "WoW64Process" },
+
     [KPROCESS_HEADER] = { "_KPROCESS", "Header" },
     [PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
     [PEB_LDR] = { "_PEB", "Ldr" },
@@ -162,6 +165,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [FILEOBJECT_NAME] = { "_FILE_OBJECT", "FileName" },
     [RTL_USER_PROCESS_PARAMETERS_COMMANDLINE] = { "_RTL_USER_PROCESS_PARAMETERS", "CommandLine" },
 
+    [EWOW64PROCESS_PEB] = { "_EWOW64PROCESS", "Peb" },
 };
 
 #endif

@@ -328,6 +328,7 @@ typedef void (*event_cb_t) (int fd, void* data);
 bool drakvuf_init (drakvuf_t* drakvuf,
                    const char* domain,
                    const char* rekall_profile,
+                   const char* rekall_wow_profile,
                    const bool verbose,
                    const bool libvmi_conf);
 void drakvuf_close (drakvuf_t drakvuf, const bool pause);
@@ -427,12 +428,14 @@ bool drakvuf_find_process(drakvuf_t drakvuf,
 
 typedef struct _module_info
 {
-    addr_t eprocess_addr ;       /* EPROCESS to which the module is currently loaded           */
-    addr_t dtb ;                 /* DTB for the process where the module is currently loaded   */
-    vmi_pid_t pid ;              /* PID of the process where the module is currently is loaded */
-    addr_t base_addr ;           /* Module base address                                        */
-    unicode_string_t full_name ; /* Module full name                                           */
-    unicode_string_t base_name ; /* Module base name                                           */
+    addr_t eprocess_addr ;        /* EPROCESS to which the module is currently loaded           */
+    addr_t dtb ;                  /* DTB for the process where the module is currently loaded   */
+    vmi_pid_t pid ;               /* PID of the process where the module is currently is loaded */
+    addr_t base_addr ;            /* Module base address                                        */
+    unicode_string_t* full_name ; /* Module full name                                           */
+    unicode_string_t* base_name ; /* Module base name                                           */
+    bool is_wow ;                 /* Is WoW64 module?                                           */
+    bool is_wow_process ;         /* Is WoW64 process?                                          */
 } module_info_t ;
 
 bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf,
@@ -456,9 +459,17 @@ bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
                                object_manager_object_t obj_type_arg,
                                addr_t* obj_body_addr);
 
+unicode_string_t* drakvuf_read_unicode_common(vmi_instance_t vmi, const access_context_t* ctx);
+
 unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr);
 
 unicode_string_t* drakvuf_read_unicode_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid);
+
+unicode_string_t* drakvuf_read_unicode32_common(vmi_instance_t vmi, const access_context_t* ctx);
+
+unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr);
+
+unicode_string_t* drakvuf_read_unicode32_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid);
 
 bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
                                    addr_t module_list_head,
