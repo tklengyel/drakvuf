@@ -123,6 +123,7 @@ typedef enum
 {
     INJECT_RESULT_SUCCESS,
     INJECT_RESULT_TIMEOUT,
+    INJECT_RESULT_CRASH,
     INJECT_RESULT_ERROR_CODE,
 } inject_result_t;
 
@@ -458,15 +459,6 @@ static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info
     return true;
 }
 
-static void fill_last_error(injector_t injector, uint32_t vcpu_id)
-{
-    if (VMI_FAILURE == drakvuf_get_last_error(injector->drakvuf, vcpu_id, &injector->error_code, &injector->error_string))
-    {
-        injector->error_code = -1;
-        injector->error_string = "<UNKNOWN>";
-    }
-}
-
 static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info)
 {
     access_context_t ctx =
@@ -587,7 +579,7 @@ static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drak
         injector->detected = false;
         PRINT_DEBUG("Target process crash detected\n");
 
-        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+        drakvuf_interrupt(drakvuf, SIGDRAKVUFCRASH);
     }
 
     return 0;
@@ -913,7 +905,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             if (info->regs->rax)
                 fill_created_process_info(injector, info);
             else
-                fill_last_error(injector, info->vcpu);
+                drakvuf_get_last_error(injector->drakvuf, info->vcpu, &injector->error_code, &injector->error_string);
 
             injector->rc = info->regs->rax;
             memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
@@ -1118,7 +1110,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         if (info->regs->rax)
             fill_created_process_info(injector, info);
         else
-            fill_last_error(injector, info->vcpu);
+            drakvuf_get_last_error(injector->drakvuf, info->vcpu, &injector->error_code, &injector->error_string);
 
         injector->rc = info->regs->rax;
         memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
@@ -1324,7 +1316,23 @@ static void print_injection_info(output_format_t format, const char* file, injec
                     break;
             }
             break;
-        default:
+        case INJECT_RESULT_CRASH:
+            switch (format)
+            {
+                case OUTPUT_CSV:
+                    printf("inject," FORMAT_TIMEVAL ",Crash\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                case OUTPUT_KV:
+                    printf("inject Time=" FORMAT_TIMEVAL ",Status=Crash\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                default:
+                case OUTPUT_DEFAULT:
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Crash\n", UNPACK_TIMEVAL(t));
+                    break;
+            }
+            break;
         case INJECT_RESULT_ERROR_CODE:
             switch (format)
             {
@@ -1512,6 +1520,8 @@ int injector_start_app(
     injector->status = STATUS_NULL;
     injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     injector->break_loop_on_detection = break_loop_on_detection;
+    injector->error_code = -1;
+    injector->error_string = "<UNKNOWN>";
 
     if (!initialize_injector_functions(drakvuf, injector, file, binary_path))
     {
@@ -1530,6 +1540,11 @@ int injector_start_app(
         if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
         {
             injector->result = INJECT_RESULT_TIMEOUT;
+            print_injection_info(format, file, injector);
+        }
+        else if (SIGDRAKVUFCRASH == drakvuf_is_interrupted(drakvuf))
+        {
+            injector->result = INJECT_RESULT_CRASH;
             print_injection_info(format, file, injector);
         }
         else
