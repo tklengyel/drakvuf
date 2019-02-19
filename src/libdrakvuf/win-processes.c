@@ -119,6 +119,7 @@
 
 typedef enum dispatcher_object
 {
+    __DISPATCHER_INVALID_OBJECT = 0,
     DISPATCHER_PROCESS_OBJECT = 3,
     DISPATCHER_THREAD_OBJECT  = 6
 } dispatcher_object_t ;
@@ -376,7 +377,7 @@ bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
 
 bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 {
-    dispatcher_object_t dispatcher_type=0;
+    dispatcher_object_t dispatcher_type = __DISPATCHER_INVALID_OBJECT;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -401,7 +402,7 @@ bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 
 bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
 {
-    dispatcher_object_t dispatcher_type=0;
+    dispatcher_object_t dispatcher_type = __DISPATCHER_INVALID_OBJECT;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
