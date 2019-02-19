@@ -376,7 +376,7 @@ bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
 
 bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 {
-    dispatcher_object_t dispatcher_type;
+    dispatcher_object_t dispatcher_type=0;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -401,7 +401,7 @@ bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 
 bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
 {
-    dispatcher_object_t dispatcher_type;
+    dispatcher_object_t dispatcher_type=0;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
