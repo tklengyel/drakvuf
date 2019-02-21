@@ -124,6 +124,7 @@ typedef enum
     INJECT_RESULT_SUCCESS,
     INJECT_RESULT_TIMEOUT,
     INJECT_RESULT_CRASH,
+    INJECT_RESULT_PREMATURE,
     INJECT_RESULT_ERROR_CODE,
 } inject_result_t;
 
@@ -170,8 +171,13 @@ struct injector
     // Results:
     int rc;
     inject_result_t result;
-    uint32_t error_code;
-    const char* error_string;
+    struct
+    {
+        bool valid;
+        uint32_t code;
+        const char* string;
+    } error_code;
+
     uint32_t pid, tid;
     uint64_t hProc, hThr;
 };
@@ -905,7 +911,10 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             if (info->regs->rax)
                 fill_created_process_info(injector, info);
             else
-                drakvuf_get_last_error(injector->drakvuf, info->vcpu, &injector->error_code, &injector->error_string);
+            {
+                injector->error_code.valid = true;
+                drakvuf_get_last_error(injector->drakvuf, info->vcpu, &injector->error_code.code, &injector->error_code.string);
+            }
 
             injector->rc = info->regs->rax;
             memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
@@ -1110,7 +1119,10 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         if (info->regs->rax)
             fill_created_process_info(injector, info);
         else
-            drakvuf_get_last_error(injector->drakvuf, info->vcpu, &injector->error_code, &injector->error_string);
+        {
+            injector->error_code.valid = true;
+            drakvuf_get_last_error(injector->drakvuf, info->vcpu, &injector->error_code.code, &injector->error_code.string);
+        }
 
         injector->rc = info->regs->rax;
         memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
@@ -1333,23 +1345,40 @@ static void print_injection_info(output_format_t format, const char* file, injec
                     break;
             }
             break;
+        case INJECT_RESULT_PREMATURE:
+            switch (format)
+            {
+                case OUTPUT_CSV:
+                    printf("inject," FORMAT_TIMEVAL ",PrematureBreak\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                case OUTPUT_KV:
+                    printf("inject Time=" FORMAT_TIMEVAL ",Status=PrematureBreak\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                default:
+                case OUTPUT_DEFAULT:
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:PrematureBreak\n", UNPACK_TIMEVAL(t));
+                    break;
+            }
+            break;
         case INJECT_RESULT_ERROR_CODE:
             switch (format)
             {
                 case OUTPUT_CSV:
                     printf("inject," FORMAT_TIMEVAL ",Error,%d,\"%s\"\n",
-                           UNPACK_TIMEVAL(t), injector->error_code, injector->error_string);
+                           UNPACK_TIMEVAL(t), injector->error_code.code, injector->error_code.string);
                     break;
 
                 case OUTPUT_KV:
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=Error,ErrorCode=%d,Error=\"%s\"\n",
-                           UNPACK_TIMEVAL(t), injector->error_code, injector->error_string);
+                           UNPACK_TIMEVAL(t), injector->error_code.code, injector->error_code.string);
                     break;
 
                 default:
                 case OUTPUT_DEFAULT:
                     printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Error ERROR_CODE:%d ERROR:\"%s\"\n",
-                           UNPACK_TIMEVAL(t), injector->error_code, injector->error_string);
+                           UNPACK_TIMEVAL(t), injector->error_code.code, injector->error_code.string);
                     break;
             }
             break;
@@ -1520,8 +1549,9 @@ int injector_start_app(
     injector->status = STATUS_NULL;
     injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     injector->break_loop_on_detection = break_loop_on_detection;
-    injector->error_code = -1;
-    injector->error_string = "<UNKNOWN>";
+    injector->error_code.valid = false;
+    injector->error_code.code = -1;
+    injector->error_code.string = "<UNKNOWN>";
 
     if (!initialize_injector_functions(drakvuf, injector, file, binary_path))
     {
@@ -1547,16 +1577,20 @@ int injector_start_app(
             injector->result = INJECT_RESULT_CRASH;
             print_injection_info(format, file, injector);
         }
-        else
+        else if (injector->error_code.valid)
         {
             injector->result = INJECT_RESULT_ERROR_CODE;
+            print_injection_info(format, file, injector);
+        }
+        else
+        {
+            injector->result = INJECT_RESULT_PREMATURE;
             print_injection_info(format, file, injector);
         }
     }
 
     rc = injector->rc;
-    PRINT_DEBUG("Finished with injection. Ret: %i. Error: %s(%d)\n", rc,
-                injector->error_string ?: "OK", injector->error_code);
+    PRINT_DEBUG("Finished with injection. Ret: %i.\n", rc);
 
     switch (method)
     {
