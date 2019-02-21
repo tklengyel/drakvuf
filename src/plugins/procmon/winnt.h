@@ -102,41 +102,23 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PROCMON_H
-#define PROCMON_H
+#ifndef WINNT_H
+#define WINNT_H
 
-#include <glib.h>
-#include "plugins/private.h"
-#include "plugins/plugins.h"
+#include <inttypes.h>
 
-class procmon: public plugin
-{
-public:
-    drakvuf_trap_t traps[4] =
-    {
-        [0 ... 3] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.pid = 4,
-            .breakpoint.addr_type = ADDR_RVA,
-            .breakpoint.module = "ntoskrnl.exe",
-            .type = BREAKPOINT,
-            .data = (void*)this
-        }
-    };
+#define PAGE_NOACCESS          0x01
+#define PAGE_READONLY          0x02
+#define PAGE_READWRITE         0x04
+#define PAGE_WRITECOPY         0x08
+#define PAGE_EXECUTE           0x10
+#define PAGE_EXECUTE_READ      0x20
+#define PAGE_EXECUTE_READWRITE 0x40
+#define PAGE_EXECUTE_WRITECOPY 0x80
+#define PAGE_GUARD            0x100
+#define PAGE_NOCACHE          0x200
+#define PAGE_WRITECOMBINE     0x400
 
-    GSList* result_traps;
-
-    output_format_t format;
-
-    addr_t command_line;
-    addr_t image_path_name;
-    addr_t dll_path;
-    addr_t current_directory_handle;
-    addr_t current_directory_dospath;
-    addr_t object_header_body;
-
-    procmon(drakvuf_t drakvuf, const void* config, output_format_t output);
-    ~procmon();
-};
+void print_protection_attributes(uint32_t attributes, char sep = ';');
 
 #endif

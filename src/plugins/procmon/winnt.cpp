@@ -102,41 +102,67 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PROCMON_H
-#define PROCMON_H
+#include "winnt.h"
+#include <stdio.h>
 
-#include <glib.h>
-#include "plugins/private.h"
-#include "plugins/plugins.h"
-
-class procmon: public plugin
+void print_protection_attributes(uint32_t attributes, char sep)
 {
-public:
-    drakvuf_trap_t traps[4] =
+    if (attributes == 0)
     {
-        [0 ... 3] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.pid = 4,
-            .breakpoint.addr_type = ADDR_RVA,
-            .breakpoint.module = "ntoskrnl.exe",
-            .type = BREAKPOINT,
-            .data = (void*)this
+        printf("NONE");
+        return;
+    }
+
+    int num = 0;
+    for (size_t i = 0; i < 8 * sizeof(attributes) && attributes; ++i)
+    {
+        uint32_t attr = attributes & (1 << i);
+        if (attr == 0)
+            continue;
+
+        attributes &= ~attr;
+        ++num;
+        if (num > 1)
+            printf("%c", sep);
+
+        switch (attr)
+        {
+            case PAGE_NOACCESS:
+                printf("PAGE_NOACCESS");
+                break;
+            case PAGE_READONLY:
+                printf("PAGE_READONLY");
+                break;
+            case PAGE_READWRITE:
+                printf("PAGE_READWRITE");
+                break;
+            case PAGE_WRITECOPY:
+                printf("PAGE_WRITECOPY");
+                break;
+            case PAGE_EXECUTE:
+                printf("PAGE_EXECUTE");
+                break;
+            case PAGE_EXECUTE_READ:
+                printf("PAGE_EXECUTE_READ");
+                break;
+            case PAGE_EXECUTE_READWRITE:
+                printf("PAGE_EXECUTE_READWRITE");
+                break;
+            case PAGE_EXECUTE_WRITECOPY:
+                printf("PAGE_EXECUTE_WRITECOPY");
+                break;
+            case PAGE_GUARD:
+                printf("PAGE_GUARD");
+                break;
+            case PAGE_NOCACHE:
+                printf("PAGE_NOCACHE");
+                break;
+            case PAGE_WRITECOMBINE:
+                printf("PAGE_WRITECOMBINE");
+                break;
+            default:
+                printf("0x%" PRIx32, attr);
+                break;
         }
-    };
-
-    GSList* result_traps;
-
-    output_format_t format;
-
-    addr_t command_line;
-    addr_t image_path_name;
-    addr_t dll_path;
-    addr_t current_directory_handle;
-    addr_t current_directory_dospath;
-    addr_t object_header_body;
-
-    procmon(drakvuf_t drakvuf, const void* config, output_format_t output);
-    ~procmon();
-};
-
-#endif
+    }
+}
