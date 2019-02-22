@@ -1561,7 +1561,7 @@ int injector_start_app(
         default:
             free_injector(injector);
             break;
-    };
+    }
 
     return rc;
 }

@@ -222,7 +222,7 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
         default:
             fprintf(stderr, "The Rekall profile describes an unknown operating system kernel!\n");
             goto err;
-    };
+    }
 
     PRINT_DEBUG("libdrakvuf initialized\n");
 
