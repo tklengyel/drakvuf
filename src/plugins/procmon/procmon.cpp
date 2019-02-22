@@ -581,8 +581,6 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
     g_free(name);
 
     return VMI_EVENT_RESPONSE_NONE;
-
-    return 0;
 }
 
 static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
