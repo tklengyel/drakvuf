@@ -164,7 +164,7 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
             size_t psize = drakvuf->address_width;
             uint32_t low_count = VMI_PS_4KB / drakvuf->sizes[HANDLE_TABLE_ENTRY];
             uint32_t mid_count = VMI_PS_4KB / psize;
-            uint
+            uint32_t k;
             uint32_t j;
             uint32_t i = handle % (low_count * HANDLE_MULTIPLIER);
 
