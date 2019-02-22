@@ -166,6 +166,10 @@ if PLUGIN_CRASHMON
 sources += crashmon/crashmon.cpp
 endif
 
+if PLUGIN_CLIPBOARDMON
+sources += clipboardmon/clipboardmon.cpp
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h
 

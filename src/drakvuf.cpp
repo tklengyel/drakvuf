@@ -152,6 +152,7 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                              bool filedelete_use_injector,     // PLUGIN_FILEDELETE
                              bool cpuid_stealth,               // PLUGIN_CPUIDMON
                              const char* tcpip_profile,        // PLUGIN_SOCKETMON
+                             const char* win32k_profile,       // PLUGIN_CLIPBOARDMON
                              const char* syscalls_filter_file, // PLUGIN_SYSCALLS
                              bool abort_on_bsod )              // PLUGIN_BSODMON
 {
@@ -208,6 +209,15 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     rc = plugins->start((drakvuf_plugin_t)i, nullptr);
                     break;
 
+                case PLUGIN_CLIPBOARDMON:
+                {
+                    struct clipboardmon_config c =
+                    {
+                        .win32k_profile = win32k_profile,
+                    };
+                    rc = plugins->start((drakvuf_plugin_t)i, &c);
+                    break;
+                }
                 default:
                     rc = plugins->start((drakvuf_plugin_t)i, nullptr);
                     break;

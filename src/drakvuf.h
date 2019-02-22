@@ -175,6 +175,7 @@ public:
                       bool filedelete_use_injector,
                       bool cpuid_stealth,
                       const char* tcpip_profile,
+                      const char* win32k_profile,
                       const char* syscalls_filter_file,
                       bool abort_on_bsod );
 };
