@@ -245,7 +245,8 @@ uint64_t xen_memshare(xen_interface_t* xen, domid_t domID, domid_t cloneID)
 #if __XEN_INTERFACE_VERSION__ < 0x00040600
     uint64_t page, max_page = xc_domain_maximum_gpfn(xen->xc, domID);
 #else
-    xen_pfn_t page, max_page;
+    xen_pfn_t page;
+    xen_pfn_t max_page;
     if (xc_domain_maximum_gpfn(xen->xc, domID, &max_page))
     {
         printf("Failed to get max gpfn from Xen!\n");
@@ -275,7 +276,8 @@ uint64_t xen_memshare(xen_interface_t* xen, domid_t domID, domid_t cloneID)
      */
     for (page = max_page; page <= max_page; page--)
     {
-        uint64_t shandle, chandle;
+        uint64_t shandle;
+        uint64_t chandle;
 
         if (xc_memshr_nominate_gfn(xen->xc, domID, page, &shandle))
             continue;

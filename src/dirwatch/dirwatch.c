@@ -293,7 +293,8 @@ void run_drakvuf(gpointer data, gpointer user_data)
     struct start_drakvuf* start = data;
     char* command;
     gint rc;
-    GThread* timer, *tcpd;
+    GThread* timer;
+    GThread* tcpd;
 
 restart:
     command = NULL;
@@ -363,7 +364,9 @@ int main(int argc, char** argv)
 {
     DIR* dir;
     struct dirent* ent;
-    unsigned int i, processed = 0, total_processed = 0;
+    unsigned int i;
+    unsigned int processed = 0;
+    unsigned int total_processed = 0;
     int ret = 0;
     struct sigaction act;
     shutting_down = 0;

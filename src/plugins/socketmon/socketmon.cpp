@@ -213,7 +213,8 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
     int64_t ownerid = 0;
     addr_t p1 = 0;
-    char* lip = NULL, *owner = NULL;
+    char* lip = NULL;
+    char* owner = NULL;
     struct wrapper* w = (struct wrapper*)info->trap->data;
     socketmon* s = w->s;
 
@@ -331,7 +332,8 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
     int64_t ownerid = 0;
     addr_t p1 = 0;
-    char* lip = NULL, *owner = NULL;
+    char* lip = NULL;
+    char* owner = NULL;
     struct wrapper* w = (struct wrapper*)info->trap->data;
     socketmon* s = w->s;
 
@@ -450,7 +452,8 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
 
     int64_t ownerid = 0;
     addr_t p1 = 0;
-    char* lip = NULL, *owner = NULL;
+    char* lip = NULL;
+    char* owner = NULL;
     struct wrapper* w = (struct wrapper*)info->trap->data;
     socketmon* s = w->s;
     gchar* escaped_pname = NULL;
@@ -568,7 +571,9 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
     int64_t ownerid = -1;
     addr_t p1 = 0;
-    char* lip = NULL, *rip = NULL, *owner=NULL;
+    char* lip = NULL;
+    char* rip = NULL;
+    char* owner=NULL;
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
@@ -710,7 +715,9 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
     int64_t ownerid;
     addr_t p1 = 0;
-    char* lip = NULL, *rip = NULL, *owner = NULL;
+    char* lip = NULL;
+    char* rip = NULL;
+    char* owner = NULL;
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
@@ -841,7 +848,9 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     int64_t ownerid;
     addr_t p1 = 0;
-    char* lip = NULL, *rip = NULL, *owner = NULL;
+    char* lip = NULL;
+    char* rip = NULL;
+    char* owner = NULL;
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
@@ -977,7 +986,8 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
     int64_t ownerid = 0;
     addr_t p1 = 0;
-    char* lip = NULL, *owner = NULL;
+    char* lip = NULL;
+    char* owner = NULL;
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
@@ -1103,7 +1113,8 @@ static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
     int64_t ownerid = 0;
     addr_t p1 = 0;
-    char* lip = NULL, *owner = NULL;
+    char* lip = NULL;
+    char* owner = NULL;
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
@@ -1222,7 +1233,8 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
 
     int64_t ownerid = 0;
     addr_t p1 = 0;
-    char* lip = NULL, *owner = NULL;
+    char* lip = NULL;
+    char* owner = NULL;
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
