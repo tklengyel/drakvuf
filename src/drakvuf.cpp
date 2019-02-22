@@ -221,7 +221,7 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                 default:
                     rc = plugins->start((drakvuf_plugin_t)i, nullptr);
                     break;
-            };
+            }
 
             if ( rc < 0 )
                 return rc;

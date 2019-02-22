@@ -283,7 +283,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             }
 
             loop = loop->next;
-        };
+        }
 
     }
 
@@ -884,7 +884,7 @@ void remove_trap(drakvuf_t drakvuf,
         case __INVALID_TRAP_TYPE: /* fall-through */
         default:
             break;
-    };
+    }
 }
 
 bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
@@ -1346,7 +1346,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
             case VMI_OS_UNKNOWN: /* fall-through */
             default:
                 break;
-        };
+        }
 
         os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GHASHTABLE, config, NULL);
 
@@ -1566,7 +1566,7 @@ void close_vmi(drakvuf_t drakvuf)
         }
         g_hash_table_destroy(drakvuf->remapped_gfns);
         drakvuf->remapped_gfns = NULL;
-    };
+    }
 
     if (drakvuf->debug)
         g_slist_free(drakvuf->debug);

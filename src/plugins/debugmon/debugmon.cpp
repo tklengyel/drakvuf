@@ -191,7 +191,7 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    info->regs->rip, info->debug->type, debug_type[info->debug->type]);
             break;
-    };
+    }
 
     return 0;
 }

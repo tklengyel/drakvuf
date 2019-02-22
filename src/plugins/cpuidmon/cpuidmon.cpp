@@ -182,7 +182,7 @@ event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                    info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx
                   );
             break;
-    };
+    }
 
     if ( s->stealth )
     {

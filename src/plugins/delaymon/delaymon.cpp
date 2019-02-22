@@ -74,7 +74,7 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    delay_interval_miliseconds);
             break;
-    };
+    }
 
     return 0;
 }

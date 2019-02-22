@@ -219,7 +219,7 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
     gchar* escaped_pname = NULL;
 
-    struct udp_endpoint_x86 udpa;;
+    struct udp_endpoint_x86 udpa;
     struct inetaf_x86 inetaf;
     struct local_address_x86 local;
     memset(&udpa, 0, sizeof(struct udp_endpoint_x86));
@@ -313,7 +313,7 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
                    lip, udpa.port);
             break;
-    };
+    }
 
 done:
     g_free(owner);
@@ -432,7 +432,7 @@ static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
                    lip, udpa.port);
             break;
-    };
+    }
 
 done:
     g_free(owner);
@@ -551,7 +551,7 @@ static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
                    lip, udpa.port);
             break;
-    };
+    }
 
 done:
     g_free(owner);
@@ -694,7 +694,7 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
                    tcp_state_str[tcpe.state],
                    lip, tcpe.localport, rip, tcpe.remoteport);
             break;
-    };
+    }
 
 done:
     g_free(lip);
@@ -824,7 +824,7 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
                    tcp_state_str[tcpe.state],
                    lip, tcpe.localport, rip, tcpe.remoteport);
             break;
-    };
+    }
 
 done:
     g_free(owner);
@@ -957,7 +957,7 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
                    tcp_state_str[tcpe.state],
                    lip, tcpe.localport, rip, tcpe.remoteport);
             break;
-    };
+    }
 
 done:
     g_free(owner);
@@ -1085,7 +1085,7 @@ static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                    lip, tcpl.port);
             break;
-    };
+    }
 
 done:
     g_free(owner);
@@ -1204,7 +1204,7 @@ static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                    lip, tcpl.port);
             break;
-    };
+    }
 
 done:
     g_free(owner);
@@ -1323,7 +1323,7 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
                    lip, tcpl.port);
             break;
-    };
+    }
 
 done:
     g_free(owner);
@@ -1374,7 +1374,7 @@ static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         case VMI_OS_WINDOWS_10:
             trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? tcpl_win10_x64_ret_cb : NULL;
             break;
-    };
+    }
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
     {
@@ -1425,7 +1425,7 @@ static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         case VMI_OS_WINDOWS_10:
             trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_win10_x64_ret_cb : NULL;
             break;
-    };
+    }
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
     {
@@ -1482,7 +1482,7 @@ static void print_dns_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    dns_name, function_name);
             break;
-    };
+    }
 }
 
 static event_response_t trap_DnsQuery_A_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
