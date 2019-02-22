@@ -384,7 +384,7 @@ int drakvuf_get_os_build_date(drakvuf_t drakvuf)
         goto err_exit;
     }
 
-    json_object* metadata = NULL; 
+    json_object* metadata = NULL;
     json_object* timestamp = NULL;
     if (!json_object_object_get_ex(drakvuf->rekall_profile_json, "$METADATA", &metadata))
     {
