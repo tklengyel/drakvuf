@@ -141,6 +141,7 @@ int main(int argc, char** argv)
     char* rekall_profile = nullptr;
     char* dump_folder = nullptr;
     char* tcpip = nullptr;
+    char* win32k = nullptr;
     char* binary_path = nullptr;
     char* target_process = nullptr;
     vmi_pid_t injection_pid = -1;
@@ -215,6 +216,10 @@ int main(int argc, char** argv)
 #endif
                 "\t -w, --rekall-wow <rekall profile>\n"
                 "\t                           The Rekall profile for WoW64 NTDLL\n"
+#ifdef ENABLE_PLUGIN_CLIPBOARDMON
+                "\t -W, --rekall-win32k <rekall profile>\n"
+                "\t                           The Rekall profile for win32k.sys\n"
+#endif
                );
         return rc;
     }
@@ -224,11 +229,12 @@ int main(int argc, char** argv)
     {
         {"rekall-kernel", required_argument, NULL, 'r'},
         {"rekall-tcpip", required_argument, NULL, 'T'},
+        {"rekall-win32k", required_argument, NULL, 'W'},
         {"injection-timeout", required_argument, NULL, 'j'},
         {"verbose", no_argument, NULL, 'v'},
         {"rekall-wow", required_argument, NULL, 'w'},
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nblgj:w:";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nblgj:w:W:";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
@@ -307,6 +313,9 @@ int main(int argc, char** argv)
                 break;
             case 'T':
                 tcpip = optarg;
+                break;
+            case 'W':
+                win32k = optarg;
                 break;
 #ifdef DRAKVUF_DEBUG
             case 'v':
@@ -390,7 +399,7 @@ int main(int argc, char** argv)
 
     PRINT_DEBUG("Starting plugins\n");
 
-    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, syscalls_filter_file, abort_on_bsod) < 0 )
+    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, win32k, syscalls_filter_file, abort_on_bsod) < 0 )
         goto exit;
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");

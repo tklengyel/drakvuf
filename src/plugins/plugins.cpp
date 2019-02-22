@@ -119,6 +119,7 @@
 #include "procmon/procmon.h"
 #include "bsodmon/bsodmon.h"
 #include "crashmon/crashmon.h"
+#include "clipboardmon/clipboardmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output, os_t os)
     : drakvuf{ drakvuf }, output{ output }, os{ os }
@@ -219,6 +220,11 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #ifdef ENABLE_PLUGIN_CRASHMON
                 case PLUGIN_CRASHMON:
                     this->plugins[plugin_id] = new crashmon(this->drakvuf, config, this->output);
+                    break;
+#endif
+#ifdef ENABLE_PLUGIN_CLIPBOARDMON
+                case PLUGIN_CLIPBOARDMON:
+                    this->plugins[plugin_id] = new clipboardmon(this->drakvuf, config, this->output);
                     break;
 #endif
                 default:
