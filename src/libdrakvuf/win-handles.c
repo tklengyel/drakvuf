@@ -198,7 +198,7 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
         case VMI_OS_WINDOWS_NONE:       /* fall-through */
         default:
             return 0;
-    };
+    }
 }
 
 addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t handle)
