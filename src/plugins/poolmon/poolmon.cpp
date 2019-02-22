@@ -141,7 +141,8 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     poolmon* p = (poolmon*)info->trap->data;
     page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-    reg_t pool_type, size;
+    reg_t pool_type;
+    reg_t size;
     char tag[5] = { [0 ... 4] = '\0' };
     struct pooltag* s = NULL;
     const char* pool_type_str;

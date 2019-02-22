@@ -121,7 +121,9 @@
 static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, uint64_t handle)
 {
     vmi_instance_t vmi = drakvuf->vmi;
-    addr_t handletable = 0, tablecode = 0, obj = 0;
+    addr_t handletable = 0;
+    addr_t tablecode = 0;
+    addr_t obj = 0;
 
     if ( VMI_FAILURE == vmi_read_addr_va(vmi, process + drakvuf->offsets[EPROCESS_OBJECTTABLE], 0, &handletable) )
         return 0;
@@ -143,7 +145,8 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
             addr_t table = 0;
             size_t psize = drakvuf->address_width;
             uint32_t low_count = VMI_PS_4KB / drakvuf->sizes[HANDLE_TABLE_ENTRY];
-            uint32_t j, i = handle % (low_count * HANDLE_MULTIPLIER);
+            uint32_t j;
+            uint32_t i = handle % (low_count * HANDLE_MULTIPLIER);
 
             handle -= i;
             j = handle / ((low_count * HANDLE_MULTIPLIER) / psize);
@@ -156,11 +159,14 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
         }
         case 2:
         {
-            addr_t table = 0, table2 = 0;
+            addr_t table = 0;
+            addr_t table2 = 0;
             size_t psize = drakvuf->address_width;
             uint32_t low_count = VMI_PS_4KB / drakvuf->sizes[HANDLE_TABLE_ENTRY];
             uint32_t mid_count = VMI_PS_4KB / psize;
-            uint32_t k, j, i = handle % (low_count * HANDLE_MULTIPLIER);
+            uint32_t k; 
+            uint32_t j;
+            uint32_t i = handle % (low_count * HANDLE_MULTIPLIER);
 
             handle -= i;
             j = handle / (low_count * HANDLE_MULTIPLIER / psize);

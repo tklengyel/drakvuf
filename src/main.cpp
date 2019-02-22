@@ -131,7 +131,9 @@ static inline void disable_plugin(char* optarg, bool* plugin_list)
 
 int main(int argc, char** argv)
 {
-    int c, rc = 1, timeout = 0;
+    int c;
+    int rc = 1;
+    int timeout = 0;
     char const* inject_file = nullptr;
     char const* inject_cwd = nullptr;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;

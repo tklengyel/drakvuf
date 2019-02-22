@@ -459,7 +459,8 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 {
 
     GSList* ret = NULL;
-    unsigned long i,j;
+    unsigned long i;
+    unsigned long j;
 
     PRINT_DEBUG("Received %lu symbols\n", symbols->count);
 

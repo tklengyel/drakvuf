@@ -1154,7 +1154,8 @@ bool inject_trap(drakvuf_t drakvuf,
 {
 
     vmi_instance_t vmi = drakvuf->vmi;
-    addr_t dtb, pa = 0;
+    addr_t dtb;
+    addr_t pa = 0;
     status_t status;
 
     if ( VMI_FAILURE == vmi_pid_to_dtb(vmi, pid, &dtb) )

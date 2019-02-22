@@ -301,7 +301,8 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
         if (trap->breakpoint.addr_type == ADDR_VA)
         {
-            addr_t dtb, trap_pa;
+            addr_t dtb;
+            addr_t trap_pa;
             if ( VMI_FAILURE == vmi_pid_to_dtb(drakvuf->vmi, trap->breakpoint.pid, &dtb) )
             {
                 PRINT_DEBUG("No DTB found for pid %i\n", trap->breakpoint.pid);

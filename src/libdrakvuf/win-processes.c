@@ -150,7 +150,8 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
 
 addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
 {
-    addr_t thread, process;
+    addr_t thread;
+    addr_t process;
 
     thread=win_get_current_thread(drakvuf,vcpu_id);
 
@@ -287,7 +288,8 @@ char* win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool ful
 int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
 {
 
-    addr_t peb, userid;
+    addr_t peb;
+    addr_t userid;
     vmi_instance_t vmi = drakvuf->vmi;
     access_context_t ctx = {.translate_mechanism = VMI_TM_PROCESS_DTB};
 
@@ -424,7 +426,9 @@ bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
 bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module_list)
 {
     vmi_instance_t vmi = drakvuf->vmi;
-    addr_t peb=0, ldr=0, modlist=0;
+    addr_t peb=0;
+    addr_t ldr=0;
+    addr_t modlist=0;
 
     access_context_t ctx = {.translate_mechanism = VMI_TM_PROCESS_DTB};
 
@@ -458,7 +462,8 @@ bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t w
     if ( wow_peb )
     {
         vmi_instance_t vmi = drakvuf->vmi;
-        addr_t ldr=0, modlist=0;
+        addr_t ldr=0;
+        addr_t modlist=0;
 
         ctx->addr = wow_peb + drakvuf->wow_offsets[WOW_PEB_LDR];
 
