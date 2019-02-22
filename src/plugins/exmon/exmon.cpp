@@ -212,7 +212,9 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if (e->pm != VMI_PM_IA32E)
     {
-        reg_t exception_record, ptrap_frame, exception_code;
+        reg_t exception_record;
+        reg_t ptrap_frame;
+        reg_t exception_code;
         uint8_t previous_mode;
 
         ctx.addr = info->regs->rsp+4;

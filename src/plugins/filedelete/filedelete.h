@@ -132,7 +132,8 @@ public:
         }
     };
     size_t* offsets;
-    size_t control_area_size, mmpte_size;
+    size_t control_area_size;
+    size_t mmpte_size;
 
     const char* dump_folder;
     page_mode_t pm;

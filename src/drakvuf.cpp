@@ -156,7 +156,8 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                              const char* syscalls_filter_file, // PLUGIN_SYSCALLS
                              bool abort_on_bsod )              // PLUGIN_BSODMON
 {
-    int i, rc;
+    int i;
+    int rc;
 
     for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
     {

@@ -417,7 +417,9 @@ static void extract_ca_file(filedelete* f,
                             uint64_t fo_flags)
 {
     addr_t subsection = control_area + f->control_area_size;
-    addr_t segment = 0, test = 0, test2 = 0;
+    addr_t segment = 0;
+    addr_t test = 0;
+    addr_t test2 = 0;
     size_t filesize = 0;
 
     /* Check whether subsection points back to the control area */
@@ -458,7 +460,8 @@ static void extract_ca_file(filedelete* f,
         if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &test) || test != control_area )
             break;
 
-        addr_t base = 0, start = 0;
+        addr_t base = 0;
+        addr_t start = 0;
         uint32_t ptes = 0;
 
         ctx->addr = subsection + f->offsets[SUBSECTION_SUBSECTIONBASE];
@@ -525,7 +528,9 @@ static void extract_file(filedelete* f,
                          uint64_t fo_flags)
 {
     addr_t sop = 0;
-    addr_t datasection = 0, sharedcachemap = 0, imagesection = 0;
+    addr_t datasection = 0;
+    addr_t sharedcachemap = 0;
+    addr_t imagesection = 0;
 
     ctx->addr = file_pa + f->offsets[FILE_OBJECT_SECTIONOBJECTPOINTER];
     if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &sop) )

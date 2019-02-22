@@ -351,7 +351,8 @@ module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_lis
 
 static bool find_kernbase(drakvuf_t drakvuf)
 {
-    addr_t sysproc_rva, sysproc;
+    addr_t sysproc_rva;
+    addr_t sysproc;
     if ( VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "PsInitialSystemProcess", &sysproc) )
     {
         printf("LibVMI failed to get us the VA of PsInitialSystemProcess!\n");

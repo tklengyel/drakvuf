@@ -127,9 +127,13 @@ static const char* queue_folder;
 
 int main(int argc, char** argv)
 {
-    DIR* indir, *qdir;
-    struct dirent* inent, *qdent;
-    uint64_t processed = 0, total_processed = 0, jobs = 0;
+    DIR* indir;
+    DIR* qdir;
+    struct dirent* inent;
+    struct dirent* qdent;
+    uint64_t processed = 0;
+    uint64_t total_processed = 0;
+    uint64_t jobs = 0;
     int ret = 0;
     uint64_t limit = 0;
 
@@ -181,7 +185,8 @@ int main(int argc, char** argv)
                             continue;
 
                         gchar** qinfo = g_strsplit(qdent->d_name, "_", 2);
-                        int qsize = atoi(qinfo[1]), count = -1;
+                        int qsize = atoi(qinfo[1]);
+                        int count = -1;
                         DIR* q;
                         struct dirent* qent;
 
