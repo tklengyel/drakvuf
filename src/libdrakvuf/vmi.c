@@ -113,6 +113,7 @@
 #include <inttypes.h>
 #include <glib.h>
 #include <err.h>
+#include <errno.h>
 
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
@@ -1245,8 +1246,11 @@ static void drakvuf_poll(drakvuf_t drakvuf, unsigned int timeout)
 
     else if (rc < 0)
     {
-        PRINT_DEBUG("DRAKVUF loop broke unexpectedly\n");
-        drakvuf->interrupted = -1;
+        PRINT_DEBUG("DRAKVUF loop broke unexpectedly: [Errno: %d] %s\n", errno, strerror(errno));
+        if (errno != EINTR)
+        {
+            drakvuf->interrupted = -1;
+        }
         return;
     }
 
