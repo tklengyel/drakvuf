@@ -161,7 +161,8 @@ std::string stringify_protection_attributes(uint32_t attributes, char sep)
             case PAGE_WRITECOMBINE:
                 result.append("PAGE_WRITECOMBINE");
                 break;
-            default: {
+            default:
+            {
                 char tmp[32] = {0};
                 sprintf(tmp, "0x%" PRIx32, attr);
                 result.append(tmp);
