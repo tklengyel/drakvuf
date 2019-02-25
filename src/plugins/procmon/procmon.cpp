@@ -111,6 +111,7 @@
 #include "../plugins.h"
 #include "ntstatus.h"
 #include "procmon.h"
+#include "winnt.h"
 
 namespace
 {
@@ -579,7 +580,6 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
     }
 
     g_free(name);
-
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -627,6 +627,60 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     return 0;
 }
 
+static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    // HANDLE ProcessHandle
+    uint64_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    // WIN32_PROTECTION_MASK NewProtectWin32
+    uint32_t new_protect = drakvuf_get_function_argument(drakvuf, info, 4);
+
+    procmon* f = (procmon*)info->trap->data;
+    switch (f->format)
+    {
+        case OUTPUT_CSV:
+            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,0x%" PRIx64 ",%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, info->trap->name, process_handle, stringify_protection_attributes(new_protect).c_str());
+            break;
+
+        case OUTPUT_KV:
+            printf("procmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
+                   "Method=%s,ProcessHandle=0x%" PRIx64 ",NewProtectWin32=%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   info->trap->name, process_handle, stringify_protection_attributes(new_protect).c_str());
+            break;
+
+        case OUTPUT_JSON:
+            printf( "{"
+                    "\"Plugin\" : \"procmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"ProcessName\": %s,"
+                    "\"Method\" : \"%s\","
+                    "\"ProcessHandle\" : %" PRIu64 ","
+                    "\"NewProtectWin32\" : \"%s\""
+                    "}",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                    info->trap->name,  process_handle, stringify_protection_attributes(new_protect).c_str());
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[PROCMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64
+                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 ":%s:0x%" PRIx64 ":%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr,
+                   info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, process_handle,
+                   stringify_protection_attributes(new_protect).c_str());
+            break;
+    }
+
+    printf("\n");
+    return 0;
+}
+
 static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
                            drakvuf_trap_t* trap,
                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
@@ -665,10 +719,11 @@ procmon::procmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_HEADER", "Body", &this->object_header_body) )
         throw -1;
 
-    assert(sizeof(traps) / sizeof(traps[0]) > 2);
+    assert(sizeof(traps) / sizeof(traps[0]) == 4);
     register_trap(drakvuf, "NtCreateUserProcess", &traps[0], create_user_process_hook_cb);
     register_trap(drakvuf, "NtTerminateProcess", &traps[1], terminate_process_hook_cb);
     register_trap(drakvuf, "NtOpenProcess", &traps[2], open_process_hook_cb);
+    register_trap(drakvuf, "NtProtectVirtualMemory", &traps[3], protect_virtual_memory_hook_cb);
 }
 
 procmon::~procmon()
