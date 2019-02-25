@@ -106,6 +106,7 @@
 #define WINNT_H
 
 #include <inttypes.h>
+#include <string>
 
 #define PAGE_NOACCESS          0x01
 #define PAGE_READONLY          0x02
@@ -119,6 +120,6 @@
 #define PAGE_NOCACHE          0x200
 #define PAGE_WRITECOMBINE     0x400
 
-void print_protection_attributes(uint32_t attributes, char sep = ';');
+std::string stringify_protection_attributes(uint32_t attributes, char sep = ';');
 
 #endif

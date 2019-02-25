@@ -580,10 +580,7 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
     }
 
     g_free(name);
-
     return VMI_EVENT_RESPONSE_NONE;
-
-    return 0;
 }
 
 static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -641,29 +638,42 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
     switch (f->format)
     {
         case OUTPUT_CSV:
-            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,0x%" PRIx64 ",",
+            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,0x%" PRIx64 ",%s",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name, process_handle);
-            print_protection_attributes(new_protect);
+                   info->proc_data.userid, info->trap->name, process_handle, stringify_protection_attributes(new_protect).c_str());
             break;
 
         case OUTPUT_KV:
             printf("procmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
-                   "Method=%s,ProcessHandle=0x%" PRIx64 ",",
+                   "Method=%s,ProcessHandle=0x%" PRIx64 ",NewProtectWin32=%s",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, process_handle);
-            printf("NewProtectWin32=");
-            print_protection_attributes(new_protect);
+                   info->trap->name, process_handle, stringify_protection_attributes(new_protect).c_str());
+            break;
+
+        case OUTPUT_JSON:
+            printf( "{"
+                    "\"Plugin\" : \"procmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"ProcessName\": %s,"
+                    "\"Method\" : \"%s\","
+                    "\"ProcessHandle\" : %" PRIu64 ","
+                    "\"NewProtectWin32\" : \"%s\""
+                    "}",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                    info->trap->name,  process_handle, stringify_protection_attributes(new_protect).c_str());
             break;
 
         default:
         case OUTPUT_DEFAULT:
             printf("[PROCMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64
-                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 ":%s:0x%" PRIx64 ":",
+                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 ":%s:0x%" PRIx64 ":%s",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr,
                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, process_handle);
-            print_protection_attributes(new_protect);
+                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, process_handle,
+                   stringify_protection_attributes(new_protect).c_str());
             break;
     }
 

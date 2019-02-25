@@ -105,13 +105,14 @@
 #include "winnt.h"
 #include <stdio.h>
 
-void print_protection_attributes(uint32_t attributes, char sep)
+std::string stringify_protection_attributes(uint32_t attributes, char sep)
 {
     if (attributes == 0)
     {
-        printf("NONE");
-        return;
+        return std::string("NONE");
     }
+
+    std::string result;
 
     int num = 0;
     for (size_t i = 0; i < 8 * sizeof(attributes) && attributes; ++i)
@@ -123,46 +124,50 @@ void print_protection_attributes(uint32_t attributes, char sep)
         attributes &= ~attr;
         ++num;
         if (num > 1)
-            printf("%c", sep);
+            result.append(1, sep);
 
         switch (attr)
         {
             case PAGE_NOACCESS:
-                printf("PAGE_NOACCESS");
+                result.append("PAGE_NOACCESS");
                 break;
             case PAGE_READONLY:
-                printf("PAGE_READONLY");
+                result.append("PAGE_READONLY");
                 break;
             case PAGE_READWRITE:
-                printf("PAGE_READWRITE");
+                result.append("PAGE_READWRITE");
                 break;
             case PAGE_WRITECOPY:
-                printf("PAGE_WRITECOPY");
+                result.append("PAGE_WRITECOPY");
                 break;
             case PAGE_EXECUTE:
-                printf("PAGE_EXECUTE");
+                result.append("PAGE_EXECUTE");
                 break;
             case PAGE_EXECUTE_READ:
-                printf("PAGE_EXECUTE_READ");
+                result.append("PAGE_EXECUTE_READ");
                 break;
             case PAGE_EXECUTE_READWRITE:
-                printf("PAGE_EXECUTE_READWRITE");
+                result.append("PAGE_EXECUTE_READWRITE");
                 break;
             case PAGE_EXECUTE_WRITECOPY:
-                printf("PAGE_EXECUTE_WRITECOPY");
+                result.append("PAGE_EXECUTE_WRITECOPY");
                 break;
             case PAGE_GUARD:
-                printf("PAGE_GUARD");
+                result.append("PAGE_GUARD");
                 break;
             case PAGE_NOCACHE:
-                printf("PAGE_NOCACHE");
+                result.append("PAGE_NOCACHE");
                 break;
             case PAGE_WRITECOMBINE:
-                printf("PAGE_WRITECOMBINE");
+                result.append("PAGE_WRITECOMBINE");
                 break;
-            default:
-                printf("0x%" PRIx32, attr);
+            default: {
+                char tmp[32] = {0};
+                sprintf(tmp, "0x%" PRIx32, attr);
+                result.append(tmp);
                 break;
+            }
         }
     }
+    return result;
 }
