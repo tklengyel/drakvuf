@@ -145,7 +145,7 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.get_current_thread_id = linux_get_current_thread_id;
     drakvuf->osi.get_process_pid = linux_get_process_pid;
     drakvuf->osi.get_process_ppid = linux_get_process_ppid;
-    drakvuf->osi.get_current_process_data = linux_get_current_process_data;
+    drakvuf->osi.get_process_data = linux_get_process_data;
 
     return 1;
 }

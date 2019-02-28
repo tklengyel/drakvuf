@@ -203,32 +203,244 @@ static char* read_ip_string(vmi_instance_t vmi, access_context_t& ctx, addr_t ad
     return nullptr;
 }
 
-static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static char const* addressfamily_string(int family)
 {
+    return (family == AF_INET) ? "UDPv4" : "UDPv6";
+}
+
+static char const* tcp_state_string(int tcp_state)
+{
+    if (tcp_state < 0 || tcp_state >= __TCP_STATE_MAX)
+        return "invalid";
+    return tcp_state_str[tcp_state];
+}
+
+static void print_udpa_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data, int addressfamily, char const* lip, int port)
+{
+    gchar* escaped_pname = NULL;
+
+    switch (s->format)
+    {
+        case OUTPUT_CSV:
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",\"%s\",%" PRIi64 ",%d,%d,%s,%s,%d\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
+                   addressfamily_string(addressfamily),
+                   lip, port);
+            break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64","
+                   "Owner=\"%s\",OwnerId=%" PRIi64 ",OwnerPID=%d,OwnerPPID=%d,Protocol=%s,LocalIp=%s,LocalPort=%d\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
+                   addressfamily_string(addressfamily),
+                   lip, port);
+            break;
+
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Owner\": \"%s\","
+                    "\"OwnerId\": %" PRIi64 ","
+                    "\"OwnerPID\" : %d,"
+                    "\"OwnerPPID\": %d,"
+                    "\"Protocol\": \"%s\","
+                    "\"LocalIp\": \"%s\","
+                    "\"LocalPort\": %d"
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
+                    addressfamily_string(addressfamily),
+                    lip, port);
+            g_free(escaped_pname);
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s %s:%d\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid,
+                   owner_proc_data.name, USERIDSTR(drakvuf), owner_proc_data.userid,
+                   addressfamily_string(addressfamily),
+                   lip, port);
+            break;
+    }
+}
+
+static void print_tcpe(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data,
+                       int addressfamily, int tcp_state, char const* lip, int localport, char const* rip, int remoteport)
+{
+    gchar* escaped_pname = NULL;
+
+    switch (s->format)
+    {
+        case OUTPUT_CSV:
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIi64 ",%d,%d,%s,%s,%s,%d,%s,%d\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
+                   addressfamily_string(addressfamily),
+                   tcp_state_string(tcp_state),
+                   lip, localport, rip, remoteport);
+            break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ","
+                   "Owner=\"%s\",OwnerId=%" PRIi64 ",OwnerPID=%d,OwnerPPID=%d,Protocol=%s,TcpState=%s,"
+                   "LocalIp=%s,LocalPort=%d,RemoteIp=%s,RemotePort=%d\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
+                   addressfamily_string(addressfamily),
+                   tcp_state_string(tcp_state),
+                   lip, localport, rip, remoteport);
+            break;
+
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Owner\": \"%s\","
+                    "\"OwnerId\": %" PRIi64 ","
+                    "\"OwnerPID\" : %d,"
+                    "\"OwnerPPID\": %d,"
+                    "\"Protocol\": \"%s\","
+                    "\"TcpState\": \"%s\","
+                    "\"LocalIp\": \"%s\","
+                    "\"LocalPort\": %d,"
+                    "\"RemoteIp\": \"%s\","
+                    "\"RemotePort\": %d"
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
+                    addressfamily_string(addressfamily),
+                    tcp_state_string(tcp_state),
+                    lip, localport, rip, remoteport);
+            g_free(escaped_pname);
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s State:%s Local:%s:%d Remote:%s:%d\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
+                   info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
+                   owner_proc_data.name, USERIDSTR(drakvuf), owner_proc_data.userid,
+                   addressfamily_string(addressfamily),
+                   tcp_state_string(tcp_state),
+                   lip, localport, rip, remoteport);
+            break;
+    }
+}
+
+static void print_tcpl_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data, int addressfamily, char const* lip, int port)
+{
+    gchar* escaped_pname = NULL;
+
+    switch (s->format)
+    {
+        case OUTPUT_CSV:
+            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",\"%s\",%" PRIi64 ",%d,%d,%s,listener,%s,%d\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
+                   addressfamily_string(addressfamily),
+                   lip, port);
+            break;
+
+        case OUTPUT_KV:
+            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ","
+                   "Owner=\"%s\",OwnerId=%" PRIi64 ",OwnerPID=%d,OwnerPPID=%d,Protocol=%s,ListenerIp=%s,ListenerPort=%d\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->proc_data.userid,
+                   owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
+                   addressfamily_string(addressfamily),
+                   lip, port);
+            break;
+
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"socketmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": \"%s\","
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Owner\": \"%s\","
+                    "\"OwnerId\": %" PRIi64 ","
+                    "\"OwnerPID\" : %d,"
+                    "\"OwnerPPID\": %d,"
+                    "\"Protocol\": \"%s\","
+                    "\"ListenerIp\": \"%s\","
+                    "\"ListenerPort\": %d"
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
+                    addressfamily_string(addressfamily),
+                    lip, port);
+            g_free(escaped_pname);
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s listener %s:%d\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid,
+                   owner_proc_data.name, USERIDSTR(drakvuf), owner_proc_data.userid,
+                   addressfamily_string(addressfamily),
+                   lip, port);
+            break;
+    }
+}
+
+template<typename udp_endpoint_struct, typename inetaf_struct, typename local_address_struct>
+static event_response_t udpa_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    struct wrapper* w = (struct wrapper*)info->trap->data;
+    socketmon* s = w->s;
+
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    int64_t ownerid = 0;
     addr_t p1 = 0;
     char* lip = NULL;
-    char* owner = NULL;
-    struct wrapper* w = (struct wrapper*)info->trap->data;
-    socketmon* s = w->s;
 
-    gchar* escaped_pname = NULL;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    struct udp_endpoint_x86 udpa;
-    struct inetaf_x86 inetaf;
-    struct local_address_x86 local;
-    memset(&udpa, 0, sizeof(struct udp_endpoint_x86));
-    memset(&inetaf, 0, sizeof(struct inetaf_x86));
-    memset(&local, 0, sizeof(local_address_x86));
+    proc_data_t owner_proc_data = {};
+    udp_endpoint_struct udpa = {};
+    inetaf_struct inetaf = {};
+    local_address_struct local = {};
 
     ctx.addr = w->obj;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct udp_endpoint_x86), &udpa, NULL) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(udpa), &udpa, NULL) )
         goto done;
 
     // Convert port to little endian
@@ -238,15 +450,14 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
         goto done;
 
     ctx.addr = udpa.inetaf;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_x86), &inetaf, NULL) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(inetaf), &inetaf, NULL) )
         goto done;
 
     if ( udpa.localaddr )
     {
         ctx.addr = udpa.localaddr;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x86), &local, NULL) )
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(local), &local, NULL) )
             goto done;
-
 
         ctx.addr = local.pdata;
         if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
@@ -256,345 +467,56 @@ static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
     if (!lip) goto done;
 
-    owner = drakvuf_get_process_name(drakvuf, udpa.owner, 1);
-    ownerid = drakvuf_get_process_userid(drakvuf, udpa.owner);
+    if (!drakvuf_get_process_data(drakvuf, udpa.owner, &owner_proc_data))
+        goto done;
 
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",\"%s\",%" PRIi64 ",%s,%s,%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                   lip, udpa.port);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64",Owner=\"%s\",OwnerId=%" PRIi64 ",Protocol=%s,LocalIp=%s,LocalPort=%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                   lip, udpa.port);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Owner\": \"%s\","
-                    "\"OwnerId\": %" PRIi64 ","
-                    "\"Protocol\": \"%s\","
-                    "\"LocalIp\": \"%s\","
-                    "\"LocalPort\": %" PRIu16
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    owner, ownerid,
-                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                    lip, udpa.port);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s %s:%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
-                   owner, USERIDSTR(drakvuf), ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                   lip, udpa.port);
-            break;
-    }
+    print_udpa_ret(drakvuf, info, s, owner_proc_data, inetaf.addressfamily, lip, udpa.port);
 
 done:
-    g_free(owner);
+    g_free(const_cast<char*>(owner_proc_data.name));
     g_free(lip);
     drakvuf_release_vmi(drakvuf);
     drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
     return 0;
+}
+
+static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    return udpa_ret_cb<udp_endpoint_x86, inetaf_x86, local_address_x86>(drakvuf, info);
 }
 
 static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    int64_t ownerid = 0;
-    addr_t p1 = 0;
-    char* lip = NULL;
-    char* owner = NULL;
-    struct wrapper* w = (struct wrapper*)info->trap->data;
-    socketmon* s = w->s;
-
-    gchar* escaped_pname = NULL;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    struct udp_endpoint_x64 udpa;
-    struct inetaf_x64 inetaf;
-    struct local_address_x64 local;
-    memset(&udpa, 0, sizeof(struct udp_endpoint_x64));
-    memset(&inetaf, 0, sizeof(struct inetaf_x64));
-    memset(&local, 0, sizeof(local_address_x64));
-
-    ctx.addr = w->obj;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct udp_endpoint_x64), &udpa, NULL) )
-        goto done;
-
-    // Convert port to little endian
-    udpa.port = __bswap_16(udpa.port);
-
-    if ( !udpa.port )
-        goto done;
-
-    ctx.addr = udpa.inetaf;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_x64), &inetaf, NULL) )
-        goto done;
-
-    if ( udpa.localaddr )
-    {
-        ctx.addr = udpa.localaddr;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x64), &local, NULL) )
-            goto done;
-
-        ctx.addr = local.pdata;
-        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-            goto done;
-    }
-
-    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
-    if (!lip) goto done;
-
-    owner = drakvuf_get_process_name(drakvuf, udpa.owner, 1);
-    ownerid = drakvuf_get_process_userid(drakvuf, udpa.owner);
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",\"%s\",%" PRIi64 ",%s,%s,%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                   lip, udpa.port);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64",Owner=\"%s\",OwnerId=%" PRIi64",Protocol=%s,LocalIp=%s,LocalPort=%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                   lip, udpa.port);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Owner\": \"%s\","
-                    "\"OwnerId\": %" PRIi64 ","
-                    "\"Protocol\": %s,"
-                    "\"LocalIp\": %s,"
-                    "\"LocalPort\": %" PRIu16 ""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    owner, ownerid,
-                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                    lip, udpa.port);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s %s:%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
-                   owner, USERIDSTR(drakvuf), ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                   lip, udpa.port);
-            break;
-    }
-
-done:
-    g_free(owner);
-    g_free(lip);
-    drakvuf_release_vmi(drakvuf);
-    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
-    return 0;
+    return udpa_ret_cb<udp_endpoint_x64, inetaf_x64, local_address_x64>(drakvuf, info);
 }
 
 static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    int64_t ownerid = 0;
-    addr_t p1 = 0;
-    char* lip = NULL;
-    char* owner = NULL;
-    struct wrapper* w = (struct wrapper*)info->trap->data;
-    socketmon* s = w->s;
-    gchar* escaped_pname = NULL;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    struct udp_endpoint_win10_x64 udpa;
-    struct inetaf_win10_x64 inetaf;
-    struct local_address_x64 local;
-    memset(&udpa, 0, sizeof(struct udp_endpoint_win10_x64));
-    memset(&inetaf, 0, sizeof(struct inetaf_win10_x64));
-    memset(&local, 0, sizeof(local_address_x64));
-
-    ctx.addr = w->obj;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct udp_endpoint_win10_x64), &udpa, NULL) )
-        goto done;
-
-    // Convert port to little endian
-    udpa.port = __bswap_16(udpa.port);
-
-    if ( !udpa.port )
-        goto done;
-
-    ctx.addr = udpa.inetaf;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_win10_x64), &inetaf, NULL) )
-        goto done;
-
-    if ( udpa.localaddr )
-    {
-        ctx.addr = udpa.localaddr;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x64), &local, NULL) )
-            goto done;
-
-        ctx.addr = local.pdata;
-        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-            goto done;
-    }
-
-    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
-    if (!lip) goto done;
-
-    owner = drakvuf_get_process_name(drakvuf, udpa.owner, 1);
-    ownerid = drakvuf_get_process_userid(drakvuf, udpa.owner);
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",\"%s\",%" PRIi64",%s,%s,%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                   lip, udpa.port);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64",Owner=\"%s\","
-                   "OwnerId=%" PRIi64",Protocol=%s,LocalIp=%s,LocalPort=%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                   lip, udpa.port);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Owner\": \"%s\","
-                    "\"OwnerId\": %" PRIi64 ","
-                    "\"Protocol\": \"%s\","
-                    "\"LocalIp\": \"%s\","
-                    "\"LocalPort\": %" PRIu16 ""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    owner, ownerid,
-                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                    lip, udpa.port);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s %s:%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
-                   owner, USERIDSTR(drakvuf), ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                   lip, udpa.port);
-            break;
-    }
-
-done:
-    g_free(owner);
-    g_free(lip);
-    drakvuf_release_vmi(drakvuf);
-    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
-    return 0;
+    return udpa_ret_cb<udp_endpoint_win10_x64, inetaf_win10_x64, local_address_x64>(drakvuf, info);
 }
 
-static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+template<typename tcp_endpoint_struct, typename inetaf_struct, typename addr_info_struct, typename local_address_struct>
+static event_response_t tcpe_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-
     socketmon* s = (socketmon*)info->trap->data;
 
-    int64_t ownerid = -1;
     addr_t p1 = 0;
     char* lip = NULL;
     char* rip = NULL;
-    char* owner=NULL;
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    gchar* escaped_pname = NULL;
-    struct tcp_endpoint_x86 tcpe;
-    struct inetaf_x86 inetaf;
-    struct addr_info_x86 addrinfo;
-    struct local_address_x86 local;
-    memset(&tcpe, 0, sizeof(struct tcp_endpoint_x86));
-    memset(&inetaf, 0, sizeof(struct inetaf_x86));
-    memset(&addrinfo, 0, sizeof(struct addr_info_x86));
-    memset(&local, 0, sizeof(local_address_x86));
+    proc_data_t owner_proc_data = {};
+    tcp_endpoint_struct tcpe = {};
+    inetaf_struct inetaf = {};
+    addr_info_struct addrinfo = {};
+    local_address_struct local = {};
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    ctx.addr = info->regs->rsp + sizeof(uint32_t);
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.addr) )
-        goto done;
-
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct tcp_endpoint_x86), &tcpe, NULL) )
+    ctx.addr = info->regs->rcx;
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(tcpe), &tcpe, NULL) )
         goto done;
 
     if ( tcpe.state >= __TCP_STATE_MAX )
@@ -605,20 +527,90 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     tcpe.remoteport = __bswap_16(tcpe.remoteport);
 
     ctx.addr = tcpe.inetaf;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_x86), &inetaf, NULL) )
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(inetaf), &inetaf, NULL) )
         goto done;
 
-    if ( tcpe.addrinfo )
-    {
-        ctx.addr = tcpe.addrinfo;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct addr_info_x86), &addrinfo, NULL) )
-            goto done;
-    }
+    ctx.addr = tcpe.addrinfo;
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(addrinfo), &addrinfo, NULL) )
+        goto done;
 
-    if ( addrinfo.local )
+    ctx.addr = addrinfo.local;
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(local), &local, NULL) )
+        goto done;
+
+    ctx.addr = local.pdata;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
+        goto done;
+
+    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
+    if (!lip) goto done;
+
+    rip = read_ip_string(vmi, ctx, addrinfo.remote, inetaf.addressfamily);
+    if (!rip) goto done;
+
+    if (!drakvuf_get_process_data(drakvuf, tcpe.owner, &owner_proc_data))
+        goto done;
+
+    print_tcpe(drakvuf, info, s, owner_proc_data, inetaf.addressfamily, tcpe.state, lip, tcpe.localport, rip, tcpe.remoteport);
+
+done:
+    g_free(const_cast<char*>(owner_proc_data.name));
+    g_free(lip);
+    g_free(rip);
+    drakvuf_release_vmi(drakvuf);
+
+    return 0;
+}
+
+static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    return tcpe_cb<tcp_endpoint_x86, inetaf_x86, addr_info_x86, local_address_x86>(drakvuf, info);
+}
+
+static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    return tcpe_cb<tcp_endpoint_x64, inetaf_x64, addr_info_x64, local_address_x64>(drakvuf, info);
+}
+
+static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    return tcpe_cb<tcp_endpoint_win10_x64, inetaf_win10_x64, addr_info_x64, local_address_x64>(drakvuf, info);
+}
+
+template<typename tcp_listener_struct, typename inetaf_struct, typename local_address_struct>
+static event_response_t tcpl_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    struct wrapper* w = (struct wrapper*)info->trap->data;
+    socketmon* s = w->s;
+
+    addr_t p1 = 0;
+    char* lip = NULL;
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    proc_data_t owner_proc_data = {};
+    tcp_listener_struct tcpl = {};
+    inetaf_struct inetaf = {};
+    local_address_struct local = {};
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    ctx.addr = w->obj - sizeof(tcpl);
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(tcpl), &tcpl, NULL) )
+        goto done;
+
+    // Convert port to little endian
+    tcpl.port = __bswap_16(tcpl.port);
+
+    ctx.addr = tcpl.inetaf;
+    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(inetaf), &inetaf, NULL) )
+        goto done;
+
+    if ( tcpl.localaddr )
     {
-        ctx.addr = addrinfo.local;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x86), &local, NULL) )
+        ctx.addr = tcpl.localaddr;
+        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(local), &local, NULL) )
             goto done;
     }
 
@@ -632,735 +624,46 @@ static event_response_t tcpe_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
     if (!lip) goto done;
 
-    rip = read_ip_string(vmi, ctx, addrinfo.remote, inetaf.addressfamily);
-    if (!rip) goto done;
+    if (!drakvuf_get_process_data(drakvuf, tcpl.owner, &owner_proc_data))
+        goto done;
 
-    owner = drakvuf_get_process_name(drakvuf, tcpe.owner, 1);
-    ownerid = drakvuf_get_process_userid(drakvuf, tcpe.owner);
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIi64 ",%s,%s,%s,%" PRIu16 ",%s,%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   tcp_state_str[tcpe.state],
-                   lip, tcpe.localport, rip, tcpe.remoteport);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ",Owner=\"%s\",OwnerId=%" PRIi64 ",Protocol=%s,TcpState=%s,"
-                   "LocalIp=%s,LocalPort=%" PRIu16 ",RemoteIp=%s,RemotePort=%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   tcp_state_str[tcpe.state],
-                   lip, tcpe.localport, rip, tcpe.remoteport);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Owner\": \"%s\","
-                    "\"OwnerId\": %" PRIi64 ","
-                    "\"Protocol\": \"%s\","
-                    "\"LocalIp\": \"%s\","
-                    "\"LocalPort\": %" PRIu16 ""
-                    "\"RemoteIp\": \"%s\","
-                    "\"RemotePort\": %" PRIu16 ""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    owner, ownerid,
-                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                    lip, tcpe.localport, rip, tcpe.remoteport);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s State:%s Local:%s:%" PRIu16 " Remote:%s:%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
-                   owner, USERIDSTR(drakvuf), ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   tcp_state_str[tcpe.state],
-                   lip, tcpe.localport, rip, tcpe.remoteport);
-            break;
-    }
+    print_tcpl_ret(drakvuf, info, s, owner_proc_data, inetaf.addressfamily, lip, tcpl.port);
 
 done:
+    g_free(const_cast<char*>(owner_proc_data.name));
     g_free(lip);
-    g_free(rip);
     drakvuf_release_vmi(drakvuf);
-
-    return 0;
-}
-
-static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    socketmon* s = (socketmon*)info->trap->data;
-
-    int64_t ownerid;
-    addr_t p1 = 0;
-    char* lip = NULL;
-    char* rip = NULL;
-    char* owner = NULL;
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    gchar* escaped_pname = NULL;
-    struct tcp_endpoint_x64 tcpe;
-    struct inetaf_x64 inetaf;
-    struct addr_info_x64 addrinfo;
-    struct local_address_x64 local;
-    memset(&tcpe, 0, sizeof(struct tcp_endpoint_x64));
-    memset(&inetaf, 0, sizeof(struct inetaf_x64));
-    memset(&addrinfo, 0, sizeof(struct addr_info_x64));
-    memset(&local, 0, sizeof(local_address_x64));
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    ctx.addr = info->regs->rcx;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct tcp_endpoint_x64), &tcpe, NULL) )
-        goto done;
-
-    if ( tcpe.state >= __TCP_STATE_MAX )
-        goto done;
-
-    // Convert ports to little endian
-    tcpe.localport = __bswap_16(tcpe.localport);
-    tcpe.remoteport = __bswap_16(tcpe.remoteport);
-
-    ctx.addr = tcpe.inetaf;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_x64),  &inetaf, NULL) )
-        goto done;
-
-    ctx.addr = tcpe.addrinfo;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct addr_info_x64), &addrinfo, NULL) )
-        goto done;
-
-    ctx.addr = addrinfo.local;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x64), &local, NULL) )
-        goto done;
-
-    ctx.addr = local.pdata;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-        goto done;
-
-    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
-    if (!lip) goto done;
-
-    rip = read_ip_string(vmi, ctx, addrinfo.remote, inetaf.addressfamily);
-    if (!rip) goto done;
-
-    owner = drakvuf_get_process_name(drakvuf, tcpe.owner, 1);
-    ownerid = drakvuf_get_process_userid(drakvuf, tcpe.owner);
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIi64 ",%s,%s,%s,%" PRIu16 ",%s,%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   tcp_state_str[tcpe.state],
-                   lip, tcpe.localport, rip, tcpe.remoteport);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ",Owner=\"%s\",OwnerId=%" PRIi64 ",Protocol=%s,TcpState=%s,"
-                   "LocalIp=%s,LocalPort=%" PRIu16 ",RemoteIp=%s,RemotePort=%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   tcp_state_str[tcpe.state],
-                   lip, tcpe.localport, rip, tcpe.remoteport);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Owner\": \"%s\","
-                    "\"OwnerId\": %" PRIi64 ","
-                    "\"Protocol\": \"%s\","
-                    "\"LocalIp\": \"%s\","
-                    "\"LocalPort\": %" PRIu16 ","
-                    "\"RemoteIp\": \"%s\","
-                    "\"RemotePort\": %" PRIu16 ""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    owner, ownerid,
-                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                    lip, tcpe.localport, rip, tcpe.remoteport);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s State:%s Local:%s:%" PRIu16 " Remote:%s:%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
-                   owner, USERIDSTR(drakvuf), ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   tcp_state_str[tcpe.state],
-                   lip, tcpe.localport, rip, tcpe.remoteport);
-            break;
-    }
-
-done:
-    g_free(owner);
-    g_free(lip);
-    g_free(rip);
-    drakvuf_release_vmi(drakvuf);
-
-    return 0;
-}
-
-static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    socketmon* s = (socketmon*)info->trap->data;
-
-    int64_t ownerid;
-    addr_t p1 = 0;
-    char* lip = NULL;
-    char* rip = NULL;
-    char* owner = NULL;
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    gchar* escaped_pname = NULL;
-    struct tcp_endpoint_win10_x64 tcpe;
-    struct inetaf_win10_x64 inetaf;
-    struct addr_info_x64 addrinfo;
-    struct local_address_x64 local;
-    memset(&tcpe, 0, sizeof(struct tcp_endpoint_win10_x64));
-    memset(&inetaf, 0, sizeof(struct inetaf_win10_x64));
-    memset(&addrinfo, 0, sizeof(struct addr_info_x64));
-    memset(&local, 0, sizeof(local_address_x64));
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    ctx.addr = info->regs->rcx;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct tcp_endpoint_win10_x64), &tcpe, NULL) )
-        goto done;
-
-    if ( tcpe.state >= __TCP_STATE_MAX )
-        goto done;
-
-    // Convert ports to little endian
-    tcpe.localport = __bswap_16(tcpe.localport);
-    tcpe.remoteport = __bswap_16(tcpe.remoteport);
-
-    ctx.addr = tcpe.inetaf;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_win10_x64), &inetaf, NULL) )
-        goto done;
-
-    ctx.addr = tcpe.addrinfo;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct addr_info_x64), &addrinfo, NULL) )
-        goto done;
-
-    ctx.addr = addrinfo.local;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x64), &local, NULL) )
-        goto done;
-
-    ctx.addr = local.pdata;
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-        goto done;
-
-    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
-    if (!lip) goto done;
-
-    rip = read_ip_string(vmi, ctx, addrinfo.remote, inetaf.addressfamily);
-    if (!rip) goto done;
-
-    owner = drakvuf_get_process_name(drakvuf, tcpe.owner, 1);
-    ownerid = drakvuf_get_process_userid(drakvuf, tcpe.owner);
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIi64 ",%s,%s,%s,%" PRIu16 ",%s,%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   tcp_state_str[tcpe.state],
-                   lip, tcpe.localport, rip, tcpe.remoteport);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ",Owner=\"%s\",OwnerId=%" PRIi64 ",Protocol=%s,TcpState=%s,"
-                   "LocalIp=%s,LocalPort=%" PRIu16 ",RemoteIp=%s,RemotePort=%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   tcp_state_str[tcpe.state],
-                   lip, tcpe.localport, rip, tcpe.remoteport);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Owner\": \"%s\","
-                    "\"OwnerId\": %" PRIi64 ","
-                    "\"Protocol\": \"%s\","
-                    "\"TcpState\": \"%s\","
-                    "\"LocalIp\": \"%s\","
-                    "\"LocalPort\": %" PRIu16 ","
-                    "\"RemoteIp\": \"%s\","
-                    "\"RemotePort\": %" PRIu16 ""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    owner, ownerid,
-                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                    tcp_state_str[tcpe.state],
-                    lip, tcpe.localport, rip, tcpe.remoteport);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s State:%s Local:%s:%" PRIu16 " Remote:%s:%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
-                   owner, USERIDSTR(drakvuf), ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   tcp_state_str[tcpe.state],
-                   lip, tcpe.localport, rip, tcpe.remoteport);
-            break;
-    }
-
-done:
-    g_free(owner);
-    g_free(lip);
-    g_free(rip);
-    drakvuf_release_vmi(drakvuf);
+    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
 
     return 0;
 }
 
 static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    struct wrapper* w = (struct wrapper*)info->trap->data;
-    socketmon* s = w->s;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    int64_t ownerid = 0;
-    addr_t p1 = 0;
-    char* lip = NULL;
-    char* owner = NULL;
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    gchar* escaped_pname = NULL;
-    struct tcp_listener_x86 tcpl;
-    struct inetaf_x86 inetaf;
-    struct local_address_x86 local;
-    memset(&tcpl, 0, sizeof(struct tcp_listener_x86));
-    memset(&inetaf, 0, sizeof(struct inetaf_x86));
-    memset(&local, 0, sizeof(local_address_x86));
-
-    uint32_t ownerp = 0;
-
-    ctx.addr = w->obj - sizeof(struct tcp_listener_x86);
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct tcp_listener_x86), &tcpl, NULL) )
-    {
-        printf("Failed to tcp listener @ 0x%lx\n", ctx.addr);
-        goto done;
-    }
-
-    // Convert port to little endian
-    tcpl.port = __bswap_16(tcpl.port);
-
-    ctx.addr = w->obj - sizeof(struct tcp_listener_x86);
-    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &ownerp) )
-        goto done;
-
-    ctx.addr = tcpl.inetaf;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_x86), &inetaf, NULL) )
-        goto done;
-
-    if ( tcpl.localaddr )
-    {
-        ctx.addr = tcpl.localaddr;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x86), &local, NULL) )
-            goto done;
-    }
-
-    if ( local.pdata )
-    {
-        ctx.addr = local.pdata;
-        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-            goto done;
-    }
-
-    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
-    if (!lip) goto done;
-
-    owner = drakvuf_get_process_name(drakvuf, tcpl.owner, 1);
-    ownerid = drakvuf_get_process_userid(drakvuf, tcpl.owner);
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",\"%s\",%" PRIi64 ",%s,listener,%s,%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   lip, tcpl.port);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ",Owner=\"%s\",OwnerId=%" PRIi64 ",Protocol=%s,listener,LocalIp=%s,LocalPort=%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   lip, tcpl.port);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Owner\": \"%s\","
-                    "\"OwnerId\": %" PRIi64 ","
-                    "\"Protocol\": \"%s\","
-                    "\"LocalIp\": \"%s\","
-                    "\"LocalPort\": %" PRIu16
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    owner, ownerid,
-                    (inetaf.addressfamily == AF_INET) ? "UDPv4" : "UDPv6",
-                    lip, tcpl.port);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s listener %s:%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
-                   owner, USERIDSTR(drakvuf), ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   lip, tcpl.port);
-            break;
-    }
-
-done:
-    g_free(owner);
-    g_free(lip);
-    drakvuf_release_vmi(drakvuf);
-    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
-
-    return 0;
+    return tcpl_ret_cb<tcp_listener_x86, inetaf_x86, local_address_x86>(drakvuf, info);
 }
 
 static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    struct wrapper* w = (struct wrapper*)info->trap->data;
-    socketmon* s = w->s;
-
-    int64_t ownerid = 0;
-    addr_t p1 = 0;
-    char* lip = NULL;
-    char* owner = NULL;
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    gchar* escaped_pname = NULL;
-    struct tcp_listener_x64 tcpl;
-    struct inetaf_x64 inetaf;
-    struct local_address_x64 local;
-    memset(&tcpl, 0, sizeof(struct tcp_listener_x64));
-    memset(&inetaf, 0, sizeof(struct inetaf_x64));
-    memset(&local, 0, sizeof(local_address_x64));
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    ctx.addr = w->obj - sizeof(struct tcp_listener_x64);
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct tcp_listener_x64), &tcpl, NULL) )
-        goto done;
-
-    // Convert port to little endian
-    tcpl.port = __bswap_16(tcpl.port);
-
-    ctx.addr = tcpl.inetaf;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_x64), &inetaf, NULL) )
-        goto done;
-
-    if ( tcpl.localaddr )
-    {
-        ctx.addr = tcpl.localaddr;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x64), &local, NULL) )
-            goto done;
-    }
-
-    if ( local.pdata )
-    {
-        ctx.addr = local.pdata;
-        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-            goto done;
-    }
-
-    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
-    if (!lip) goto done;
-
-    owner = drakvuf_get_process_name(drakvuf, tcpl.owner, 1);
-    ownerid = drakvuf_get_process_userid(drakvuf, tcpl.owner);
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIi64 ",%s,listener,%s,%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   lip, tcpl.port);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ",Owner=\"%s\",OwnerId=%" PRIi64 ",Protocol=%s,listener,LocalIp=%s,LocalPort=%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   lip, tcpl.port);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Owner\": \"%s\""
-                    "\"OwnerId\": %" PRIi64 ","
-                    "\"Protocol\": \"%s\","
-                    "\"LocalIp\": \"%s\","
-                    "\"LocalPort\": %" PRIu16 ""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    owner, ownerid,
-                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                    lip, tcpl.port);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s listener %s:%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
-                   owner, USERIDSTR(drakvuf), ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   lip, tcpl.port);
-            break;
-    }
-
-done:
-    g_free(owner);
-    g_free(lip);
-    drakvuf_release_vmi(drakvuf);
-    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
-
-    return 0;
+    return tcpl_ret_cb<tcp_listener_x64, inetaf_x64, local_address_x64>(drakvuf, info);
 }
 
 static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    struct wrapper* w = (struct wrapper*)info->trap->data;
-    socketmon* s = w->s;
-
-    int64_t ownerid = 0;
-    addr_t p1 = 0;
-    char* lip = NULL;
-    char* owner = NULL;
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    gchar* escaped_pname = NULL;
-    struct tcp_listener_win10_x64 tcpl;
-    struct inetaf_win10_x64 inetaf;
-    struct local_address_x64 local;
-    memset(&tcpl, 0, sizeof(struct tcp_listener_win10_x64));
-    memset(&inetaf, 0, sizeof(struct inetaf_win10_x64));
-    memset(&local, 0, sizeof(local_address_x64));
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    ctx.addr = w->obj - sizeof(struct tcp_listener_win10_x64);
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct tcp_listener_win10_x64), &tcpl, NULL) )
-        goto done;
-
-    // Convert port to little endian
-    tcpl.port = __bswap_16(tcpl.port);
-
-    ctx.addr = tcpl.inetaf;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct inetaf_win10_x64), &inetaf, NULL) )
-        goto done;
-
-    if ( tcpl.localaddr )
-    {
-        ctx.addr = tcpl.localaddr;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct local_address_x64), &local, NULL) )
-            goto done;
-    }
-
-    if ( local.pdata )
-    {
-        ctx.addr = local.pdata;
-        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-            goto done;
-    }
-
-    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
-    if (!lip) goto done;
-
-    owner = drakvuf_get_process_name(drakvuf, tcpl.owner, 1);
-    ownerid = drakvuf_get_process_userid(drakvuf, tcpl.owner);
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIi64 ",%s,listener,%s,%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   lip, tcpl.port);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ",Owner=\"%s\",OwnerId=%" PRIi64 ",Protocol=%s,listener,LocalIp=%s,LocalPort=%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner, ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   lip, tcpl.port);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Owner\": \"%s\","
-                    "\"OwnerId\": %" PRIi64 ","
-                    "\"Protocol\": \"%s\","
-                    "\"LocalIp\": \"%s\","
-                    "\"LocalPort\": %" PRIu16 ""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    owner, ownerid,
-                    (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                    lip, tcpl.port);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:%s %s:%" PRIi64 " %s listener %s:%" PRIu16 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
-                   owner, USERIDSTR(drakvuf), ownerid,
-                   (inetaf.addressfamily == AF_INET) ? "TCPv4" : "TCPv6",
-                   lip, tcpl.port);
-            break;
-    }
-
-done:
-    g_free(owner);
-    g_free(lip);
-    drakvuf_release_vmi(drakvuf);
-    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
-
-    return 0;
+    return tcpl_ret_cb<tcp_listener_win10_x64, inetaf_win10_x64, local_address_x64>(drakvuf, info);
 }
 
 static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    addr_t rsp = 0;
     struct wrapper* w = (struct wrapper*)g_malloc0(sizeof(struct wrapper));
     w->s = (socketmon*)info->trap->data;
 
+    addr_t rsp = 0;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     vmi_read_addr_va(vmi, info->regs->rsp, 0, &rsp);
-
-    if ( w->s->pm == VMI_PM_IA32E )
-        w->obj = info->regs->rcx;
-    else
-        vmi_read_addr_va(vmi, info->regs->rsp + sizeof(uint32_t), 0, &w->obj);
-
     drakvuf_release_vmi(drakvuf);
+
+    w->obj = drakvuf_get_function_argument(drakvuf, info, 1);
 
     if ( !w->obj )
     {
@@ -1399,19 +702,15 @@ static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    addr_t rsp = 0;
     struct wrapper* w = (struct wrapper*)g_malloc0(sizeof(struct wrapper));
     w->s = (socketmon*)info->trap->data;
 
+    addr_t rsp = 0;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     vmi_read_addr_va(vmi, info->regs->rsp, 0, &rsp);
-
-    if ( w->s->pm == VMI_PM_IA32E )
-        w->obj = info->regs->rcx;
-    else
-        vmi_read_addr_va(vmi, info->regs->rsp + sizeof(uint32_t), 0, &w->obj);
-
     drakvuf_release_vmi(drakvuf);
+
+    w->obj = drakvuf_get_function_argument(drakvuf, info, 1);
 
     if ( !w->obj )
     {
@@ -1691,10 +990,12 @@ static bool module_trap_visitor(drakvuf_t drakvuf, const module_info_t* module_i
     status_t ret ;
     vmi_instance_t vmi;
     addr_t exec_func ;
-    access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB,
-                             .dtb                 = module_info->dtb,
-                             .addr                = module_info->base_addr
-                           };
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb                 = module_info->dtb,
+        .addr                = module_info->base_addr,
+    };
 
     PRINT_DEBUG("[SOCKETMON] trap_visitor: CR3[0x%lX] pid[0x%X %d] is_wow_process[%d]  is_wow_module[%d] base_name[%s] load_address[0x%lX] full_name[%s]\n",
                 module_info->dtb, module_info->pid, module_info->pid, module_info->is_wow_process, module_info->is_wow, module_info->base_name->contents, module_info->base_addr, module_info->full_name->contents );
