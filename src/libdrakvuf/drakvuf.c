@@ -572,6 +572,24 @@ int drakvuf_get_address_width(drakvuf_t drakvuf)
     return drakvuf->address_width;
 }
 
+bool drakvuf_get_current_process_data(drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_priv_t* proc_data)
+{
+    addr_t process_base = drakvuf_get_current_process(drakvuf, vcpu_id);
+    return drakvuf_get_process_data_priv(drakvuf, process_base, proc_data);
+}
+
+bool drakvuf_get_process_data(drakvuf_t drakvuf, addr_t process_base, proc_data_t* proc_data)
+{
+    proc_data_priv_t proc_data_priv;
+    bool success = drakvuf_get_process_data_priv(drakvuf, process_base, &proc_data_priv);
+    proc_data->name = proc_data_priv.name;
+    proc_data->pid = proc_data_priv.pid;
+    proc_data->ppid = proc_data_priv.ppid;
+    proc_data->base_addr = proc_data_priv.base_addr;
+    proc_data->userid = proc_data_priv.userid;
+    return success;
+}
+
 unicode_string_t* drakvuf_read_unicode_common(vmi_instance_t vmi, const access_context_t* ctx)
 {
     unicode_string_t* us = vmi_read_unicode_str(vmi, ctx);

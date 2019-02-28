@@ -464,7 +464,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.exportsym_to_va = eprocess_sym2va;
     drakvuf->osi.get_process_pid = win_get_process_pid;
     drakvuf->osi.get_process_ppid = win_get_process_ppid;
-    drakvuf->osi.get_current_process_data = win_get_current_process_data;
+    drakvuf->osi.get_process_data = win_get_process_data;
     drakvuf->osi.get_registry_keyhandle_path = win_reg_keyhandle_path;
     drakvuf->osi.get_filename_from_handle = win_get_filename_from_handle;
     drakvuf->osi.get_function_argument = win_get_function_argument;

@@ -381,7 +381,7 @@ char* drakvuf_get_process_name(drakvuf_t drakvuf,
 /* Caller must free the returned string */
 char* drakvuf_get_process_commandline(drakvuf_t drakvuf,
                                       drakvuf_trap_info_t* info,
-                                      addr_t eprocess_base);
+                                      addr_t process_base);
 
 
 status_t drakvuf_get_process_pid( drakvuf_t drakvuf,
@@ -391,6 +391,10 @@ status_t drakvuf_get_process_pid( drakvuf_t drakvuf,
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
                                    addr_t process_base);
+
+bool drakvuf_get_process_data(drakvuf_t drakvuf,
+                              addr_t process_base,
+                              proc_data_t* proc_data);
 
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
                                    uint64_t vcpu_id,

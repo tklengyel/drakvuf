@@ -155,7 +155,7 @@ bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_
 
 status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, int32_t* ppid );
 
-bool win_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_priv_t* proc_data );
+bool win_get_process_data( drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data );
 
 gchar* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle );
 
