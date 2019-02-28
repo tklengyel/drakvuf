@@ -203,9 +203,14 @@ static char* read_ip_string(vmi_instance_t vmi, access_context_t& ctx, addr_t ad
     return nullptr;
 }
 
-static char const* addressfamily_string(int family)
+static char const* udp_addressfamily_string(int family)
 {
     return (family == AF_INET) ? "UDPv4" : "UDPv6";
+}
+
+static char const* tcp_addressfamily_string(int family)
+{
+    return (family == AF_INET) ? "TCPv4" : "TCPv6";
 }
 
 static char const* tcp_state_string(int tcp_state)
@@ -226,7 +231,7 @@ static void print_udpa_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, info->proc_data.userid,
                    owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                   addressfamily_string(addressfamily),
+                   udp_addressfamily_string(addressfamily),
                    lip, port);
             break;
 
@@ -236,7 +241,7 @@ static void print_udpa_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
                    info->proc_data.name, info->proc_data.userid,
                    owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                   addressfamily_string(addressfamily),
+                   udp_addressfamily_string(addressfamily),
                    lip, port);
             break;
 
@@ -263,7 +268,7 @@ static void print_udpa_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                     USERIDSTR(drakvuf), info->proc_data.userid,
                     info->proc_data.pid, info->proc_data.ppid,
                     owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                    addressfamily_string(addressfamily),
+                    udp_addressfamily_string(addressfamily),
                     lip, port);
             g_free(escaped_pname);
             break;
@@ -274,7 +279,7 @@ static void print_udpa_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    owner_proc_data.name, USERIDSTR(drakvuf), owner_proc_data.userid,
-                   addressfamily_string(addressfamily),
+                   udp_addressfamily_string(addressfamily),
                    lip, port);
             break;
     }
@@ -292,7 +297,7 @@ static void print_tcpe(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* 
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, info->proc_data.userid,
                    owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                   addressfamily_string(addressfamily),
+                   tcp_addressfamily_string(addressfamily),
                    tcp_state_string(tcp_state),
                    lip, localport, rip, remoteport);
             break;
@@ -304,7 +309,7 @@ static void print_tcpe(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* 
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
                    info->proc_data.name, info->proc_data.userid,
                    owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                   addressfamily_string(addressfamily),
+                   tcp_addressfamily_string(addressfamily),
                    tcp_state_string(tcp_state),
                    lip, localport, rip, remoteport);
             break;
@@ -335,7 +340,7 @@ static void print_tcpe(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* 
                     USERIDSTR(drakvuf), info->proc_data.userid,
                     info->proc_data.pid, info->proc_data.ppid,
                     owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                    addressfamily_string(addressfamily),
+                    tcp_addressfamily_string(addressfamily),
                     tcp_state_string(tcp_state),
                     lip, localport, rip, remoteport);
             g_free(escaped_pname);
@@ -347,7 +352,7 @@ static void print_tcpe(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* 
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
                    owner_proc_data.name, USERIDSTR(drakvuf), owner_proc_data.userid,
-                   addressfamily_string(addressfamily),
+                   tcp_addressfamily_string(addressfamily),
                    tcp_state_string(tcp_state),
                    lip, localport, rip, remoteport);
             break;
@@ -365,7 +370,7 @@ static void print_tcpl_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
                    info->proc_data.name, info->proc_data.userid,
                    owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                   addressfamily_string(addressfamily),
+                   tcp_addressfamily_string(addressfamily),
                    lip, port);
             break;
 
@@ -375,7 +380,7 @@ static void print_tcpl_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
                    info->proc_data.name, info->proc_data.userid,
                    owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                   addressfamily_string(addressfamily),
+                   tcp_addressfamily_string(addressfamily),
                    lip, port);
             break;
 
@@ -402,7 +407,7 @@ static void print_tcpl_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                     USERIDSTR(drakvuf), info->proc_data.userid,
                     info->proc_data.pid, info->proc_data.ppid,
                     owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                    addressfamily_string(addressfamily),
+                    tcp_addressfamily_string(addressfamily),
                     lip, port);
             g_free(escaped_pname);
             break;
@@ -413,7 +418,7 @@ static void print_tcpl_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    owner_proc_data.name, USERIDSTR(drakvuf), owner_proc_data.userid,
-                   addressfamily_string(addressfamily),
+                   tcp_addressfamily_string(addressfamily),
                    lip, port);
             break;
     }
