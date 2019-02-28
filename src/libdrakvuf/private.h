@@ -292,6 +292,10 @@ bool drakvuf_get_current_process_data(drakvuf_t drakvuf,
                                       uint64_t vcpu_id,
                                       proc_data_priv_t* proc_data);
 
+bool drakvuf_get_process_data_priv(drakvuf_t drakvuf,
+                                   addr_t process_base,
+                                   proc_data_priv_t* proc_data);
+
 char* drakvuf_get_current_process_name(drakvuf_t drakvuf,
                                        uint64_t vcpu_id,
                                        bool fullpath);

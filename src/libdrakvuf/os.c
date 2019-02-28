@@ -309,10 +309,10 @@ status_t drakvuf_get_process_ppid(drakvuf_t drakvuf, addr_t process_base, vmi_pi
     return VMI_FAILURE ;
 }
 
-bool drakvuf_get_current_process_data(drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_priv_t* proc_data)
+bool drakvuf_get_process_data_priv(drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data)
 {
-    if ( drakvuf->osi.get_current_process_data )
-        return drakvuf->osi.get_current_process_data( drakvuf, vcpu_id, proc_data );
+    if ( drakvuf->osi.get_process_data )
+        return drakvuf->osi.get_process_data( drakvuf, process_base, proc_data );
 
     return false;
 }
