@@ -165,7 +165,8 @@ static void
 make_clone(xen_interface_t* xen, domid_t* cloneID, uint16_t vlan, char** clone_name)
 {
     char* command = g_malloc0(snprintf(NULL, 0, CLONE_CMD, clone_script, domain_name, vlan, domain_config) + 1);
-    sprintf(command, CLONE_CMD, clone_script, domain_name, vlan, domain_config);
+    const size_t sz = sizeof(command);
+    snprintf(command, sz, CLONE_CMD, clone_script, domain_name, vlan, domain_config);
     printf("** RUNNING COMMAND: %s\n", command);
     char* output = NULL;
     g_spawn_command_line_sync(command, &output, NULL, NULL, NULL);
