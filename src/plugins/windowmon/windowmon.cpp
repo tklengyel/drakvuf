@@ -220,22 +220,6 @@ static bool get_constant_rva(json_object* profile_json, const char* constant, ad
     return true;
 }
 
-struct SYSTEM_SERVICE_TABLE_32
-{
-    uint32_t ssdt;
-    uint32_t reserved;
-    uint32_t limit;
-    uint32_t arguments;
-} __attribute__((packed));
-
-struct SYSTEM_SERVICE_TABLE_64
-{
-    uint64_t ssdt;
-    uint64_t reserved;
-    uint64_t limit;
-    uint64_t arguments;
-} __attribute__((packed));
-
 static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const char* function_name,
                            drakvuf_trap_t* trap,
                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
@@ -268,8 +252,10 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
         return false;
     }
 
+    const int SYSTEM_SERVICE_TABLE_32 = 16;
+    const int SYSTEM_SERVICE_TABLE_64 = 32;
     bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    addr_t offset = is32bit ? sizeof(struct SYSTEM_SERVICE_TABLE_32) : sizeof(struct SYSTEM_SERVICE_TABLE_64);
+    addr_t offset = is32bit ? SYSTEM_SERVICE_TABLE_32 : SYSTEM_SERVICE_TABLE_64;
     addr_t ssdt_ptr_va = sdt_va + offset;
 
     addr_t eprocess_base = 0;
