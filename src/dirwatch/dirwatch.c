@@ -165,7 +165,7 @@ static void
 make_clone(xen_interface_t* xen, domid_t* cloneID, uint16_t vlan, char** clone_name)
 {
     char* command;
-    command = g_strdup_printf(command, CLONE_CMD, clone_script, domain_name, vlan, domain_config);
+    command = g_strdup_printf(CLONE_CMD, clone_script, domain_name, vlan, domain_config);
     printf("** RUNNING COMMAND: %s\n", command);
     char* output = NULL;
     g_spawn_command_line_sync(command, &output, NULL, NULL, NULL);
