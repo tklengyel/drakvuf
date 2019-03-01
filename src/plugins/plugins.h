@@ -132,6 +132,10 @@ struct syscalls_config
 {
     const char* syscalls_filter_file;
 };
+struct windowmon_config
+{
+    const char* win32k_profile;
+};
 
 /***************************************************************************/
 
@@ -153,6 +157,7 @@ typedef enum drakvuf_plugin
     PLUGIN_BSODMON,
     PLUGIN_CRASHMON,
     PLUGIN_CLIPBOARDMON,
+    PLUGIN_WINDOWMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -174,6 +179,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_BSODMON] = "bsodmon",
     [PLUGIN_CRASHMON] = "crashmon",
     [PLUGIN_CLIPBOARDMON] = "clipboardmon",
+    [PLUGIN_WINDOWMON] = "windowmon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -194,6 +200,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_BSODMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_CRASHMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_CLIPBOARDMON] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_WINDOWMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
 class plugin

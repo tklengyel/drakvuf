@@ -105,30 +105,62 @@
 #include <libvmi/libvmi.h>
 #include <cassert>
 
-#include "clipboardmon.h"
+#include "windowmon.h"
+
+static char const* get_value_name(unicode_string_t* us)
+{
+    char* name = nullptr;
+
+    if (us && us->length > 0)
+    {
+        auto len = strlen((const char*)us->contents);
+        auto full_len = len + 3;
+
+        name = (char*)g_malloc0(full_len);
+
+        name[0] = '"';
+        g_strlcpy(name + 1, (const char*)us->contents, len + 1);
+        name[full_len - 2] = '"';
+    }
+    else
+    {
+        name = g_strdup("NULL");
+    }
+
+    return name;
+}
 
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    clipboardmon* c = static_cast<clipboardmon*>(info->trap->data);
+    windowmon* c = static_cast<windowmon*>(info->trap->data);
 
     gchar* escaped_pname = NULL;
+
+    auto class_va = drakvuf_get_function_argument(drakvuf, info, 3);
+    auto name_va = drakvuf_get_function_argument(drakvuf, info, 4);
+
+    auto class_us = drakvuf_read_unicode(drakvuf, info, class_va);
+    auto name_us = drakvuf_read_unicode(drakvuf, info, name_va);
+
+    auto window_class = get_value_name(class_us);
+    auto window_name = get_value_name(name_us);
 
     switch (c->format)
     {
         case OUTPUT_CSV:
-            printf("clipboardmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 "\n",
+            printf("windowmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid);
+                   info->proc_data.userid, window_class, window_name);
             break;
         case OUTPUT_KV:
-            printf("clipboardmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s\n",
+            printf("windowmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Class=%s,Name=%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name);
+                   info->trap->name, window_class, window_name);
             break;
         case OUTPUT_JSON:
             escaped_pname = drakvuf_escape_str(info->proc_data.name);
             printf( "{"
-                    "\"Plugin\" : \"clipboardmon\","
+                    "\"Plugin\" : \"windowmon\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
                     "\"ProcessName\": %s,"
                     "\"UserName\": \"%s\","
@@ -136,21 +168,29 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
                     "\"Method\" : \"%s\","
+                    "\"Class\" : %s,"
+                    "\"Name\" : %s,"
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
                     info->proc_data.pid, info->proc_data.ppid,
-                    info->trap->name);
+                    info->trap->name,
+                    window_class, window_name);
             g_free(escaped_pname);
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[CLIPBOARDMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64"\n",
+            printf("[WINDOWMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" CLASS:%s NAME:%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid);
+                   USERIDSTR(drakvuf), info->proc_data.userid, window_class, window_name);
             break;
     }
+
+    vmi_free_unicode_str(class_us);
+    vmi_free_unicode_str(name_us);
+    g_free((gpointer)window_class);
+    g_free((gpointer)window_name);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -266,29 +306,25 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
     return true;
 }
 
-clipboardmon::clipboardmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+windowmon::windowmon(drakvuf_t drakvuf, const void* config, output_format_t output)
     : format(output)
 {
-    const struct clipboardmon_config* c = (const struct clipboardmon_config*)config;
+    const struct windowmon_config* c = (const struct windowmon_config*)config;
 
     if ( !c->win32k_profile )
     {
-        PRINT_DEBUG("Clipboardmon plugin requires the Rekall profile for win32k.sys!\n");
+        PRINT_DEBUG("Windowmon plugin requires the Rekall profile for win32k.sys!\n");
         return;
     }
 
     json_object* profile_json = json_object_from_file(c->win32k_profile);
     if (!profile_json)
     {
-        PRINT_DEBUG("Clipboardmon plugin fails to load rekall profile for win32k.sys\n");
+        PRINT_DEBUG("Windowmon plugin fails to load rekall profile for win32k.sys\n");
         throw -1;
     }
 
-    assert(sizeof(traps) / sizeof(traps[0]) >= 3);
-    if ( !register_trap(drakvuf, profile_json, "NtUserGetClipboardData", &traps[0], cb) )
-        throw -1;
-    if ( !register_trap(drakvuf, profile_json, "NtUserAddClipboardFormatListener", &traps[1], cb) )
-        throw -1;
-    if ( !register_trap(drakvuf, profile_json, "NtUserSetClipboardViewer", &traps[2], cb) )
+    assert(sizeof(traps) / sizeof(traps[0]) >= 1);
+    if ( !register_trap(drakvuf, profile_json, "NtUserFindWindowEx", &traps[0], cb) )
         throw -1;
 }
