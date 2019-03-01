@@ -170,6 +170,10 @@ if PLUGIN_CLIPBOARDMON
 sources += clipboardmon/clipboardmon.cpp
 endif
 
+if PLUGIN_WINDOWMON
+sources += windowmon/windowmon.cpp
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h
 

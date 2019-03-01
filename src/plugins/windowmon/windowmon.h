@@ -102,150 +102,29 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdarg.h>
-#include "plugins.h"
-#include "syscalls/syscalls.h"
-#include "poolmon/poolmon.h"
-#include "filetracer/filetracer.h"
-#include "filedelete/filedelete.h"
-#include "objmon/objmon.h"
-#include "exmon/exmon.h"
-#include "ssdtmon/ssdtmon.h"
-#include "debugmon/debugmon.h"
-#include "delaymon/delaymon.h"
-#include "cpuidmon/cpuidmon.h"
-#include "socketmon/socketmon.h"
-#include "regmon/regmon.h"
-#include "procmon/procmon.h"
-#include "bsodmon/bsodmon.h"
-#include "crashmon/crashmon.h"
-#include "clipboardmon/clipboardmon.h"
-#include "windowmon/windowmon.h"
+#ifndef WINDOWMON_H
+#define WINDOWMON_H
 
-drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output, os_t os)
-    : drakvuf{ drakvuf }, output{ output }, os{ os }
-{
-}
+#include "plugins/private.h"
+#include "plugins/plugins.h"
 
-drakvuf_plugins::~drakvuf_plugins()
+class windowmon: public plugin
 {
-    for (int i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
-        delete plugins[i];
-}
+public:
+    const output_format_t format;
 
-int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
-                           const void* config)
-{
-    if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
-            plugin_id < __DRAKVUF_PLUGIN_LIST_MAX)
+    windowmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+
+private:
+    drakvuf_trap_t traps[1] =
     {
-        PRINT_DEBUG("Starting plugin %s\n", drakvuf_plugin_names[plugin_id]);
-
-        if ( !drakvuf_plugin_os_support[plugin_id][this->os] )
-            return 0;
-
-        try
-        {
-            switch (plugin_id)
-            {
-#ifdef ENABLE_PLUGIN_SYSCALLS
-                case PLUGIN_SYSCALLS:
-                    this->plugins[plugin_id] = new syscalls(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_POOLMON
-                case PLUGIN_POOLMON:
-                    this->plugins[plugin_id] = new poolmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_FILETRACER
-                case PLUGIN_FILETRACER:
-                    this->plugins[plugin_id] = new filetracer(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_FILEDELETE
-                case PLUGIN_FILEDELETE:
-                    this->plugins[plugin_id] = new filedelete(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_OBJMON
-                case PLUGIN_OBJMON:
-                    this->plugins[plugin_id] = new objmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_EXMON
-                case PLUGIN_EXMON:
-                    this->plugins[plugin_id] = new exmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_SSDTMON
-                case PLUGIN_SSDTMON:
-                    this->plugins[plugin_id] = new ssdtmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_DEBUGMON
-                case PLUGIN_DEBUGMON:
-                    this->plugins[plugin_id] = new debugmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_DELAYMON
-                case PLUGIN_DELAYMON:
-                    this->plugins[plugin_id] = new delaymon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_CPUIDMON
-                case PLUGIN_CPUIDMON:
-                    this->plugins[plugin_id] = new cpuidmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_SOCKETMON
-                case PLUGIN_SOCKETMON:
-                    this->plugins[plugin_id] = new socketmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_REGMON
-                case PLUGIN_REGMON:
-                    this->plugins[plugin_id] = new regmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_PROCMON
-                case PLUGIN_PROCMON:
-                    this->plugins[plugin_id] = new procmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_BSODMON
-                case PLUGIN_BSODMON:
-                    this->plugins[plugin_id] = new bsodmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_CRASHMON
-                case PLUGIN_CRASHMON:
-                    this->plugins[plugin_id] = new crashmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_CLIPBOARDMON
-                case PLUGIN_CLIPBOARDMON:
-                    this->plugins[plugin_id] = new clipboardmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-#ifdef ENABLE_PLUGIN_WINDOWMON
-                case PLUGIN_WINDOWMON:
-                    this->plugins[plugin_id] = new windowmon(this->drakvuf, config, this->output);
-                    break;
-#endif
-                default:
-                    break;
-            }
+        [0] = {
+            .breakpoint.lookup_type = LOOKUP_DTB,
+            .breakpoint.addr_type = ADDR_VA,
+            .type = BREAKPOINT,
+            .data = (void*)this
         }
-        catch (int e)
-        {
-            fprintf(stderr, "Plugin %s startup failed!\n", drakvuf_plugin_names[plugin_id]);
-            return -1;
-        }
+    };
+};
 
-        PRINT_DEBUG("Starting plugin %s finished\n", drakvuf_plugin_names[plugin_id]);
-        return 1;
-    }
-
-    return 0;
-}
+#endif // WINDOWMON_H

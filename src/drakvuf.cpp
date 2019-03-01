@@ -219,6 +219,17 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     rc = plugins->start((drakvuf_plugin_t)i, &c);
                     break;
                 }
+
+                case PLUGIN_WINDOWMON:
+                {
+                    struct windowmon_config c =
+                    {
+                        .win32k_profile = win32k_profile,
+                    };
+                    rc = plugins->start((drakvuf_plugin_t)i, &c);
+                    break;
+                }
+
                 default:
                     rc = plugins->start((drakvuf_plugin_t)i, nullptr);
                     break;
