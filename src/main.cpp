@@ -232,9 +232,10 @@ int main(int argc, char** argv)
         {"rekall-kernel", required_argument, NULL, 'r'},
         {"rekall-tcpip", required_argument, NULL, 'T'},
         {"rekall-win32k", required_argument, NULL, 'W'},
+        {"rekall-wow", required_argument, NULL, 'w'},
         {"injection-timeout", required_argument, NULL, 'j'},
         {"verbose", no_argument, NULL, 'v'},
-        {"rekall-wow", required_argument, NULL, 'w'},
+        {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nblgj:w:W:";
 
