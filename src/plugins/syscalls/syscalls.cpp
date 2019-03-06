@@ -110,59 +110,6 @@
 #include "winscproto.h"
 #include "linuxscproto.h"
 
-/*
-static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-
-    syscalls* s = (syscalls*)info->trap->data;
-    GTimeVal t;
-    g_get_current_time(&t);
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("syscall," FORMAT_TIMEVAL ",%" PRIu32" 0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s\n",
-                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->breakpoint.module, info->trap->name);
-            break;
-        case OUTPUT_KV:
-            printf("syscall Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s\n",
-                   UNPACK_TIMEVAL(t), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name, info->trap->name);
-            break;
-        case OUTPUT_JSON:
-            // Place single EOL at end of JSON doc to simplify parsing on other end
-            printf( "{"
-                    "\"Plugin\" : \"syscall\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"VCPU\": %" PRIu32 ","
-                    "\"CR3\": %" PRIu64 ","
-                    "\"ProcessName\": \"%s\","
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Module\": \"%s\","
-                    "\"Method\": \"%s\""
-                    "}\n",
-                    UNPACK_TIMEVAL(t),
-                    info->vcpu, info->regs->cr3, info->proc_data.name,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    info->trap->breakpoint.module, info->trap->name);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SYSCALL] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" %s!%s\n",
-                   UNPACK_TIMEVAL(t), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
-                   info->trap->breakpoint.module, info->trap->name);
-            break;
-    }
-
-    return 0;
-}
-*/
-
 static char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
     if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
@@ -342,8 +289,6 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
     for ( size_t i=0; i<nargs; i++ )
     {
         addr_t val = ( 4 == s->reg_size ) ? args_data32[i] : args_data64[i];
-
-        // handle PCHAR,
 
         char* str = extract_string(drakvuf, info, sc->args[i], val);
 
