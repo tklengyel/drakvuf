@@ -111,47 +111,52 @@
 
 static const syscall_t linux_syscalls[] =
 {
- { .name = "sys_open",  .ret = LONG,   .num_args = 3, .args =
-   {
-	   {.name = "pathname", .dir = DIR_IN, .type = PCHAR },
-	   {.name = "flags",    .dir = DIR_IN, .type = LONG },
-	   {.name = "mode",     .dir = DIR_IN, .type = LONG },
-	   
-   },
- },
+    {
+        .name = "sys_open",  .ret = LONG,   .num_args = 3, .args =
+        {
+            {.name = "pathname", .dir = DIR_IN, .type = PCHAR },
+            {.name = "flags",    .dir = DIR_IN, .type = ULONG },
+            {.name = "mode",     .dir = DIR_IN, .type = ULONG },
 
- { .name = "sys_openat",  .ret = LONG,   .num_args = 4, .args =
-   {
-	   {.name = "dirfd",    .dir = DIR_IN, .type = LONG },
-	   {.name = "pathname", .dir = DIR_IN, .type = PCHAR },
-	   {.name = "flags",    .dir = DIR_IN, .type = LONG },
-	   {.name = "mode",     .dir = DIR_IN, .type = LONG },
-	   
-   },
- },
-   
- { .name = "sys_close", .ret = LONG,   .num_args = 1, .args =
-   {
-	   {.name = "fd",       .dir = DIR_IN, .type = LONG },
-   },
- },
-   
- { .name = "sys_read", .ret = LONG,   .num_args = 3, .args =
-   {
-	   {.name = "fd",      .dir = DIR_IN, .type = LONG },
-	   {.name = "buf",     .dir = DIR_IN, .type = PVOID },
-	   {.name = "count",   .dir = DIR_IN, .type = LONG },
-	   
-   }
- },
- 
- { .name = "sys_write", .ret = LONG,    .num_args = 3, .args =
-   {
-	   {.name = "fd",       .dir = DIR_IN,  .type = LONG },
-	   {.name = "buf",      .dir = DIR_OUT, .type = PVOID },
-	   {.name = "count",    .dir = DIR_OUT, .type = LONG },
-   },
- },
+        },
+    },
+
+    {
+        .name = "sys_openat",  .ret = LONG,   .num_args = 4, .args =
+        {
+            {.name = "dirfd",    .dir = DIR_IN, .type = LONG },
+            {.name = "pathname", .dir = DIR_IN, .type = PCHAR },
+            {.name = "flags",    .dir = DIR_IN, .type = ULONG },
+            {.name = "mode",     .dir = DIR_IN, .type = ULONG },
+
+        },
+    },
+
+    {
+        .name = "sys_close", .ret = LONG,   .num_args = 1, .args =
+        {
+            {.name = "fd",       .dir = DIR_IN, .type = LONG },
+        },
+    },
+
+    {
+        .name = "sys_read", .ret = LONG,   .num_args = 3, .args =
+        {
+            {.name = "fd",      .dir = DIR_IN, .type = LONG },
+            {.name = "buf",     .dir = DIR_IN, .type = PVOID },
+            {.name = "count",   .dir = DIR_IN, .type = ULONG },
+
+        }
+    },
+
+    {
+        .name = "sys_write", .ret = LONG,    .num_args = 3, .args =
+        {
+            {.name = "fd",       .dir = DIR_IN,  .type = LONG },
+            {.name = "buf",      .dir = DIR_OUT, .type = PVOID },
+            {.name = "count",    .dir = DIR_OUT, .type = ULONG },
+        },
+    },
 };
 
 #endif // linuxscproto_h
