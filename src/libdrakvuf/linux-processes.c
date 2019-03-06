@@ -112,6 +112,7 @@
 #include <limits.h>
 
 #include "private.h"
+#include "linux.h"
 #include "linux-offsets.h"
 
 #define STACK_SIZE_8K  0x1fff
@@ -310,26 +311,26 @@ status_t linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid
     return VMI_FAILURE ;
 }
 
-bool linux_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t* proc_data )
+bool linux_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv_t* proc_data )
 {
-    proc_data->base_addr = linux_get_current_process( drakvuf, vcpu_id );
+    proc_data->base_addr = base_addr;
 
-    if ( proc_data->base_addr )
+    if ( base_addr )
     {
-        if ( linux_get_process_pid( drakvuf, proc_data->base_addr, &proc_data->pid ) == VMI_SUCCESS )
+        if ( linux_get_process_pid( drakvuf, base_addr, &proc_data->pid ) == VMI_SUCCESS )
         {
-            proc_data->name = linux_get_process_name( drakvuf, proc_data->base_addr, 1 );
+            proc_data->name = linux_get_process_name( drakvuf, base_addr, true );
 
             if ( proc_data->name )
             {
-                proc_data->userid = linux_get_process_userid( drakvuf, proc_data->base_addr );
-                linux_get_process_ppid( drakvuf, proc_data->base_addr, &proc_data->ppid );
+                proc_data->userid = linux_get_process_userid( drakvuf, base_addr );
+                linux_get_process_ppid( drakvuf, base_addr, &proc_data->ppid );
 
-                return true ;
+                return true;
             }
         }
     }
 
-    return false ;
+    return false;
 }
 

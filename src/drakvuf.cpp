@@ -152,10 +152,12 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                              bool filedelete_use_injector,     // PLUGIN_FILEDELETE
                              bool cpuid_stealth,               // PLUGIN_CPUIDMON
                              const char* tcpip_profile,        // PLUGIN_SOCKETMON
+                             const char* win32k_profile,       // PLUGIN_CLIPBOARDMON
                              const char* syscalls_filter_file, // PLUGIN_SYSCALLS
                              bool abort_on_bsod )              // PLUGIN_BSODMON
 {
-    int i, rc;
+    int i;
+    int rc;
 
     for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
     {
@@ -208,10 +210,30 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                     rc = plugins->start((drakvuf_plugin_t)i, nullptr);
                     break;
 
+                case PLUGIN_CLIPBOARDMON:
+                {
+                    struct clipboardmon_config c =
+                    {
+                        .win32k_profile = win32k_profile,
+                    };
+                    rc = plugins->start((drakvuf_plugin_t)i, &c);
+                    break;
+                }
+
+                case PLUGIN_WINDOWMON:
+                {
+                    struct windowmon_config c =
+                    {
+                        .win32k_profile = win32k_profile,
+                    };
+                    rc = plugins->start((drakvuf_plugin_t)i, &c);
+                    break;
+                }
+
                 default:
                     rc = plugins->start((drakvuf_plugin_t)i, nullptr);
                     break;
-            };
+            }
 
             if ( rc < 0 )
                 return rc;
@@ -223,13 +245,14 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
 
 drakvuf_c::drakvuf_c(const char* domain,
                      const char* rekall_profile,
+                     const char* rekall_wow_profile,
                      output_format_t output,
                      bool verbose,
                      bool leave_paused,
                      bool libvmi_conf)
     : leave_paused{ leave_paused }
 {
-    if (!drakvuf_init(&drakvuf, domain, rekall_profile, verbose, libvmi_conf))
+    if (!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf))
         throw std::runtime_error("drakvuf_init() failed");
 
     plugins = new drakvuf_plugins(drakvuf, output, drakvuf_get_os_type(drakvuf));

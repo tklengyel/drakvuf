@@ -116,6 +116,7 @@
 #include <dirent.h>
 #include <glib.h>
 #include <err.h>
+#include <ctype.h>
 
 #include <libvmi/libvmi.h>
 #include "../plugins.h"
@@ -140,10 +141,12 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     poolmon* p = (poolmon*)info->trap->data;
     page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-    reg_t pool_type, size;
+    reg_t pool_type;
+    reg_t size;
     char tag[5] = { [0 ... 4] = '\0' };
     struct pooltag* s = NULL;
     const char* pool_type_str;
+    gchar* escaped_pname = NULL;
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -196,6 +199,36 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 printf(",Source=%s,Description=%s", s->source, s->description);
             break;
 
+        case OUTPUT_JSON:
+            // Remove non-ascii characters from tag
+            for (size_t i = 0; i < sizeof(tag); ++i)
+            {
+                if (!isascii(tag[i]))
+                    tag[i] = '?';
+            }
+
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"poolmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"VCPU\": %" PRIu32 ","
+                    "\"CR3\": %" PRIu64 ","
+                    "\"ProcessName\": %s,"
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Tag\": \"%s\","
+                    "\"PoolType\": \"%s\","
+                    "\"Size\": %" PRIu64  ""
+                    "}",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    info->vcpu, info->regs->cr3, escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    tag, pool_type_str, size);
+            g_free(escaped_pname);
+            break;
         default:
         case OUTPUT_DEFAULT:
             printf("[POOLMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s (type: %s, size: %" PRIu64 ")",

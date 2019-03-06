@@ -168,7 +168,7 @@ modlist_sym2va(drakvuf_t drakvuf, addr_t list_head, access_context_t* ctx,
                     {
                         ctx->addr = dllbase;
 
-                        ret = vmi_translate_sym2v(vmi, ctx, (char*) symbol, va);
+                        ret = vmi_translate_sym2v(vmi, ctx, symbol, va);
                         if ( ret == VMI_SUCCESS )
                             PRINT_DEBUG("\t%s @ 0x%lx\n", symbol, *va);
                     }
@@ -268,7 +268,10 @@ addr_t ksym2va(drakvuf_t drakvuf, vmi_pid_t pid, const char* proc_name, const ch
 
 addr_t eprocess_sym2va (drakvuf_t drakvuf, addr_t eprocess_base, const char* mod_name, const char* symbol)
 {
-    addr_t peb, ldr, inloadorder, ret = 0;
+    addr_t peb;
+    addr_t ldr;
+    addr_t inloadorder;
+    addr_t ret = 0;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,

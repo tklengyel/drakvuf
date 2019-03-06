@@ -115,7 +115,7 @@
 
 bool fill_offsets_from_rekall(drakvuf_t drakvuf, size_t size, const char* names [][2])
 {
-    drakvuf->offsets = g_malloc0(sizeof(addr_t) * size );
+    drakvuf->offsets = (addr_t*)g_malloc0(sizeof(addr_t) * size );
     if ( !drakvuf->offsets )
         return 0;
 
@@ -301,7 +301,7 @@ addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
     return 0;
 }
 
-status_t drakvuf_get_process_ppid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid )
+status_t drakvuf_get_process_ppid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid)
 {
     if ( drakvuf->osi.get_process_ppid )
         return drakvuf->osi.get_process_ppid( drakvuf, process_base, ppid );
@@ -309,15 +309,15 @@ status_t drakvuf_get_process_ppid(drakvuf_t drakvuf, addr_t process_base, vmi_pi
     return VMI_FAILURE ;
 }
 
-bool drakvuf_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t* proc_data )
+bool drakvuf_get_process_data_priv(drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data)
 {
-    if ( drakvuf->osi.get_current_process_data )
-        return drakvuf->osi.get_current_process_data( drakvuf, vcpu_id, proc_data );
+    if ( drakvuf->osi.get_process_data )
+        return drakvuf->osi.get_process_data( drakvuf, process_base, proc_data );
 
     return false;
 }
 
-char* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle )
+char* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle)
 {
     if ( drakvuf->osi.get_registry_keyhandle_path )
         return drakvuf->osi.get_registry_keyhandle_path( drakvuf, info, key_handle );

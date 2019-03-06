@@ -140,8 +140,10 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    char* origin_name = NULL, *clone_name = NULL;
-    domid_t origin_domID = 0, clone_domID = 0;
+    char* origin_name = NULL;
+    char* clone_name = NULL;
+    domid_t origin_domID = 0;
+    domid_t clone_domID = 0;
 
     get_dom_info(xen, argv[1], &origin_domID, &origin_name);
     get_dom_info(xen, argv[2], &clone_domID, &clone_name);

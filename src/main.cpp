@@ -131,7 +131,9 @@ static inline void disable_plugin(char* optarg, bool* plugin_list)
 
 int main(int argc, char** argv)
 {
-    int c, rc = 1, timeout = 0;
+    int c;
+    int rc = 1;
+    int timeout = 0;
     char const* inject_file = nullptr;
     char const* inject_cwd = nullptr;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
@@ -141,6 +143,7 @@ int main(int argc, char** argv)
     char* rekall_profile = nullptr;
     char* dump_folder = nullptr;
     char* tcpip = nullptr;
+    char* win32k = nullptr;
     char* binary_path = nullptr;
     char* target_process = nullptr;
     vmi_pid_t injection_pid = -1;
@@ -156,6 +159,7 @@ int main(int argc, char** argv)
     bool filedelete_use_injector = false;
     bool abort_on_bsod = false;
     bool libvmi_conf = false;
+    char* rekall_wow_profile = nullptr;
 
     eprint_current_time();
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -184,7 +188,7 @@ int main(int argc, char** argv)
                 "\t -j, --injection-timeout <seconds>\n"
                 "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
                 "\t -t <timeout>              Timeout (in seconds)\n"
-                "\t -o <format>               Output format (default or csv)\n"
+                "\t -o <format>               Output format (default, csv, kv, or json)\n"
                 "\t -x <plugin>               Don't activate the specified plugin\n"
                 "\t -p                        Leave domain paused after DRAKVUF exits\n"
 #ifdef ENABLE_DOPPELGANGING
@@ -212,6 +216,12 @@ int main(int argc, char** argv)
 #ifdef ENABLE_PLUGIN_BSODMON
                 "\t -b                        Exit from execution as soon as a BSoD is detected\n"
 #endif
+                "\t -w, --rekall-wow <rekall profile>\n"
+                "\t                           The Rekall profile for WoW64 NTDLL\n"
+#ifdef ENABLE_PLUGIN_CLIPBOARDMON
+                "\t -W, --rekall-win32k <rekall profile>\n"
+                "\t                           The Rekall profile for win32k.sys\n"
+#endif
                );
         return rc;
     }
@@ -221,10 +231,13 @@ int main(int argc, char** argv)
     {
         {"rekall-kernel", required_argument, NULL, 'r'},
         {"rekall-tcpip", required_argument, NULL, 'T'},
+        {"rekall-win32k", required_argument, NULL, 'W'},
+        {"rekall-wow", required_argument, NULL, 'w'},
         {"injection-timeout", required_argument, NULL, 'j'},
         {"verbose", no_argument, NULL, 'v'},
+        {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nblgj:";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nblgj:w:W:";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
@@ -289,6 +302,8 @@ int main(int argc, char** argv)
                     output = OUTPUT_CSV;
                 if (!strncmp(optarg,"kv",2))
                     output = OUTPUT_KV;
+                if (!strncmp(optarg,"json",4))
+                    output = OUTPUT_JSON;
                 break;
             case 'x':
                 disable_plugin(optarg, plugin_list);
@@ -301,6 +316,9 @@ int main(int argc, char** argv)
                 break;
             case 'T':
                 tcpip = optarg;
+                break;
+            case 'W':
+                win32k = optarg;
                 break;
 #ifdef DRAKVUF_DEBUG
             case 'v':
@@ -321,6 +339,9 @@ int main(int argc, char** argv)
                 break;
             case 'l':
                 libvmi_conf = true;
+                break;
+            case 'w':
+                rekall_wow_profile = optarg;
                 break;
             default:
                 if (isalnum(c))
@@ -352,7 +373,7 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = new drakvuf_c(domain, rekall_profile, output, verbose, leave_paused, libvmi_conf);
+        drakvuf = new drakvuf_c(domain, rekall_profile, rekall_wow_profile, output, verbose, leave_paused, libvmi_conf);
     }
     catch (const std::exception& e)
     {
@@ -381,7 +402,7 @@ int main(int argc, char** argv)
 
     PRINT_DEBUG("Starting plugins\n");
 
-    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, syscalls_filter_file, abort_on_bsod) < 0 )
+    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, win32k, syscalls_filter_file, abort_on_bsod) < 0 )
         goto exit;
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");

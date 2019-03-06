@@ -118,6 +118,10 @@
 #include "win.h"
 #include "win-offsets.h"
 #include "win-offsets-map.h"
+#include "win-wow-offsets.h"
+#include "win-wow-offsets-map.h"
+
+bool fill_wow_offsets_from_rekall( drakvuf_t drakvuf, size_t size, const char* names [][2] );
 
 bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap,
                               addr_t list_head, vmi_pid_t pid)
@@ -260,41 +264,22 @@ module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_he
             ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
             if ( vmi_read_addr( vmi, ctx, &ret_module_info->base_addr ) == VMI_SUCCESS )
             {
-                unicode_string_t* aux;
+                ctx->addr                  = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
+                ret_module_info->base_name = drakvuf_read_unicode_common( vmi, ctx );
 
-                ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-                aux = vmi_read_unicode_str( vmi, ctx );
-
-                if ( aux )
+                if ( ret_module_info->base_name )
                 {
-                    if ( vmi_convert_str_encoding( aux, &ret_module_info->base_name, "UTF-8" ) == VMI_SUCCESS )
+                    PRINT_DEBUG("Found module %s at 0x%lx\n", ret_module_info->base_name->contents, ret_module_info->base_addr );
+
+                    if ( !strcasecmp( (char*)ret_module_info->base_name->contents, module_name ) )
                     {
-                        PRINT_DEBUG("Found module %s at 0x%lx\n", ret_module_info->base_name.contents, ret_module_info->base_addr );
+                        ctx->addr                  = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
+                        ret_module_info->full_name = drakvuf_read_unicode_common( vmi, ctx );
 
-                        if ( !strcasecmp( (char*)ret_module_info->base_name.contents, module_name ) )
-                        {
-                            unicode_string_t* aux2 ;
-
-                            ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
-                            aux2 = vmi_read_unicode_str( vmi, ctx );
-
-                            if ( aux2 )
-                            {
-                                if ( vmi_convert_str_encoding( aux2, &ret_module_info->full_name, "UTF-8" ) == VMI_FAILURE )
-                                    memset( (void*)&ret_module_info->full_name, 0, sizeof( unicode_string_t ) );
-
-                                vmi_free_unicode_str( aux2 );
-                            }
-
-                            vmi_free_unicode_str( aux );
-
-                            return ret_module_info ;
-                        }
+                        return ret_module_info ;
                     }
 
-                    g_free( ret_module_info->base_name.contents  );
-
-                    vmi_free_unicode_str( aux );
+                    vmi_free_unicode_str( ret_module_info->base_name );
                 }
             }
             g_free( ret_module_info );
@@ -308,9 +293,66 @@ module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_he
     return NULL;
 }
 
+module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name )
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t next_module = module_list_head;
+
+    /* walk the module list */
+    while (1)
+    {
+        /* follow the next pointer */
+        addr_t tmp_next = 0;
+        ctx->addr = next_module;
+        if (VMI_FAILURE == vmi_read_32(vmi, ctx, (uint32_t*)&tmp_next))
+            break;
+
+        /* if we are back at the list head, we are done */
+        if (module_list_head == tmp_next || !tmp_next)
+        {
+            break;
+        }
+
+        module_info_t* ret_module_info = (module_info_t*)g_malloc0( sizeof( module_info_t ) );
+
+        if ( ret_module_info )
+        {
+            ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_DLLBASE];
+            if ( vmi_read_32( vmi, ctx, (uint32_t*)&ret_module_info->base_addr ) == VMI_SUCCESS )
+            {
+                ctx->addr                  = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
+                ret_module_info->base_name = drakvuf_read_unicode32_common( vmi, ctx );
+
+                if ( ret_module_info->base_name )
+                {
+                    PRINT_DEBUG("Found WoW64 module %s at 0x%lx\n", ret_module_info->base_name->contents, ret_module_info->base_addr );
+
+                    if ( !strcasecmp( (char*)ret_module_info->base_name->contents, module_name ) )
+                    {
+                        ctx->addr                  = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
+                        ret_module_info->full_name = drakvuf_read_unicode32_common( vmi, ctx );
+
+                        return ret_module_info ;
+                    }
+
+                    vmi_free_unicode_str( ret_module_info->base_name );
+                }
+            }
+            g_free( ret_module_info );
+        }
+
+        next_module = tmp_next;
+    }
+
+    PRINT_DEBUG("Failed to find %s in WoW64 list starting at 0x%lx\n", module_name, module_list_head);
+
+    return NULL;
+}
+
 static bool find_kernbase(drakvuf_t drakvuf)
 {
-    addr_t sysproc_rva, sysproc;
+    addr_t sysproc_rva;
+    addr_t sysproc;
     if ( VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "PsInitialSystemProcess", &sysproc) )
     {
         printf("LibVMI failed to get us the VA of PsInitialSystemProcess!\n");
@@ -360,6 +402,21 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, i
     return addr;
 }
 
+bool fill_wow_offsets_from_rekall( drakvuf_t drakvuf, size_t size, const char* names [][2] )
+{
+    drakvuf->wow_offsets = (size_t*)g_malloc0(sizeof(addr_t) * size );
+
+    if ( !drakvuf->wow_offsets )
+        return 0;
+
+    if ( !rekall_get_struct_members_array_rva( drakvuf->rekall_wow_profile_json, names, size, drakvuf->wow_offsets ) )
+    {
+        PRINT_DEBUG("Failed to find WoW64 offsets for array of structure names and subsymbols.\n");
+    }
+
+    return 1 ;
+}
+
 bool set_os_windows(drakvuf_t drakvuf)
 {
 
@@ -370,9 +427,17 @@ bool set_os_windows(drakvuf_t drakvuf)
     if ( !fill_offsets_from_rekall(drakvuf, __WIN_OFFSETS_MAX, win_offset_names) )
         return 0;
 
-    drakvuf->sizes = g_malloc0(sizeof(size_t) * __WIN_SIZES_MAX);
+    drakvuf->sizes = (size_t*)g_malloc0(sizeof(size_t) * __WIN_SIZES_MAX);
     if ( !drakvuf->sizes )
         return 0;
+
+    // Get the WoW64 offsets if WoW64 profile is provided...
+    if ( drakvuf->rekall_wow_profile_json )
+    {
+        if ( !fill_wow_offsets_from_rekall(drakvuf, __WIN_WOW_OFFSETS_MAX, win_wow_offset_names) )
+            return 0;
+        PRINT_DEBUG("Loaded WoW64 offsets...\n");
+    }
 
     if ( !drakvuf_get_struct_size(drakvuf, "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY]) )
         return 0;
@@ -399,7 +464,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.exportsym_to_va = eprocess_sym2va;
     drakvuf->osi.get_process_pid = win_get_process_pid;
     drakvuf->osi.get_process_ppid = win_get_process_ppid;
-    drakvuf->osi.get_current_process_data = win_get_current_process_data;
+    drakvuf->osi.get_process_data = win_get_process_data;
     drakvuf->osi.get_registry_keyhandle_path = win_reg_keyhandle_path;
     drakvuf->osi.get_filename_from_handle = win_get_filename_from_handle;
     drakvuf->osi.get_function_argument = win_get_function_argument;

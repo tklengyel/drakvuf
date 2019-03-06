@@ -147,6 +147,7 @@ public:
 
     drakvuf_c(const char* domain,
               const char* rekall_profile,
+              const char* rekall_wow_profile,
               output_format_t output,
               bool verbose,
               bool leave_paused,
@@ -174,6 +175,7 @@ public:
                       bool filedelete_use_injector,
                       bool cpuid_stealth,
                       const char* tcpip_profile,
+                      const char* win32k_profile,
                       const char* syscalls_filter_file,
                       bool abort_on_bsod );
 };

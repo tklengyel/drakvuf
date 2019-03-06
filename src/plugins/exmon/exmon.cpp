@@ -163,16 +163,29 @@ static const char* offset_names[__OFFSET_MAX][2] =
 
 static void print_program_info(uint8_t previous_mode, char const* user_format, drakvuf_trap_info_t* info)
 {
+    exmon* e = (exmon*)info->trap->data;
     if (previous_mode == 1)
     {
         if (info->proc_data.base_addr)
         {
-            printf(user_format, info->proc_data.pid, info->proc_data.ppid, info->proc_data.name);
+            const char* escaped_pname = info->proc_data.name;
+            if (e->format == OUTPUT_JSON)
+            {
+                escaped_pname = (const char*)drakvuf_escape_str (info->proc_data.name);
+            }
+            printf(user_format, info->proc_data.pid, info->proc_data.ppid, escaped_pname);
+            if (e->format == OUTPUT_JSON)
+            {
+                g_free ((void*) escaped_pname);
+            }
         }
         else printf(user_format, 0, 0, "NOPROC");
     }
     else
     {
+        if (e->format == OUTPUT_JSON)
+            printf("}");
+
         printf("\n");
     }
 }
@@ -199,7 +212,9 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if (e->pm != VMI_PM_IA32E)
     {
-        reg_t exception_record, ptrap_frame, exception_code;
+        reg_t exception_record;
+        reg_t ptrap_frame;
+        reg_t exception_code;
         uint8_t previous_mode;
 
         ctx.addr = info->regs->rsp+4;
@@ -235,6 +250,10 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             case OUTPUT_KV:
                 str_format=KV_FORMAT32;
                 user_format=KV_FORMAT_USER;
+                break;
+            case OUTPUT_JSON:
+                str_format=JSON_FORMAT32;
+                user_format=JSON_FORMAT_USER;
                 break;
             default:
             case OUTPUT_DEFAULT:
@@ -286,6 +305,10 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             case OUTPUT_KV:
                 str_format=KV_FORMAT64;
                 user_format=KV_FORMAT_USER;
+                break;
+            case OUTPUT_JSON:
+                str_format=JSON_FORMAT64;
+                user_format=JSON_FORMAT_USER;
                 break;
             default:
             case OUTPUT_DEFAULT:

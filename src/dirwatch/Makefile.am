@@ -109,6 +109,7 @@ dirwatch_LDADD = ../xen_helper/libxenhelper.la
 
 distributor_SOURCES = distributor.c
 
-AM_CFLAGS = -Werror -Wall -Wextra $(CFLAGS) $(GLIB_CFLAGS)
+AM_CPPFLAGS = $(CPPFLAGS) $(GLIB_CFLAGS)
+AM_CFLAGS = -Werror -Wall -Wextra $(CFLAGS)
 AM_CFLAGS += -Wno-missing-field-initializers
-
+AM_LDFLAGS = $(LDFLAGS) $(GLIB_LIBS)

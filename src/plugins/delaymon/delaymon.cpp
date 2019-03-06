@@ -10,6 +10,7 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
 
     addr_t delay_addr = drakvuf_get_function_argument(drakvuf, info, 2);
     int64_t delay = 0; // in hundreds of nanoseconds
+    gchar* escaped_pname = NULL;
 
     {
         access_context_t ctx;
@@ -44,6 +45,28 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
                    delay_interval_miliseconds);
             break;
 
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"delaymon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"VCPU\": %" PRIu32 ","
+                    "\"CR3\": %" PRIu64 ","
+                    "\"ProcessName\": %s,"
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"DelayIntervalMs\": %.4f"
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    info->vcpu, info->regs->cr3, escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    delay_interval_miliseconds);
+            g_free(escaped_pname);
+            break;
+
         default:
         case OUTPUT_DEFAULT:
             printf("[DELAYMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " DelayIntervalMs:%.4f\n",
@@ -51,7 +74,7 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
                    USERIDSTR(drakvuf), info->proc_data.userid,
                    delay_interval_miliseconds);
             break;
-    };
+    }
 
     return 0;
 }

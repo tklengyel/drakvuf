@@ -107,6 +107,7 @@
 
 #include <libvmi/libvmi.h>
 #include "libdrakvuf.h"
+#include "os.h"
 #include "win-exports.h"
 
 addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id);
@@ -144,6 +145,7 @@ bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module
 bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
 bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
 module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );
+module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );
 
 bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* eprocess_addr);
 
@@ -153,12 +155,14 @@ bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_
 
 status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, int32_t* ppid );
 
-bool win_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t* proc_data );
+bool win_get_process_data( drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data );
 
 gchar* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle );
 
 char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
 
 addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int argument_number);
+
+bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
 
 #endif

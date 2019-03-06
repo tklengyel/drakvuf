@@ -113,14 +113,21 @@
 
 #include "private.h"
 #include "win-offsets.h"
+#include "win-wow-offsets.h"
 #include "win-error-codes.h"
 #include "win.h"
 
 typedef enum dispatcher_object
 {
+    __DISPATCHER_INVALID_OBJECT = 0,
     DISPATCHER_PROCESS_OBJECT = 3,
     DISPATCHER_THREAD_OBJECT  = 6
 } dispatcher_object_t ;
+
+bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list );
+bool win_search_modules( drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx, addr_t eprocess_addr, addr_t wow_process, vmi_pid_t pid, access_context_t* ctx );
+bool win_search_modules_wow( drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx, addr_t eprocess_addr, addr_t wow_peb, vmi_pid_t pid, access_context_t* ctx );
+addr_t win_get_wow_peb( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_process );
 
 addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
 {
@@ -143,7 +150,8 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
 
 addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
 {
-    addr_t thread, process;
+    addr_t thread;
+    addr_t process;
 
     thread=win_get_current_thread(drakvuf,vcpu_id);
 
@@ -280,7 +288,8 @@ char* win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool ful
 int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
 {
 
-    addr_t peb, userid;
+    addr_t peb;
+    addr_t userid;
     vmi_instance_t vmi = drakvuf->vmi;
     access_context_t ctx = {.translate_mechanism = VMI_TM_PROCESS_DTB};
 
@@ -344,8 +353,6 @@ bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_
 {
     if ( kthread )
     {
-        *previous_mode = 0 ;
-
         if ( vmi_read_8_va( drakvuf->vmi, kthread + drakvuf->offsets[ KTHREAD_PREVIOUSMODE ], 0,
                             (uint8_t*)previous_mode ) == VMI_SUCCESS )
         {
@@ -372,7 +379,7 @@ bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
 
 bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 {
-    dispatcher_object_t dispatcher_type = 0 ;
+    dispatcher_object_t dispatcher_type = __DISPATCHER_INVALID_OBJECT;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -397,7 +404,7 @@ bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 
 bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
 {
-    dispatcher_object_t dispatcher_type = 0;
+    dispatcher_object_t dispatcher_type = __DISPATCHER_INVALID_OBJECT;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -418,9 +425,10 @@ bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
 
 bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module_list)
 {
-
     vmi_instance_t vmi = drakvuf->vmi;
-    addr_t peb=0, ldr=0, modlist=0;
+    addr_t peb=0;
+    addr_t ldr=0;
+    addr_t modlist=0;
 
     access_context_t ctx = {.translate_mechanism = VMI_TM_PROCESS_DTB};
 
@@ -448,6 +456,36 @@ bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module
 
     return true;
 }
+
+bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list )
+{
+    if ( wow_peb )
+    {
+        vmi_instance_t vmi = drakvuf->vmi;
+        addr_t ldr=0;
+        addr_t modlist=0;
+
+        ctx->addr = wow_peb + drakvuf->wow_offsets[WOW_PEB_LDR];
+
+        if (VMI_FAILURE == vmi_read_32( vmi, ctx, (uint32_t*)&ldr ) )
+            return false;
+
+        ctx->addr = ldr + drakvuf->wow_offsets[WOW_PEB_LDR_DATA_INLOADORDERMODULELIST];
+
+        if (VMI_FAILURE == vmi_read_32( vmi, ctx, (uint32_t*)&modlist ) )
+            return false;
+
+        if (!modlist)
+            return false;
+
+        *module_list = modlist;
+
+        return true;
+    }
+
+    return false ;
+}
+
 
 static bool win_find_process_list(drakvuf_t drakvuf, addr_t* list_head)
 {
@@ -520,13 +558,114 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_p
     return false;
 }
 
-bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx)
+bool win_search_modules( drakvuf_t drakvuf,
+                         const char* module_name,
+                         bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
+                         void* visitor_ctx,
+                         addr_t eprocess_addr,
+                         addr_t wow_process,
+                         vmi_pid_t pid,
+                         access_context_t* ctx )
+{
+    bool ret = false ;
+    addr_t module_list_head;
+
+    // List x64 modules...
+    if ( win_get_module_list( drakvuf, eprocess_addr, &module_list_head ) )
+    {
+        module_info_t* module_info = win_get_module_info_ctx( drakvuf, module_list_head, ctx, module_name );
+
+        if ( module_info )
+        {
+            module_info->eprocess_addr  = eprocess_addr ;
+            module_info->dtb            = ctx->dtb ;
+            module_info->pid            = pid ;
+            module_info->is_wow_process = wow_process ? true : false ;
+            module_info->is_wow         = false ;
+
+            ret = visitor_func( drakvuf, module_info, visitor_ctx );
+
+            vmi_free_unicode_str( module_info->full_name );
+            vmi_free_unicode_str( module_info->base_name );
+            g_free( module_info );
+        }
+    }
+
+    return ret ;
+}
+
+bool win_search_modules_wow( drakvuf_t drakvuf,
+                             const char* module_name,
+                             bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
+                             void* visitor_ctx,
+                             addr_t eprocess_addr,
+                             addr_t wow_peb,
+                             vmi_pid_t pid,
+                             access_context_t* ctx )
+{
+    bool ret = false ;
+    addr_t module_list_head ;
+
+    if ( win_get_module_list_wow( drakvuf, ctx, wow_peb, &module_list_head ) )
+    {
+        module_info_t* module_info = win_get_module_info_ctx_wow( drakvuf, module_list_head, ctx, module_name );
+
+        if ( module_info )
+        {
+            module_info->eprocess_addr  = eprocess_addr ;
+            module_info->dtb            = ctx->dtb ;
+            module_info->pid            = pid ;
+            module_info->is_wow_process = true ;
+            module_info->is_wow         = true ;
+
+            ret = visitor_func( drakvuf, module_info, visitor_ctx );
+
+            vmi_free_unicode_str( module_info->full_name );
+            vmi_free_unicode_str( module_info->base_name );
+            g_free( module_info );
+        }
+    }
+
+    return ret ;
+}
+
+addr_t win_get_wow_peb( drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess )
+{
+    // 'Wow64Process' could not be the first member of '_EPROCESS' so this is cheap check
+    if (!drakvuf->offsets[EPROCESS_WOW64PROCESS])
+        return 0;
+
+    addr_t ret_peb_addr = 0 ;
+    addr_t wow_process = 0 ;
+    addr_t eprocess_wow64_addr = eprocess + drakvuf->offsets[EPROCESS_WOW64PROCESS];
+
+    if ( vmi_get_winver( drakvuf->vmi ) == VMI_OS_WINDOWS_10 )
+        eprocess_wow64_addr = eprocess + drakvuf->offsets[EPROCESS_WOW64PROCESS_WIN10];
+
+    if ( vmi_read_addr_va( drakvuf->vmi, eprocess_wow64_addr, 0, &wow_process ) == VMI_SUCCESS )
+    {
+        if ( vmi_get_winver( drakvuf->vmi ) == VMI_OS_WINDOWS_10 )
+        {
+            ctx->addr = wow_process + drakvuf->offsets[EWOW64PROCESS_PEB] ;
+
+            if ( vmi_read_addr( drakvuf->vmi, ctx, &ret_peb_addr ) == VMI_FAILURE )
+                ret_peb_addr = 0;
+        }
+        else
+            ret_peb_addr = wow_process ;
+    }
+
+    return ret_peb_addr ;
+}
+
+bool win_enumerate_processes_with_module( drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx )
 {
     addr_t list_head;
     if (!win_find_process_list(drakvuf, &list_head))
         return false;
     addr_t current_list_entry = list_head;
     addr_t next_list_entry;
+
     if (!win_find_next_process_list_entry(drakvuf, current_list_entry, &next_list_entry))
     {
         PRINT_DEBUG("Failed to read next pointer at 0x%"PRIx64" before entering loop\n", current_list_entry);
@@ -537,35 +676,26 @@ bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_n
     {
         addr_t current_process = current_list_entry - drakvuf->offsets[EPROCESS_TASKS];
 
-        vmi_pid_t pid;
-        addr_t module_list_head;
+        vmi_pid_t pid ;
 
-        if ((win_get_process_pid(drakvuf, current_process, &pid) == VMI_SUCCESS) &&
-                win_get_module_list(drakvuf, current_process, &module_list_head))
+        if ( win_get_process_pid( drakvuf, current_process, &pid) == VMI_SUCCESS )
         {
             access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB };
 
             if ( vmi_pid_to_dtb( drakvuf->vmi, pid, &ctx.dtb ) == VMI_SUCCESS )
             {
-                module_info_t* module_info = win_get_module_info_ctx( drakvuf, module_list_head, &ctx, module_name );
+                addr_t wow_peb = win_get_wow_peb( drakvuf, &ctx, current_process ) ;
 
-                if ( module_info )
+                if ( win_search_modules( drakvuf, module_name, visitor_func, visitor_ctx, current_process,
+                                         wow_peb, pid, &ctx ) )
+                    return true ;
+
+                // List WoW64 modules...
+                if ( wow_peb )
                 {
-                    bool ret ;
-
-                    module_info->eprocess_addr = current_process ;
-                    module_info->dtb           = ctx.dtb ;
-                    module_info->pid           = pid ;
-
-                    ret = visitor_func( drakvuf, module_info, visitor_ctx );
-
-                    g_free( module_info->full_name.contents  );
-                    g_free( module_info->base_name.contents );
-
-                    g_free( module_info );
-
-                    if ( ret )
-                        return true;
+                    if ( win_search_modules_wow( drakvuf, module_name, visitor_func, visitor_ctx, current_process,
+                                                 wow_peb, pid, &ctx ) )
+                        return true ;
                 }
             }
         }
@@ -623,24 +753,24 @@ status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t
     return vmi_read_32_va( drakvuf->vmi, process_base + drakvuf->offsets[EPROCESS_INHERITEDPID], 0, (uint32_t*)ppid );
 }
 
-bool win_get_current_process_data( drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_t* proc_data )
+bool win_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv_t* proc_data )
 {
-    proc_data->base_addr = win_get_current_process( drakvuf, vcpu_id );
+    proc_data->base_addr = base_addr;
 
-    if ( proc_data->base_addr )
+    if ( base_addr )
     {
-        if ( win_get_process_pid( drakvuf, proc_data->base_addr, &proc_data->pid ) == VMI_SUCCESS )
+        if ( win_get_process_pid( drakvuf, base_addr, &proc_data->pid ) == VMI_SUCCESS )
         {
-            if ( win_get_process_ppid( drakvuf, proc_data->base_addr, &proc_data->ppid ) == VMI_SUCCESS )
+            if ( win_get_process_ppid( drakvuf, base_addr, &proc_data->ppid ) == VMI_SUCCESS )
             {
-                proc_data->userid = win_get_process_userid( drakvuf, proc_data->base_addr );
-                proc_data->name   = win_get_process_name( drakvuf, proc_data->base_addr, 1 );
+                proc_data->userid = win_get_process_userid( drakvuf, base_addr );
+                proc_data->name   = win_get_process_name( drakvuf, base_addr, true );
 
                 if ( proc_data->name )
-                    return true ;
+                    return true;
             }
         }
     }
 
-    return false ;
+    return false;
 }

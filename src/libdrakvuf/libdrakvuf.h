@@ -261,7 +261,7 @@ typedef enum object_manager_object
 
 typedef struct symbol
 {
-    const char* name;
+    char* name;
     addr_t rva;
     uint8_t type;
     int inputs;
@@ -330,6 +330,7 @@ typedef void (*event_cb_t) (int fd, void* data);
 bool drakvuf_init (drakvuf_t* drakvuf,
                    const char* domain,
                    const char* rekall_profile,
+                   const char* rekall_wow_profile,
                    const bool verbose,
                    const bool libvmi_conf);
 void drakvuf_close (drakvuf_t drakvuf, const bool pause);
@@ -382,7 +383,7 @@ char* drakvuf_get_process_name(drakvuf_t drakvuf,
 /* Caller must free the returned string */
 char* drakvuf_get_process_commandline(drakvuf_t drakvuf,
                                       drakvuf_trap_info_t* info,
-                                      addr_t eprocess_base);
+                                      addr_t process_base);
 
 
 status_t drakvuf_get_process_pid( drakvuf_t drakvuf,
@@ -392,6 +393,10 @@ status_t drakvuf_get_process_pid( drakvuf_t drakvuf,
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
                                    addr_t process_base);
+
+bool drakvuf_get_process_data(drakvuf_t drakvuf,
+                              addr_t process_base,
+                              proc_data_t* proc_data);
 
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
                                    uint64_t vcpu_id,
@@ -429,12 +434,14 @@ bool drakvuf_find_process(drakvuf_t drakvuf,
 
 typedef struct _module_info
 {
-    addr_t eprocess_addr ;       /* EPROCESS to which the module is currently loaded           */
-    addr_t dtb ;                 /* DTB for the process where the module is currently loaded   */
-    vmi_pid_t pid ;              /* PID of the process where the module is currently is loaded */
-    addr_t base_addr ;           /* Module base address                                        */
-    unicode_string_t full_name ; /* Module full name                                           */
-    unicode_string_t base_name ; /* Module base name                                           */
+    addr_t eprocess_addr ;        /* EPROCESS to which the module is currently loaded           */
+    addr_t dtb ;                  /* DTB for the process where the module is currently loaded   */
+    vmi_pid_t pid ;               /* PID of the process where the module is currently is loaded */
+    addr_t base_addr ;            /* Module base address                                        */
+    unicode_string_t* full_name ; /* Module full name                                           */
+    unicode_string_t* base_name ; /* Module base name                                           */
+    bool is_wow ;                 /* Is WoW64 module?                                           */
+    bool is_wow_process ;         /* Is WoW64 process?                                          */
 } module_info_t ;
 
 bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf,
@@ -458,11 +465,20 @@ bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
                                object_manager_object_t obj_type_arg,
                                addr_t* obj_body_addr);
 
+
 char* drakvuf_read_ascii_str(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr);
+
+unicode_string_t* drakvuf_read_unicode_common(vmi_instance_t vmi, const access_context_t* ctx);
 
 unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr);
 
 unicode_string_t* drakvuf_read_unicode_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid);
+
+unicode_string_t* drakvuf_read_unicode32_common(vmi_instance_t vmi, const access_context_t* ctx);
+
+unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr);
+
+unicode_string_t* drakvuf_read_unicode32_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid);
 
 bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
                                    addr_t module_list_head,
@@ -478,10 +494,6 @@ bool drakvuf_get_module_base_addr_ctx( drakvuf_t drakvuf,
 status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
                                    addr_t process_base,
                                    vmi_pid_t* ppid );
-
-bool drakvuf_get_current_process_data( drakvuf_t drakvuf,
-                                       uint64_t vcpu_id,
-                                       proc_data_t* proc_data );
 
 gchar* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf,
                                   drakvuf_trap_info_t* info,
@@ -500,6 +512,10 @@ size_t drakvuf_wchar_string_length(vmi_instance_t vmi, const access_context_t* c
 
 // Reads null-terminated string of UTF_16 charachters, automatically determining length, into unicode_string_t object with UTF_8 encoding
 unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_context_t* ctx);
+
+// Returns JSON-compliant copy of input string. User must free the result.
+gchar* drakvuf_escape_str(const char* input);
+
 
 addr_t drakvuf_get_function_argument(drakvuf_t drakvuf,
                                      drakvuf_trap_info_t* info,
@@ -526,6 +542,7 @@ typedef enum
     OUTPUT_DEFAULT,
     OUTPUT_CSV,
     OUTPUT_KV,
+    OUTPUT_JSON,
     __OUTPUT_MAX
 } output_format_t;
 

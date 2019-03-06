@@ -155,7 +155,7 @@ sources += regmon/regmon.cpp
 endif
 
 if PLUGIN_PROCMON
-sources += procmon/procmon.cpp procmon/ntstatus.cpp
+sources += procmon/procmon.cpp procmon/ntstatus.cpp procmon/winnt.cpp
 endif
 
 if PLUGIN_BSODMON
@@ -166,26 +166,40 @@ if PLUGIN_CRASHMON
 sources += crashmon/crashmon.cpp
 endif
 
+if PLUGIN_CLIPBOARDMON
+sources += clipboardmon/clipboardmon.cpp
+endif
+
+if PLUGIN_WINDOWMON
+sources += windowmon/windowmon.cpp
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(CPPFLAGS)
-AM_CPPFLAGS += $(CXXFLAGS)
 AM_CPPFLAGS += $(VMI_CFLAGS)
 AM_CPPFLAGS += $(GLIB_CFLAGS)
+AM_CPPFLAGS += $(JSONC_CFLAGS)
 
-#if HARDENING
-AM_CPPFLAGS += $(HARDEN_CFLAGS) -DHARDENING
-#endif
+AM_LDFLAGS =  $(LDFLAGS)
+AM_LDFLAGS += $(GLIB_LIBS)
+AM_LDFLAGS += $(VMI_LIBS)
+AM_LDFLAGS += $(JSONC_LIBS)
+
+AM_CXXFLAGS = $(CXXFLAGS)
+if HARDENING
+AM_CXXFLAGS += $(HARDEN_CFLAGS) -DHARDENING
+endif
 
 # Note that -pg is incompatible with HARDENING
 if DEBUG
-AM_CPPFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
-AM_CPPFLAGS += -Wno-missing-field-initializers -Wno-unused-parameter
-AM_CPPFLAGS += -Wno-initializer-overrides
+AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
+AM_CXXFLAGS += -Wno-missing-field-initializers -Wno-unused-parameter
+AM_CXXFLAGS += -Wno-initializer-overrides
 if !HARDENING
-AM_CPPFLAGS += -pg
+AM_CXXFLAGS += -pg
 endif
 endif
 

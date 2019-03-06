@@ -458,6 +458,15 @@ static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info
     return true;
 }
 
+static void fill_last_error(injector_t injector, uint32_t vcpu_id)
+{
+    if (VMI_FAILURE == drakvuf_get_last_error(injector->drakvuf, vcpu_id, &injector->error_code, &injector->error_string))
+    {
+        injector->error_code = -1;
+        injector->error_string = "<UNKNOWN>";
+    }
+}
+
 static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info)
 {
     access_context_t ctx =
@@ -903,6 +912,8 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
             if (info->regs->rax)
                 fill_created_process_info(injector, info);
+            else
+                fill_last_error(injector, info->vcpu);
 
             injector->rc = info->regs->rax;
             memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
@@ -1106,6 +1117,8 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         if (info->regs->rax)
             fill_created_process_info(injector, info);
+        else
+            fill_last_error(injector, info->vcpu);
 
         injector->rc = info->regs->rax;
         memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
@@ -1521,20 +1534,14 @@ int injector_start_app(
         }
         else
         {
-            uint32_t err = 0;
-            const char* err_str = "<UNKNOWN>";
-            if (VMI_SUCCESS != drakvuf_get_last_error(drakvuf, 0, &err, &err_str))
-                err = -1;
-
             injector->result = INJECT_RESULT_ERROR_CODE;
-            injector->error_code = err;
-            injector->error_string = err_str;
             print_injection_info(format, file, injector);
         }
     }
 
     rc = injector->rc;
-    PRINT_DEBUG("Finished with injection. Ret: %i\n", rc);
+    PRINT_DEBUG("Finished with injection. Ret: %i. Error: %s(%d)\n", rc,
+                injector->error_string ?: "OK", injector->error_code);
 
     switch (method)
     {
@@ -1554,7 +1561,7 @@ int injector_start_app(
         default:
             free_injector(injector);
             break;
-    };
+    }
 
     return rc;
 }
