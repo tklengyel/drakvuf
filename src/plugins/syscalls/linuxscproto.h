@@ -109,8 +109,6 @@
 
 #include "commonscproto.h"
 
-
-
 /**
  * Older Linux kernels pass the arguments to the syscall functions via
  * registers, per the ABI. Newer kernels pass the arguments via a

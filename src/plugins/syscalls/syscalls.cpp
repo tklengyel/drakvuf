@@ -427,6 +427,7 @@ static int linux_build_argbuf(uint8_t* buf, vmi_instance_t vmi, drakvuf_trap_inf
                 buf64[5] = info->regs->r9;
         }
     }
+
 exit:
     return rc;
 }
