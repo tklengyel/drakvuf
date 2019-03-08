@@ -109,6 +109,51 @@
 
 #include "commonscproto.h"
 
+
+
+/**
+ * Older Linux kernels pass the arguments to the syscall functions via
+ * registers, per the ABI. Newer kernels pass the arguments via a
+ * struct pt_regs. This change was made Apr 2018 in/near commit
+ * fa697140f9a20119a9ec8fd7460cc4314fbdaff3.
+ *
+ * See kernel: arch/x86/include/asm/syscall_wrapper.h
+ *             arch/x86/entry/entry_64.S
+ *             arch/x86/include/uapi/asm/ptrace.h
+ *
+ * Functions named __x64_sys_* expect the new convention and are
+ * marked in DRAKVUF with SYSCALL_FLAG_LINUX_PT_REGS (commonscproto.h)
+ * in their wrappers' flags field.
+ */
+
+struct linux_pt_regs
+{
+    unsigned long r15;
+    unsigned long r14;
+    unsigned long r13;
+    unsigned long r12;
+    unsigned long rbp;
+    unsigned long rbx;
+
+    unsigned long r11;
+    unsigned long r10;
+    unsigned long r9;
+    unsigned long r8;
+    unsigned long rax;
+    unsigned long rcx;
+    unsigned long rdx;
+    unsigned long rsi;
+    unsigned long rdi;
+
+    unsigned long orig_rax;
+
+    unsigned long rip;
+    unsigned long cs;
+    unsigned long eflags;
+    unsigned long rsp;
+    unsigned long ss;
+};
+
 static const syscall_t linux_syscalls[] =
 {
     {
