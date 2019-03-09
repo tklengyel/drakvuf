@@ -420,6 +420,8 @@ static const char* type_names[]
 };
 
 
+/* For now, put all syscall flags here */
+#define SYSCALL_FLAG_LINUX_PT_REGS (1 << 0) /* Args passed via struct pt_regs rather than direct registers */
 
 typedef struct
 {
@@ -441,7 +443,8 @@ typedef struct
 typedef struct
 {
     syscalls* sc;
-    int syscall_index;
+    int       syscall_index;
+    uint32_t  flags;
 } syscall_wrapper_t;
 
 
