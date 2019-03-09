@@ -106,9 +106,11 @@
 #include <glib.h>
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
+#include <assert.h>
 #include "syscalls.h"
 #include "winscproto.h"
 #include "linuxscproto.h"
+
 
 static char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
@@ -173,7 +175,7 @@ static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvu
                     "\"PPID\": %d,"
                     "\"Module\": \"%s\","
                     "\"Method\": \"%s\","
-                    "\"Args\": [ ",
+                    "\"Args\": [",
                     UNPACK_TIMEVAL(info->timestamp),
                     info->vcpu, info->regs->cr3, escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
@@ -335,54 +337,82 @@ static void print_footer(output_format_t format, uint32_t nargs)
     }
 }
 
-static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+// Builds the argument buffer from the current context, returns status
+static int linux_build_argbuf(uint8_t* buf, vmi_instance_t vmi, drakvuf_trap_info_t* info, const syscall_t* sc)
 {
-    unsigned int nargs = 0;
-    size_t size = 0;
-    unsigned char* buf = NULL; // pointer to buffer to hold argument values
-
+    int nargs = 0;
+    int rc = VMI_SUCCESS;
     syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
     syscalls* s = wrapper->sc;
-    const syscall_t* sc = NULL;
 
-    if (wrapper->syscall_index>-1 )
+    if (NULL == sc)
     {
-        // need to malloc buf before setting type of each array cell
-        sc = &linux_syscalls[wrapper->syscall_index];
-        nargs = sc->num_args;
-        size = s->reg_size * nargs;
-        buf = (unsigned char*)g_malloc(sizeof(char) * size);
+        rc = VMI_FAILURE;
+        goto exit;
     }
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    (void)vmi;
+    nargs = sc->num_args;
 
-    access_context_t ctx;
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    if ( nargs )
+    // get arguments only if we know how many to get
+    if (0 == nargs)
     {
-        // get arguments only if we know how many to get
+        goto exit;
+    }
 
-        if ( 4 == s->reg_size )
+    // Now now, only support legacy syscall arg passing on 32 bit
+    if ( 4 == s->reg_size )
+    {
+        uint32_t* buf32 = (uint32_t*)buf;
+        if ( nargs > 0 )
+            buf32[0] = (uint32_t) info->regs->rbx;
+        if ( nargs > 1 )
+            buf32[1] = (uint32_t) info->regs->rcx;
+        if ( nargs > 2 )
+            buf32[2] = (uint32_t) info->regs->rdx;
+        if ( nargs > 3 )
+            buf32[3] = (uint32_t) info->regs->rsi;
+        if ( nargs > 4 )
+            buf32[4] = (uint32_t) info->regs->rdi;
+    }
+    else if ( 8 == s->reg_size )
+    {
+        uint64_t* buf64 = (uint64_t*)buf;
+
+        // Support both calling conventions for 64 bit Linux syscalls
+        if (wrapper->flags & SYSCALL_FLAG_LINUX_PT_REGS)
         {
-            uint32_t* buf32 = (uint32_t*)buf;
+            // The syscall args are passed via a struct pt_regs *, which is in %rdi upon entry
+            struct linux_pt_regs lr;
+            access_context_t ctx =
+            {
+                .translate_mechanism = VMI_TM_PROCESS_DTB,
+                .dtb = info->regs->cr3,
+                .addr = info->regs->rdi,
+            };
+
+            rc = vmi_read(vmi, &ctx, sizeof(lr), &lr, NULL);
+            if (VMI_SUCCESS != rc)
+            {
+                fprintf(stderr, "vmi_read_va(%p) failed\n", (void*)ctx.addr);
+                goto exit;
+            }
+
             if ( nargs > 0 )
-                buf32[0] = (uint32_t) info->regs->rbx;
+                buf64[0] = lr.rdi;
             if ( nargs > 1 )
-                buf32[1] = (uint32_t) info->regs->rcx;
+                buf64[1] = lr.rsi;
             if ( nargs > 2 )
-                buf32[2] = (uint32_t) info->regs->rdx;
+                buf64[2] = lr.rdx;
             if ( nargs > 3 )
-                buf32[3] = (uint32_t) info->regs->rsi;
+                buf64[3] = lr.r10;
             if ( nargs > 4 )
-                buf32[4] = (uint32_t) info->regs->rdi;
+                buf64[4] = lr.r8;
+            if ( nargs > 5 )
+                buf64[5] = lr.r9;
         }
-
-        if ( 8 == s->reg_size )
+        else
         {
-            uint64_t* buf64 = (uint64_t*)buf;
+            // The args are passed directly via registers in sycall context
             if ( nargs > 0 )
                 buf64[0] = info->regs->rdi;
             if ( nargs > 1 )
@@ -398,6 +428,35 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
+exit:
+    return rc;
+}
+
+static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    unsigned int nargs = 0;
+    uint8_t buf[sizeof(uint64_t) * 8] = {0};
+
+    syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
+    syscalls* s = wrapper->sc;
+    const syscall_t* sc = NULL;
+
+    if (wrapper->syscall_index>-1 )
+    {
+        sc = &linux_syscalls[wrapper->syscall_index];
+        nargs = sc->num_args;
+    }
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    (void)vmi;
+
+    int rc = linux_build_argbuf(buf, vmi, info, sc);
+    if (VMI_SUCCESS != rc)
+    {
+        // Don't extract any args
+        nargs = 0;
+    }
+
     print_header(s->format, drakvuf, info);
     if ( nargs )
     {
@@ -406,7 +465,6 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     print_footer(s->format, nargs);
 
-    g_free(buf);
     drakvuf_release_vmi(drakvuf);
     return 0;
 }
@@ -593,18 +651,26 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             syscall_wrapper_t* wrapper = (syscall_wrapper_t*)g_malloc(sizeof(syscall_wrapper_t));
             wrapper->syscall_index = -1;
             wrapper->sc = s;
+            wrapper->flags = 0;
 
             /* Record symbol's index for faster lookup */
             for (j=0; j<NUMBER_OF(linux_syscalls); j++)
             {
+                // See kernel: arch/x86/include/asm/syscall_wrapper.h
+                //             arch/x86/entry/entry_64.S
                 char alt_name[32] = {0};
 
+                assert(strlen(linux_syscalls[j].name) < sizeof(alt_name) - 6);
                 (void) snprintf( alt_name, sizeof(alt_name), "__x64_%s", linux_syscalls[j].name);
-                if ( !strcmp(symbol->name, alt_name) ||
-                        !strcmp(symbol->name, linux_syscalls[j].name))
+
+                if (!strcmp(symbol->name, linux_syscalls[j].name))
                 {
-                    //linux_syscalls[j].addr = trap->breakpoint.addr;
-                    wrapper->syscall_index=j;
+                    wrapper->syscall_index = j;
+                }
+                else if (!strcmp(symbol->name, alt_name))
+                {
+                    wrapper->syscall_index = j;
+                    wrapper->flags |= SYSCALL_FLAG_LINUX_PT_REGS;
                     break;
                 }
             }
