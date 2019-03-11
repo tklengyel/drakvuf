@@ -118,6 +118,7 @@
 #include "regmon/regmon.h"
 #include "procmon/procmon.h"
 #include "bsodmon/bsodmon.h"
+#include "envmon/envmon.h"
 #include "crashmon/crashmon.h"
 #include "clipboardmon/clipboardmon.h"
 #include "windowmon/windowmon.h"
@@ -216,6 +217,11 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #ifdef ENABLE_PLUGIN_BSODMON
                 case PLUGIN_BSODMON:
                     this->plugins[plugin_id] = new bsodmon(this->drakvuf, config, this->output);
+                    break;
+#endif
+#ifdef ENABLE_PLUGIN_ENVMON
+                case PLUGIN_ENVMON:
+                    this->plugins[plugin_id] = new envmon(this->drakvuf, config, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_CRASHMON
