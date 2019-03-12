@@ -104,7 +104,6 @@
 
 #include <glib.h>
 #include <json-c/json.h>
-#include <string.h>
 #include "../xen_helper/xen_helper.h"
 
 #include "libdrakvuf.h"
@@ -581,8 +580,7 @@ bool drakvuf_get_current_process_data(drakvuf_t drakvuf, uint64_t vcpu_id, proc_
 
 bool drakvuf_get_process_data(drakvuf_t drakvuf, addr_t process_base, proc_data_t* proc_data)
 {
-    proc_data_priv_t proc_data_priv;
-    memset(&proc_data_priv, 0, sizeof(proc_data_priv));
+    proc_data_priv_t proc_data_priv = { 0 };
     bool success = drakvuf_get_process_data_priv(drakvuf, process_base, &proc_data_priv);
     proc_data->name = proc_data_priv.name;
     proc_data->pid = proc_data_priv.pid;
