@@ -111,6 +111,22 @@
 #include <sys/time.h>
 #include <libdrakvuf/libdrakvuf.h>
 
+struct plugins_options
+{
+    const char* dump_folder;            // PLUGIN_FILEDELETE
+    bool dump_modified_files;           // PLUGIN_FILEDELETE
+    bool filedelete_use_injector;       // PLUGIN_FILEDELETE
+    bool cpuid_stealth;                 // PLUGIN_CPUIDMON
+    const char* tcpip_profile;          // PLUGIN_SOCKETMON
+    const char* win32k_profile;         // PLUGIN_CLIPBOARDMON, PLUGIN_WINDOWMON
+    const char* sspicli_profile;        // PLUGIN_ENVMON
+    const char* kernel32_profile;       // PLUGIN_ENVMON
+    const char* kernelbase_profile;       // PLUGIN_ENVMON
+    const char* wow_kernel32_profile;   // PLUGIN_ENVMON
+    const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
+    bool abort_on_bsod;                 // PLUGIN_BSODMON
+};
+
 /***************************************************************************/
 
 /* Plugin-specific configuration input */
@@ -136,6 +152,13 @@ struct windowmon_config
 {
     const char* win32k_profile;
 };
+struct envmon_config
+{
+    const char* sspicli_profile;
+    const char* kernel32_profile;
+    const char* kernelbase_profile;
+    const char* wow_kernel32_profile;
+};
 
 /***************************************************************************/
 
@@ -155,6 +178,7 @@ typedef enum drakvuf_plugin
     PLUGIN_REGMON,
     PLUGIN_PROCMON,
     PLUGIN_BSODMON,
+    PLUGIN_ENVMON,
     PLUGIN_CRASHMON,
     PLUGIN_CLIPBOARDMON,
     PLUGIN_WINDOWMON,
@@ -177,6 +201,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_REGMON] = "regmon",
     [PLUGIN_PROCMON] = "procmon",
     [PLUGIN_BSODMON] = "bsodmon",
+    [PLUGIN_ENVMON] = "envmon",
     [PLUGIN_CRASHMON] = "crashmon",
     [PLUGIN_CLIPBOARDMON] = "clipboardmon",
     [PLUGIN_WINDOWMON] = "windowmon",
@@ -198,6 +223,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_REGMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_PROCMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_BSODMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_ENVMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_CRASHMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_CLIPBOARDMON] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_WINDOWMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },

@@ -169,15 +169,7 @@ public:
                    const char* target_process,
                    int timeout,
                    bool global_search);
-    int start_plugins(const bool* plugin_list,
-                      const char* dump_folder,
-                      bool dump_modified_files,
-                      bool filedelete_use_injector,
-                      bool cpuid_stealth,
-                      const char* tcpip_profile,
-                      const char* win32k_profile,
-                      const char* syscalls_filter_file,
-                      bool abort_on_bsod );
+    int start_plugins(const bool* plugin_list, const plugins_options* options);
 };
 
 #endif
