@@ -126,6 +126,13 @@ struct module_trap_context_t
     event_response_t(*hook_cb)(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 };
 
+typedef enum
+{
+    ARCH_X86,
+    ARCH_X64,
+    ARCH_INVALID,
+} arch_t;
+
 struct gdeleter
 {
     void operator() (gpointer p)
@@ -417,12 +424,6 @@ static win_ver_t get_win_ver(drakvuf_t drakvuf)
     vmi_lock_guard vmi(drakvuf);
     return vmi_get_winver(vmi.vmi);
 }
-
-typedef enum {
-    ARCH_X86,
-    ARCH_X64,
-    ARCH_INVALID,
-} arch_t;
 
 static arch_t get_arch(drakvuf_t drakvuf)
 {

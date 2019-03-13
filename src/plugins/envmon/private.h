@@ -123,7 +123,8 @@ typedef enum
 } extended_name_format_t;
 
 // from Windows sysinfoapi.h
-typedef enum _COMPUTER_NAME_FORMAT {
+typedef enum _COMPUTER_NAME_FORMAT
+{
     ComputerNameNetBIOS,
     ComputerNameDnsHostname,
     ComputerNameDnsDomain,

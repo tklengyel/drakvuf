@@ -229,7 +229,7 @@ int drakvuf_c::start_plugins(const bool* plugin_list, const plugins_options* opt
                 {
                     struct windowmon_config c =
                     {
-                        .win32k_profile = win32k_profile,
+                        .win32k_profile = options->win32k_profile,
                     };
                     rc = plugins->start((drakvuf_plugin_t)i, &c);
                     break;
