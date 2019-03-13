@@ -256,6 +256,16 @@ if test x$plugin_bsodmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_BSODMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_envmon],
+  [AS_HELP_STRING([--disable-plugin-envmon],
+    [Enable the windows environment watching plugin @<:@yes@:>@])],
+  [plugin_envmon="$enableval"],
+  [plugin_envmon="yes"])
+AM_CONDITIONAL([PLUGIN_ENVMON], [test x$plugin_envmon = xyes])
+if test x$plugin_envmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_ENVMON, 1, "")
+fi
+
 AC_ARG_ENABLE([plugin_crashmon],
   [AS_HELP_STRING([--disable-plugin-crashmon],
     [Enable the windows error reporting tool WerFault.exe watching plugin @<:@yes@:>@])],
@@ -459,6 +469,7 @@ Socketmon:    $plugin_socketmon
 Regmon:       $plugin_regmon
 Procmon:      $plugin_procmon
 BSODmon:      $plugin_bsodmon
+EnvMon:       $plugin_envmon
 CrashMon:     $plugin_crashmon
 ClipboardMon: $plugin_clipboardmon
 WindowMon:    $plugin_windowmon

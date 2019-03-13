@@ -146,15 +146,7 @@ static void cleanup_timer(drakvuf_c* drakvuf, GThread* timeout_thread)
     }
 }
 
-int drakvuf_c::start_plugins(const bool* plugin_list,
-                             const char* dump_folder,          // PLUGIN_FILEDELETE
-                             bool dump_modified_files,         // PLUGIN_FILEDELETE
-                             bool filedelete_use_injector,     // PLUGIN_FILEDELETE
-                             bool cpuid_stealth,               // PLUGIN_CPUIDMON
-                             const char* tcpip_profile,        // PLUGIN_SOCKETMON
-                             const char* win32k_profile,       // PLUGIN_CLIPBOARDMON
-                             const char* syscalls_filter_file, // PLUGIN_SYSCALLS
-                             bool abort_on_bsod )              // PLUGIN_BSODMON
+int drakvuf_c::start_plugins(const bool* plugin_list, const plugins_options* options)
 {
     int i;
     int rc;
@@ -169,9 +161,9 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                 {
                     struct filedelete_config c =
                     {
-                        .dump_folder = dump_folder,
-                        .dump_modified_files = dump_modified_files,
-                        .filedelete_use_injector = filedelete_use_injector,
+                        .dump_folder = options->dump_folder,
+                        .dump_modified_files = options->dump_modified_files,
+                        .filedelete_use_injector = options->filedelete_use_injector,
                     };
 
                     rc = plugins->start((drakvuf_plugin_t)i, &c);
@@ -179,14 +171,14 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                 }
 
                 case PLUGIN_CPUIDMON:
-                    rc = plugins->start((drakvuf_plugin_t)i, &cpuid_stealth);
+                    rc = plugins->start((drakvuf_plugin_t)i, &options->cpuid_stealth);
                     break;
 
                 case PLUGIN_SOCKETMON:
                 {
                     struct socketmon_config c =
                     {
-                        .tcpip_profile = tcpip_profile,
+                        .tcpip_profile = options->tcpip_profile,
                     };
                     rc = plugins->start((drakvuf_plugin_t)i, &c);
                     break;
@@ -196,15 +188,28 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                 {
                     struct syscalls_config c =
                     {
-                        .syscalls_filter_file = syscalls_filter_file
+                        .syscalls_filter_file = options->syscalls_filter_file
                     };
                     rc = plugins->start((drakvuf_plugin_t)i, &c);
                     break;
                 }
 
                 case PLUGIN_BSODMON:
-                    rc = plugins->start((drakvuf_plugin_t)i, &abort_on_bsod);
+                    rc = plugins->start((drakvuf_plugin_t)i, &options->abort_on_bsod);
                     break;
+
+                case PLUGIN_ENVMON:
+                {
+                    struct envmon_config c =
+                    {
+                        .sspicli_profile = options->sspicli_profile,
+                        .kernel32_profile = options->kernel32_profile,
+                        .kernelbase_profile = options->kernelbase_profile,
+                        .wow_kernel32_profile = options->wow_kernel32_profile
+                    };
+                    rc = plugins->start((drakvuf_plugin_t)i, &c);
+                    break;
+                }
 
                 case PLUGIN_CRASHMON:
                     rc = plugins->start((drakvuf_plugin_t)i, nullptr);
@@ -214,7 +219,7 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                 {
                     struct clipboardmon_config c =
                     {
-                        .win32k_profile = win32k_profile,
+                        .win32k_profile = options->win32k_profile,
                     };
                     rc = plugins->start((drakvuf_plugin_t)i, &c);
                     break;
@@ -224,7 +229,7 @@ int drakvuf_c::start_plugins(const bool* plugin_list,
                 {
                     struct windowmon_config c =
                     {
-                        .win32k_profile = win32k_profile,
+                        .win32k_profile = options->win32k_profile,
                     };
                     rc = plugins->start((drakvuf_plugin_t)i, &c);
                     break;

@@ -141,9 +141,6 @@ int main(int argc, char** argv)
     bool injection_global_search = false;
     char* domain = nullptr;
     char* rekall_profile = nullptr;
-    char* dump_folder = nullptr;
-    char* tcpip = nullptr;
-    char* win32k = nullptr;
     char* binary_path = nullptr;
     char* target_process = nullptr;
     vmi_pid_t injection_pid = -1;
@@ -152,14 +149,10 @@ int main(int argc, char** argv)
     output_format_t output = OUTPUT_DEFAULT;
     bool plugin_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 1};
     bool verbose = false;
-    bool cpuid_stealth = false;
     bool leave_paused = false;
-    char const* syscalls_filter_file = nullptr;
-    bool dump_modified_files = false;
-    bool filedelete_use_injector = false;
-    bool abort_on_bsod = false;
     bool libvmi_conf = false;
     char* rekall_wow_profile = nullptr;
+    plugins_options options = { 0 };
 
     eprint_current_time();
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -222,17 +215,36 @@ int main(int argc, char** argv)
                 "\t -W, --rekall-win32k <rekall profile>\n"
                 "\t                           The Rekall profile for win32k.sys\n"
 #endif
+                "\t --rekall-sspicli <rekall profile>\n"
+                "\t                           The Rekall profile for sspicli.dll\n"
+                "\t --rekall-kernel32 <rekall profile>\n"
+                "\t                           The Rekall profile for kernel32.dll\n"
+                "\t --rekall-kernelbase <rekall profile>\n"
+                "\t                           The Rekall profile for KernelBase.dll\n"
+                "\t --rekall-wow-kernel32 <rekall profile>\n"
+                "\t                           The Rekall profile for SysWOW64/kernel32.dll\n"
                );
         return rc;
     }
 
     int long_index = 0;
+    enum
+    {
+        opt_rekall_sspicli = 1000,
+        opt_rekall_kernel32,
+        opt_rekall_kernelbase,
+        opt_rekall_wow_kernel32,
+    };
     const option long_opts[] =
     {
         {"rekall-kernel", required_argument, NULL, 'r'},
+        {"rekall-kernel32", required_argument, NULL, opt_rekall_kernel32},
+        {"rekall-kernelbase", required_argument, NULL, opt_rekall_kernelbase},
+        {"rekall-sspicli", required_argument, NULL, opt_rekall_sspicli},
         {"rekall-tcpip", required_argument, NULL, 'T'},
         {"rekall-win32k", required_argument, NULL, 'W'},
         {"rekall-wow", required_argument, NULL, 'w'},
+        {"rekall-wow-kernel32", required_argument, NULL, opt_rekall_wow_kernel32},
         {"injection-timeout", required_argument, NULL, 'j'},
         {"verbose", no_argument, NULL, 'v'},
         {NULL, 0, NULL, 0}
@@ -295,7 +307,7 @@ int main(int argc, char** argv)
                 timeout = atoi(optarg);
                 break;
             case 'D':
-                dump_folder = optarg;
+                options.dump_folder = optarg;
                 break;
             case 'o':
                 if (!strncmp(optarg,"csv",3))
@@ -309,16 +321,16 @@ int main(int argc, char** argv)
                 disable_plugin(optarg, plugin_list);
                 break;
             case 's':
-                cpuid_stealth = true;
+                options.cpuid_stealth = true;
                 break;
             case 'p':
                 leave_paused = true;
                 break;
             case 'T':
-                tcpip = optarg;
+                options.tcpip_profile = optarg;
                 break;
             case 'W':
-                win32k = optarg;
+                options.win32k_profile = optarg;
                 break;
 #ifdef DRAKVUF_DEBUG
             case 'v':
@@ -326,22 +338,34 @@ int main(int argc, char** argv)
                 break;
 #endif
             case 'S':
-                syscalls_filter_file = optarg;
+                options.syscalls_filter_file = optarg;
                 break;
             case 'M':
-                dump_modified_files = true;
+                options.dump_modified_files = true;
                 break;
             case 'n':
-                filedelete_use_injector = true;
+                options.filedelete_use_injector = true;
                 break;
             case 'b':
-                abort_on_bsod = true;
+                options.abort_on_bsod = true;
                 break;
             case 'l':
                 libvmi_conf = true;
                 break;
             case 'w':
                 rekall_wow_profile = optarg;
+                break;
+            case opt_rekall_sspicli:
+                options.sspicli_profile = optarg;
+                break;
+            case opt_rekall_kernel32:
+                options.kernel32_profile = optarg;
+                break;
+            case opt_rekall_kernelbase:
+                options.kernelbase_profile = optarg;
+                break;
+            case opt_rekall_wow_kernel32:
+                options.wow_kernel32_profile = optarg;
                 break;
             default:
                 if (isalnum(c))
@@ -363,7 +387,7 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    if ( INJECT_METHOD_DOPP == injection_method && (!binary_path || !target_process) )
+    if (INJECT_METHOD_DOPP == injection_method && (!binary_path || !target_process))
     {
         fprintf(stderr, "Missing parameters for process doppelganging injection (-B and -P)!\n");
         return rc;
@@ -392,7 +416,7 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, nullptr);
     sigaction(SIGALRM, &act, nullptr);
 
-    if ( injection_pid > 0 && inject_file )
+    if (injection_pid > 0 && inject_file)
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
         int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout, injection_global_search);
@@ -402,7 +426,7 @@ int main(int argc, char** argv)
 
     PRINT_DEBUG("Starting plugins\n");
 
-    if ( drakvuf->start_plugins(plugin_list, dump_folder, dump_modified_files, filedelete_use_injector, cpuid_stealth, tcpip, win32k, syscalls_filter_file, abort_on_bsod) < 0 )
+    if (drakvuf->start_plugins(plugin_list, &options) < 0)
         goto exit;
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");
