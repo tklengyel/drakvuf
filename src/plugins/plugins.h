@@ -121,46 +121,11 @@ struct plugins_options
     const char* win32k_profile;         // PLUGIN_CLIPBOARDMON, PLUGIN_WINDOWMON
     const char* sspicli_profile;        // PLUGIN_ENVMON
     const char* kernel32_profile;       // PLUGIN_ENVMON
-    const char* kernelbase_profile;       // PLUGIN_ENVMON
+    const char* kernelbase_profile;     // PLUGIN_ENVMON
     const char* wow_kernel32_profile;   // PLUGIN_ENVMON
     const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
     bool abort_on_bsod;                 // PLUGIN_BSODMON
 };
-
-/***************************************************************************/
-
-/* Plugin-specific configuration input */
-struct clipboardmon_config
-{
-    const char* win32k_profile;
-};
-struct filedelete_config
-{
-    const char* dump_folder;
-    bool dump_modified_files;
-    bool filedelete_use_injector;
-};
-struct socketmon_config
-{
-    const char* tcpip_profile;
-};
-struct syscalls_config
-{
-    const char* syscalls_filter_file;
-};
-struct windowmon_config
-{
-    const char* win32k_profile;
-};
-struct envmon_config
-{
-    const char* sspicli_profile;
-    const char* kernel32_profile;
-    const char* kernelbase_profile;
-    const char* wow_kernel32_profile;
-};
-
-/***************************************************************************/
 
 typedef enum drakvuf_plugin
 {
@@ -246,7 +211,7 @@ private:
 public:
     drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
     ~drakvuf_plugins();
-    int start(drakvuf_plugin_t plugin, const void* config);
+    int start(drakvuf_plugin_t plugin, const plugins_options* config);
 };
 
 /***************************************************************************/

@@ -680,10 +680,9 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }
 
-regmon::regmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+regmon::regmon(drakvuf_t drakvuf, output_format_t output)
+    : format{output}
 {
-    this->format = output;
-
     if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
         throw -1;
     if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )

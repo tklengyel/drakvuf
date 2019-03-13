@@ -157,7 +157,7 @@ static event_response_t check_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info
     return 0;
 }
 
-crashmon::crashmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+crashmon::crashmon(drakvuf_t drakvuf, output_format_t output)
     : format(output)
 {
     /* Setup trap for thread switch */

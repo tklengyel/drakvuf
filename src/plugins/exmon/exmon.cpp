@@ -342,13 +342,13 @@ done:
     return 0;
 }
 
-exmon::exmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+exmon::exmon(drakvuf_t drakvuf, output_format_t output)
+    : format{output}
 {
     if ( !drakvuf_get_function_rva(drakvuf, "KiDispatchException", &this->trap.breakpoint.rva) )
         throw -1;
 
     this->trap.cb = cb;
-    this->format = output;
     this->offsets = (addr_t*)g_malloc0(__OFFSET_MAX*sizeof(addr_t));
     this->ktrap_frame_size = 0;
 

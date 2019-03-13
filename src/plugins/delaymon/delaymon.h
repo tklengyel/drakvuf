@@ -20,6 +20,6 @@ public:
         .data = (void*)this
     };
 
-    delaymon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    delaymon(drakvuf_t drakvuf, output_format_t output);
     ~delaymon();
 };

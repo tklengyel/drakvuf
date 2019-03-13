@@ -221,7 +221,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 /* ----------------------------------------------------- */
 
-objmon::objmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+objmon::objmon(drakvuf_t drakvuf, output_format_t output)
 {
     if ( !drakvuf_get_function_rva(drakvuf, "ObCreateObject", &this->trap.breakpoint.rva) )
         throw -1;

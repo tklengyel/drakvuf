@@ -126,7 +126,7 @@ public:
     size_t* offsets;
     size_t ktrap_frame_size;
 
-    exmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    exmon(drakvuf_t drakvuf, output_format_t output);
     ~exmon();
 };
 
