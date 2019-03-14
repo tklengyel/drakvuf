@@ -117,6 +117,13 @@ using handle_t = uint64_t;
 using handled_t = bool;
 using file_name_t = std::string;
 
+struct filedelete_config
+{
+    const char* dump_folder;
+    bool dump_modified_files;
+    bool filedelete_use_injector;
+};
+
 class filedelete: public plugin
 {
 public:
@@ -144,7 +151,7 @@ public:
     std::map<std::pair<vmi_pid_t, handle_t>, file_name_t> files;
     int sequence_number;
 
-    filedelete(drakvuf_t drakvuf, const void* config, output_format_t output);
+    filedelete(drakvuf_t drakvuf, const filedelete_config* config, output_format_t output);
     ~filedelete();
 
     // For `filedelete2`

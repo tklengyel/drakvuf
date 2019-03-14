@@ -261,7 +261,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 /* ----------------------------------------------------- */
 
-poolmon::poolmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+poolmon::poolmon(drakvuf_t drakvuf, output_format_t output)
 {
     this->pooltag_tree = pooltag_build_tree();
 

@@ -116,7 +116,7 @@ public:
     drakvuf_t drakvuf;
     bool stealth;
 
-    cpuidmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    cpuidmon(drakvuf_t drakvuf, bool stealth, output_format_t output);
     ~cpuidmon();
 };
 

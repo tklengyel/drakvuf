@@ -119,7 +119,7 @@ public:
     addr_t kiservicetable;
     uint32_t kiservicelimit;
 
-    ssdtmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    ssdtmon(drakvuf_t drakvuf, output_format_t output);
     ~ssdtmon();
 };
 

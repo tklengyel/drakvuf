@@ -113,7 +113,7 @@ class crashmon: public plugin
 public:
     const output_format_t format;
 
-    crashmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    crashmon(drakvuf_t drakvuf, output_format_t output);
 
 private:
     drakvuf_trap_t trap =

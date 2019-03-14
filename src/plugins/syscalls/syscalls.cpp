@@ -751,9 +751,8 @@ static symbols_t* filter_symbols(const symbols_t* symbols, const char* filter_fi
     return ret;
 }
 
-syscalls::syscalls(drakvuf_t drakvuf, const void* config, output_format_t output)
+syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output)
 {
-    const struct syscalls_config* c = (const struct syscalls_config*)config;
     symbols_t* symbols = drakvuf_get_symbols_from_rekall(drakvuf);
     if (!symbols)
     {

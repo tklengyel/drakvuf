@@ -132,7 +132,7 @@ public:
         }
     };
 
-    filetracer(drakvuf_t drakvuf, const void* config, output_format_t output);
+    filetracer(drakvuf_t drakvuf, output_format_t output);
     ~filetracer();
 };
 

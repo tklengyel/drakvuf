@@ -109,6 +109,11 @@
 #include "plugins/plugins.h"
 #include "plugins/private.h"
 
+struct syscalls_config
+{
+    const char* syscalls_filter_file;
+};
+
 class syscalls: public plugin
 {
 
@@ -120,7 +125,7 @@ public:
     output_format_t format;
     os_t os;
 
-    syscalls(drakvuf_t drakvuf, const void* config, output_format_t output);
+    syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     ~syscalls();
 };
 

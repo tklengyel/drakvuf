@@ -128,7 +128,7 @@ public:
     addr_t objattr_name;
     addr_t objattr_root;
 
-    regmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    regmon(drakvuf_t drakvuf, output_format_t output);
     ~regmon();
 };
 

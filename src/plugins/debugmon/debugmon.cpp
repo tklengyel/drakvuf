@@ -198,11 +198,10 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 /* ----------------------------------------------------- */
 
-debugmon::debugmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+debugmon::debugmon(drakvuf_t drakvuf, output_format_t output)
+    : format{output}
+    , drakvuf{drakvuf}
 {
-
-    this->format = output;
-    this->drakvuf = drakvuf;
     this->debug.cb = debug_cb;
     this->debug.data = (void*)this;
     this->debug.type = DEBUG;

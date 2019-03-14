@@ -1061,12 +1061,11 @@ static win_ver_t get_win_ver(drakvuf_t drakvuf)
     return winver;
 }
 
-socketmon::socketmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format_t output)
+    : format{output}
 {
-    const struct socketmon_config* c = (const struct socketmon_config*)config;
     this->pm = drakvuf_get_page_mode(drakvuf);
     this->winver = get_win_ver(drakvuf);
-    this->format = output;
 
     if ( !c->tcpip_profile )
     {

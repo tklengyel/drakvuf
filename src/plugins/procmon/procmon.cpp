@@ -694,7 +694,7 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
 }
 
 
-procmon::procmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+procmon::procmon(drakvuf_t drakvuf, output_format_t output)
     : result_traps {}
 {
     this->format = output;
