@@ -135,7 +135,7 @@ drakvuf_plugins::~drakvuf_plugins()
 }
 
 int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
-                           const void* config)
+                           const plugins_options* options)
 {
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
             plugin_id < __DRAKVUF_PLUGIN_LIST_MAX)
@@ -151,93 +151,134 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
             {
 #ifdef ENABLE_PLUGIN_SYSCALLS
                 case PLUGIN_SYSCALLS:
-                    this->plugins[plugin_id] = new syscalls(this->drakvuf, config, this->output);
+                {
+                    syscalls_config config =
+                    {
+                        .syscalls_filter_file = options->syscalls_filter_file,
+                    };
+                    this->plugins[plugin_id] = new syscalls(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_POOLMON
                 case PLUGIN_POOLMON:
-                    this->plugins[plugin_id] = new poolmon(this->drakvuf, config, this->output);
+                    this->plugins[plugin_id] = new poolmon(this->drakvuf, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_FILETRACER
                 case PLUGIN_FILETRACER:
-                    this->plugins[plugin_id] = new filetracer(this->drakvuf, config, this->output);
+                    this->plugins[plugin_id] = new filetracer(this->drakvuf, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_FILEDELETE
                 case PLUGIN_FILEDELETE:
-                    this->plugins[plugin_id] = new filedelete(this->drakvuf, config, this->output);
+                {
+                    filedelete_config config =
+                    {
+                        .dump_folder = options->dump_folder,
+                        .dump_modified_files = options->dump_modified_files,
+                        .filedelete_use_injector = options->filedelete_use_injector,
+                    };
+                    this->plugins[plugin_id] = new filedelete(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_OBJMON
                 case PLUGIN_OBJMON:
-                    this->plugins[plugin_id] = new objmon(this->drakvuf, config, this->output);
+                    this->plugins[plugin_id] = new objmon(this->drakvuf, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_EXMON
                 case PLUGIN_EXMON:
-                    this->plugins[plugin_id] = new exmon(this->drakvuf, config, this->output);
+                    this->plugins[plugin_id] = new exmon(this->drakvuf, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_SSDTMON
                 case PLUGIN_SSDTMON:
-                    this->plugins[plugin_id] = new ssdtmon(this->drakvuf, config, this->output);
+                    this->plugins[plugin_id] = new ssdtmon(this->drakvuf, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_DEBUGMON
                 case PLUGIN_DEBUGMON:
-                    this->plugins[plugin_id] = new debugmon(this->drakvuf, config, this->output);
+                    this->plugins[plugin_id] = new debugmon(this->drakvuf, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_DELAYMON
                 case PLUGIN_DELAYMON:
-                    this->plugins[plugin_id] = new delaymon(this->drakvuf, config, this->output);
+                    this->plugins[plugin_id] = new delaymon(this->drakvuf, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_CPUIDMON
                 case PLUGIN_CPUIDMON:
-                    this->plugins[plugin_id] = new cpuidmon(this->drakvuf, config, this->output);
+                    this->plugins[plugin_id] = new cpuidmon(this->drakvuf, options->cpuid_stealth, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_SOCKETMON
                 case PLUGIN_SOCKETMON:
-                    this->plugins[plugin_id] = new socketmon(this->drakvuf, config, this->output);
+                {
+                    socketmon_config config =
+                    {
+                        .tcpip_profile = options->tcpip_profile,
+                    };
+                    this->plugins[plugin_id] = new socketmon(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_REGMON
                 case PLUGIN_REGMON:
-                    this->plugins[plugin_id] = new regmon(this->drakvuf, config, this->output);
+                    this->plugins[plugin_id] = new regmon(this->drakvuf, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_PROCMON
                 case PLUGIN_PROCMON:
-                    this->plugins[plugin_id] = new procmon(this->drakvuf, config, this->output);
+                    this->plugins[plugin_id] = new procmon(this->drakvuf, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_BSODMON
                 case PLUGIN_BSODMON:
-                    this->plugins[plugin_id] = new bsodmon(this->drakvuf, config, this->output);
+                    this->plugins[plugin_id] = new bsodmon(this->drakvuf, options->abort_on_bsod, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_ENVMON
                 case PLUGIN_ENVMON:
-                    this->plugins[plugin_id] = new envmon(this->drakvuf, config, this->output);
+                {
+                    envmon_config config =
+                    {
+                        .sspicli_profile = options->sspicli_profile,
+                        .kernel32_profile = options->kernel32_profile,
+                        .kernelbase_profile = options->kernelbase_profile,
+                        .wow_kernel32_profile = options->wow_kernel32_profile,
+                    };
+                    this->plugins[plugin_id] = new envmon(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_CRASHMON
                 case PLUGIN_CRASHMON:
-                    this->plugins[plugin_id] = new crashmon(this->drakvuf, config, this->output);
+                    this->plugins[plugin_id] = new crashmon(this->drakvuf, this->output);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_CLIPBOARDMON
                 case PLUGIN_CLIPBOARDMON:
-                    this->plugins[plugin_id] = new clipboardmon(this->drakvuf, config, this->output);
+                {
+                    clipboardmon_config config =
+                    {
+                        .win32k_profile = options->win32k_profile,
+                    };
+                    this->plugins[plugin_id] = new clipboardmon(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_WINDOWMON
                 case PLUGIN_WINDOWMON:
-                    this->plugins[plugin_id] = new windowmon(this->drakvuf, config, this->output);
+                {
+                    windowmon_config config =
+                    {
+                        .win32k_profile = options->win32k_profile,
+                    };
+                    this->plugins[plugin_id] = new windowmon(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
                 default:
                     break;

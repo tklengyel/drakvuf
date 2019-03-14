@@ -115,7 +115,7 @@ public:
     GTree* pooltag_tree;
     drakvuf_trap_t trap;
 
-    poolmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    poolmon(drakvuf_t drakvuf, output_format_t output);
     ~poolmon();
 };
 

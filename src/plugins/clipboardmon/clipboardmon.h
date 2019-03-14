@@ -108,12 +108,17 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
+struct clipboardmon_config
+{
+    const char* win32k_profile;
+};
+
 class clipboardmon: public plugin
 {
 public:
     const output_format_t format;
 
-    clipboardmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    clipboardmon(drakvuf_t drakvuf, const clipboardmon_config* config, output_format_t output);
 
 private:
     drakvuf_trap_t traps[3] =

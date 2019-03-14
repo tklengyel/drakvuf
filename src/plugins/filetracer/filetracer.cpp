@@ -593,10 +593,10 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }
 
-filetracer::filetracer(drakvuf_t drakvuf, const void* config, output_format_t output)
+filetracer::filetracer(drakvuf_t drakvuf, output_format_t output)
+    : format{output}
 {
     int addr_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
-    this->format = output;
 
     if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
         throw -1;

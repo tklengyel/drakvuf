@@ -134,6 +134,6 @@ typedef enum _COMPUTER_NAME_FORMAT
     ComputerNamePhysicalDnsDomain,
     ComputerNamePhysicalDnsFullyQualified,
     ComputerNameMax
-} computer_name_format_t;;
+} computer_name_format_t;
 
 #endif

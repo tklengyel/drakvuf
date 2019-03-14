@@ -115,7 +115,7 @@ public:
     drakvuf_trap_t debug;
     drakvuf_t drakvuf;
 
-    debugmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    debugmon(drakvuf_t drakvuf, output_format_t output);
     ~debugmon();
 };
 

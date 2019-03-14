@@ -107,13 +107,21 @@
 
 #include "plugins/plugins.h"
 
+struct envmon_config
+{
+    const char* sspicli_profile;
+    const char* kernel32_profile;
+    const char* kernelbase_profile;
+    const char* wow_kernel32_profile;
+};
+
 class envmon: public plugin
 {
 public:
     output_format_t format;
 
 public:
-    envmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    envmon(drakvuf_t drakvuf, const envmon_config* config, output_format_t output);
 
 private:
     drakvuf_trap_t traps[5] =
