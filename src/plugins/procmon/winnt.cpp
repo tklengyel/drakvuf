@@ -164,7 +164,7 @@ std::string stringify_protection_attributes(uint32_t attributes, char sep)
             default:
             {
                 char tmp[32] = {0};
-                sprintf(tmp, "0x%" PRIx32, attr);
+                snprintf(tmp, 32, "0x%" PRIx32, attr);
                 result.append(tmp);
                 break;
             }
