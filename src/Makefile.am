@@ -102,13 +102,14 @@
 #                                                                         #
 #*************************************************************************#
 
-bin_PROGRAMS = drakvuf xen_memclone injector
+bin_PROGRAMS = drakvuf xen_memclone injector mem_monitor
 
 SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch
 
 drakvuf_SOURCES = main.cpp drakvuf.cpp
 xen_memclone_SOURCES  = xen_memclone.c
 injector_SOURCES = injector.c
+mem_monitor_SOURCES = mem_monitor.c
 
 AM_CPPFLAGS = $(CPPFLAGS)
 AM_CPPFLAGS += $(VMI_CFLAGS)
@@ -122,6 +123,16 @@ AM_LDFLAGS += $(GLIB_LIBS)
 AM_LDFLAGS += $(JSONC_LIBS)
 
 AM_CFLAGS = $(CFLAGS)
+AM_CFLAGS += $(VMI_CFLAGS)
+AM_CFLAGS += $(GLIB_CFLAGS)
+AM_CFLAGS += $(JSON_CFLAGS)
+AM_CFLAGS += -I$(top_srcdir) -I$(srcdir)
+
+mem_monitor_CFLAGSADD += $(VMI_CFLAGS)
+mem_monitor_CFLAGSADD += $(GLIB_CFLAGS)
+mem_monitor_CFLAGSADD += $(JSON_CFLAGS)
+mem_monitor_CFLAGSADD += -I$(top_srcdir) -I$(srcdir)
+
 AM_CXXFLAGS = $(CXXFLAGS)
 
 if HARDENING
@@ -152,5 +163,8 @@ endif
 
 injector_LDADD = libdrakvuf/libdrakvuf.la
 injector_LDADD += libinjector/libinjector.la
+
+mem_monitor_LDADD = libdrakvuf/libdrakvuf.la
+mem_monitor_LDADD += libinjector/libinjector.la
 
 xen_memclone_LDADD = xen_helper/libxenhelper.la

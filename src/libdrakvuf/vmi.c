@@ -585,11 +585,8 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     event->x86_regs->cr3 = event->reg_event.value;
 
-    /* Flush the LibVMI caches */
+    /* Flush the LibVMI caches that are invalidated */
     vmi_v2pcache_flush(drakvuf->vmi, event->reg_event.previous);
-    vmi_pidcache_flush(drakvuf->vmi);
-    vmi_rvacache_flush(drakvuf->vmi);
-    vmi_symcache_flush(drakvuf->vmi);
 
     if ( drakvuf->os == VMI_OS_WINDOWS )
     {
