@@ -148,7 +148,7 @@ endif
 endif
 
 if !DEBUG
-mem_monitor_CFLAGS_ADD = -Wno-missing-field-initializers
+mem_monitor_CFLAGSADD = -Wno-missing-field-initializers
 endif
 
 drakvuf_LDADD = libdrakvuf/libdrakvuf.la
