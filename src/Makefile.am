@@ -128,11 +128,6 @@ AM_CFLAGS += $(GLIB_CFLAGS)
 AM_CFLAGS += $(JSON_CFLAGS)
 AM_CFLAGS += -I$(top_srcdir) -I$(srcdir)
 
-mem_monitor_CFLAGSADD += $(VMI_CFLAGS)
-mem_monitor_CFLAGSADD += $(GLIB_CFLAGS)
-mem_monitor_CFLAGSADD += $(JSON_CFLAGS)
-mem_monitor_CFLAGSADD += -I$(top_srcdir) -I$(srcdir)
-
 AM_CXXFLAGS = $(CXXFLAGS)
 
 if HARDENING

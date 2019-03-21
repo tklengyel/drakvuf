@@ -303,11 +303,19 @@ static int init_linux()
     symbols_t* symbols = NULL;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     addr_t base = 0;
+    addr_t rva = 0;
 
     if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, 0, &kpdb))
     {
         rc = ENOENT;
         fprintf(stderr, "Couldn't find kernel page table base\n");
+        goto exit;
+    }
+
+    if ( !drakvuf_get_constant_rva(drakvuf, "_text", &rva) )
+    {
+        rc = ENOENT;
+        fprintf(stderr, "Couldn't find symbol _text\n");
         goto exit;
     }
 
@@ -326,7 +334,7 @@ static int init_linux()
     }
 
     base = drakvuf_get_kernel_base(drakvuf);
-    kaslr = base - stext;
+    kaslr = base - rva;
 
     PRINT_DEBUG("Linux kernel: VA [%lx - %lx], cr3=%lx, kaslr=%lx\n",
                 stext, etext, kpdb, kaslr);
