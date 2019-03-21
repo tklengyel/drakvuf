@@ -140,9 +140,7 @@ extern bool verbose;
 static drakvuf_t drakvuf = {0};
 static GSList* traps = NULL;
 
-
 static addr_t kaslr = 0;
-
 static addr_t kpdb = 0;
 
 // Kernel range
@@ -152,8 +150,9 @@ static addr_t etext = 0;
 // Track the range of virtual addresses seen
 static addr_t    addr_min = 0;
 static addr_t    addr_max = 0;
+
 // Max function/data length to account for in sym resolution
-#define MAX_SCAN_LEN 0x1000
+#define MAX_SCAN_LEN 0x200
 
 static int resolve_va(vmi_instance_t vmi,
                       addr_t va, const char** sym, size_t* ofs)
@@ -189,13 +188,16 @@ static int resolve_va(vmi_instance_t vmi,
             rc = 0;
             break;
         }
-        PRINT_DEBUG("No symbol found at %lx\n", va);
+    }
+
+    if (rc)
+    {
+        PRINT_DEBUG("No symbol found at/near %lx\n", va);
     }
 
 exit:
     return rc;
 }
-
 
 static event_response_t memaccess_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -241,8 +243,7 @@ static void cleanup(void)
 
         drakvuf_remove_trap(drakvuf, trap, NULL);
 
-        //g_free(trap->data);
-        //g_free(trap->name);
+        // data, name fields don't hold allocations
         g_free(trap);
         loop = loop->next;
     }
@@ -301,19 +302,12 @@ static int init_linux()
     int rc = 0;
     symbols_t* symbols = NULL;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    addr_t text = 0;
+    addr_t base = 0;
 
     if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, 0, &kpdb))
     {
         rc = ENOENT;
         fprintf(stderr, "Couldn't find kernel page table base\n");
-        goto exit;
-    }
-
-    if (!drakvuf_get_constant_rva(drakvuf, "_text", &text))
-    {
-        rc = ENOENT;
-        fprintf(stderr, "Couldn't find symbol _text\n");
         goto exit;
     }
 
@@ -331,7 +325,8 @@ static int init_linux()
         goto exit;
     }
 
-    kaslr = drakvuf_get_kernel_base(drakvuf) - text;
+    base = drakvuf_get_kernel_base(drakvuf);
+    kaslr = base - stext;
 
     PRINT_DEBUG("Linux kernel: VA [%lx - %lx], cr3=%lx, kaslr=%lx\n",
                 stext, etext, kpdb, kaslr);
@@ -347,11 +342,10 @@ static int init_linux()
     for (size_t i = 0; i < symbols->count; ++i)
     {
         const struct symbol* s = &symbols->symbols[i];
+        addr_t va = kaslr + s->rva;
 
-        addr_t adjusted = (0xffffffff & kaslr) + s->rva;
-
-        PRINT_DEBUG("Adding symbol %s <== %lx\n", s->name, adjusted);
-        vmi_rvacache_add(vmi, 0, kpdb, adjusted, s->name);
+        PRINT_DEBUG("Adding symbol %s <== %lx\n", s->name, va);
+        vmi_rvacache_add(vmi, 0, kpdb, va, s->name);
     }
 
 exit:
@@ -405,6 +399,7 @@ static int init(void)
             fprintf(stderr, "Unhandled OS found\n");
             break;
     }
+
 exit:
     return rc;
 }
@@ -443,7 +438,6 @@ int main(int argc, char** argv)
                );
         goto exit;
     }
-
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
     {
@@ -499,13 +493,11 @@ int main(int argc, char** argv)
     act.sa_handler = close_handler;
     act.sa_flags = 0;
     sigemptyset(&act.sa_mask);
-    sigaction(SIGHUP, &act, NULL);
+    sigaction(SIGHUP,  &act, NULL);
     sigaction(SIGTERM, &act, NULL);
-    sigaction(SIGINT, &act, NULL);
+    sigaction(SIGINT,  &act, NULL);
     sigaction(SIGALRM, &act, NULL);
     sigaction(SIGABRT, &act, NULL);
-
-    PRINT_DEBUG("Beginning DRAKVUF loop\n");
 
     rc = init();
     if (rc)
@@ -514,6 +506,7 @@ int main(int argc, char** argv)
     }
 
     /* Start the event listener */
+    PRINT_DEBUG("Beginning DRAKVUF loop\n");
     drakvuf_loop(drakvuf);
     rc = 0;
 

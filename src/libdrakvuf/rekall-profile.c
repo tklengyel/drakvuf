@@ -311,10 +311,11 @@ symbols_t* rekall_get_symbols_from_rekall(json_object* rekall_profile_json)
     {
         ret->symbols[i].name = g_strdup(json_object_iter_peek_name(&it));
         ret->symbols[i].rva = json_object_get_int64(json_object_iter_peek_value(&it));
-
+#if 0
         /* This may not be an rva but a full VA that needs to made canonical (Linux addr) */
         if ( VMI_GET_BIT(ret->symbols[i].rva, 47) )
             ret->symbols[i].rva |= 0xffff000000000000;
+#endif
 
         i++;
         json_object_iter_next(&it);
