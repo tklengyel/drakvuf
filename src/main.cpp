@@ -135,12 +135,12 @@ static inline void disable_all_plugins(bool* plugin_list)
         plugin_list[i] = false;
 }
 
-static inline void enable_plugin(char* optarg, bool* plugin_list, bool& disabled_all)
+static inline void enable_plugin(char* optarg, bool* plugin_list, bool* disabled_all)
 {
-    if (!disabled_all)
+    if (!*disabled_all)
     {
         disable_all_plugins(plugin_list);
-        disabled_all = true;
+        *disabled_all = true;
     }
     for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
         if (!strcmp(optarg, drakvuf_plugin_names[i]))
@@ -342,7 +342,7 @@ int main(int argc, char** argv)
                 disable_plugin(optarg, plugin_list);
                 break;
             case 'a':
-                enable_plugin(optarg, plugin_list, disabled_all);
+                enable_plugin(optarg, plugin_list, &disabled_all);
                 break;
             case 's':
                 options.cpuid_stealth = true;
