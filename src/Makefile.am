@@ -147,6 +147,10 @@ AM_CXXFLAGS += -pg
 endif
 endif
 
+if !DEBUG
+mem_monitor_CFLAGS_ADD = -Wno-missing-field-initializers
+endif
+
 drakvuf_LDADD = libdrakvuf/libdrakvuf.la
 drakvuf_LDADD += xen_helper/libxenhelper.la
 drakvuf_LDADD += plugins/libdrakvufplugins.la
