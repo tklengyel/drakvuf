@@ -108,12 +108,17 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
+struct windowmon_config
+{
+    const char* win32k_profile;
+};
+
 class windowmon: public plugin
 {
 public:
     const output_format_t format;
 
-    windowmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    windowmon(drakvuf_t drakvuf, const windowmon_config* config, output_format_t output);
 
 private:
     drakvuf_trap_t traps[1] =

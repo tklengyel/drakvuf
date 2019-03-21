@@ -135,7 +135,7 @@ public:
     addr_t current_directory_dospath;
     addr_t object_header_body;
 
-    procmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    procmon(drakvuf_t drakvuf, output_format_t output);
     ~procmon();
 };
 

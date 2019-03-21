@@ -205,13 +205,11 @@ event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 /* ----------------------------------------------------- */
 
-cpuidmon::cpuidmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+cpuidmon::cpuidmon(drakvuf_t drakvuf, bool stealth, output_format_t output)
+    : format{output}
+    , drakvuf{drakvuf}
+    , stealth{stealth}
 {
-
-    this->format = output;
-    this->stealth = *(bool*)config;
-    this->drakvuf = drakvuf;
-
     this->cpuid.cb = cpuid_cb;
     this->cpuid.data = (void*)this;
     this->cpuid.type = CPUID;

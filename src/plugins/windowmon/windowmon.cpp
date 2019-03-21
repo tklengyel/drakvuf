@@ -227,28 +227,28 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
     addr_t func_rva = 0;
     if ( !rekall_get_function_rva(profile_json, function_name, &func_rva) )
     {
-        PRINT_DEBUG("[CLIPBOARDMON] Failed to get RVA of win32k!%s\n", function_name);
+        PRINT_DEBUG("[WINDOWMON] Failed to get RVA of win32k!%s\n", function_name);
         return false;
     }
 
     addr_t w32pst_rva = 0;
     if ( !get_constant_rva(profile_json, "W32pServiceTable", &w32pst_rva) )
     {
-        PRINT_DEBUG("[CLIPBOARDMON] Failed to get RVA of win32k!W32pServiceTable\n");
+        PRINT_DEBUG("[WINDOWMON] Failed to get RVA of win32k!W32pServiceTable\n");
         return false;
     }
 
     addr_t sdt_rva = 0;
     if ( !drakvuf_get_constant_rva( drakvuf, "KeServiceDescriptorTableShadow", &sdt_rva) )
     {
-        PRINT_DEBUG("[CLIPBOARDMON] [Init] Failed to get RVA of nt!KeServiceDescriptorTableShadow\n");
+        PRINT_DEBUG("[WINDOWMON] [Init] Failed to get RVA of nt!KeServiceDescriptorTableShadow\n");
         return false;
     }
 
     addr_t sdt_va = 0;
     if (!(sdt_va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, "ntoskrnl.exe", sdt_rva)))
     {
-        PRINT_DEBUG("[CLIPBOARDMON] [Init] Failed to get VA of nt!KeServiceDescriptorTableShadow\n");
+        PRINT_DEBUG("[WINDOWMON] [Init] Failed to get VA of nt!KeServiceDescriptorTableShadow\n");
         return false;
     }
 
@@ -261,14 +261,14 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
     addr_t eprocess_base = 0;
     if (!drakvuf_find_process(drakvuf, ~0, "explorer.exe", &eprocess_base))
     {
-        PRINT_DEBUG("[CLIPBOARDMON] [Init] Failed to find EPROCESS of \"explorer.exe\"\n");
+        PRINT_DEBUG("[WINDOWMON] [Init] Failed to find EPROCESS of \"explorer.exe\"\n");
         return false;
     }
 
     vmi_pid_t pid = 0;
     if (VMI_SUCCESS != drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
     {
-        PRINT_DEBUG("[CLIPBOARDMON] [Init] Failed to get PID of \"explorer.exe\"\n");
+        PRINT_DEBUG("[WINDOWMON] [Init] Failed to get PID of \"explorer.exe\"\n");
         return false;
     }
 
@@ -276,7 +276,7 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
 
     if (VMI_SUCCESS != vmi_pid_to_dtb(vmi.vmi, pid, &trap->breakpoint.dtb))
     {
-        PRINT_DEBUG("[CLIPBOARDMON] [Init] Failed to get CR3 of \"explorer.exe\"\n");
+        PRINT_DEBUG("[WINDOWMON] [Init] Failed to get CR3 of \"explorer.exe\"\n");
         return false;
     }
 
@@ -289,7 +289,7 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
     addr_t ssdt_va = 0;
     if (VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &ssdt_va))
     {
-        PRINT_DEBUG("[CLIPBOARDMON] Failed to read the address of SSDT (VA 0x%lx)\n", ssdt_ptr_va);
+        PRINT_DEBUG("[WINDOWMON] Failed to read the address of SSDT (VA 0x%lx)\n", ssdt_ptr_va);
         return false;
     }
 
@@ -299,18 +299,16 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
 
     if ( !drakvuf_add_trap( drakvuf, trap ) )
     {
-        PRINT_DEBUG("[CLIPBOARDMON] Failed to trap VA 0x%lx\n", trap->breakpoint.addr);
+        PRINT_DEBUG("[WINDOWMON] Failed to trap VA 0x%lx\n", trap->breakpoint.addr);
         return false;
     }
 
     return true;
 }
 
-windowmon::windowmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+windowmon::windowmon(drakvuf_t drakvuf, const windowmon_config* c, output_format_t output)
     : format(output)
 {
-    const struct windowmon_config* c = (const struct windowmon_config*)config;
-
     if ( !c->win32k_profile )
     {
         PRINT_DEBUG("Windowmon plugin requires the Rekall profile for win32k.sys!\n");

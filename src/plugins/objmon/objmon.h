@@ -125,7 +125,7 @@ public:
     };
     addr_t key_offset;
 
-    objmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    objmon(drakvuf_t drakvuf, output_format_t output);
     ~objmon();
 };
 

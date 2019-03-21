@@ -109,6 +109,11 @@
 #include "plugins/plugins.h"
 #include "private.h"
 
+struct socketmon_config
+{
+    const char* tcpip_profile;
+};
+
 class socketmon: public plugin
 {
 public:
@@ -139,7 +144,7 @@ public:
         }
     };
 
-    socketmon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    socketmon(drakvuf_t drakvuf, const socketmon_config* config, output_format_t output);
     ~socketmon();
 };
 

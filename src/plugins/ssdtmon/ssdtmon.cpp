@@ -175,13 +175,12 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 /* ----------------------------------------------------- */
 
-ssdtmon::ssdtmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+ssdtmon::ssdtmon(drakvuf_t drakvuf, output_format_t output)
+    : format{output}
 {
     addr_t kiservicetable_rva = 0;
     addr_t kiservicelimit_rva = 0;
     addr_t kernbase = 0;
-
-    this->format = output;
 
     if ( !drakvuf_get_constant_rva(drakvuf, "KiServiceTable", &kiservicetable_rva) )
     {

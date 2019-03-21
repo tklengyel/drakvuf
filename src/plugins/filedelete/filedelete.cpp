@@ -1115,10 +1115,9 @@ static addr_t get_function_va(drakvuf_t drakvuf, const char* lib, const char* fu
     return va;
 }
 
-filedelete::filedelete(drakvuf_t drakvuf, const void* config, output_format_t output)
+filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_format_t output)
     : sequence_number()
 {
-    const struct filedelete_config* c = (const struct filedelete_config*)config;
     this->pm = drakvuf_get_page_mode(drakvuf);
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);

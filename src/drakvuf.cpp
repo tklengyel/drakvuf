@@ -148,99 +148,12 @@ static void cleanup_timer(drakvuf_c* drakvuf, GThread* timeout_thread)
 
 int drakvuf_c::start_plugins(const bool* plugin_list, const plugins_options* options)
 {
-    int i;
-    int rc;
-
-    for (i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
+    for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
     {
         if (plugin_list[i])
         {
-            switch ((drakvuf_plugin_t)i)
-            {
-                case PLUGIN_FILEDELETE:
-                {
-                    struct filedelete_config c =
-                    {
-                        .dump_folder = options->dump_folder,
-                        .dump_modified_files = options->dump_modified_files,
-                        .filedelete_use_injector = options->filedelete_use_injector,
-                    };
-
-                    rc = plugins->start((drakvuf_plugin_t)i, &c);
-                    break;
-                }
-
-                case PLUGIN_CPUIDMON:
-                    rc = plugins->start((drakvuf_plugin_t)i, &options->cpuid_stealth);
-                    break;
-
-                case PLUGIN_SOCKETMON:
-                {
-                    struct socketmon_config c =
-                    {
-                        .tcpip_profile = options->tcpip_profile,
-                    };
-                    rc = plugins->start((drakvuf_plugin_t)i, &c);
-                    break;
-                }
-
-                case PLUGIN_SYSCALLS:
-                {
-                    struct syscalls_config c =
-                    {
-                        .syscalls_filter_file = options->syscalls_filter_file
-                    };
-                    rc = plugins->start((drakvuf_plugin_t)i, &c);
-                    break;
-                }
-
-                case PLUGIN_BSODMON:
-                    rc = plugins->start((drakvuf_plugin_t)i, &options->abort_on_bsod);
-                    break;
-
-                case PLUGIN_ENVMON:
-                {
-                    struct envmon_config c =
-                    {
-                        .sspicli_profile = options->sspicli_profile,
-                        .kernel32_profile = options->kernel32_profile,
-                        .kernelbase_profile = options->kernelbase_profile,
-                        .wow_kernel32_profile = options->wow_kernel32_profile
-                    };
-                    rc = plugins->start((drakvuf_plugin_t)i, &c);
-                    break;
-                }
-
-                case PLUGIN_CRASHMON:
-                    rc = plugins->start((drakvuf_plugin_t)i, nullptr);
-                    break;
-
-                case PLUGIN_CLIPBOARDMON:
-                {
-                    struct clipboardmon_config c =
-                    {
-                        .win32k_profile = options->win32k_profile,
-                    };
-                    rc = plugins->start((drakvuf_plugin_t)i, &c);
-                    break;
-                }
-
-                case PLUGIN_WINDOWMON:
-                {
-                    struct windowmon_config c =
-                    {
-                        .win32k_profile = options->win32k_profile,
-                    };
-                    rc = plugins->start((drakvuf_plugin_t)i, &c);
-                    break;
-                }
-
-                default:
-                    rc = plugins->start((drakvuf_plugin_t)i, nullptr);
-                    break;
-            }
-
-            if ( rc < 0 )
+            int rc = plugins->start(static_cast<drakvuf_plugin_t>(i), options);
+            if (rc < 0)
                 return rc;
         }
     }

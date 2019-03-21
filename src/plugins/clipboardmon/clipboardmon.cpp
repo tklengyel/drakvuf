@@ -266,11 +266,9 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
     return true;
 }
 
-clipboardmon::clipboardmon(drakvuf_t drakvuf, const void* config, output_format_t output)
+clipboardmon::clipboardmon(drakvuf_t drakvuf, const clipboardmon_config* c, output_format_t output)
     : format(output)
 {
-    const struct clipboardmon_config* c = (const struct clipboardmon_config*)config;
-
     if ( !c->win32k_profile )
     {
         PRINT_DEBUG("Clipboardmon plugin requires the Rekall profile for win32k.sys!\n");

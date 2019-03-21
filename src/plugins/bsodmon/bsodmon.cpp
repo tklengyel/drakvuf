@@ -231,11 +231,10 @@ void bsodmon::register_trap(drakvuf_t drakvuf, const char* syscall_name,
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }
 
-bsodmon::bsodmon(drakvuf_t drakvuf, const void* config, output_format_t output)
-    : format(output)
+bsodmon::bsodmon(drakvuf_t drakvuf, bool abort_on_bsod, output_format_t output)
+    : format{output}
+    , abort_on_bsod{abort_on_bsod}
 {
-    this->abort_on_bsod = *(bool*)config;
-
     init_bugcheck_map( this, drakvuf );
 
     register_trap(drakvuf, "KeBugCheck2", &trap, hook_cb);
