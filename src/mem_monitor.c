@@ -141,7 +141,8 @@ static drakvuf_t drakvuf = {0};
 static GSList* traps = NULL;
 
 static addr_t kaslr = 0;
-static addr_t kpdb = 0;
+static addr_t kpdb  = 0;
+static addr_t kbase = 0;
 
 // Kernel range
 static addr_t stext = 0;
@@ -163,8 +164,8 @@ static int resolve_va(vmi_instance_t vmi,
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = kpdb,
-        .addr = 0,
+        .dtb  = kpdb,
+        .addr = kbase,
     };
 
     *sym = "unknown";
@@ -302,7 +303,6 @@ static int init_linux()
     int rc = 0;
     symbols_t* symbols = NULL;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    addr_t base = 0;
     addr_t rva = 0;
 
     if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, 0, &kpdb))
@@ -333,8 +333,8 @@ static int init_linux()
         goto exit;
     }
 
-    base = drakvuf_get_kernel_base(drakvuf);
-    kaslr = base - rva;
+    kbase = drakvuf_get_kernel_base(drakvuf);
+    kaslr = kbase - rva;
 
     PRINT_DEBUG("Linux kernel: VA [%lx - %lx], cr3=%lx, kaslr=%lx\n",
                 stext, etext, kpdb, kaslr);
@@ -353,7 +353,7 @@ static int init_linux()
         addr_t va = kaslr + s->rva;
 
         PRINT_DEBUG("Adding symbol %s <== %lx\n", s->name, va);
-        vmi_rvacache_add(vmi, 0, kpdb, va, s->name);
+        vmi_rvacache_add(vmi, kbase, 0, va, s->name);
     }
 
 exit:
