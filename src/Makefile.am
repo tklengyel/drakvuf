@@ -147,9 +147,7 @@ AM_CXXFLAGS += -pg
 endif
 endif
 
-if !DEBUG
-mem_monitor_CFLAGSADD = -Wno-missing-field-initializers
-endif
+mem_monitor_CFLAGS = $(AM_CFLAGS) -Wno-missing-braces
 
 drakvuf_LDADD = libdrakvuf/libdrakvuf.la
 drakvuf_LDADD += xen_helper/libxenhelper.la
