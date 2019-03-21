@@ -135,9 +135,10 @@ static inline void disable_all_plugins(bool* plugin_list)
         plugin_list[i] = false;
 }
 
-static inline void enable_plugin(char* optarg, bool* plugin_list, bool &disabled_all)
+static inline void enable_plugin(char* optarg, bool* plugin_list, bool& disabled_all)
 {
-    if(!disabled_all){
+    if (!disabled_all)
+    {
         disable_all_plugins(plugin_list);
         disabled_all = true;
     }
