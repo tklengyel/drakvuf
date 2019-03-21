@@ -269,7 +269,7 @@ int main(int argc, char** argv)
         {"verbose", no_argument, NULL, 'v'},
         {NULL, 0, NULL, 0}
     };
-    const char *opts = "r:d:i:I:e:m:t:D:o:vx:a:spT:S:Mc:nblgj:w:W:";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:spT:S:Mc:nblgj:w:W:";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
