@@ -116,7 +116,6 @@
 #include "drakvuf.h"
 
 static drakvuf_c* drakvuf;
-static bool disabled_all; // Used to disable all plugin once
 
 void close_handler(int signal)
 {
@@ -136,12 +135,11 @@ static inline void disable_all_plugins(bool* plugin_list)
         plugin_list[i] = false;
 }
 
-static inline void enable_plugin(char* optarg, bool* plugin_list)
+static inline void enable_plugin(char* optarg, bool* plugin_list, bool &disabled_all)
 {
-    if (!disabled_all)
-    {
-        disabled_all = true;
+    if(!disabled_all){
         disable_all_plugins(plugin_list);
+        disabled_all = true;
     }
     for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
         if (!strcmp(optarg, drakvuf_plugin_names[i]))
@@ -172,6 +170,8 @@ int main(int argc, char** argv)
     bool libvmi_conf = false;
     char* rekall_wow_profile = nullptr;
     plugins_options options = { 0 };
+    bool disabled_all = false; // Used to disable all plugin once
+
 
     eprint_current_time();
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -341,7 +341,7 @@ int main(int argc, char** argv)
                 disable_plugin(optarg, plugin_list);
                 break;
             case 'a':
-                enable_plugin(optarg, plugin_list);
+                enable_plugin(optarg, plugin_list, disabled_all);
                 break;
             case 's':
                 options.cpuid_stealth = true;
