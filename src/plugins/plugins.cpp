@@ -249,8 +249,6 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .kernel32_profile = options->kernel32_profile,
                         .kernelbase_profile = options->kernelbase_profile,
                         .wow_kernel32_profile = options->wow_kernel32_profile,
-                        .iphlpapi_profile = options->iphlpapi_profile,
-                        .mpr_profile = options->mpr_profile,
                     };
                     this->plugins[plugin_id] = new envmon(this->drakvuf, &config, this->output);
                     break;
