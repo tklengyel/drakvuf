@@ -178,8 +178,12 @@ if PLUGIN_WINDOWMON
 sources += windowmon/windowmon.cpp
 endif
 
+if PLUGIN_LIBRARYMON
+sources += librarymon/librarymon.cpp
+endif
+
 ###############################################################################
-sources += plugins.cpp plugins.h
+sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(CPPFLAGS)

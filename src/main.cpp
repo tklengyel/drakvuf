@@ -244,6 +244,8 @@ int main(int argc, char** argv)
                 "\t                           The Rekall profile for KernelBase.dll\n"
                 "\t --rekall-wow-kernel32 <rekall profile>\n"
                 "\t                           The Rekall profile for SysWOW64/kernel32.dll\n"
+                "\t --rekall-ntdll <rekall profile>\n"
+                "\t                           The Rekall profile for ntdll.dll\n"
                );
         return rc;
     }
@@ -255,6 +257,7 @@ int main(int argc, char** argv)
         opt_rekall_kernel32,
         opt_rekall_kernelbase,
         opt_rekall_wow_kernel32,
+        opt_rekall_ntdll,
     };
     const option long_opts[] =
     {
@@ -266,6 +269,7 @@ int main(int argc, char** argv)
         {"rekall-win32k", required_argument, NULL, 'W'},
         {"rekall-wow", required_argument, NULL, 'w'},
         {"rekall-wow-kernel32", required_argument, NULL, opt_rekall_wow_kernel32},
+        {"rekall-ntdll", required_argument, NULL, opt_rekall_ntdll},
         {"injection-timeout", required_argument, NULL, 'j'},
         {"verbose", no_argument, NULL, 'v'},
         {NULL, 0, NULL, 0}
@@ -390,6 +394,9 @@ int main(int argc, char** argv)
                 break;
             case opt_rekall_wow_kernel32:
                 options.wow_kernel32_profile = optarg;
+                break;
+            case opt_rekall_ntdll:
+                options.ntdll_profile = optarg;
                 break;
             default:
                 if (isalnum(c))
