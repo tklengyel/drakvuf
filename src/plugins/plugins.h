@@ -125,6 +125,7 @@ struct plugins_options
     const char* wow_kernel32_profile;   // PLUGIN_ENVMON
     const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
     bool abort_on_bsod;                 // PLUGIN_BSODMON
+    const char* ntdll_profile;          // PLUGIN_LIBRARYMON
 };
 
 typedef enum drakvuf_plugin
@@ -147,6 +148,7 @@ typedef enum drakvuf_plugin
     PLUGIN_CRASHMON,
     PLUGIN_CLIPBOARDMON,
     PLUGIN_WINDOWMON,
+    PLUGIN_LIBRARYMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -170,6 +172,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_CRASHMON] = "crashmon",
     [PLUGIN_CLIPBOARDMON] = "clipboardmon",
     [PLUGIN_WINDOWMON] = "windowmon",
+    [PLUGIN_LIBRARYMON] = "librarymon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -192,6 +195,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_CRASHMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_CLIPBOARDMON] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_WINDOWMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_LIBRARYMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
 class plugin
