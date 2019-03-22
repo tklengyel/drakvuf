@@ -129,6 +129,24 @@ static inline void disable_plugin(char* optarg, bool* plugin_list)
             plugin_list[i] = false;
 }
 
+static inline void disable_all_plugins(bool* plugin_list)
+{
+    for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
+        plugin_list[i] = false;
+}
+
+static inline void enable_plugin(char* optarg, bool* plugin_list, bool* disabled_all)
+{
+    if (!*disabled_all)
+    {
+        disable_all_plugins(plugin_list);
+        *disabled_all = true;
+    }
+    for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
+        if (!strcmp(optarg, drakvuf_plugin_names[i]))
+            plugin_list[i] = true;
+}
+
 int main(int argc, char** argv)
 {
     int c;
@@ -153,6 +171,8 @@ int main(int argc, char** argv)
     bool libvmi_conf = false;
     char* rekall_wow_profile = nullptr;
     plugins_options options = { 0 };
+    bool disabled_all = false; // Used to disable all plugin once
+
 
     eprint_current_time();
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
@@ -183,6 +203,7 @@ int main(int argc, char** argv)
                 "\t -t <timeout>              Timeout (in seconds)\n"
                 "\t -o <format>               Output format (default, csv, kv, or json)\n"
                 "\t -x <plugin>               Don't activate the specified plugin\n"
+                "\t -a <plugin>               Activate the specified plugin\n"
                 "\t -p                        Leave domain paused after DRAKVUF exits\n"
 #ifdef ENABLE_DOPPELGANGING
                 "\t -B <path>                 The host path of the windows binary to inject (requires -m doppelganging)\n"
@@ -249,7 +270,7 @@ int main(int argc, char** argv)
         {"verbose", no_argument, NULL, 'v'},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:spT:S:Mc:nblgj:w:W:";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:spT:S:Mc:nblgj:w:W:";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
@@ -319,6 +340,9 @@ int main(int argc, char** argv)
                 break;
             case 'x':
                 disable_plugin(optarg, plugin_list);
+                break;
+            case 'a':
+                enable_plugin(optarg, plugin_list, &disabled_all);
                 break;
             case 's':
                 options.cpuid_stealth = true;
