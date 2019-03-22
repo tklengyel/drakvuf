@@ -122,6 +122,7 @@
 #include "crashmon/crashmon.h"
 #include "clipboardmon/clipboardmon.h"
 #include "windowmon/windowmon.h"
+#include "librarymon/librarymon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output, os_t os)
     : drakvuf{ drakvuf }, output{ output }, os{ os }
@@ -248,6 +249,8 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .kernel32_profile = options->kernel32_profile,
                         .kernelbase_profile = options->kernelbase_profile,
                         .wow_kernel32_profile = options->wow_kernel32_profile,
+                        .iphlpapi_profile = options->iphlpapi_profile,
+                        .mpr_profile = options->mpr_profile,
                     };
                     this->plugins[plugin_id] = new envmon(this->drakvuf, &config, this->output);
                     break;
@@ -277,6 +280,17 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .win32k_profile = options->win32k_profile,
                     };
                     this->plugins[plugin_id] = new windowmon(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_LIBRARYMON
+                case PLUGIN_LIBRARYMON:
+                {
+                    librarymon_config config =
+                    {
+                        .ntdll_profile = options->ntdll_profile,
+                    };
+                    this->plugins[plugin_id] = new librarymon(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif
