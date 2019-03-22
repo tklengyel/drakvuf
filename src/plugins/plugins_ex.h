@@ -181,10 +181,10 @@ public:
         {
             if (trap)
             {
-                trap->breakpoint.lookup_type = LOOKUP_PID,
-                trap->breakpoint.pid = 4,
-                trap->breakpoint.addr_type = ADDR_RVA,
-                trap->breakpoint.module = "ntoskrnl.exe",
+                trap->breakpoint.lookup_type = LOOKUP_PID;
+                trap->breakpoint.pid = 4;
+                trap->breakpoint.addr_type = ADDR_RVA;
+                trap->breakpoint.module = "ntoskrnl.exe";
                 trap->type = BREAKPOINT;
                 trap->name = syscall_name;
             }
@@ -246,7 +246,7 @@ public:
 
     template<typename P, typename PMS = plugin_params<pluginex>, typename SP = initialize_result_trap_params_by_PID, typename AT = allocate_default_trap>
     drakvuf_trap_t* register_result_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, hook_cb_t hook_cb, P* plugin,
-        SP set_params = initialize_result_trap_params_by_PID(), AT allocate_trap = allocate_default_trap())
+                                         SP set_params = initialize_result_trap_params_by_PID(), AT allocate_trap = allocate_default_trap())
     {
         access_context_t ctx =
         {
@@ -300,7 +300,7 @@ public:
 protected:
     template<typename P = pluginex, typename PMS = plugin_params<P>, typename SP = initialize_trap_params, typename AT = allocate_default_trap>
     drakvuf_trap_t* register_trap(drakvuf_t drakvuf, const char* syscall_name, hook_cb_t hook_cb, P* plugin,
-        SP set_params = initialize_trap_params(), AT allocate_trap = allocate_default_trap())
+                                  SP set_params = initialize_trap_params(), AT allocate_trap = allocate_default_trap())
     {
         auto trap = allocate_trap();
         if (!trap)
@@ -340,8 +340,8 @@ protected:
 
     template<typename P = pluginex, typename PMS = plugin_params<P>, typename SP = initialize_dll_trap_params, typename AT = allocate_default_trap>
     drakvuf_trap_t* register_dll_trap(drakvuf_t drakvuf, json_object* rekall_profile, const char* module_name,
-        const char* syscall_name, event_response_t(*cb)(drakvuf_t, drakvuf_trap_info_t*), P* plugin, bool wow = false,
-        SP set_params = initialize_dll_trap_params(), AT allocate_trap = allocate_default_trap())
+                                      const char* syscall_name, event_response_t(*cb)(drakvuf_t, drakvuf_trap_info_t*), P* plugin, bool wow = false,
+                                      SP set_params = initialize_dll_trap_params(), AT allocate_trap = allocate_default_trap())
     {
         auto trap = allocate_trap();
         if (!trap)

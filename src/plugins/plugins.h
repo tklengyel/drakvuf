@@ -123,8 +123,6 @@ struct plugins_options
     const char* kernel32_profile;       // PLUGIN_ENVMON
     const char* kernelbase_profile;     // PLUGIN_ENVMON
     const char* wow_kernel32_profile;   // PLUGIN_ENVMON
-    const char* iphlpapi_profile;       // PLUGIN_ENVMON
-    const char* mpr_profile;            // PLUGIN_ENVMON
     const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
     bool abort_on_bsod;                 // PLUGIN_BSODMON
     const char* ntdll_profile;          // PLUGIN_LIBRARYMON

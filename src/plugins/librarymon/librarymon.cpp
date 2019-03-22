@@ -140,7 +140,7 @@ static event_response_t load_library_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 }
 
 librarymon::librarymon(drakvuf_t drakvuf, const librarymon_config* c, output_format_t output)
-: pluginex(drakvuf, output)
+    : pluginex(drakvuf, output)
 {
     if (!c->ntdll_profile)
     {
@@ -173,8 +173,8 @@ void librarymon::print_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, c
             printf("librarymon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,\"%s\",\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    info->proc_data.userid, info->trap->name,
-                   (name.contents) ? (char*)name.contents : "",
-                   (path.contents) ? (char*)path.contents : "");
+                   name.contents ? (char*)name.contents : "",
+                   path.contents ? (char*)path.contents : "");
             break;
 
         case OUTPUT_KV:
@@ -182,8 +182,8 @@ void librarymon::print_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, c
                    "Method=%s,ModuleName=\"%s\",ModulePath=\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    info->trap->name,
-                   (name.contents) ? (char*)name.contents : "",
-                   (path.contents) ? (char*)path.contents : "");
+                   name.contents ? (char*)name.contents : "",
+                   path.contents ? (char*)path.contents : "");
             break;
 
         case OUTPUT_JSON:
@@ -201,8 +201,8 @@ void librarymon::print_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, c
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     info->proc_data.pid, info->proc_data.ppid, escaped_pname, info->trap->name,
-                    (name.contents) ? (char*)name.contents : "",
-                   (path.contents) ? (char*)path.contents : "");
+                    name.contents ? (char*)name.contents : "",
+                    path.contents ? (char*)path.contents : "");
             g_free(escaped_pname);
             break;
         }
@@ -213,8 +213,8 @@ void librarymon::print_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, c
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr,
                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name,
-                   (name.contents) ? (char*)name.contents : "",
-                   (path.contents) ? (char*)path.contents : "");
+                   name.contents ? (char*)name.contents : "",
+                   path.contents ? (char*)path.contents : "");
             break;
     }
 }

@@ -121,8 +121,8 @@ std::string FieldToString(const std::map<uint64_t, std::string>& maps, uint64_t 
 }// namespace print
 
 pluginex::pluginex(drakvuf_t drakvuf, output_format_t output)
-: m_output_format(output)
-, m_params()
+    : m_output_format(output)
+    , m_params()
 {
 }
 
@@ -136,7 +136,7 @@ bool pluginex::module_trap_visitor(drakvuf_t drakvuf, const module_info_t* modul
     trap_context_dll const* data = reinterpret_cast<trap_context_dll*>(ctx);
 
     PRINT_DEBUG("[PLUGIN_EX] trap_visitor: CR3[0x%lX] pid[0x%X] base_name[%s] load_address[0x%lX] full_name[%s]\n",
-        module_info->dtb, module_info->pid, module_info->base_name->contents, module_info->base_addr, module_info->full_name->contents);
+                module_info->dtb, module_info->pid, module_info->base_name->contents, module_info->base_addr, module_info->full_name->contents);
 
     if (module_info->is_wow != data->wow)
         return false;

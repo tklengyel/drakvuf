@@ -296,6 +296,16 @@ if test x$plugin_windowmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_WINDOWMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_librarymon],
+  [AS_HELP_STRING([--disable-plugin-librarymon],
+    [Enable the windows kernel bugcheck watching plugin @<:@yes@:>@])],
+  [plugin_librarymon="$enableval"],
+  [plugin_librarymon="yes"])
+AM_CONDITIONAL([PLUGIN_LIBRARYMON], [test x$plugin_librarymon = xyes])
+if test x$plugin_librarymon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_LIBRARYMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -473,4 +483,5 @@ EnvMon:       $plugin_envmon
 CrashMon:     $plugin_crashmon
 ClipboardMon: $plugin_clipboardmon
 WindowMon:    $plugin_windowmon
+LibraryMon:   $plugin_librarymon
 -------------------------------------------------------------------------------])
