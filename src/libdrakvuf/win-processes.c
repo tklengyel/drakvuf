@@ -507,6 +507,11 @@ static bool win_find_next_process_list_entry(drakvuf_t drakvuf, addr_t current_l
     return VMI_FAILURE != status;
 }
 
+static addr_t win_process_list_entry_to_process(drakvuf_t drakvuf, addr_t list_entry)
+{
+    return list_entry - drakvuf->offsets[EPROCESS_TASKS];
+}
+
 bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* eprocess_addr)
 {
     addr_t list_head;
@@ -658,6 +663,39 @@ addr_t win_get_wow_peb( drakvuf_t drakvuf, access_context_t* ctx, addr_t eproces
     return ret_peb_addr ;
 }
 
+bool win_enumerate_processes( drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx )
+{
+    addr_t list_head;
+    if (!win_find_process_list(drakvuf, &list_head))
+        return false;
+    addr_t current_list_entry = list_head;
+    addr_t next_list_entry;
+
+    if (!win_find_next_process_list_entry(drakvuf, current_list_entry, &next_list_entry))
+    {
+        PRINT_DEBUG("Failed to read next pointer at 0x%"PRIx64" before entering loop\n", current_list_entry);
+        return false;
+    }
+
+    do
+    {
+        addr_t eprocess = win_process_list_entry_to_process(drakvuf, current_list_entry);
+
+        visitor_func(drakvuf, eprocess, visitor_ctx);
+
+        current_list_entry = next_list_entry;
+
+        if (!win_find_next_process_list_entry(drakvuf, current_list_entry, &next_list_entry))
+        {
+            PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
+            return false;
+        }
+    }
+    while (next_list_entry != list_head);
+
+    return true;
+}
+
 bool win_enumerate_processes_with_module( drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx )
 {
     addr_t list_head;
@@ -674,7 +712,7 @@ bool win_enumerate_processes_with_module( drakvuf_t drakvuf, const char* module_
 
     do
     {
-        addr_t current_process = current_list_entry - drakvuf->offsets[EPROCESS_TASKS];
+        addr_t current_process = win_process_list_entry_to_process(drakvuf, current_list_entry);
 
         vmi_pid_t pid ;
 
