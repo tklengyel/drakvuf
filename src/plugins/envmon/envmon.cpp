@@ -105,6 +105,7 @@
 #include <libvmi/libvmi.h>
 #include <memory>
 #include <stdexcept>
+#include <map>
 
 #include "plugins/private.h"
 
@@ -113,25 +114,6 @@
 
 namespace
 {
-
-typedef event_response_t(*hook_cb_t)(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-struct module_trap_context_t
-{
-    bool wow;
-    const char* module_name;
-    const char* function_name;
-    addr_t function_rva;
-    drakvuf_trap_t* trap;
-    event_response_t(*hook_cb)(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-};
-
-typedef enum
-{
-    ARCH_X86,
-    ARCH_X64,
-    ARCH_INVALID,
-} arch_t;
 
 struct gdeleter
 {
@@ -173,60 +155,41 @@ static const char* computer_name_formats[] =
     [ComputerNamePhysicalDnsFullyQualified] = "PhysicalDnsFullyQualified"
 };
 
-static bool module_trap_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx)
+static const std::map<uint64_t, std::string> family_name_formats
 {
-    module_trap_context_t const* data = (module_trap_context_t*)visitor_ctx;
+    { AF_UNSPEC, "AF_UNSPEC"  },
+    { AF_INET,   "AF_INET"    },
+    { AF_INET6,  "AF_INET6"   }
+};
 
-    PRINT_DEBUG("\t[ENVMON] trap_visitor: CR3[0x%lX] pid[0x%X] WoW64[%s] base_name[%s] load_address[0x%lX] full_name[%s]\n",
-                module_info->dtb, module_info->pid, module_info->is_wow ? "True" : "False", module_info->base_name->contents, module_info->base_addr, module_info->full_name->contents);
-
-    if (module_info->is_wow != data->wow)
-        return false;
-
-    data->trap->breakpoint.module = data->module_name;
-    data->trap->breakpoint.pid    = module_info->pid;
-    data->trap->breakpoint.addr   = module_info->base_addr + data->function_rva;
-
-    data->trap->name = data->function_name;
-    data->trap->cb   = data->hook_cb;
-
-    return drakvuf_add_trap(drakvuf, data->trap);
-}
-
-static void register_trap(drakvuf_t drakvuf, json_object* rekall_profile, const char* function_name, bool wow, drakvuf_trap_t* trap, hook_cb_t hook_cb)
+static const std::map<uint64_t, std::string> flags_name_formats
 {
-    module_trap_context_t visitor_ctx;
-
-    visitor_ctx.wow = wow;
-    visitor_ctx.module_name = trap->breakpoint.module;
-    visitor_ctx.function_name = function_name;
-    visitor_ctx.trap = trap;
-    visitor_ctx.hook_cb = hook_cb;
-
-    PRINT_DEBUG("[ENVMON] Search for %s'%s!%s'\n", wow ? "WoW64 " : "", trap->breakpoint.module, function_name);
-
-    if (!rekall_get_function_rva(rekall_profile, function_name, &visitor_ctx.function_rva))
-    {
-        PRINT_DEBUG("[ENVMON] Failed to get function %s address", function_name);
-        return;
-    }
-    if (!drakvuf_enumerate_processes_with_module(drakvuf, trap->breakpoint.module, module_trap_visitor, &visitor_ctx))
-    {
-        PRINT_DEBUG("[ENVMON] Failed to trap function %s!%s\n", trap->breakpoint.module, function_name);
-        return;
-    }
-}
+    { GAA_FLAG_SKIP_UNICAST,                "GAA_FLAG_SKIP_UNICAST"                 },
+    { GAA_FLAG_SKIP_ANYCAST,                "GAA_FLAG_SKIP_ANYCAST"                 },
+    { GAA_FLAG_SKIP_MULTICAST,              "GAA_FLAG_SKIP_MULTICAST"               },
+    { GAA_FLAG_SKIP_DNS_SERVER,             "GAA_FLAG_SKIP_DNS_SERVER"              },
+    { GAA_FLAG_INCLUDE_PREFIX,              "GAA_FLAG_INCLUDE_PREFIX"               },
+    { GAA_FLAG_SKIP_FRIENDLY_NAME,          "GAA_FLAG_SKIP_FRIENDLY_NAME"           },
+    { GAA_FLAG_INCLUDE_WINS_INFO,           "GAA_FLAG_INCLUDE_WINS_INFO"            },
+    { GAA_FLAG_INCLUDE_GATEWAYS,            "GAA_FLAG_INCLUDE_GATEWAYS"             },
+    { GAA_FLAG_INCLUDE_ALL_INTERFACES,      "GAA_FLAG_INCLUDE_ALL_INTERFACES"       },
+    { GAA_FLAG_INCLUDE_ALL_COMPARTMENTS,    "GAA_FLAG_INCLUDE_ALL_COMPARTMENTS"     },
+    { GAA_FLAG_INCLUDE_TUNNEL_BINDINGORDER, "GAA_FLAG_INCLUDE_TUNNEL_BINDINGORDER"  }
+};
 
 static event_response_t trap_SspipGetUserName_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    envmon* obj = (envmon*)(info->trap->data);
+    auto p = get_trap_plugin<envmon>(info);
+    if (!p)
+        return VMI_EVENT_RESPONSE_NONE;
+
     addr_t ex_name_fmt = drakvuf_get_function_argument(drakvuf, info, 1);
 
     const char* ex_name_fmt_str = "<UNKNOWN>";
     if (ex_name_fmt < sizeof(extended_name_formats)/sizeof(extended_name_formats[0]) && extended_name_formats[ex_name_fmt])
         ex_name_fmt_str = extended_name_formats[ex_name_fmt];
 
-    switch (obj->format)
+    switch (p->m_output_format)
     {
         case OUTPUT_CSV:
             printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s",
@@ -269,14 +232,16 @@ static event_response_t trap_SspipGetUserName_cb(drakvuf_t drakvuf, drakvuf_trap
             printf(" EXTENDEDNAMEFORMAT:%lu EXTENDEDNAMEFORMATSTR:\"%s\"\n", ex_name_fmt, ex_name_fmt_str);
             break;
     }
-    return 0;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t trap_GetComputerNameW_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    envmon* obj = (envmon*)(info->trap->data);
+    auto p = get_trap_plugin<envmon>(info);
+    if (!p)
+        return VMI_EVENT_RESPONSE_NONE;
 
-    switch (obj->format)
+    switch (p->m_output_format)
     {
         case OUTPUT_CSV:
             printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s\n",
@@ -313,15 +278,16 @@ static event_response_t trap_GetComputerNameW_cb(drakvuf_t drakvuf, drakvuf_trap
                    info->trap->name);
             break;
     }
-
-    return 0;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t trap_IsNativeVhdBoot_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    envmon* obj = (envmon*)(info->trap->data);
+    auto p = get_trap_plugin<envmon>(info);
+    if (!p)
+        return VMI_EVENT_RESPONSE_NONE;
 
-    switch (obj->format)
+    switch (p->m_output_format)
     {
         case OUTPUT_CSV:
             printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s\n",
@@ -358,13 +324,14 @@ static event_response_t trap_IsNativeVhdBoot_cb(drakvuf_t drakvuf, drakvuf_trap_
                    info->trap->name);
             break;
     }
-
-    return 0;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t trap_GetComputerNameExW_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    envmon* obj = (envmon*)(info->trap->data);
+    auto p = get_trap_plugin<envmon>(info);
+    if (!p)
+        return VMI_EVENT_RESPONSE_NONE;
 
     // COMPUTER_NAME_FORMAT NameType
     addr_t name_type = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -373,7 +340,7 @@ static event_response_t trap_GetComputerNameExW_cb(drakvuf_t drakvuf, drakvuf_tr
     if (name_type < ComputerNameMax)
         name_type_str = computer_name_formats[name_type];
 
-    switch (obj->format)
+    switch (p->m_output_format)
     {
         case OUTPUT_CSV:
             printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s",
@@ -416,7 +383,114 @@ static event_response_t trap_GetComputerNameExW_cb(drakvuf_t drakvuf, drakvuf_tr
             printf(" NAMETYPE:%lu NAMETYPESTR:\"%s\"\n", name_type, name_type_str);
             break;
     }
-    return 0;
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t trap_GetAdaptersAddresses_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto p = get_trap_plugin<envmon>(info);
+    if (!p)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    const auto family = print::FieldToString(family_name_formats, drakvuf_get_function_argument(drakvuf, info, 1));
+    const auto flags  = print::FieldToString(flags_name_formats, std::bitset<64>(drakvuf_get_function_argument(drakvuf, info, 2)));
+
+    switch (p->m_output_format)
+    {
+        case OUTPUT_CSV:
+            printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
+                   info->proc_data.name, info->trap->name);
+            printf(",%s,%s\n", family.c_str(), flags.c_str());
+            break;
+        case OUTPUT_KV:
+            printf("envmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->trap->name);
+            printf(",Family=%s,%s\n", family.c_str(), flags.c_str());
+            break;
+        case OUTPUT_JSON:
+        {
+            gchar_ptr proc_name(drakvuf_escape_str(info->proc_data.name));
+            printf("{"
+                   "\"Plugin\" : \"envmon\","
+                   "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                   "\"ProcessName\": \"%s\","
+                   "\"PID\" : %d,"
+                   "\"PPID\": %d,"
+                   "\"Method\" : \"%s\","
+                   "\"Family\" : \"%s\","
+                   "\"Flags\" : \"%s\""
+                   "}\n",
+                   UNPACK_TIMEVAL(info->timestamp),
+                   proc_name.get(),
+                   info->proc_data.pid,
+                   info->proc_data.ppid,
+                   info->trap->name,
+                   family.c_str(), flags.c_str());
+            break;
+        }
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[ENVMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->trap->name);
+            printf(" FAMILY:%s FLAGS:%s\n", family.c_str(), flags.c_str());
+            break;
+    }
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t trap_WNetGetProviderNameW_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto p = get_trap_plugin<envmon>(info);
+    if (!p)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    const auto net_type = drakvuf_get_function_argument(drakvuf, info, 1);
+    switch (p->m_output_format)
+    {
+        case OUTPUT_CSV:
+            printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
+                   info->proc_data.name, info->trap->name);
+            printf(",%lu\n", net_type);
+            break;
+        case OUTPUT_KV:
+            printf("envmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->trap->name);
+            printf(",NetType=%lu\n", net_type);
+            break;
+        case OUTPUT_JSON:
+        {
+            gchar_ptr proc_name(drakvuf_escape_str(info->proc_data.name));
+            printf("{"
+                   "\"Plugin\" : \"envmon\","
+                   "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                   "\"ProcessName\": \"%s\","
+                   "\"PID\" : %d,"
+                   "\"PPID\": %d,"
+                   "\"Method\" : \"%s\","
+                   "\"NetType\" : %lu"
+                   "}\n",
+                   UNPACK_TIMEVAL(info->timestamp),
+                   proc_name.get(),
+                   info->proc_data.pid,
+                   info->proc_data.ppid,
+                   info->trap->name,
+                   net_type);
+            break;
+        }
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[ENVMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->trap->name);
+            printf(" NETTYPE:%lu\n", net_type);
+            break;
+    }
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static win_ver_t get_win_ver(drakvuf_t drakvuf)
@@ -424,6 +498,13 @@ static win_ver_t get_win_ver(drakvuf_t drakvuf)
     vmi_lock_guard vmi(drakvuf);
     return vmi_get_winver(vmi.vmi);
 }
+
+typedef enum
+{
+    ARCH_X86,
+    ARCH_X64,
+    ARCH_INVALID,
+} arch_t;
 
 static arch_t get_arch(drakvuf_t drakvuf)
 {
@@ -440,28 +521,42 @@ static arch_t get_arch(drakvuf_t drakvuf)
 }
 
 envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output)
-    : format(output)
+    : pluginex(drakvuf, output)
 {
     auto winver = get_win_ver(drakvuf);
-
     if (!c->sspicli_profile)
     {
         PRINT_DEBUG("envmon plugin requires the Rekall profile for sspicli.dll!\n");
         return;
     }
+
     if (!c->kernel32_profile)
     {
         PRINT_DEBUG("envmon plugin requires the Rekall profile for kernel32.dll!\n");
         return;
     }
+
     if (!c->kernelbase_profile)
     {
         PRINT_DEBUG("envmon plugin requires the Rekall profile for KernelBase.dll!\n");
         return;
     }
+
     if (ARCH_X64 == get_arch(drakvuf) && !c->wow_kernel32_profile)
     {
         PRINT_DEBUG("envmon plugin requires the Rekall profile for SysWOW64/kernel32.dll!\n");
+        return;
+    }
+
+    if (!c->iphlpapi_profile)
+    {
+        PRINT_DEBUG("envmon plugin requires the Rekall profile for iphlpapi.dll!\n");
+        return;
+    }
+
+    if (!c->mpr_profile)
+    {
+        PRINT_DEBUG("envmon plugin requires the Rekall profile for mpr.dll!\n");
         return;
     }
 
@@ -471,28 +566,37 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
         PRINT_DEBUG("envmon plugin fails to load rekall profile for sspicli.dll\n");
         return;
     }
-    register_trap(drakvuf, sspicli_profile, "SspipGetUserName", false, &traps[0], trap_SspipGetUserName_cb);
+
+    PRINT_DEBUG("envmon attempt to setup a trap for \"sspicli.dll\"\n");
+    register_dll_trap(drakvuf, sspicli_profile, "sspicli.dll", "SspipGetUserName", trap_SspipGetUserName_cb, this);
     json_object_put(sspicli_profile);
 
     json_object* kernelbase_profile = json_object_from_file(c->kernelbase_profile);
     if (!kernelbase_profile)
     {
         PRINT_DEBUG("envmon plugin fails to load rekall profile for KernelBase.dll\n");
-        return;
+        throw -1;
     }
-    register_trap(drakvuf, kernelbase_profile, "GetComputerNameExW", false, &traps[1], trap_GetComputerNameExW_cb);
+
+    PRINT_DEBUG("envmon attempt to setup a trap for \"kernelbase.dll\"\n");
+    register_dll_trap(drakvuf, kernelbase_profile, "kernelbase.dll", "GetComputerNameExW", trap_GetComputerNameExW_cb, this);
     json_object_put(kernelbase_profile);
 
     json_object* kernel32_profile = json_object_from_file(c->kernel32_profile);
     if (!kernel32_profile)
     {
         PRINT_DEBUG("envmon plugin fails to load rekall profile for kernel32.dll\n");
-        return;
+        throw -1;
     }
-    register_trap(drakvuf, kernel32_profile, "GetComputerNameW", false, &traps[2], trap_GetComputerNameW_cb);
-    if (VMI_OS_WINDOWS_7 < winver)
-        register_trap(drakvuf, kernel32_profile, "IsNativeVhdBoot", false, &traps[3], trap_IsNativeVhdBoot_cb);
 
+    PRINT_DEBUG("envmon attempt to setup a trap for \"kernel32.dll\"\n");
+    register_dll_trap(drakvuf, kernel32_profile, "kernel32.dll", "GetComputerNameW", trap_GetComputerNameW_cb, this);
+
+    if (VMI_OS_WINDOWS_7 < winver)
+    {
+        PRINT_DEBUG("envmon attempt to setup a trap for \"kernel32.dll\"\n");
+        register_dll_trap(drakvuf, kernel32_profile, "kernel32.dll", "IsNativeVhdBoot", trap_IsNativeVhdBoot_cb, this);
+    }
     json_object_put(kernel32_profile);
 
     if (c->wow_kernel32_profile)
@@ -501,12 +605,38 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
         if (!wow_kernel32_profile)
         {
             PRINT_DEBUG("envmon plugin failed to load rekall profile for SysWOW64/kernel32.dll\n");
-            return;
+            throw -1;
         }
+
         if (VMI_OS_WINDOWS_7 < winver)
-            register_trap(drakvuf, wow_kernel32_profile, "IsNativeVhdBoot", true, &traps[4], trap_IsNativeVhdBoot_cb);
+        {
+            PRINT_DEBUG("envmon attempt to setup a trap for \"kernel32.dll\"\n");
+            register_dll_trap(drakvuf, wow_kernel32_profile, "kernel32.dll", "IsNativeVhdBoot", trap_IsNativeVhdBoot_cb, this);
+        }
         json_object_put(wow_kernel32_profile);
     }
+
+    json_object* iphlpapi_profile = json_object_from_file(c->iphlpapi_profile);
+    if (!iphlpapi_profile)
+    {
+        PRINT_DEBUG("envmon plugin fails to load rekall profile for iphlpapi.dll\n");
+        throw -1;
+    }
+
+    PRINT_DEBUG("envmon attempt to setup a trap for \"iphlpapi.dll\"\n");
+    register_dll_trap(drakvuf, iphlpapi_profile, "iphlpapi.dll", "GetAdaptersAddresses", trap_GetAdaptersAddresses_cb, this);
+    json_object_put(iphlpapi_profile);
+
+    json_object* mpr_profile = json_object_from_file(c->mpr_profile);
+    if (!mpr_profile)
+    {
+        PRINT_DEBUG("envmon plugin fails to load rekall profile for mpr.dll\n");
+        throw -1;
+    }
+
+    PRINT_DEBUG("envmon attempt to setup a trap for \"mpr.dll\"\n");
+    register_dll_trap(drakvuf, mpr_profile, "mpr.dll", "WNetGetProviderNameW", trap_WNetGetProviderNameW_cb, this);
+    json_object_put(mpr_profile);
 
     PRINT_DEBUG("[ENVMON] envmon constructor end.\n");
 }

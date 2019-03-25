@@ -107,27 +107,11 @@
 
 #include <glib.h>
 #include "plugins/private.h"
-#include "plugins/plugins.h"
+#include "plugins/plugins_ex.h"
 
-class procmon: public plugin
+class procmon: public pluginex
 {
 public:
-    drakvuf_trap_t traps[4] =
-    {
-        [0 ... 3] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.pid = 4,
-            .breakpoint.addr_type = ADDR_RVA,
-            .breakpoint.module = "ntoskrnl.exe",
-            .type = BREAKPOINT,
-            .data = (void*)this
-        }
-    };
-
-    GSList* result_traps;
-
-    output_format_t format;
-
     addr_t command_line;
     addr_t image_path_name;
     addr_t dll_path;
@@ -136,7 +120,6 @@ public:
     addr_t object_header_body;
 
     procmon(drakvuf_t drakvuf, output_format_t output);
-    ~procmon();
 };
 
 #endif
