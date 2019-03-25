@@ -105,7 +105,7 @@
 #ifndef ENVMON_H
 #define ENVMON_H
 
-#include "plugins/plugins.h"
+#include "plugins/plugins_ex.h"
 
 struct envmon_config
 {
@@ -113,42 +113,14 @@ struct envmon_config
     const char* kernel32_profile;
     const char* kernelbase_profile;
     const char* wow_kernel32_profile;
+    const char* iphlpapi_profile;
+    const char* mpr_profile;
 };
 
-class envmon: public plugin
+class envmon: public pluginex
 {
 public:
-    output_format_t format;
-
-public:
     envmon(drakvuf_t drakvuf, const envmon_config* config, output_format_t output);
-
-private:
-    drakvuf_trap_t traps[5] =
-    {
-        [0] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.addr_type = ADDR_VA,
-            .breakpoint.module = "sspicli.dll",
-            .type = BREAKPOINT,
-            .data = (void*)this
-        },
-        [1] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.addr_type = ADDR_VA,
-            .breakpoint.module = "kernelbase.dll",
-            .type = BREAKPOINT,
-            .data = (void*)this
-        },
-        [2 ... 4] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.addr_type = ADDR_VA,
-            .breakpoint.module = "kernel32.dll",
-            .type = BREAKPOINT,
-            .data = (void*)this
-        }
-    };
-
 };
 
 #endif
