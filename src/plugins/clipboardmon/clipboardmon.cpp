@@ -282,11 +282,13 @@ clipboardmon::clipboardmon(drakvuf_t drakvuf, const clipboardmon_config* c, outp
         throw -1;
     }
 
-    assert(sizeof(traps) / sizeof(traps[0]) >= 3);
+    assert(sizeof(traps) / sizeof(traps[0]) >= 4);
     if ( !register_trap(drakvuf, profile_json, "NtUserGetClipboardData", &traps[0], cb) )
         throw -1;
     if ( !register_trap(drakvuf, profile_json, "NtUserAddClipboardFormatListener", &traps[1], cb) )
         throw -1;
     if ( !register_trap(drakvuf, profile_json, "NtUserSetClipboardViewer", &traps[2], cb) )
+        throw -1;
+    if ( !register_trap(drakvuf, profile_json, "NtUserSetClipboardData", &traps[3], cb) )
         throw -1;
 }

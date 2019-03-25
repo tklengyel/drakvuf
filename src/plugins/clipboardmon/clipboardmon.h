@@ -121,9 +121,9 @@ public:
     clipboardmon(drakvuf_t drakvuf, const clipboardmon_config* config, output_format_t output);
 
 private:
-    drakvuf_trap_t traps[3] =
+    drakvuf_trap_t traps[4] =
     {
-        [0 ... 2] = {
+        [0 ... 3] = {
             .breakpoint.lookup_type = LOOKUP_DTB,
             .breakpoint.addr_type = ADDR_VA,
             .type = BREAKPOINT,
