@@ -125,6 +125,8 @@ static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_inf
 {
     dkommon* d = static_cast<dkommon*>(info->trap->data);
 
+    gchar* escaped_pname = NULL;
+
     switch (d->format)
     {
         case OUTPUT_CSV:
@@ -135,6 +137,26 @@ static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_inf
             printf("dkommon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name);
             break;
+
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"dkommon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": %s,"
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid);
+
+            g_free(escaped_pname);
+            break;
+
         case OUTPUT_DEFAULT:
         default:
             printf("[DKOMMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 "\n",
