@@ -102,140 +102,31 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAKVUF_PLUGINS_H
-#define DRAKVUF_PLUGINS_H
+#ifndef DKOMMON_H
+#define DKOMMON_H
 
-#include <config.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <sys/time.h>
-#include <libdrakvuf/libdrakvuf.h>
+#include "plugins/private.h"
+#include "plugins/plugins.h"
 
-struct plugins_options
-{
-    const char* dump_folder;            // PLUGIN_FILEDELETE
-    bool dump_modified_files;           // PLUGIN_FILEDELETE
-    bool filedelete_use_injector;       // PLUGIN_FILEDELETE
-    bool cpuid_stealth;                 // PLUGIN_CPUIDMON
-    const char* tcpip_profile;          // PLUGIN_SOCKETMON
-    const char* win32k_profile;         // PLUGIN_CLIPBOARDMON, PLUGIN_WINDOWMON
-    const char* sspicli_profile;        // PLUGIN_ENVMON
-    const char* kernel32_profile;       // PLUGIN_ENVMON
-    const char* kernelbase_profile;     // PLUGIN_ENVMON
-    const char* wow_kernel32_profile;   // PLUGIN_ENVMON
-    const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
-    bool abort_on_bsod;                 // PLUGIN_BSODMON
-    const char* ntdll_profile;          // PLUGIN_LIBRARYMON
-};
-
-typedef enum drakvuf_plugin
-{
-    PLUGIN_SYSCALLS,
-    PLUGIN_POOLMON,
-    PLUGIN_FILETRACER,
-    PLUGIN_FILEDELETE,
-    PLUGIN_OBJMON,
-    PLUGIN_EXMON,
-    PLUGIN_SSDTMON,
-    PLUGIN_DEBUGMON,
-    PLUGIN_DELAYMON,
-    PLUGIN_CPUIDMON,
-    PLUGIN_SOCKETMON,
-    PLUGIN_REGMON,
-    PLUGIN_PROCMON,
-    PLUGIN_BSODMON,
-    PLUGIN_ENVMON,
-    PLUGIN_CRASHMON,
-    PLUGIN_CLIPBOARDMON,
-    PLUGIN_WINDOWMON,
-    PLUGIN_LIBRARYMON,
-    PLUGIN_DKOMMON,
-    __DRAKVUF_PLUGIN_LIST_MAX
-} drakvuf_plugin_t;
-
-static const char* drakvuf_plugin_names[] =
-{
-    [PLUGIN_SYSCALLS] = "syscalls",
-    [PLUGIN_POOLMON] = "poolmon",
-    [PLUGIN_FILETRACER] = "filetracer",
-    [PLUGIN_FILEDELETE] = "filedelete",
-    [PLUGIN_OBJMON] = "objmon",
-    [PLUGIN_EXMON] = "exmon",
-    [PLUGIN_SSDTMON] = "ssdtmon",
-    [PLUGIN_DEBUGMON] = "debugmon",
-    [PLUGIN_DELAYMON] = "delaymon",
-    [PLUGIN_CPUIDMON] = "cpuidmon",
-    [PLUGIN_SOCKETMON] = "socketmon",
-    [PLUGIN_REGMON] = "regmon",
-    [PLUGIN_PROCMON] = "procmon",
-    [PLUGIN_BSODMON] = "bsodmon",
-    [PLUGIN_ENVMON] = "envmon",
-    [PLUGIN_CRASHMON] = "crashmon",
-    [PLUGIN_CLIPBOARDMON] = "clipboardmon",
-    [PLUGIN_WINDOWMON] = "windowmon",
-    [PLUGIN_LIBRARYMON] = "librarymon",
-    [PLUGIN_DKOMMON] = "dkommon",
-};
-
-static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
-{
-    [PLUGIN_SYSCALLS]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_POOLMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_FILETRACER]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_FILEDELETE]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_OBJMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_EXMON]        = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_SSDTMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_DEBUGMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_DELAYMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_CPUIDMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_SOCKETMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_REGMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_PROCMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_BSODMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_ENVMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_CRASHMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_CLIPBOARDMON] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_WINDOWMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_LIBRARYMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_DKOMMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-};
-
-class plugin
+class dkommon: public plugin
 {
 public:
-    virtual ~plugin() = default;
-};
+    const output_format_t format;
+    addr_t list_addr_offset;
+    addr_t flink_offset;
+    addr_t blink_offset;
+    size_t* offsets;
 
-class drakvuf_plugins
-{
+    dkommon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    ~dkommon();
+
 private:
-    drakvuf_t drakvuf;
-    output_format_t output;
-    os_t os;
-    plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = nullptr };
-
-public:
-    drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
-    ~drakvuf_plugins();
-    int start(drakvuf_plugin_t plugin, const plugins_options* config);
-};
-
-/***************************************************************************/
-
-struct vmi_lock_guard
-{
-    vmi_lock_guard(drakvuf_t drakvuf_) : drakvuf{ drakvuf_ }, vmi{ drakvuf_lock_and_get_vmi(drakvuf_) }
+    drakvuf_trap_t trap =
     {
-    }
-
-    ~vmi_lock_guard()
-    {
-        drakvuf_release_vmi(drakvuf);
-    }
-
-    drakvuf_t drakvuf;
-    vmi_instance_t vmi;
+        .type = REGISTER,
+        .reg = CR3,
+        .data = this
+    };
 };
 
 #endif

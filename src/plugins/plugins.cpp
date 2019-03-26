@@ -123,6 +123,7 @@
 #include "clipboardmon/clipboardmon.h"
 #include "windowmon/windowmon.h"
 #include "librarymon/librarymon.h"
+#include "dkommon/dkommon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output, os_t os)
     : drakvuf{ drakvuf }, output{ output }, os{ os }
@@ -291,6 +292,11 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     this->plugins[plugin_id] = new librarymon(this->drakvuf, &config, this->output);
                     break;
                 }
+#endif
+#ifdef ENABLE_PLUGIN_DKOMMON
+                case PLUGIN_DKOMMON:
+                    this->plugins[plugin_id] = new dkommon(this->drakvuf, nullptr, this->output);
+                    break;
 #endif
                 default:
                     break;
