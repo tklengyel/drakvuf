@@ -106,6 +106,8 @@
 
 #include "dkommon.h"
 
+#include <algorithm>
+
 enum offset
 {
     EPROCESS_ACTIVEPROCESSLINKS,
@@ -206,8 +208,56 @@ done:
     return 0;
 }
 
-static void enumerate_drivers(dkommon* d, drakvuf_t drakvuf)
+static void print_driver(drakvuf_t drakvuf, drakvuf_trap_info_t* info, output_format_t format, const char* message, const char* name)
 {
+    gchar* escaped_pname = NULL;
+
+    switch (format)
+    {
+        case OUTPUT_CSV:
+            printf("dkommon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, message, name);
+            break;
+        case OUTPUT_KV:
+            printf("dkommon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Message=\"%s\",DriverName=\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name, message, name);
+            break;
+
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"dkommon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": %s,"
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Message\": \"%s\","
+                    "\"DriverName\": \"%s\","
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    message, name);
+
+            g_free(escaped_pname);
+            break;
+
+        case OUTPUT_DEFAULT:
+        default:
+            printf("[DKOMMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " MESSAGE:\"%s\" DRIVERNAME:\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
+                   message, name);
+            break;
+    }
+}
+
+static std::vector<std::string> enumerate_drivers(dkommon* d, drakvuf_t drakvuf)
+{
+    std::vector<std::string> drivers_list;
+
     vmi_lock_guard vmi(drakvuf);
 
     access_context_t ctx = {
@@ -217,15 +267,15 @@ static void enumerate_drivers(dkommon* d, drakvuf_t drakvuf)
     if (VMI_SUCCESS != vmi_pid_to_dtb(vmi.vmi, 4, &ctx.dtb))
     {
         PRINT_DEBUG("dkommon:enumerate drivers: failed to get CR3 for System process\n");
-        return;
+        return drivers_list;
     }
 
     addr_t list_head = 0;
-    ctx.addr = d->modules_list;
+    ctx.addr = d->modules_list_va;
     if ( VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &list_head) )
     {
         PRINT_DEBUG("dkommon:enumerate drivers: failed to read PsLoadedModuleList (VA 0x%lx)\n", ctx.addr);
-        return;
+        return drivers_list;
     }
     list_head -= d->offsets[LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS];
 
@@ -236,17 +286,40 @@ static void enumerate_drivers(dkommon* d, drakvuf_t drakvuf)
         if ( VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &entry) )
         {
             PRINT_DEBUG("dkommon:enumerate drivers: failed to read next entry (VA 0x%lx)\n", ctx.addr);
-            return;
+            return drivers_list;
         }
 
         ctx.addr = entry + d->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
         auto name = drakvuf_read_unicode_common(vmi.vmi, &ctx);
         if (name && name->contents)
         {
-            PRINT_DEBUG("[DKOMmon] Found driver '%s'\n", name->contents);
+            drivers_list.push_back(std::string(reinterpret_cast<char*>(name->contents)));
             vmi_free_unicode_str(name);
         }
     } while (entry != list_head);
+
+    return drivers_list;
+}
+
+static event_response_t check_hidden_drivers(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    dkommon* d = static_cast<dkommon*>(info->trap->data);
+
+    auto list = enumerate_drivers(d, drakvuf);
+
+    // Check for new drivers
+    for (auto i: list)
+        if (std::find(d->drivers_list.begin(), d->drivers_list.end(), i) == d->drivers_list.end())
+            print_driver(drakvuf, info, d->format, "Driver Added", i.c_str());
+
+    // Check for deleted drivers
+    for (auto i: d->drivers_list)
+        if (std::find(list.begin(), list.end(), i) == list.end())
+            print_driver(drakvuf, info, d->format, "Driver Removed", i.c_str());
+
+    d->drivers_list = list;
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
@@ -260,15 +333,20 @@ dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
     if ( !drakvuf_get_constant_rva( drakvuf, "PsLoadedModuleList", &ml_rva) )
         throw -1;
 
-    if (!(modules_list = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, "ntoskrnl.exe", ml_rva)))
+    if (!(modules_list_va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, "ntoskrnl.exe", ml_rva)))
         throw -1;
 
-    enumerate_drivers(this, drakvuf);
+    drivers_list = enumerate_drivers(this, drakvuf);
+    for (auto i: drivers_list)
+        PRINT_DEBUG("[DKOMmon] Found driver '%s'\n", i.c_str());
 
     /* Setup trap for thread switch */
-    trap.cb = check_hidden_process;
+    processes_trap.cb = check_hidden_process;
+    if (!drakvuf_add_trap(drakvuf, &processes_trap))
+        throw -1;
 
-    if (!drakvuf_add_trap(drakvuf, &trap))
+    drivers_trap.cb = check_hidden_drivers;
+    if (!drakvuf_add_trap(drakvuf, &drivers_trap))
         throw -1;
 }
 

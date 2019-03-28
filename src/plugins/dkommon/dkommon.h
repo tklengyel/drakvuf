@@ -108,6 +108,9 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
+#include <string>
+#include <vector>
+
 class dkommon: public plugin
 {
 public:
@@ -116,13 +119,21 @@ public:
     addr_t flink_offset;
     addr_t blink_offset;
     size_t* offsets;
-    addr_t modules_list;
+    addr_t modules_list_va;
+    std::vector<std::string> drivers_list;
 
     dkommon(drakvuf_t drakvuf, const void* config, output_format_t output);
     ~dkommon();
 
 private:
-    drakvuf_trap_t trap =
+    drakvuf_trap_t processes_trap =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .data = this
+    };
+
+    drakvuf_trap_t drivers_trap =
     {
         .type = REGISTER,
         .reg = CR3,
