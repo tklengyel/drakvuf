@@ -111,6 +111,8 @@ enum offset
     EPROCESS_ACTIVEPROCESSLINKS,
     LIST_ENTRY_BLINK,
     LIST_ENTRY_FLINK,
+    LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS,
+    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
     __OFFSET_MAX
 };
 
@@ -118,7 +120,9 @@ static const char* offset_names[__OFFSET_MAX][2] =
 {
     [EPROCESS_ACTIVEPROCESSLINKS] = {"_EPROCESS", "ActiveProcessLinks"},
     [LIST_ENTRY_BLINK] = {"_LIST_ENTRY", "Blink"},
-    [LIST_ENTRY_FLINK] = {"_LIST_ENTRY", "Flink"}
+    [LIST_ENTRY_FLINK] = {"_LIST_ENTRY", "Flink"},
+    [LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS] = {"_LDR_DATA_TABLE_ENTRY", "InLoadOrderLinks"},
+    [LDR_DATA_TABLE_ENTRY_FULLDLLNAME] = {"_LDR_DATA_TABLE_ENTRY", "FullDllName"},
 };
 
 static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -202,12 +206,64 @@ done:
     return 0;
 }
 
+static void enumerate_drivers(dkommon* d, drakvuf_t drakvuf)
+{
+    vmi_lock_guard vmi(drakvuf);
+
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+    };
+
+    if (VMI_SUCCESS != vmi_pid_to_dtb(vmi.vmi, 4, &ctx.dtb))
+    {
+        PRINT_DEBUG("dkommon:enumerate drivers: failed to get CR3 for System process\n");
+        return;
+    }
+
+    addr_t list_head = 0;
+    ctx.addr = d->modules_list;
+    if ( VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &list_head) )
+    {
+        PRINT_DEBUG("dkommon:enumerate drivers: failed to read PsLoadedModuleList (VA 0x%lx)\n", ctx.addr);
+        return;
+    }
+    list_head -= d->offsets[LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS];
+
+    addr_t entry = list_head;
+    do
+    {
+        ctx.addr = entry + d->offsets[LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS] + d->offsets[LIST_ENTRY_FLINK];
+        if ( VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &entry) )
+        {
+            PRINT_DEBUG("dkommon:enumerate drivers: failed to read next entry (VA 0x%lx)\n", ctx.addr);
+            return;
+        }
+
+        ctx.addr = entry + d->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
+        auto name = drakvuf_read_unicode_common(vmi.vmi, &ctx);
+        if (name && name->contents)
+        {
+            PRINT_DEBUG("[DKOMmon] Found driver '%s'\n", name->contents);
+            vmi_free_unicode_str(name);
+        }
+    } while (entry != list_head);
+}
+
 dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
     : format(output)
     , offsets(new size_t[__OFFSET_MAX])
 {
     if ( !drakvuf_get_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets) )
         throw -1;
+
+    addr_t ml_rva = 0;
+    if ( !drakvuf_get_constant_rva( drakvuf, "PsLoadedModuleList", &ml_rva) )
+        throw -1;
+
+    if (!(modules_list = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, "ntoskrnl.exe", ml_rva)))
+        throw -1;
+
+    enumerate_drivers(this, drakvuf);
 
     /* Setup trap for thread switch */
     trap.cb = check_hidden_process;

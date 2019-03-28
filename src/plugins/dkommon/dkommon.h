@@ -116,6 +116,7 @@ public:
     addr_t flink_offset;
     addr_t blink_offset;
     size_t* offsets;
+    addr_t modules_list;
 
     dkommon(drakvuf_t drakvuf, const void* config, output_format_t output);
     ~dkommon();
