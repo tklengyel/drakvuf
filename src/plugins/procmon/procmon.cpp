@@ -607,6 +607,7 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
 static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
+    gchar* escaped_pname = NULL;
     // HANDLE ProcessHandle
     uint64_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
     // WIN32_PROTECTION_MASK NewProtectWin32
@@ -632,6 +633,7 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
             break;
 
         case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
             printf( "{"
                     "\"Plugin\" : \"procmon\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
@@ -643,8 +645,9 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
                     "\"NewProtectWin32\" : \"%s\""
                     "}",
                     UNPACK_TIMEVAL(info->timestamp),
-                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                    info->proc_data.pid, info->proc_data.ppid, escaped_pname,
                     info->trap->name,  process_handle, stringify_protection_attributes(new_protect).c_str());
+            g_free(escaped_pname);
             break;
 
         default:
