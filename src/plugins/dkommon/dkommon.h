@@ -120,6 +120,8 @@ public:
     addr_t blink_offset;
     size_t* offsets;
     addr_t modules_list_va;
+
+    std::vector<vmi_pid_t> processes_list;
     std::vector<std::string> drivers_list;
 
     dkommon(drakvuf_t drakvuf, const void* config, output_format_t output);

@@ -136,11 +136,11 @@ static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_inf
     switch (d->format)
     {
         case OUTPUT_CSV:
-            printf("dkommon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 "\n",
+            printf("dkommon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"Hidden Process\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid);
             break;
         case OUTPUT_KV:
-            printf("dkommon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\"\n",
+            printf("dkommon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Message=\"Hidden Process\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name);
             break;
 
@@ -154,6 +154,7 @@ static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_inf
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
+                    "\"Message\": \"Hidden Process\","
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
@@ -165,7 +166,7 @@ static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_inf
 
         case OUTPUT_DEFAULT:
         default:
-            printf("[DKOMMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 "\n",
+            printf("[DKOMMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " MESSAGE:\"Hidden Process\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid);
             break;
     }
@@ -194,10 +195,16 @@ static event_response_t check_hidden_process(drakvuf_t drakvuf, drakvuf_trap_inf
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &blink) )
         goto err;
 
-    if (list_entry_va == flink && flink == blink)
+    if (list_entry_va == flink && flink == blink &&
+        std::find(d->processes_list.begin(), d->processes_list.end(), info->proc_data.pid) == d->processes_list.end())
+    {
+        d->processes_list.push_back(info->proc_data.pid);
         print_hidden_process_information(drakvuf, info);
+    }
     else
+    {
         goto done;
+    }
 
 err:
     PRINT_DEBUG("[DKOMmon] Error. Failed to read virtual address.\n");
