@@ -117,13 +117,48 @@
 #include <glib.h>
 #include <err.h>
 #include <assert.h>
+#include <string>
 
 #include <libvmi/libvmi.h>
 #include "plugins/plugins.h"
 #include "private.h"
 #include "filetracer.h"
 
-static void print_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char const* file_path, bool with_attr, uint32_t file_attr)
+static std::string obj_attrs_to_string(uint32_t attrs)
+{
+    std::string str();
+
+    if (attr & OBJ_INHERIT)
+        str = "OBJ_INHERIT";
+
+    if (attr & OBJ_PERMANENT)
+        str += " | OBJ_PERMANENT";
+
+    if (attr & OBJ_EXCLUSIVE)
+        str += " | OBJ_EXCLUSIVE";
+
+    if (attr & OBJ_CASE_INSENSITIVE)
+        str += " | OBJ_CASE_INSENSITIVE";
+
+    if (attr & OBJ_OPENIF)
+        str += " | OBJ_OPENIF";
+
+    if (attr & OBJ_OPENLINK)
+        str += " | OBJ_OPENLINK";
+
+    if (attr & OBJ_KERNEL_HANDLE)
+        str += " | OBJ_KERNEL_HANDLE";
+
+    if (attr & OBJ_FORCE_ACCESS_CHECK)
+        str += " | OBJ_FORCE_ACCESS_CHECK";
+
+    if (attr & OBJ_VALID_ATTRIBUTES)
+        str += " | OBJ_VALID_ATTRIBUTES";
+
+    return str;
+}
+
+static void print_file_obj_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char const* file_path, bool with_attr, uint32_t file_attr)
 {
     filetracer* f = (filetracer*)info->trap->data;
     gchar* escaped_pname = NULL;
@@ -135,7 +170,7 @@ static void print_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char c
             printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->name, file_path);
             if (with_attr)
-                printf(",0x%" PRIu32, file_attr);
+                printf(",0x%" PRIu32, obj_attrs_to_string(file_attr).c_str());
             printf("\n");
             break;
 
@@ -144,7 +179,7 @@ static void print_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char c
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    info->trap->name, file_path);
             if (with_attr)
-                printf(",Attributes=0x%x", file_attr);
+                printf(",ObjectAttributes=0x%x", obj_attrs_to_string(file_attr).c_str());
             printf("\n");
             break;
 
@@ -169,7 +204,7 @@ static void print_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char c
                     info->trap->name, escaped_fname);
 
             if (with_attr)
-                printf(",\"Attributes\": %" PRIu32, file_attr);
+                printf(",\"ObjectAttributes\": %" PRIu32, obj_attrs_to_string(file_attr).c_str());
 
             printf("}\n");
             g_free(escaped_fname);
@@ -182,13 +217,13 @@ static void print_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char c
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, file_path);
             if (with_attr)
-                printf(",0x%" PRIu32, file_attr);
+                printf(",0x%" PRIu32, obj_attrs_to_string(file_attr).c_str());
             printf("\n");
             break;
     }
 }
 
-static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
+void objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
 {
     if (!attr) return 0;
 
@@ -224,9 +259,9 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         return 0;
     }
 
-    uint32_t file_attr = 0;
+    uint32_t obj_attr = 0;
     ctx.addr = attr + f->objattr_attr;
-    if ( VMI_FAILURE == vmi_read_32(vmi_lg.vmi, &ctx, &file_attr) )
+    if ( VMI_FAILURE == vmi_read_32(vmi_lg.vmi, &ctx, &obj_attr) )
     {
         g_free(file_root);
         return 0;
@@ -240,7 +275,7 @@ static event_response_t objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     vmi_free_unicode_str(file_name_us);
     g_free(file_root);
 
-    print_file_info(drakvuf, info, file_path, true, file_attr);
+    print_file_obj_info(drakvuf, info, file_path, true, obj_attr);
 
     g_free(file_path);
 
@@ -253,7 +288,7 @@ static event_response_t handle_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
     char* file_path = drakvuf_get_filename_from_handle(drakvuf, info, handle);
 
-    print_file_info(drakvuf, info, file_path, false, 0);
+    print_file_obj_info(drakvuf, info, file_path, false, 0);
 
     g_free(file_path);
 
@@ -471,7 +506,9 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     );
     */
     addr_t attr = drakvuf_get_function_argument(drakvuf, info, 3);
-    return objattr_read(drakvuf, info, attr);
+    objattr_read(drakvuf, info, attr);
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -487,7 +524,9 @@ static event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     );
     */
     addr_t attr = drakvuf_get_function_argument(drakvuf, info, 3);
-    return objattr_read(drakvuf, info, attr);
+    objattr_read(drakvuf, info, attr);
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t open_directory_object_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -500,7 +539,9 @@ static event_response_t open_directory_object_cb(drakvuf_t drakvuf, drakvuf_trap
     );
     */
     addr_t attr = drakvuf_get_function_argument(drakvuf, info, 3);
-    return objattr_read(drakvuf, info, attr);
+    objattr_read(drakvuf, info, attr);
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t query_attributes_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -512,7 +553,9 @@ static event_response_t query_attributes_file_cb(drakvuf_t drakvuf, drakvuf_trap
     );
     */
     addr_t attr = drakvuf_get_function_argument(drakvuf, info, 1);
-    return objattr_read(drakvuf, info, attr);
+    objattr_read(drakvuf, info, attr);
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 #define FILE_RENAME_INFORMATION 10

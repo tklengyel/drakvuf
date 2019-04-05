@@ -138,4 +138,17 @@ struct pool_header_x64
     uint64_t process_billed; // _EPROCESS *
 } __attribute__ ((packed));
 
+enum
+{
+    OBJ_INHERIT            = 0x002L,
+    OBJ_PERMANENT          = 0x010L,
+    OBJ_EXCLUSIVE          = 0x020L,
+    OBJ_CASE_INSENSITIVE   = 0x040L,
+    OBJ_OPENIF             = 0x080L,
+    OBJ_OPENLINK           = 0x100L,
+    OBJ_KERNEL_HANDLE      = 0x200L,
+    OBJ_FORCE_ACCESS_CHECK = 0x400L,
+    OBJ_VALID_ATTRIBUTES   = 0x7F2L,
+};
+
 #endif
