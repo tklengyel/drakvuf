@@ -175,60 +175,78 @@ enum
     FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS = 0x00400000,
 };
 
+// Flags
+enum
+{
+    FILE_FLAG_OPEN_NO_RECALL     = 0x00100000,
+    FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000,
+    FILE_FLAG_POSIX_SEMANTICS    = 0x01000000,
+    FILE_FLAG_BACKUP_SEMANTICS   = 0x02000000,
+    FILE_FLAG_DELETE_ON_CLOSE    = 0x04000000,
+    FILE_FLAG_SEQUENTIAL_SCAN    = 0x08000000,
+    FILE_FLAG_RANDOM_ACCESS      = 0x10000000,
+    FILE_FLAG_NO_BUFFERING       = 0x20000000,
+    FILE_FLAG_OVERLAPPED         = 0x40000000,
+    FILE_FLAG_WRITE_THROUGH      = 0x80000000,
+};
+
 // Generic Access Rights
 enum
 {
-    GENERIC_READ               = 0x80000000,
-    GENERIC_WRITE              = 0x40000000,
-    GENERIC_EXECUTE            = 0x20000000,
-    GENERIC_ALL                = 0x10000000,
-    DELETE                     = 0x00010000,
-    READ_CONTROL               = 0x00020000,
-    WRITE_DAC                  = 0x00040000,
-    WRITE_OWNER                = 0x00080000,
-    SYNCHRONIZE                = 0x00100000,
+    DELETE                 = 0x00010000,
+    READ_CONTROL           = 0x00020000,
+    WRITE_DAC              = 0x00040000,
+    WRITE_OWNER            = 0x00080000,
+    SYNCHRONIZE            = 0x00100000,
+    ACCESS_SYSTEM_SECURITY = 0x01000000,
+    GENERIC_ALL            = 0x10000000,
+    GENERIC_EXECUTE        = 0x20000000,
+    GENERIC_WRITE          = 0x40000000,
+    GENERIC_READ           = 0x80000000,
 };
 
 // File Access Rights
 enum
 {
-    FILE_READ_DATA             = 0x00000001,
-    FILE_WRITE_DATA            = 0x00000002,
-    FILE_APPEND_DATA           = 0x00000004,
-    FILE_READ_EA               = 0x00000008,
-    FILE_WRITE_EA              = 0x00000010,
-    FILE_EXECUTE               = 0x00000020,
-    FILE_READ_ATTRIBUTES       = 0x00000080,
-    FILE_WRITE_ATTRIBUTES      = 0x00000100,
+    FILE_ANY_ACCESS       = 0x00000000,
+    FILE_READ_DATA        = 0x00000001,
+    FILE_WRITE_DATA       = 0x00000002,
+    FILE_APPEND_DATA      = 0x00000004,
+    FILE_READ_EA          = 0x00000008,
+    FILE_WRITE_EA         = 0x00000010,
+    FILE_EXECUTE          = 0x00000020,
+    FILE_READ_ATTRIBUTES  = 0x00000080,
+    FILE_WRITE_ATTRIBUTES = 0x00000100,
 };
 
 // Directory Access Rights
 enum
 {
-    FILE_LIST_DIRECTORY        = 0x00000001,
-    FILE_ADD_FILE              = 0x00000002,
-    FILE_ADD_SUBDIRECTORY      = 0x00000004,
-    FILE_TRAVERSE              = 0x00000020,
-    FILE_DELETE_CHILD          = 0x00000040,
+    FILE_LIST_DIRECTORY   = 0x00000001,
+    FILE_ADD_FILE         = 0x00000002,
+    FILE_ADD_SUBDIRECTORY = 0x00000004,
+    FILE_TRAVERSE         = 0x00000020,
+    FILE_DELETE_CHILD     = 0x00000040,
 };
 
 // Share Mode
 enum
 {
-    FILE_SHARE_NONE            = 0x00000000,
-    FILE_SHARE_READ            = 0x00000001,
-    FILE_SHARE_WRITE           = 0x00000002,
-    FILE_SHARE_DELETE          = 0x00000004,
+    FILE_SHARE_NONE   = 0x00000000,
+    FILE_SHARE_READ   = 0x00000001,
+    FILE_SHARE_WRITE  = 0x00000002,
+    FILE_SHARE_DELETE = 0x00000004,
 };
 
 // Disposition
 enum
 {
-    CREATE_NEW = 1,
-    CREATE_ALWAYS,
-    OPEN_EXISTING,
-    OPEN_ALWAYS,
-    TRUNCATE_EXISTING,
+    FILE_SUPERSEDE    = 0x00000000,
+    FILE_OPEN         = 0x00000001,
+    FILE_CREATE       = 0x00000002,
+    FILE_OPEN_IF      = 0x00000003,
+    FILE_OVERWRITE    = 0x00000004,
+    FILE_OVERWRITE_IF = 0x00000005,
 };
 
 // Create Options

@@ -240,18 +240,38 @@ static std::string file_attrs_to_string(uint32_t attrs)
     return str;
 }
 
+static std::string flags_to_string(uint32_t attrs)
+{
+    std::string str;
+
+    if (attrs & FILE_FLAG_WRITE_THROUGH)
+        str += " | FILE_FLAG_WRITE_THROUGH";
+    if (attrs & FILE_FLAG_OVERLAPPED)
+        str += " | FILE_FLAG_OVERLAPPED";
+    if (attrs & FILE_FLAG_NO_BUFFERING)
+        str += " | FILE_FLAG_NO_BUFFERING";
+    if (attrs & FILE_FLAG_RANDOM_ACCESS)
+        str += " | FILE_FLAG_RANDOM_ACCESS";
+    if (attrs & FILE_FLAG_SEQUENTIAL_SCAN)
+        str += " | FILE_FLAG_SEQUENTIAL_SCAN";
+    if (attrs & FILE_FLAG_DELETE_ON_CLOSE)
+        str += " | FILE_FLAG_DELETE_ON_CLOSE";
+    if (attrs & FILE_FLAG_BACKUP_SEMANTICS)
+        str += " | FILE_FLAG_BACKUP_SEMANTICS";
+    if (attrs & FILE_FLAG_POSIX_SEMANTICS)
+        str += " | FILE_FLAG_POSIX_SEMANTICS";
+    if (attrs & FILE_FLAG_OPEN_REPARSE_POINT)
+        str += " | FILE_FLAG_OPEN_REPARSE_POINT";
+    if (attrs & FILE_FLAG_OPEN_NO_RECALL)
+        str += " | FILE_FLAG_OPEN_NO_RECALL";
+
+    return str;
+}
+
 static std::string generic_ar_to_string(uint32_t attrs)
 {
     std::string str;
 
-    if (attrs & GENERIC_READ)
-        str = " | GENERIC_READ";
-    if (attrs & GENERIC_WRITE)
-        str += " | GENERIC_WRITE";
-    if (attrs & GENERIC_EXECUTE)
-        str += " | GENERIC_EXECUTE";
-    if (attrs & GENERIC_ALL)
-        str += " | GENERIC_ALL";
     if (attrs & DELETE)
         str += " | DELETE";
     if (attrs & READ_CONTROL)
@@ -262,6 +282,16 @@ static std::string generic_ar_to_string(uint32_t attrs)
         str += " | WRITE_OWNER";
     if (attrs & SYNCHRONIZE)
         str += " | SYNCHRONIZE";
+    if (attrs & ACCESS_SYSTEM_SECURITY)
+        str += " | ACCESS_SYSTEM_SECURITY";
+    if (attrs & GENERIC_ALL)
+        str += " | GENERIC_ALL";
+    if (attrs & GENERIC_EXECUTE)
+        str += " | GENERIC_EXECUTE";
+    if (attrs & GENERIC_WRITE)
+        str += " | GENERIC_WRITE";
+    if (attrs & GENERIC_READ)
+        str = " | GENERIC_READ";
 
     return str;
 }
@@ -287,15 +317,16 @@ static std::string file_ar_to_string(uint32_t attrs)
     if (attrs & FILE_WRITE_ATTRIBUTES)
         str += " | FILE_WRITE_ATTRIBUTES";
 
-    attrs &= ~GENERIC_READ
-             & ~GENERIC_WRITE
-             & ~GENERIC_EXECUTE
-             & ~GENERIC_ALL
-             & ~DELETE
+    attrs &= ~DELETE
              & ~READ_CONTROL
              & ~WRITE_DAC
              & ~WRITE_OWNER
              & ~SYNCHRONIZE
+             & ~ACCESS_SYSTEM_SECURITY
+             & ~GENERIC_ALL
+             & ~GENERIC_EXECUTE
+             & ~GENERIC_WRITE
+             & ~GENERIC_READ
              & ~FILE_READ_DATA
              & ~FILE_WRITE_DATA
              & ~FILE_APPEND_DATA
@@ -308,7 +339,7 @@ static std::string file_ar_to_string(uint32_t attrs)
         str += std::string(" | ") + std::to_string(attrs);
 
     if (str.empty())
-        str = "0";
+        str = "FILE_ANY_ACCESS";
 
     if (str.find(" | ") == 0) str.erase(0, 3);
 
@@ -325,30 +356,43 @@ static std::string directory_ar_to_string(uint32_t attrs)
         str += " | FILE_ADD_FILE";
     if (attrs & FILE_ADD_SUBDIRECTORY)
         str += " | FILE_ADD_SUBDIRECTORY";
+    if (attrs & FILE_READ_EA)
+        str += " | FILE_READ_EA";
+    if (attrs & FILE_WRITE_EA)
+        str += " | FILE_WRITE_EA";
     if (attrs & FILE_TRAVERSE)
         str += " | FILE_TRAVERSE";
     if (attrs & FILE_DELETE_CHILD)
         str += " | FILE_DELETE_CHILD";
+    if (attrs & FILE_READ_ATTRIBUTES)
+        str += " | FILE_READ_ATTRIBUTES";
+    if (attrs & FILE_WRITE_ATTRIBUTES)
+        str += " | FILE_WRITE_ATTRIBUTES";
 
-    attrs &= ~GENERIC_READ
-             & ~GENERIC_WRITE
-             & ~GENERIC_EXECUTE
-             & ~GENERIC_ALL
-             & ~DELETE
+    attrs &= ~DELETE
              & ~READ_CONTROL
              & ~WRITE_DAC
              & ~WRITE_OWNER
              & ~SYNCHRONIZE
+             & ~ACCESS_SYSTEM_SECURITY
+             & ~GENERIC_ALL
+             & ~GENERIC_EXECUTE
+             & ~GENERIC_WRITE
+             & ~GENERIC_READ
              & ~FILE_LIST_DIRECTORY
              & ~FILE_ADD_FILE
              & ~FILE_ADD_SUBDIRECTORY
+             & ~FILE_READ_EA
+             & ~FILE_WRITE_EA
              & ~FILE_TRAVERSE
-             & ~FILE_DELETE_CHILD;
+             & ~FILE_DELETE_CHILD
+             & ~FILE_READ_ATTRIBUTES
+             & ~FILE_WRITE_ATTRIBUTES;
     if (attrs)
         str += std::string(" | ") + std::to_string(attrs);
 
     if (str.empty())
-        str = "0";
+        str = "FILE_ANY_ACCESS";
 
     if (str.find(" | ") == 0) str.erase(0, 3);
 
@@ -384,27 +428,27 @@ static std::string disposition_to_string(uint32_t attrs)
 {
     std::string str;
 
-    if (attrs & CREATE_NEW)
-        str += " | CREATE_NEW";
-    if (attrs & CREATE_ALWAYS)
-        str += " | CREATE_ALWAYS";
-    if (attrs & OPEN_EXISTING)
-        str += " | OPEN_EXISTING";
-    if (attrs & OPEN_ALWAYS)
-        str += " | OPEN_ALWAYS";
-    if (attrs & TRUNCATE_EXISTING)
-        str += " | TRUNCATE_EXISTING";
+    if (attrs & FILE_OPEN)
+        str += " | FILE_OPEN";
+    if (attrs & FILE_CREATE)
+        str += " | FILE_CREATE";
+    if (attrs & FILE_OPEN_IF)
+        str += " | FILE_OPEN_IF";
+    if (attrs & FILE_OVERWRITE)
+        str += " | FILE_OVERWRITE";
+    if (attrs & FILE_OVERWRITE_IF)
+        str += " | FILE_OVERWRITE_IF";
 
-    attrs &= ~CREATE_NEW
-             & ~CREATE_ALWAYS
-             & ~OPEN_EXISTING
-             & ~OPEN_ALWAYS
-             & ~TRUNCATE_EXISTING;
+    attrs &= ~FILE_OPEN
+             & ~FILE_CREATE
+             & ~FILE_OPEN_IF
+             & ~FILE_OVERWRITE
+             & ~FILE_OVERWRITE_IF;
     if (attrs)
         str += std::string(" | ") + std::to_string(attrs);
 
     if (str.empty())
-        str = "0";
+        str = "FILE_SUPERSEDE";
 
     if (str.find(" | ") == 0) str.erase(0, 3);
 
@@ -841,13 +885,14 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     addr_t obj_attr = drakvuf_get_function_argument(drakvuf, info, 3);
     auto file_path = objattr_read(drakvuf, info, obj_attr);
 
-    auto attrs = file_attrs_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 6)));
+    auto flagsandattrs = static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 6));
+    auto attrs = file_attrs_to_string(flagsandattrs) + flags_to_string(flagsandattrs);
     auto share = share_mode_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 7)));
     auto disp = disposition_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 8)));
     auto opts = createoptions_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 9)));
-    auto access = drakvuf_get_function_argument(drakvuf, info, 9) & FILE_NON_DIRECTORY_FILE
-                  ? file_ar_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 2)))
-                  : directory_ar_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 2)));
+    auto access = drakvuf_get_function_argument(drakvuf, info, 9) & FILE_DIRECTORY_FILE
+                  ? directory_ar_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 2)))
+                  : file_ar_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 2)));
 
     gchar* escaped_pname = NULL;
     gchar* escaped_fname = NULL;
