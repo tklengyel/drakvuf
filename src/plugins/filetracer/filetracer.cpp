@@ -162,7 +162,7 @@ static std::string obj_attrs_to_string(uint32_t attrs)
     if (str.empty())
         str = "0";
 
-    if (str.size() > 3) str.erase(0, 3);
+    if (str.find(" | ") == 0) str.erase(0, 3);
 
     return str;
 }
@@ -235,7 +235,7 @@ static std::string file_attrs_to_string(uint32_t attrs)
     if (str.empty())
         str = "0";
 
-    if (str.size() > 3) str.erase(0, 3);
+    if (str.find(" | ") == 0) str.erase(0, 3);
 
     return str;
 }
@@ -310,7 +310,7 @@ static std::string file_ar_to_string(uint32_t attrs)
     if (str.empty())
         str = "0";
 
-    if (str.size() > 3) str.erase(0, 3);
+    if (str.find(" | ") == 0) str.erase(0, 3);
 
     return str;
 }
@@ -350,7 +350,7 @@ static std::string directory_ar_to_string(uint32_t attrs)
     if (str.empty())
         str = "0";
 
-    if (str.size() > 3) str.erase(0, 3);
+    if (str.find(" | ") == 0) str.erase(0, 3);
 
     return str;
 }
@@ -375,7 +375,7 @@ static std::string share_mode_to_string(uint32_t attrs)
     if (str.empty())
         str = "FILE_SHARE_NONE";
 
-    if (str.size() > 3) str.erase(0, 3);
+    if (str.find(" | ") == 0) str.erase(0, 3);
 
     return str;
 }
@@ -406,7 +406,7 @@ static std::string disposition_to_string(uint32_t attrs)
     if (str.empty())
         str = "0";
 
-    if (str.size() > 3) str.erase(0, 3);
+    if (str.find(" | ") == 0) str.erase(0, 3);
 
     return str;
 }
@@ -485,7 +485,7 @@ static std::string createoptions_to_string(uint32_t attrs)
     if (str.empty())
         str = "0";
 
-    if (str.size() > 3) str.erase(0, 3);
+    if (str.find(" | ") == 0) str.erase(0, 3);
 
     return str;
 }
