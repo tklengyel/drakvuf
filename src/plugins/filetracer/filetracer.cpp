@@ -126,34 +126,270 @@
 
 static std::string obj_attrs_to_string(uint32_t attrs)
 {
-    std::string str();
+    std::string str;
 
-    if (attr & OBJ_INHERIT)
-        str = "OBJ_INHERIT";
+    if (attrs & OBJ_INHERIT)
+        str = " | OBJ_INHERIT";
 
-    if (attr & OBJ_PERMANENT)
+    if (attrs & OBJ_PERMANENT)
         str += " | OBJ_PERMANENT";
 
-    if (attr & OBJ_EXCLUSIVE)
+    if (attrs & OBJ_EXCLUSIVE)
         str += " | OBJ_EXCLUSIVE";
 
-    if (attr & OBJ_CASE_INSENSITIVE)
+    if (attrs & OBJ_CASE_INSENSITIVE)
         str += " | OBJ_CASE_INSENSITIVE";
 
-    if (attr & OBJ_OPENIF)
+    if (attrs & OBJ_OPENIF)
         str += " | OBJ_OPENIF";
 
-    if (attr & OBJ_OPENLINK)
+    if (attrs & OBJ_OPENLINK)
         str += " | OBJ_OPENLINK";
 
-    if (attr & OBJ_KERNEL_HANDLE)
+    if (attrs & OBJ_KERNEL_HANDLE)
         str += " | OBJ_KERNEL_HANDLE";
 
-    if (attr & OBJ_FORCE_ACCESS_CHECK)
+    if (attrs & OBJ_FORCE_ACCESS_CHECK)
         str += " | OBJ_FORCE_ACCESS_CHECK";
 
-    if (attr & OBJ_VALID_ATTRIBUTES)
+    if (attrs & OBJ_VALID_ATTRIBUTES)
         str += " | OBJ_VALID_ATTRIBUTES";
+
+    if (str.empty())
+        str = "0";
+
+    if (str.size() > 3) str.erase(0, 3);
+
+    return str;
+}
+
+static std::string file_attrs_to_string(uint32_t attrs)
+{
+    std::string str;
+
+    if (attrs & FILE_ATTRIBUTE_READONLY)
+        str = " | FILE_ATTRIBUTE_READONLY";
+    if (attrs & FILE_ATTRIBUTE_HIDDEN)
+        str += " | FILE_ATTRIBUTE_HIDDEN";
+    if (attrs & FILE_ATTRIBUTE_SYSTEM)
+        str += " | FILE_ATTRIBUTE_SYSTEM";
+    if (attrs & FILE_ATTRIBUTE_DIRECTORY)
+        str += " | FILE_ATTRIBUTE_DIRECTORY";
+    if (attrs & FILE_ATTRIBUTE_ARCHIVE)
+        str += " | FILE_ATTRIBUTE_ARCHIVE";
+    if (attrs & FILE_ATTRIBUTE_DEVICE)
+        str += " | FILE_ATTRIBUTE_DEVICE";
+    if (attrs & FILE_ATTRIBUTE_NORMAL)
+        str += " | FILE_ATTRIBUTE_NORMAL";
+    if (attrs & FILE_ATTRIBUTE_TEMPORARY)
+        str += " | FILE_ATTRIBUTE_TEMPORARY";
+    if (attrs & FILE_ATTRIBUTE_SPARSE_FILE)
+        str += " | FILE_ATTRIBUTE_SPARSE_FILE";
+    if (attrs & FILE_ATTRIBUTE_REPARSE_POINT)
+        str += " | FILE_ATTRIBUTE_REPARSE_POINT";
+    if (attrs & FILE_ATTRIBUTE_COMPRESSED)
+        str += " | FILE_ATTRIBUTE_COMPRESSED";
+    if (attrs & FILE_ATTRIBUTE_OFFLINE)
+        str += " | FILE_ATTRIBUTE_OFFLINE";
+    if (attrs & FILE_ATTRIBUTE_NOT_CONTENT_INDEXED)
+        str += " | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED";
+    if (attrs & FILE_ATTRIBUTE_ENCRYPTED)
+        str += " | FILE_ATTRIBUTE_ENCRYPTED";
+    if (attrs & FILE_ATTRIBUTE_INTEGRITY_STREAM)
+        str += " | FILE_ATTRIBUTE_INTEGRITY_STREAM";
+    if (attrs & FILE_ATTRIBUTE_VIRTUAL)
+        str += " | FILE_ATTRIBUTE_VIRTUAL";
+    if (attrs & FILE_ATTRIBUTE_NO_SCRUB_DATA)
+        str += " | FILE_ATTRIBUTE_NO_SCRUB_DATA";
+    if (attrs & FILE_ATTRIBUTE_RECALL_ON_OPEN)
+        str += " | FILE_ATTRIBUTE_RECALL_ON_OPEN";
+    if (attrs & FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS)
+        str += " | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS";
+
+    if (str.empty())
+        str = "0";
+
+    if (str.size() > 3) str.erase(0, 3);
+
+    return str;
+}
+
+static std::string generic_ar_to_string(uint32_t attrs)
+{
+    std::string str;
+
+    if (attrs & GENERIC_READ)
+        str = " | GENERIC_READ";
+    if (attrs & GENERIC_WRITE)
+        str += " | GENERIC_WRITE";
+    if (attrs & GENERIC_EXECUTE)
+        str += " | GENERIC_EXECUTE";
+    if (attrs & GENERIC_ALL)
+        str += " | GENERIC_ALL";
+    if (attrs & DELETE)
+        str += " | DELETE";
+    if (attrs & READ_CONTROL)
+        str += " | READ_CONTROL";
+    if (attrs & WRITE_DAC)
+        str += " | WRITE_DAC";
+    if (attrs & WRITE_OWNER)
+        str += " | WRITE_OWNER";
+    if (attrs & SYNCHRONIZE)
+        str += " | SYNCHRONIZE";
+
+    if (str.empty())
+        str = "0";
+
+    if (str.size() > 3) str.erase(0, 3);
+
+    return str;
+}
+
+static std::string file_ar_to_string(uint32_t attrs)
+{
+    std::string str = generic_ar_to_string(attrs);
+
+    if (attrs & FILE_READ_DATA)
+        str += " | FILE_READ_DATA";
+    if (attrs & FILE_WRITE_DATA)
+        str += " | FILE_WRITE_DATA";
+    if (attrs & FILE_APPEND_DATA)
+        str += " | FILE_APPEND_DATA";
+    if (attrs & FILE_READ_EA)
+        str += " | FILE_READ_EA";
+    if (attrs & FILE_WRITE_EA)
+        str += " | FILE_WRITE_EA";
+    if (attrs & FILE_EXECUTE)
+        str += " | FILE_EXECUTE";
+    if (attrs & FILE_READ_ATTRIBUTES)
+        str += " | FILE_READ_ATTRIBUTES";
+    if (attrs & FILE_WRITE_ATTRIBUTES)
+        str += " | FILE_WRITE_ATTRIBUTES";
+
+    if (str.empty())
+        str = "0";
+
+    if (str.size() > 3) str.erase(0, 3);
+
+    return str;
+}
+
+static std::string directory_ar_to_string(uint32_t attrs)
+{
+    std::string str = generic_ar_to_string(attrs);
+
+    if (attrs & FILE_LIST_DIRECTORY)
+        str += " | FILE_LIST_DIRECTORY";
+    if (attrs & FILE_ADD_FILE)
+        str += " | FILE_ADD_FILE";
+    if (attrs & FILE_ADD_SUBDIRECTORY)
+        str += " | FILE_ADD_SUBDIRECTORY";
+    if (attrs & FILE_TRAVERSE)
+        str += " | FILE_TRAVERSE";
+    if (attrs & FILE_DELETE_CHILD)
+        str += " | FILE_DELETE_CHILD";
+
+    if (str.empty())
+        str = "0";
+
+    if (str.size() > 3) str.erase(0, 3);
+
+    return str;
+}
+
+static std::string share_mode_to_string(uint32_t attrs)
+{
+    std::string str;
+
+    if (attrs & FILE_SHARE_READ)
+        str = " | FILE_SHARE_READ";
+    if (attrs & FILE_SHARE_WRITE)
+        str += " | FILE_SHARE_WRITE";
+    if (attrs & FILE_SHARE_DELETE)
+        str += " | FILE_SHARE_DELETE";
+
+    if (str.empty())
+        str = "FILE_SHARE_NONE";
+
+    if (str.size() > 3) str.erase(0, 3);
+
+    return str;
+}
+
+static std::string disposition_to_string(uint32_t attrs)
+{
+    std::string str;
+
+    if (attrs & CREATE_NEW)
+        str += " | CREATE_NEW";
+    if (attrs & CREATE_ALWAYS)
+        str += " | CREATE_ALWAYS";
+    if (attrs & OPEN_EXISTING)
+        str += " | OPEN_EXISTING";
+    if (attrs & OPEN_ALWAYS)
+        str += " | OPEN_ALWAYS";
+    if (attrs & TRUNCATE_EXISTING)
+        str += " | TRUNCATE_EXISTING";
+
+    if (str.empty())
+        str = "0";
+
+    if (str.size() > 3) str.erase(0, 3);
+
+    return str;
+}
+
+static std::string createoptions_to_string(uint32_t attrs)
+{
+    std::string str;
+
+    if (attrs & FILE_DIRECTORY_FILE)
+        str += " | FILE_DIRECTORY_FILE";
+    if (attrs & FILE_WRITE_THROUGH)
+        str += " | FILE_WRITE_THROUGH";
+    if (attrs & FILE_SEQUENTIAL_ONLY)
+        str += " | FILE_SEQUENTIAL_ONLY";
+    if (attrs & FILE_NO_INTERMEDIATE_BUFFERING)
+        str += " | FILE_NO_INTERMEDIATE_BUFFERING";
+    if (attrs & FILE_SYNCHRONOUS_IO_ALERT)
+        str += " | FILE_SYNCHRONOUS_IO_ALERT";
+    if (attrs & FILE_SYNCHRONOUS_IO_NONALERT)
+        str += " | FILE_SYNCHRONOUS_IO_NONALERT";
+    if (attrs & FILE_NON_DIRECTORY_FILE)
+        str += " | FILE_NON_DIRECTORY_FILE";
+    if (attrs & FILE_CREATE_TREE_CONNECTION)
+        str += " | FILE_CREATE_TREE_CONNECTION";
+    if (attrs & FILE_COMPLETE_IF_OPLOCKED)
+        str += " | FILE_COMPLETE_IF_OPLOCKED";
+    if (attrs & FILE_NO_EA_KNOWLEDGE)
+        str += " | FILE_NO_EA_KNOWLEDGE";
+    if (attrs & FILE_OPEN_REMOTE_INSTANCE)
+        str += " | FILE_OPEN_REMOTE_INSTANCE";
+    if (attrs & FILE_RANDOM_ACCESS)
+        str += " | FILE_RANDOM_ACCESS";
+    if (attrs & FILE_DELETE_ON_CLOSE)
+        str += " | FILE_DELETE_ON_CLOSE";
+    if (attrs & FILE_OPEN_BY_FILE_ID)
+        str += " | FILE_OPEN_BY_FILE_ID";
+    if (attrs & FILE_OPEN_FOR_BACKUP_INTENT)
+        str += " | FILE_OPEN_FOR_BACKUP_INTENT";
+    if (attrs & FILE_NO_COMPRESSION)
+        str += " | FILE_NO_COMPRESSION";
+    if (attrs & FILE_OPEN_REQUIRING_OPLOCK)
+        str += " | FILE_OPEN_REQUIRING_OPLOCK";
+    if (attrs & FILE_RESERVE_OPFILTER)
+        str += " | FILE_RESERVE_OPFILTER";
+    if (attrs & FILE_OPEN_REPARSE_POINT)
+        str += " | FILE_OPEN_REPARSE_POINT";
+    if (attrs & FILE_OPEN_NO_RECALL)
+        str += " | FILE_OPEN_NO_RECALL";
+    if (attrs & FILE_OPEN_FOR_FREE_SPACE_QUERY)
+        str += " | FILE_OPEN_FOR_FREE_SPACE_QUERY";
+
+    if (str.empty())
+        str = "0";
+
+    if (str.size() > 3) str.erase(0, 3);
 
     return str;
 }
@@ -166,66 +402,66 @@ static void print_file_obj_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, ch
 
     switch (f->format)
     {
-        case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->name, file_path);
-            if (with_attr)
-                printf(",0x%" PRIu32, obj_attrs_to_string(file_attr).c_str());
-            printf("\n");
-            break;
+    case OUTPUT_CSV:
+        printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s",
+               UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->name, file_path);
+        if (with_attr)
+            printf(" \"%s\"", obj_attrs_to_string(file_attr).c_str());
+        printf("\n");
+        break;
 
-        case OUTPUT_KV:
-            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\"",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, file_path);
-            if (with_attr)
-                printf(",ObjectAttributes=0x%x", obj_attrs_to_string(file_attr).c_str());
-            printf("\n");
-            break;
+    case OUTPUT_KV:
+        printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\"",
+               UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+               info->trap->name, file_path);
+        if (with_attr)
+            printf(",ObjectAttributes=\"%s\"", obj_attrs_to_string(file_attr).c_str());
+        printf("\n");
+        break;
 
-        case OUTPUT_JSON:
-            escaped_fname = drakvuf_escape_str(file_path);
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+    case OUTPUT_JSON:
+        escaped_fname = drakvuf_escape_str(file_path);
+        escaped_pname = drakvuf_escape_str(info->proc_data.name);
 
-            printf( "{"
-                    "\"Plugin\" : \"filetracer\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Method\": \"%s\","
-                    "\"FileName\": %s",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    info->trap->name, escaped_fname);
+        printf( "{"
+                "\"Plugin\" : \"filetracer\","
+                "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                "\"ProcessName\": %s,"
+                "\"UserName\": \"%s\","
+                "\"UserId\": %" PRIu64 ","
+                "\"PID\" : %d,"
+                "\"PPID\": %d,"
+                "\"Method\": \"%s\","
+                "\"FileName\": %s",
+                UNPACK_TIMEVAL(info->timestamp),
+                escaped_pname,
+                USERIDSTR(drakvuf), info->proc_data.userid,
+                info->proc_data.pid, info->proc_data.ppid,
+                info->trap->name, escaped_fname);
 
-            if (with_attr)
-                printf(",\"ObjectAttributes\": %" PRIu32, obj_attrs_to_string(file_attr).c_str());
+        if (with_attr)
+            printf(",\"ObjectAttributes\": \"%s\"", obj_attrs_to_string(file_attr).c_str());
 
-            printf("}\n");
-            g_free(escaped_fname);
-            g_free(escaped_pname);
-            break;
+        printf("}\n");
+        g_free(escaped_fname);
+        g_free(escaped_pname);
+        break;
 
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, file_path);
-            if (with_attr)
-                printf(",0x%" PRIu32, obj_attrs_to_string(file_attr).c_str());
-            printf("\n");
-            break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s",
+               UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+               USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, file_path);
+        if (with_attr)
+            printf(",\"%s\"", obj_attrs_to_string(file_attr).c_str());
+        printf("\n");
+        break;
     }
 }
 
-void objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
+std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs)
 {
-    if (!attr) return 0;
+    if (!attrs) return std::string();
 
     filetracer* f = (filetracer*)info->trap->data;
 
@@ -238,17 +474,17 @@ void objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
     };
 
     addr_t file_root_handle = 0;
-    ctx.addr = attr + f->objattr_root;
+    ctx.addr = attrs + f->objattr_root;
     if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &file_root_handle) )
-        return 0;
+        return std::string();
 
     char* file_root = drakvuf_get_filename_from_handle(drakvuf, info, file_root_handle);
 
-    ctx.addr = attr + f->objattr_name;
+    ctx.addr = attrs + f->objattr_name;
     if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &ctx.addr) )
     {
         g_free(file_root);
-        return 0;
+        return std::string();
     }
 
     unicode_string_t* file_name_us = drakvuf_read_unicode(drakvuf, info, ctx.addr);
@@ -256,21 +492,22 @@ void objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
     if ( !file_name_us )
     {
         g_free(file_root);
-        return 0;
+        return std::string();
     }
 
     uint32_t obj_attr = 0;
-    ctx.addr = attr + f->objattr_attr;
+    ctx.addr = attrs + f->objattr_attr;
     if ( VMI_FAILURE == vmi_read_32(vmi_lg.vmi, &ctx, &obj_attr) )
     {
         g_free(file_root);
-        return 0;
+        return std::string();
     }
 
     char* file_path = g_strdup_printf("%s%s%s",
                                       file_root ?: "",
                                       file_root ? "\\" : "",
                                       file_name_us->contents);
+    std::string ret{file_path};
 
     vmi_free_unicode_str(file_name_us);
     g_free(file_root);
@@ -279,7 +516,7 @@ void objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attr)
 
     g_free(file_path);
 
-    return 0;
+    return ret;
 }
 
 static event_response_t handle_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t handle)
@@ -328,49 +565,49 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
 
     switch (f->format)
     {
-        case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
-                   syscall_name, operation_name, file);
-            break;
+    case OUTPUT_CSV:
+        printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,%s\n",
+               UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
+               syscall_name, operation_name, file);
+        break;
 
-        case OUTPUT_KV:
-            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Operation=%s,File=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   syscall_name, operation_name, file);
-            break;
+    case OUTPUT_KV:
+        printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Operation=%s,File=\"%s\"\n",
+               UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+               syscall_name, operation_name, file);
+        break;
 
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            escaped_fname = drakvuf_escape_str(file);
-            printf( "{"
-                    "\"Plugin\" : \"filetracer\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Method\" : \"%s\","
-                    "\"Operation\" : \"%s\","
-                    "\"FileName\" : %s"
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    syscall_name, operation_name, escaped_fname);
+    case OUTPUT_JSON:
+        escaped_pname = drakvuf_escape_str(info->proc_data.name);
+        escaped_fname = drakvuf_escape_str(file);
+        printf( "{"
+                "\"Plugin\" : \"filetracer\","
+                "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                "\"ProcessName\": %s,"
+                "\"UserName\": \"%s\","
+                "\"UserId\": %" PRIu64 ","
+                "\"PID\" : %d,"
+                "\"PPID\": %d,"
+                "\"Method\" : \"%s\","
+                "\"Operation\" : \"%s\","
+                "\"FileName\" : %s"
+                "}\n",
+                UNPACK_TIMEVAL(info->timestamp),
+                escaped_pname,
+                USERIDSTR(drakvuf), info->proc_data.userid,
+                info->proc_data.pid, info->proc_data.ppid,
+                syscall_name, operation_name, escaped_fname);
 
-            g_free(escaped_fname);
-            g_free(escaped_pname);
-            break;
+        g_free(escaped_fname);
+        g_free(escaped_pname);
+        break;
 
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
-                   syscall_name, operation_name, file);
-            break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,%s\n",
+               UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
+               syscall_name, operation_name, file);
+        break;
     }
 
     g_free(file);
@@ -436,52 +673,52 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
 
     switch (f->format)
     {
-        case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,%s,%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
-                   syscall_name, operation_name, src_file, dst_file_p);
-            break;
+    case OUTPUT_CSV:
+        printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,%s,%s\n",
+               UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
+               syscall_name, operation_name, src_file, dst_file_p);
+        break;
 
-        case OUTPUT_KV:
-            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Operation=%s,FileSrc=\"%s\",FileDst=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   syscall_name, operation_name,
-                   src_file, dst_file_p);
-            break;
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            escaped_fname_src = drakvuf_escape_str(src_file);
-            escaped_fname_dst = drakvuf_escape_str(dst_file_p);
-            printf( "{"
-                    "\"Plugin\" : \"filetracer\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Method\" : \"%s\","
-                    "\"Operation\" : \"%s\","
-                    "\"SrcFileName\" : %s,"
-                    "\"DstFileName\" : %s"
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    syscall_name, operation_name, escaped_fname_src, escaped_fname_dst );
+    case OUTPUT_KV:
+        printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Operation=%s,FileSrc=\"%s\",FileDst=\"%s\"\n",
+               UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+               syscall_name, operation_name,
+               src_file, dst_file_p);
+        break;
+    case OUTPUT_JSON:
+        escaped_pname = drakvuf_escape_str(info->proc_data.name);
+        escaped_fname_src = drakvuf_escape_str(src_file);
+        escaped_fname_dst = drakvuf_escape_str(dst_file_p);
+        printf( "{"
+                "\"Plugin\" : \"filetracer\","
+                "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                "\"ProcessName\": %s,"
+                "\"UserName\": \"%s\","
+                "\"UserId\": %" PRIu64 ","
+                "\"PID\" : %d,"
+                "\"PPID\": %d,"
+                "\"Method\" : \"%s\","
+                "\"Operation\" : \"%s\","
+                "\"SrcFileName\" : %s,"
+                "\"DstFileName\" : %s"
+                "}\n",
+                UNPACK_TIMEVAL(info->timestamp),
+                escaped_pname,
+                USERIDSTR(drakvuf), info->proc_data.userid,
+                info->proc_data.pid, info->proc_data.ppid,
+                syscall_name, operation_name, escaped_fname_src, escaped_fname_dst );
 
-            g_free(escaped_fname_dst);
-            g_free(escaped_fname_src);
-            g_free(escaped_pname);
-            break;
+        g_free(escaped_fname_dst);
+        g_free(escaped_fname_src);
+        g_free(escaped_pname);
+        break;
 
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,%s,%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
-                   syscall_name, operation_name, src_file, dst_file_p);
-            break;
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,%s,%s\n",
+               UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid,
+               syscall_name, operation_name, src_file, dst_file_p);
+        break;
     }
 
     g_free(dst_file_p);
@@ -505,8 +742,79 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
       IN ULONG              EaLength
     );
     */
-    addr_t attr = drakvuf_get_function_argument(drakvuf, info, 3);
-    objattr_read(drakvuf, info, attr);
+    addr_t obj_attr = drakvuf_get_function_argument(drakvuf, info, 3);
+    auto file_path = objattr_read(drakvuf, info, obj_attr);
+
+    auto attrs = file_attrs_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 6)));
+    auto share = share_mode_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 7)));
+    auto disp = disposition_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 8)));
+    auto opts = createoptions_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 9)));
+    auto access = drakvuf_get_function_argument(drakvuf, info, 9) & FILE_NON_DIRECTORY_FILE
+                  ? file_ar_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 2)))
+                  : directory_ar_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 2)));
+
+    gchar* escaped_pname = NULL;
+    gchar* escaped_fname = NULL;
+
+    filetracer* f = (filetracer*)info->trap->data;
+    switch (f->format)
+    {
+    case OUTPUT_CSV:
+        printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"",
+               UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->name,
+               file_path.c_str(), access.c_str(), attrs.c_str(), share.c_str(), disp.c_str(), opts.c_str());
+        printf("\n");
+        break;
+
+    case OUTPUT_KV:
+        printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\""
+               ",DesiredAccess=\"%s\",FileAttributes=\"%s\",ShareAccess=\"%s\",CreateDisposition=\"%s\",CreateOptions=\"%s\"",
+               UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+               info->trap->name, file_path.c_str(), access.c_str(), attrs.c_str(), share.c_str(), disp.c_str(), opts.c_str());
+        printf("\n");
+        break;
+
+    case OUTPUT_JSON:
+        escaped_fname = drakvuf_escape_str(file_path.c_str());
+        escaped_pname = drakvuf_escape_str(info->proc_data.name);
+
+        printf( "{"
+                "\"Plugin\" : \"filetracer\","
+                "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                "\"ProcessName\": %s,"
+                "\"UserName\": \"%s\","
+                "\"UserId\": %" PRIu64 ","
+                "\"PID\" : %d,"
+                "\"PPID\": %d,"
+                "\"Method\": \"%s\","
+                "\"FileName\": %s,"
+                "\"DesiredAccess\": \"%s\","
+                "\"FileAttributes\": \"%s\","
+                "\"ShareAccess\": \"%s\","
+                "\"CreateDisposition\": \"%s\","
+                "\"CreateOptions\": \"%s\"",
+                UNPACK_TIMEVAL(info->timestamp),
+                escaped_pname,
+                USERIDSTR(drakvuf), info->proc_data.userid,
+                info->proc_data.pid, info->proc_data.ppid,
+                info->trap->name, escaped_fname,
+                access.c_str(), attrs.c_str(), share.c_str(), disp.c_str(), opts.c_str());
+
+        printf("}\n");
+        g_free(escaped_fname);
+        g_free(escaped_pname);
+        break;
+
+    default:
+    case OUTPUT_DEFAULT:
+        printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s"
+               " DESIREDACCESS:\"%s\" FILEATTRIBUTES:\"%s\" SHAREACCESS:\"%s\" CREATEDISPOSITION:\"%s\" CREATEOPTIONS:\"%s\"",
+               UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+               USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, file_path.c_str(),
+               access.c_str(), attrs.c_str(), share.c_str(), disp.c_str(), opts.c_str());
+        printf("\n");
+        break;
+    }
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -523,8 +831,8 @@ static event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
       IN ULONG              OpenOptions
     );
     */
-    addr_t attr = drakvuf_get_function_argument(drakvuf, info, 3);
-    objattr_read(drakvuf, info, attr);
+    addr_t attrs = drakvuf_get_function_argument(drakvuf, info, 3);
+    objattr_read(drakvuf, info, attrs);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -538,8 +846,8 @@ static event_response_t open_directory_object_cb(drakvuf_t drakvuf, drakvuf_trap
       _In_  POBJECT_ATTRIBUTES ObjectAttributes
     );
     */
-    addr_t attr = drakvuf_get_function_argument(drakvuf, info, 3);
-    objattr_read(drakvuf, info, attr);
+    addr_t attrs = drakvuf_get_function_argument(drakvuf, info, 3);
+    objattr_read(drakvuf, info, attrs);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -552,8 +860,8 @@ static event_response_t query_attributes_file_cb(drakvuf_t drakvuf, drakvuf_trap
       _Out_ PFILE_BASIC_INFORMATION FileInformation
     );
     */
-    addr_t attr = drakvuf_get_function_argument(drakvuf, info, 1);
-    objattr_read(drakvuf, info, attr);
+    addr_t attrs = drakvuf_get_function_argument(drakvuf, info, 1);
+    objattr_read(drakvuf, info, attrs);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
