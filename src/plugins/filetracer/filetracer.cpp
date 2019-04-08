@@ -130,30 +130,34 @@ static std::string obj_attrs_to_string(uint32_t attrs)
 
     if (attrs & OBJ_INHERIT)
         str = " | OBJ_INHERIT";
-
     if (attrs & OBJ_PERMANENT)
         str += " | OBJ_PERMANENT";
-
     if (attrs & OBJ_EXCLUSIVE)
         str += " | OBJ_EXCLUSIVE";
-
     if (attrs & OBJ_CASE_INSENSITIVE)
         str += " | OBJ_CASE_INSENSITIVE";
-
     if (attrs & OBJ_OPENIF)
         str += " | OBJ_OPENIF";
-
     if (attrs & OBJ_OPENLINK)
         str += " | OBJ_OPENLINK";
-
     if (attrs & OBJ_KERNEL_HANDLE)
         str += " | OBJ_KERNEL_HANDLE";
-
     if (attrs & OBJ_FORCE_ACCESS_CHECK)
         str += " | OBJ_FORCE_ACCESS_CHECK";
-
     if (attrs & OBJ_VALID_ATTRIBUTES)
         str += " | OBJ_VALID_ATTRIBUTES";
+
+    attrs &= ~OBJ_INHERIT
+             & ~OBJ_PERMANENT
+             & ~OBJ_EXCLUSIVE
+             & ~OBJ_CASE_INSENSITIVE
+             & ~OBJ_OPENIF
+             & ~OBJ_OPENLINK
+             & ~OBJ_KERNEL_HANDLE
+             & ~OBJ_FORCE_ACCESS_CHECK
+             & ~OBJ_VALID_ATTRIBUTES;
+    if (attrs)
+        str += std::string(" | ") + std::to_string(attrs);
 
     if (str.empty())
         str = "0";
@@ -206,6 +210,28 @@ static std::string file_attrs_to_string(uint32_t attrs)
     if (attrs & FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS)
         str += " | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS";
 
+    attrs &= ~FILE_ATTRIBUTE_READONLY
+             & ~FILE_ATTRIBUTE_HIDDEN
+             & ~FILE_ATTRIBUTE_SYSTEM
+             & ~FILE_ATTRIBUTE_DIRECTORY
+             & ~FILE_ATTRIBUTE_ARCHIVE
+             & ~FILE_ATTRIBUTE_DEVICE
+             & ~FILE_ATTRIBUTE_NORMAL
+             & ~FILE_ATTRIBUTE_TEMPORARY
+             & ~FILE_ATTRIBUTE_SPARSE_FILE
+             & ~FILE_ATTRIBUTE_REPARSE_POINT
+             & ~FILE_ATTRIBUTE_COMPRESSED
+             & ~FILE_ATTRIBUTE_OFFLINE
+             & ~FILE_ATTRIBUTE_NOT_CONTENT_INDEXED
+             & ~FILE_ATTRIBUTE_ENCRYPTED
+             & ~FILE_ATTRIBUTE_INTEGRITY_STREAM
+             & ~FILE_ATTRIBUTE_VIRTUAL
+             & ~FILE_ATTRIBUTE_NO_SCRUB_DATA
+             & ~FILE_ATTRIBUTE_RECALL_ON_OPEN
+             & ~FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS;
+    if (attrs)
+        str += std::string(" | ") + std::to_string(attrs);
+
     if (str.empty())
         str = "0";
 
@@ -237,11 +263,6 @@ static std::string generic_ar_to_string(uint32_t attrs)
     if (attrs & SYNCHRONIZE)
         str += " | SYNCHRONIZE";
 
-    if (str.empty())
-        str = "0";
-
-    if (str.size() > 3) str.erase(0, 3);
-
     return str;
 }
 
@@ -266,6 +287,26 @@ static std::string file_ar_to_string(uint32_t attrs)
     if (attrs & FILE_WRITE_ATTRIBUTES)
         str += " | FILE_WRITE_ATTRIBUTES";
 
+    attrs &= ~GENERIC_READ
+             & ~GENERIC_WRITE
+             & ~GENERIC_EXECUTE
+             & ~GENERIC_ALL
+             & ~DELETE
+             & ~READ_CONTROL
+             & ~WRITE_DAC
+             & ~WRITE_OWNER
+             & ~SYNCHRONIZE
+             & ~FILE_READ_DATA
+             & ~FILE_WRITE_DATA
+             & ~FILE_APPEND_DATA
+             & ~FILE_READ_EA
+             & ~FILE_WRITE_EA
+             & ~FILE_EXECUTE
+             & ~FILE_READ_ATTRIBUTES
+             & ~FILE_WRITE_ATTRIBUTES;
+    if (attrs)
+        str += std::string(" | ") + std::to_string(attrs);
+
     if (str.empty())
         str = "0";
 
@@ -289,6 +330,23 @@ static std::string directory_ar_to_string(uint32_t attrs)
     if (attrs & FILE_DELETE_CHILD)
         str += " | FILE_DELETE_CHILD";
 
+    attrs &= ~GENERIC_READ
+             & ~GENERIC_WRITE
+             & ~GENERIC_EXECUTE
+             & ~GENERIC_ALL
+             & ~DELETE
+             & ~READ_CONTROL
+             & ~WRITE_DAC
+             & ~WRITE_OWNER
+             & ~SYNCHRONIZE
+             & ~FILE_LIST_DIRECTORY
+             & ~FILE_ADD_FILE
+             & ~FILE_ADD_SUBDIRECTORY
+             & ~FILE_TRAVERSE
+             & ~FILE_DELETE_CHILD;
+    if (attrs)
+        str += std::string(" | ") + std::to_string(attrs);
+
     if (str.empty())
         str = "0";
 
@@ -307,6 +365,12 @@ static std::string share_mode_to_string(uint32_t attrs)
         str += " | FILE_SHARE_WRITE";
     if (attrs & FILE_SHARE_DELETE)
         str += " | FILE_SHARE_DELETE";
+
+    attrs &= ~FILE_SHARE_READ
+             & ~FILE_SHARE_WRITE
+             & ~FILE_SHARE_DELETE;
+    if (attrs)
+        str += std::string(" | ") + std::to_string(attrs);
 
     if (str.empty())
         str = "FILE_SHARE_NONE";
@@ -330,6 +394,14 @@ static std::string disposition_to_string(uint32_t attrs)
         str += " | OPEN_ALWAYS";
     if (attrs & TRUNCATE_EXISTING)
         str += " | TRUNCATE_EXISTING";
+
+    attrs &= ~CREATE_NEW
+             & ~CREATE_ALWAYS
+             & ~OPEN_EXISTING
+             & ~OPEN_ALWAYS
+             & ~TRUNCATE_EXISTING;
+    if (attrs)
+        str += std::string(" | ") + std::to_string(attrs);
 
     if (str.empty())
         str = "0";
@@ -385,6 +457,30 @@ static std::string createoptions_to_string(uint32_t attrs)
         str += " | FILE_OPEN_NO_RECALL";
     if (attrs & FILE_OPEN_FOR_FREE_SPACE_QUERY)
         str += " | FILE_OPEN_FOR_FREE_SPACE_QUERY";
+
+    attrs &= ~FILE_DIRECTORY_FILE
+             & ~FILE_WRITE_THROUGH
+             & ~FILE_SEQUENTIAL_ONLY
+             & ~FILE_NO_INTERMEDIATE_BUFFERING
+             & ~FILE_SYNCHRONOUS_IO_ALERT
+             & ~FILE_SYNCHRONOUS_IO_NONALERT
+             & ~FILE_NON_DIRECTORY_FILE
+             & ~FILE_CREATE_TREE_CONNECTION
+             & ~FILE_COMPLETE_IF_OPLOCKED
+             & ~FILE_NO_EA_KNOWLEDGE
+             & ~FILE_OPEN_REMOTE_INSTANCE
+             & ~FILE_RANDOM_ACCESS
+             & ~FILE_DELETE_ON_CLOSE
+             & ~FILE_OPEN_BY_FILE_ID
+             & ~FILE_OPEN_FOR_BACKUP_INTENT
+             & ~FILE_NO_COMPRESSION
+             & ~FILE_OPEN_REQUIRING_OPLOCK
+             & ~FILE_RESERVE_OPFILTER
+             & ~FILE_OPEN_REPARSE_POINT
+             & ~FILE_OPEN_NO_RECALL
+             & ~FILE_OPEN_FOR_FREE_SPACE_QUERY;
+    if (attrs)
+        str += std::string(" | ") + std::to_string(attrs);
 
     if (str.empty())
         str = "0";
