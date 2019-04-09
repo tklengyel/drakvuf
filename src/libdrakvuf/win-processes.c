@@ -459,7 +459,7 @@ bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module
 
 bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list )
 {
-    if ( wow_peb )
+    if ( wow_peb && drakvuf->wow_offsets)
     {
         vmi_instance_t vmi = drakvuf->vmi;
         addr_t ldr=0;
