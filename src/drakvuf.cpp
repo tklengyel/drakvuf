@@ -102,114 +102,169 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef LIBINJECTOR_H
-#define LIBINJECTOR_H
+#include "drakvuf.h"
+#include <stdexcept>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 
-#pragma GCC visibility push(default)
-
-#include <libdrakvuf/libdrakvuf.h>
-
-typedef struct injector* injector_t;
-
-typedef enum
+static gpointer timer(gpointer data)
 {
-    INJECT_METHOD_CREATEPROC,
-    INJECT_METHOD_SHELLEXEC,
-    INJECT_METHOD_SHELLCODE,
-    INJECT_METHOD_DOPP,
-    __INJECT_METHOD_MAX
+    drakvuf_c* drakvuf = (drakvuf_c*)data;
+
+    while (drakvuf->timeout && !drakvuf->interrupted)
+    {
+        sleep(1);
+        --drakvuf->timeout;
+    }
+
+    if (!drakvuf->interrupted)
+    {
+        drakvuf->interrupt(SIGDRAKVUFTIMEOUT);
+    }
+
+    g_thread_exit(nullptr);
+    return nullptr;
 }
-injection_method_t;
 
-typedef enum
+static GThread* startup_timer(drakvuf_c* drakvuf, int timeout)
 {
-    ARGUMENT_STRING,
-    ARGUMENT_STRUCT,
-    ARGUMENT_INT,
-    __ARGUMENT_MAX
-} argument_type_t;
+    drakvuf->interrupted = 0;
+    drakvuf->timeout = timeout;
 
-typedef enum
-{
-    STATUS_NULL,
-    STATUS_ALLOC_OK,
-    STATUS_PHYS_ALLOC_OK,
-    STATUS_WRITE_OK,
-    STATUS_EXEC_OK,
-    STATUS_BP_HIT,
-    STATUS_CREATE_OK,
-    STATUS_RESUME_OK,
-    __STATUS_MAX
-} status_type_t;
-
-struct argument
-{
-    uint32_t type;
-    uint32_t size;
-    uint64_t data_on_stack;
-    void* data;
-};
-
-
-void init_argument(struct argument* arg,
-                   argument_type_t type,
-                   size_t size,
-                   void* data);
-
-void init_int_argument(struct argument* arg,
-                       uint64_t value);
-
-void init_unicode_argument(struct argument* arg,
-                           unicode_string_t* us);
-
-#define init_struct_argument(arg, sv) \
-    init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
-
-bool setup_stack(drakvuf_t drakvuf,
-                 drakvuf_trap_info_t* info,
-                 struct argument args[],
-                 int nb_args);
-
-bool setup_stack_locked(drakvuf_t drakvuf,
-                        vmi_instance_t vmi,
-                        drakvuf_trap_info_t* info,
-                        struct argument args[],
-                        int nb_args);
-
-int injector_start_app_on_linux(drakvuf_t drakvuf,
-                       vmi_pid_t pid,
-                       uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-                       const char* app,
-                       const char* cwd,
-                       injection_method_t method,
-                       output_format_t format,
-                       const char* binary_path,     // if -m = doppelganging
-                       const char* target_process,  // if -m = doppelganging
-                       bool break_loop_on_detection,
-                       injector_t* injector_to_be_freed,
-                       bool global_search); // out: iff break_loop_on_detection is set                        
-
-int injector_start_app_on_windows(drakvuf_t drakvuf,
-                       vmi_pid_t pid,
-                       uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-                       const char* app,
-                       const char* cwd,
-                       injection_method_t method,
-                       output_format_t format,
-                       const char* binary_path,     // if -m = doppelganging
-                       const char* target_process,  // if -m = doppelganging
-                       bool break_loop_on_detection,
-                       injector_t* injector_to_be_freed,
-                       bool global_search); // out: iff break_loop_on_detection is set
-
-#pragma GCC visibility pop
-
-#ifdef __cplusplus
+    GThread* timeout_thread = nullptr;
+    if (drakvuf->timeout > 0)
+        timeout_thread = g_thread_new("timer", timer, (void*)drakvuf);
+    return timeout_thread;
 }
-#endif
 
-#endif // LIBINJECTOR_H
+static void cleanup_timer(drakvuf_c* drakvuf, GThread* timeout_thread)
+{
+    if (timeout_thread)
+    {
+        // Force stop timeout thread
+        if (drakvuf->timeout && !drakvuf->interrupted)
+            drakvuf->interrupted = -1;
+        g_thread_join(timeout_thread);
+    }
+}
+
+int drakvuf_c::start_plugins(const bool* plugin_list, const plugins_options* options)
+{
+    for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
+    {
+        if (plugin_list[i])
+        {
+            int rc = plugins->start(static_cast<drakvuf_plugin_t>(i), options);
+            if (rc < 0)
+                return rc;
+        }
+    }
+
+    return 1;
+}
+
+drakvuf_c::drakvuf_c(const char* domain,
+                     const char* rekall_profile,
+                     const char* rekall_wow_profile,
+                     output_format_t output,
+                     bool verbose,
+                     bool leave_paused,
+                     bool libvmi_conf)
+    : leave_paused{ leave_paused }
+{
+    if (!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf))
+        throw std::runtime_error("drakvuf_init() failed");
+
+    plugins = new drakvuf_plugins(drakvuf, output, drakvuf_get_os_type(drakvuf));
+}
+
+drakvuf_c::~drakvuf_c()
+{
+    if ( !interrupted )
+        interrupt(SIGDRAKVUFERROR);
+
+    g_free(injector_to_be_freed);
+
+    if (drakvuf)
+        drakvuf_close(drakvuf, leave_paused);
+
+    delete plugins;
+}
+
+void drakvuf_c::interrupt(int signal)
+{
+    interrupted = signal;
+    drakvuf_interrupt(drakvuf, signal);
+}
+
+void drakvuf_c::loop(int duration)
+{
+    GThread* timeout_thread = startup_timer(this, duration);
+    drakvuf_loop(drakvuf);
+    cleanup_timer(this, timeout_thread);
+}
+
+void drakvuf_c::pause()
+{
+    drakvuf_pause(drakvuf);
+}
+
+void drakvuf_c::resume()
+{
+    drakvuf_resume(drakvuf);
+}
+
+int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
+                          uint32_t injection_tid,
+                          const char* inject_cmd,
+                          const char* cwd,
+                          injection_method_t method,
+                          output_format_t format,
+                          const char* binary_path,
+                          const char* target_process,
+                          int timeout,
+                          bool global_search)
+{
+    //TODO REMOVE
+    fprintf(stderr, "Entered inject_cmd\n");
+    fflush(stderr);
+    GThread* timeout_thread = startup_timer(this, timeout);
+    int rc=0;
+    if(drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX){
+        printf("Injector under construction");
+        rc = 0;
+        rc = injector_start_app_on_linux(drakvuf,
+                                    injection_pid,
+                                    injection_tid,
+                                    inject_cmd,
+                                    cwd,
+                                    method,
+                                    format,
+                                    binary_path,
+                                    target_process,
+                                    true,
+                                    &injector_to_be_freed,
+                                    global_search);
+    }
+    else if(drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
+    {
+        rc = injector_start_app_on_windows(drakvuf,
+                                    injection_pid,
+                                    injection_tid,
+                                    inject_cmd,
+                                    cwd,
+                                    method,
+                                    format,
+                                    binary_path,
+                                    target_process,
+                                    true,
+                                    &injector_to_be_freed,
+                                    global_search);
+        
+
+
+        if (!rc)
+            fprintf(stderr, "Process startup failed\n");
+    }
+    cleanup_timer(this, timeout_thread);
+    return rc;
+}

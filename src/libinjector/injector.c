@@ -593,6 +593,21 @@ static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drak
     return 0;
 }
 
+static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    (void)drakvuf;
+    (void)info;
+    injector_t injector = info->trap->data;
+
+    // PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". PID: %u PPID: %u\n",
+                // info->regs->cr3, info->proc_data.pid, info->proc_data.ppid);
+
+    if (info->proc_data.pid != injector->target_pid)
+        return 0;
+    PRINT_DEBUG("Target PID scheduled");
+    return 0;
+}
+
 static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
@@ -1170,6 +1185,44 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
+static bool inject_on_linux(drakvuf_t drakvuf, injector_t injector){
+    injector->hijacked = 0;
+    injector->status = STATUS_NULL;
+
+    drakvuf_trap_t trap =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .cb = wait_for_target_linux_process_cb,
+        .data = injector,
+    };
+    if (!drakvuf_add_trap(drakvuf, &trap))
+        return false;
+
+    drakvuf_trap_t trap_crashreporter =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .cb = wait_for_crash_of_target_process,
+        .data = injector,
+    };
+    if (!drakvuf_add_trap(drakvuf, &trap_crashreporter))
+        return false;
+
+    if (!drakvuf_is_interrupted(drakvuf))
+    {
+        PRINT_DEBUG("Starting injection loop\n");
+        drakvuf_loop(drakvuf);
+    }
+
+    free_memtraps(injector);
+
+    drakvuf_remove_trap(drakvuf, &trap, NULL);
+    drakvuf_remove_trap(drakvuf, &trap_crashreporter, NULL);
+
+    return true;
+}
+
 static bool inject(drakvuf_t drakvuf, injector_t injector)
 {
     injector->hijacked = 0;
@@ -1456,7 +1509,80 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
     return injector->exec_func != 0;
 }
 
-int injector_start_app(
+int injector_start_app_on_linux(
+    drakvuf_t drakvuf,
+    vmi_pid_t pid,
+    uint32_t tid,
+    const char* file,
+    const char* cwd,
+    injection_method_t method,
+    output_format_t format,
+    const char* binary_path,
+    const char* target_process,
+    bool break_loop_on_detection,
+    injector_t* to_be_freed_later,
+    bool global_search)
+{
+    
+    int rc = 0;
+    printf("Enterd start app on linux\n");
+    PRINT_DEBUG("Target PID %u to start '%s' On linux\n", pid, file);
+
+    unicode_string_t* target_file_us = convert_utf8_to_utf16(file);
+    if (!target_file_us)
+    {
+        PRINT_DEBUG("Unable to convert file path from utf8 to utf16\n");
+        return 0;
+    }
+
+    unicode_string_t* cwd_us = NULL;
+    if (cwd)
+    {
+        cwd_us = convert_utf8_to_utf16(cwd);
+        if (!cwd_us)
+        {
+            PRINT_DEBUG("Unable to convert cwd from utf8 to utf16\n");
+            vmi_free_unicode_str(target_file_us);
+            return 0;
+        }
+    }
+
+    injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
+    if (!injector)
+    {
+        vmi_free_unicode_str(target_file_us);
+        vmi_free_unicode_str(cwd_us);
+        return 0;
+    }
+
+    injector->drakvuf = drakvuf;
+    injector->target_pid = pid;
+    injector->target_tid = tid;
+    injector->target_file_us = target_file_us;
+    injector->cwd_us = cwd_us;
+    injector->method = method;
+    injector->global_search = global_search;
+    injector->binary_path = binary_path;
+    injector->target_process = target_process;
+    injector->status = STATUS_NULL;
+    injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    injector->break_loop_on_detection = break_loop_on_detection;
+    
+    (void)(rc);
+    (void)(drakvuf);
+    (void)(to_be_freed_later);
+    (void)(format);
+    
+
+    PRINT_DEBUG("Inject on linux called");
+    inject_on_linux(drakvuf, injector);
+    
+    
+    return true;
+
+}
+
+int injector_start_app_on_windows(
     drakvuf_t drakvuf,
     vmi_pid_t pid,
     uint32_t tid,
