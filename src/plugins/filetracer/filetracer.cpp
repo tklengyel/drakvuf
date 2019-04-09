@@ -124,6 +124,23 @@
 #include "private.h"
 #include "filetracer.h"
 
+enum offset
+{
+    _OBJECT_ATTRIBUTES_ObjectName,
+    _OBJECT_ATTRIBUTES_RootDirectory,
+    _OBJECT_ATTRIBUTES_Attributes,
+    _OBJECT_ATTRIBUTES_SecurityDescriptor,
+    __OFFSET_MAX
+};
+
+static const char* offset_names[__OFFSET_MAX][2] =
+{
+    [_OBJECT_ATTRIBUTES_ObjectName] = {"_OBJECT_ATTRIBUTES", "ObjectName"},
+    [_OBJECT_ATTRIBUTES_RootDirectory] = {"_OBJECT_ATTRIBUTES", "RootDirectory"},
+    [_OBJECT_ATTRIBUTES_Attributes] = {"_OBJECT_ATTRIBUTES", "Attributes"},
+    [_OBJECT_ATTRIBUTES_SecurityDescriptor] = {"_OBJECT_ATTRIBUTES", "SecurityDescriptor"},
+};
+
 static std::string obj_attrs_to_string(uint32_t attrs)
 {
     std::string str;
@@ -614,13 +631,13 @@ std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t at
     };
 
     addr_t file_root_handle = 0;
-    ctx.addr = attrs + f->objattr_root;
+    ctx.addr = attrs + f->offsets[_OBJECT_ATTRIBUTES_RootDirectory];
     if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &file_root_handle) )
         return std::string();
 
     char* file_root = drakvuf_get_filename_from_handle(drakvuf, info, file_root_handle);
 
-    ctx.addr = attrs + f->objattr_name;
+    ctx.addr = attrs + f->offsets[_OBJECT_ATTRIBUTES_ObjectName];
     if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &ctx.addr) )
     {
         g_free(file_root);
@@ -636,7 +653,7 @@ std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t at
     }
 
     uint32_t obj_attr = 0;
-    ctx.addr = attrs + f->objattr_attr;
+    ctx.addr = attrs + f->offsets[_OBJECT_ATTRIBUTES_Attributes];
     if ( VMI_FAILURE == vmi_read_32(vmi_lg.vmi, &ctx, &obj_attr) )
     {
         g_free(file_root);
@@ -1087,14 +1104,11 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
 
 filetracer::filetracer(drakvuf_t drakvuf, output_format_t output)
     : format{output}
+    , offsets(new size_t[__OFFSET_MAX])
 {
     int addr_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
 
-    if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "ObjectName", &this->objattr_name) )
-        throw -1;
-    if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "RootDirectory", &this->objattr_root) )
-        throw -1;
-    if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_ATTRIBUTES", "Attributes", &this->objattr_attr) )
+    if ( !drakvuf_get_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets) )
         throw -1;
     // Offset of the RootDirectory field in _FILE_RENAME_INFORMATION structure
     this->newfile_root_offset = addr_size;
