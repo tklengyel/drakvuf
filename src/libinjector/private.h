@@ -129,8 +129,20 @@ enum offset
 {
     KTHREAD_TRAPFRAME,
     KTRAP_FRAME_RIP,
-
     OFFSET_MAX
+};
+
+enum linux_offset
+{
+    TASK_STRUCT_STACK,
+    TASK_STRUCT_PID,
+    LINUX_OFFSET_MAX,
+};
+
+static const char* linux_offset_names[LINUX_OFFSET_MAX][2] = 
+{
+    [TASK_STRUCT_STACK] = {"task_struct", "stack"},
+    [TASK_STRUCT_PID] = {"task_struct", "tgid"},
 };
 
 static const char* offset_names[OFFSET_MAX][2] =

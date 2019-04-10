@@ -165,6 +165,7 @@ struct injector
     GSList* memtraps;
 
     size_t offsets[OFFSET_MAX];
+    size_t linux_offsets[LINUX_OFFSET_MAX];
 
     // Results:
     int rc;
@@ -595,17 +596,131 @@ static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drak
 
 static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    (void)drakvuf;
-    (void)info;
+   (void)drakvuf;
+
     injector_t injector = info->trap->data;
 
-    // PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". PID: %u PPID: %u\n",
-                // info->regs->cr3, info->proc_data.pid, info->proc_data.ppid);
-
+   
     if (info->proc_data.pid != injector->target_pid)
         return 0;
-    PRINT_DEBUG("Target PID scheduled");
+    PRINT_DEBUG("Target PID scheduled\n");
+
+    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
+    pid_t pid = info->proc_data.pid;
+    
+    
+
+    printf("PID = %d\n", pid);
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    status_t status;
+    if (!injector->is32bit)
+    {
+        if(!drakvuf_get_struct_members_array_rva(drakvuf, 
+            linux_offset_names, LINUX_OFFSET_MAX, injector->linux_offsets) ) 
+        {
+            PRINT_DEBUG("COULD NOT POPULATE OFFSET NAMES\n");
+            goto done;
+        }          
+        
+        PRINT_DEBUG("process addr = %"PRIx64"\n", process);
+        PRINT_DEBUG("task_struct.stack offset = %"PRIx64"\n", injector->linux_offsets[TASK_STRUCT_STACK]);
+        PRINT_DEBUG("task_struct.pid offset = %"PRIx64"\n", injector->linux_offsets[TASK_STRUCT_PID]);
+        addr_t task_struct_stack;
+
+        uint32_t temp_p;
+        access_context_t ctx =
+        {   
+            .translate_mechanism = VMI_TM_PROCESS_PID,
+            .pid = 0,
+            .addr = process + injector->offsets[TASK_STRUCT_PID]
+        };
+
+        status = vmi_read_32(vmi, &ctx, &temp_p);
+        if(status == VMI_FAILURE)
+        {
+            PRINT_DEBUG("COULD NOT READ TASK_STRUCT.pid\n");
+            goto done;  
+        }
+        PRINT_DEBUG("TASK_STRUCT.PID = %"PRIu32"\n", temp_p);
+
+        access_context_t ctx1 =
+        {   
+            .translate_mechanism = VMI_TM_PROCESS_PID,
+            .pid = 0,
+            .addr = process + injector->offsets[TASK_STRUCT_STACK]
+        };
+
+        status = vmi_read_64(vmi, &ctx1, &task_struct_stack);
+        if(status == VMI_FAILURE)
+        {
+            PRINT_DEBUG("COULD NOT READ TASK_STRUCT.STACK\n");
+            goto done;  
+        }
+        PRINT_DEBUG("TASK_STRUCT.STACK = %"PRIX64"\n", task_struct_stack);
+
+
+    }
+//         addr_t bp_addr;
+//         status = vmi_read_addr_va(vmi,
+//                                   trapframe + injector->offsets[KTRAP_FRAME_RIP],
+//                                   0, &bp_addr);
+
+//         if (status == VMI_FAILURE || !bp_addr)
+//         {
+//             PRINT_DEBUG("Failed to read RIP from trapframe or RIP is NULL!\n");
+//             goto done;
+//         }
+
+//         if (setup_int3_trap(injector, info, bp_addr))
+//         {
+//             PRINT_DEBUG("Got return address 0x%lx from trapframe and it's now trapped!\n",
+//                         bp_addr);
+
+//             // Unsubscribe from the CR3 trap
+//             drakvuf_remove_trap(drakvuf, info->trap, NULL);
+//         }
+//         else
+//             fprintf(stderr, "Failed to trap trapframe return address\n");
+//     }
+//     else
+//     {
+//         drakvuf_pause(drakvuf);
+
+//         GSList* va_plinux_offset_names_va_pages(vmi, info->regs->cr3);
+//         GSList* looplinux_offset_names
+//         while (loop)linux_offset_names
+//         {
+//             page_info_t* page = loop->data;
+//             if (page->vaddr < 0x80000000 && USER_SUPERVISOR(page->x86_pae.pte_value))
+//             {
+//                 drakvuf_trap_t* new_trap = g_malloc0(sizeof(drakvuf_trap_t));
+//                 new_trap->type = MEMACCESS;
+//                 new_trap->cb = mem_callback;
+//                 new_trap->data = injector;
+//                 new_trap->memaccess.access = VMI_MEMACCESS_X;
+//                 new_trap->memaccess.type = POST;
+//                 new_trap->memaccess.gfn = page->paddr >> 12;
+//                 if ( drakvuf_add_trap(injector->drakvuf, new_trap) )
+//                     injector->memtraps = g_slist_prepend(injector->memtraps, new_trap);
+//                 else
+//                     g_free(new_trap);
+//             }
+//             g_free(page);
+//             loop = loop->next;
+//         }
+//         g_slist_free(va_pages);
+
+//         // Unsubscribe from the CR3 trap
+//         drakvuf_remove_trap(drakvuf, info->trap, NULL);
+
+//         drakvuf_resume(drakvuf);
+//     }
+
+done:
+    drakvuf_release_vmi(drakvuf);
     return 0;
+
 }
 
 static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -1575,6 +1690,10 @@ int injector_start_app_on_linux(
     
 
     PRINT_DEBUG("Inject on linux called");
+    
+    // if ( !drakvuf_get_struct_members_array_rva(drakvuf, linux_offset_names, OFFSET_MAX, injector->offsets) )
+    //     PRINT_DEBUG("Failed to find one of offsets.\n");
+
     inject_on_linux(drakvuf, injector);
     
     
