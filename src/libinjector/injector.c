@@ -610,8 +610,7 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
     
     
 
-    printf("PID = %d\n", pid);
-
+    PRINT_DEBUG("PID = %d\n", pid);
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     status_t status;
     if (!injector->is32bit)
@@ -623,35 +622,18 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
             goto done;
         }          
         
-        PRINT_DEBUG("process addr = %"PRIx64"\n", process);
-        PRINT_DEBUG("task_struct.stack offset = %"PRIx64"\n", injector->linux_offsets[TASK_STRUCT_STACK]);
-        PRINT_DEBUG("task_struct.pid offset = %"PRIx64"\n", injector->linux_offsets[TASK_STRUCT_PID]);
+        
         addr_t task_struct_stack;
-
-        uint32_t temp_p;
+        
+        //get stack
         access_context_t ctx =
         {   
             .translate_mechanism = VMI_TM_PROCESS_PID,
             .pid = 0,
-            .addr = process + injector->offsets[TASK_STRUCT_PID]
+            .addr = process + injector->linux_offsets[TASK_STRUCT_STACK]
         };
 
-        status = vmi_read_32(vmi, &ctx, &temp_p);
-        if(status == VMI_FAILURE)
-        {
-            PRINT_DEBUG("COULD NOT READ TASK_STRUCT.pid\n");
-            goto done;  
-        }
-        PRINT_DEBUG("TASK_STRUCT.PID = %"PRIu32"\n", temp_p);
-
-        access_context_t ctx1 =
-        {   
-            .translate_mechanism = VMI_TM_PROCESS_PID,
-            .pid = 0,
-            .addr = process + injector->offsets[TASK_STRUCT_STACK]
-        };
-
-        status = vmi_read_64(vmi, &ctx1, &task_struct_stack);
+        status = vmi_read_64(vmi, &ctx, &task_struct_stack);
         if(status == VMI_FAILURE)
         {
             PRINT_DEBUG("COULD NOT READ TASK_STRUCT.STACK\n");

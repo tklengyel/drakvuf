@@ -136,7 +136,7 @@ enum linux_offset
 {
     TASK_STRUCT_STACK,
     TASK_STRUCT_PID,
-    LINUX_OFFSET_MAX,
+    LINUX_OFFSET_MAX
 };
 
 static const char* linux_offset_names[LINUX_OFFSET_MAX][2] = 

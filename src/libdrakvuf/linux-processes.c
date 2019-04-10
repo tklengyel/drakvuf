@@ -188,8 +188,7 @@ status_t linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t
         .pid = 0,
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_TGID]
     };
-
-    return vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)pid);
+    return vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)pid);;
 }
 
 char* linux_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath)
