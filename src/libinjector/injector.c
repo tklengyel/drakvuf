@@ -640,6 +640,29 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
             goto done;  
         }
         PRINT_DEBUG("TASK_STRUCT.STACK = %"PRIX64"\n", task_struct_stack);
+        uint64_t thread_size, top_of_kernel_padding=0, thread_size_order, page_size;
+        page_size = 1UL << 12;
+        //assuming kasan stack order = 0;
+        thread_size_order = 2+0;
+        thread_size = page_size << thread_size_order;
+        //assuming top_of_the_kernel_padding = 0
+        task_struct_stack += (thread_size - top_of_kernel_padding);
+        addr_t regs_addr = task_struct_stack-sizeof(struct pt_regs);
+        
+        uint64_t rip;
+
+        ctx.translate_mechanism = VMI_TM_PROCESS_PID;
+        ctx.pid = 0;
+        ctx.addr = regs_addr + injector->linux_offsets[PT_REGS_IP];
+
+        status = vmi_read_64(vmi, &ctx, &rip);
+        if(status == VMI_FAILURE)
+        {
+            PRINT_DEBUG("COULD NOT READ PTREGS->IP\n");
+            goto done;  
+        }
+        PRINT_DEBUG("pt_regs->ip = %"PRIu64"\n",rip);
+
 
 
     }
