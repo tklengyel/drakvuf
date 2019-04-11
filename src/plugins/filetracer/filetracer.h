@@ -113,9 +113,7 @@ class filetracer: public plugin
 public:
     output_format_t format;
 
-    addr_t objattr_name;
-    addr_t objattr_root;
-    addr_t objattr_attr;
+    size_t* offsets;
     addr_t newfile_name_offset;
     addr_t newfile_name_length_offset;
     addr_t newfile_root_offset;
