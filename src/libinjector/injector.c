@@ -142,7 +142,6 @@ struct injector
     bool global_search;
     addr_t exec_func;
     reg_t target_rsp;
-
     // For create process
     addr_t resume_thread;
 
@@ -150,6 +149,8 @@ struct injector
     addr_t payload, payload_addr, memset;
     size_t binary_size, payload_size;
     uint32_t status;
+    bool inject_shell_code;
+
 
     // For process doppelganging shellcode
     addr_t binary, binary_addr, saved_bp;
@@ -507,6 +508,25 @@ static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* 
 
 static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
+static event_response_t injector_int3_linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+//TODO 
+
+static bool setup_int3_linux_trap(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
+{
+    injector->bp.type = BREAKPOINT;
+    injector->bp.name = "entry";
+    injector->bp.cb = injector_int3_linux_cb;
+    injector->bp.data = injector;
+    injector->bp.breakpoint.lookup_type = LOOKUP_DTB;
+    injector->bp.breakpoint.dtb = info->regs->cr3;
+    injector->bp.breakpoint.addr_type = ADDR_VA;
+    injector->bp.breakpoint.addr = bp_addr;
+
+    return drakvuf_add_trap(injector->drakvuf, &injector->bp);
+}
+
+
 static bool setup_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
 {
     injector->bp.type = BREAKPOINT;
@@ -640,14 +660,16 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
             goto done;  
         }
         PRINT_DEBUG("TASK_STRUCT.STACK = %"PRIX64"\n", task_struct_stack);
+
         uint64_t thread_size, top_of_kernel_padding=0, thread_size_order, page_size;
         page_size = 1UL << 12;
-        //assuming kasan stack order = 0;
-        thread_size_order = 2+0;
+        // assuming kasan stack order = 0;
+        thread_size_order = 2+0 ;
         thread_size = page_size << thread_size_order;
-        //assuming top_of_the_kernel_padding = 0
+        // assuming top_of_the_kernel_padding = 0
         task_struct_stack += (thread_size - top_of_kernel_padding);
         addr_t regs_addr = task_struct_stack-sizeof(struct pt_regs);
+        
         
         uint64_t rip;
 
@@ -655,72 +677,55 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
         ctx.pid = 0;
         ctx.addr = regs_addr + injector->linux_offsets[PT_REGS_IP];
 
+        // simulating task_pt_regs
         status = vmi_read_64(vmi, &ctx, &rip);
         if(status == VMI_FAILURE)
         {
             PRINT_DEBUG("COULD NOT READ PTREGS->IP\n");
             goto done;  
         }
-        PRINT_DEBUG("pt_regs->ip = %"PRIu64"\n",rip);
+        PRINT_DEBUG("pt_regs->ip = %"PRIX64"\n",rip);
 
+        // try getting ip from thread
+        
+        // addr_t task_struct_thread = process + injector->linux_offsets[TASK_STRUCT_THREAD];
 
+        // addr_t thread_sp0 = task_struct_thread + injector->linux_offsets[THREAD_SP0];
+        
+        
+        // ctx.translate_mechanism = VMI_TM_PROCESS_PID;
+        // ctx.pid = 0;
+        // ctx.addr = thread_sp0;
+        // status = vmi_read_64(vmi, &ctx, &thread_sp0);    
 
+        // if(status == VMI_FAILURE)
+        // {
+        //     PRINT_DEBUG("COULD NOT READ THRREAD->sp0\n");
+        //     goto done;  
+        // }
+        // PRINT_DEBUG("thread_sp0 = %"PRIX64"\n",thread_sp0);
+
+        // addr_t thread_regs = thread_sp0 - sizeof(struct pt_regs);
+
+        // addr_t ptregs_rip;
+        // ctx.translate_mechanism = VMI_TM_PROCESS_PID;
+        // ctx.pid = 0;
+        // ctx.addr = thread_regs + injector->linux_offsets[PT_REGS_IP];
+        // status = vmi_read_64(vmi, &ctx, &ptregs_rip);    
+
+        // if(status == VMI_FAILURE)
+        // {
+        //     PRINT_DEBUG("COULD NOT READ (sp0-sizeof(pt_regs))->IP\n");
+        //     goto done;  
+        // }
+        // PRINT_DEBUG("regs->ip = %"PRIX64"\n",ptregs_rip);
+
+        
+        if(injector->inject_shell_code)
+            setup_int3_linux_trap(injector, info, rip);
+        
     }
-//         addr_t bp_addr;
-//         status = vmi_read_addr_va(vmi,
-//                                   trapframe + injector->offsets[KTRAP_FRAME_RIP],
-//                                   0, &bp_addr);
 
-//         if (status == VMI_FAILURE || !bp_addr)
-//         {
-//             PRINT_DEBUG("Failed to read RIP from trapframe or RIP is NULL!\n");
-//             goto done;
-//         }
-
-//         if (setup_int3_trap(injector, info, bp_addr))
-//         {
-//             PRINT_DEBUG("Got return address 0x%lx from trapframe and it's now trapped!\n",
-//                         bp_addr);
-
-//             // Unsubscribe from the CR3 trap
-//             drakvuf_remove_trap(drakvuf, info->trap, NULL);
-//         }
-//         else
-//             fprintf(stderr, "Failed to trap trapframe return address\n");
-//     }
-//     else
-//     {
-//         drakvuf_pause(drakvuf);
-
-//         GSList* va_plinux_offset_names_va_pages(vmi, info->regs->cr3);
-//         GSList* looplinux_offset_names
-//         while (loop)linux_offset_names
-//         {
-//             page_info_t* page = loop->data;
-//             if (page->vaddr < 0x80000000 && USER_SUPERVISOR(page->x86_pae.pte_value))
-//             {
-//                 drakvuf_trap_t* new_trap = g_malloc0(sizeof(drakvuf_trap_t));
-//                 new_trap->type = MEMACCESS;
-//                 new_trap->cb = mem_callback;
-//                 new_trap->data = injector;
-//                 new_trap->memaccess.access = VMI_MEMACCESS_X;
-//                 new_trap->memaccess.type = POST;
-//                 new_trap->memaccess.gfn = page->paddr >> 12;
-//                 if ( drakvuf_add_trap(injector->drakvuf, new_trap) )
-//                     injector->memtraps = g_slist_prepend(injector->memtraps, new_trap);
-//                 else
-//                     g_free(new_trap);
-//             }
-//             g_free(page);
-//             loop = loop->next;
-//         }
-//         g_slist_free(va_pages);
-
-//         // Unsubscribe from the CR3 trap
-//         drakvuf_remove_trap(drakvuf, info->trap, NULL);
-
-//         drakvuf_resume(drakvuf);
-//     }
 
 done:
     drakvuf_release_vmi(drakvuf);
@@ -986,6 +991,48 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
+
+
+static event_response_t injector_int3_linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+    (void)drakvuf;
+    (void)injector;
+    PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx.\n", info->regs->rip, info->regs->cr3);
+
+    //setup shell code
+    unsigned char shellcode[] = "\x50\x48\x31\xd2\x48\x31\xf6\x48\xbb\x2f\
+        \x62\x69\x6e\x2f\x2f\x73\x68\x53\x54\x5f\xb0\x3b\x0f\x05";
+    //pause the vm
+    drakvuf_pause(drakvuf);
+    //inject the shell code
+    size_t bytes_written;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    PRINT_DEBUG("RIP value = %"PRIX64"\n", info->regs->rip);
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rip
+    };
+
+    status_t status = vmi_write(vmi,&ctx, 24, shellcode, &bytes_written);
+    if(status == VMI_FAILURE){
+        PRINT_DEBUG("Could not write shellcode");
+        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+        drakvuf_resume(drakvuf);
+        return 0;
+    }
+    PRINT_DEBUG("Number of bytes injected = %lu\n",bytes_written);
+    PRINT_DEBUG("Shellcode injected\n");
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    injector->inject_shell_code = false;
+    drakvuf_release_vmi(drakvuf);
+    drakvuf_resume(drakvuf);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 
 static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -1687,7 +1734,7 @@ int injector_start_app_on_linux(
     injector->status = STATUS_NULL;
     injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     injector->break_loop_on_detection = break_loop_on_detection;
-    
+    injector->inject_shell_code = true;
     (void)(rc);
     (void)(drakvuf);
     (void)(to_be_freed_later);

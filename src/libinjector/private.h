@@ -136,7 +136,9 @@ enum linux_offset
 {
     TASK_STRUCT_STACK,
     TASK_STRUCT_PID,
+	TASK_STRUCT_THREAD,
     PT_REGS_IP,
+	THREAD_SP0,
     LINUX_OFFSET_MAX
 };
 
@@ -144,7 +146,9 @@ static const char* linux_offset_names[LINUX_OFFSET_MAX][2] =
 {
     [TASK_STRUCT_STACK] = {"task_struct", "stack"},
     [TASK_STRUCT_PID] = {"task_struct", "tgid"},
+	[TASK_STRUCT_THREAD] = {"task_struct","thread"},
     [PT_REGS_IP] = {"pt_regs", "ip"},
+	[THREAD_SP0] = {"thread_struct", "sp0"},
 };
 
 static const char* offset_names[OFFSET_MAX][2] =
