@@ -208,7 +208,7 @@ enum
 // File Access Rights
 enum
 {
-    FILE_ANY_ACCESS       = 0x00000000,
+    //FILE_ANY_ACCESS       = 0x00000000,
     FILE_READ_DATA        = 0x00000001,
     FILE_WRITE_DATA       = 0x00000002,
     FILE_APPEND_DATA      = 0x00000004,
@@ -232,7 +232,7 @@ enum
 // Share Mode
 enum
 {
-    FILE_SHARE_NONE   = 0x00000000,
+    //FILE_SHARE_NONE   = 0x00000000,
     FILE_SHARE_READ   = 0x00000001,
     FILE_SHARE_WRITE  = 0x00000002,
     FILE_SHARE_DELETE = 0x00000004,
@@ -241,7 +241,7 @@ enum
 // Disposition
 enum
 {
-    FILE_SUPERSEDE    = 0x00000000,
+    //FILE_SUPERSEDE    = 0x00000000,
     FILE_OPEN         = 0x00000001,
     FILE_CREATE       = 0x00000002,
     FILE_OPEN_IF      = 0x00000003,
