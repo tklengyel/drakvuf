@@ -1313,4 +1313,5 @@ filetracer::filetracer(drakvuf_t drakvuf, output_format_t output)
 
 filetracer::~filetracer()
 {
+    delete[] offsets;
 }
