@@ -162,7 +162,8 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [_SID_SubAuthority] = {"_SID", "SubAuthority"},
 };
 
-static const flags_str_t object_attrs = {
+static const flags_str_t object_attrs =
+{
     REGISTER_FLAG(OBJ_INHERIT           ),
     REGISTER_FLAG(OBJ_PERMANENT         ),
     REGISTER_FLAG(OBJ_EXCLUSIVE         ),
@@ -174,7 +175,8 @@ static const flags_str_t object_attrs = {
     REGISTER_FLAG(OBJ_VALID_ATTRIBUTES  ),
 };
 
-static const flags_str_t file_flags_and_attrs = {
+static const flags_str_t file_flags_and_attrs =
+{
     REGISTER_FLAG(FILE_ATTRIBUTE_READONLY             ),
     REGISTER_FLAG(FILE_ATTRIBUTE_HIDDEN               ),
     REGISTER_FLAG(FILE_ATTRIBUTE_SYSTEM               ),
@@ -206,7 +208,8 @@ static const flags_str_t file_flags_and_attrs = {
     REGISTER_FLAG(FILE_FLAG_WRITE_THROUGH             ),
 };
 
-static const flags_str_t file_ar = {
+static const flags_str_t file_ar =
+{
     REGISTER_FLAG(DELETE                ),
     REGISTER_FLAG(READ_CONTROL          ),
     REGISTER_FLAG(WRITE_DAC             ),
@@ -227,7 +230,8 @@ static const flags_str_t file_ar = {
     REGISTER_FLAG(FILE_WRITE_ATTRIBUTES ),
 };
 
-static const flags_str_t directory_ar = {
+static const flags_str_t directory_ar =
+{
     REGISTER_FLAG(DELETE                ),
     REGISTER_FLAG(READ_CONTROL          ),
     REGISTER_FLAG(WRITE_DAC             ),
@@ -245,13 +249,15 @@ static const flags_str_t directory_ar = {
     REGISTER_FLAG(FILE_DELETE_CHILD     ),
 };
 
-static const flags_str_t share_mode = {
+static const flags_str_t share_mode =
+{
     REGISTER_FLAG(FILE_SHARE_READ  ),
     REGISTER_FLAG(FILE_SHARE_WRITE ),
     REGISTER_FLAG(FILE_SHARE_DELETE),
 };
 
-static const flags_str_t disposition = {
+static const flags_str_t disposition =
+{
     REGISTER_FLAG(FILE_OPEN        ),
     REGISTER_FLAG(FILE_CREATE      ),
     REGISTER_FLAG(FILE_OPEN_IF     ),
@@ -259,7 +265,8 @@ static const flags_str_t disposition = {
     REGISTER_FLAG(FILE_OVERWRITE_IF),
 };
 
-static const flags_str_t create_options = {
+static const flags_str_t create_options =
+{
     REGISTER_FLAG(FILE_DIRECTORY_FILE           ),
     REGISTER_FLAG(FILE_WRITE_THROUGH            ),
     REGISTER_FLAG(FILE_SEQUENTIAL_ONLY          ),
@@ -283,7 +290,8 @@ static const flags_str_t create_options = {
     REGISTER_FLAG(FILE_OPEN_FOR_FREE_SPACE_QUERY)
 };
 
-static const flags_str_t security_controls = {
+static const flags_str_t security_controls =
+{
     REGISTER_FLAG(SE_OWNER_DEFAULTED      ),
     REGISTER_FLAG(SE_GROUP_DEFAULTED      ),
     REGISTER_FLAG(SE_DACL_PRESENT         ),

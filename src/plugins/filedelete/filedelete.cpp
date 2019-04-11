@@ -136,7 +136,8 @@ const char* offset_names[__OFFSET_MAX][2] =
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
 };
 
-static const flags_str_t fo_flags_map = {
+static const flags_str_t fo_flags_map =
+{
     REGISTER_FLAG(FO_FILE_OPEN),
     REGISTER_FLAG(FO_SYNCHRONOUS_IO),
     REGISTER_FLAG(FO_ALERTABLE_IO),
