@@ -741,17 +741,17 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     filetracer* f = (filetracer*)info->trap->data;
 
     auto attrs_value = drakvuf_get_function_argument(drakvuf, info, 6);
-    auto attrs = parse_flags(attrs_value, file_flags_and_attrs, f->format, "FileAttributes=0");
+    auto attrs = parse_flags(attrs_value, file_flags_and_attrs, f->format);
     auto share_value = drakvuf_get_function_argument(drakvuf, info, 7);
-    auto share = parse_flags(share_value, share_mode, f->format, "ShareAccess=FILE_SHARE_NONE");
+    auto share = parse_flags(share_value, share_mode, f->format);
     auto disp_value = drakvuf_get_function_argument(drakvuf, info, 8);
-    auto disp = parse_flags(disp_value, disposition, f->format, "CreateDisposition=FILE_SUPERSEDE");
+    auto disp = parse_flags(disp_value, disposition, f->format);
     auto opts_value = drakvuf_get_function_argument(drakvuf, info, 9);
-    auto opts = parse_flags(opts_value, create_options, f->format, "CreateOptions=0");
+    auto opts = parse_flags(opts_value, create_options, f->format);
     auto access_value = drakvuf_get_function_argument(drakvuf, info, 2);
     auto access = opts_value & FILE_DIRECTORY_FILE
-                  ? parse_flags(access_value, directory_ar, f->format, "DesiredAccess=FILE_ANY_ACCESS")
-                  : parse_flags(access_value, file_ar, f->format, "DesiredAccess=FILE_ANY_ACCESS");
+                  ? parse_flags(access_value, directory_ar, f->format)
+                  : parse_flags(access_value, file_ar, f->format);
 
     gchar* escaped_pname = NULL;
     gchar* escaped_fname = NULL;

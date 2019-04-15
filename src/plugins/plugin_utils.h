@@ -114,6 +114,18 @@ using flags_str_t = std::map<uint64_t, std::string>;
 
 #define REGISTER_FLAG(FLAG) { FLAG, #FLAG }
 
+/* Represent a set of binary flags as string.
+ *
+ * Use a mapping from binary flags to their names to represent an input value
+ * as a string in KV format or C-like OR-ed list of flags.
+ *
+ * flags A combination of flags to parse.
+ * flags_map An mapping from flags values to names.
+ * format Use OUTPUT_KV for KV list. Any other value to C-like OR-ed list.
+ * empty A default value if no flags parsed.
+ *
+ * Return a string of all known set flags. Return empty otherwise.
+ */
 std::string parse_flags(uint64_t flags, flags_str_t flags_map, output_format_t format = OUTPUT_DEFAULT, std::string empty = std::string());
 
 #endif

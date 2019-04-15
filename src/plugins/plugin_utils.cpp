@@ -122,7 +122,7 @@ std::string parse_flags(uint64_t flags, flags_str_t flags_map, output_format_t f
     string output;
 
     for (const auto flag: flags_map)
-        if (flag.first & flags)
+        if ((flag.first & flags) == flag.first)
             output += format_flag(flag.second, format);
 
     if (output.empty())
