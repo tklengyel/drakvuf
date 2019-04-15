@@ -106,6 +106,7 @@
 #define PLUGIN_UTILS_H
 
 #include <map>
+#include <memory>
 #include <string>
 
 #include "plugins.h"
@@ -126,6 +127,44 @@ using flags_str_t = std::map<uint64_t, std::string>;
  *
  * Return a string of all known set flags. Return empty otherwise.
  */
-std::string parse_flags(uint64_t flags, flags_str_t flags_map, output_format_t format = OUTPUT_DEFAULT, std::string empty = std::string());
+std::string parse_flags(uint64_t flags,
+                        flags_str_t flags_map,
+                        output_format_t format = OUTPUT_DEFAULT,
+                        std::string empty = std::string());
+
+/* Dump buffer from VA to stdout.
+ *
+ * Read count bytes from VA specified in ctx and dumps it to stdout
+ * in byte to byte format.
+ *
+ * vmi VMI instance.
+ * ctx Fully prepared context.
+ * count Number of bytes to read.
+ * columns Bytes to print in row (default: 16).
+ * header Opening message.
+ * footer Closing message
+ */
+void dump_va(vmi_instance_t vmi,
+             access_context_t* ctx,
+             const size_t count,
+             const size_t columns = 16,
+             std::string header = std::string(),
+             std::string footer = std::string());
+
+/* Dump buffer to stdout.
+ *
+ * buffer Pointer to buffer.
+ * ctx Fully prepared context.
+ * count Number of bytes to read.
+ * columns Bytes to print in row (default: 16).
+ * header Opening message.
+ * footer Closing message
+ */
+void dump_buffer(const uint8_t buffer[],
+                 const size_t count,
+                 const size_t columns,
+                 addr_t base_addr,
+                 std::string header = std::string(),
+                 std::string footer = std::string());
 
 #endif
