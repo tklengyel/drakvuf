@@ -116,12 +116,14 @@
 #include <dirent.h>
 #include <glib.h>
 #include <err.h>
+#include <algorithm>
 #include <assert.h>
 #include <sstream>
 #include <string>
 
 #include <libvmi/libvmi.h>
 #include "plugins/plugins.h"
+#include "plugins/plugin_utils.h"
 #include "private.h"
 #include "filetracer.h"
 
@@ -160,501 +162,151 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [_SID_SubAuthority] = {"_SID", "SubAuthority"},
 };
 
-static std::string obj_attrs_to_string(uint32_t attrs)
+static const flags_str_t object_attrs =
 {
-    std::string str;
+    REGISTER_FLAG(OBJ_INHERIT           ),
+    REGISTER_FLAG(OBJ_PERMANENT         ),
+    REGISTER_FLAG(OBJ_EXCLUSIVE         ),
+    REGISTER_FLAG(OBJ_CASE_INSENSITIVE  ),
+    REGISTER_FLAG(OBJ_OPENIF            ),
+    REGISTER_FLAG(OBJ_OPENLINK          ),
+    REGISTER_FLAG(OBJ_KERNEL_HANDLE     ),
+    REGISTER_FLAG(OBJ_FORCE_ACCESS_CHECK),
+    REGISTER_FLAG(OBJ_VALID_ATTRIBUTES  ),
+};
 
-    if (attrs & OBJ_INHERIT)
-        str = " | OBJ_INHERIT";
-    if (attrs & OBJ_PERMANENT)
-        str += " | OBJ_PERMANENT";
-    if (attrs & OBJ_EXCLUSIVE)
-        str += " | OBJ_EXCLUSIVE";
-    if (attrs & OBJ_CASE_INSENSITIVE)
-        str += " | OBJ_CASE_INSENSITIVE";
-    if (attrs & OBJ_OPENIF)
-        str += " | OBJ_OPENIF";
-    if (attrs & OBJ_OPENLINK)
-        str += " | OBJ_OPENLINK";
-    if (attrs & OBJ_KERNEL_HANDLE)
-        str += " | OBJ_KERNEL_HANDLE";
-    if (attrs & OBJ_FORCE_ACCESS_CHECK)
-        str += " | OBJ_FORCE_ACCESS_CHECK";
-    if (attrs & OBJ_VALID_ATTRIBUTES)
-        str += " | OBJ_VALID_ATTRIBUTES";
-
-    attrs &= ~OBJ_INHERIT
-             & ~OBJ_PERMANENT
-             & ~OBJ_EXCLUSIVE
-             & ~OBJ_CASE_INSENSITIVE
-             & ~OBJ_OPENIF
-             & ~OBJ_OPENLINK
-             & ~OBJ_KERNEL_HANDLE
-             & ~OBJ_FORCE_ACCESS_CHECK
-             & ~OBJ_VALID_ATTRIBUTES;
-    if (attrs)
-        str += std::string(" | ") + std::to_string(attrs);
-
-    if (str.empty())
-        str = "0";
-
-    if (str.find(" | ") == 0) str.erase(0, 3);
-
-    return str;
-}
-
-static std::string file_attrs_to_string(uint32_t attrs)
+static const flags_str_t file_flags_and_attrs =
 {
-    std::string str;
+    REGISTER_FLAG(FILE_ATTRIBUTE_READONLY             ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_HIDDEN               ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_SYSTEM               ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_DIRECTORY            ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_ARCHIVE              ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_DEVICE               ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_NORMAL               ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_TEMPORARY            ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_SPARSE_FILE          ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_REPARSE_POINT        ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_COMPRESSED           ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_OFFLINE              ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_NOT_CONTENT_INDEXED  ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_ENCRYPTED            ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_INTEGRITY_STREAM     ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_VIRTUAL              ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_NO_SCRUB_DATA        ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_RECALL_ON_OPEN       ),
+    REGISTER_FLAG(FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS),
+    REGISTER_FLAG(FILE_FLAG_OPEN_NO_RECALL            ),
+    REGISTER_FLAG(FILE_FLAG_OPEN_REPARSE_POINT        ),
+    REGISTER_FLAG(FILE_FLAG_POSIX_SEMANTICS           ),
+    REGISTER_FLAG(FILE_FLAG_BACKUP_SEMANTICS          ),
+    REGISTER_FLAG(FILE_FLAG_DELETE_ON_CLOSE           ),
+    REGISTER_FLAG(FILE_FLAG_SEQUENTIAL_SCAN           ),
+    REGISTER_FLAG(FILE_FLAG_RANDOM_ACCESS             ),
+    REGISTER_FLAG(FILE_FLAG_NO_BUFFERING              ),
+    REGISTER_FLAG(FILE_FLAG_OVERLAPPED                ),
+    REGISTER_FLAG(FILE_FLAG_WRITE_THROUGH             ),
+};
 
-    if (attrs & FILE_ATTRIBUTE_READONLY)
-        str = " | FILE_ATTRIBUTE_READONLY";
-    if (attrs & FILE_ATTRIBUTE_HIDDEN)
-        str += " | FILE_ATTRIBUTE_HIDDEN";
-    if (attrs & FILE_ATTRIBUTE_SYSTEM)
-        str += " | FILE_ATTRIBUTE_SYSTEM";
-    if (attrs & FILE_ATTRIBUTE_DIRECTORY)
-        str += " | FILE_ATTRIBUTE_DIRECTORY";
-    if (attrs & FILE_ATTRIBUTE_ARCHIVE)
-        str += " | FILE_ATTRIBUTE_ARCHIVE";
-    if (attrs & FILE_ATTRIBUTE_DEVICE)
-        str += " | FILE_ATTRIBUTE_DEVICE";
-    if (attrs & FILE_ATTRIBUTE_NORMAL)
-        str += " | FILE_ATTRIBUTE_NORMAL";
-    if (attrs & FILE_ATTRIBUTE_TEMPORARY)
-        str += " | FILE_ATTRIBUTE_TEMPORARY";
-    if (attrs & FILE_ATTRIBUTE_SPARSE_FILE)
-        str += " | FILE_ATTRIBUTE_SPARSE_FILE";
-    if (attrs & FILE_ATTRIBUTE_REPARSE_POINT)
-        str += " | FILE_ATTRIBUTE_REPARSE_POINT";
-    if (attrs & FILE_ATTRIBUTE_COMPRESSED)
-        str += " | FILE_ATTRIBUTE_COMPRESSED";
-    if (attrs & FILE_ATTRIBUTE_OFFLINE)
-        str += " | FILE_ATTRIBUTE_OFFLINE";
-    if (attrs & FILE_ATTRIBUTE_NOT_CONTENT_INDEXED)
-        str += " | FILE_ATTRIBUTE_NOT_CONTENT_INDEXED";
-    if (attrs & FILE_ATTRIBUTE_ENCRYPTED)
-        str += " | FILE_ATTRIBUTE_ENCRYPTED";
-    if (attrs & FILE_ATTRIBUTE_INTEGRITY_STREAM)
-        str += " | FILE_ATTRIBUTE_INTEGRITY_STREAM";
-    if (attrs & FILE_ATTRIBUTE_VIRTUAL)
-        str += " | FILE_ATTRIBUTE_VIRTUAL";
-    if (attrs & FILE_ATTRIBUTE_NO_SCRUB_DATA)
-        str += " | FILE_ATTRIBUTE_NO_SCRUB_DATA";
-    if (attrs & FILE_ATTRIBUTE_RECALL_ON_OPEN)
-        str += " | FILE_ATTRIBUTE_RECALL_ON_OPEN";
-    if (attrs & FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS)
-        str += " | FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS";
-
-    attrs &= ~FILE_ATTRIBUTE_READONLY
-             & ~FILE_ATTRIBUTE_HIDDEN
-             & ~FILE_ATTRIBUTE_SYSTEM
-             & ~FILE_ATTRIBUTE_DIRECTORY
-             & ~FILE_ATTRIBUTE_ARCHIVE
-             & ~FILE_ATTRIBUTE_DEVICE
-             & ~FILE_ATTRIBUTE_NORMAL
-             & ~FILE_ATTRIBUTE_TEMPORARY
-             & ~FILE_ATTRIBUTE_SPARSE_FILE
-             & ~FILE_ATTRIBUTE_REPARSE_POINT
-             & ~FILE_ATTRIBUTE_COMPRESSED
-             & ~FILE_ATTRIBUTE_OFFLINE
-             & ~FILE_ATTRIBUTE_NOT_CONTENT_INDEXED
-             & ~FILE_ATTRIBUTE_ENCRYPTED
-             & ~FILE_ATTRIBUTE_INTEGRITY_STREAM
-             & ~FILE_ATTRIBUTE_VIRTUAL
-             & ~FILE_ATTRIBUTE_NO_SCRUB_DATA
-             & ~FILE_ATTRIBUTE_RECALL_ON_OPEN
-             & ~FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS;
-    if (attrs)
-        str += std::string(" | ") + std::to_string(attrs);
-
-    if (str.empty())
-        str = "0";
-
-    if (str.find(" | ") == 0) str.erase(0, 3);
-
-    return str;
-}
-
-static std::string flags_to_string(uint32_t attrs)
+static const flags_str_t file_ar =
 {
-    std::string str;
+    REGISTER_FLAG(DELETE                ),
+    REGISTER_FLAG(READ_CONTROL          ),
+    REGISTER_FLAG(WRITE_DAC             ),
+    REGISTER_FLAG(WRITE_OWNER           ),
+    REGISTER_FLAG(SYNCHRONIZE           ),
+    REGISTER_FLAG(ACCESS_SYSTEM_SECURITY),
+    REGISTER_FLAG(GENERIC_ALL           ),
+    REGISTER_FLAG(GENERIC_EXECUTE       ),
+    REGISTER_FLAG(GENERIC_WRITE         ),
+    REGISTER_FLAG(GENERIC_READ          ),
+    REGISTER_FLAG(FILE_READ_DATA        ),
+    REGISTER_FLAG(FILE_WRITE_DATA       ),
+    REGISTER_FLAG(FILE_APPEND_DATA      ),
+    REGISTER_FLAG(FILE_READ_EA          ),
+    REGISTER_FLAG(FILE_WRITE_EA         ),
+    REGISTER_FLAG(FILE_EXECUTE          ),
+    REGISTER_FLAG(FILE_READ_ATTRIBUTES  ),
+    REGISTER_FLAG(FILE_WRITE_ATTRIBUTES ),
+};
 
-    if (attrs & FILE_FLAG_WRITE_THROUGH)
-        str += " | FILE_FLAG_WRITE_THROUGH";
-    if (attrs & FILE_FLAG_OVERLAPPED)
-        str += " | FILE_FLAG_OVERLAPPED";
-    if (attrs & FILE_FLAG_NO_BUFFERING)
-        str += " | FILE_FLAG_NO_BUFFERING";
-    if (attrs & FILE_FLAG_RANDOM_ACCESS)
-        str += " | FILE_FLAG_RANDOM_ACCESS";
-    if (attrs & FILE_FLAG_SEQUENTIAL_SCAN)
-        str += " | FILE_FLAG_SEQUENTIAL_SCAN";
-    if (attrs & FILE_FLAG_DELETE_ON_CLOSE)
-        str += " | FILE_FLAG_DELETE_ON_CLOSE";
-    if (attrs & FILE_FLAG_BACKUP_SEMANTICS)
-        str += " | FILE_FLAG_BACKUP_SEMANTICS";
-    if (attrs & FILE_FLAG_POSIX_SEMANTICS)
-        str += " | FILE_FLAG_POSIX_SEMANTICS";
-    if (attrs & FILE_FLAG_OPEN_REPARSE_POINT)
-        str += " | FILE_FLAG_OPEN_REPARSE_POINT";
-    if (attrs & FILE_FLAG_OPEN_NO_RECALL)
-        str += " | FILE_FLAG_OPEN_NO_RECALL";
-
-    return str;
-}
-
-static std::string generic_ar_to_string(uint32_t attrs)
+static const flags_str_t directory_ar =
 {
-    std::string str;
+    REGISTER_FLAG(DELETE                ),
+    REGISTER_FLAG(READ_CONTROL          ),
+    REGISTER_FLAG(WRITE_DAC             ),
+    REGISTER_FLAG(WRITE_OWNER           ),
+    REGISTER_FLAG(SYNCHRONIZE           ),
+    REGISTER_FLAG(ACCESS_SYSTEM_SECURITY),
+    REGISTER_FLAG(GENERIC_ALL           ),
+    REGISTER_FLAG(GENERIC_EXECUTE       ),
+    REGISTER_FLAG(GENERIC_WRITE         ),
+    REGISTER_FLAG(GENERIC_READ          ),
+    REGISTER_FLAG(FILE_LIST_DIRECTORY   ),
+    REGISTER_FLAG(FILE_ADD_FILE         ),
+    REGISTER_FLAG(FILE_ADD_SUBDIRECTORY ),
+    REGISTER_FLAG(FILE_TRAVERSE         ),
+    REGISTER_FLAG(FILE_DELETE_CHILD     ),
+};
 
-    if (attrs & DELETE)
-        str += " | DELETE";
-    if (attrs & READ_CONTROL)
-        str += " | READ_CONTROL";
-    if (attrs & WRITE_DAC)
-        str += " | WRITE_DAC";
-    if (attrs & WRITE_OWNER)
-        str += " | WRITE_OWNER";
-    if (attrs & SYNCHRONIZE)
-        str += " | SYNCHRONIZE";
-    if (attrs & ACCESS_SYSTEM_SECURITY)
-        str += " | ACCESS_SYSTEM_SECURITY";
-    if (attrs & GENERIC_ALL)
-        str += " | GENERIC_ALL";
-    if (attrs & GENERIC_EXECUTE)
-        str += " | GENERIC_EXECUTE";
-    if (attrs & GENERIC_WRITE)
-        str += " | GENERIC_WRITE";
-    if (attrs & GENERIC_READ)
-        str = " | GENERIC_READ";
-
-    return str;
-}
-
-static std::string file_ar_to_string(uint32_t attrs)
+static const flags_str_t share_mode =
 {
-    std::string str = generic_ar_to_string(attrs);
+    REGISTER_FLAG(FILE_SHARE_READ  ),
+    REGISTER_FLAG(FILE_SHARE_WRITE ),
+    REGISTER_FLAG(FILE_SHARE_DELETE),
+};
 
-    if (attrs & FILE_READ_DATA)
-        str += " | FILE_READ_DATA";
-    if (attrs & FILE_WRITE_DATA)
-        str += " | FILE_WRITE_DATA";
-    if (attrs & FILE_APPEND_DATA)
-        str += " | FILE_APPEND_DATA";
-    if (attrs & FILE_READ_EA)
-        str += " | FILE_READ_EA";
-    if (attrs & FILE_WRITE_EA)
-        str += " | FILE_WRITE_EA";
-    if (attrs & FILE_EXECUTE)
-        str += " | FILE_EXECUTE";
-    if (attrs & FILE_READ_ATTRIBUTES)
-        str += " | FILE_READ_ATTRIBUTES";
-    if (attrs & FILE_WRITE_ATTRIBUTES)
-        str += " | FILE_WRITE_ATTRIBUTES";
-
-    attrs &= ~DELETE
-             & ~READ_CONTROL
-             & ~WRITE_DAC
-             & ~WRITE_OWNER
-             & ~SYNCHRONIZE
-             & ~ACCESS_SYSTEM_SECURITY
-             & ~GENERIC_ALL
-             & ~GENERIC_EXECUTE
-             & ~GENERIC_WRITE
-             & ~GENERIC_READ
-             & ~FILE_READ_DATA
-             & ~FILE_WRITE_DATA
-             & ~FILE_APPEND_DATA
-             & ~FILE_READ_EA
-             & ~FILE_WRITE_EA
-             & ~FILE_EXECUTE
-             & ~FILE_READ_ATTRIBUTES
-             & ~FILE_WRITE_ATTRIBUTES;
-    if (attrs)
-        str += std::string(" | ") + std::to_string(attrs);
-
-    if (str.empty())
-        str = "FILE_ANY_ACCESS";
-
-    if (str.find(" | ") == 0) str.erase(0, 3);
-
-    return str;
-}
-
-static std::string directory_ar_to_string(uint32_t attrs)
+static const flags_str_t disposition =
 {
-    std::string str = generic_ar_to_string(attrs);
+    REGISTER_FLAG(FILE_OPEN        ),
+    REGISTER_FLAG(FILE_CREATE      ),
+    REGISTER_FLAG(FILE_OPEN_IF     ),
+    REGISTER_FLAG(FILE_OVERWRITE   ),
+    REGISTER_FLAG(FILE_OVERWRITE_IF),
+};
 
-    if (attrs & FILE_LIST_DIRECTORY)
-        str += " | FILE_LIST_DIRECTORY";
-    if (attrs & FILE_ADD_FILE)
-        str += " | FILE_ADD_FILE";
-    if (attrs & FILE_ADD_SUBDIRECTORY)
-        str += " | FILE_ADD_SUBDIRECTORY";
-    if (attrs & FILE_READ_EA)
-        str += " | FILE_READ_EA";
-    if (attrs & FILE_WRITE_EA)
-        str += " | FILE_WRITE_EA";
-    if (attrs & FILE_TRAVERSE)
-        str += " | FILE_TRAVERSE";
-    if (attrs & FILE_DELETE_CHILD)
-        str += " | FILE_DELETE_CHILD";
-    if (attrs & FILE_READ_ATTRIBUTES)
-        str += " | FILE_READ_ATTRIBUTES";
-    if (attrs & FILE_WRITE_ATTRIBUTES)
-        str += " | FILE_WRITE_ATTRIBUTES";
-
-    attrs &= ~DELETE
-             & ~READ_CONTROL
-             & ~WRITE_DAC
-             & ~WRITE_OWNER
-             & ~SYNCHRONIZE
-             & ~ACCESS_SYSTEM_SECURITY
-             & ~GENERIC_ALL
-             & ~GENERIC_EXECUTE
-             & ~GENERIC_WRITE
-             & ~GENERIC_READ
-             & ~FILE_LIST_DIRECTORY
-             & ~FILE_ADD_FILE
-             & ~FILE_ADD_SUBDIRECTORY
-             & ~FILE_READ_EA
-             & ~FILE_WRITE_EA
-             & ~FILE_TRAVERSE
-             & ~FILE_DELETE_CHILD
-             & ~FILE_READ_ATTRIBUTES
-             & ~FILE_WRITE_ATTRIBUTES;
-    if (attrs)
-        str += std::string(" | ") + std::to_string(attrs);
-
-    if (str.empty())
-        str = "FILE_ANY_ACCESS";
-
-    if (str.find(" | ") == 0) str.erase(0, 3);
-
-    return str;
-}
-
-static std::string share_mode_to_string(uint32_t attrs)
+static const flags_str_t create_options =
 {
-    std::string str;
+    REGISTER_FLAG(FILE_DIRECTORY_FILE           ),
+    REGISTER_FLAG(FILE_WRITE_THROUGH            ),
+    REGISTER_FLAG(FILE_SEQUENTIAL_ONLY          ),
+    REGISTER_FLAG(FILE_NO_INTERMEDIATE_BUFFERING),
+    REGISTER_FLAG(FILE_SYNCHRONOUS_IO_ALERT     ),
+    REGISTER_FLAG(FILE_SYNCHRONOUS_IO_NONALERT  ),
+    REGISTER_FLAG(FILE_NON_DIRECTORY_FILE       ),
+    REGISTER_FLAG(FILE_CREATE_TREE_CONNECTION   ),
+    REGISTER_FLAG(FILE_COMPLETE_IF_OPLOCKED     ),
+    REGISTER_FLAG(FILE_NO_EA_KNOWLEDGE          ),
+    REGISTER_FLAG(FILE_OPEN_REMOTE_INSTANCE     ),
+    REGISTER_FLAG(FILE_RANDOM_ACCESS            ),
+    REGISTER_FLAG(FILE_DELETE_ON_CLOSE          ),
+    REGISTER_FLAG(FILE_OPEN_BY_FILE_ID          ),
+    REGISTER_FLAG(FILE_OPEN_FOR_BACKUP_INTENT   ),
+    REGISTER_FLAG(FILE_NO_COMPRESSION           ),
+    REGISTER_FLAG(FILE_OPEN_REQUIRING_OPLOCK    ),
+    REGISTER_FLAG(FILE_RESERVE_OPFILTER         ),
+    REGISTER_FLAG(FILE_OPEN_REPARSE_POINT       ),
+    REGISTER_FLAG(FILE_OPEN_NO_RECALL           ),
+    REGISTER_FLAG(FILE_OPEN_FOR_FREE_SPACE_QUERY)
+};
 
-    if (attrs & FILE_SHARE_READ)
-        str = " | FILE_SHARE_READ";
-    if (attrs & FILE_SHARE_WRITE)
-        str += " | FILE_SHARE_WRITE";
-    if (attrs & FILE_SHARE_DELETE)
-        str += " | FILE_SHARE_DELETE";
-
-    attrs &= ~FILE_SHARE_READ
-             & ~FILE_SHARE_WRITE
-             & ~FILE_SHARE_DELETE;
-    if (attrs)
-        str += std::string(" | ") + std::to_string(attrs);
-
-    if (str.empty())
-        str = "FILE_SHARE_NONE";
-
-    if (str.find(" | ") == 0) str.erase(0, 3);
-
-    return str;
-}
-
-static std::string disposition_to_string(uint32_t attrs)
+static const flags_str_t security_controls =
 {
-    std::string str;
-
-    if (attrs & FILE_OPEN)
-        str += " | FILE_OPEN";
-    if (attrs & FILE_CREATE)
-        str += " | FILE_CREATE";
-    if (attrs & FILE_OPEN_IF)
-        str += " | FILE_OPEN_IF";
-    if (attrs & FILE_OVERWRITE)
-        str += " | FILE_OVERWRITE";
-    if (attrs & FILE_OVERWRITE_IF)
-        str += " | FILE_OVERWRITE_IF";
-
-    attrs &= ~FILE_OPEN
-             & ~FILE_CREATE
-             & ~FILE_OPEN_IF
-             & ~FILE_OVERWRITE
-             & ~FILE_OVERWRITE_IF;
-    if (attrs)
-        str += std::string(" | ") + std::to_string(attrs);
-
-    if (str.empty())
-        str = "FILE_SUPERSEDE";
-
-    if (str.find(" | ") == 0) str.erase(0, 3);
-
-    return str;
-}
-
-static std::string createoptions_to_string(uint32_t attrs)
-{
-    std::string str;
-
-    if (attrs & FILE_DIRECTORY_FILE)
-        str += " | FILE_DIRECTORY_FILE";
-    if (attrs & FILE_WRITE_THROUGH)
-        str += " | FILE_WRITE_THROUGH";
-    if (attrs & FILE_SEQUENTIAL_ONLY)
-        str += " | FILE_SEQUENTIAL_ONLY";
-    if (attrs & FILE_NO_INTERMEDIATE_BUFFERING)
-        str += " | FILE_NO_INTERMEDIATE_BUFFERING";
-    if (attrs & FILE_SYNCHRONOUS_IO_ALERT)
-        str += " | FILE_SYNCHRONOUS_IO_ALERT";
-    if (attrs & FILE_SYNCHRONOUS_IO_NONALERT)
-        str += " | FILE_SYNCHRONOUS_IO_NONALERT";
-    if (attrs & FILE_NON_DIRECTORY_FILE)
-        str += " | FILE_NON_DIRECTORY_FILE";
-    if (attrs & FILE_CREATE_TREE_CONNECTION)
-        str += " | FILE_CREATE_TREE_CONNECTION";
-    if (attrs & FILE_COMPLETE_IF_OPLOCKED)
-        str += " | FILE_COMPLETE_IF_OPLOCKED";
-    if (attrs & FILE_NO_EA_KNOWLEDGE)
-        str += " | FILE_NO_EA_KNOWLEDGE";
-    if (attrs & FILE_OPEN_REMOTE_INSTANCE)
-        str += " | FILE_OPEN_REMOTE_INSTANCE";
-    if (attrs & FILE_RANDOM_ACCESS)
-        str += " | FILE_RANDOM_ACCESS";
-    if (attrs & FILE_DELETE_ON_CLOSE)
-        str += " | FILE_DELETE_ON_CLOSE";
-    if (attrs & FILE_OPEN_BY_FILE_ID)
-        str += " | FILE_OPEN_BY_FILE_ID";
-    if (attrs & FILE_OPEN_FOR_BACKUP_INTENT)
-        str += " | FILE_OPEN_FOR_BACKUP_INTENT";
-    if (attrs & FILE_NO_COMPRESSION)
-        str += " | FILE_NO_COMPRESSION";
-    if (attrs & FILE_OPEN_REQUIRING_OPLOCK)
-        str += " | FILE_OPEN_REQUIRING_OPLOCK";
-    if (attrs & FILE_RESERVE_OPFILTER)
-        str += " | FILE_RESERVE_OPFILTER";
-    if (attrs & FILE_OPEN_REPARSE_POINT)
-        str += " | FILE_OPEN_REPARSE_POINT";
-    if (attrs & FILE_OPEN_NO_RECALL)
-        str += " | FILE_OPEN_NO_RECALL";
-    if (attrs & FILE_OPEN_FOR_FREE_SPACE_QUERY)
-        str += " | FILE_OPEN_FOR_FREE_SPACE_QUERY";
-
-    attrs &= ~FILE_DIRECTORY_FILE
-             & ~FILE_WRITE_THROUGH
-             & ~FILE_SEQUENTIAL_ONLY
-             & ~FILE_NO_INTERMEDIATE_BUFFERING
-             & ~FILE_SYNCHRONOUS_IO_ALERT
-             & ~FILE_SYNCHRONOUS_IO_NONALERT
-             & ~FILE_NON_DIRECTORY_FILE
-             & ~FILE_CREATE_TREE_CONNECTION
-             & ~FILE_COMPLETE_IF_OPLOCKED
-             & ~FILE_NO_EA_KNOWLEDGE
-             & ~FILE_OPEN_REMOTE_INSTANCE
-             & ~FILE_RANDOM_ACCESS
-             & ~FILE_DELETE_ON_CLOSE
-             & ~FILE_OPEN_BY_FILE_ID
-             & ~FILE_OPEN_FOR_BACKUP_INTENT
-             & ~FILE_NO_COMPRESSION
-             & ~FILE_OPEN_REQUIRING_OPLOCK
-             & ~FILE_RESERVE_OPFILTER
-             & ~FILE_OPEN_REPARSE_POINT
-             & ~FILE_OPEN_NO_RECALL
-             & ~FILE_OPEN_FOR_FREE_SPACE_QUERY;
-    if (attrs)
-        str += std::string(" | ") + std::to_string(attrs);
-
-    if (str.empty())
-        str = "0";
-
-    if (str.find(" | ") == 0) str.erase(0, 3);
-
-    return str;
-}
-
-static std::string securitydescriptor_to_string(uint32_t attrs)
-{
-    std::string str;
-
-    if (attrs & SE_OWNER_DEFAULTED)
-    {
-        str += " | SE_OWNER_DEFAULTED";
-        attrs &= ~SE_OWNER_DEFAULTED;
-    }
-    if (attrs & SE_GROUP_DEFAULTED)
-    {
-        str += " | SE_GROUP_DEFAULTED";
-        attrs &= ~SE_GROUP_DEFAULTED;
-    }
-    if (attrs & SE_DACL_PRESENT)
-    {
-        str += " | SE_DACL_PRESENT";
-        attrs &= ~SE_DACL_PRESENT;
-    }
-    if (attrs & SE_DACL_DEFAULTED)
-    {
-        str += " | SE_DACL_DEFAULTED";
-        attrs &= ~SE_DACL_DEFAULTED;
-    }
-    if (attrs & SE_SACL_PRESENT)
-    {
-        str += " | SE_SACL_PRESENT";
-        attrs &= ~SE_SACL_PRESENT;
-    }
-    if (attrs & SE_SACL_DEFAULTED)
-    {
-        str += " | SE_SACL_DEFAULTED";
-        attrs &= ~SE_SACL_DEFAULTED;
-    }
-    if (attrs & SE_DACL_AUTO_INHERIT_REQ)
-    {
-        str += " | SE_DACL_AUTO_INHERIT_REQ";
-        attrs &= ~SE_DACL_AUTO_INHERIT_REQ;
-    }
-    if (attrs & SE_SACL_AUTO_INHERIT_REQ)
-    {
-        str += " | SE_SACL_AUTO_INHERIT_REQ";
-        attrs &= ~SE_SACL_AUTO_INHERIT_REQ;
-    }
-    if (attrs & SE_DACL_AUTO_INHERITED)
-    {
-        str += " | SE_DACL_AUTO_INHERITED";
-        attrs &= ~SE_DACL_AUTO_INHERITED;
-    }
-    if (attrs & SE_SACL_AUTO_INHERITED)
-    {
-        str += " | SE_SACL_AUTO_INHERITED";
-        attrs &= ~SE_SACL_AUTO_INHERITED;
-    }
-    if (attrs & SE_DACL_PROTECTED)
-    {
-        str += " | SE_DACL_PROTECTED";
-        attrs &= ~SE_DACL_PROTECTED;
-    }
-    if (attrs & SE_SACL_PROTECTED)
-    {
-        str += " | SE_SACL_PROTECTED";
-        attrs &= ~SE_SACL_PROTECTED;
-    }
-    if (attrs & SE_RM_CONTROL_VALID)
-    {
-        str += " | SE_RM_CONTROL_VALID";
-        attrs &= ~SE_RM_CONTROL_VALID;
-    }
-    if (attrs & SE_SELF_RELATIVE)
-    {
-        str += " | SE_SELF_RELATIVE";
-        attrs &= ~SE_SELF_RELATIVE;
-    }
-
-    if (attrs)
-        str += std::string(" | ") + std::to_string(attrs);
-
-    if (str.empty())
-        str = "0";
-
-    if (str.find(" | ") == 0) str.erase(0, 3);
-
-    return str;
-}
+    REGISTER_FLAG(SE_OWNER_DEFAULTED      ),
+    REGISTER_FLAG(SE_GROUP_DEFAULTED      ),
+    REGISTER_FLAG(SE_DACL_PRESENT         ),
+    REGISTER_FLAG(SE_DACL_DEFAULTED       ),
+    REGISTER_FLAG(SE_SACL_PRESENT         ),
+    REGISTER_FLAG(SE_SACL_DEFAULTED       ),
+    REGISTER_FLAG(SE_DACL_AUTO_INHERIT_REQ),
+    REGISTER_FLAG(SE_SACL_AUTO_INHERIT_REQ),
+    REGISTER_FLAG(SE_DACL_AUTO_INHERITED  ),
+    REGISTER_FLAG(SE_SACL_AUTO_INHERITED  ),
+    REGISTER_FLAG(SE_DACL_PROTECTED       ),
+    REGISTER_FLAG(SE_SACL_PROTECTED       ),
+    REGISTER_FLAG(SE_RM_CONTROL_VALID     ),
+    REGISTER_FLAG(SE_SELF_RELATIVE        ),
+};
 
 static void print_file_obj_info(drakvuf_t drakvuf,
                                 drakvuf_trap_info_t* info,
@@ -684,7 +336,7 @@ static void print_file_obj_info(drakvuf_t drakvuf,
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    info->trap->name, file_path);
             if (with_attr)
-                printf(",ObjectAttributes=\"%s\",SecurityFlags=\"%s\",Owner=\"%s\",Group=\"%s\"",
+                printf(",%s,%s,Owner=\"%s\",Group=\"%s\"",
                        file_attr.c_str(), security_flags.c_str(), owner.c_str(), group.c_str());
             printf("\n");
             break;
@@ -782,7 +434,7 @@ std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t at
     // Read security descriptor
     //==========================
 
-    std::string security_flags_str{"Default"};
+    std::string security_flags_str{"SecurityControl=\"Default\""};
     std::string owner{"Default"};
     std::string group{"Default"};
 
@@ -793,10 +445,10 @@ std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t at
             && security_descriptor )
     {
         // Get flags of security descriptor
-        uint16_t security_flags = 0;
+        uint16_t se_ctrl = 0;
         ctx.addr = security_descriptor + f->offsets[_SECURITY_DESCRIPTOR_Control];
-        if ( VMI_SUCCESS == vmi_read_16(vmi_lg.vmi, &ctx, &security_flags) )
-            security_flags_str = securitydescriptor_to_string(security_flags);
+        if ( VMI_SUCCESS == vmi_read_16(vmi_lg.vmi, &ctx, &se_ctrl) )
+            security_flags_str = parse_flags(se_ctrl, security_controls, f->format, "SecurityControl=0");
 
         // Get owner SID
         addr_t powner = 0;
@@ -853,7 +505,7 @@ std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t at
     vmi_free_unicode_str(file_name_us);
     g_free(file_root);
 
-    print_file_obj_info(drakvuf, info, file_path, true, obj_attrs_to_string(obj_attr), security_flags_str, owner, group);
+    print_file_obj_info(drakvuf, info, file_path, true, parse_flags(obj_attr, object_attrs, f->format, "Attributes=0"), security_flags_str, owner, group);
 
     g_free(file_path);
 
@@ -1086,19 +738,24 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     addr_t obj_attr = drakvuf_get_function_argument(drakvuf, info, 3);
     auto file_path = objattr_read(drakvuf, info, obj_attr);
 
-    auto flagsandattrs = static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 6));
-    auto attrs = file_attrs_to_string(flagsandattrs) + flags_to_string(flagsandattrs);
-    auto share = share_mode_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 7)));
-    auto disp = disposition_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 8)));
-    auto opts = createoptions_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 9)));
-    auto access = drakvuf_get_function_argument(drakvuf, info, 9) & FILE_DIRECTORY_FILE
-                  ? directory_ar_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 2)))
-                  : file_ar_to_string(static_cast<uint32_t>(drakvuf_get_function_argument(drakvuf, info, 2)));
+    filetracer* f = (filetracer*)info->trap->data;
+
+    auto attrs_value = drakvuf_get_function_argument(drakvuf, info, 6);
+    auto attrs = parse_flags(attrs_value, file_flags_and_attrs, f->format);
+    auto share_value = drakvuf_get_function_argument(drakvuf, info, 7);
+    auto share = parse_flags(share_value, share_mode, f->format);
+    auto disp_value = drakvuf_get_function_argument(drakvuf, info, 8);
+    auto disp = parse_flags(disp_value, disposition, f->format);
+    auto opts_value = drakvuf_get_function_argument(drakvuf, info, 9);
+    auto opts = parse_flags(opts_value, create_options, f->format);
+    auto access_value = drakvuf_get_function_argument(drakvuf, info, 2);
+    auto access = opts_value & FILE_DIRECTORY_FILE
+                  ? parse_flags(access_value, directory_ar, f->format)
+                  : parse_flags(access_value, file_ar, f->format);
 
     gchar* escaped_pname = NULL;
     gchar* escaped_fname = NULL;
 
-    filetracer* f = (filetracer*)info->trap->data;
     switch (f->format)
     {
         case OUTPUT_CSV:
@@ -1110,7 +767,7 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
         case OUTPUT_KV:
             printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\""
-                   ",DesiredAccess=\"%s\",FileAttributes=\"%s\",ShareAccess=\"%s\",CreateDisposition=\"%s\",CreateOptions=\"%s\"",
+                   ",%s,%s,%s,%s,%s",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    info->trap->name, file_path.c_str(), access.c_str(), attrs.c_str(), share.c_str(), disp.c_str(), opts.c_str());
             printf("\n");

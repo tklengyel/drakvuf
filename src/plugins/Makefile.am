@@ -187,7 +187,7 @@ sources += dkommon/dkommon.cpp
 endif
 
 ###############################################################################
-sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h
+sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(CPPFLAGS)
