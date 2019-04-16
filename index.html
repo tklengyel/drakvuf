@@ -153,7 +153,7 @@ To install Xen with dom0 getting 4GB RAM assigned and two dedicated CPU cores (t
 <pre><code>sudo su
 make -j4 install-xen
 make -j4 install-tools
-echo "GRUB_CMDLINE_XEN_DEFAULT=\"dom0_mem=4096M,max:4096M dom0_max_vcpus=4 dom0_vcpus_pin=true hap_1gb=false hap_2mb=false altp2m=1\"" >> /etc/default/grub
+echo "GRUB_CMDLINE_XEN_DEFAULT=\"dom0_mem=4096M,max:4096M dom0_max_vcpus=4 dom0_vcpus_pin=true force-ept=1 ept=ad=0 hap_1gb=false hap_2mb=false altp2m=1\"" >> /etc/default/grub
 echo "/usr/local/lib" > /etc/ld.so.conf.d/xen.conf
 ldconfig
 echo "none /proc/xen xenfs defaults,nofail 0 0" >> /etc/fstab
