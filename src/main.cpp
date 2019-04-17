@@ -125,7 +125,7 @@ void close_handler(int signal)
 static inline void disable_plugin(char* optarg, bool* plugin_list)
 {
     for (int i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
-        if (!strcmp(optarg, drakvuf_plugin_names[i]))
+        if (strstr(optarg, drakvuf_plugin_names[i]))
             plugin_list[i] = false;
 }
 
@@ -143,7 +143,7 @@ static inline void enable_plugin(char* optarg, bool* plugin_list, bool* disabled
         *disabled_all = true;
     }
     for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
-        if (!strcmp(optarg, drakvuf_plugin_names[i]))
+        if (strstr(optarg, drakvuf_plugin_names[i]))
             plugin_list[i] = true;
 }
 
