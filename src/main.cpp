@@ -246,6 +246,16 @@ int main(int argc, char** argv)
                 "\t                           The Rekall profile for SysWOW64/kernel32.dll\n"
                 "\t --rekall-ntdll <rekall profile>\n"
                 "\t                           The Rekall profile for ntdll.dll\n"
+                "\t --rekall-iphlpapi <rekall profile>\n"
+                "\t                           The Rekall profile for iphlpapi.dll\n"
+#ifdef ENABLE_PLUGIN_WMIMON
+                "\t --rekall-mpr <rekall profile>\n"
+                "\t                           The Rekall profile for mpr.dll\n"
+                "\t --rekall-ole32 <rekall profile>\n"
+                "\t                           The Rekall profile for ole32.dll\n"
+                "\t --rekall-wow-ole32 <rekall profile>\n"
+                "\t                           The Rekall profile for SysWOW64/ole32.dll\n"
+#endif
                );
         return rc;
     }
@@ -258,6 +268,10 @@ int main(int argc, char** argv)
         opt_rekall_kernelbase,
         opt_rekall_wow_kernel32,
         opt_rekall_ntdll,
+        opt_rekall_iphlpapi,
+        opt_rekall_mpr,
+        opt_rekall_ole32,
+        opt_rekall_wow_ole32,
     };
     const option long_opts[] =
     {
@@ -270,8 +284,12 @@ int main(int argc, char** argv)
         {"rekall-wow", required_argument, NULL, 'w'},
         {"rekall-wow-kernel32", required_argument, NULL, opt_rekall_wow_kernel32},
         {"rekall-ntdll", required_argument, NULL, opt_rekall_ntdll},
+        {"rekall-iphlpapi", required_argument, NULL, opt_rekall_iphlpapi},
+        {"rekall-mpr", required_argument, NULL, opt_rekall_mpr},
         {"injection-timeout", required_argument, NULL, 'j'},
         {"verbose", no_argument, NULL, 'v'},
+        {"rekall-ole32", required_argument, NULL, opt_rekall_ole32},
+        {"rekall-wow-ole32", required_argument, NULL, opt_rekall_wow_ole32},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:spT:S:Mc:nblgj:w:W:";
@@ -398,6 +416,20 @@ int main(int argc, char** argv)
             case opt_rekall_ntdll:
                 options.ntdll_profile = optarg;
                 break;
+            case opt_rekall_iphlpapi:
+                options.iphlpapi_profile = optarg;
+                break;
+            case opt_rekall_mpr:
+                options.mpr_profile = optarg;
+                break;
+#ifdef ENABLE_PLUGIN_WMIMON
+            case opt_rekall_ole32:
+                options.ole32_profile = optarg;
+                break;
+            case opt_rekall_wow_ole32:
+                options.wow_ole32_profile = optarg;
+                break;
+#endif
             default:
                 if (isalnum(c))
                     fprintf(stderr, "Unrecognized option: %c\n", c);

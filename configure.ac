@@ -316,6 +316,16 @@ if test x$plugin_dkommon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_DKOMMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_wmimon],
+  [AS_HELP_STRING([--disable-plugin-wmimon],
+    [Enable the windows kernel bugcheck watching plugin @<:@yes@:>@])],
+  [plugin_wmimon="$enableval"],
+  [plugin_wmimon="yes"])
+AM_CONDITIONAL([PLUGIN_WMIMON], [test x$plugin_wmimon = xyes])
+if test x$plugin_wmimon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_WMIMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -495,4 +505,5 @@ ClipboardMon: $plugin_clipboardmon
 WindowMon:    $plugin_windowmon
 LibraryMon:   $plugin_librarymon
 DKOMmon:      $plugin_dkommon
+WMIMon:       $plugin_wmimon
 -------------------------------------------------------------------------------])
