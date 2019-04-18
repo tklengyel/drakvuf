@@ -363,7 +363,12 @@ static event_response_t create_user_process_hook(
     if (!plugin)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto trap = plugin->register_result_trap<procmon, process_creation_result_t<procmon>>(drakvuf, info, process_creation_return_hook, plugin);
+    auto trap = plugin->register_trap<procmon, process_creation_result_t<procmon>>(
+                    drakvuf,
+                    info,
+                    plugin,
+                    process_creation_return_hook,
+                    breakpoint_by_pid_searcher());
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
 
@@ -558,7 +563,12 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     if (!plugin)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto trap = plugin->register_result_trap<procmon, open_process_result_t<procmon>>(drakvuf, info, open_process_return_hook_cb, plugin);
+    auto trap = plugin->register_trap<procmon, open_process_result_t<procmon>>(
+                    drakvuf,
+                    info,
+                    plugin,
+                    open_process_return_hook_cb,
+                    breakpoint_by_pid_searcher());
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
 
@@ -681,8 +691,12 @@ procmon::procmon(drakvuf_t drakvuf, output_format_t output)
     if (!drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_HEADER", "Body", &this->object_header_body))
         throw -1;
 
-    register_trap<procmon>(drakvuf, "NtCreateUserProcess", create_user_process_hook_cb, this);
-    register_trap<procmon>(drakvuf, "NtTerminateProcess", terminate_process_hook_cb, this);
-    register_trap<procmon>(drakvuf, "NtOpenProcess", open_process_hook_cb, this);
-    register_trap<procmon>(drakvuf, "NtProtectVirtualMemory", protect_virtual_memory_hook_cb, this);
+    breakpoint_in_system_process_searcher bp;
+    if (!register_trap<procmon>(drakvuf, nullptr, this, create_user_process_hook_cb, bp.for_syscall_name("NtCreateUserProcess")) ||
+            !register_trap<procmon>(drakvuf, nullptr, this, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
+            !register_trap<procmon>(drakvuf, nullptr, this, open_process_hook_cb, bp.for_syscall_name("NtOpenProcess")) ||
+            !register_trap<procmon>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")))
+    {
+        throw -1;
+    }
 }

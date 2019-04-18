@@ -109,9 +109,14 @@
 #include <bitset>
 #include <map>
 #include <new>
+#include <memory>
 
 #include "private.h"
 #include "plugins.h"
+
+
+// Errors
+extern char ERROR_MSG_ADDING_TRAP[];
 
 namespace print
 {
@@ -144,6 +149,38 @@ std::string FieldToString(const std::map<uint64_t, std::string>& maps, uint64_t 
 } // namespace print
 
 template<typename T>
+struct allocator
+{
+    allocator() noexcept {}
+    ~allocator() {}
+
+    template<typename... _Args>
+    inline T* allocate(std::size_t n, _Args&& ... args);
+    void deallocate(T* p, std::size_t n) { delete[] p; }
+};
+
+template<typename T>
+template<typename... _Args>
+inline T* allocator<T>::allocate(std::size_t n, _Args&& ... args)
+{
+    if (n == 1)
+        return new (std::nothrow) T(args...);
+    else
+    {
+        auto p = new (std::nothrow) char(sizeof (T) * n);
+        if (p)
+        {
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                auto t = reinterpret_cast<T*>(p + sizeof(T) * i);
+                new (t)T(args...);
+            }
+        }
+        return reinterpret_cast<T*>(p);
+    }
+}
+
+template<typename T>
 struct plugin_params
 {
 private:
@@ -157,6 +194,185 @@ public:
     T* plugin() const noexcept { return source; }
 };
 
+struct breakpoint_in_system_process_searcher
+{
+    breakpoint_in_system_process_searcher() : m_syscall_name() {}
+
+    breakpoint_in_system_process_searcher& for_syscall_name(const char* syscall_name)
+    {
+        if (syscall_name)
+            m_syscall_name = syscall_name;
+
+        return *this;
+    }
+
+    drakvuf_trap_t* operator()(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap) const
+    {
+        if (trap)
+        {
+            if (!drakvuf_get_function_rva(drakvuf, m_syscall_name, &trap->breakpoint.rva))
+            {
+                PRINT_DEBUG("Failed to receive addr of function %s\n", m_syscall_name);
+                return nullptr;
+            }
+
+            trap->breakpoint.lookup_type = LOOKUP_PID;
+            trap->breakpoint.pid = 4;
+            trap->breakpoint.addr_type = ADDR_RVA;
+            trap->breakpoint.module = "ntoskrnl.exe";
+
+            trap->name = m_syscall_name;
+
+            if (!drakvuf_add_trap(drakvuf, &*trap))
+                return nullptr;
+        }
+        return trap;
+    }
+
+    const char* m_syscall_name;
+};
+
+struct breakpoint_in_dll_module_searcher
+{
+    breakpoint_in_dll_module_searcher(json_object* rekall_profile,
+                                      const char* module,
+                                      bool wow = false)
+        : m_is_wow(wow), m_rekall_profile(rekall_profile), m_module_name(module), m_syscall_name()
+    {}
+
+    static bool module_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* ctx)
+    {
+        auto data = reinterpret_cast<context*>(ctx);
+        if (!data || module_info->is_wow != data->m_is_wow)
+            return false;
+
+        data->m_trap->breakpoint.pid = module_info->pid;
+        data->m_trap->breakpoint.addr = module_info->base_addr + data->m_function_rva;
+
+        return drakvuf_add_trap(drakvuf, data->m_trap);
+    }
+
+    breakpoint_in_dll_module_searcher& for_syscall_name(const char* syscall_name)
+    {
+        if (syscall_name)
+            m_syscall_name = syscall_name;
+
+        return *this;
+    }
+
+    drakvuf_trap_t* operator()(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap) const
+    {
+        if (trap)
+        {
+            context ctx(&*trap, m_is_wow);
+            if (!rekall_get_function_rva(m_rekall_profile, m_syscall_name, &ctx.m_function_rva))
+            {
+                PRINT_DEBUG("Failed to find a function %s::%s. %s\n", m_module_name, m_syscall_name, m_is_wow ? "WoW64 " : "");
+                return nullptr;
+            }
+
+            trap->breakpoint.lookup_type = LOOKUP_PID;
+            trap->breakpoint.addr_type = ADDR_VA;
+            trap->breakpoint.module = m_module_name;
+
+            trap->name = m_syscall_name;
+
+            if (!drakvuf_enumerate_processes_with_module(drakvuf, m_module_name, module_visitor, &ctx))
+            {
+                PRINT_DEBUG("Failed to set a trap for function %s::%s in PID: %u\n", m_module_name, m_syscall_name, trap->breakpoint.pid);
+                return nullptr;
+            }
+        }
+        return trap;
+    }
+
+    struct context
+    {
+        context(drakvuf_trap_t* t, bool w) : m_is_wow(w), m_function_rva(), m_trap(t) {}
+
+        bool m_is_wow;
+        addr_t m_function_rva;
+        drakvuf_trap_t* m_trap;
+    };
+
+    bool m_is_wow;
+    json_object* m_rekall_profile;
+    const char* m_module_name;
+    const char* m_syscall_name;
+};
+
+struct breakpoint_by_dtb_searcher
+{
+    drakvuf_trap_t* operator()(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap) const
+    {
+        if (trap)
+        {
+            access_context_t ctx =
+            {
+                .translate_mechanism = VMI_TM_PROCESS_DTB,
+                .dtb = info->regs->cr3,
+                .addr = info->regs->rsp,
+            };
+
+            addr_t ret_addr;
+            vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+            status_t status = vmi_read_addr(vmi, &ctx, &ret_addr);
+            drakvuf_release_vmi(drakvuf);
+
+            if (status != VMI_SUCCESS)
+                return nullptr;
+
+            trap->breakpoint.lookup_type = LOOKUP_DTB;
+            trap->breakpoint.dtb = info->regs->cr3;
+            trap->breakpoint.addr_type = ADDR_VA;
+            trap->breakpoint.addr = ret_addr;
+            trap->breakpoint.module = info->trap->breakpoint.module;
+
+            trap->name = info->trap->name;
+
+            if (!drakvuf_add_trap(drakvuf, &*trap))
+                return nullptr;
+        }
+        return trap;
+    }
+};
+
+struct breakpoint_by_pid_searcher
+{
+    drakvuf_trap_t* operator()(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap) const
+    {
+        if (trap)
+        {
+            access_context_t ctx =
+            {
+                .translate_mechanism = VMI_TM_PROCESS_DTB,
+                .dtb = info->regs->cr3,
+                .addr = info->regs->rsp,
+            };
+
+            addr_t ret_addr;
+            vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+            status_t status = vmi_read_addr(vmi, &ctx, &ret_addr);
+            drakvuf_release_vmi(drakvuf);
+
+            if (status != VMI_SUCCESS)
+                return nullptr;
+
+            trap->breakpoint.lookup_type = LOOKUP_PID;
+            trap->breakpoint.pid = info->trap->breakpoint.pid;
+            trap->breakpoint.addr_type = ADDR_VA;
+            trap->breakpoint.addr = ret_addr;
+            trap->breakpoint.module = info->trap->breakpoint.module;
+
+            trap->name = info->trap->name;
+
+            if (!drakvuf_add_trap(drakvuf, &*trap))
+                return nullptr;
+        }
+        return trap;
+    }
+};
+
 class pluginex : public plugin
 {
 public:
@@ -167,130 +383,31 @@ public:
     virtual ~pluginex();
 
 public:
-    struct allocate_default_trap
+    template<typename P = pluginex, typename Params = plugin_params<P>, typename IB,
+             typename AP = allocator<Params>, typename AT = allocator<drakvuf_trap_t>>
+    drakvuf_trap_t* register_trap(drakvuf_t drakvuf,
+                                  drakvuf_trap_info_t* info,
+                                  P* plugin,
+                                  hook_cb_t hook_cb,
+                                  IB init_breakpoint,
+                                  const char* trap_name = nullptr,
+                                  AP ap = allocator<Params>(),
+                                  AT at = allocator<drakvuf_trap_t>())
     {
-        drakvuf_trap_t* operator()() const
-        {
-            return new (std::nothrow) drakvuf_trap_t;
-        }
-    };
-
-    struct initialize_trap_params
-    {
-        drakvuf_trap_t* operator()(drakvuf_trap_t* trap, const char* syscall_name) const
-        {
-            if (trap)
-            {
-                trap->breakpoint.lookup_type = LOOKUP_PID;
-                trap->breakpoint.pid = 4;
-                trap->breakpoint.addr_type = ADDR_RVA;
-                trap->breakpoint.module = "ntoskrnl.exe";
-                trap->type = BREAKPOINT;
-                trap->name = syscall_name;
-            }
-            return trap;
-        }
-    };
-
-    struct initialize_dll_trap_params
-    {
-        drakvuf_trap_t* operator()(drakvuf_trap_t* trap, const char* syscall_name, const char* module_name) const
-        {
-            if (trap)
-            {
-                trap->breakpoint.lookup_type = LOOKUP_PID;
-                trap->breakpoint.addr_type = ADDR_VA;
-                trap->breakpoint.module = module_name;
-                trap->type = BREAKPOINT;
-                trap->name = syscall_name;
-            }
-            return trap;
-        }
-    };
-
-    struct initialize_result_trap_params_by_DTB
-    {
-        drakvuf_trap_t* operator()(drakvuf_trap_t* trap, drakvuf_trap_info_t* info, addr_t ret_addr) const
-        {
-            if (trap)
-            {
-                trap->breakpoint.lookup_type = LOOKUP_DTB;
-                trap->breakpoint.dtb = info->regs->cr3;
-                trap->breakpoint.addr_type = ADDR_VA;
-                trap->breakpoint.addr = ret_addr;
-                trap->breakpoint.module = info->trap->breakpoint.module;
-                trap->type = BREAKPOINT;
-                trap->name = info->trap->name;
-            }
-            return trap;
-        }
-    };
-
-    struct initialize_result_trap_params_by_PID
-    {
-        drakvuf_trap_t* operator()(drakvuf_trap_t* trap, drakvuf_trap_info_t* info, addr_t ret_addr) const
-        {
-            if (trap)
-            {
-                trap->breakpoint.lookup_type = LOOKUP_PID;
-                trap->breakpoint.pid = info->trap->breakpoint.pid;
-                trap->breakpoint.addr_type = ADDR_VA;
-                trap->breakpoint.addr = ret_addr;
-                trap->breakpoint.module = info->trap->breakpoint.module;
-                trap->type = BREAKPOINT;
-                trap->name = info->trap->name;
-            }
-            return trap;
-        }
-    };
-
-    template<typename P, typename PMS = plugin_params<pluginex>, typename SP = initialize_result_trap_params_by_PID, typename AT = allocate_default_trap>
-    drakvuf_trap_t* register_result_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, hook_cb_t hook_cb, P* plugin,
-                                         SP set_params = initialize_result_trap_params_by_PID(), AT allocate_trap = allocate_default_trap())
-    {
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = info->regs->rsp,
-        };
-
-        addr_t ret_addr;
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        status_t status = vmi_read_addr(vmi, &ctx, &ret_addr);
-        drakvuf_release_vmi(drakvuf);
-
-        if (status != VMI_SUCCESS)
+        std::unique_ptr<Params> params;
+        std::unique_ptr<drakvuf_trap_t> trap;
+        if (!init_memory(plugin, trap, params, hook_cb, trap_name, ap, at))
             return nullptr;
 
-        auto trap = allocate_trap();
-        if (!trap)
+        if (!init_breakpoint(drakvuf, info, &*trap))
         {
-            PRINT_DEBUG("Failed to allocate a memory for trap of %s\n", info->trap->breakpoint.module);
+            PRINT_DEBUG("%s for %s\n", ERROR_MSG_ADDING_TRAP, trap_name ? trap_name : trap->name);
             return nullptr;
         }
 
-        auto params = new (std::nothrow) PMS(plugin);
-        if (!params)
-        {
-            PRINT_DEBUG("Failed to allocate a memory for params of trap\n");
-            delete trap;
-            return nullptr;
-        }
-
-        set_params(trap, info, ret_addr);
-        trap->cb = hook_cb;
-        trap->data = params;
-
-        attach_plugin_params(trap);
-
-        if (!drakvuf_add_trap(drakvuf, trap))
-        {
-            PRINT_DEBUG("Failed to create a trap\n");
-            destroy_plugin_params(detach_plugin_params(trap));
-            return nullptr;
-        }
-        return trap;
+        attach_plugin_params(&*trap);
+        params.release();
+        return trap.release();
     }
 
     virtual void destroy_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
@@ -298,103 +415,38 @@ public:
     static void destroy_plugin_params(drakvuf_trap_t* data);
 
 protected:
-    template<typename P = pluginex, typename PMS = plugin_params<P>, typename SP = initialize_trap_params, typename AT = allocate_default_trap>
-    drakvuf_trap_t* register_trap(drakvuf_t drakvuf, const char* syscall_name, hook_cb_t hook_cb, P* plugin,
-                                  SP set_params = initialize_trap_params(), AT allocate_trap = allocate_default_trap())
-    {
-        auto trap = allocate_trap();
-        if (!trap)
-        {
-            PRINT_DEBUG("Failed to allocate a memory for trap of %s\n", syscall_name);
-            throw -1;
-        }
-
-        auto params = new (std::nothrow) PMS(plugin);
-        if (!params)
-        {
-            PRINT_DEBUG("Failed to allocate a memory for params of trap\n");
-            delete trap;
-            throw -1;
-        }
-
-        set_params(trap, syscall_name);
-        trap->cb = hook_cb;
-        trap->data = params;
-
-        attach_plugin_params(trap);
-        if (!drakvuf_get_function_rva(drakvuf, syscall_name, &trap->breakpoint.rva))
-        {
-            PRINT_DEBUG("Failed to receive addr of breakpoint.rva\n");
-            destroy_plugin_params(detach_plugin_params(trap));
-            throw -1;
-        }
-
-        if (!drakvuf_add_trap(drakvuf, trap))
-        {
-            PRINT_DEBUG("Failed to create a trap\n");
-            destroy_plugin_params(detach_plugin_params(trap));
-            throw -1;
-        }
-        return trap;
-    }
-
-    template<typename P = pluginex, typename PMS = plugin_params<P>, typename SP = initialize_dll_trap_params, typename AT = allocate_default_trap>
-    drakvuf_trap_t* register_dll_trap(drakvuf_t drakvuf, json_object* rekall_profile, const char* module_name,
-                                      const char* syscall_name, event_response_t(*cb)(drakvuf_t, drakvuf_trap_info_t*), P* plugin, bool wow = false,
-                                      SP set_params = initialize_dll_trap_params(), AT allocate_trap = allocate_default_trap())
-    {
-        auto trap = allocate_trap();
-        if (!trap)
-        {
-            PRINT_DEBUG("Failed to allocate a memory for trap of %s\n", syscall_name);
-            throw -1;
-        }
-
-        auto params = new (std::nothrow) PMS(plugin);
-        if (!params)
-        {
-            PRINT_DEBUG("Failed to allocate a memory for params of trap\n");
-            delete trap;
-            throw -1;
-        }
-
-        set_params(trap, syscall_name, module_name);
-        trap->cb = cb;
-        trap->data = params;
-
-        attach_plugin_params(trap);
-
-        trap_context_dll ctx(trap, wow);
-        PRINT_DEBUG("[PLUGIN_EX] Search for %s'%s!%s'\n", wow ? "WoW64 " : "", trap->breakpoint.module, syscall_name);
-        if (!rekall_get_function_rva(rekall_profile, syscall_name, &ctx.function_rva))
-        {
-            PRINT_DEBUG("[PLUGIN_EX] Failed to get function %s address\n", syscall_name);
-            destroy_plugin_params(detach_plugin_params(trap));
-            throw -1;
-        }
-
-        if (!drakvuf_enumerate_processes_with_module(drakvuf, trap->breakpoint.module, module_trap_visitor, &ctx))
-        {
-            PRINT_DEBUG("[PLUGIN_EX] Failed to trap function %s!%s\n", trap->breakpoint.module, syscall_name);
-            destroy_plugin_params(detach_plugin_params(trap));
-            throw -1;
-        }
-        return trap;
-    }
-
     void attach_plugin_params(drakvuf_trap_t* data);
 
-protected:
-    struct trap_context_dll
+    template<typename Plugin, typename Params, typename AP = allocator<Params>, typename AT = allocator<drakvuf_trap_t>>
+    bool init_memory(Plugin* plugin,
+                     std::unique_ptr<drakvuf_trap_t>& trap,
+                     std::unique_ptr<Params>& params,
+                     hook_cb_t hook_cb,
+                     const char* trap_name = nullptr,
+                     AP ap = allocator<Params>(),
+                     AT at = allocator<drakvuf_trap_t>())
     {
-        trap_context_dll(drakvuf_trap_t* t, bool w) : wow(w), function_rva(), trap(t) {}
+        trap.reset(at.allocate(1));
+        if (!trap)
+        {
+            PRINT_DEBUG("%s. Failed to allocate a memory for trap of %s\n", ERROR_MSG_ADDING_TRAP, trap_name);
+            return false;
+        }
 
-        bool wow;
-        addr_t function_rva;
-        drakvuf_trap_t* trap;
-    };
+        params.reset(ap.allocate(1, plugin));
+        if (!params)
+        {
+            PRINT_DEBUG("%s. Failed to allocate a memory for trap params of %s\n", ERROR_MSG_ADDING_TRAP, trap_name);
+            trap.reset();
+            return false;
+        }
 
-    static bool module_trap_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* ctx);
+        trap->cb = hook_cb;
+        trap->data = &*params;
+        trap->name = trap_name;
+        trap->type = BREAKPOINT;
+        return true;
+    }
 
 public:
     const output_format_t m_output_format;
