@@ -109,7 +109,6 @@
 
 #include "private.h"
 #include "win_acl.h"
-#include "plugins/plugin_utils.h"
 
 using std::hex;
 using std::showbase;
@@ -411,30 +410,30 @@ struct SYSTEM_ALARM_CALLBACK_OBJECT_ACE
 
 std::map<std::string, std::string> known_sids
 {
-    {"S-1-0-0"    , "Null SID"},
-    {"S-1-1-0"    , "World"},
-    {"S-1-2-0"    , "Local"},
-    {"S-1-3-0"    , "Creator Owner ID"},
-    {"S-1-3-1"    , "Creator Group ID"},
-    {"S-1-3-2"    , "Creator Owner Server ID"},
-    {"S-1-3-3"    , "Creator Group Server ID"},
-    {"S-1-5-1"    , "Dialup"},
-    {"S-1-5-2"    , "Network"},
-    {"S-1-5-3"    , "Batch"},
-    {"S-1-5-4"    , "Interactive"},
-    {"S-1-5-6"    , "Service"},
-    {"S-1-5-7"    , "AnonymousLogon"},
-    {"S-1-5-8"    , "Proxy"},
-    {"S-1-5-9"    , "Enterprise DC (EDC)"},
-    {"S-1-5-10"   , "Self"},
-    {"S-1-5-11"   , "Authenticated User"},
-    {"S-1-5-12"   , "Restricted Code"},
-    {"S-1-5-13"   , "Terminal Server"},
-    {"S-1-5-14"   , "Remote Logon"},
-    {"S-1-5-15"   , "This Organization"},
-    {"S-1-5-17"   , "IUser"},
-    {"S-1-5-19"   , "Local Service"},
-    {"S-1-5-20"   , "Network Service"},
+    {"S-1-0-0", "Null SID"},
+    {"S-1-1-0", "World"},
+    {"S-1-2-0", "Local"},
+    {"S-1-3-0", "Creator Owner ID"},
+    {"S-1-3-1", "Creator Group ID"},
+    {"S-1-3-2", "Creator Owner Server ID"},
+    {"S-1-3-3", "Creator Group Server ID"},
+    {"S-1-5-1", "Dialup"},
+    {"S-1-5-2", "Network"},
+    {"S-1-5-3", "Batch"},
+    {"S-1-5-4", "Interactive"},
+    {"S-1-5-6", "Service"},
+    {"S-1-5-7", "AnonymousLogon"},
+    {"S-1-5-8", "Proxy"},
+    {"S-1-5-9", "Enterprise DC (EDC)"},
+    {"S-1-5-10", "Self"},
+    {"S-1-5-11", "Authenticated User"},
+    {"S-1-5-12", "Restricted Code"},
+    {"S-1-5-13", "Terminal Server"},
+    {"S-1-5-14", "Remote Logon"},
+    {"S-1-5-15", "This Organization"},
+    {"S-1-5-17", "IUser"},
+    {"S-1-5-19", "Local Service"},
+    {"S-1-5-20", "Network Service"},
     {"S-1-5-64-10", "NTLM Authentication"},
     {"S-1-5-64-14", "SChannel Authentication"},
     {"S-1-5-64-21", "Digest Authentication"},
@@ -538,7 +537,7 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
         auto header = reinterpret_cast<const struct ACE_HEADER*>(ace_ptr);
         auto ace_size = static_cast<size_t>(header->size);
         string type;
-        ACCESS_MASK mask = 0;
+        string mask;
         string sid;
 
         switch (header->type)
@@ -547,7 +546,7 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
             {
                 auto ace = reinterpret_cast<const struct ACCESS_ALLOWED_ACE*>(header);
                 type = "ACCESS_ALLOWED_ACE_TYPE";
-                mask = ace->Mask;
+                mask = parse_flags(ace->Mask, generic_ar, format);
                 sid = parse_sid(ace_ptr + offsetof(struct ACCESS_ALLOWED_ACE, SidStart));
 
                 break;
@@ -565,7 +564,7 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
                 break;
 
             case OUTPUT_KV:
-                fmt << ",Type=\"" << type << "\",AccessMask=\"" << hex << showbase << mask << "\",SID=\"" << sid << '"';
+                fmt << ",Type=\"" << type << "\"," << hex << showbase << mask << ",SID=\"" << sid << '"';
                 break;
 
             case OUTPUT_JSON:
@@ -576,7 +575,7 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
 
             default:
             case OUTPUT_DEFAULT:
-                fmt << ",TYPE:" << type << ",ACCESS_MASK:" << hex << showbase << mask << ",SID:" << sid;;
+                fmt << ",TYPE:" << type << ",ACCESS_MASK:\"" << hex << showbase << mask << "\",SID:" << sid;;
                 break;
         }
 
