@@ -126,7 +126,7 @@ enum
     ACCESS_DENIED_ACE_TYPE                  = 0x1,
     SYSTEM_AUDIT_ACE_TYPE                   = 0x2,
     SYSTEM_ALARM_ACE_TYPE                   = 0x3,
-    ACCESS_ALLOWED_COMPOUND_ACE_TYPE        = 0x4,
+    // ACCESS_ALLOWED_COMPOUND_ACE_TYPE        = 0x4,
     ACCESS_ALLOWED_OBJECT_ACE_TYPE          = 0x5,
     ACCESS_DENIED_OBJECT_ACE_TYPE           = 0x6,
     SYSTEM_AUDIT_OBJECT_ACE_TYPE            = 0x7,
@@ -146,13 +146,20 @@ enum
     SYSTEM_ACCESS_FILTER_ACE_TYPE           = 0x15,
 };
 
+#define REGISTER_ACE_PARSER(ACE) \
+            case ACE##_TYPE: {\
+                auto ace = reinterpret_cast<const struct ACE*>(header); \
+                type = #ACE "_TYPE"; \
+                mask = parse_flags(ace->Mask, generic_ar, format); \
+                sid = parse_sid(ace_ptr + offsetof(struct ACE, SidStart)); \
+                break; }\
+
 static const flags_str_t ace_types =
 {
     REGISTER_FLAG(ACCESS_ALLOWED_ACE_TYPE),
     REGISTER_FLAG(ACCESS_DENIED_ACE_TYPE),
     REGISTER_FLAG(SYSTEM_AUDIT_ACE_TYPE),
     REGISTER_FLAG(SYSTEM_ALARM_ACE_TYPE),
-    REGISTER_FLAG(ACCESS_ALLOWED_COMPOUND_ACE_TYPE),
     REGISTER_FLAG(ACCESS_ALLOWED_OBJECT_ACE_TYPE),
     REGISTER_FLAG(ACCESS_DENIED_OBJECT_ACE_TYPE),
     REGISTER_FLAG(SYSTEM_AUDIT_OBJECT_ACE_TYPE),
@@ -542,16 +549,29 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
 
         switch (header->type)
         {
-            case ACCESS_ALLOWED_ACE_TYPE:
-            {
-                auto ace = reinterpret_cast<const struct ACCESS_ALLOWED_ACE*>(header);
-                type = "ACCESS_ALLOWED_ACE_TYPE";
-                mask = parse_flags(ace->Mask, generic_ar, format);
-                sid = parse_sid(ace_ptr + offsetof(struct ACCESS_ALLOWED_ACE, SidStart));
+           REGISTER_ACE_PARSER(ACCESS_ALLOWED_ACE)
+           REGISTER_ACE_PARSER(ACCESS_DENIED_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_AUDIT_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_ALARM_ACE)
+           REGISTER_ACE_PARSER(ACCESS_ALLOWED_OBJECT_ACE)
+           REGISTER_ACE_PARSER(ACCESS_DENIED_OBJECT_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_AUDIT_OBJECT_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_ALARM_OBJECT_ACE)
+           REGISTER_ACE_PARSER(ACCESS_ALLOWED_CALLBACK_ACE)
+           REGISTER_ACE_PARSER(ACCESS_DENIED_CALLBACK_ACE)
+           REGISTER_ACE_PARSER(ACCESS_ALLOWED_CALLBACK_OBJECT_ACE)
+           REGISTER_ACE_PARSER(ACCESS_DENIED_CALLBACK_OBJECT_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_AUDIT_CALLBACK_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_ALARM_CALLBACK_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_AUDIT_CALLBACK_OBJECT_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_ALARM_CALLBACK_OBJECT_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_MANDATORY_LABEL_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_RESOURCE_ATTRIBUTE_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_SCOPED_POLICY_ID_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_PROCESS_TRUST_LABEL_ACE)
+           REGISTER_ACE_PARSER(SYSTEM_ACCESS_FILTER_ACE)
 
-                break;
-            }
-            default:
+           default:
                 break;
         }
 
