@@ -414,7 +414,13 @@ std::string parse_sid(const uint8_t buffer[])
 {
     auto sid = reinterpret_cast<const struct SID*>(buffer);
     auto rev = static_cast<int>(sid->Revision);
-    auto id_auth = *(reinterpret_cast<const uint64_t*>(&sid->IdentifierAuthority)) & 0xffffffffffff;
+    uint64_t id_auth = 0;
+    for (auto i = 0; i != sizeof(SID_IDENTIFIER_AUTHORITY); ++i)
+    {
+        auto idx = sizeof(SID_IDENTIFIER_AUTHORITY) - 1 - i;
+        auto offset = i * sizeof(uint8_t);
+        id_auth += sid->IdentifierAuthority[idx] << offset;
+    }
 
     std::stringstream fmt;
     fmt << "S-" << rev << "-" << id_auth;
