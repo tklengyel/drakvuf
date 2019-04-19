@@ -662,9 +662,46 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx)
+{
+    struct process_visitor_ctx* ctx = reinterpret_cast<struct process_visitor_ctx*>(visitor_ctx);
+
+    proc_data_t data = {};
+    if (!drakvuf_get_process_data(drakvuf, process, &data))
+    {
+        PRINT_DEBUG("Failed to get PID of process 0x%" PRIx64 "\n", process);
+        return;
+    }
+
+    GTimeVal t;
+    g_get_current_time(&t);
+
+    switch (ctx->format)
+    {
+        case OUTPUT_CSV:
+            printf("procmon," FORMAT_TIMEVAL ",Process,%u,%u,\"%s\"\n",
+                   UNPACK_TIMEVAL(t), data.pid, data.ppid, data.name);
+            break;
+
+        case OUTPUT_KV:
+            printf("procmon Time=" FORMAT_TIMEVAL ",RunningProcess=\"%s\",PID=%u,PPID=%u\n",
+                   UNPACK_TIMEVAL(t), data.name, data.pid, data.ppid);
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[PROCMON] TIME:" FORMAT_TIMEVAL " PROCESS PID:%u PPID:%u FILE:\"%s\"\n",
+                   UNPACK_TIMEVAL(t), data.pid, data.ppid, data.name);
+            break;
+    }
+}
+
 procmon::procmon(drakvuf_t drakvuf, output_format_t output)
     : pluginex(drakvuf, output)
 {
+    struct process_visitor_ctx ctx = { .format = output };
+    drakvuf_enumerate_processes(drakvuf, process_visitor, &ctx);
+
     if (!drakvuf_get_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "CommandLine", &this->command_line))
         throw -1;
 
