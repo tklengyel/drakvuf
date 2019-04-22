@@ -694,6 +694,8 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx
                    UNPACK_TIMEVAL(t), data.pid, data.ppid, data.name);
             break;
     }
+
+    g_free(const_cast<char*>(data.name));
 }
 
 procmon::procmon(drakvuf_t drakvuf, output_format_t output)
