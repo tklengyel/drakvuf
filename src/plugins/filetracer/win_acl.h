@@ -88,7 +88,7 @@
  * otherwise) that you are offering unlimited, non-exclusive right to      *
  * reuse, modify, and relicense the code.  DRAKVUF will always be          *
  * available Open Source, but this is important because the inability to   *
-* relicense code has caused devastating problems for other Free Software  *
+ * relicense code has caused devastating problems for other Free Software  *
  * projects (such as KDE and NASM).                                        *
  * To specify special license conditions of your contributions, just say   *
  * so when you send them.                                                  *
@@ -102,90 +102,43 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "plugin_utils.h"
-#include <algorithm>
-#include <cctype>
-#include <iostream>
+#ifndef FILETRACER_WIN_ACL_H
+#define FILETRACER_WIN_ACL_H
 
-using std::string;
-using std::cout;
-using std::endl;
+#include <memory>
+#include <string>
+#include <plugins/plugins.h>
 
-void dump_buffer(const uint8_t buffer[], const size_t count, const size_t columns, addr_t base_addr,std::string header, std::string footer)
-{
-    cout << header << endl;
+/* Represents SID as string
+ *
+ * buffer Pointer to buffer with SID structure
+ */
+std::string parse_sid(const uint8_t buffer[]);
 
-    for (size_t r = 0; r < count; r += columns)
-    {
-        // Print base address
-        printf("\n\t0x%08lX | +0x%04zX |", base_addr + r, r);
+/* Represents SID as string.
+ *
+ * Accesses VM's virtual memory to read a whole SID and
+ * returns human readable string.
+ *
+ * vmi A pointer to VMI structure.
+ * ctx A pointer to initilized with SID address context.
+ * offsets A pointer to mapping of structures field names to offsets.
+ *
+ * Note. User should provide an SID address through ctx parameter.
+ */
+std::string read_sid(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets);
 
-        // Print memory contents as bytes in hex format
-        size_t c;
-        for (c = 0; c != std::min(columns, count -r); ++c)
-            printf(" %02X", buffer[r + c]);
+/* Represents ACL of object as string.
+ *
+ * Accesses VM's virtual memory to read a whole ACL with accompanied ACEs and
+ * returns human readable string.
+ *
+ * vmi A pointer to VMI structure.
+ * ctx A pointer to initilized with ACL address context.
+ * offsets A pointer to mapping of structures field names to offsets.
+ *
+ * Note. User should provide an ACL address through ctx parameter.
+ */
+std::string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, std::string base_name, output_format_t format = OUTPUT_DEFAULT);
 
-        // Print spaces if row is "short"
-        for (size_t s = 0; s != columns - c; ++s)
-            printf("   ");
-
-        // Print bytes as ASCII characters
-        printf(" | ");
-        for (size_t a = 0; a != c; ++a)
-        {
-            auto v = buffer[r + a];
-            if (std::isprint(v))
-                printf("%c", v);
-            else
-                printf(".");
-        }
-    }
-
-    cout << endl << footer << endl;
-}
-
-void dump_va(vmi_instance_t vmi, access_context_t* ctx, const size_t count, const size_t columns, std::string header, std::string footer)
-{
-    std::unique_ptr<uint8_t[]> buffer(new uint8_t[count] {0});
-    if (VMI_SUCCESS == vmi_read(vmi, ctx, count, buffer.get(), nullptr))
-        dump_buffer(buffer.get(), count, columns, ctx->addr, header, footer);
-}
-
-static std::string format_flag(string flag, output_format_t format)
-{
-    switch (format)
-    {
-        case OUTPUT_KV:
-            return flag + "=1,";
-        default:
-            return flag + " | ";
-    }
-}
-
-std::string parse_flags(uint64_t flags, flags_str_t flags_map, output_format_t format, std::string empty)
-{
-    string output;
-
-    for (const auto flag: flags_map)
-        if ((flag.first & flags) == flag.first)
-            output += format_flag(flag.second, format);
-
-    if (output.empty())
-    {
-        output = empty;
-    }
-    else
-    {
-        switch (format)
-        {
-            case OUTPUT_KV:
-                output.resize(output.size() - 1);
-                break;
-            default:
-                output.resize(output.size() - 3);
-                break;
-        }
-    }
-
-    return output;
-}
+#endif

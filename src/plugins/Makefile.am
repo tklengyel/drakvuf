@@ -115,7 +115,7 @@ sources += poolmon/poolmon.cpp
 endif
 
 if PLUGIN_FILETRACER
-sources += filetracer/filetracer.cpp
+sources += filetracer/filetracer.cpp filetracer/win_acl.cpp
 endif
 
 if PLUGIN_FILEDELETE

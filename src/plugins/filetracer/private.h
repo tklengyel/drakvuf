@@ -140,6 +140,26 @@ struct pool_header_x64
 
 enum
 {
+    _OBJECT_ATTRIBUTES_ObjectName,
+    _OBJECT_ATTRIBUTES_RootDirectory,
+    _OBJECT_ATTRIBUTES_Attributes,
+    _OBJECT_ATTRIBUTES_SecurityDescriptor,
+    _SECURITY_DESCRIPTOR_Control,
+    _SECURITY_DESCRIPTOR_Owner,
+    _SECURITY_DESCRIPTOR_Group,
+    _SECURITY_DESCRIPTOR_Sacl,
+    _SECURITY_DESCRIPTOR_Dacl,
+    _SID_Revision,
+    _SID_SubAuthorityCount,
+    _SID_IdentifierAuthority,
+    _SID_SubAuthority,
+    _ACL_AceCount,
+    _ACL_AclSize,
+    __OFFSET_MAX
+};
+
+enum
+{
     OBJ_INHERIT            = 0x002L,
     OBJ_PERMANENT          = 0x010L,
     OBJ_EXCLUSIVE          = 0x020L,
