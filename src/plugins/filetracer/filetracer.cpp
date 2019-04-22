@@ -126,24 +126,9 @@
 #include "plugins/plugin_utils.h"
 #include "private.h"
 #include "filetracer.h"
+#include "win_acl.h"
 
-enum offset
-{
-    _OBJECT_ATTRIBUTES_ObjectName,
-    _OBJECT_ATTRIBUTES_RootDirectory,
-    _OBJECT_ATTRIBUTES_Attributes,
-    _OBJECT_ATTRIBUTES_SecurityDescriptor,
-    _SECURITY_DESCRIPTOR_Control,
-    _SECURITY_DESCRIPTOR_Owner,
-    _SECURITY_DESCRIPTOR_Group,
-    _SECURITY_DESCRIPTOR_Sacl,
-    _SECURITY_DESCRIPTOR_Dacl,
-    _SID_Revision,
-    _SID_SubAuthorityCount,
-    _SID_IdentifierAuthority,
-    _SID_SubAuthority,
-    __OFFSET_MAX
-};
+using std::string;
 
 static const char* offset_names[__OFFSET_MAX][2] =
 {
@@ -160,6 +145,8 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [_SID_SubAuthorityCount] = {"_SID", "SubAuthorityCount"},
     [_SID_IdentifierAuthority] = {"_SID", "IdentifierAuthority"},
     [_SID_SubAuthority] = {"_SID", "SubAuthority"},
+    [_ACL_AceCount] = {"_ACL", "AceCount"},
+    [_ACL_AclSize] = {"_ACL", "AclSize"},
 };
 
 static const flags_str_t object_attrs =
@@ -311,11 +298,12 @@ static const flags_str_t security_controls =
 static void print_file_obj_info(drakvuf_t drakvuf,
                                 drakvuf_trap_info_t* info,
                                 char const* file_path,
-                                bool with_attr = false,
-                                std::string file_attr = std::string(),
-                                std::string security_flags = std::string(),
-                                std::string owner = std::string(),
-                                std::string group = std::string())
+                                string file_attr = string(),
+                                string security_flags = string(),
+                                string owner = string(),
+                                string group = string(),
+                                string sacl = string(),
+                                string dacl = string())
 {
     filetracer* f = (filetracer*)info->trap->data;
     gchar* escaped_pname = NULL;
@@ -326,8 +314,12 @@ static void print_file_obj_info(drakvuf_t drakvuf,
         case OUTPUT_CSV:
             printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->name, file_path);
-            if (with_attr)
-                printf(" \"%s\"", file_attr.c_str());
+            if (!file_attr.empty()) printf(",\"%s\"", file_attr.data());
+            if (!security_flags.empty()) printf(",\"%s\"", security_flags.data());
+            if (!owner.empty()) printf(",%s", owner.data());
+            if (!group.empty()) printf(",%s", group.data());
+            if (!sacl.empty()) printf(",%s", sacl.data());
+            if (!dacl.empty()) printf(",%s", dacl.data());
             printf("\n");
             break;
 
@@ -335,9 +327,12 @@ static void print_file_obj_info(drakvuf_t drakvuf,
             printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\"",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    info->trap->name, file_path);
-            if (with_attr)
-                printf(",%s,%s,Owner=\"%s\",Group=\"%s\"",
-                       file_attr.c_str(), security_flags.c_str(), owner.c_str(), group.c_str());
+            if (!file_attr.empty()) printf(",%s",file_attr.data());
+            if (!security_flags.empty()) printf(",%s", security_flags.data());
+            if (!owner.empty()) printf(",%s", owner.data());
+            if (!group.empty()) printf(",%s", group.data());
+            if (!sacl.empty()) printf(",%s", sacl.data());
+            if (!dacl.empty()) printf(",%s", dacl.data());
             printf("\n");
             break;
 
@@ -361,8 +356,21 @@ static void print_file_obj_info(drakvuf_t drakvuf,
                     info->proc_data.pid, info->proc_data.ppid,
                     info->trap->name, escaped_fname);
 
-            if (with_attr)
-                printf(",\"ObjectAttributes\": \"%s\"", file_attr.c_str());
+            if (!file_attr.empty())
+                printf(",\"ObjectAttributes\" : \"%s\"", file_attr.data());
+            if (!security_flags.empty() || !owner.empty() || ~group.empty())
+            {
+                printf(",\"SecurityDescriptor\" : {");
+
+                if (!security_flags.empty())
+                    printf(",\"Control\" : \"%s\"", security_flags.data());
+                if (!owner.empty()) printf(",%s", owner.data());
+                if (!group.empty()) printf(",%s", group.data());
+                if (!sacl.empty()) printf(",%s", sacl.data());
+                if (!dacl.empty()) printf(",%s", dacl.data());
+
+                printf("}");
+            }
 
             printf("}\n");
             g_free(escaped_fname);
@@ -374,51 +382,20 @@ static void print_file_obj_info(drakvuf_t drakvuf,
             printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, file_path);
-            if (with_attr)
-                printf(",\"%s\"", file_attr.c_str());
+            if (!file_attr.empty()) printf(",\"%s\"", file_attr.data());
+            if (!security_flags.empty()) printf(",\"%s\"", security_flags.data());
+            if (!owner.empty()) printf(",%s", owner.data());
+            if (!group.empty()) printf(",%s", group.data());
+            if (!sacl.empty()) printf(",%s", sacl.data());
+            if (!dacl.empty()) printf(",%s", dacl.data());
             printf("\n");
             break;
     }
 }
 
-static std::string read_sid(vmi_instance_t vmi, access_context_t* ctx, addr_t psid, size_t* offsets)
+string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs)
 {
-    std::stringstream fmt;
-    fmt << "S";
-
-    uint8_t rev = 0;
-    ctx->addr = psid + offsets[_SID_Revision];
-    if ( VMI_FAILURE == vmi_read_8(vmi, ctx, &rev) )
-        return std::string();
-    fmt << "-" << rev;
-
-    uint8_t count = 0;
-    ctx->addr = psid + offsets[_SID_SubAuthorityCount];
-    if ( VMI_FAILURE == vmi_read_8(vmi, ctx, &count) )
-        return std::string();
-
-    uint64_t auth = 0;
-    ctx->addr = psid + offsets[_SID_IdentifierAuthority];
-    if ( VMI_FAILURE == vmi_read(vmi, ctx, 6, &auth, nullptr) )
-        return std::string();
-    fmt << "-" << auth;
-
-    // Assume 'ANYSIZE_ARRAY' here
-    for (int i = 0; i < count; ++i)
-    {
-        uint8_t sub = 0;
-        ctx->addr = psid + offsets[_SID_SubAuthority] + i * sizeof(uint32_t);
-        if ( VMI_FAILURE == vmi_read_8(vmi, ctx, &sub) )
-            return std::string();
-        fmt << "-" << sub;
-    }
-
-    return fmt.str();
-}
-
-std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs)
-{
-    if (!attrs) return std::string();
+    if (!attrs) return string();
 
     filetracer* f = (filetracer*)info->trap->data;
 
@@ -434,9 +411,11 @@ std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t at
     // Read security descriptor
     //==========================
 
-    std::string security_flags_str{"SecurityControl=\"Default\""};
-    std::string owner{"Default"};
-    std::string group{"Default"};
+    string security_flags_str;
+    string owner;
+    string group;
+    string sacl;
+    string dacl;
 
     // Get address of security descriptor
     addr_t security_descriptor = 0;
@@ -454,13 +433,37 @@ std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t at
         addr_t powner = 0;
         ctx.addr = security_descriptor + f->offsets[_SECURITY_DESCRIPTOR_Owner];
         if ( VMI_SUCCESS == vmi_read_addr(vmi_lg.vmi, &ctx, &powner) && powner)
-            owner = read_sid(vmi_lg.vmi, &ctx, powner, f->offsets);
+        {
+            ctx.addr = powner;
+            owner = read_sid(vmi_lg.vmi, &ctx, f->offsets);
+        }
 
         // Get group SID
         addr_t pgroup = 0;
         ctx.addr = security_descriptor + f->offsets[_SECURITY_DESCRIPTOR_Group];
         if ( VMI_SUCCESS == vmi_read_addr(vmi_lg.vmi, &ctx, &pgroup) && pgroup)
-            group = read_sid(vmi_lg.vmi, &ctx, pgroup, f->offsets);
+        {
+            ctx.addr = pgroup;
+            group = read_sid(vmi_lg.vmi, &ctx, f->offsets);
+        }
+
+        // Get DACL
+        addr_t pdacl = 0;
+        ctx.addr = security_descriptor + f->offsets[_SECURITY_DESCRIPTOR_Dacl];
+        if ( VMI_SUCCESS == vmi_read_addr(vmi_lg.vmi, &ctx, &pdacl) && pdacl)
+        {
+            ctx.addr = pdacl;
+            dacl = read_acl(vmi_lg.vmi, &ctx, f->offsets, "Dacl", f->format);
+        }
+
+        // Get SACL
+        addr_t psacl = 0;
+        ctx.addr = security_descriptor + f->offsets[_SECURITY_DESCRIPTOR_Sacl];
+        if ( VMI_SUCCESS == vmi_read_addr(vmi_lg.vmi, &ctx, &psacl) && psacl)
+        {
+            ctx.addr = psacl;
+            sacl = read_acl(vmi_lg.vmi, &ctx, f->offsets, "Sacl", f->format);
+        }
     }
 
     //==========================
@@ -469,7 +472,7 @@ std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t at
     addr_t file_root_handle = 0;
     ctx.addr = attrs + f->offsets[_OBJECT_ATTRIBUTES_RootDirectory];
     if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &file_root_handle) )
-        return std::string();
+        return string();
 
     char* file_root = drakvuf_get_filename_from_handle(drakvuf, info, file_root_handle);
 
@@ -477,7 +480,7 @@ std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t at
     if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &ctx.addr) )
     {
         g_free(file_root);
-        return std::string();
+        return string();
     }
 
     unicode_string_t* file_name_us = drakvuf_read_unicode(drakvuf, info, ctx.addr);
@@ -485,7 +488,7 @@ std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t at
     if ( !file_name_us )
     {
         g_free(file_root);
-        return std::string();
+        return string();
     }
 
     uint32_t obj_attr = 0;
@@ -493,19 +496,21 @@ std::string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t at
     if ( VMI_FAILURE == vmi_read_32(vmi_lg.vmi, &ctx, &obj_attr) )
     {
         g_free(file_root);
-        return std::string();
+        return string();
     }
 
     char* file_path = g_strdup_printf("%s%s%s",
                                       file_root ?: "",
                                       file_root ? "\\" : "",
                                       file_name_us->contents);
-    std::string ret{file_path};
+    string ret{file_path};
 
     vmi_free_unicode_str(file_name_us);
     g_free(file_root);
 
-    print_file_obj_info(drakvuf, info, file_path, true, parse_flags(obj_attr, object_attrs, f->format, "Attributes=0"), security_flags_str, owner, group);
+    auto a = parse_flags(obj_attr, object_attrs, f->format, "Attributes=0");
+
+    print_file_obj_info(drakvuf, info, file_path, a, security_flags_str, owner, group, sacl, dacl);
 
     g_free(file_path);
 
