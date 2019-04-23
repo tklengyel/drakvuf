@@ -105,6 +105,8 @@
 #ifndef FILETRACER_PRIVATE_H
 #define FILETRACER_PRIVATE_H
 
+#include "plugins/plugin_utils.h"
+
 struct pool_header_x86
 {
     union
@@ -223,6 +225,8 @@ enum
     GENERIC_EXECUTE        = 0x20000000,
     GENERIC_WRITE          = 0x40000000,
     GENERIC_READ           = 0x80000000,
+    SPECIFIC_RIGHTS_ALL    = 0x0000FFFF,
+    STANDARD_RIGHTS_ALL    = 0x001F0000,
 };
 
 // File Access Rights
@@ -313,5 +317,7 @@ enum
     SE_RM_CONTROL_VALID      = 0x4000,
     SE_SELF_RELATIVE         = 0x8000,
 };
+
+extern const flags_str_t generic_ar;
 
 #endif
