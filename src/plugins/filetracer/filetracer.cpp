@@ -123,7 +123,6 @@
 
 #include <libvmi/libvmi.h>
 #include "plugins/plugins.h"
-#include "plugins/plugin_utils.h"
 #include "private.h"
 #include "filetracer.h"
 #include "win_acl.h"
@@ -195,6 +194,22 @@ static const flags_str_t file_flags_and_attrs =
     REGISTER_FLAG(FILE_FLAG_WRITE_THROUGH             ),
 };
 
+const flags_str_t generic_ar =
+{
+    REGISTER_FLAG(DELETE                ),
+    REGISTER_FLAG(READ_CONTROL          ),
+    REGISTER_FLAG(WRITE_DAC             ),
+    REGISTER_FLAG(WRITE_OWNER           ),
+    REGISTER_FLAG(SYNCHRONIZE           ),
+    REGISTER_FLAG(ACCESS_SYSTEM_SECURITY),
+    REGISTER_FLAG(GENERIC_ALL           ),
+    REGISTER_FLAG(GENERIC_EXECUTE       ),
+    REGISTER_FLAG(GENERIC_WRITE         ),
+    REGISTER_FLAG(GENERIC_READ          ),
+    REGISTER_FLAG(SPECIFIC_RIGHTS_ALL   ),
+    REGISTER_FLAG(STANDARD_RIGHTS_ALL   ),
+};
+
 static const flags_str_t file_ar =
 {
     REGISTER_FLAG(DELETE                ),
@@ -207,6 +222,8 @@ static const flags_str_t file_ar =
     REGISTER_FLAG(GENERIC_EXECUTE       ),
     REGISTER_FLAG(GENERIC_WRITE         ),
     REGISTER_FLAG(GENERIC_READ          ),
+    REGISTER_FLAG(SPECIFIC_RIGHTS_ALL   ),
+    REGISTER_FLAG(STANDARD_RIGHTS_ALL   ),
     REGISTER_FLAG(FILE_READ_DATA        ),
     REGISTER_FLAG(FILE_WRITE_DATA       ),
     REGISTER_FLAG(FILE_APPEND_DATA      ),
@@ -229,6 +246,8 @@ static const flags_str_t directory_ar =
     REGISTER_FLAG(GENERIC_EXECUTE       ),
     REGISTER_FLAG(GENERIC_WRITE         ),
     REGISTER_FLAG(GENERIC_READ          ),
+    REGISTER_FLAG(SPECIFIC_RIGHTS_ALL   ),
+    REGISTER_FLAG(STANDARD_RIGHTS_ALL   ),
     REGISTER_FLAG(FILE_LIST_DIRECTORY   ),
     REGISTER_FLAG(FILE_ADD_FILE         ),
     REGISTER_FLAG(FILE_ADD_SUBDIRECTORY ),
