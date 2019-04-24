@@ -215,6 +215,53 @@ done:
     return 0;
 }
 
+static event_response_t notify_zero_page_write(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    dkommon* d = static_cast<dkommon*>(info->trap->data);
+
+    gchar* escaped_pname = NULL;
+
+    switch (d->format)
+    {
+        case OUTPUT_CSV:
+            printf("dkommon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"Zero Page Write\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid);
+            break;
+        case OUTPUT_KV:
+            printf("dkommon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Message=\"Zero Page Write\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name);
+            break;
+
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"dkommon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": %s,"
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Message\": \"Zero Page Write\","
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid);
+
+            g_free(escaped_pname);
+            break;
+
+        case OUTPUT_DEFAULT:
+        default:
+            printf("[DKOMMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " MESSAGE:\"Zero Page Write\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, USERIDSTR(drakvuf), info->proc_data.userid);
+            break;
+    }
+
+    return 0;
+}
+
 static void print_driver(drakvuf_t drakvuf, drakvuf_trap_info_t* info, output_format_t format, const char* message, const char* name)
 {
     gchar* escaped_pname = NULL;
@@ -351,12 +398,13 @@ dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
 
     /* Setup trap for thread switch */
     processes_trap.cb = check_hidden_process;
-    if (!drakvuf_add_trap(drakvuf, &processes_trap))
-        throw -1;
+    if (!drakvuf_add_trap(drakvuf, &processes_trap)) throw -1;
 
     drivers_trap.cb = check_hidden_drivers;
-    if (!drakvuf_add_trap(drakvuf, &drivers_trap))
-        throw -1;
+    if (!drakvuf_add_trap(drakvuf, &drivers_trap)) throw -1;
+
+    zeropage_trap.cb = notify_zero_page_write;
+    if (!drakvuf_add_trap(drakvuf, &zeropage_trap)) throw -1;
 }
 
 dkommon::~dkommon()

@@ -141,6 +141,15 @@ private:
         .reg = CR3,
         .data = this
     };
+
+    drakvuf_trap_t zeropage_trap =
+    {
+        .type = MEMACCESS,
+        .memaccess.gfn = 0,
+        .memaccess.type = PRE,
+        .memaccess.access = VMI_MEMACCESS_W,
+        .data = this
+    };
 };
 
 #endif
