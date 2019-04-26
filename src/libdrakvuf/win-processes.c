@@ -129,18 +129,27 @@ bool win_search_modules( drakvuf_t drakvuf, const char* module_name, bool (*visi
 bool win_search_modules_wow( drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx, addr_t eprocess_addr, addr_t wow_peb, vmi_pid_t pid, access_context_t* ctx );
 addr_t win_get_wow_peb( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_process );
 
-addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
+addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t thread;
     addr_t prcb;
+    addr_t kpcr;
 
     if (drakvuf->pm == VMI_PM_IA32E)
+    {
         prcb=drakvuf->offsets[KPCR_PRCB];
+
+        vmi_get_vcpureg(drakvuf->vmi, &kpcr, GS_BASE, info->vcpu);
+    }
     else
+    {
         prcb=drakvuf->offsets[KPCR_PRCBDATA];
 
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, drakvuf->kpcr[vcpu_id] + prcb + drakvuf->offsets[KPRCB_CURRENTTHREAD], 0, &thread))
+        vmi_get_vcpureg(drakvuf->vmi, &kpcr, FS_BASE, info->vcpu);
+    }
+
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, kpcr + prcb + drakvuf->offsets[KPRCB_CURRENTTHREAD], 0, &thread))
     {
         return 0;
     }
@@ -148,12 +157,12 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
     return thread;
 }
 
-addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
+addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
     addr_t thread;
     addr_t process;
 
-    thread=win_get_current_thread(drakvuf,vcpu_id);
+    thread=win_get_current_thread(drakvuf, info);
 
     if (thread == 0 || VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_PROCESS], 0, &process))
     {
@@ -163,21 +172,21 @@ addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
     return process;
 }
 
-status_t win_get_last_error(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str)
+status_t win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t *info, uint32_t* err, const char** err_str)
 {
     if (!err || !err_str)
         return VMI_FAILURE;
 
     vmi_instance_t vmi = drakvuf->vmi;
 
-    addr_t eprocess = win_get_current_process(drakvuf, vcpu_id);
+    addr_t eprocess = win_get_current_process(drakvuf, info);
     addr_t cr3 = 0;
     vmi_pid_t pid = 0;
     if (eprocess && VMI_SUCCESS == win_get_process_pid(drakvuf, eprocess, &pid))
         if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, pid, &cr3))
             return VMI_FAILURE;
 
-    addr_t kthread = win_get_current_thread(drakvuf, vcpu_id);
+    addr_t kthread = win_get_current_thread(drakvuf, info);
     if (!kthread)
         return VMI_FAILURE;
 
@@ -281,9 +290,9 @@ status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t*
     return vmi_read_32_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)pid);
 }
 
-char* win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath)
+char* win_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t *info, bool fullpath)
 {
-    return win_get_process_name(drakvuf, win_get_current_process(drakvuf, vcpu_id), fullpath);
+    return win_get_process_name(drakvuf, win_get_current_process(drakvuf, info), fullpath);
 }
 
 int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
@@ -316,18 +325,18 @@ int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
     return (int64_t)userid;
 };
 
-int64_t win_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id)
+int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
-    return win_get_process_userid(drakvuf, win_get_current_process(drakvuf, vcpu_id));
+    return win_get_process_userid(drakvuf, win_get_current_process(drakvuf, info));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 
-bool win_get_current_thread_id(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* thread_id)
+bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t *info, uint32_t* thread_id)
 {
     addr_t p_tid ;
-    addr_t ethread = win_get_current_thread(drakvuf, vcpu_id);
+    addr_t ethread = win_get_current_thread(drakvuf, info);
 
     if ( ethread )
     {
@@ -366,10 +375,10 @@ bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_
 }
 
 bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
-        uint64_t vcpu_id,
+        drakvuf_trap_info_t *info,
         privilege_mode_t* previous_mode )
 {
-    addr_t kthread = win_get_current_thread(drakvuf, vcpu_id);
+    addr_t kthread = win_get_current_thread(drakvuf, info);
 
     return win_get_thread_previous_mode(drakvuf, kthread, previous_mode);
 }

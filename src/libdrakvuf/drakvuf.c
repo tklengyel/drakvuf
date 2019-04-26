@@ -348,6 +348,9 @@ bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     if (CR3 == trap->reg)
     {
+        if ( !drakvuf->cr3 && !control_cr3_trap(drakvuf, 1) )
+            return 0;
+
         drakvuf->cr3 = g_slist_prepend(drakvuf->cr3, trap);
         return 1;
     }
@@ -572,9 +575,9 @@ int drakvuf_get_address_width(drakvuf_t drakvuf)
     return drakvuf->address_width;
 }
 
-bool drakvuf_get_current_process_data(drakvuf_t drakvuf, uint64_t vcpu_id, proc_data_priv_t* proc_data)
+bool drakvuf_get_current_process_data(drakvuf_t drakvuf, drakvuf_trap_info_t *info, proc_data_priv_t* proc_data)
 {
-    addr_t process_base = drakvuf_get_current_process(drakvuf, vcpu_id);
+    addr_t process_base = drakvuf_get_current_process(drakvuf, info);
     return drakvuf_get_process_data_priv(drakvuf, process_base, proc_data);
 }
 

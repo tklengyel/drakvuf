@@ -606,7 +606,7 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return 0;
 
     uint32_t thread_id = 0;
-    if (!drakvuf_get_current_thread_id(drakvuf, info->vcpu, &thread_id))
+    if (!drakvuf_get_current_thread_id(drakvuf, info, &thread_id))
         return 0;
 
     if (thread_id != injector->target_thread_id)
@@ -726,7 +726,7 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (info->regs->cr3 != injector->target_cr3)
         goto done;
 
-    if ( !drakvuf_get_current_thread_id(drakvuf, info->vcpu, &thread_id) ||
+    if ( !drakvuf_get_current_thread_id(drakvuf, info, &thread_id) ||
             !injector->target_thread_id || thread_id != injector->target_thread_id )
         goto done;
 
@@ -768,7 +768,7 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (info->regs->cr3 != injector->target_cr3)
         return 0;
 
-    if ( !drakvuf_get_current_thread_id(drakvuf, info->vcpu, &thread_id) ||
+    if ( !drakvuf_get_current_thread_id(drakvuf, info, &thread_id) ||
             !injector->target_thread_id || thread_id != injector->target_thread_id )
         return 0;
 
@@ -854,7 +854,7 @@ static bool start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_ins
     }
 
     uint32_t target_thread_id = 0;
-    if ( !drakvuf_get_current_thread_id(drakvuf, info->vcpu, &target_thread_id) ||
+    if ( !drakvuf_get_current_thread_id(drakvuf, info, &target_thread_id) ||
             !target_thread_id )
     {
         PRINT_DEBUG("[FILEDELETE2] Failed to get Thread ID\n");

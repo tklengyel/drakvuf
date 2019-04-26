@@ -110,7 +110,7 @@
 
 char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)
 {
-    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
+    addr_t process = drakvuf_get_current_process(drakvuf, info);
     if (!process) return NULL;
 
     addr_t obj = drakvuf_get_obj_by_handle(drakvuf, process, handle);
