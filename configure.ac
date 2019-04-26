@@ -342,6 +342,13 @@ AC_ARG_ENABLE([debug],
   [debug="no"])
 AM_CONDITIONAL([DEBUG], [test x$debug = xyes])
 
+AC_ARG_ENABLE([sanitize],
+  [AS_HELP_STRING([--enable-sanitize],
+    [Enable sanitizers to be compiled @<:@no@:>@])],
+  [sanitize="$enableval"],
+  [sanitize="no"])
+AM_CONDITIONAL([SANITIZE], [test x$sanitize = xyes])
+
 AC_ARG_ENABLE([doppelganging],
   [AS_HELP_STRING([--enable-doppelganging-injection],
     [Enable doppelganging injection @<:@no@:>@])],
@@ -422,6 +429,46 @@ CC="$saved_CC"
 CXX="$saved_CXX"
 LD="$saved_LD"
 # AUTOHARDEN END
+#####################################################
+
+#####################################################
+# AUTOSANITIZE START
+
+saved_CC="$CC"
+saved_CXX="$CXX"
+saved_LD="$LD"
+flag_wrap="$srcdir/scripts/wrap-compiler-for-flag-check"
+CC="$flag_wrap $CC"
+CXX="$flag_wrap $CXX"
+LD="$flag_wrap $LD"
+
+SANITIZE_CFLAGS=""
+SANITIZE_CXXFLAGS=""
+SANITIZE_LDFLAGS=""
+
+AS_IF([test x"$fsanitize" != x"no"], [
+  check_cc_cxx_flag([-fsanitize=address],
+   [check_link_flag([-fsanitize=address],
+     [SANITIZE_CFLAGS="$SANITIZE_CFLAGS -fsanitize=address"
+      SANITIZE_CXXFLAGS="$SANITIZE_CXXFLAGS -fsanitize=address"
+      SANITIZE_LDFLAGS="$SANITIZE_LDFLAGS -fsanitize=address"])])
+
+  check_cc_cxx_flag([-fsanitize=leak],
+   [check_link_flag([-fsanitize=leak],
+     [SANITIZE_CFLAGS="$SANITIZE_CFLAGS -fsanitize=leak"
+      SANITIZE_CXXFLAGS="$SANITIZE_CXXFLAGS -fsanitize=leak"
+      SANITIZE_LDFLAGS="$SANITIZE_LDFLAGS -fsanitize=leak"])])
+])
+
+AC_SUBST([SANITIZE_CFLAGS])
+AC_SUBST([SANITIZE_CXXFLAGS])
+AC_SUBST([SANITIZE_LDFLAGS])
+
+# End of flag tests.
+CC="$saved_CC"
+CXX="$saved_CXX"
+LD="$saved_LD"
+# AUTOSANITIZE END
 #####################################################
 
 AC_HEADER_STDC
