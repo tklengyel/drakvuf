@@ -118,6 +118,11 @@ if HARDENING
 AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 endif
 
+if SANITIZE
+AM_CFLAGS += $(SANITIZE_CFLAGS)
+AM_LDFLAGS += $(SANITIZE_LDFLAGS)
+endif
+
 # Note that -pg is incompatible with HARDENING
 if DEBUG
 AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
