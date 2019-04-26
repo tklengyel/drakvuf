@@ -325,7 +325,7 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu)))
+    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
 
     auto* plugin = data->plugin();
@@ -379,7 +379,7 @@ static event_response_t create_user_process_hook(
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu));
+    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
     data->new_process_handle_addr = process_handle_addr;
     data->user_process_parameters_addr = user_process_parameters_addr;
     return VMI_EVENT_RESPONSE_NONE;
@@ -476,7 +476,7 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu)))
+    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(drakvuf, info->trap);
@@ -579,7 +579,7 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu));
+    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
 
     // PHANDLE ProcessHandle
     data->process_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);

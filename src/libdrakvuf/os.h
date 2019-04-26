@@ -110,13 +110,13 @@ typedef struct process_data_priv proc_data_priv_t;
 typedef struct os_interface
 {
     addr_t (*get_current_thread)
-    (drakvuf_t drakvuf, uint64_t vcpu_id);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     addr_t (*get_current_process)
-    (drakvuf_t drakvuf, uint64_t vcpu_id);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     status_t (*get_last_error)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
 
     char* (*get_process_name)
     (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
@@ -125,7 +125,7 @@ typedef struct os_interface
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
 
     char* (*get_current_process_name)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
 
     int64_t (*get_process_userid)
     (drakvuf_t drakvuf, addr_t process_base);
@@ -134,16 +134,16 @@ typedef struct os_interface
     (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid);
 
     int64_t (*get_current_process_userid)
-    (drakvuf_t drakvuf, uint64_t vcpu_id);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     bool (*get_current_thread_id)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* thread_id);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
 
     bool (*get_thread_previous_mode)
     (drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
 
     bool (*get_current_thread_previous_mode)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, privilege_mode_t* previous_mode);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t* previous_mode);
 
     bool (*is_process)
     (drakvuf_t drakvuf, addr_t dtb, addr_t process_addr);

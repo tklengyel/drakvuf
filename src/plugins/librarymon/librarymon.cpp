@@ -111,7 +111,7 @@
 
 static event_response_t load_library_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    addr_t thread = drakvuf_get_current_thread(drakvuf, info->vcpu);
+    addr_t thread = drakvuf_get_current_thread(drakvuf, info);
     if (!thread)
         return VMI_EVENT_RESPONSE_NONE;
 
