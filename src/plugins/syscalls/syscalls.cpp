@@ -468,6 +468,12 @@ exit:
     return rc;
 }
 
+void free_trap(drakvuf_trap_t* trap)
+{
+    g_free((gpointer)trap->name);
+    g_free(trap);
+}
+
 static int catch_ret_value(drakvuf_t drakvuf, vmi_instance_t vmi, access_context_t* ctx, drakvuf_trap_info_t* info)
 {
     syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
@@ -480,25 +486,21 @@ static int catch_ret_value(drakvuf_t drakvuf, vmi_instance_t vmi, access_context
 
     PRINT_DEBUG("Adding trap to return address 0x%lx\n", ret_addr);
 
-    // Most of the time the return address will be the same for a given syscall.
-    // If it is not, then we update the return address of that syscall and add a
-    // new trap.
-    if (ret_addr != wrapper->ret_addr)
-    {
-        wrapper->ret_addr = ret_addr;
-        drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
-        trap->breakpoint.lookup_type = LOOKUP_PID;
-        trap->breakpoint.pid = info->trap->breakpoint.pid;
-        trap->breakpoint.addr_type = ADDR_VA;
-        trap->breakpoint.addr = wrapper->ret_addr;
-        trap->breakpoint.module = info->trap->breakpoint.module;
-        trap->name = g_strdup(info->trap->name);
-        trap->type = BREAKPOINT;
-        trap->cb = win_ret_cb;
-        trap->data = wrapper;
+    drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+    trap->breakpoint.lookup_type = LOOKUP_PID;
+    trap->breakpoint.pid = info->trap->breakpoint.pid;
+    trap->breakpoint.addr_type = ADDR_VA;
+    trap->breakpoint.addr = ret_addr;
+    trap->breakpoint.module = info->trap->breakpoint.module;
+    trap->name = g_strdup(info->trap->name);
+    trap->type = BREAKPOINT;
+    trap->cb = win_ret_cb;
+    trap->data = wrapper;
 
-        if ( !drakvuf_add_trap(drakvuf, trap) )
-            return -1;
+    if ( !drakvuf_add_trap(drakvuf, trap) )
+    {
+        PRINT_DEBUG("Error adding trap on return address 0x%lx\n", ret_addr);
+        return -1;
     }
 
     return 0;
@@ -547,7 +549,7 @@ static event_response_t win_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     syscalls* s = wrapper->s;
     uint32_t thread_id = 0;
 
-    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    drakvuf_remove_trap(drakvuf, info->trap, free_trap);
 
     if ( !s || !wrapper->args )
         goto exit;
@@ -572,11 +574,7 @@ static event_response_t win_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     print_footer(s->format, wrapper->nargs);
 
 exit:
-    if (wrapper->args)
-    {
-        g_free(wrapper->args);
-        wrapper->args = NULL;
-    }
+    g_free(wrapper->args);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -649,13 +647,13 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     wrapper->args = (unsigned char*)g_malloc(sizeof(char)*size);
     memcpy(wrapper->args, buf, sizeof(char)*size);
     wrapper->nargs = nargs;
-    wrapper->ret_addr = 0;
     wrapper->target_pid = info->trap->breakpoint.pid;
     if ( !drakvuf_get_current_thread_id(drakvuf, info->vcpu, &wrapper->target_tid) )
         goto exit;
 
+    // add trap to get the return value
     if ( catch_ret_value(drakvuf, vmi, &ctx, info) == -1 )
-        PRINT_DEBUG("Error adding trap on return address 0x%lx\n", wrapper->ret_addr);
+        g_free(wrapper->args);
 
 exit:
     g_free(buf);

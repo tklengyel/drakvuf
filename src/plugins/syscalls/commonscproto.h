@@ -450,7 +450,6 @@ typedef struct
     int32_t          target_pid;
     unsigned char*   args;
     unsigned int     nargs;
-    addr_t           ret_addr;
 } syscall_wrapper_t;
 
 
