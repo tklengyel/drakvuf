@@ -142,6 +142,15 @@ extern bool verbose;
 
 #define UNUSED(x) (void)(x)
 
+/*
+ * How often should the VMI caches be flushed?
+ *
+ * TODO: develop intelligent cache-flush system that
+ *       catches the events that actually make flushes
+ *       necessary.
+ */
+#define VMI_FLUSH_RATE 100
+
 struct fd_info
 {
     int fd;
@@ -168,6 +177,7 @@ struct drakvuf
     xen_pfn_t zero_page_gfn;
 
     // VMI
+    unsigned long flush_counter;
     GMutex vmi_lock;
     vmi_instance_t vmi;
 

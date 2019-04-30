@@ -127,6 +127,20 @@
 
 static uint8_t bp = TRAP;
 
+static inline void flush_vmi(drakvuf_t drakvuf)
+{
+    drakvuf->flush_counter++;
+
+    if ( !(drakvuf->flush_counter % VMI_FLUSH_RATE) )
+    {
+        vmi_v2pcache_flush(drakvuf->vmi, ~0ull);
+        vmi_pidcache_flush(drakvuf->vmi);
+        vmi_rvacache_flush(drakvuf->vmi);
+        vmi_symcache_flush(drakvuf->vmi);
+        drakvuf->flush_counter = 0;
+    }
+}
+
 /*
  * This function gets called from the singlestep event
  * after an int3 or a read event happens.
@@ -172,6 +186,8 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     event_response_t rsp = 0;
     struct memcb_pass* pass = (struct memcb_pass*)event->data;
     drakvuf_t drakvuf = pass->drakvuf;
+
+    flush_vmi(drakvuf);
 
     /*
      * The trap may have been removed since in another callback,
@@ -304,6 +320,8 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     UNUSED(vmi);
     event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
+
+    flush_vmi(drakvuf);
 
     if (event->mem_event.gfn == drakvuf->zero_page_gfn)
     {
@@ -455,6 +473,8 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
 
+    flush_vmi(drakvuf);
+
     addr_t pa = (event->interrupt_event.gfn << 12)
                 + event->interrupt_event.offset + event->interrupt_event.insn_length - 1;
 
@@ -556,6 +576,8 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
 
+    flush_vmi(drakvuf);
+
 #ifdef DRAKVUF_DEBUG
     /* This is very verbose and always on so we only print debug information
      * when there is a subscriber trap */
@@ -624,6 +646,8 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
     event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
 
+    flush_vmi(drakvuf);
+
 #ifdef DEBUG
     addr_t pa = (event->debug_event.gfn << 12) + event->debug_event.offset;
     PRINT_DEBUG("Debug event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64". Insn_length: %u\n",
@@ -674,6 +698,8 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
     UNUSED(vmi);
     event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
+
+    flush_vmi(drakvuf);
 
     PRINT_DEBUG("CPUID event vCPU %u altp2m:%u CR3: 0x%"PRIx64" RIP=0x%"PRIx64". Insn_length: %u\n",
                 event->vcpu_id, event->slat_id, event->x86_regs->cr3,
