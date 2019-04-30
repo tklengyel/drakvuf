@@ -575,7 +575,7 @@ int drakvuf_get_address_width(drakvuf_t drakvuf)
     return drakvuf->address_width;
 }
 
-bool drakvuf_get_current_process_data(drakvuf_t drakvuf, drakvuf_trap_info_t *info, proc_data_priv_t* proc_data)
+bool drakvuf_get_current_process_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info, proc_data_priv_t* proc_data)
 {
     addr_t process_base = drakvuf_get_current_process(drakvuf, info);
     return drakvuf_get_process_data_priv(drakvuf, process_base, proc_data);

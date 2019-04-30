@@ -128,7 +128,7 @@ bool fill_offsets_from_rekall(drakvuf_t drakvuf, size_t size, const char* names 
     return 1;
 }
 
-addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     if ( drakvuf->osi.get_current_thread )
         return drakvuf->osi.get_current_thread(drakvuf, info);
@@ -136,7 +136,7 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
     return 0;
 }
 
-status_t drakvuf_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t *info, uint32_t* err, const char** err_str)
+status_t drakvuf_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str)
 {
     if ( drakvuf->osi.get_last_error )
         return drakvuf->osi.get_last_error(drakvuf, info, err, err_str);
@@ -144,7 +144,7 @@ status_t drakvuf_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t *info, ui
     return VMI_FAILURE;
 }
 
-addr_t drakvuf_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+addr_t drakvuf_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     if ( drakvuf->osi.get_current_process )
         return drakvuf->osi.get_current_process(drakvuf, info);
@@ -176,7 +176,7 @@ status_t drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid
     return VMI_FAILURE;
 }
 
-char* drakvuf_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t *info, bool fullpath)
+char* drakvuf_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath)
 {
     if ( drakvuf->osi.get_current_process_name )
         return drakvuf->osi.get_current_process_name(drakvuf, info, fullpath);
@@ -192,7 +192,7 @@ int64_t drakvuf_get_process_userid(drakvuf_t drakvuf, addr_t process_base)
     return ~0l;
 }
 
-int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     if ( drakvuf->osi.get_current_process_userid )
         return drakvuf->osi.get_current_process_userid(drakvuf, info);
@@ -200,7 +200,7 @@ int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_
     return ~0l;
 }
 
-bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, drakvuf_trap_info_t *info, uint32_t* thread_id )
+bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id )
 {
     if ( drakvuf->osi.get_current_thread_id )
         return drakvuf->osi.get_current_thread_id(drakvuf, info, thread_id);
@@ -218,7 +218,7 @@ bool drakvuf_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privil
 }
 
 bool drakvuf_get_current_thread_previous_mode( drakvuf_t drakvuf,
-        drakvuf_trap_info_t *info,
+        drakvuf_trap_info_t* info,
         privilege_mode_t* previous_mode )
 {
     if ( drakvuf->osi.get_current_thread_previous_mode )

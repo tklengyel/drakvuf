@@ -119,7 +119,7 @@
 #define STACK_SIZE_16K 0x3fff
 #define MIN_KERNEL_BOUNDARY 0x80000000
 
-addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t process = 0;
     vmi_instance_t vmi = drakvuf->vmi;
@@ -158,7 +158,7 @@ addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 /*
  * Threads are really just processes on Linux.
  */
-addr_t linux_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+addr_t linux_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     return linux_get_current_process(drakvuf, info);
 }
@@ -192,7 +192,7 @@ status_t linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t
     return vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)pid);
 }
 
-char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t *info, bool fullpath)
+char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath)
 {
     UNUSED(fullpath);
     addr_t process_base = linux_get_current_process(drakvuf, info);
@@ -230,7 +230,7 @@ int64_t linux_get_process_userid(drakvuf_t drakvuf, addr_t process_base)
     return uid;
 };
 
-int64_t linux_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+int64_t linux_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t process_base = linux_get_current_process(drakvuf, info);
     if ( !process_base )
@@ -255,7 +255,7 @@ int64_t linux_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t 
     return uid;
 }
 
-bool linux_get_current_thread_id( drakvuf_t drakvuf, drakvuf_trap_info_t *info, uint32_t* thread_id )
+bool linux_get_current_thread_id( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id )
 {
     /*
      * On Linux PID is actually the thread ID....... ... ...

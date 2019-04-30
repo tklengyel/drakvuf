@@ -363,12 +363,12 @@ json_object* drakvuf_get_rekall_profile_json(drakvuf_t drakvuf);
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf);
 
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
-                                   drakvuf_trap_info_t *info);
+                                   drakvuf_trap_info_t* info);
 
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
-                                  drakvuf_trap_info_t *info);
+                                  drakvuf_trap_info_t* info);
 status_t drakvuf_get_last_error(drakvuf_t drakvuf,
-                                drakvuf_trap_info_t *info,
+                                drakvuf_trap_info_t* info,
                                 uint32_t* err,
                                 const char** err_str);
 
@@ -396,7 +396,7 @@ bool drakvuf_get_process_data(drakvuf_t drakvuf,
                               proc_data_t* proc_data);
 
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
-                                   drakvuf_trap_info_t *info,
+                                   drakvuf_trap_info_t* info,
                                    uint32_t* thread_id);
 
 addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf,
@@ -409,7 +409,7 @@ addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
 // Microsoft PreviousMode KTHREAD explanation:
 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff559860(v=vs.85).aspx
 bool drakvuf_get_current_thread_previous_mode(drakvuf_t drakvuf,
-        drakvuf_trap_info_t *info,
+        drakvuf_trap_info_t* info,
         privilege_mode_t* previous_mode);
 
 bool drakvuf_get_thread_previous_mode(drakvuf_t drakvuf,
