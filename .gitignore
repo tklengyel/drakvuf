@@ -1,3 +1,11 @@
+# CMake files
+CMakeCache.txt
+CMakeFiles
+build
+cmake_install.cmake
+
+config.h
+
 # Object files
 *.o
 *.ko
@@ -20,7 +28,6 @@ configure
 autom4te.cache/*
 compile
 aclocal.m4
-config.*
 depcomp
 install-sh
 missing

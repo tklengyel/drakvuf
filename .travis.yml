@@ -33,7 +33,7 @@ matrix:
       install:
         - sudo apt-get install astyle
       script:
-        - export ARTISTIC_STYLE_OPTIONS=".astylerc" && astyle `find . | egrep "\.c|\.h"` > astyle.out
+        - export ARTISTIC_STYLE_OPTIONS=".astylerc" && astyle `find src | egrep "\.c|\.h"` > astyle.out
         - TEST=$(cat astyle.out | grep Formatted | wc -l)
         - |
           if [[ $TEST -ne 0 ]]; then
@@ -78,9 +78,8 @@ matrix:
         - make install
         - cd ..
       install:
-        - ./autogen.sh
+        - cmake -DCMAKE_BUILD_TYPE=Debug .
       script:
-        - ./configure --enable-debug || cat config.log
         - make
 
 #
@@ -165,13 +164,9 @@ matrix:
         - make install
         - cd ..
       install:
-        - ./autogen.sh
+        - cmake -DCMAKE_BUILD_TYPE=Debug .
       script:
-        - scan-build --status-bugs --use-cc=clang ./configure --enable-debug
-        - cd src/libdrakvuf && scan-build --status-bugs --use-cc=clang make && cd ../..
-        - cd src/xen_helper && scan-build --status-bugs --use-cc=clang make && cd ../..
-        - cd src/libinjector && scan-build --status-bugs --use-cc=clang make && cd ../..
-        - cd src/dirwatch && scan-build --status-bugs --use-cc=clang make && cd ../..
+        - scan-build --status-bugs --use-cc=clang make
 
 #
 # SonarCloud
@@ -213,9 +208,8 @@ matrix:
         - make install
         - cd ..
       install:
-        - ./autogen.sh
+        - cmake -DCMAKE_BUILD_TYPE=Debug .
       script:
         - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
-        - ./configure --enable-debug
         - build-wrapper-linux-x86-64 --out-dir bw-output make -j2
         - sonar-scanner
