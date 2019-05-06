@@ -233,6 +233,9 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
 
         PRINT_DEBUG("Re-copying remapped gfn\n");
 
+        if ( VMI_FAILURE == vmi_pause_vm(drakvuf->vmi) )
+            return 0;
+
         uint8_t backup[VMI_PS_4KB] = {0};
 
         if ( VMI_FAILURE == vmi_read_pa(drakvuf->vmi, pass->remapped_gfn->o<<12, VMI_PS_4KB, &backup, NULL) )
@@ -285,6 +288,8 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             loop = loop->next;
         }
 
+        if ( VMI_FAILURE == vmi_resume_vm(drakvuf->vmi) )
+            return 0;
     }
 
 done:
