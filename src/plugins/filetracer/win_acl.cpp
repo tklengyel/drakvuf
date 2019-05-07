@@ -109,6 +109,7 @@
 
 #include "private.h"
 #include "win_acl.h"
+#include "plugins/private.h"
 
 using std::hex;
 using std::showbase;
@@ -597,6 +598,12 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
             case OUTPUT_DEFAULT:
                 fmt << ",TYPE:" << type << ",ACCESS_MASK:\"" << hex << showbase << mask << "\",SID:" << sid;;
                 break;
+        }
+
+        if (0 == ace_size || ace_ptr + ace_size < ace_ptr)
+        {
+            PRINT_DEBUG("WARNING! Incorrect ACE size %ld\n", ace_size);
+            break;
         }
 
         ace_ptr += ace_size;
