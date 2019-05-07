@@ -147,6 +147,82 @@ static inline void enable_plugin(char* optarg, bool* plugin_list, bool* disabled
             plugin_list[i] = true;
 }
 
+static void print_usage()
+{
+    fprintf(stderr, "Required input:\n"
+            "\t -r, --rekall-kernel <rekall profile>\n"
+            "\t                           The Rekall profile of the OS kernel\n"
+            "\t -d <domain ID or name>    The domain's ID or name\n"
+            "Optional inputs:\n"
+            "\t -l                        Use libvmi.conf\n"
+            "\t -i <injection pid>        The PID of the process to hijack for injection\n"
+            "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
+            "\t -e <inject_file>          The executable to start with injection\n"
+            "\t -c <current_working_dir>  The current working directory for injected executable\n"
+            "\t -m <inject_method>        The injection method: createproc, shellexec, shellcode, doppelganging\n"
+            "\t -g                        Search required for injection functions in all processes\n"
+            "\t -j, --injection-timeout <seconds>\n"
+            "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
+            "\t -t <timeout>              Timeout (in seconds)\n"
+            "\t -o <format>               Output format (default, csv, kv, or json)\n"
+            "\t -x <plugin>               Don't activate the specified plugin\n"
+            "\t -a <plugin>               Activate the specified plugin\n"
+            "\t -p                        Leave domain paused after DRAKVUF exits\n"
+#ifdef ENABLE_DOPPELGANGING
+            "\t -B <path>                 The host path of the windows binary to inject (requires -m doppelganging)\n"
+            "\t -P <target>               The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
+#endif
+#ifdef ENABLE_PLUGIN_FILEDELETE
+            "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
+            "\t -M                        Dump new or modified files also (requires -D)\n"
+            "\t -n                        Use extraction method based on function injection (requires -D)\n"
+#endif
+#ifdef ENABLE_PLUGIN_SOCKETMON
+            "\t -T, --rekall-tcpip <rekall profile>\n"
+            "\t                           The Rekall profile for tcpip.sys\n"
+#endif
+#ifdef ENABLE_PLUGIN_CPUIDMON
+            "\t -s                        Hide Hypervisor bits and signature in CPUID\n"
+#endif
+#ifdef DRAKVUF_DEBUG
+            "\t -v, --verbose             Turn on verbose (debug) output\n"
+#endif
+#ifdef ENABLE_PLUGIN_SYSCALLS
+            "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
+#endif
+#ifdef ENABLE_PLUGIN_BSODMON
+            "\t -b                        Exit from execution as soon as a BSoD is detected\n"
+#endif
+            "\t -w, --rekall-wow <rekall profile>\n"
+            "\t                           The Rekall profile for WoW64 NTDLL\n"
+#ifdef ENABLE_PLUGIN_CLIPBOARDMON
+            "\t -W, --rekall-win32k <rekall profile>\n"
+            "\t                           The Rekall profile for win32k.sys\n"
+#endif
+            "\t --rekall-sspicli <rekall profile>\n"
+            "\t                           The Rekall profile for sspicli.dll\n"
+            "\t --rekall-kernel32 <rekall profile>\n"
+            "\t                           The Rekall profile for kernel32.dll\n"
+            "\t --rekall-kernelbase <rekall profile>\n"
+            "\t                           The Rekall profile for KernelBase.dll\n"
+            "\t --rekall-wow-kernel32 <rekall profile>\n"
+            "\t                           The Rekall profile for SysWOW64/kernel32.dll\n"
+            "\t --rekall-ntdll <rekall profile>\n"
+            "\t                           The Rekall profile for ntdll.dll\n"
+            "\t --rekall-iphlpapi <rekall profile>\n"
+            "\t                           The Rekall profile for iphlpapi.dll\n"
+#ifdef ENABLE_PLUGIN_WMIMON
+            "\t --rekall-mpr <rekall profile>\n"
+            "\t                           The Rekall profile for mpr.dll\n"
+            "\t --rekall-ole32 <rekall profile>\n"
+            "\t                           The Rekall profile for ole32.dll\n"
+            "\t --rekall-wow-ole32 <rekall profile>\n"
+            "\t                           The Rekall profile for SysWOW64/ole32.dll\n"
+#endif
+            "\t -h, --help                Show this help\n"
+           );
+}
+
 int main(int argc, char** argv)
 {
     int c;
@@ -184,82 +260,6 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    if (argc < 4)
-    {
-        fprintf(stderr, "Required input:\n"
-                "\t -r, --rekall-kernel <rekall profile>\n"
-                "\t                           The Rekall profile of the OS kernel\n"
-                "\t -d <domain ID or name>    The domain's ID or name\n"
-                "Optional inputs:\n"
-                "\t -l                        Use libvmi.conf\n"
-                "\t -i <injection pid>        The PID of the process to hijack for injection\n"
-                "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
-                "\t -e <inject_file>          The executable to start with injection\n"
-                "\t -c <current_working_dir>  The current working directory for injected executable\n"
-                "\t -m <inject_method>        The injection method: createproc, shellexec, shellcode, doppelganging\n"
-                "\t -g                        Search required for injection functions in all processes\n"
-                "\t -j, --injection-timeout <seconds>\n"
-                "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
-                "\t -t <timeout>              Timeout (in seconds)\n"
-                "\t -o <format>               Output format (default, csv, kv, or json)\n"
-                "\t -x <plugin>               Don't activate the specified plugin\n"
-                "\t -a <plugin>               Activate the specified plugin\n"
-                "\t -p                        Leave domain paused after DRAKVUF exits\n"
-#ifdef ENABLE_DOPPELGANGING
-                "\t -B <path>                 The host path of the windows binary to inject (requires -m doppelganging)\n"
-                "\t -P <target>               The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
-#endif
-#ifdef ENABLE_PLUGIN_FILEDELETE
-                "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
-                "\t -M                        Dump new or modified files also (requires -D)\n"
-                "\t -n                        Use extraction method based on function injection (requires -D)\n"
-#endif
-#ifdef ENABLE_PLUGIN_SOCKETMON
-                "\t -T, --rekall-tcpip <rekall profile>\n"
-                "\t                           The Rekall profile for tcpip.sys\n"
-#endif
-#ifdef ENABLE_PLUGIN_CPUIDMON
-                "\t -s                        Hide Hypervisor bits and signature in CPUID\n"
-#endif
-#ifdef DRAKVUF_DEBUG
-                "\t -v, --verbose             Turn on verbose (debug) output\n"
-#endif
-#ifdef ENABLE_PLUGIN_SYSCALLS
-                "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
-#endif
-#ifdef ENABLE_PLUGIN_BSODMON
-                "\t -b                        Exit from execution as soon as a BSoD is detected\n"
-#endif
-                "\t -w, --rekall-wow <rekall profile>\n"
-                "\t                           The Rekall profile for WoW64 NTDLL\n"
-#ifdef ENABLE_PLUGIN_CLIPBOARDMON
-                "\t -W, --rekall-win32k <rekall profile>\n"
-                "\t                           The Rekall profile for win32k.sys\n"
-#endif
-                "\t --rekall-sspicli <rekall profile>\n"
-                "\t                           The Rekall profile for sspicli.dll\n"
-                "\t --rekall-kernel32 <rekall profile>\n"
-                "\t                           The Rekall profile for kernel32.dll\n"
-                "\t --rekall-kernelbase <rekall profile>\n"
-                "\t                           The Rekall profile for KernelBase.dll\n"
-                "\t --rekall-wow-kernel32 <rekall profile>\n"
-                "\t                           The Rekall profile for SysWOW64/kernel32.dll\n"
-                "\t --rekall-ntdll <rekall profile>\n"
-                "\t                           The Rekall profile for ntdll.dll\n"
-                "\t --rekall-iphlpapi <rekall profile>\n"
-                "\t                           The Rekall profile for iphlpapi.dll\n"
-#ifdef ENABLE_PLUGIN_WMIMON
-                "\t --rekall-mpr <rekall profile>\n"
-                "\t                           The Rekall profile for mpr.dll\n"
-                "\t --rekall-ole32 <rekall profile>\n"
-                "\t                           The Rekall profile for ole32.dll\n"
-                "\t --rekall-wow-ole32 <rekall profile>\n"
-                "\t                           The Rekall profile for SysWOW64/ole32.dll\n"
-#endif
-               );
-        return rc;
-    }
-
     int long_index = 0;
     enum
     {
@@ -288,11 +288,12 @@ int main(int argc, char** argv)
         {"rekall-mpr", required_argument, NULL, opt_rekall_mpr},
         {"injection-timeout", required_argument, NULL, 'j'},
         {"verbose", no_argument, NULL, 'v'},
+        {"help", no_argument, NULL, 'h'},
         {"rekall-ole32", required_argument, NULL, opt_rekall_ole32},
         {"rekall-wow-ole32", required_argument, NULL, opt_rekall_wow_ole32},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:spT:S:Mc:nblgj:w:W:";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:spT:S:Mc:nblgj:w:W:h";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
@@ -430,6 +431,9 @@ int main(int argc, char** argv)
                 options.wow_ole32_profile = optarg;
                 break;
 #endif
+            case 'h':
+                print_usage();
+                return 0;
             default:
                 if (isalnum(c))
                     fprintf(stderr, "Unrecognized option: %c\n", c);

@@ -260,3 +260,15 @@ message(STATUS " ↳ CXX Compiler → ${CMAKE_CXX_COMPILER}")
 message(STATUS " ↳ CXX Flags    → ${CMAKE_CXX_FLAGS}")
 message(STATUS " ↳ Prefix       → ${CMAKE_INSTALL_PREFIX}")
 message(STATUS " ↳ Build        → ${CMAKE_BUILD_TYPE}")
+
+#-----------------------------------------------------------------------------
+#                               INSTALL
+#-----------------------------------------------------------------------------
+install(TARGETS drakvuf DESTINATION bin)
+
+#-----------------------------------------------------------------------------
+#                               INSTALL
+#-----------------------------------------------------------------------------
+include(CTest)
+
+add_test(NAME DrakvufRuns COMMAND drakvuf -h)
