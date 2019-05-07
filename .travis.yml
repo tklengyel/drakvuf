@@ -63,6 +63,7 @@ matrix:
                 - libpixman-1-dev
                 - libaio-dev
                 - libxen-dev
+                - clang
       before_install:
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
@@ -77,8 +78,10 @@ matrix:
         - make
         - make install
         - cd ..
+        - mkdir build
+        - cd build
       install:
-        - cmake -DCMAKE_BUILD_TYPE=Debug .
+        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DCMAKE_BUILD_TYPE=Debug ..
       script:
         - make
 
@@ -163,8 +166,10 @@ matrix:
         - make
         - make install
         - cd ..
+        - mkdir build
+        - cd build
       install:
-        - cmake -DCMAKE_BUILD_TYPE=Debug .
+        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DCMAKE_BUILD_TYPE=Debug ..
       script:
         - scan-build --status-bugs --use-cc=clang make
 
@@ -207,8 +212,10 @@ matrix:
         - make
         - make install
         - cd ..
+        - mkdir build
+        - cd build
       install:
-        - cmake -DCMAKE_BUILD_TYPE=Debug .
+        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DCMAKE_BUILD_TYPE=Debug ..
       script:
         - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
         - build-wrapper-linux-x86-64 --out-dir bw-output make -j2

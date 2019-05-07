@@ -28,7 +28,6 @@ find_library(PTHREAD pthread)
 
 find_package(PkgConfig REQUIRED)
 pkg_search_module(GLIB REQUIRED glib-2.0>=2.28)
-pkg_search_module(VMI REQUIRED libvmi>=0.11)
 pkg_search_module(JSONC REQUIRED json-c)
 
 find_package(Xen)

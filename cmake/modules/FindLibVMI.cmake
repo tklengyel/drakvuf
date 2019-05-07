@@ -3,18 +3,16 @@
 # LibVMI_INCLUDE_DIRS
 
 # define HAVE_XXX
-set(CMAKE_REQUIRED_INCLUDES "/usr/local/include/libvmi")
-
 include(CheckIncludeFile)
 check_include_file(libvmi.h HAVE_LIBVMI_H)
 
 find_path(LibVMI_INCLUDE_DIR
-    NAMES libvmi.h
-    PATHS "/usr/local/include/libvmi")
+    NAMES libvmi/libvmi.h
+    HINTS ${CMAKE_INSTALL_PREFIX})
 
 find_library(LibVMI_LIBRARY
              NAMES libvmi.so
-             HINTS "/usr/local/lib")
+             HINTS ${CMAKE_INSTALL_PREFIX}/lib)
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(LibVMI
