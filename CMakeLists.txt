@@ -30,8 +30,8 @@ find_package(PkgConfig REQUIRED)
 pkg_search_module(GLIB REQUIRED glib-2.0>=2.28)
 pkg_search_module(JSONC REQUIRED json-c)
 
-find_package(Xen)
-find_package(LibVMI)
+find_package(Xen REQUIRED)
+find_package(LibVMI REQUIRED)
 
 #-----------------------------------------------------------------------------
 #                             BUILD OPTIONS
@@ -248,7 +248,7 @@ target_link_libraries(drakvuf PRIVATE ${GLIB_LIBRARIES})
 target_include_directories(drakvuf PRIVATE ${JSONC_INCLUDE_DIRS})
 target_link_libraries(drakvuf PRIVATE ${JSONC_LIBRARIES})
 
-target_link_libraries(drakvuf PRIVATE ${Xenctrl_LIBRARIES})
+target_link_libraries(drakvuf PRIVATE ${Xen_LIBRARIES})
 
 #-----------------------------------------------------------------------------
 #                               BUILD SUMMARY
