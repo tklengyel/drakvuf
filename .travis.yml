@@ -81,7 +81,7 @@ matrix:
         - mkdir build
         - cd build
       install:
-        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DCMAKE_BUILD_TYPE=Debug ..
+        - cmake -DXL_VERSION=xlutil-4.6 -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DCMAKE_BUILD_TYPE=Debug ..
       script:
         - make
 

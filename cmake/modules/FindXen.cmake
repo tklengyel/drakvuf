@@ -19,8 +19,14 @@ find_library(XenLight_LIBRARY
 find_library(Xentoollog_LIBRARY
              NAMES xentoollog)
 
-find_library(Xlutil_LIBRARY
-             NAMES xlutil)
+# A workaround for Ubuntu 16.04 used in Travis-CI because of broken symlink
+if (XL_VERSION)
+    find_library(Xlutil_LIBRARY
+                NAMES ${XL_VERSION})
+else()
+    find_library(Xlutil_LIBRARY
+                 NAMES xlutil)
+endif()
 
 include(FindPackageHandleStandardArgs)
 
