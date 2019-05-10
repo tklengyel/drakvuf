@@ -771,6 +771,7 @@ bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_
     if (!param)
     {
         PRINT_DEBUG("Error. Failed to get param\n");
+        free(cmdline);
         return false;
     }
 
@@ -779,9 +780,11 @@ bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_
     if (ERANGE == errno)
     {
         PRINT_DEBUG("Error. Failed to parse PID: the value is out of range\n");
+        free(cmdline);
         return false;
     }
 
+    free(cmdline);
     return true;
 }
 
