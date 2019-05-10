@@ -135,11 +135,13 @@ static event_response_t check_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info
     {
         addr_t eprocess = 0;
         vmi_pid_t ppid = 0;
-        const char* name = "<UNKNOWN>";
+        const char* name_unknown = "<UNKNOWN>";
+        const char* name = name_unknown;
+        char* tmp = NULL;
 
         if (drakvuf_find_process(drakvuf, pid, nullptr, &eprocess))
         {
-            char* tmp = drakvuf_get_process_name(drakvuf, eprocess, true);
+            tmp = drakvuf_get_process_name(drakvuf, eprocess, true);
             if (tmp)
                 name = tmp;
 
@@ -152,6 +154,7 @@ static event_response_t check_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info
         }
 
         print_crashed_process_information(drakvuf, info, pid, ppid, name);
+        free(tmp);
     }
 
     return 0;
