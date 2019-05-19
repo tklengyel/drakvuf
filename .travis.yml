@@ -167,11 +167,8 @@ matrix:
       install:
         - ./autogen.sh
       script:
-        - scan-build --status-bugs --use-cc=clang ./configure --enable-debug
-        - cd src/libdrakvuf && scan-build --status-bugs --use-cc=clang make && cd ../..
-        - cd src/xen_helper && scan-build --status-bugs --use-cc=clang make && cd ../..
-        - cd src/libinjector && scan-build --status-bugs --use-cc=clang make && cd ../..
-        - cd src/dirwatch && scan-build --status-bugs --use-cc=clang make && cd ../..
+        - scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
+        - scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores make
 
 #
 # SonarCloud
