@@ -400,11 +400,15 @@ static event_response_t log_reg_key_value_data( drakvuf_t drakvuf, drakvuf_trap_
         uint32_t type, addr_t data_addr, size_t data_size )
 {
     unicode_string_t* data_us = get_data_as_string(drakvuf, info, type, data_addr, data_size);
-    char const* data = data_us ? (char const*)data_us->contents : nullptr;
 
+    if ( !data_us )
+        return 0;
+
+    char const* data = (char const*)data_us->contents;
     auto status = log_reg_impl( drakvuf, info, key_handle, value_name_addr, true, data );
 
-    if (data_us) vmi_free_unicode_str(data_us);
+    free(data_us->contents);
+    free(data_us);
 
     return status;
 }

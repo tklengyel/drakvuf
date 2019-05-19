@@ -200,7 +200,6 @@ static void print_process_creation_result(
     if (VMI_SUCCESS == vmi_read_addr(vmi_lg.vmi, &ctx, &curdir_handle))
         curdir = drakvuf_get_filename_from_handle(drakvuf, info, curdir_handle);
 
-    curdir = drakvuf_get_filename_from_handle(drakvuf, info, curdir_handle_addr);
     if (!curdir)
     {
         unicode_string_t* curdir_us = drakvuf_read_unicode(drakvuf, info, curdir_dospath_addr);

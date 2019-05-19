@@ -979,10 +979,10 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
     }
 
     uint8_t addr_width = 0;
-    win_ver_t winver = VMI_OS_WINDOWS_NONE;
+    //win_ver_t winver;
     {
         vmi_lock_guard guard(drakvuf);
-        winver = vmi_get_winver(guard);
+        //winver = vmi_get_winver(guard);
         addr_width = vmi_get_address_width(guard);
     }
 
