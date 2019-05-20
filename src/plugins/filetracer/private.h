@@ -105,6 +105,7 @@
 #ifndef FILETRACER_PRIVATE_H
 #define FILETRACER_PRIVATE_H
 
+#include <string>
 #include "plugins/plugin_utils.h"
 
 struct pool_header_x86
@@ -319,5 +320,9 @@ enum
 };
 
 extern const flags_str_t generic_ar;
+
+using std::string;
+
+string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs);
 
 #endif

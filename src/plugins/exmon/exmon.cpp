@@ -216,6 +216,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         reg_t ptrap_frame;
         reg_t exception_code;
         uint8_t previous_mode;
+        uint32_t eip, eax, ebx, ecx, edx, edi, esi, ebp, hwesp;
 
         ctx.addr = info->regs->rsp+4;
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&exception_record) )
@@ -240,6 +241,16 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         ctx.addr = exception_record;
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&exception_code) )
             goto done;
+
+        memcpy(&eip, trap_frame+e->offsets[KTRAP_FRAME_EIP], sizeof(uint32_t));
+        memcpy(&eax, trap_frame+e->offsets[KTRAP_FRAME_EAX], sizeof(uint32_t));
+        memcpy(&ebx, trap_frame+e->offsets[KTRAP_FRAME_EBX], sizeof(uint32_t));
+        memcpy(&ecx, trap_frame+e->offsets[KTRAP_FRAME_ECX], sizeof(uint32_t));
+        memcpy(&edx, trap_frame+e->offsets[KTRAP_FRAME_EDX], sizeof(uint32_t));
+        memcpy(&edi, trap_frame+e->offsets[KTRAP_FRAME_EDI], sizeof(uint32_t));
+        memcpy(&esi, trap_frame+e->offsets[KTRAP_FRAME_ESI], sizeof(uint32_t));
+        memcpy(&ebp, trap_frame+e->offsets[KTRAP_FRAME_EBP], sizeof(uint32_t));
+        memcpy(&hwesp, trap_frame+e->offsets[KTRAP_FRAME_HWESP], sizeof(uint32_t));
 
         switch (e->format)
         {
@@ -268,21 +279,14 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                (uint32_t)exception_record,
                (uint32_t)exception_code,
                (uint32_t)first_chance,
-               *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EIP]),
-               *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EAX]),
-               *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EBX]),
-               *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_ECX]),
-               *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EDX]),
-               *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EDI]),
-               *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_ESI]),
-               *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_EBP]),
-               *(uint32_t*)(trap_frame+e->offsets[KTRAP_FRAME_HWESP]));
+               eip, eax, ebx, ecx, edx, edi, esi, ebp, hwesp);
 
         print_program_info(previous_mode, user_format, info);
     }
     else
     {
         reg_t exception_code;
+        uint64_t rip, rax, rbx, rcx, rdx, rsp, rbp, rsi, rdi, r8, r9, r10, r11;
 
         ctx.addr = info->regs->r8;
         if ( VMI_FAILURE == vmi_read(vmi,&ctx, e->ktrap_frame_size, trap_frame, NULL) )
@@ -295,6 +299,20 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         ctx.addr = info->regs->rsp+40; // Return address + 32 byte shadow space
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&first_chance) )
             goto done;
+
+        memcpy(&rip, trap_frame+e->offsets[KTRAP_FRAME_RIP], sizeof(uint64_t));
+        memcpy(&rax, trap_frame+e->offsets[KTRAP_FRAME_RAX], sizeof(uint64_t));
+        memcpy(&rbx, trap_frame+e->offsets[KTRAP_FRAME_RBX], sizeof(uint64_t));
+        memcpy(&rcx, trap_frame+e->offsets[KTRAP_FRAME_RCX], sizeof(uint64_t));
+        memcpy(&rdx, trap_frame+e->offsets[KTRAP_FRAME_RDX], sizeof(uint64_t));
+        memcpy(&rsp, trap_frame+e->offsets[KTRAP_FRAME_RSP], sizeof(uint64_t));
+        memcpy(&rbp, trap_frame+e->offsets[KTRAP_FRAME_RBP], sizeof(uint64_t));
+        memcpy(&rsi, trap_frame+e->offsets[KTRAP_FRAME_RSI], sizeof(uint64_t));
+        memcpy(&rdi, trap_frame+e->offsets[KTRAP_FRAME_RDI], sizeof(uint64_t));
+        memcpy(&r8, trap_frame+e->offsets[KTRAP_FRAME_R8], sizeof(uint64_t));
+        memcpy(&r9, trap_frame+e->offsets[KTRAP_FRAME_R9], sizeof(uint64_t));
+        memcpy(&r10, trap_frame+e->offsets[KTRAP_FRAME_R10], sizeof(uint64_t));
+        memcpy(&r11, trap_frame+e->offsets[KTRAP_FRAME_R11], sizeof(uint64_t));
 
         switch (e->format)
         {
@@ -316,22 +334,11 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 user_format=DEFAULT_FORMAT_USER;
                 break;
         }
+
         printf(str_format,
                UNPACK_TIMEVAL(info->timestamp),
                info->regs->rcx, exception_code, first_chance & 1,
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RIP]),
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RAX]),
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RBX]),
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RCX]),
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RDX]),
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RSP]),
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RBP]),
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RSI]),
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_RDI]),
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_R8]),
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_R9]),
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_R10]),
-               *(uint64_t*)(trap_frame+e->offsets[KTRAP_FRAME_R11]));
+               rip, rax, rbx, rcx, rdx, rsp, rbp, rsi, rdi, r8, r9, r10, r11);
 
         print_program_info((uint8_t)(info->regs->r9), user_format, info);
     }

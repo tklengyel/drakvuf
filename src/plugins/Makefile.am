@@ -214,11 +214,16 @@ AM_CXXFLAGS += $(SANITIZE_CFLAGS)
 AM_LDFLAGS += $(SANITIZE_LDFLAGS)
 endif
 
-# Note that -pg is incompatible with HARDENING
 if DEBUG
 AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
 AM_CXXFLAGS += -Wno-missing-field-initializers -Wno-unused-parameter
 AM_CXXFLAGS += -Wno-initializer-overrides
+AM_CXXFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
+               -Wpointer-arith -Winit-self -Wshadow \
+               -Wswitch-enum -Wstrict-prototypes \
+               -Wmissing-prototypes -Wredundant-decls \
+               -Wfloat-equal -Wundef -Wvla
+# Note that -pg is incompatible with HARDENING
 if !HARDENING
 AM_CXXFLAGS += -pg
 endif

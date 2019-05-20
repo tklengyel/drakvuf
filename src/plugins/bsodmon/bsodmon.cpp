@@ -105,8 +105,8 @@
 #include <libdrakvuf/libdrakvuf.h>
 
 #include "bsodmon.h"
+#include "private.h"
 #include "bugcheck.h"
-
 
 static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -221,21 +221,13 @@ done:
     return 0;
 }
 
-void bsodmon::register_trap(drakvuf_t drakvuf, const char* syscall_name,
-                            drakvuf_trap_t* trap,
-                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ))
-{
-    trap->name = syscall_name;
-    trap->cb   = hook_cb;
-    if ( !drakvuf_get_function_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
-    if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
-}
-
-bsodmon::bsodmon(drakvuf_t drakvuf, bool abort_on_bsod, output_format_t output)
+bsodmon::bsodmon(drakvuf_t drakvuf, bool _abort_on_bsod, output_format_t output)
     : format{output}
-    , abort_on_bsod{abort_on_bsod}
+    , abort_on_bsod{_abort_on_bsod}
 {
     init_bugcheck_map( this, drakvuf );
-
-    register_trap(drakvuf, "KeBugCheck2", &trap, hook_cb);
+    trap.name = "KeBugCheck2";
+    trap.cb   = hook_cb;
+    if ( !drakvuf_get_function_rva( drakvuf, "KeBugCheck2", &trap.breakpoint.rva) ) throw -1;
+    if ( ! drakvuf_add_trap( drakvuf, &trap ) ) throw -1;
 }
