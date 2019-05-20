@@ -126,8 +126,8 @@
 #include "dkommon/dkommon.h"
 #include "wmimon/wmimon.h"
 
-drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output, os_t os)
-    : drakvuf{ drakvuf }, output{ output }, os{ os }
+drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
+    : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
 {
 }
 
@@ -313,6 +313,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     break;
                 }
 #endif
+                case __DRAKVUF_PLUGIN_LIST_MAX: /* fall-through */
                 default:
                     break;
             }

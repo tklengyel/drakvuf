@@ -102,32 +102,8 @@
 *                                                                         *
 ***************************************************************************/
 
-#include <sstream>
-#include <iomanip>
-
 #include "wmimon.h"
-
-using uuid_t = unsigned char[16];
-
-static const uuid_t CLSID_WbemLocator = { 0x11, 0xF8, 0x90, 0x45, 0x3A, 0x1D, 0xD0, 0x11, 0x89, 0x1F, 0x00, 0xAA, 0x00, 0x4B, 0x2E, 0x24 }; // "4590f811-1d3a-11d0-891f-00aa004b2e24"
-static const uuid_t IID_IWbemLocator  = { 0x87, 0xA6, 0x12, 0xDC, 0x7F, 0x73, 0xCF, 0x11, 0x88, 0x4D, 0x00, 0xAA, 0x00, 0x4B, 0x2E, 0x24 }; // "dc12a687-737f-11cf-884d-00aa004b2e24"
-
-enum offset
-{
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
-    __OFFSET_MAX
-};
-
-static const char* offset_names[__OFFSET_MAX][2] =
-{
-    [LDR_DATA_TABLE_ENTRY_DLLBASE]     = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
-    [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
-    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
-    [LDR_DATA_TABLE_ENTRY_FULLDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "FullDllName" },
-};
+#include "private.h"
 
 bool FAILED(unsigned long rax)
 {
@@ -265,8 +241,8 @@ struct search_breakpoint_by_addr
                 }
                 else
                 {
-                    context ctx(info->proc_data.pid, trap, false);
-                    if (!drakvuf_enumerate_processes_with_module(drakvuf, module_name, module_visitor, &ctx))
+                    context _ctx(info->proc_data.pid, trap, false);
+                    if (!drakvuf_enumerate_processes_with_module(drakvuf, module_name, module_visitor, &_ctx))
                     {
                         PRINT_DEBUG("Failed to search a other process with loaded module %s\n", module_name);
                         g_free(module_name);

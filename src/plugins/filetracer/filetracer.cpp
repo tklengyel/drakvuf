@@ -119,15 +119,12 @@
 #include <algorithm>
 #include <assert.h>
 #include <sstream>
-#include <string>
 
 #include <libvmi/libvmi.h>
 #include "plugins/plugins.h"
 #include "private.h"
 #include "filetracer.h"
 #include "win_acl.h"
-
-using std::string;
 
 static const char* offset_names[__OFFSET_MAX][2] =
 {
