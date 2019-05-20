@@ -195,7 +195,12 @@ struct drakvuf_trap
     trap_type_t type;
     event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*);
     void* data;
-    const char* name; // Only used for informational/debugging purposes
+
+    union
+    {
+        const char* name; // Only used for informational/debugging purposes
+        void* _name;
+    };
 
     union
     {
@@ -544,7 +549,6 @@ typedef enum
     OUTPUT_CSV,
     OUTPUT_KV,
     OUTPUT_JSON,
-    __OUTPUT_MAX
 } output_format_t;
 
 // Printf helpers for timestamp.

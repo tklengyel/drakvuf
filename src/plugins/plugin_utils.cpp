@@ -153,13 +153,10 @@ void dump_va(vmi_instance_t vmi, access_context_t* ctx, const size_t count, cons
 
 static std::string format_flag(string flag, output_format_t format)
 {
-    switch (format)
-    {
-        case OUTPUT_KV:
-            return flag + "=1,";
-        default:
-            return flag + " | ";
-    }
+    if ( format == OUTPUT_KV )
+        return flag + "=1,";
+
+    return flag + " | ";
 }
 
 std::string parse_flags(uint64_t flags, flags_str_t flags_map, output_format_t format, std::string empty)
@@ -176,15 +173,10 @@ std::string parse_flags(uint64_t flags, flags_str_t flags_map, output_format_t f
     }
     else
     {
-        switch (format)
-        {
-            case OUTPUT_KV:
-                output.resize(output.size() - 1);
-                break;
-            default:
-                output.resize(output.size() - 3);
-                break;
-        }
+        if (format == OUTPUT_KV)
+            output.resize(output.size() - 1);
+        else
+            output.resize(output.size() - 3);
     }
 
     return output;

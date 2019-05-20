@@ -687,6 +687,10 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx
                    UNPACK_TIMEVAL(t), data.name, data.pid, data.ppid);
             break;
 
+        case OUTPUT_JSON:
+            //TODO
+            break;
+
         default:
         case OUTPUT_DEFAULT:
             printf("[PROCMON] TIME:" FORMAT_TIMEVAL " PROCESS PID:%u PPID:%u FILE:\"%s\"\n",

@@ -282,7 +282,7 @@ static void print_default_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_
     printf("\n");
 }
 
-static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, unsigned char* args_data)
+static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data)
 {
     size_t nargs = sc->num_args;
     uint32_t* args_data32 = (uint32_t*)args_data;
@@ -343,7 +343,7 @@ static void print_footer(output_format_t format, uint32_t nargs)
 }
 
 // Builds the argument buffer from the current context, returns status
-static int linux_build_argbuf(uint8_t* buf, vmi_instance_t vmi, drakvuf_trap_info_t* info, const syscall_t* sc)
+static int linux_build_argbuf(void* buf, vmi_instance_t vmi, drakvuf_trap_info_t* info, const syscall_t* sc)
 {
     int nargs = 0;
     int rc = VMI_SUCCESS;
@@ -478,7 +478,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     unsigned int nargs = 0;
     size_t size = 0;
-    unsigned char* buf = NULL; // pointer to buffer to hold argument values
+    void* buf = NULL; // pointer to buffer to hold argument values
 
     syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
     syscalls* s = wrapper->sc;
@@ -834,7 +834,7 @@ syscalls::~syscalls()
     while (loop)
     {
         drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
-        g_free((char*)trap->name);
+        g_free(trap->_name);
         if (trap->data != (void*)this)
         {
             g_free(trap->data);

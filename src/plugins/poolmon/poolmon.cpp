@@ -130,8 +130,8 @@ static GTree* pooltag_build_tree()
     uint32_t i = 0;
     for (; i < TAG_COUNT; i++)
     {
-        g_tree_insert(pooltags, (char*) tags[i].tag,
-                      (char*) &tags[i]);
+        g_tree_insert(pooltags, (gpointer) tags[i].tag,
+                      (gpointer) &tags[i]);
     }
 
     return pooltags;
@@ -162,10 +162,13 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         vmi_lock_guard vmi_lg(drakvuf);
         vmi_instance_t& vmi = vmi_lg.vmi;
+        uint32_t _tag;
 
         ctx.addr = info->regs->rsp+12;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)tag) )
+        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &_tag) )
             return 0;
+
+        memcpy(tag, &_tag, sizeof(uint32_t));
 
         ctx.addr = info->regs->rsp+8;
         if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&size) )
