@@ -290,7 +290,12 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
     for ( size_t i=0; i<nargs; i++ )
     {
-        addr_t val = ( 4 == s->reg_size ) ? args_data32[i] : args_data64[i];
+        addr_t val = 0;
+
+        if ( 4 == s->reg_size )
+            memcpy(&val, &args_data32[i], sizeof(uint32_t));
+        else
+            memcpy(&val, &args_data64[i], sizeof(uint64_t));
 
         char* str = extract_string(drakvuf, info, sc->args[i], val);
 
