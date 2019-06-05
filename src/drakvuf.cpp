@@ -221,21 +221,43 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                           const char* binary_path,
                           const char* target_process,
                           int timeout,
-                          bool global_search)
+                          bool global_search,
+                          const char* args[],
+                          int args_count)
 {
     GThread* timeout_thread = startup_timer(this, timeout);
-    int rc = injector_start_app(drakvuf,
-                                injection_pid,
-                                injection_tid,
-                                inject_cmd,
-                                cwd,
-                                method,
-                                format,
-                                binary_path,
-                                target_process,
-                                true,
-                                &injector_to_be_freed,
-                                global_search);
+    int rc = 0;
+    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
+    {
+        rc = injector_start_app_on_win(drakvuf,
+                                       injection_pid,
+                                       injection_tid,
+                                       inject_cmd,
+                                       cwd,
+                                       method,
+                                       format,
+                                       binary_path,
+                                       target_process,
+                                       true,
+                                       &injector_to_be_freed,
+                                       global_search);
+    }
+    else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
+    {
+        rc = injector_start_app_on_linux(drakvuf,
+                                         injection_pid,
+                                         injection_tid,
+                                         inject_cmd,
+                                         method,
+                                         format,
+                                         binary_path,
+                                         target_process,
+                                         true,
+                                         global_search,
+                                         args,
+                                         args_count);
+    }
+
 
     if (!rc)
         fprintf(stderr, "Process startup failed\n");

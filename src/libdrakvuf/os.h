@@ -115,7 +115,10 @@ typedef struct os_interface
     addr_t (*get_current_process)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-    bool (*get_last_error)
+    addr_t (*export_libc_address)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* libc);
+
+    status_t (*get_last_error)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
 
     char* (*get_process_name)
@@ -132,6 +135,9 @@ typedef struct os_interface
 
     bool (*get_process_pid)
     (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid);
+
+    status_t (*get_process_tid)
+    (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* tid);
 
     int64_t (*get_current_process_userid)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);

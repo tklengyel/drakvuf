@@ -117,6 +117,16 @@ static const char* linux_offset_names[__LINUX_OFFSETS_MAX][2] =
     [TASK_STRUCT_TGID] = {"task_struct", "tgid"},
     [TASK_STRUCT_REALPARENT] = {"task_struct", "real_parent"},
     [TASK_STRUCT_PARENT] = {"task_struct", "parent"},
+    [TASK_STRUCT_MMSTRUCT] = {"task_struct", "mm"},
+    [MM_STRUCT_MMAP] = {"mm_struct", "mmap"},
+    [VM_AREA_STRUCT_FILE] = {"vm_area_struct", "vm_file"},
+    [VM_AREA_STRUCT_START] = {"vm_area_struct", "vm_start"},
+    [VM_AREA_STRUCT_END] = {"vm_area_struct", "vm_end"},
+    [VM_AREA_STRUCT_NEXT] = {"vm_area_struct", "vm_next"},
+    [FILE_PATH] = {"file", "f_path"},
+    [PATH_DENTRY] = {"path", "dentry"},
+    [DENTRY_D_NAME] = {"dentry", "d_name"},
+    [QSTR_NAME] = {"qstr", "name"},
     [CRED_UID] = {"cred", "uid"},
 };
 

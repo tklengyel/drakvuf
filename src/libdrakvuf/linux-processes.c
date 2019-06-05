@@ -144,7 +144,6 @@ static addr_t read_process_base(drakvuf_t drakvuf, addr_t rsp, access_context_t*
                 process = 0;
         }
     }
-
     return process;
 }
 
@@ -221,6 +220,21 @@ bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pi
         return true;
 
     return false;
+}
+
+status_t linux_get_process_tid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* tid )
+{
+    /*
+     * On Linux PID is actually the thread ID....... ... ...
+     */
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]
+    };
+
+    return vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)tid);
 }
 
 char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath)
@@ -313,8 +327,8 @@ bool linux_get_current_thread_id( drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
 
 bool linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid )
 {
-    status_t status;
-    addr_t parent_proc_base = 0 ;
+    status_t ret;
+    addr_t parent_proc_base = 0;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -350,19 +364,15 @@ bool linux_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv
     if ( !base_addr )
         return false;
 
-    if ( !linux_get_process_pid(drakvuf, base_addr, &proc_data->pid) )
-        return false;
-
-    proc_data->name = linux_get_process_name(drakvuf, base_addr, true);
-
-    if ( !proc_data->name )
-        return false;
-
-    proc_data->userid = linux_get_process_userid(drakvuf, base_addr);
-
-    if ( !linux_get_process_ppid(drakvuf, base_addr, &proc_data->ppid) )
-        PRINT_DEBUG("Failed to gather parent process' PID for %s:%u\n", proc_data->name, proc_data->pid);
+            if ( proc_data->name )
+            {
+                proc_data->userid = linux_get_process_userid( drakvuf, base_addr );
+                linux_get_process_ppid( drakvuf, base_addr, &proc_data->ppid );
+                linux_get_process_tid(drakvuf, base_addr, &proc_data->tid);
+                return true;
+            }
+        }
+    }
 
     return false;
 }
-

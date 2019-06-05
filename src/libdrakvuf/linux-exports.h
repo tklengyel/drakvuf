@@ -102,35 +102,11 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef LINUX_OFFSETS_H
-#define LINUX_OFFSETS_H
+#ifndef LINUX_EXPORTS_H
+#define LINUX_EXPORTS_H
 
-/*
- * Easy-to-use structure offsets to be loaded from the Rekall profile.
- * Define actual mapping in linux-offsets-map.h
- */
-enum linux_offsets
-{
-    CURRENT_TASK,
-    TASK_STRUCT_COMM,
-    TASK_STRUCT_CRED,
-    TASK_STRUCT_PID,
-    TASK_STRUCT_TGID,
-    TASK_STRUCT_REALPARENT,
-    TASK_STRUCT_PARENT,
-    TASK_STRUCT_MMSTRUCT,
-    MM_STRUCT_MMAP,
-    VM_AREA_STRUCT_FILE,
-    VM_AREA_STRUCT_START,
-    VM_AREA_STRUCT_END,
-    VM_AREA_STRUCT_NEXT,
-    FILE_PATH,
-    PATH_DENTRY,
-    DENTRY_D_NAME,
-    QSTR_NAME,
-    CRED_UID,
+#include <libvmi/libvmi.h>
 
-    __LINUX_OFFSETS_MAX
-};
+addr_t linux_get_address_of_libc(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* libc);
 
 #endif

@@ -115,6 +115,7 @@
 #include <glib.h>
 
 #include "private.h"
+#include "linux-exports.h"
 #include "linux.h"
 #include "linux-offsets.h"
 #include "linux-offsets-map.h"
@@ -144,8 +145,10 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.get_current_process_userid = linux_get_current_process_userid;
     drakvuf->osi.get_current_thread_id = linux_get_current_thread_id;
     drakvuf->osi.get_process_pid = linux_get_process_pid;
+    drakvuf->osi.get_process_tid = linux_get_process_tid;
     drakvuf->osi.get_process_ppid = linux_get_process_ppid;
     drakvuf->osi.get_process_data = linux_get_process_data;
+    drakvuf->osi.export_libc_address = linux_get_address_of_libc;
 
     return 1;
 }

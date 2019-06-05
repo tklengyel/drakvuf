@@ -168,6 +168,7 @@ typedef struct process_data
     vmi_pid_t ppid ;    /* Process parent pid */
     addr_t base_addr ;  /* Process base address */
     int64_t userid ;    /* Process SessionID/UID */
+    vmi_pid_t tid ;    /* Thread Id for Linux */
 } proc_data_t ;
 
 typedef struct drakvuf* drakvuf_t;
@@ -394,6 +395,10 @@ bool drakvuf_get_process_pid(drakvuf_t drakvuf,
                              addr_t process_base,
                              vmi_pid_t* pid);
 
+status_t drakvuf_get_process_tid( drakvuf_t drakvuf,
+                                  addr_t process_base,
+                                  vmi_pid_t* pid);
+
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
                                    addr_t process_base);
@@ -430,6 +435,8 @@ addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf,
 
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
                                const char* module, const char* sym);
+
+addr_t drakvuf_get_libc_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* libc);
 
 // Microsoft PreviousMode KTHREAD explanation:
 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff559860(v=vs.85).aspx
