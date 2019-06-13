@@ -104,7 +104,6 @@
 
 #ifndef LIBINJECTOR_PRIVATE_H
 #define LIBINJECTOR_PRIVATE_H
-
 #ifdef DRAKVUF_DEBUG
 
 extern bool verbose;

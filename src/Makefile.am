@@ -102,13 +102,14 @@
 #                                                                         #
 #*************************************************************************#
 
-bin_PROGRAMS = drakvuf xen_memclone injector
+bin_PROGRAMS = drakvuf xen_memclone injector ozzer
 
-SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch
+SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch 
 
 drakvuf_SOURCES = main.cpp drakvuf.cpp
 xen_memclone_SOURCES  = xen_memclone.c
 injector_SOURCES = injector.c
+ozzer_SOURCES = ozzer.cpp
 
 AM_CPPFLAGS = $(CPPFLAGS)
 AM_CPPFLAGS += $(VMI_CFLAGS)
