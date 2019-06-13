@@ -105,6 +105,7 @@
 #include "drakvuf.h"
 #include <stdexcept>
 
+
 static gpointer timer(gpointer data)
 {
     drakvuf_c* drakvuf = (drakvuf_c*)data;
@@ -223,23 +224,47 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                           int timeout,
                           bool global_search)
 {
+    //TODO REMOVE
+    fprintf(stderr, "Entered inject_cmd\n");
+    fflush(stderr);
     GThread* timeout_thread = startup_timer(this, timeout);
-    int rc = injector_start_app(drakvuf,
-                                injection_pid,
-                                injection_tid,
-                                inject_cmd,
-                                cwd,
-                                method,
-                                format,
-                                binary_path,
-                                target_process,
-                                true,
-                                &injector_to_be_freed,
-                                global_search);
+    int rc=0;
+    if(drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX){
+        printf("Injector under construction");
+        rc = 0;
+        rc = injector_start_app_on_linux(drakvuf,
+                                    injection_pid,
+                                    injection_tid,
+                                    inject_cmd,
+                                    cwd,
+                                    method,
+                                    format,
+                                    binary_path,
+                                    target_process,
+                                    true,
+                                    &injector_to_be_freed,
+                                    global_search);
+    }
+    else if(drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
+    {
+        rc = injector_start_app_on_windows(drakvuf,
+                                    injection_pid,
+                                    injection_tid,
+                                    inject_cmd,
+                                    cwd,
+                                    method,
+                                    format,
+                                    binary_path,
+                                    target_process,
+                                    true,
+                                    &injector_to_be_freed,
+                                    global_search);
+        
 
-    if (!rc)
-        fprintf(stderr, "Process startup failed\n");
 
+        if (!rc)
+            fprintf(stderr, "Process startup failed\n");
+    }
     cleanup_timer(this, timeout_thread);
     return rc;
 }
