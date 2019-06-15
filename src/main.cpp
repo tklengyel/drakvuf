@@ -180,7 +180,7 @@ int main(int argc, char** argv)
     if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 )
     {
         eprint_current_time();
-        fprintf(stderr, "No plugins have been enabled, nothing to do!\n");
+        fprintf(stderr, "No plugins have been enabled,, nothing to do!\n");
         return rc;
     }
 
