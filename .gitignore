@@ -1,3 +1,6 @@
+#IDE files
+.vscode
+
 # Object files
 *.o
 *.ko
