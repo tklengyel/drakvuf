@@ -12,7 +12,10 @@
 #include "drakvuf.h"
 
 static drakvuf_c *drakvuf;
-
+static void close_handler(int sig)
+{
+    drakvuf->interrupt(sig);
+}
 int main(int argc, char **argv){
     char *domain, *rekall_profile, *rekall_wow_profile = NULL, *inject_file, *function_name;
     int injection_pid, injection_thread;
@@ -72,6 +75,15 @@ int main(int argc, char **argv){
                     fprintf(stderr, "other error");
                 return rc;
         }
+	/* for a clean exit */
+    struct sigaction act;
+    act.sa_handler = close_handler;
+    act.sa_flags = 0;
+    sigemptyset(&act.sa_mask);
+    sigaction(SIGHUP, &act, NULL);
+    sigaction(SIGTERM, &act, NULL);
+    sigaction(SIGINT, &act, NULL);
+    sigaction(SIGALRM, &act, NULL);
 
     try
     {

@@ -193,6 +193,11 @@ int injector_start_app(drakvuf_t drakvuf,
                        injector_t* injector_to_be_freed,
                        bool global_search); // out: iff break_loop_on_detection is set
 
+bool injector_hijack(
+    drakvuf_t drakvuf,
+    vmi_pid_t target_pid,
+    char *function_name
+);
 #pragma GCC visibility pop
 
 #ifdef __cplusplus

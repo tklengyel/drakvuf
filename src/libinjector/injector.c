@@ -366,6 +366,34 @@ static unicode_string_t* convert_utf8_to_utf16(char const* str)
     return NULL;
 }
 
+static bool setup_message_box_stack(injector_t injector, drakvuf_trap_info_t *info){
+    /**
+     * int MessageBox(
+        HWND    hWnd,           ==>NULL
+        LPCTSTR lpText,         ==>String
+        LPCTSTR lpCaption,      ==>NULL
+        UINT    uType           ==>0x00000000L
+    );
+    */
+   struct argument args[4] = { {0} };
+   init_int_argument(&args[0], 0);
+   char *str = "Hijacked";
+   unicode_string_t message =
+    {
+        .contents = (uint8_t*)g_strdup(str),
+        .length = strlen(str),
+        .encoding = "UTF-8",
+    };
+   init_unicode_argument(&args[1], &message);
+   init_int_argument(&args[2], 0);
+   init_int_argument(&args[3], 0);
+   //assuming 64 bit
+   //TODO add checks for 32 bit
+   bool success = setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+   return success;
+
+}
+
 static bool setup_create_process_stack(injector_t injector, drakvuf_trap_info_t* info)
 {
     struct argument args[10] = { {0} };
@@ -849,6 +877,9 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
+
+
+
 
 static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -1491,6 +1522,98 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
     }
 
     return injector->exec_func != 0;
+}
+
+static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+{
+    
+    addr_t msg_box_addr;
+    addr_t eprocess_base;
+    injector_t injector = info->trap->data;
+
+    if ( info->proc_data.pid != injector->target_pid )
+    {
+        PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
+                    info->proc_data.name, info->proc_data.pid, injector->target_pid);
+        return 0;
+    }
+
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+
+    if ( !drakvuf_find_process(drakvuf, injector->target_pid, NULL, &eprocess_base) ){
+        PRINT_DEBUG("[+] Find process failed");
+        return false;
+    }
+
+    msg_box_addr = get_function_va(drakvuf, eprocess_base, "user32.dll", "MessageBox", true);
+    if (!msg_box_addr){
+        PRINT_DEBUG("msg_box_addr not found");
+        return false;
+    }
+
+    PRINT_DEBUG(" [+] In kernel by hijack cb... \
+        \n[+] Setting up stack\n");
+    if (!setup_message_box_stack(injector, info))
+        PRINT_DEBUG("[+] Hijacking: Stack setup failed\n");
+
+    info->regs->rip = msg_box_addr;
+
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    
+
+    
+}
+
+bool injector_hijack(
+    drakvuf_t drakvuf,
+    vmi_pid_t target_pid,
+    char *function_name
+)
+{
+    PRINT_DEBUG("[+] Target PID %u to jump to function %s", target_pid, function_name );
+
+    injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
+    if (!injector)
+    {
+        PRINT_DEBUG("[+] Injector g_malloc failed");
+        return false;
+    }
+
+    injector->drakvuf = drakvuf;
+    injector->target_pid = target_pid;
+    // injector->target_tid = tid;
+    // injector->target_file_us = target_file_us;
+    // injector->cwd_us = cwd_us;
+    injector->method = INJECT_METHOD_CREATEPROC;
+    injector->global_search = true;
+    // injector->binary_path = binary_path;
+    // injector->target_process = target_process;
+    injector->status = STATUS_NULL;
+    injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    // injector->break_loop_on_detection = break_loop_on_detection;
+    injector->error_code.valid = false;
+    injector->error_code.code = -1;
+    injector->error_code.string = "<UNKNOWN>";
+
+    if (!initialize_injector_functions(drakvuf, injector, NULL, NULL))
+    {
+        PRINT_DEBUG("Unable to initialize injector functions\n");
+        free_injector(injector);
+        return 0;
+    }
+    drakvuf_trap_t trap =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .cb = hijack_wait_for_kernel_cb,
+        .data = injector,
+    };
+
+     if (!drakvuf_add_trap(drakvuf, &trap))
+        return false;
+
+    return true;
+
 }
 
 int injector_start_app(
