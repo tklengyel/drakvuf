@@ -153,7 +153,7 @@ drakvuf_LDADD += xen_helper/libxenhelper.la
 drakvuf_LDADD += plugins/libdrakvufplugins.la
 drakvuf_LDADD += libinjector/libinjector.la
 
-ozzer_CXXFLAGS = $(AM_CXXFLAGS)
+ozzer_CXXFLAGS = $(AM_CFLAGS)
 ozzer_LDADD = libdrakvuf/libdrakvuf.la
 ozzer_LDADD += xen_helper/libxenhelper.la
 ozzer_LDADD += plugins/libdrakvufplugins.la

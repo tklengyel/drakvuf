@@ -159,8 +159,6 @@ public:
     void loop(int duration);
     void pause();
     void resume();
-    bool hijack(vmi_pid_t hijack_pid,
-                      char *hijack_function);
     int inject_cmd(vmi_pid_t injection_pid,
                    uint32_t injection_tid,
                    const char* inject_cmd,
