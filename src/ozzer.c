@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <glib.h>
+#include "libhijack/libhijack.h"
 #include "libdrakvuf/libdrakvuf.h"
 #include "libinjector/libinjector.h"
 

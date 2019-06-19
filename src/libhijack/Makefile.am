@@ -103,7 +103,7 @@
 #*************************************************************************#
 
 h_sources = libhijack.h 
-c_sources = hijack.c 
+c_sources = libhijack.c 
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(VMI_CFLAGS)
@@ -132,7 +132,9 @@ AM_CFLAGS += -pg
 endif
 endif
 
-noinst_LTLIBRARIES= libinjector.la
-libinjector_la_SOURCES= $(h_sources) $(c_sources)
-libinjector_la_LIBADD= ../xen_helper/libxenhelper.la
-libinjector_la_LIBADD+= ../libdrakvuf/libdrakvuf.la
+noinst_LTLIBRARIES= libhijack.la
+libhijack_la_SOURCES= $(h_sources) $(c_sources)
+libhijack_la_LIBADD= ../xen_helper/libxenhelper.la
+libhijack_la_LIBADD+= ../libdrakvuf/libdrakvuf.la
+libhijack_la_LIBADD+= ../libinjector/libinjector.la
+

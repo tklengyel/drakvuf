@@ -169,6 +169,7 @@ void init_unicode_argument(struct argument* arg,
 #define init_struct_argument(arg, sv) \
     init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
 
+
 bool setup_stack(drakvuf_t drakvuf,
                  drakvuf_trap_info_t* info,
                  struct argument args[],

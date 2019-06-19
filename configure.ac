@@ -517,6 +517,7 @@ AC_CHECK_LIB([xentoollog], [xtl_logger_destroy])
 AC_CONFIG_FILES([Makefile src/Makefile
                  src/libdrakvuf/Makefile
                  src/libinjector/Makefile
+		src/libhijack/Makefile
                  src/xen_helper/Makefile
                  src/plugins/Makefile
                  src/dirwatch/Makefile

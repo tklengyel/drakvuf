@@ -47,7 +47,6 @@ static bool setup_hijack_int3_trap(injector_t injector, drakvuf_trap_info_t* inf
 static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
 
-    (void)injector_int3_cb;
     (void)setup_hijack_int3_trap;
     addr_t msg_box_addr;
     addr_t eprocess_base;
@@ -70,7 +69,7 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
     {
         drakvuf_pause(drakvuf);
         PRINT_DEBUG("[+] Searching for function\n");
-        msg_box_addr = get_function_va(drakvuf, eprocess_base, "user32.dll", "MessageBoxW", true);
+        msg_box_addr = get_function_va(drakvuf, eprocess_base, "ntoskrnl.dll", "MessageBoxW", true);
         if (!msg_box_addr){
             PRINT_DEBUG("msg_box_addr not found\n");
             return VMI_EVENT_RESPONSE_NONE;
@@ -192,7 +191,7 @@ bool hijack(
         drakvuf_loop(drakvuf);
     }
 
-    free_memtraps(injector);
+
 
     return true;
 
