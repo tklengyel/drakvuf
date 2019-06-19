@@ -212,6 +212,15 @@ void drakvuf_c::resume()
     drakvuf_resume(drakvuf);
 }
 
+bool drakvuf_c::hijack(vmi_pid_t hijack_pid,
+                      char *hijack_function)
+{
+    bool rc = injector_hijack(drakvuf, 
+                    hijack_pid, 
+                    hijack_function);   
+    return rc;
+}
+
 int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                           uint32_t injection_tid,
                           const char* inject_cmd,

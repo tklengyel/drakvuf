@@ -94,5 +94,13 @@ int main(int argc, char **argv){
         fprintf(stderr, "Failed to initialize DRAKVUF: %s\n", e.what());
         return rc;
     }
+    if(!drakvuf->hijack(injection_pid, function_name))
+    {
+        fprintf(stderr, "Hijack Failed [+]");
+    }
+    drakvuf->resume(); 
+    delete drakvuf;
+    // PRINT_DEBUG("[+] Starting Injectino");
+	// injector_hijack(drakvuf)
 
 }

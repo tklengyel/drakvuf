@@ -182,6 +182,10 @@ struct injector
     uint64_t hProc, hThr;
 };
 
+//decl
+static event_response_t hijack_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info);
+//decl end
+
 static void free_memtraps(injector_t injector)
 {
     GSList* loop = injector->memtraps;
@@ -378,13 +382,8 @@ static bool setup_message_box_stack(injector_t injector, drakvuf_trap_info_t *in
    struct argument args[4] = { {0} };
    init_int_argument(&args[0], 0);
    char *str = "Hijacked";
-   unicode_string_t message =
-    {
-        .contents = (uint8_t*)g_strdup(str),
-        .length = strlen(str),
-        .encoding = "UTF-8",
-    };
-   init_unicode_argument(&args[1], &message);
+   unicode_string_t *message = convert_utf8_to_utf16(str);
+   init_unicode_argument(&args[1], message);
    init_int_argument(&args[2], 0);
    init_int_argument(&args[3], 0);
    //assuming 64 bit
@@ -530,13 +529,32 @@ static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* 
     drakvuf_release_vmi(injector->drakvuf);
 }
 
+static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+{
+    //Return from msg box
+    PRINT_DEBUG("[+] int3_cb for return from msgbox\n");
+    injector_t injector = info->trap->data;
+    if ( info->proc_data.pid != injector->target_pid)
+    {
+        PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
+                    info->proc_data.name, info->proc_data.pid, injector->target_pid);
+        return 0;
+    }
+    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+    PRINT_DEBUG("[+] Removing return trap\n");
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    PRINT_DEBUG("[+] Restoring registers\n");
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+
+}
+
 static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-static bool setup_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
+static bool setup_hijack_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
 {
     injector->bp.type = BREAKPOINT;
-    injector->bp.name = "entry";
-    injector->bp.cb = injector_int3_cb;
+    injector->bp.name = "return path";
+    injector->bp.cb = hijack_return_path;
     injector->bp.data = injector;
     injector->bp.breakpoint.lookup_type = LOOKUP_DTB;
     injector->bp.breakpoint.dtb = info->regs->cr3;
@@ -545,6 +563,22 @@ static bool setup_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr
 
     return drakvuf_add_trap(injector->drakvuf, &injector->bp);
 }
+
+static bool setup_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
+{
+    injector->bp.type = BREAKPOINT;
+    injector->bp.name = "entry";
+    injector->bp.cb = hijack_int3_cb;
+    injector->bp.data = injector;
+    injector->bp.breakpoint.lookup_type = LOOKUP_DTB;
+    injector->bp.breakpoint.dtb = info->regs->cr3;
+    injector->bp.breakpoint.addr_type = ADDR_VA;
+    injector->bp.breakpoint.addr = bp_addr;
+
+    return drakvuf_add_trap(injector->drakvuf, &injector->bp);
+}
+
+
 
 static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -1524,45 +1558,132 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
     return injector->exec_func != 0;
 }
 
-static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+
+static event_response_t hijack_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
-    
+
+    (void)injector_int3_cb;
+    (void)setup_hijack_int3_trap;
     addr_t msg_box_addr;
     addr_t eprocess_base;
     injector_t injector = info->trap->data;
-
+    PRINT_DEBUG("[+] Hijack In int3\n");
     if ( info->proc_data.pid != injector->target_pid )
     {
-        PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
+        PRINT_DEBUG("int3cb received but '%s' PID (%u) doesn't match target process (%u)\n",
                     info->proc_data.name, info->proc_data.pid, injector->target_pid);
         return 0;
     }
-
-    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
-
-    if ( !drakvuf_find_process(drakvuf, injector->target_pid, NULL, &eprocess_base) ){
-        PRINT_DEBUG("[+] Find process failed");
-        return false;
-    }
-
-    msg_box_addr = get_function_va(drakvuf, eprocess_base, "user32.dll", "MessageBox", true);
-    if (!msg_box_addr){
-        PRINT_DEBUG("msg_box_addr not found");
-        return false;
-    }
-
-    PRINT_DEBUG(" [+] In kernel by hijack cb... \
-        \n[+] Setting up stack\n");
-    if (!setup_message_box_stack(injector, info))
-        PRINT_DEBUG("[+] Hijacking: Stack setup failed\n");
-
-    info->regs->rip = msg_box_addr;
-
-    return VMI_EVENT_RESPONSE_SET_REGISTERS;
     
+    PRINT_DEBUG("[+] Finding Process\n");
+    if ( !drakvuf_find_process(drakvuf, injector->target_pid, NULL, &eprocess_base) ){
+        PRINT_DEBUG("[+] Find process failed\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    if( injector->status == STATUS_NULL)
+    {
+        drakvuf_pause(drakvuf);
+        PRINT_DEBUG("[+] Searching for function\n");
+        msg_box_addr = get_function_va(drakvuf, eprocess_base, "user32.dll", "MessageBoxW", true);
+        if (!msg_box_addr){
+            PRINT_DEBUG("msg_box_addr not found\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+        memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
+        PRINT_DEBUG("[+] In usermode by hijack cb... "
+            "\n[+] Setting up stack\n");
+        if (!setup_message_box_stack(injector, info))
+            PRINT_DEBUG("[+] Hijacking: Stack setup failed\n");
+        PRINT_DEBUG("[+] Stack setup\n");
+
+        
+
+        PRINT_DEBUG("[+] Modifying rip\n");
+
+        info->regs->rip = msg_box_addr;
+        injector->status = STATUS_CREATE_OK;
+        drakvuf_resume(drakvuf);
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    else if(injector->status == STATUS_CREATE_OK){
+        // PRINT_DEBUG("[+] Setting up return trap\n");
+        // if(!setup_hijack_int3_trap(injector, info, info->regs->rip))
+        // {
+        //     PRINT_DEBUG("[+] Failed setting up return trap\n");
+        //     return VMI_EVENT_RESPONSE_NONE;
+        // }
+        drakvuf_pause(drakvuf);
+        PRINT_DEBUG("[+] Restoring registers\n");
+        memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+        PRINT_DEBUG("[+] Removing trap\n");
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_resume(drakvuf);
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    return 0;
+    
+}
+
+static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+{
+    injector_t injector = info->trap->data;
+
+    PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". PID: %u PPID: %u\n",
+                info->regs->cr3, info->proc_data.pid, info->proc_data.ppid);
+
+    if (info->proc_data.pid != injector->target_pid)
+        return 0;
+    addr_t thread = drakvuf_get_current_thread(drakvuf, info->vcpu);
+    if (!thread)
+    {
+        PRINT_DEBUG("Failed to find current thread\n");
+        return 0;
+    }
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    //check for 32 bit
+    addr_t trapframe = 0;
+    status_t status;
+    status = vmi_read_addr_va(vmi,
+                                thread + injector->offsets[KTHREAD_TRAPFRAME],
+                                0, &trapframe);
+
+    if (status == VMI_FAILURE || !trapframe)
+    {
+        PRINT_DEBUG("cr3_cb: failed to read trapframe (0x%lx)\n", trapframe);
+        goto done;
+    }
+
+    addr_t bp_addr;
+    status = vmi_read_addr_va(vmi,
+                                trapframe + injector->offsets[KTRAP_FRAME_RIP],
+                                0, &bp_addr);
+
+    if (status == VMI_FAILURE || !bp_addr)
+    {
+        PRINT_DEBUG("Failed to read RIP from trapframe or RIP is NULL!\n");
+        goto done;
+    }
+
+    if (setup_int3_trap(injector, info, bp_addr))
+    {
+        PRINT_DEBUG("Got return address 0x%lx from trapframe and it's now trapped!\n",
+                    bp_addr);
+
+        // Unsubscribe from the CR3 trap
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    }
+    else
+        fprintf(stderr, "Failed to trap trapframe return address\n");    
+    
+    done:
+    drakvuf_release_vmi(drakvuf);
+    return 0;
 
     
 }
+
 
 bool injector_hijack(
     drakvuf_t drakvuf,
@@ -1570,12 +1691,12 @@ bool injector_hijack(
     char *function_name
 )
 {
-    PRINT_DEBUG("[+] Target PID %u to jump to function %s", target_pid, function_name );
+    PRINT_DEBUG("[+] Target PID %u to jump to function %s\n", target_pid, function_name );
 
     injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
     if (!injector)
     {
-        PRINT_DEBUG("[+] Injector g_malloc failed");
+        PRINT_DEBUG("[+] Injector g_malloc failed\n");
         return false;
     }
 
@@ -1594,6 +1715,7 @@ bool injector_hijack(
     injector->error_code.valid = false;
     injector->error_code.code = -1;
     injector->error_code.string = "<UNKNOWN>";
+    injector->status = STATUS_NULL;
 
     if (!initialize_injector_functions(drakvuf, injector, NULL, NULL))
     {
@@ -1611,6 +1733,14 @@ bool injector_hijack(
 
      if (!drakvuf_add_trap(drakvuf, &trap))
         return false;
+
+    if (!drakvuf_is_interrupted(drakvuf))
+    {
+        PRINT_DEBUG("Starting injection loop\n");
+        drakvuf_loop(drakvuf);
+    }
+
+    free_memtraps(injector);
 
     return true;
 
