@@ -109,7 +109,7 @@ SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libhijack
 drakvuf_SOURCES = main.cpp drakvuf.cpp
 xen_memclone_SOURCES  = xen_memclone.c
 injector_SOURCES = injector.c
-ozzer_SOURCES = ozzer.cpp drakvuf.cpp
+ozzer_SOURCES = ozzer.c
 
 AM_CPPFLAGS = $(CPPFLAGS)
 AM_CPPFLAGS += $(VMI_CFLAGS)
@@ -153,11 +153,11 @@ drakvuf_LDADD += xen_helper/libxenhelper.la
 drakvuf_LDADD += plugins/libdrakvufplugins.la
 drakvuf_LDADD += libinjector/libinjector.la
 
-ozzer_CXXFLAGS = $(AM_CFLAGS)
+ozzer_CFLAGS = $(AM_CFLAGS)
 ozzer_LDADD = libdrakvuf/libdrakvuf.la
 ozzer_LDADD += xen_helper/libxenhelper.la
 ozzer_LDADD += plugins/libdrakvufplugins.la
-ozzer_LDADD += libinjector/libinjector.la
+ozzer_LDADD += libhijack/libhijack.la
 
 if HARDENING
 drakvuf_LDADD += $(HARDEN_LDFLAGS)

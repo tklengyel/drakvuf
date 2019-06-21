@@ -9,19 +9,19 @@
 #include <glib.h>
 #include "libhijack/libhijack.h"
 #include "libdrakvuf/libdrakvuf.h"
-#include "libinjector/libinjector.h"
 
 static drakvuf_t drakvuf;
 static void close_handler(int sig)
 {
-    drakvuf->interrupt(sig);
+    drakvuf_interrupt(drakvuf, sig);
 }
 int main(int argc, char **argv){
-    char *domain, *rekall_profile, *rekall_wow_profile = NULL, *inject_file, *function_name;
-    int injection_pid, injection_thread;
-    output_format_t output = OUTPUT_DEFAULT;
-    bool verbose = false, leave_paused = false, libvmi_conf = false;
-    bool injection_global_search = false;
+    char *domain=NULL, *rekall_profile=NULL, *rekall_wow_profile = NULL, *function_name = NULL;
+    int injection_pid = 0;
+	// int injection_thread;
+    // output_format_t output = OUTPUT_DEFAULT;
+    bool verbose = false,  libvmi_conf = false;
+    // bool leave_paused = false, injection_global_search = false;
     char c;
     
     int rc = -1;
@@ -52,13 +52,13 @@ int main(int argc, char **argv){
                 injection_pid = atoi(optarg);
                 break;
             case 'I':
-                injection_thread = atoi(optarg);
+                // injection_thread = atoi(optarg);
                 break;
             case 'e':
-                inject_file = optarg;
+                // inject_file = optarg;
                 break;
             case 'g':
-                injection_global_search = true;
+                // injection_global_search = true;
                 break;
             case 'f':
                 function_name  = optarg;
@@ -85,13 +85,13 @@ int main(int argc, char **argv){
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if(!drakvuf_init(drakvuf, domain, rekall_profile, rekall_wow_profile, output, verbose, leave_paused, libvmi_conf)){
-        fprintf(stderr, "Failed to initialize DRAKVUF: %s\n", e.what());
+    if(!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf)){
+        fprintf(stderr, "Failed to initialize DRAKVUF\n %s", domain);
         return rc;
     }
-    if(!hijack(injection_pid, function_name))
+    if(!hijack(drakvuf, injection_pid, function_name))
     {
-        fprintf(stderr, "Hijack Failed [+]");
+        fprintf(stderr, "Hijack Failed [+]\n");
     }
     drakvuf_resume(drakvuf); 
     drakvuf_close(drakvuf, 0);
@@ -99,3 +99,4 @@ int main(int argc, char **argv){
     
 
 }
+

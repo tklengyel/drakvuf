@@ -109,6 +109,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <libvmi/libvmi.h>
+#include <libinjector/libinjector.h>
 #include <libdrakvuf/libdrakvuf.h>
 
 static drakvuf_t drakvuf;

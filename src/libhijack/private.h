@@ -102,8 +102,8 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef LIBINJECTOR_PRIVATE_H
-#define LIBINJECTOR_PRIVATE_H
+#ifndef LIBHIJACK_PRIVATE_H
+#define LIBHIJACK_PRIVATE_H
 
 #ifdef DRAKVUF_DEBUG
 
@@ -133,10 +133,5 @@ enum offset
     OFFSET_MAX
 };
 
-static const char* offset_names[OFFSET_MAX][2] =
-{
-    [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
-    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
-};
 
 #endif

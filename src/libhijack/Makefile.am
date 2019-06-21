@@ -137,4 +137,4 @@ libhijack_la_SOURCES= $(h_sources) $(c_sources)
 libhijack_la_LIBADD= ../xen_helper/libxenhelper.la
 libhijack_la_LIBADD+= ../libdrakvuf/libdrakvuf.la
 libhijack_la_LIBADD+= ../libinjector/libinjector.la
-
+libhijack_la_CFLAGS = $(AM_CFLAGS)

@@ -336,7 +336,7 @@ static int patch_payload(injector_t injector, unsigned char* addr)
 }
 #endif
 
-static unicode_string_t* convert_utf8_to_utf16(char const* str)
+unicode_string_t* convert_utf8_to_utf16(char const* str)
 {
     if (!str) return NULL;
 
@@ -1410,7 +1410,7 @@ static bool module_visitor(drakvuf_t drakvuf, const module_info_t* module_info, 
     return false;
 }
 
-static addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib, char const* fun, bool global_search)
+addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib, char const* fun, bool global_search)
 {
     // First check current process for function
     addr_t addr = drakvuf_exportsym_to_va(drakvuf, eprocess_base, lib, fun);
