@@ -12,6 +12,17 @@
 #include "libinjector/libinjector.h"
 #include "private.h"
 
+static addr_t hijack_get_function_address(drakvuf_t drakvuf, char* function_name){
+        PRINT_DEBUG("Trying to Get function va\n");
+        addr_t rva = 0;
+        drakvuf_get_function_rva(drakvuf, "noError", &rva);
+        if(!rva)
+            return 0;
+        PRINT_DEBUG("Returned RVA = %"PRIx64"\n", rva);
+        addr_t bugcheckaddr = 0;
+        bugcheckaddr = drakvuf_exportksym_to_va(drakvuf, 4, "ndoError", "DummyDriver.sys", rva);
+        return bugcheckaddr;
+}
 
 static bool setup_message_box_stack(hijacker_t hijacker, drakvuf_trap_info_t *info){
     /**
@@ -38,8 +49,8 @@ static bool setup_message_box_stack(hijacker_t hijacker, drakvuf_trap_info_t *in
 
 static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
-    //Return from msg box
-    PRINT_DEBUG("[+] int3_cb for return from msgbox\n");
+    //Return path
+    PRINT_DEBUG("[+] int3_cb for return \n");
     hijacker_t hijacker = info->trap->data;
     if ( info->proc_data.pid != hijacker->target_pid)
     {
@@ -47,10 +58,12 @@ static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_
                     info->proc_data.name, info->proc_data.pid, hijacker->target_pid);
         return 0;
     }
+    drakvuf_pause(drakvuf);
     PRINT_DEBUG("[+] Removing return trap\n");
     drakvuf_remove_trap(drakvuf, info->trap, NULL);
     PRINT_DEBUG("[+] Restoring registers\n");
     memcpy(info->regs, &hijacker->saved_regs, sizeof(x86_registers_t));
+    drakvuf_resume(drakvuf);
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 
 }
@@ -60,7 +73,7 @@ static int setup_hijack_int3_trap(hijacker_t hijacker, drakvuf_trap_info_t* info
     drakvuf_trap_t trap = 
     {
         .type = BREAKPOINT,
-        .name = "return path",
+        .name = "returnpath",
         .cb = hijack_return_path,
         .data = hijacker,
         .breakpoint.lookup_type = LOOKUP_DTB,
@@ -79,7 +92,7 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
     hijacker_t hijacker = info->trap->data;
     addr_t msg_box_addr;
     addr_t eprocess_base;
-    PRINT_DEBUG("[+] Hijack In int3\n");
+    PRINT_DEBUG("[+] Hijack In cr3cb\n");
     if ( info->proc_data.pid != hijacker->target_pid )
     {
         PRINT_DEBUG("cr3cb received but '%s' PID (%u) doesn't match target process (%u)\n",
@@ -93,26 +106,24 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
         return VMI_EVENT_RESPONSE_NONE;
     }
 
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
     if( hijacker->status == STATUS_NULL)
     {
         drakvuf_pause(drakvuf);
         PRINT_DEBUG("[+] Searching for function\n");
-        //#########################################################
-            PRINT_DEBUG("Trying to Get function va\n");
-            addr_t rva;
-            drakvuf_get_function_rva(drakvuf, "KeBugCheck", &rva);
-            PRINT_DEBUG("Returned RVA = %"PRIx64"\n", rva);
-            addr_t bugcheckaddr = 0;
-            bugcheckaddr = drakvuf_exportksym_to_va(drakvuf, 4, "System", "ntoskrnl.exe", rva);
-            
+            addr_t bugcheckaddr = hijacker->exec_func;            
             if(bugcheckaddr){
-                PRINT_DEBUG("KeBugCheckAddress %"PRIx64"\n",bugcheckaddr);
-                struct argument args[1];
-                init_int_argument(&args[0], 0xE0000001);
-                setup_stack(drakvuf, info, args, ARRAY_SIZE(args));
-                info->regs->rip = bugcheckaddr;
+                PRINT_DEBUG("[+] Saving register state\n");
+                memcpy(&hijacker->saved_regs, info->regs, sizeof(x86_registers_t));
+                PRINT_DEBUG("[+] Hijacking to KeBugCheckAddress %"PRIx64"\n",bugcheckaddr);
+                // struct argument args[1];
+                // unicode_string_t *str = convert_utf8_to_utf16("hello from vmi");
+                // setup_hijack_int3_trap(hijacker, info, info->regs->rip);
+                // init_unicode_argument(&args[0], str);
+                // setup_stack(drakvuf, info, args, ARRAY_SIZE(args));
+                // info->regs->rip = bugcheckaddr;
                 drakvuf_resume(drakvuf);
-                return VMI_EVENT_RESPONSE_SET_REGISTERS;
+                return 0;
             }
             else{
                 PRINT_DEBUG("KeBugCheck Address NOT found\n");
@@ -133,7 +144,6 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
             PRINT_DEBUG("[+] Hijacking: Stack setup failed\n");
         PRINT_DEBUG("[+] Stack setup\n");
 
-        drakvuf_remove_trap(drakvuf, info->trap, NULL);
         return 0;
 
         PRINT_DEBUG("[+] Modifying rip\n");
@@ -152,28 +162,29 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
 
 
 
-
 int hijack(
     drakvuf_t drakvuf,
     vmi_pid_t target_pid,
     char *function_name
 )
 {
-    // PRINT_DEBUG("Trying to Get function va\n");
-    // addr_t rva;
-    // drakvuf_get_function_rva(drakvuf, "KeBugCheck", &rva);
-    // PRINT_DEBUG("Returned RVA = %"PRIx64"\n", rva);
-    // addr_t bugcheckaddr = 0;
-    // bugcheckaddr = drakvuf_exportksym_to_va(drakvuf, 4, "System", "ntoskrnl.exe", rva);
-    
-    // if(bugcheckaddr)
-    //     PRINT_DEBUG("Address found for KeBugCheck\n");
-    // else
-    //     PRINT_DEBUG("KeBugCheck Address NOT found\n");
+    PRINT_DEBUG("Trying to Get function va\n");
+    addr_t bugcheckaddr = 0;
+    #if 1
+    bugcheckaddr = hijack_get_function_address(drakvuf, function_name);
+    #else
+    // addr_t proc_base = 0;
+    // drakvuf_find_process(drakvuf, target_pid, NULL, &proc_base);
+    // bugcheckaddr = get_function_va(drakvuf, proc_base, "DummyDriver.sys", "noError", true);
+    #endif
+    if(bugcheckaddr)
+        PRINT_DEBUG("Address found for KeBugCheck %"PRIx64"\n", bugcheckaddr);
+    else
+        PRINT_DEBUG("KeBugCheck Address NOT found\n");
 
 
-    // // #######################  exit  ##############################        
-    // return 0;
+    return 0;
+    // #######################  checking  ##############################        
 
     PRINT_DEBUG("[+] Target PID %u to jump to function %s\n", target_pid, function_name );
 
@@ -198,6 +209,12 @@ int hijack(
     // hijacker->error_code.string = "<UNKNOWN>";
     hijacker->status = STATUS_NULL;
 
+    hijacker->exec_func = hijack_get_function_address(drakvuf);
+    if(!hijacker->exec_func)
+    {
+        PRINT_DEBUG("KeBugCheck Address Not found");
+        return 0;
+    }
     
     drakvuf_trap_t trap =
     {

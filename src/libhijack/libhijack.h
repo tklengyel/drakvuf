@@ -10,6 +10,7 @@ struct hijacker {
     bool is32bit;
     x86_registers_t saved_regs;
     status_type_t status;
+    addr_t exec_func;
 };
 typedef struct hijacker* hijacker_t;
 
