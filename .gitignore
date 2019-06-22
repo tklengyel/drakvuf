@@ -1,3 +1,5 @@
+#windows log files
+.tlog
 #IDE files
 .vscode
 
