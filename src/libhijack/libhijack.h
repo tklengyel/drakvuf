@@ -11,12 +11,15 @@ struct hijacker {
     x86_registers_t saved_regs;
     status_type_t status;
     addr_t exec_func;
+    json_object* driver_rekall_profile_json;
 };
 typedef struct hijacker* hijacker_t;
 
+bool hijack_get_driver_function_rva(hijacker_t hijacker, char * function_name, addr_t *rva);
 
 int hijack(drakvuf_t drakvuf, vmi_pid_t hijack_pid,
-                      char *hijack_function) ;
+                      char *hijack_function, 
+                      char *driver_rekall_profile) ;
 
 
 

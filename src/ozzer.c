@@ -23,6 +23,7 @@ int main(int argc, char **argv){
     bool verbose = false,  libvmi_conf = false;
     // bool leave_paused = false, injection_global_search = false;
     char c;
+    char *driver_rekal_profile=NULL;
     
     int rc = -1;
     eprint_current_time();
@@ -34,10 +35,12 @@ int main(int argc, char **argv){
                 "\t                           The Rekall profile of the OS kernel\n"
                 "\t -d <domain ID or name>    The domain's ID or name\n"
                 "\t -f function-name          The function to call after hijacking\n"
+                "\t -g <driver rekall profile> \n"
+                "\t                           The Rekall profile of the Driver"
             );
         return rc;
     }
-    const char *opts = "r:d:i:I:e:gvf:";
+    const char *opts = "r:d:i:I:e:g:vf:p";
     
     while ((c = getopt (argc, argv, opts)) != -1)
         switch (c)
@@ -58,7 +61,7 @@ int main(int argc, char **argv){
                 // inject_file = optarg;
                 break;
             case 'g':
-                // injection_global_search = true;
+                driver_rekal_profile = optarg;
                 break;
             case 'f':
                 function_name  = optarg;
@@ -85,11 +88,18 @@ int main(int argc, char **argv){
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
+    fprintf(stderr, "driver rekall profile %s", driver_rekal_profile);
+
     if(!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf)){
         fprintf(stderr, "Failed to initialize DRAKVUF\n %s", domain);
         return rc;
     }
-    if(!hijack(drakvuf, injection_pid, function_name))
+    if(
+        !hijack(drakvuf, 
+            injection_pid, 
+            function_name, 
+            driver_rekal_profile)
+    )
     {
         fprintf(stderr, "Hijack Failed [+]\n");
     }

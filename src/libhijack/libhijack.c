@@ -12,14 +12,19 @@
 #include "libinjector/libinjector.h"
 #include "private.h"
 
-static addr_t hijack_get_function_address(drakvuf_t drakvuf, char* function_name){
+bool hijack_get_driver_function_rva(hijacker_t hijacker, char *function_name, addr_t *rva)
+{
+    return rekall_get_function_rva(hijacker->driver_rekall_profile_json, function_name, rva);
+}
+
+static addr_t hijack_get_function_address(hijacker_t hijacker, char* function_name){
         PRINT_DEBUG("Trying to Get address for %s\n", function_name);
         addr_t rva = 0;
-        drakvuf_get_function_rva(drakvuf, function_name, &rva);
+        hijack_get_driver_function_rva(hijacker, function_name, &rva);
         if(!rva)
             return 0;
         PRINT_DEBUG("Returned RVA = %"PRIx64"\n", rva);        
-        return  drakvuf_exportksym_to_va(drakvuf, 4, function_name, "DummyDriver.sys", rva);;
+        return  drakvuf_exportksym_to_va(hijacker->drakvuf, 4, function_name, "DummyDriver.sys", rva);;
 }
 
 
@@ -109,7 +114,8 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
 int hijack(
     drakvuf_t drakvuf,
     vmi_pid_t target_pid,
-    char *function_name
+    char *function_name,
+    char *driver_rekall
 )
 {
 
@@ -135,14 +141,15 @@ int hijack(
     // hijacker->error_code.code = -1;
     // hijacker->error_code.string = "<UNKNOWN>";
     hijacker->status = STATUS_NULL;
+    hijacker->driver_rekall_profile_json = json_object_from_file(driver_rekall);
 
-    hijacker->exec_func = hijack_get_function_address(drakvuf, function_name);
+    hijacker->exec_func = hijack_get_function_address(hijacker, function_name);
     if(!hijacker->exec_func)
     {
-        PRINT_DEBUG("%s Address Not found",function_name);
+        PRINT_DEBUG("%s Address Not found\n",function_name);
         return 0;
     }
-    PRINT_DEBUG("Address for %s foudn: %"PRIx64"\n", function_name, hijacker->exec_func);
+    PRINT_DEBUG("Address for %s found: %"PRIx64"\n", function_name, hijacker->exec_func);
     return 0;
     
     drakvuf_trap_t trap =
