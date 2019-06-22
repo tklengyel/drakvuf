@@ -93,6 +93,8 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
 
             setup_hijack_int3_trap(hijacker, info, info->regs->rip);
 
+            setup_stack(drakvuf, info, NULL, 0);
+
             PRINT_DEBUG("[+] Hijacking to  %"PRIx64"\n",hijacker->exec_func);
             info->regs->rip = hijacker->exec_func;
             drakvuf_resume(drakvuf);
@@ -150,7 +152,7 @@ int hijack(
         return 0;
     }
     PRINT_DEBUG("Address for %s found: %"PRIx64"\n", function_name, hijacker->exec_func);
-    return 0;
+    
     
     drakvuf_trap_t trap =
     {
