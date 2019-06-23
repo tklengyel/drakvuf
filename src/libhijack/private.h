@@ -113,6 +113,7 @@ extern bool verbose;
     do { \
         if(verbose) fprintf (stderr, args); \
     } while (0)
+#define UNUSED(x) (void)(x)
 
 #else
 #define PRINT_DEBUG(args...) \
@@ -124,6 +125,7 @@ extern bool verbose;
 #ifdef __clang_analyzer__
 #define vmi_free_unicode_str g_free
 #endif
+
 
 enum offset
 {

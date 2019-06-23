@@ -12,6 +12,7 @@ struct hijacker {
     status_type_t status;
     addr_t exec_func;
     json_object* driver_rekall_profile_json;
+    drakvuf_trap_t bp;
 };
 typedef struct hijacker* hijacker_t;
 

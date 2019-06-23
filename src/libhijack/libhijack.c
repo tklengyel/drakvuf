@@ -55,21 +55,20 @@ static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_
     return 0;
 }
 
-static int setup_hijack_int3_trap(hijacker_t hijacker, drakvuf_trap_info_t* info, addr_t bp_addr)
+static bool hijack_setup_int3_trap(hijacker_t hijacker, drakvuf_trap_info_t* info, addr_t bp_addr)
 {   
-    drakvuf_trap_t trap = 
-    {
-        .type = BREAKPOINT,
-        .name = "returnpath",
-        .cb = hijack_return_path,
-        .data = hijacker,
-        .breakpoint.lookup_type = LOOKUP_DTB,
-        .breakpoint.dtb = info->regs->cr3,
-        .breakpoint.addr_type = ADDR_VA,
-        .breakpoint.addr = bp_addr
-    };
+    
+    hijacker->bp.type = BREAKPOINT;
+    hijacker->bp.name = "returnpath";
+    hijacker->bp.cb = hijack_return_path;
+    hijacker->bp.data = hijacker;
+    hijacker->bp.breakpoint.lookup_type = LOOKUP_DTB;
+    hijacker->bp.breakpoint.dtb = info->regs->cr3;
+    hijacker->bp.breakpoint.addr_type = ADDR_VA;
+    hijacker->bp.breakpoint.addr = bp_addr;
+    
 
-    return drakvuf_add_trap(hijacker->drakvuf, &trap);
+    return drakvuf_add_trap(hijacker->drakvuf, &hijacker->bp);
 }
 
 static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
@@ -84,26 +83,33 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
         return 0;
     }
     
-    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    
     if( hijacker->status == STATUS_NULL)
     {
-        drakvuf_pause(drakvuf);
             PRINT_DEBUG("[+] Saving register state\n");
             memcpy(&hijacker->saved_regs, info->regs, sizeof(x86_registers_t));
+            // UNUSED(hijack_setup_int3_trap);
+            if(!hijack_setup_int3_trap(hijacker, info, info->regs->rip))
+            {
+                PRINT_DEBUG("Could not setup return trap: leaving");
+                return 0;
+            }
 
-            setup_hijack_int3_trap(hijacker, info, info->regs->rip);
-
-            setup_stack(drakvuf, info, NULL, 0);
+            struct argument args[1];
+            init_int_argument(&args[0], 12);
+            setup_stack(drakvuf, info, args, ARRAY_SIZE(args));
 
             PRINT_DEBUG("[+] Hijacking to  %"PRIx64"\n",hijacker->exec_func);
             info->regs->rip = hijacker->exec_func;
-            drakvuf_resume(drakvuf);
-
             hijacker->status = STATUS_CREATE_OK;
-
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
-    drakvuf_resume(drakvuf); 
+    if(hijacker->status == STATUS_CREATE_OK){
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        return 0;
+
+    }
+    
     return 0;
     
 }
@@ -144,8 +150,8 @@ int hijack(
     // hijacker->error_code.string = "<UNKNOWN>";
     hijacker->status = STATUS_NULL;
     hijacker->driver_rekall_profile_json = json_object_from_file(driver_rekall);
-
     hijacker->exec_func = hijack_get_function_address(hijacker, function_name);
+
     if(!hijacker->exec_func)
     {
         PRINT_DEBUG("%s Address Not found\n",function_name);
@@ -159,7 +165,7 @@ int hijack(
         .type = REGISTER,
         .reg = CR3,
         .cb = hijack_wait_for_kernel_cb,
-        .data = hijacker,
+        .data = hijacker
     };
 
      if (!drakvuf_add_trap(drakvuf, &trap))
