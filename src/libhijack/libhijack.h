@@ -18,9 +18,14 @@ typedef struct hijacker* hijacker_t;
 
 bool hijack_get_driver_function_rva(hijacker_t hijacker, char * function_name, addr_t *rva);
 
+bool setup_KeBugCheckEx_stack(hijacker_t hijacker, drakvuf_trap_info_t *info);
+
+bool setup_noError_stack(hijacker_t hijacker, drakvuf_trap_info_t *info);
+
 int hijack(drakvuf_t drakvuf, vmi_pid_t hijack_pid,
                       char *hijack_function, 
-                      char *driver_rekall_profile) ;
+                      char *driver_rekall_profile,
+                      char *lib_name) ;
 
 
 

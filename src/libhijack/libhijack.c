@@ -14,17 +14,21 @@
 
 bool hijack_get_driver_function_rva(hijacker_t hijacker, char *function_name, addr_t *rva)
 {
-    return rekall_get_function_rva(hijacker->driver_rekall_profile_json, function_name, rva);
+    bool rva_found =  rekall_get_function_rva(hijacker->driver_rekall_profile_json, function_name, rva);
+    if(!rva_found){
+        rva_found = drakvuf_get_function_rva(hijacker->drakvuf, function_name, rva);
+    }
+    return rva_found;
 }
 
-static addr_t hijack_get_function_address(hijacker_t hijacker, char* function_name){
+static addr_t hijack_get_function_address(hijacker_t hijacker, char* function_name, char *lib_name){
         PRINT_DEBUG("Trying to Get address for %s\n", function_name);
         addr_t rva = 0;
         hijack_get_driver_function_rva(hijacker, function_name, &rva);
         if(!rva)
             return 0;
         PRINT_DEBUG("Returned RVA = %"PRIx64"\n", rva);        
-        return  drakvuf_exportksym_to_va(hijacker->drakvuf, 4, function_name, "DummyDriver.sys", rva);;
+        return  drakvuf_exportksym_to_va(hijacker->drakvuf, 4, function_name, lib_name, rva);;
 }
 
 
@@ -42,9 +46,11 @@ static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_
     }
 
     //TODO check rsp, vcpu
-
-    if(hijacker->status == STATUS_CREATE_OK){
+    if(hijacker->status == STATUS_CREATE_OK || hijacker->status == STATUS_RESUME_OK){
         drakvuf_pause(drakvuf);
+        //Print Return value;
+        uint64_t ret_value = info->regs->rax;
+        PRINT_DEBUG("[+] RAX = %"PRIx64"\n", ret_value);
         PRINT_DEBUG("[+] Removing return trap\n");
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         PRINT_DEBUG("[+] Restoring registers\n");
@@ -66,7 +72,6 @@ static bool hijack_setup_int3_trap(hijacker_t hijacker, drakvuf_trap_info_t* inf
     hijacker->bp.breakpoint.dtb = info->regs->cr3;
     hijacker->bp.breakpoint.addr_type = ADDR_VA;
     hijacker->bp.breakpoint.addr = bp_addr;
-    
 
     return drakvuf_add_trap(hijacker->drakvuf, &hijacker->bp);
 }
@@ -95,9 +100,11 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
                 return 0;
             }
 
-            struct argument args[1];
-            init_int_argument(&args[0], 12);
-            setup_stack(drakvuf, info, args, ARRAY_SIZE(args));
+            if(!setup_noError_stack(hijacker,info))
+            {
+                PRINT_DEBUG("Could not setup stack\n");
+                return 0;
+            }
 
             PRINT_DEBUG("[+] Hijacking to  %"PRIx64"\n",hijacker->exec_func);
             info->regs->rip = hijacker->exec_func;
@@ -123,7 +130,8 @@ int hijack(
     drakvuf_t drakvuf,
     vmi_pid_t target_pid,
     char *function_name,
-    char *driver_rekall
+    char *driver_rekall,
+    char *lib_name
 )
 {
 
@@ -150,7 +158,7 @@ int hijack(
     // hijacker->error_code.string = "<UNKNOWN>";
     hijacker->status = STATUS_NULL;
     hijacker->driver_rekall_profile_json = json_object_from_file(driver_rekall);
-    hijacker->exec_func = hijack_get_function_address(hijacker, function_name);
+    hijacker->exec_func = hijack_get_function_address(hijacker, function_name, lib_name);
 
     if(!hijacker->exec_func)
     {
@@ -158,7 +166,6 @@ int hijack(
         return 0;
     }
     PRINT_DEBUG("Address for %s found: %"PRIx64"\n", function_name, hijacker->exec_func);
-    
     
     drakvuf_trap_t trap =
     {

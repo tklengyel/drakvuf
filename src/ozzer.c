@@ -18,6 +18,7 @@ static void close_handler(int sig)
 int main(int argc, char **argv){
     char *domain=NULL, *rekall_profile=NULL, *rekall_wow_profile = NULL, *function_name = NULL;
     int injection_pid = 0;
+    char *lib_name=NULL;
 	// int injection_thread;
     // output_format_t output = OUTPUT_DEFAULT;
     bool verbose = false,  libvmi_conf = false;
@@ -36,11 +37,12 @@ int main(int argc, char **argv){
                 "\t -d <domain ID or name>    The domain's ID or name\n"
                 "\t -f function-name          The function to call after hijacking\n"
                 "\t -g <driver rekall profile> \n"
-                "\t                           The Rekall profile of the Driver"
+                "\t                           The Rekall profile of the Driver\n"
+                "\t -l <driver-name>          The name of the module"
             );
         return rc;
     }
-    const char *opts = "r:d:i:I:e:g:vf:p";
+    const char *opts = "r:d:i:I:e:g:vf:pl:";
     
     while ((c = getopt (argc, argv, opts)) != -1)
         switch (c)
@@ -71,6 +73,9 @@ int main(int argc, char **argv){
                 verbose = true;
                 break;
 #endif            
+            case 'l':
+                lib_name = optarg;
+                break;
             default:
                 if (isalnum(c))
                     fprintf(stderr, "Unrecognized option: %c\n", c);
@@ -98,7 +103,8 @@ int main(int argc, char **argv){
         !hijack(drakvuf, 
             injection_pid, 
             function_name, 
-            driver_rekal_profile)
+            driver_rekal_profile,
+            lib_name)
     )
     {
         fprintf(stderr, "Hijack Failed [+]\n");

@@ -103,7 +103,7 @@
 #*************************************************************************#
 
 h_sources = libhijack.h 
-c_sources = libhijack.c 
+c_sources = libhijack.c function-stacks.c
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(VMI_CFLAGS)
