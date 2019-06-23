@@ -4,12 +4,12 @@
 DRIVER_INITIALIZE DriverEntry;
 EVT_WDF_DRIVER_DEVICE_ADD DummyDriverEvtDeviceAdd;
 
-_declspec(dllexport) int noError(int in) {
+_declspec(dllexport) int add1(int in) {
 	DbgPrint("In DummyDriver!noError");
 	return in+1;
 }
 
-_declspec(dllexport) int error(int in) {
+_declspec(dllexport) int sub1(int in) {
 	DbgPrint("In DummyDriver!error");
 	return in-1;
 }
