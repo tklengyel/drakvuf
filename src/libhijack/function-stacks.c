@@ -19,7 +19,7 @@ bool setup_KeBugCheckEx_stack(hijacker_t hijacker, drakvuf_trap_info_t *info)
     return setup_stack(hijacker->drakvuf, info, args, ARRAY_SIZE(args));
 }
 
-bool setup_noError_stack(hijacker_t hijacker, drakvuf_trap_info_t *info)
+bool setup_add1_stack(hijacker_t hijacker, drakvuf_trap_info_t *info)
 {
     struct argument args[1];
     init_int_argument(&args[0], 0xE2222222);

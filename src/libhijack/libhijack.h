@@ -20,7 +20,7 @@ bool hijack_get_driver_function_rva(hijacker_t hijacker, char * function_name, a
 
 bool setup_KeBugCheckEx_stack(hijacker_t hijacker, drakvuf_trap_info_t *info);
 
-bool setup_noError_stack(hijacker_t hijacker, drakvuf_trap_info_t *info);
+bool setup_add1_stack(hijacker_t hijacker, drakvuf_trap_info_t *info);
 
 int hijack(drakvuf_t drakvuf, vmi_pid_t hijack_pid,
                       char *hijack_function, 

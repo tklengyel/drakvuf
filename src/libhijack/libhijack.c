@@ -100,7 +100,7 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
                 return 0;
             }
 
-            if(!setup_noError_stack(hijacker,info))
+            if(!setup_add1_stack(hijacker,info))
             {
                 PRINT_DEBUG("Could not setup stack\n");
                 return 0;
@@ -112,6 +112,7 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
     if(hijacker->status == STATUS_CREATE_OK){
+        PRINT_DEBUG("Removing cr3 call back");
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         return 0;
 
