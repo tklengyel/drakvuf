@@ -11,6 +11,13 @@ _declspec(dllexport) int add1(int in) {
 
 _declspec(dllexport) int sub1(int in) {
 	DbgPrint("In DummyDriver!error");
+	if (in > 10)
+	{
+		if (in < 15)
+		{
+			KeBugCheck(0xEFFFEFFF);
+		}
+	}
 	return in-1;
 }
 /*
@@ -98,7 +105,8 @@ NTSTATUS DummyDriverEvtDeviceAdd(
 		NULL);
 	if (!NT_SUCCESS(status))
 	{
-		DbgPrint("queue create failed");
+		DbgPri
+		nt("queue create failed");
 		return status;
 	}
 	*/
