@@ -143,6 +143,7 @@ typedef enum
     STATUS_BP_HIT,
     STATUS_CREATE_OK,
     STATUS_RESUME_OK,
+    STATUS_RESTORE_OK,
     __STATUS_MAX
 } status_type_t;
 

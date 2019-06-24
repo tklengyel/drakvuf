@@ -47,16 +47,21 @@ static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_
 
     //TODO check rsp, vcpu
     if(hijacker->status == STATUS_CREATE_OK || hijacker->status == STATUS_RESUME_OK){
-        drakvuf_pause(drakvuf);
         //Print Return value;
         uint64_t ret_value = info->regs->rax;
         PRINT_DEBUG("[+] RAX = %"PRIx64"\n", ret_value);
-        PRINT_DEBUG("[+] Removing return trap\n");
-        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        hijacker->status = STATUS_RESTORE_OK;
         PRINT_DEBUG("[+] Restoring registers\n");
         memcpy(info->regs, &hijacker->saved_regs, sizeof(x86_registers_t));
-        drakvuf_resume(drakvuf);
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+    else if( hijacker->status == STATUS_RESTORE_OK)
+    {   
+        drakvuf_pause(drakvuf);
+        PRINT_DEBUG("[+] Removing return trap\n");
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_resume(drakvuf);
+        drakvuf_interrupt(drakvuf, SIGINT);
     }
     return 0;
 }
