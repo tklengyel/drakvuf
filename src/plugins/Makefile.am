@@ -226,5 +226,7 @@ endif
 
 noinst_LTLIBRARIES= libdrakvufplugins.la
 libdrakvufplugins_la_SOURCES= $(sources)
+libdrakvufplugins_la_CXXFLAGS = $(AM_CXXFLAGS)
 libdrakvufplugins_la_LIBADD = ../xen_helper/libxenhelper.la
+libdrakvufplugins_la_LIBADD+=../libinjector/libinjector.la
 libdrakvufplugins_la_LIBADD += ../libdrakvuf/libdrakvuf.la

@@ -103,7 +103,7 @@
 #*************************************************************************#
 
 h_sources = libhijack.h 
-c_sources = libhijack.c function-stacks.c
+c_sources = libhijack.c function-stacks.c fuzz-candidates.c
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(VMI_CFLAGS)
@@ -137,4 +137,4 @@ libhijack_la_SOURCES= $(h_sources) $(c_sources)
 libhijack_la_LIBADD= ../xen_helper/libxenhelper.la
 libhijack_la_LIBADD+= ../libdrakvuf/libdrakvuf.la
 libhijack_la_LIBADD+= ../libinjector/libinjector.la
-libhijack_la_CFLAGS = $(AM_CFLAGS)
+libhijack_la_CXXFLAGS = $(AM_CXXFLAGS)

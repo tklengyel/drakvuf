@@ -133,6 +133,7 @@ endif
 endif
 
 noinst_LTLIBRARIES= libinjector.la
+libinjector_la_CFLAGS = $(CFLAGS)
 libinjector_la_SOURCES= $(h_sources) $(c_sources)
 libinjector_la_LIBADD= ../xen_helper/libxenhelper.la
 libinjector_la_LIBADD+= ../libdrakvuf/libdrakvuf.la

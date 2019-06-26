@@ -49,7 +49,7 @@ static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_
     if(hijacker->status == STATUS_CREATE_OK || hijacker->status == STATUS_RESUME_OK){
         //Print Return value;
         uint64_t ret_value = info->regs->rax;
-        PRINT_DEBUG("[+] RAX = %"PRIx64"\n", ret_value);
+        fprintf(stderr, "[+] RAX = %"PRIx64"\n", ret_value);
         hijacker->status = STATUS_RESTORE_OK;
         PRINT_DEBUG("[+] Restoring registers\n");
         memcpy(info->regs, &hijacker->saved_regs, sizeof(x86_registers_t));
@@ -61,7 +61,11 @@ static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_
         PRINT_DEBUG("[+] Removing return trap\n");
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         drakvuf_resume(drakvuf);
-        drakvuf_interrupt(drakvuf, SIGINT);
+        g_mutex_lock(hijacker->h_d_mutex);
+        *hijacker->spin_lock = false;
+        g_mutex_unlock(hijacker->h_d_mutex);
+        drakvuf_interrupt(drakvuf,SIGINT);
+        drakvuf_resume(drakvuf);
     }
     return 0;
 }
@@ -137,7 +141,9 @@ int hijack(
     vmi_pid_t target_pid,
     char *function_name,
     char *driver_rekall,
-    char *lib_name
+    char *lib_name,
+    GMutex* lock,
+    bool *spin_lock
 )
 {
 
@@ -165,7 +171,8 @@ int hijack(
     hijacker->status = STATUS_NULL;
     hijacker->driver_rekall_profile_json = json_object_from_file(driver_rekall);
     hijacker->exec_func = hijack_get_function_address(hijacker, function_name, lib_name);
-
+    hijacker->h_d_mutex = lock;
+    hijacker->spin_lock = spin_lock;
     if(!hijacker->exec_func)
     {
         PRINT_DEBUG("%s Address Not found\n",function_name);
@@ -184,7 +191,7 @@ int hijack(
      if (!drakvuf_add_trap(drakvuf, &trap))
         return false;
 
-    if (!drakvuf_is_interrupted(drakvuf))
+    if (hijacker->status != STATUS_RESUME_OK)
     {
         PRINT_DEBUG("Starting injection loop\n");
         drakvuf_loop(drakvuf);
