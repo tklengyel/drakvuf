@@ -127,6 +127,9 @@ struct plugins_options
     const char* mpr_profile;            // PLUGIN_ENVMON
     const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
     bool abort_on_bsod;                 // PLUGIN_BSODMON
+    json_object *input;                 // PLUGIN_BSODMON-FUZZING
+    volatile int *spin_lock;            // PLUGIN_BSODMON-FUZZING
+    bool *continue_fuzzing;             // PLUGIN_BSODMON-FUZZING
     const char* ntdll_profile;          // PLUGIN_LIBRARYMON
     const char* ole32_profile;          // PLUGIN_WMIMON
     const char* wow_ole32_profile;      // PLUGIN_WMIMON

@@ -116,9 +116,12 @@ public:
     const output_format_t format;
     std::map<int, const char*> bugcheck_map;
     bool abort_on_bsod;
-
-    bsodmon(drakvuf_t drakvuf, bool abort_on_bsod, output_format_t output);
-
+    json_object *input;
+    volatile int *spin_lock;
+    bool *continue_fuzzing;
+    bsodmon(drakvuf_t drakvuf, bool abort_on_bsod, output_format_t output
+            , json_object *inp, volatile int *sl, bool *cf);
+    
 private:
     drakvuf_trap_t trap =
     {

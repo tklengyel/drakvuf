@@ -61,11 +61,8 @@ static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_
         PRINT_DEBUG("[+] Removing return trap\n");
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         drakvuf_resume(drakvuf);
-        g_mutex_lock(hijacker->h_d_mutex);
-        *hijacker->spin_lock = false;
-        g_mutex_unlock(hijacker->h_d_mutex);
+        g_atomic_int_set(hijacker->spin_lock, false);
         drakvuf_interrupt(drakvuf,SIGINT);
-        drakvuf_resume(drakvuf);
     }
     return 0;
 }
@@ -109,7 +106,7 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
                 return 0;
             }
 
-            if(!setup_add1_stack(hijacker,info))
+            if(!setup_stack_from_json(hijacker, info))
             {
                 PRINT_DEBUG("Could not setup stack\n");
                 return 0;
@@ -142,8 +139,8 @@ int hijack(
     char *function_name,
     char *driver_rekall,
     char *lib_name,
-    GMutex* lock,
-    bool *spin_lock
+    json_object *args,
+    volatile  int *spin_lock
 )
 {
 
@@ -171,8 +168,8 @@ int hijack(
     hijacker->status = STATUS_NULL;
     hijacker->driver_rekall_profile_json = json_object_from_file(driver_rekall);
     hijacker->exec_func = hijack_get_function_address(hijacker, function_name, lib_name);
-    hijacker->h_d_mutex = lock;
     hijacker->spin_lock = spin_lock;
+    hijacker->args = args;
     if(!hijacker->exec_func)
     {
         PRINT_DEBUG("%s Address Not found\n",function_name);
