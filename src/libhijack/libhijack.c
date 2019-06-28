@@ -36,34 +36,39 @@ static addr_t hijack_get_function_address(hijacker_t hijacker, char* function_na
 static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
     //Return path
-    PRINT_DEBUG("[+] int3_cb for return \n");
     hijacker_t hijacker = info->trap->data;
+    
+    PRINT_DEBUG("[+] int3_cb for return \n");
     if ( info->proc_data.pid != hijacker->target_pid)
     {
-        PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
-                    info->proc_data.name, info->proc_data.pid, hijacker->target_pid);
+        // PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
+                    // info->proc_data.name, info->proc_data.pid, hijacker->target_pid);
         return 0;
     }
 
     //TODO check rsp, vcpu
-    if(hijacker->status == STATUS_CREATE_OK || hijacker->status == STATUS_RESUME_OK){
+    if(hijacker->status == STATUS_CREATE_OK){
         //Print Return value;
         uint64_t ret_value = info->regs->rax;
-        fprintf(stderr, "[+] RAX = %"PRIx64"\n", ret_value);
+        PRINT_DEBUG(stderr, "[+] RAX = %"PRId64"\n", ret_value);
         hijacker->status = STATUS_RESTORE_OK;
         PRINT_DEBUG("[+] Restoring registers\n");
         memcpy(info->regs, &hijacker->saved_regs, sizeof(x86_registers_t));
-        return VMI_EVENT_RESPONSE_SET_REGISTERS;
-    }
-    else if( hijacker->status == STATUS_RESTORE_OK)
-    {   
+
         drakvuf_pause(drakvuf);
         PRINT_DEBUG("[+] Removing return trap\n");
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         drakvuf_resume(drakvuf);
         g_atomic_int_set(hijacker->spin_lock, false);
         drakvuf_interrupt(drakvuf,SIGINT);
+        hijacker->status = STATUS_RESUME_OK;
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
+    // else if( hijacker->status == STATUS_RESTORE_OK)
+    // {   
+       
+    // }
     return 0;
 }
 
@@ -86,51 +91,41 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
 {
 
     hijacker_t hijacker = info->trap->data;
-    PRINT_DEBUG("[+] Hijack In cr3cb\n");
+    
     if ( info->proc_data.pid != hijacker->target_pid )
     {
-        PRINT_DEBUG("cr3cb received but '%s' PID (%u) doesn't match target process (%u)\n",
-                    info->proc_data.name, info->proc_data.pid, hijacker->target_pid);
+        // PRINT_DEBUG("cr3cb received but '%s' PID (%u) doesn't match target process (%u)\n",
+        //             info->proc_data.name, info->proc_data.pid, hijacker->target_pid);
         return 0;
     }
+    PRINT_DEBUG("In CR3 CB ");
     
     
-    if( hijacker->status == STATUS_NULL)
+    PRINT_DEBUG("[+] Saving register state\n");
+    memcpy(&hijacker->saved_regs, info->regs, sizeof(x86_registers_t));
+    // UNUSED(hijack_setup_int3_trap);
+    drakvuf_pause(drakvuf);
+    if(!setup_stack_from_json(hijacker, info))
     {
-            PRINT_DEBUG("[+] Saving register state\n");
-            memcpy(&hijacker->saved_regs, info->regs, sizeof(x86_registers_t));
-            // UNUSED(hijack_setup_int3_trap);
-            if(!hijack_setup_int3_trap(hijacker, info, info->regs->rip))
-            {
-                PRINT_DEBUG("Could not setup return trap: leaving");
-                return 0;
-            }
-
-            if(!setup_stack_from_json(hijacker, info))
-            {
-                PRINT_DEBUG("Could not setup stack\n");
-                return 0;
-            }
-
-            PRINT_DEBUG("[+] Hijacking to  %"PRIx64"\n",hijacker->exec_func);
-            info->regs->rip = hijacker->exec_func;
-            hijacker->status = STATUS_CREATE_OK;
-            return VMI_EVENT_RESPONSE_SET_REGISTERS;
-    }
-    if(hijacker->status == STATUS_CREATE_OK){
-        PRINT_DEBUG("Removing cr3 call back");
-        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        PRINT_DEBUG("Could not setup stack\n");
+        hijacker->rc = false;
+        drakvuf_interrupt(drakvuf, 2);
+        drakvuf_resume(drakvuf);
         return 0;
-
     }
-    
-    return 0;
-    
+    drakvuf_resume(drakvuf);
+    if(!hijack_setup_int3_trap(hijacker, info, info->regs->rip))
+    {
+        PRINT_DEBUG("Could not setup return trap: leaving");
+        return 0;
+    }
+    PRINT_DEBUG("[+] Hijacking to  %"PRIx64"\n",hijacker->exec_func);
+    info->regs->rip = hijacker->exec_func;
+    hijacker->status = STATUS_CREATE_OK;
+    PRINT_DEBUG("Removing cr3 call back\n");
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
-
-
-
-
 
 
 int hijack(
@@ -160,16 +155,17 @@ int hijack(
     // hijacker->target_file_us = target_file_us;
     hijacker->global_search = true;
     hijacker->status = STATUS_NULL;
+    hijacker->status = STATUS_NULL;
     hijacker->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     // hijacker->break_loop_on_detection = break_loop_on_detection;
     // hijacker->error_code.valid = false;
     // hijacker->error_code.code = -1;
     // hijacker->error_code.string = "<UNKNOWN>";
-    hijacker->status = STATUS_NULL;
     hijacker->driver_rekall_profile_json = json_object_from_file(driver_rekall);
     hijacker->exec_func = hijack_get_function_address(hijacker, function_name, lib_name);
     hijacker->spin_lock = spin_lock;
     hijacker->args = args;
+    hijacker->rc = true;
     if(!hijacker->exec_func)
     {
         PRINT_DEBUG("%s Address Not found\n",function_name);
@@ -188,14 +184,14 @@ int hijack(
      if (!drakvuf_add_trap(drakvuf, &trap))
         return false;
 
-    if (hijacker->status != STATUS_RESUME_OK)
+    PRINT_DEBUG("Starting injection loop\n");
+    if (!drakvuf_is_interrupted(drakvuf))
     {
-        PRINT_DEBUG("Starting injection loop\n");
         drakvuf_loop(drakvuf);
     }
+    drakvuf_interrupt(drakvuf, 0);
 
 
-
-    return true;
+    return hijacker->rc;
 
 }

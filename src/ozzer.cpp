@@ -53,9 +53,6 @@ void stop_bsodmon()
 // }
 
 json_object *get_inputs(json_object *function){
-    printf("%s\n",json_object_to_json_string_ext(function, JSON_C_TO_STRING_PRETTY));
-
-    
     json_object *args = hijack_get_arguments(function);
     int len = hijack_get_num_arguments(args);
     json_object *array = json_object_new_array();
@@ -66,6 +63,7 @@ json_object *get_inputs(json_object *function){
         const char* arg_type = json_object_get_string(arg);
         if(!strcmp(arg_type, "INTEGER")){
             int num = g_rand_int(grand);
+            num = num>=0?num:(-num);
             json_object *val = json_object_new_int(num);
             json_object *jtype = json_object_new_string(arg_type);
             json_object_object_add(temp_obj, "type", jtype);
@@ -162,7 +160,7 @@ int main(int argc, char **argv){
     fprintf(stderr, "STARTING FUZZING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
     while(fuzz_iterations<100)
     {   
-        sleep(5);
+        // sleep(5);
         if(!continue_fuzzing)
             break;
         fprintf(stderr, "Generating Input iteration %d>>>>>>>>>>>>>>>>\n", fuzz_iterations);     
@@ -184,7 +182,7 @@ int main(int argc, char **argv){
         driver_rekal_profile = hijack_get_module_rekall_profile(module);
         
         
-        start_bsodmon(drakvuf, inputs);
+        // start_bsodmon(drakvuf, inputs);
         fprintf(stderr, "Calling %s!%s, with %d arguments\n",lib_name, function_name, num_args);
         fprintf(stderr, "Calling With Input >>>>>>>>>>>>>>>>\n");
         fprintf(stderr, "%s\n", 
@@ -202,13 +200,13 @@ int main(int argc, char **argv){
             fprintf(stderr, "Hijack Failed [+]\n");
             goto error;
         }
+        fprintf(stderr, "waiting for lock\n");
         while(!g_atomic_int_compare_and_exchange(&spin_lock_held,false, true));
         stop_bsodmon();
         fprintf(stderr, "Returned >>>>>>>>>>>>>>>>\n");
         fuzz_iterations++;
     }
     error:
-
     drakvuf_resume(drakvuf); 
     drakvuf_close(drakvuf, 0);
 

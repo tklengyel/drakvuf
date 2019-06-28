@@ -7,19 +7,21 @@ bool setup_stack_from_json(hijacker_t hijacker, drakvuf_trap_info_t *info)
 {
     drakvuf_t drakvuf = hijacker->drakvuf;
     json_object *jargs = hijacker->args;
+    fprintf(stderr, "in setup stack from json\n"
+                    "%s\n", json_object_to_json_string_ext(jargs, JSON_C_TO_STRING_PRETTY));
     int len = json_object_array_length(jargs);
     struct argument *args = g_malloc0(len*sizeof(struct argument)) ; 
     for(int i = 0; i < len; i++)
-    {
+    {   
         json_object *jarg = json_object_array_get_idx(jargs, i);
         json_object *jtype;
         json_object_object_get_ex(jarg, "type", &jtype);
         const char *type = json_object_get_string(jtype);
 
         json_object *jval;
-        json_object_object_get_ex(jarg, "type", &jval);
-        int val = json_object_get_int(jval);
-        fprintf(stderr, "setting up %d",val);
+        json_object_object_get_ex(jarg, "value", &jval);
+        uint64_t val = json_object_get_int(jval);
+        PRINT_DEBUG("Init arg[%d] with value %ld\n",i, val);
         if(!strcmp(type, "INTEGER"))
         {
             init_int_argument(&args[i], val);
@@ -29,7 +31,7 @@ bool setup_stack_from_json(hijacker_t hijacker, drakvuf_trap_info_t *info)
 
         }
     }
-    return setup_stack(drakvuf, info, args, ARRAY_SIZE(args));
+    return setup_stack(drakvuf, info, args, len);
 
 }
 

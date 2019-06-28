@@ -18,6 +18,7 @@ struct hijacker {
     json_object *args;
     drakvuf_trap_t bp;
     volatile  int *spin_lock;
+    bool rc;
 };
 typedef struct hijacker* hijacker_t;
 
