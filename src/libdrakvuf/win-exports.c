@@ -246,7 +246,7 @@ addr_t ksym2va(drakvuf_t drakvuf, vmi_pid_t pid, const char* proc_name, const ch
 
             if (VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8") )
             {
-                PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", out.contents, dllbase);
+                // PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", out.contents, dllbase);
 
                 if ( !strcmp((char*)out.contents, mod_name) )
                     ret_addr =  dllbase + rva;

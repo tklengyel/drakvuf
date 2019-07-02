@@ -10,6 +10,7 @@
 #include <gmodule.h>
 #include "libhijack/libhijack.h"
 #include "libdrakvuf/libdrakvuf.h"
+#include "colors.h"
 #include "plugins/plugins.h"
 
 #define SEED 321651
@@ -88,6 +89,7 @@ int main(int argc, char **argv){
     char *driver_rekal_profile=NULL;
     char *fuzz_candidates_path=NULL;
     int injection_pid = 0;
+    uint32_t injection_tid = 0;
     bool verbose = false,  libvmi_conf = false;
     char c;
     int num_libs = 0, num_functions = 0, num_args=0, fuzz_iterations=0;
@@ -99,17 +101,17 @@ int main(int argc, char **argv){
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
     if (argc < 4)
     {
-        fprintf(stderr, "Required input:\n"
+        fprintf(stderr, BGRED"Required input:\n"
                 "\t -r, --rekall-kernel <rekall profile>\n"
                 "\t                           The Rekall profile of the OS kernel\n"
                 "\t -d <domain ID or name>    The domain's ID or name\n"
                 "\t -f <fuzzing-candidates-file>\n"
                 "                             The file containing candidates for fuzzer\n"
-                "\t -i <injection-pid>        The pid of the process to be used for kernel hijacking"
+                "\t -i <injection-pid>        The pid of the process to be used for kernel hijacking" RESET
             );
         return rc;
     }
-    const char *opts = "r:d:i:vf:";
+    const char *opts = "r:d:i:vf:t:";
     
     while ((c = getopt (argc, argv, opts)) != -1)
         switch (c)
@@ -125,6 +127,9 @@ int main(int argc, char **argv){
                 break;
             case 'f':
                 fuzz_candidates_path  = optarg;
+                break;
+            case 't':
+                injection_tid = (uint32_t)atoi(optarg);
                 break;
 #ifdef DRAKVUF_DEBUG
             case 'v':
@@ -156,7 +161,7 @@ int main(int argc, char **argv){
         return rc;
     }
     json_object *candidates = json_object_from_file(fuzz_candidates_path);
-
+    int successfull = 0;
     fprintf(stderr, "STARTING FUZZING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
     while(fuzz_iterations<100)
     {   
@@ -190,6 +195,7 @@ int main(int argc, char **argv){
         if(
         !hijack(drakvuf, 
             injection_pid, 
+            injection_tid,
             function_name, 
             driver_rekal_profile,
             lib_name,
@@ -197,19 +203,26 @@ int main(int argc, char **argv){
             &spin_lock_held)
         )
         {
-            fprintf(stderr, "Hijack Failed [+]\n");
-            goto error;
+            fprintf(stderr, BGRED WHITE "Hijack Failed [+]" RESET "\n");
+            // goto error;
         }
+        else
+        {
+            successfull++;
+        }
+        
         fprintf(stderr, "waiting for lock\n");
         while(!g_atomic_int_compare_and_exchange(&spin_lock_held,false, true));
         stop_bsodmon();
         fprintf(stderr, "Returned >>>>>>>>>>>>>>>>\n");
+        // sleep(3);
+        
         fuzz_iterations++;
     }
-    error:
+    // error:
     drakvuf_resume(drakvuf); 
     drakvuf_close(drakvuf, 0);
-
+    printf("[+] Successfull = %d", successfull);
     
 
 }

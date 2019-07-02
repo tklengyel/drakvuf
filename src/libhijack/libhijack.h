@@ -6,19 +6,23 @@
 extern "C" {
 #endif
 struct hijacker {
+    bool cr3_valid;
+    uint64_t savedcr3;
     drakvuf_t drakvuf;
     vmi_pid_t target_pid;
+    uint32_t target_tid;
     char *function_name;
     bool global_search;
     bool is32bit;
-    x86_registers_t saved_regs;
-    status_type_t status;
+    status_type_t int3_status;
+    status_type_t cr3_status;
     addr_t exec_func;
     json_object *driver_rekall_profile_json;
     json_object *args;
     drakvuf_trap_t bp;
     volatile  int *spin_lock;
     bool rc;
+    x86_registers_t saved_regs;
 };
 typedef struct hijacker* hijacker_t;
 
@@ -31,6 +35,7 @@ bool setup_add1_stack(hijacker_t hijacker, drakvuf_trap_info_t *info);
 bool setup_stack_from_json(hijacker_t hijacker, drakvuf_trap_info_t *info);
 
 int hijack(drakvuf_t drakvuf, vmi_pid_t hijack_pid,
+                      uint32_t target_tid,
                       char *hijack_function, 
                       char *driver_rekall_profile,
                       char *lib_name,
