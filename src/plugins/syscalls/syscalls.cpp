@@ -474,6 +474,54 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
+static void extract_memory_allocation(syscalls* s, drakvuf_t drakvuf, const drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data, vmi_instance_t vmi)
+{
+    uint32_t* args_data32 = (uint32_t*)args_data;
+    uint64_t* args_data64 = (uint64_t*)args_data;
+    addr_t process_handle_val = 0;
+    addr_t base_address_val = 0;
+    addr_t buffer_val = 0;
+    addr_t buffer_size_val = 0;
+
+    for(int i=0; i < sc->num_args; i++){
+        if( 4 == s->reg_size )
+            if(strcmp(sc->args[i].name, "ProcessHandle")==0)
+                memcpy(&process_handle_val, &args_data32[i], sizeof(uint32_t));
+            if(strcmp(sc->args[i].name, "BaseAddress")==0)
+                memcpy(&base_address_val, &args_data32[i], sizeof(uint32_t));
+            if(strcmp(sc->args[i].name, "Buffer")==0)
+                memcpy(&buffer_val, &args_data32[i], sizeof(uint32_t));
+            if(strcmp(sc->args[i].name, "BufferSize")==0)
+                memcpy(&buffer_size_val, &args_data32[i], sizeof(uint32_t));
+        else
+            if(strcmp(sc->args[i].name, "ProcessHandle")==0)
+                memcpy(&process_handle_val, &args_data64[i], sizeof(uint64_t));
+            if(strcmp(sc->args[i].name, "BaseAddress")==0)
+                memcpy(&base_address_val, &args_data64[i], sizeof(uint64_t));
+            if(strcmp(sc->args[i].name, "Buffer")==0)
+                memcpy(&buffer_val, &args_data64[i], sizeof(uint64_t));
+            if(strcmp(sc->args[i].name, "BufferSize")==0)
+                memcpy(&buffer_size_val, &args_data64[i], sizeof(uint64_t));
+    }
+
+    if(buffer_val != 0 && buffer_size_val != 0){
+        void* content = g_malloc(buffer_size_val);
+        access_context_t ctx;
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+        ctx.addr = buffer_val;
+        if ( VMI_FAILURE != vmi_read(vmi, &ctx, buffer_size_val, content, NULL )){
+            char* filename = NULL;
+            if(asprintf(&filename, "%s/" FORMAT_TIMEVAL "_%lu_write.bin",s->syscalls_virtual_memory_write, UNPACK_TIMEVAL(info->timestamp), buffer_val) >= 0){
+                FILE* file = fopen(filename, "wb");
+                fwrite(content, 1, buffer_size_val, file);
+                fclose(file);
+            }
+        }
+        g_free(content);
+    }
+}
+
 static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     unsigned int nargs = 0;
@@ -542,6 +590,9 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         print_nargs(s->format, nargs);
         print_args(s, drakvuf, info, sc, buf);
+        if(strcmp(info->trap->name, "NtWriteVirtualMemory") == 0 && s->syscalls_virtual_memory_write){
+            extract_memory_allocation(s, drakvuf, info, sc, buf, vmi);
+        }
     }
     print_footer(s->format, nargs);
 
@@ -756,6 +807,7 @@ static symbols_t* filter_symbols(const symbols_t* symbols, const char* filter_fi
     return ret;
 }
 
+
 syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output)
 {
     symbols_t* symbols = drakvuf_get_symbols_from_rekall(drakvuf);
@@ -775,6 +827,11 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
             throw -1;
         }
         symbols = filtered_symbols;
+    }
+
+    if (c->syscalls_virtual_memory_write)
+    {
+        this->syscalls_virtual_memory_write = c->syscalls_virtual_memory_write;
     }
 
     this->os = drakvuf_get_os_type(drakvuf);

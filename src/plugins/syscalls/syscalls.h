@@ -112,6 +112,7 @@
 struct syscalls_config
 {
     const char* syscalls_filter_file;
+    const char* syscalls_virtual_memory_write;
 };
 
 class syscalls: public plugin
@@ -124,6 +125,7 @@ public:
     uint8_t reg_size;
     output_format_t format;
     os_t os;
+    const char* syscalls_virtual_memory_write;
 
     syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     ~syscalls();

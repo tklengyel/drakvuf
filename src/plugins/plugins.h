@@ -126,6 +126,7 @@ struct plugins_options
     const char* iphlpapi_profile;       // PLUGIN_ENVMON
     const char* mpr_profile;            // PLUGIN_ENVMON
     const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
+    const char* syscalls_virtual_memory_write; //PLUGIN_SYSCALLS
     bool abort_on_bsod;                 // PLUGIN_BSODMON
     const char* ntdll_profile;          // PLUGIN_LIBRARYMON
     const char* ole32_profile;          // PLUGIN_WMIMON

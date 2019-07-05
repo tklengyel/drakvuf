@@ -226,6 +226,8 @@ int main(int argc, char** argv)
 #endif
 #ifdef ENABLE_PLUGIN_SYSCALLS
                 "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
+                "\t -E <memory write dump folder>\n"
+                "\t                           Folder where virtual memory write should be stored\n"
 #endif
 #ifdef ENABLE_PLUGIN_BSODMON
                 "\t -b                        Exit from execution as soon as a BSoD is detected\n"
@@ -292,7 +294,7 @@ int main(int argc, char** argv)
         {"rekall-wow-ole32", required_argument, NULL, opt_rekall_wow_ole32},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:spT:S:Mc:nblgj:w:W:";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:spT:S:E:Mc:nblgj:w:W:";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
@@ -385,6 +387,9 @@ int main(int argc, char** argv)
 #endif
             case 'S':
                 options.syscalls_filter_file = optarg;
+                break;
+            case 'E':
+                options.syscalls_virtual_memory_write = optarg;
                 break;
             case 'M':
                 options.dump_modified_files = true;
