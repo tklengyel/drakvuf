@@ -16,6 +16,9 @@
 #define BGCYAN "\033[46m"
 #define BGWHITE "\033[47m"
 
+#define BOLD "\033[1m"
+#define UNDERLINE "\033[4m"
+
 #define RESET "\033[0m"
 
 

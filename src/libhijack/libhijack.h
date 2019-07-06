@@ -6,8 +6,6 @@
 extern "C" {
 #endif
 struct hijacker {
-    bool cr3_valid;
-    uint64_t savedcr3;
     drakvuf_t drakvuf;
     vmi_pid_t target_pid;
     uint32_t target_tid;

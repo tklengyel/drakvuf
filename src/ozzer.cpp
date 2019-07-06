@@ -32,14 +32,17 @@ drakvuf_plugins *plugins;
 
 bool start_bsodmon(drakvuf_t drakvuf, json_object *function)
 {
+    (void)function;
     plugins = new drakvuf_plugins(drakvuf, OUTPUT_DEFAULT, 
         drakvuf_get_os_type(drakvuf));
-    options = {0};
-    options.input = function;
-    options.abort_on_bsod = true;
-    options.continue_fuzzing = &continue_fuzzing;
-    options.spin_lock = &spin_lock_held;
-    plugins->start(PLUGIN_BSODMON, &options);
+    // options = {0};
+    // options.input = function;
+    // options.abort_on_bsod = true;
+    // options.continue_fuzzing = &continue_fuzzing;
+    // options.spin_lock = &spin_lock_held;
+    options.syscalls_filter_file = NULL;
+    // plugins->start(PLUGIN_BSODMON, &options);
+    plugins->start(PLUGIN_SYSCALLS, &options);
     return true;
 }
 
@@ -90,6 +93,7 @@ int main(int argc, char **argv){
     char *fuzz_candidates_path=NULL;
     int injection_pid = 0;
     uint32_t injection_tid = 0;
+    int num_iterations = 0;
     bool verbose = false,  libvmi_conf = false;
     char c;
     int num_libs = 0, num_functions = 0, num_args=0, fuzz_iterations=0;
@@ -101,17 +105,19 @@ int main(int argc, char **argv){
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
     if (argc < 4)
     {
-        fprintf(stderr, BGRED"Required input:\n"
+        fprintf(stderr, "Required input:\n"
                 "\t -r, --rekall-kernel <rekall profile>\n"
                 "\t                           The Rekall profile of the OS kernel\n"
                 "\t -d <domain ID or name>    The domain's ID or name\n"
                 "\t -f <fuzzing-candidates-file>\n"
                 "                             The file containing candidates for fuzzer\n"
-                "\t -i <injection-pid>        The pid of the process to be used for kernel hijacking" RESET
+                "\t -i <injection-pid>        The pid of the process to be used for kernel hijacking\n" 
+                "\t -t <inection-tid>         Thread id to be used for injection\n"
+                "\t -c <iteration-count>      Fuzzing iteration count\n"
             );
         return rc;
     }
-    const char *opts = "r:d:i:vf:t:";
+    const char *opts = "r:d:i:vf:t:c:";
     
     while ((c = getopt (argc, argv, opts)) != -1)
         switch (c)
@@ -136,6 +142,9 @@ int main(int argc, char **argv){
                 verbose = true;
                 break;
 #endif            
+            case 'c':
+                num_iterations = atoi(optarg);
+                break;
             default:
                 if (isalnum(c))
                     fprintf(stderr, "Unrecognized option: %c\n", c);
@@ -163,7 +172,7 @@ int main(int argc, char **argv){
     json_object *candidates = json_object_from_file(fuzz_candidates_path);
     int successfull = 0;
     fprintf(stderr, "STARTING FUZZING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
-    while(fuzz_iterations<100)
+    while(fuzz_iterations<num_iterations)
     {   
         // sleep(5);
         if(!continue_fuzzing)
@@ -213,14 +222,14 @@ int main(int argc, char **argv){
         
         fprintf(stderr, "waiting for lock\n");
         while(!g_atomic_int_compare_and_exchange(&spin_lock_held,false, true));
-        stop_bsodmon();
+        // stop_bsodmon();
         fprintf(stderr, "Returned >>>>>>>>>>>>>>>>\n");
         // sleep(3);
         
         fuzz_iterations++;
     }
     // error:
-    drakvuf_resume(drakvuf); 
+    // drakvuf_resume(drakvuf); 
     drakvuf_close(drakvuf, 0);
     printf("[+] Successfull = %d", successfull);
     
