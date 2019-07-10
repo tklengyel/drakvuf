@@ -1,10 +1,30 @@
-#include<libdrakvuf/libdrakvuf.h>
-#include<libinjector/libinjector.h>
-#include<gmodule.h>
+
+#ifndef LIBHIJACK_H
+#define LIBHIJACK_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include<libdrakvuf/libdrakvuf.h>
+#include<libinjector/libinjector.h>
+#include<gmodule.h>
+
+
+enum offset
+{
+    KPROCESS_USERDIRECTORYTABLEBASE,
+    KPROCESS_DIRECTORYTABLEBASE,
+
+    OFFSET_MAX
+};
+
+static const char* offset_names[OFFSET_MAX][2] =
+{
+    [KPROCESS_USERDIRECTORYTABLEBASE] = {"_KPROCESS", "UserDirectoryTableBase" },
+    [KPROCESS_DIRECTORYTABLEBASE] = {"_KPROCESS", "DirectoryTableBase" }
+};
+
 struct hijacker {
     drakvuf_t drakvuf;
     vmi_pid_t target_pid;
@@ -21,7 +41,11 @@ struct hijacker {
     volatile  int *spin_lock;
     bool rc;
     x86_registers_t saved_regs;
+    size_t offsets[OFFSET_MAX];
 };
+
+
+
 typedef struct hijacker* hijacker_t;
 
 bool hijack_get_driver_function_rva(hijacker_t hijacker, char * function_name, addr_t *rva);
@@ -58,4 +82,6 @@ char * hijack_get_argument_type(json_object *arg, int idx);
 #ifdef __cplusplus
 }
 #endif
+
+#endif //libhijack.h
 

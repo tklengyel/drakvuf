@@ -2,9 +2,9 @@
 #include "libdrakvuf/libdrakvuf.h"
 #include "libinjector/libinjector.h"
 #include "private.h"
-
 bool setup_stack_from_json(hijacker_t hijacker, drakvuf_trap_info_t *info)
 {
+    (void)offset_names;
     drakvuf_t drakvuf = hijacker->drakvuf;
     json_object *jargs = hijacker->args;
     fprintf(stderr, "in setup stack from json\n"

@@ -127,13 +127,6 @@ extern bool verbose;
 #endif
 
 
-enum offset
-{
-    KTHREAD_TRAPFRAME,
-    KTRAP_FRAME_RIP,
-
-    OFFSET_MAX
-};
 
 
 #endif

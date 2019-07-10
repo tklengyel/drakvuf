@@ -7,13 +7,69 @@
 #include <string.h>
 #include <unistd.h>
 #include <glib.h>
-#include "libhijack.h"
+#include <libhijack.h>
 #include "libdrakvuf/libdrakvuf.h"
 #include "libinjector/libinjector.h"
-#include "private.h"
 #include "colors.h"
-static uint64_t static_cr3;
-static bool cr3_valid = false;
+#include "libvmi/libvmi_extra.h"
+#include "private.h"
+
+void print_page_info(page_info_t *pi, int entry_number)
+{
+    if(entry_number%2 == 0)
+    {
+        fprintf(stderr, BGBLUE BLACK);
+    }
+    else
+    {
+        fprintf(stderr, BGCYAN BLACK);
+    }
+    fprintf(stderr, "pte_location = %lx \n", pi->x86_ia32e.pte_location);
+    fprintf(stderr, "pte_value = %lx \n", pi->x86_ia32e.pte_value);
+    fprintf(stderr, "pgd_location = %lx \n", pi->x86_ia32e.pgd_location);
+    fprintf(stderr, "pgd_value = %lx \n", pi->x86_ia32e.pgd_value);
+    fprintf(stderr, "pdpte_location = %lx \n", pi->x86_ia32e.pdpte_location);
+    fprintf(stderr, "pdpte_value = %lx \n", pi->x86_ia32e.pdpte_value);
+    fprintf(stderr, "pml4e_location = %lx \n", pi->x86_ia32e.pml4e_location);
+    fprintf(stderr, "pml4e_value = %lx \n", pi->x86_ia32e.pml4e_value);
+    fprintf(stderr, RESET);
+}
+
+void print_page_table(vmi_instance_t vmi, addr_t dtb)
+{
+    fprintf(stderr, BGGREEN BLACK"Printing page table for dtb = %lx" RESET "\n", dtb);
+    GSList* loop = vmi_get_va_pages(vmi, dtb);
+    int i = 0;
+    while(loop)
+    {
+        page_info_t *page = loop->data;
+        print_page_info(page, i);
+        i++;
+        loop = loop->next;
+    }
+
+
+}
+
+addr_t hijack_get_user_dtb(drakvuf_t drakvuf, addr_t process, hijacker_t hijacker)
+{
+    addr_t udtb = 0;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    vmi_read_64_va(vmi, process + hijacker->offsets[KPROCESS_USERDIRECTORYTABLEBASE],
+        hijacker->target_pid, &udtb);
+    drakvuf_release_vmi(drakvuf);
+    return udtb;
+}
+
+addr_t hijack_get_dtb(drakvuf_t drakvuf, addr_t process, hijacker_t hijacker)
+{
+    addr_t dtb = 0;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    vmi_read_64_va(vmi, process + hijacker->offsets[KPROCESS_DIRECTORYTABLEBASE],
+        hijacker->target_pid, &dtb);
+    drakvuf_release_vmi(drakvuf);
+    return dtb;
+}
 
 bool hijack_get_driver_function_rva(hijacker_t hijacker, char *function_name, addr_t *rva)
 {
@@ -116,10 +172,7 @@ static bool hijack_setup_int3_trap(hijacker_t hijacker, drakvuf_trap_info_t* inf
 
 static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
-
-    
     hijacker_t hijacker = info->trap->data;
-    
     if ( info->proc_data.pid != hijacker->target_pid )
     {
         PRINT_DEBUG("cr3cb received but '%s' PID (%u) doesn't match target process (%u)\n",
@@ -127,11 +180,35 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
         return 0;
     }
 
+   
+    uint8_t cpl = info->regs->cs_sel & 3;
+    if(cpl != 0 )
+    {
+        fprintf(stderr, "Something serverely wrong, Not in ring 0 Ring = %d\n", cpl);
+        return 0;
+    }
+
     uint32_t tid;
     drakvuf_get_current_thread_id(drakvuf, info->vcpu, &tid);
+
+    addr_t udtb;
+    udtb = hijack_get_user_dtb(drakvuf, info->proc_data.base_addr, hijacker);
+    fprintf(stderr, "user dtb = %"PRIx64"\n", udtb);
+    addr_t dtb;
+    dtb = hijack_get_dtb(drakvuf, info->proc_data.base_addr, hijacker);
+    fprintf(stderr, "dtb = %"PRIx64"\n", dtb);
+    
+    if(info->regs->cr3 != dtb)
+    {
+        fprintf(stderr, BGRED WHITE"[+] CR3 is userdtb PID=%d, "
+            "cr3 = %lx"RESET"\n", info->proc_data.pid
+                                , info->regs->cr3);
+        return 0;
+    }
+    
     fprintf(stderr, BGCYAN BLACK"[+] In CR3 CB PID=%d, Process Name = %s"
     "ThreadId = %d, PPID = %d, BASE Addr = %lx, "
-    "User Id = %"PRIx64 BOLD BLUE", cr3 = %lx"RESET"\n", info->proc_data.pid
+    "User Id = %"PRIx64 BOLD BLACK", cr3 = %lx"RESET"\n", info->proc_data.pid
                                                 , info->proc_data.name
                                                 , tid
                                                 , info->proc_data.ppid
@@ -142,53 +219,33 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
     {
         return 0;
     }
-    (void)hijack_setup_int3_trap;
-    if(!cr3_valid)
-    {
-        static_cr3 = info->regs->cr3;
-        cr3_valid = true;
-    }
-    if(cr3_valid && info->regs->cr3 != static_cr3)
-    {
-        fprintf(stderr, BGRED WHITE"[+] In CR3 CB PID=%d, Process Name = %s"
-        "ThreadId = %d, PPID = %d, BASE Addr = %lx, "
-        "User Id = %"PRIx64 BOLD BLUE", cr3 = %lx"RESET"\n", info->proc_data.pid
-                                                    , info->proc_data.name
-                                                    , tid
-                                                    , info->proc_data.ppid
-                                                    , info->proc_data.base_addr
-                                                    , info->proc_data.userid
-                                                    , info->regs->cr3);
-    }
-    drakvuf_remove_trap(drakvuf, info->trap, NULL);
-    drakvuf_interrupt(drakvuf, SIGINT);
-    release_ozzer_lock(hijacker);
-    // if(hijacker->cr3_status == STATUS_NULL){
-    //     PRINT_DEBUG("[+] Saving register state\n");
-    //     memcpy(&hijacker->saved_regs, info->regs, sizeof(x86_registers_t));
-    //     PRINT_DEBUG("[+] Removing wait for kernel trap\n");
-    //     drakvuf_remove_trap(drakvuf, info->trap, NULL);
-    //     // UNUSED(hijack_setup_int3_trap);
-    //     hijacker->cr3_status = STATUS_CREATE_OK;
-    //     if(!setup_stack_from_json(hijacker, info))
-    //     {
-    //         PRINT_DEBUG("[+] Could not setup stack\n");
-    //         hijacker->rc = false;
-    //         drakvuf_interrupt(drakvuf, 2);
-    //         drakvuf_resume(drakvuf);
-    //         release_ozzer_lock(hijacker);
-    //         return 0;
-    //     }
+    
+    if(hijacker->cr3_status == STATUS_NULL){
+        PRINT_DEBUG("[+] Saving register state\n");
+        memcpy(&hijacker->saved_regs, info->regs, sizeof(x86_registers_t));
+        PRINT_DEBUG("[+] Removing wait for kernel trap\n");
+        // UNUSED(hijack_setup_int3_trap);
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        hijacker->cr3_status = STATUS_CREATE_OK;
+        if(!setup_stack_from_json(hijacker, info))
+        {
+            fprintf(stderr, "[+] Could not setup stack\n");
+            hijacker->rc = false;
+            drakvuf_interrupt(drakvuf, 2);
+            drakvuf_resume(drakvuf);
+            release_ozzer_lock(hijacker);
+            return 0;
+        }
         
-    //     PRINT_DEBUG("[+] Hijacking to  %"PRIx64"\n",hijacker->exec_func);
-    //     if(!hijack_setup_int3_trap(hijacker, info, info->regs->rip))
-    //     {
-    //         PRINT_DEBUG("[+] Could not setup return trap: leaving");
-    //         return 0;
-    //     }
-    //     info->regs->rip = hijacker->exec_func;
-    //     return VMI_EVENT_RESPONSE_SET_REGISTERS;
-    // }
+        PRINT_DEBUG("[+] Hijacking to  %"PRIx64"\n",hijacker->exec_func);
+        if(!hijack_setup_int3_trap(hijacker, info, info->regs->rip))
+        {
+            PRINT_DEBUG("[+] Could not setup return trap: leaving");
+            return 0;
+        }
+        info->regs->rip = hijacker->exec_func;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
     return 0;
 }
 
@@ -205,6 +262,7 @@ int hijack(
 )
 {
 
+    
     PRINT_DEBUG("[+] Hijacking PID %u to function %s\n", target_pid, function_name );
 
     hijacker_t hijacker = (hijacker_t)g_malloc0(sizeof(struct hijacker));
@@ -236,13 +294,18 @@ int hijack(
     {
         hijacker->target_tid = target_tid;
     }
-    // if(!hijacker->exec_func)
-    // {
-    //     PRINT_DEBUG("%s Address Not found\n",function_name);
-    //     return 0;
-    // }
-    // PRINT_DEBUG("Address for %s found: %"PRIx64"\n", function_name, hijacker->exec_func);
-    
+
+    // Get the offsets from the Rekall profile
+    if ( !drakvuf_get_struct_members_array_rva(drakvuf, offset_names, OFFSET_MAX, hijacker->offsets) )
+        PRINT_DEBUG("Failed to find one of offsets.\n");
+
+    if(!hijacker->exec_func)
+    {
+        PRINT_DEBUG("%s Address Not found\n",function_name);
+        return 0;
+    }
+    PRINT_DEBUG("Address for %s found: %"PRIx64"\n", function_name, hijacker->exec_func);
+
     drakvuf_trap_t trap =
     {
         .type = REGISTER,
@@ -262,5 +325,4 @@ int hijack(
     g_free(hijacker);
     drakvuf_interrupt(drakvuf, 0);
     return hijacker->rc;
-
 }

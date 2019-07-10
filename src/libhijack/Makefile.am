@@ -102,7 +102,7 @@
 #                                                                         #
 #*************************************************************************#
 
-h_sources = libhijack.h 
+h_sources = libhijack.h private.h
 c_sources = libhijack.c function-stacks.c fuzz-candidates.c
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)

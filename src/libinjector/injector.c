@@ -114,7 +114,6 @@
 #include <inttypes.h>
 #include <glib.h>
 #include <json-c/json.h>
-
 #include "libdrakvuf/libdrakvuf.h"
 #include <libinjector/libinjector.h>
 #include "private.h"

@@ -217,6 +217,7 @@ int main(int argc, char **argv){
         }
         else
         {
+            fuzz_iterations++;
             successfull++;
         }
         
@@ -224,12 +225,11 @@ int main(int argc, char **argv){
         while(!g_atomic_int_compare_and_exchange(&spin_lock_held,false, true));
         // stop_bsodmon();
         fprintf(stderr, "Returned >>>>>>>>>>>>>>>>\n");
-        // sleep(3);
+        // sleep(1);
         
-        fuzz_iterations++;
     }
     // error:
-    // drakvuf_resume(drakvuf); 
+    drakvuf_resume(drakvuf); 
     drakvuf_close(drakvuf, 0);
     printf("[+] Successfull = %d", successfull);
     
