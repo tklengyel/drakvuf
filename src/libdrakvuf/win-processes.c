@@ -187,6 +187,9 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if (VMI_SUCCESS != vmi_read_addr_va(vmi, kpcr + prcb + drakvuf->offsets[KPRCB_CURRENTTHREAD], 0, &thread))
     {
+#ifndef DEBUG
+        PRINT_DEBUG("Failed to find current thread\n");
+#endif
         return 0;
     }
 
@@ -202,6 +205,9 @@ addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if (thread == 0 || VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_PROCESS], 0, &process))
     {
+#ifndef DEBUG
+        PRINT_DEBUG("Failed to find current process\n");
+#endif
         return 0;
     }
 

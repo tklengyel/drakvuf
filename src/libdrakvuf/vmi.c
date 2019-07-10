@@ -476,7 +476,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
 event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
-    event_response_t rsp = 0;
+    event_response_t rsp = VMI_EVENT_RESPONSE_NONE;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
 
     flush_vmi(drakvuf);
@@ -540,7 +540,11 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.timestamp = timestamp;
     trap_info.trap_pa = pa;
 
-    drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data );
+    if (!drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data ))
+    {
+        PRINT_DEBUG("%s: unable to determine current running process\n", __func__);
+        return rsp;
+    }
 
     trap_info.proc_data.base_addr = proc_data.base_addr;
     trap_info.proc_data.name      = proc_data.name;
@@ -580,7 +584,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
 event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
-    event_response_t rsp = 0;
+    event_response_t rsp = VMI_EVENT_RESPONSE_NONE;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
 
     flush_vmi(drakvuf);
@@ -605,7 +609,14 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.vcpu = event->vcpu_id;
     trap_info.timestamp = timestamp;
 
-    drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data );
+    if (!drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data ))
+    {
+#ifdef DRAKVUF_DEBUG
+        PRINT_DEBUG("%s: Unable to determine current running process (desc 0x%" PRIx64 ")\n",
+                    __func__, proc_data.base_addr);
+#endif
+        return rsp;
+    }
 
     trap_info.proc_data.base_addr = proc_data.base_addr;
     trap_info.proc_data.name      = proc_data.name;
