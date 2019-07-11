@@ -297,7 +297,6 @@ static bool setup_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
     };
-
     addr_t addr = info->regs->rsp;
 
     if ( args )
@@ -336,6 +335,7 @@ static bool setup_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct
         {
             addr -= 0x8;
             ctx.addr = addr;
+            fprintf(stderr, "\033[43m [+] injector_stack : %"PRIx64"\033[0m\n", addr);
             if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
                 goto err;
         }

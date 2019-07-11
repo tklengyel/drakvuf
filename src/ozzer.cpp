@@ -212,7 +212,7 @@ int main(int argc, char **argv){
             &spin_lock_held)
         )
         {
-            fprintf(stderr, BGRED WHITE "Hijack Failed [+]" RESET "\n");
+            fprintf(stderr, BGRED WHITE "[+] Hijack Failed" RESET "\n");
             // goto error;
         }
         else

@@ -1323,6 +1323,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     }
     PRINT_DEBUG("init_vmi: initializing vmi done\n");
 
+
     if (VMI_PM_UNKNOWN == vmi_init_paging(drakvuf->vmi, flags) )
     {
         printf("Failed to init LibVMI paging.\n");

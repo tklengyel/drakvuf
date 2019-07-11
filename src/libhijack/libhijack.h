@@ -15,14 +15,18 @@ enum offset
 {
     KPROCESS_USERDIRECTORYTABLEBASE,
     KPROCESS_DIRECTORYTABLEBASE,
-
+    KTHREAD_TRAPFRAME,
+    KTRAP_FRAME_RSP,
+    
     OFFSET_MAX
 };
 
 static const char* offset_names[OFFSET_MAX][2] =
 {
     [KPROCESS_USERDIRECTORYTABLEBASE] = {"_KPROCESS", "UserDirectoryTableBase" },
-    [KPROCESS_DIRECTORYTABLEBASE] = {"_KPROCESS", "DirectoryTableBase" }
+    [KPROCESS_DIRECTORYTABLEBASE] = {"_KPROCESS", "DirectoryTableBase" },
+    [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
+    [KTRAP_FRAME_RSP] = {"_KTRAP_FRAME", "Rsp" }
 };
 
 struct hijacker {
