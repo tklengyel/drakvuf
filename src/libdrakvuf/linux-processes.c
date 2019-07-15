@@ -119,19 +119,12 @@
 #define STACK_SIZE_16K 0x3fff
 #define MIN_KERNEL_BOUNDARY 0x80000000
 
-addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static addr_t read_process_base(drakvuf_t drakvuf, addr_t rsp, access_context_t* ctx)
 {
-    addr_t process = 0;
     vmi_instance_t vmi = drakvuf->vmi;
+    addr_t process = 0;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->gs_base + drakvuf->offsets[CURRENT_TASK],
-    };
-
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &process) || process < MIN_KERNEL_BOUNDARY )
+    if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &process) || process < MIN_KERNEL_BOUNDARY )
     {
         /*
          * The kernel stack also has a structure called thread_info that points
@@ -143,13 +136,48 @@ addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
          * something that resembles a kernel-address.
          * See https://www.cs.columbia.edu/~smb/classes/s06-4118/l06.pdf for more info.
          */
-        ctx.addr = info->regs->rsp & ~STACK_SIZE_16K;
-        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &process) || process < MIN_KERNEL_BOUNDARY )
+        ctx->addr = rsp & ~STACK_SIZE_16K;
+        if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &process) || process < MIN_KERNEL_BOUNDARY )
         {
-            ctx.addr = info->regs->rsp & ~STACK_SIZE_8K;
-            if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &process) || process < MIN_KERNEL_BOUNDARY )
+            ctx->addr = rsp & ~STACK_SIZE_8K;
+            if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &process) || process < MIN_KERNEL_BOUNDARY )
                 process = 0;
         }
+    }
+
+    return process;
+}
+
+addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t process = 0;
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+    };
+
+    if (info->regs->cs_sel & 3)
+    {
+        // Let's assume a modern kernel with KPTI enabled first
+        ctx.dtb = info->regs->cr3 & ~0x1fffull;
+        ctx.addr = info->regs->shadow_gs;
+    }
+    else
+    {
+        // Mask PCID bits
+        ctx.dtb = info->regs->cr3 & ~0xfffull;
+        ctx.addr = info->regs->gs_base;
+    }
+
+    ctx.addr += drakvuf->offsets[CURRENT_TASK];
+
+    process = read_process_base(drakvuf, info->regs->rsp, &ctx);
+
+    if ( !process && (info->regs->cs_sel & 3) )
+    {
+        // If that didn't work and we are in usermode, try without masking KPTI bits
+        ctx.dtb |= 0x1000ull;
+        process = read_process_base(drakvuf, info->regs->rsp, &ctx);
     }
 
     return process;
