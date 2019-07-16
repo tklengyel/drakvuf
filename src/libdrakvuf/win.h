@@ -110,6 +110,10 @@
 #include "os.h"
 #include "win-exports.h"
 
+#define POOL_TAG_VADL (0x6c646156)
+#define POOL_TAG_VAD (0x20646156)
+#define POOL_TAG_VADM (0x20646156)
+
 addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
@@ -165,5 +169,7 @@ char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int argument_number);
 
 bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
+
+status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t *out_mmvad);
 
 #endif

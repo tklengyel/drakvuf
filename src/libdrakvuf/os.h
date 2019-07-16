@@ -196,6 +196,9 @@ typedef struct os_interface
     bool (*is_crashreporter)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
 
+    status_t (*find_mmvad)
+    (drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t *out_mmvad);
+
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);
