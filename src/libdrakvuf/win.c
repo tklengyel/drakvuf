@@ -471,6 +471,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.enumerate_processes = win_enumerate_processes;
     drakvuf->osi.enumerate_processes_with_module = win_enumerate_processes_with_module;
     drakvuf->osi.is_crashreporter = win_is_crashreporter;
+    drakvuf->osi.find_mmvad = win_find_mmvad;
 
     return true;
 }

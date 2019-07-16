@@ -400,6 +400,19 @@ bool drakvuf_get_process_data(drakvuf_t drakvuf,
                               addr_t process_base,
                               proc_data_t* proc_data);
 
+typedef struct _mmvad_info
+{
+    uint64_t starting_vpn;
+    uint64_t ending_vpn;
+    uint64_t flags1;
+
+    /* Pointer to the file name, if this MMVAD is backed by some file on disk.
+     * If not null, read with: drakvuf_read_unicode_va(drakvuf->vmi, mmvad->file_name_ptr, 0) */
+    addr_t file_name_ptr;
+} mmvad_info_t;
+
+status_t drakvuf_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
+
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
                                    drakvuf_trap_info_t* info,
                                    uint32_t* thread_id);
