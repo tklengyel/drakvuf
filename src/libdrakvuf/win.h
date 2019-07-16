@@ -110,10 +110,6 @@
 #include "os.h"
 #include "win-exports.h"
 
-#define POOL_TAG_VADL (0x6c646156)
-#define POOL_TAG_VAD (0x20646156)
-#define POOL_TAG_VADM (0x20646156)
-
 addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);

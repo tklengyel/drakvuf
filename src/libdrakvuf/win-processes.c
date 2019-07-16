@@ -117,6 +117,10 @@
 #include "win-error-codes.h"
 #include "win.h"
 
+#define POOL_TAG_VADL (0x6c646156)
+#define POOL_TAG_VAD (0x20646156)
+#define POOL_TAG_VADM (0x20646156)
+
 typedef enum dispatcher_object
 {
     __DISPATCHER_INVALID_OBJECT = 0,
@@ -953,7 +957,8 @@ status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_
                             // file_object is a special _EX_FAST_REF pointer, we need to explicitly clear low bits
                             file_object &= (~0xFULL);
 
-                            if ((void*)file_object != NULL) {
+                            if ((void*)file_object != NULL)
+                            {
                                 out_mmvad->file_name_ptr = (file_object + drakvuf->offsets[FILEOBJECT_NAME]);
                             }
                         }
