@@ -117,6 +117,8 @@
 #include "win-error-codes.h"
 #include "win.h"
 
+#define MMVAD_MAX_DEPTH (100)
+
 #define POOL_TAG_VADL (0x6c646156)
 #define POOL_TAG_VAD (0x20646156)
 #define POOL_TAG_VADM (0x20646156)
@@ -868,6 +870,7 @@ bool win_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv_t
 
 status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad)
 {
+    int depth = 0;
     addr_t node_addr = eprocess + drakvuf->offsets[EPROCESS_VADROOT] + drakvuf->offsets[VADROOT_BALANCED_ROOT];
 
     while (node_addr)
@@ -878,6 +881,14 @@ status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_
         uint64_t starting_vpn;
         uint64_t ending_vpn;
         uint64_t flags1;
+
+        if (depth > MMVAD_MAX_DEPTH)
+        {
+            PRINT_DEBUG("Error. Max depth exceeded when walking MMVAD tree.\n");
+            return VMI_FAILURE;
+        }
+
+        ++depth;
 
         access_context_t ctx;
         ctx.translate_mechanism = VMI_TM_PROCESS_PID;
