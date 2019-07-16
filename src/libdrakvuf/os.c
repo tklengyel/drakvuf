@@ -367,7 +367,7 @@ bool drakvuf_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_
     return false;
 }
 
-status_t drakvuf_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t *out_mmvad)
+status_t drakvuf_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad)
 {
     if ( drakvuf->osi.find_mmvad )
         return drakvuf->osi.find_mmvad(drakvuf, eprocess, vaddr, out_mmvad);

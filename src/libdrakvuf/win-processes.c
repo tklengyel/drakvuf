@@ -862,11 +862,12 @@ bool win_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv_t
     return false;
 }
 
-status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t *out_mmvad)
+status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad)
 {
     addr_t node_addr = eprocess + drakvuf->offsets[EPROCESS_VADROOT] + drakvuf->offsets[VADROOT_BALANCED_ROOT];
 
-    while (node_addr) {
+    while (node_addr)
+    {
         addr_t left_child;
         addr_t right_child;
 
@@ -879,31 +880,39 @@ status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_
         ctx.pid = 4;
         ctx.addr = node_addr + drakvuf->offsets[MMVAD_LEFT_CHILD];
 
-        if (vmi_read_addr(drakvuf->vmi, &ctx, &left_child) != VMI_SUCCESS) {
+        if (vmi_read_addr(drakvuf->vmi, &ctx, &left_child) != VMI_SUCCESS)
+        {
             return VMI_FAILURE;
         }
 
         ctx.addr = node_addr + drakvuf->offsets[MMVAD_RIGHT_CHILD];
 
-        if (vmi_read_addr(drakvuf->vmi, &ctx, &right_child) != VMI_SUCCESS) {
+        if (vmi_read_addr(drakvuf->vmi, &ctx, &right_child) != VMI_SUCCESS)
+        {
             return VMI_FAILURE;
         }
 
         ctx.addr = node_addr + drakvuf->offsets[MMVAD_STARTING_VPN];
 
-        if (vmi_read_64(drakvuf->vmi, &ctx, &starting_vpn) != VMI_SUCCESS) {
+        if (vmi_read_64(drakvuf->vmi, &ctx, &starting_vpn) != VMI_SUCCESS)
+        {
             return VMI_FAILURE;
         }
 
         ctx.addr = node_addr + drakvuf->offsets[MMVAD_ENDING_VPN];
 
-        if (vmi_read_64(drakvuf->vmi, &ctx, &ending_vpn) != VMI_SUCCESS) {
+        if (vmi_read_64(drakvuf->vmi, &ctx, &ending_vpn) != VMI_SUCCESS)
+        {
             return VMI_FAILURE;
         }
 
-        if (starting_vpn == 0 && ending_vpn == 0) { // root node
+        if (starting_vpn == 0 && ending_vpn == 0)
+        {
+            // the root node seems to be empty with only right child pointer filled in
             node_addr = right_child;
-        } else if (starting_vpn * VMI_PS_4KB <= vaddr && (ending_vpn + 1) * VMI_PS_4KB > vaddr) {
+        }
+        else if (starting_vpn * VMI_PS_4KB <= vaddr && (ending_vpn + 1) * VMI_PS_4KB > vaddr)
+        {
             uint32_t pool_tag;
             addr_t subsection;
             addr_t control_area;
@@ -913,28 +922,34 @@ status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_
 
             ctx.addr = node_addr + drakvuf->offsets[MMVAD_FLAGS1];
 
-            if (vmi_read_64(drakvuf->vmi, &ctx, &flags1) != VMI_SUCCESS) {
+            if (vmi_read_64(drakvuf->vmi, &ctx, &flags1) != VMI_SUCCESS)
+            {
                 return VMI_FAILURE;
             }
 
             // read Windows' PoolTag which is 12 bytes before the actual object
             ctx.addr = node_addr - 0xC;
-            if (vmi_read_32(drakvuf->vmi, &ctx, &pool_tag) != VMI_SUCCESS) {
+            if (vmi_read_32(drakvuf->vmi, &ctx, &pool_tag) != VMI_SUCCESS)
+            {
                 return VMI_FAILURE;
             }
 
             // Windows MMVAD can have multiple types, can be differentiated with pool tags
             // some types are shorter and don't even contain "Subsection" field
-            if (pool_tag == POOL_TAG_VADL || pool_tag == POOL_TAG_VAD || pool_tag == POOL_TAG_VADM) {
+            if (pool_tag == POOL_TAG_VADL || pool_tag == POOL_TAG_VAD || pool_tag == POOL_TAG_VADM)
+            {
                 ctx.addr = node_addr + drakvuf->offsets[MMVAD_SUBSECTION];
 
-                if (vmi_read_addr(drakvuf->vmi, &ctx, &subsection) == VMI_SUCCESS) {
+                if (vmi_read_addr(drakvuf->vmi, &ctx, &subsection) == VMI_SUCCESS)
+                {
                     ctx.addr = subsection + drakvuf->offsets[SUBSECTION_CONTROL_AREA];
 
-                    if (vmi_read_addr(drakvuf->vmi, &ctx, &control_area) == VMI_SUCCESS) {
+                    if (vmi_read_addr(drakvuf->vmi, &ctx, &control_area) == VMI_SUCCESS)
+                    {
                         ctx.addr = control_area + drakvuf->offsets[CONTROL_AREA_FILEPOINTER];
 
-                        if (vmi_read_addr(drakvuf->vmi, &ctx, &file_object) == VMI_SUCCESS) {
+                        if (vmi_read_addr(drakvuf->vmi, &ctx, &file_object) == VMI_SUCCESS)
+                        {
                             // file_object is a special _EX_FAST_REF pointer, we need to explicitly clear low bits
                             file_object &= (~0xFULL);
 
@@ -951,9 +966,13 @@ status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_
             out_mmvad->flags1 = flags1;
 
             return VMI_SUCCESS;
-        } else if (starting_vpn * VMI_PS_4KB > vaddr) {
+        }
+        else if (starting_vpn * VMI_PS_4KB > vaddr)
+        {
             node_addr = left_child;
-        } else {
+        }
+        else
+        {
             node_addr = right_child;
         }
     }
