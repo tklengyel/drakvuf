@@ -119,6 +119,7 @@ class memdump: public pluginex
 public:
     addr_t object_header_body;
     const char* dump_save_dir;
+    int memdump_counter;
 
     memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
 };

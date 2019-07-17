@@ -168,15 +168,17 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
         if (VMI_SUCCESS == vmi_mmap_guest(vmi, &ctx, num_pages, access_ptrs))
         {
-            printf("[MEMDUMP] Writing dump with %d pages...\n", (int)num_pages);
+            plugin->memdump_counter++;
 
             char* file = nullptr;
-            if ( asprintf(&file, "%s/%d", plugin->dump_save_dir, rand()) < 0 )
+            if ( asprintf(&file, "%s/%d-%04d.dmp", plugin->dump_save_dir, info->proc_data.pid, plugin->memdump_counter) < 0 )
             {
                 printf("[MEMDUMP] Failed asprintf\n");
                 drakvuf_release_vmi(drakvuf);
                 return VMI_EVENT_RESPONSE_NONE;
             }
+
+            printf("[MEMDUMP] Writing dump with %d pages to: %s\n", (int)num_pages, file);
 
             FILE* fp = fopen(file, "w");
             free(file);
@@ -211,6 +213,7 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
     : pluginex(drakvuf, output)
 {
     this->dump_save_dir = c->dump_save_dir;
+    this->memdump_counter = 0;
 
     if (!drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_HEADER", "Body", &this->object_header_body))
         throw -1;
