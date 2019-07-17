@@ -125,6 +125,7 @@
 #include "librarymon/librarymon.h"
 #include "dkommon/dkommon.h"
 #include "wmimon/wmimon.h"
+#include "memdump/memdump.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -310,6 +311,17 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .wow_ole32_profile = options->wow_ole32_profile,
                     };
                     this->plugins[plugin_id] = new wmimon(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_MEMDUMP
+                case PLUGIN_MEMDUMP:
+                {
+                    memdump_config config =
+                    {
+                        .dump_save_dir = options->memdump_dir
+                    };
+                    this->plugins[plugin_id] = new memdump(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif
