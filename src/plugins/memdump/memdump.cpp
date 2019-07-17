@@ -149,22 +149,23 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
     }
 
     ctx.addr = mem_base_address;
-    char magic[2];
+    uint16_t magic;
+    char* magic_c = (char *)&magic;
 
-    if (VMI_SUCCESS != vmi_read_16(vmi, &ctx, (uint16_t *)&magic))
+    if (VMI_SUCCESS != vmi_read_16(vmi, &ctx, &magic))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to access memory to be used with NtFreeVirtualMemory\n");
         drakvuf_release_vmi(drakvuf);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (magic[0] == 'M' && magic[1] == 'Z')
+    if (magic_c[0] == 'M' && magic_c[1] == 'Z')
     {
         printf("[MEMDUMP] Interesting memory detected %d\n", info->proc_data.pid);
         ctx.addr = mmvad.starting_vpn << 12;
 
         size_t num_pages = mmvad.ending_vpn - mmvad.starting_vpn + 1;
-        void **access_ptrs = (void **)g_malloc(num_pages * sizeof(void *));
+        void** access_ptrs = (void**)g_malloc(num_pages * sizeof(void*));
 
         if (VMI_SUCCESS == vmi_mmap_guest(vmi, &ctx, num_pages, access_ptrs))
         {
@@ -189,10 +190,14 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
-            for (int i = 0; i < num_pages; i++) {
-                if (access_ptrs[i]) {
+            for (size_t i = 0; i < num_pages; i++)
+            {
+                if (access_ptrs[i])
+                {
                     fwrite(access_ptrs[i], VMI_PS_4KB, 1, fp);
-                } else {
+                }
+                else
+                {
                     uint8_t zeros[4096];
                     fwrite(zeros, VMI_PS_4KB, 1, fp);
                 }
@@ -200,7 +205,9 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
             fclose(fp);
             printf("[MEMDUMP] Wrote dump file\n");
-        } else {
+        }
+        else
+        {
             printf("[MEMDUMP] Failed mmap guest\n");
         }
     }
