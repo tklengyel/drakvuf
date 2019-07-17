@@ -150,7 +150,7 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     ctx.addr = mem_base_address;
     uint16_t magic;
-    char* magic_c = (char *)&magic;
+    char* magic_c = (char*)&magic;
 
     if (VMI_SUCCESS != vmi_read_16(vmi, &ctx, &magic))
     {
@@ -172,44 +172,47 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
             plugin->memdump_counter++;
 
             char* file = nullptr;
-            if ( asprintf(&file, "%s/%d-%04d.dmp", plugin->dump_save_dir, info->proc_data.pid, plugin->memdump_counter) < 0 )
+            if ( asprintf(&file, "%s/%d-0x%llx-%04d.dmp", plugin->dump_save_dir, info->proc_data.pid, (unsigned long long)ctx.addr, plugin->memdump_counter) < 0 )
             {
                 printf("[MEMDUMP] Failed asprintf\n");
-                drakvuf_release_vmi(drakvuf);
-                return VMI_EVENT_RESPONSE_NONE;
             }
-
-            printf("[MEMDUMP] Writing dump with %d pages to: %s\n", (int)num_pages, file);
-
-            FILE* fp = fopen(file, "w");
-            free(file);
-            if (!fp)
+            else
             {
-                printf("[MEMDUMP] Failed fp\n");
-                drakvuf_release_vmi(drakvuf);
-                return VMI_EVENT_RESPONSE_NONE;
-            }
+                printf("[MEMDUMP] Writing dump with %d pages to: %s\n", (int)num_pages, file);
 
-            for (size_t i = 0; i < num_pages; i++)
-            {
-                if (access_ptrs[i])
+                FILE* fp = fopen(file, "w");
+                free(file);
+
+                if (fp)
                 {
-                    fwrite(access_ptrs[i], VMI_PS_4KB, 1, fp);
+                    for (size_t i = 0; i < num_pages; i++)
+                    {
+                        if (access_ptrs[i])
+                        {
+                            fwrite(access_ptrs[i], VMI_PS_4KB, 1, fp);
+                            munmap(access_ptrs[i], VMI_PS_4KB);
+                        }
+                        else
+                        {
+                            uint8_t zeros[VMI_PS_4KB];
+                            fwrite(zeros, VMI_PS_4KB, 1, fp);
+                        }
+                    }
+
+                    fclose(fp);
                 }
                 else
                 {
-                    uint8_t zeros[4096];
-                    fwrite(zeros, VMI_PS_4KB, 1, fp);
+                    printf("[MEMDUMP] Failed to open file\n");
                 }
             }
-
-            fclose(fp);
-            printf("[MEMDUMP] Wrote dump file\n");
         }
         else
         {
             printf("[MEMDUMP] Failed mmap guest\n");
         }
+
+        g_free(access_ptrs);
     }
 
     drakvuf_release_vmi(drakvuf);
