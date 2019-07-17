@@ -109,6 +109,66 @@
 #include <assert.h>
 #include "memdump.h"
 
+static bool dump_memory_region(memdump* plugin, vmi_instance_t vmi, access_context_t* ctx, size_t num_pages, vmi_pid_t pid)
+{
+    char* file = nullptr;
+    void** access_ptrs = nullptr;
+    FILE* fp = nullptr;
+    bool ret = false;
+
+    plugin->memdump_counter++;
+
+    if ( asprintf(&file, "%s/%d-0x%llx-%04d.dmp", plugin->memdump_dir, pid, (unsigned long long)ctx->addr, plugin->memdump_counter) < 0 )
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed asprintf\n");
+        goto done;
+    }
+
+    access_ptrs = (void**)g_malloc(num_pages * sizeof(void*));
+
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, access_ptrs))
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed mmap guest\n");
+        goto done;
+    }
+
+    printf("[MEMDUMP] Writing dump with %d pages to: %s\n", (int)num_pages, file);
+    fp = fopen(file, "w");
+
+    if (!fp)
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed to open file\n");
+        goto done;
+    }
+
+    for (size_t i = 0; i < num_pages; i++)
+    {
+        if (access_ptrs[i])
+        {
+            fwrite(access_ptrs[i], VMI_PS_4KB, 1, fp);
+            munmap(access_ptrs[i], VMI_PS_4KB);
+        }
+        else
+        {
+            // unaccessible page, pad with zeros to ensure proper alignment of the data
+            uint8_t zeros[VMI_PS_4KB];
+            fwrite(zeros, VMI_PS_4KB, 1, fp);
+        }
+    }
+
+    fclose(fp);
+    ret = true;
+
+done:
+    if (file)
+        free(file);
+
+    if (access_ptrs)
+        g_free(access_ptrs);
+
+    return ret;
+}
+
 static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     // HANDLE ProcessHandle
@@ -161,58 +221,17 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     if (magic_c[0] == 'M' && magic_c[1] == 'Z')
     {
-        printf("[MEMDUMP] Interesting memory detected %d\n", info->proc_data.pid);
         ctx.addr = mmvad.starting_vpn << 12;
-
         size_t num_pages = mmvad.ending_vpn - mmvad.starting_vpn + 1;
-        void** access_ptrs = (void**)g_malloc(num_pages * sizeof(void*));
-
-        if (VMI_SUCCESS == vmi_mmap_guest(vmi, &ctx, num_pages, access_ptrs))
+        printf("[MEMDUMP] Possible binary detected at address %llx in PID %d\n", (unsigned long long)ctx.addr, info->proc_data.pid);
+        if (!plugin->memdump_dir)
         {
-            plugin->memdump_counter++;
-
-            char* file = nullptr;
-            if ( asprintf(&file, "%s/%d-0x%llx-%04d.dmp", plugin->dump_save_dir, info->proc_data.pid, (unsigned long long)ctx.addr, plugin->memdump_counter) < 0 )
-            {
-                printf("[MEMDUMP] Failed asprintf\n");
-            }
-            else
-            {
-                printf("[MEMDUMP] Writing dump with %d pages to: %s\n", (int)num_pages, file);
-
-                FILE* fp = fopen(file, "w");
-                free(file);
-
-                if (fp)
-                {
-                    for (size_t i = 0; i < num_pages; i++)
-                    {
-                        if (access_ptrs[i])
-                        {
-                            fwrite(access_ptrs[i], VMI_PS_4KB, 1, fp);
-                            munmap(access_ptrs[i], VMI_PS_4KB);
-                        }
-                        else
-                        {
-                            uint8_t zeros[VMI_PS_4KB];
-                            fwrite(zeros, VMI_PS_4KB, 1, fp);
-                        }
-                    }
-
-                    fclose(fp);
-                }
-                else
-                {
-                    printf("[MEMDUMP] Failed to open file\n");
-                }
-            }
+            printf("[MEMDUMP] Not saving memory dump because --memdump-dir was not provided\n");
         }
-        else
+        else if (!dump_memory_region(plugin, vmi, &ctx, num_pages, info->proc_data.pid))
         {
-            printf("[MEMDUMP] Failed mmap guest\n");
+            printf("[MEMDUMP] Failed to store memory dump due to an internal error\n");
         }
-
-        g_free(access_ptrs);
     }
 
     drakvuf_release_vmi(drakvuf);
@@ -222,11 +241,8 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
 memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
     : pluginex(drakvuf, output)
 {
-    this->dump_save_dir = c->dump_save_dir;
+    this->memdump_dir = c->memdump_dir;
     this->memdump_counter = 0;
-
-    if (!drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_HEADER", "Body", &this->object_header_body))
-        throw -1;
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap<memdump>(drakvuf, nullptr, this, free_virtual_memory_hook_cb, bp.for_syscall_name("NtFreeVirtualMemory")))

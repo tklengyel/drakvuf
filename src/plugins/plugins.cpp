@@ -319,7 +319,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 {
                     memdump_config config =
                     {
-                        .dump_save_dir = options->memdump_dir
+                        .memdump_dir = options->memdump_dir
                     };
                     this->plugins[plugin_id] = new memdump(this->drakvuf, &config, this->output);
                     break;
