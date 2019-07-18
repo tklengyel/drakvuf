@@ -109,16 +109,19 @@
 #include <assert.h>
 #include "memdump.h"
 
-static bool dump_memory_region(memdump* plugin, vmi_instance_t vmi, access_context_t* ctx, size_t num_pages, vmi_pid_t pid)
+static bool dump_memory_region(drakvuf_t drakvuf, vmi_instance_t vmi, drakvuf_trap_info_t* info, memdump* plugin, access_context_t* ctx, size_t num_pages, const char* reason)
 {
     char* file = nullptr;
     void** access_ptrs = nullptr;
     FILE* fp = nullptr;
     bool ret = false;
 
+    gchar* escaped_pname = nullptr;
+    gchar* escaped_fname = nullptr;
+
     plugin->memdump_counter++;
 
-    if ( asprintf(&file, "%s/%d-0x%llx-%04d.dmp", plugin->memdump_dir, pid, (unsigned long long)ctx->addr, plugin->memdump_counter) < 0 )
+    if ( asprintf(&file, "%s/%d-0x%llx-%04d.dmp", plugin->memdump_dir, info->proc_data.pid, (unsigned long long)ctx->addr, plugin->memdump_counter) < 0 )
     {
         PRINT_DEBUG("[MEMDUMP] Failed asprintf\n");
         goto done;
@@ -132,7 +135,6 @@ static bool dump_memory_region(memdump* plugin, vmi_instance_t vmi, access_conte
         goto done;
     }
 
-    printf("[MEMDUMP] Writing dump with %d pages to: %s\n", (int)num_pages, file);
     fp = fopen(file, "w");
 
     if (!fp)
@@ -158,6 +160,56 @@ static bool dump_memory_region(memdump* plugin, vmi_instance_t vmi, access_conte
 
     fclose(fp);
     ret = true;
+
+    switch (plugin->m_output_format)
+    {
+        case OUTPUT_CSV:
+            printf("memdump," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",\"%s\",%d,%" PRIx64 ",%" PRIu64 ",\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, info->trap->name, reason, info->proc_data.pid, ctx->addr, num_pages * VMI_PS_4KB, file);
+            break;
+        case OUTPUT_KV:
+            printf("memdump Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,DumpReason=\"%s\",DumpPID=%d,DumpAddr=%" PRIx64 ",DumpSize=%" PRIu64 ",DumpFilename=\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   info->trap->name, reason, info->proc_data.pid, ctx->addr, num_pages * VMI_PS_4KB, file);
+            break;
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_fname = drakvuf_escape_str(file);
+            printf( "{"
+                    "\"Plugin\" : \"memdump\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": %s,"
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"Method\" : \"%s\","
+                    "\"DumpReason\" : \"%s\","
+                    "\"DumpPID\" : %d,"
+                    "\"DumpAddr\" : %" PRIx64 ","
+                    "\"DumpSize\" : %" PRIu64 ","
+                    "\"DumpFilename\" : \"%s\""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    info->trap->name, reason, info->proc_data.pid, ctx->addr,
+                    num_pages * VMI_PS_4KB, escaped_fname);
+            g_free(escaped_fname);
+            g_free(escaped_pname);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[MEMDUMP] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" Reason:\"%s\" Process:%d Base:0x%" PRIx64 " Size:%" PRIu64 " File:\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, reason, info->proc_data.pid, ctx->addr,
+                   num_pages * VMI_PS_4KB, file);
+            break;
+    }
+
+    printf("\n");
 
 done:
     if (file)
@@ -223,14 +275,14 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
     {
         ctx.addr = mmvad.starting_vpn << 12;
         size_t num_pages = mmvad.ending_vpn - mmvad.starting_vpn + 1;
-        printf("[MEMDUMP] Possible binary detected at address %llx in PID %d\n", (unsigned long long)ctx.addr, info->proc_data.pid);
+        PRINT_DEBUG("[MEMDUMP] Possible binary detected at address %llx in PID %d\n", (unsigned long long)ctx.addr, info->proc_data.pid);
         if (!plugin->memdump_dir)
         {
-            printf("[MEMDUMP] Not saving memory dump because --memdump-dir was not provided\n");
+            PRINT_DEBUG("[MEMDUMP] Not saving memory dump because --memdump-dir was not provided\n");
         }
-        else if (!dump_memory_region(plugin, vmi, &ctx, num_pages, info->proc_data.pid))
+        else if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, num_pages, "Possible binary detected"))
         {
-            printf("[MEMDUMP] Failed to store memory dump due to an internal error\n");
+            PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
         }
     }
 
