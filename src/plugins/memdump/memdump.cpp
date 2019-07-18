@@ -191,19 +191,19 @@ printout:
             escaped_pname = drakvuf_escape_str(info->proc_data.name);
             escaped_fname = drakvuf_escape_str(file);
             printf( "{"
-                    "\"Plugin\" : \"memdump\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"Plugin\": \"memdump\","
+                    "\"TimeStamp\":" "\"" FORMAT_TIMEVAL "\","
                     "\"ProcessName\": %s,"
                     "\"UserName\": \"%s\","
                     "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
+                    "\"PID\": %d,"
                     "\"PPID\": %d,"
-                    "\"Method\" : \"%s\","
-                    "\"DumpReason\" : \"%s\","
-                    "\"DumpPID\" : %d,"
-                    "\"DumpAddr\" : %" PRIx64 ","
-                    "\"DumpSize\" : %" PRIu64 ","
-                    "\"DumpFilename\" : \"%s\""
+                    "\"Method\": \"%s\","
+                    "\"DumpReason\": \"%s\","
+                    "\"DumpPID\": %d,"
+                    "\"DumpAddr\": %" PRIx64 ","
+                    "\"DumpSize\": %" PRIu64 ","
+                    "\"DumpFilename\": %s"
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
