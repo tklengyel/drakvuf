@@ -125,15 +125,14 @@ static bool dump_memory_region(drakvuf_t drakvuf, vmi_instance_t vmi, drakvuf_tr
     {
         if (asprintf(&file, "%s/%d-0x%llx-%04d.dmp", plugin->memdump_dir, info->proc_data.pid,
                      (unsigned long long) ctx->addr, plugin->memdump_counter) < 0)
-        {
-            PRINT_DEBUG("[MEMDUMP] Failed asprintf\n");
             goto done;
-        }
     }
     else
     {
+        if (asprintf(&file, "(not configured)") < 0)
+            goto done;
+
         // dry run, just print that the dump would be saved
-        file = "(not configured)";
         ret = true;
         goto printout;
     }
