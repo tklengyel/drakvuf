@@ -137,7 +137,7 @@ static char* get_process_name_by_id(drakvuf_t drakvuf, vmi_pid_t pid)
 }
 
 static void extract_memory_allocation(drakvuf_t drakvuf, const drakvuf_trap_info_t* info,
- addr_t buffer, addr_t buffer_size, vmi_instance_t vmi)
+ addr_t buffer, addr_t buffer_size, vmi_instance_t vmi, writevirtualmemmon* wvm)
 {
     addr_t process_handle_val = 0;
     addr_t base_address_val = 0;
@@ -152,8 +152,7 @@ static void extract_memory_allocation(drakvuf_t drakvuf, const drakvuf_trap_info
         ctx.addr = buffer_val;
         if ( VMI_FAILURE != vmi_read(vmi, &ctx, buffer_size_val, content, NULL )){
             char* filename = NULL;
-            char* path = "./extracted_bin_files";
-            if(asprintf(&filename, "%s/" FORMAT_TIMEVAL "_%lu_write.bin", path, UNPACK_TIMEVAL(info->timestamp), buffer_val) >= 0){
+            if(asprintf(&filename, "%s/" FORMAT_TIMEVAL "_%lu_write.bin", wvm->dump_folder, UNPACK_TIMEVAL(info->timestamp), buffer_val) >= 0){
                 FILE* file = fopen(filename, "wb");
                 fwrite(content, 1, buffer_size_val, file);
                 fclose(file);
@@ -172,12 +171,13 @@ static event_response_t trap_NtWriteVirtualMemory_cb(drakvuf_t drakvuf, drakvuf_
     addr_t buffer_size = drakvuf_get_function_argument(drakvuf, info, 4);
     addr_t nb_bytes_written = drakvuf_get_function_argument(drakvuf, info, 5);
                  
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    if(wvm->dump_folder)
+    {
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+        extract_memory_allocation(drakvuf, info, buffer, buffer_size, vmi, wvm);
+        drakvuf_release_vmi(drakvuf);
+    }
 
-    if(strcmp(info->trap->name, "NtWriteVirtualMemory") == 0) // && s->syscalls_virtual_memory_write)
-        extract_memory_allocation(drakvuf, info, buffer, buffer_size, vmi);
-
-    drakvuf_release_vmi(drakvuf);
     vmi_pid_t target_pid = get_pid_from_handle(drakvuf, process_handle, info);
     printf("FROM : [%d] %s TO : [%d] %s\n", info->proc_data.pid, drakvuf_escape_str(info->proc_data.name), target_pid, get_process_name_by_id(drakvuf, target_pid));
     return 0;
@@ -195,8 +195,9 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }
 
-writevirtualmemmon::writevirtualmemmon(drakvuf_t drakvuf, output_format_t output) : format{output}
+writevirtualmemmon::writevirtualmemmon(drakvuf_t drakvuf, writevirtualmemmon_config* config, output_format_t output) : format{output}
 {
+    this->dump_folder = config->dump_folder;
     register_trap(drakvuf, "NtWriteVirtualMemory", &trap, trap_NtWriteVirtualMemory_cb);
 }
 

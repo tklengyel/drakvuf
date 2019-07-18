@@ -130,6 +130,7 @@ struct plugins_options
     const char* ntdll_profile;          // PLUGIN_LIBRARYMON
     const char* ole32_profile;          // PLUGIN_WMIMON
     const char* wow_ole32_profile;      // PLUGIN_WMIMON
+    const char* virtualmemdump_dir;     // PLUGIN_WRITEVIRTUALMEMMON
 };
 
 typedef enum drakvuf_plugin

@@ -316,8 +316,14 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #endif
 #ifdef ENABLE_PLUGIN_WRITEVIRTUALMEMMON
                 case PLUGIN_WRITEVIRTUALMEMMON:
-                    this->plugins[plugin_id] = new writevirtualmemmon(this->drakvuf, this->output);
+                {
+                    writevirtualmemmon_config config =
+                    {
+                        .dump_folder = options->virtualmemdump_dir,
+                    };
+                    this->plugins[plugin_id] = new writevirtualmemmon(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
                 case __DRAKVUF_PLUGIN_LIST_MAX: /* fall-through */
                 default:

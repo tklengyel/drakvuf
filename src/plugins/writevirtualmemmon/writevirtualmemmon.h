@@ -109,11 +109,17 @@
 #include "plugins/plugins.h"
 #include "plugins/private.h"
 
+struct writevirtualmemmon_config
+{
+    const char* dump_folder;
+};
+
 class writevirtualmemmon: public plugin
 {
 
 public:
     output_format_t format;
+    const char* dump_folder;
     drakvuf_trap_t trap =
     {
         // TODO: check in depth the lookup type
@@ -125,7 +131,7 @@ public:
         .data = (void*)this
     };
 
-    writevirtualmemmon(drakvuf_t drakvuf, output_format_t output);
+    writevirtualmemmon(drakvuf_t drakvuf, writevirtualmemmon_config* config, output_format_t output);
     ~writevirtualmemmon();
 };
 
