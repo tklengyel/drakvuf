@@ -143,7 +143,7 @@ static void extract_memory_allocation(drakvuf_t drakvuf, const drakvuf_trap_info
         ctx.addr = buffer_val;
         if ( VMI_FAILURE != vmi_read(vmi, &ctx, buffer_size_val, content, NULL )){
             char* filename = NULL;
-            if(asprintf(&filename, "%s/" FORMAT_TIMEVAL "_%lu_write.bin", wvm->dump_folder, UNPACK_TIMEVAL(info->timestamp), buffer_val) >= 0){
+            if(asprintf(&filename, "%s/" FORMAT_TIMEVAL "_%d_write.bin", wvm->dump_folder, UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid) >= 0){
                 FILE* file = fopen(filename, "wb");
                 fwrite(content, 1, buffer_size_val, file);
                 fclose(file);
