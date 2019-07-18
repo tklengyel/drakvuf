@@ -226,11 +226,8 @@ printout:
     printf("\n");
 
 done:
-    if (file)
-        free(file);
-
-    if (access_ptrs)
-        g_free(access_ptrs);
+    free(file);
+    g_free(access_ptrs);
 
     return ret;
 }
