@@ -180,16 +180,16 @@ printout:
         case OUTPUT_CSV:
             printf("memdump," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",\"%s\",%d,%" PRIx64 ",%" PRIu64 ",\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name, reason, info->proc_data.pid, ctx->addr, num_pages * VMI_PS_4KB, file);
+                   info->proc_data.userid, info->trap->name, reason, info->proc_data.pid, ctx->addr, num_pages * VMI_PS_4KB, display_file);
             break;
         case OUTPUT_KV:
             printf("memdump Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,DumpReason=\"%s\",DumpPID=%d,DumpAddr=%" PRIx64 ",DumpSize=%" PRIu64 ",DumpFilename=\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, reason, info->proc_data.pid, ctx->addr, num_pages * VMI_PS_4KB, file);
+                   info->trap->name, reason, info->proc_data.pid, ctx->addr, num_pages * VMI_PS_4KB, display_file);
             break;
         case OUTPUT_JSON:
             escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            escaped_fname = drakvuf_escape_str(file);
+            escaped_fname = drakvuf_escape_str(display_file);
             printf( "{"
                     "\"Plugin\": \"memdump\","
                     "\"TimeStamp\":" "\"" FORMAT_TIMEVAL "\","
@@ -219,7 +219,7 @@ printout:
             printf("[MEMDUMP] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" Reason:\"%s\" Process:%d Base:0x%" PRIx64 " Size:%" PRIu64 " File:\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, reason, info->proc_data.pid, ctx->addr,
-                   num_pages * VMI_PS_4KB, file);
+                   num_pages * VMI_PS_4KB, display_file);
             break;
     }
 
