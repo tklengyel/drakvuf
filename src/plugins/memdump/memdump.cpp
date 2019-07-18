@@ -109,9 +109,12 @@
 #include <assert.h>
 #include "memdump.h"
 
+#define DUMP_NAME_PLACEHOLDER "(not configured)"
+
 static bool dump_memory_region(drakvuf_t drakvuf, vmi_instance_t vmi, drakvuf_trap_info_t* info, memdump* plugin, access_context_t* ctx, size_t num_pages, const char* reason)
 {
     char* file = nullptr;
+    const char* display_file = nullptr;
     void** access_ptrs = nullptr;
     FILE* fp = nullptr;
     bool ret = false;
@@ -126,14 +129,14 @@ static bool dump_memory_region(drakvuf_t drakvuf, vmi_instance_t vmi, drakvuf_tr
         if (asprintf(&file, "%s/%d-0x%llx-%04d.dmp", plugin->memdump_dir, info->proc_data.pid,
                      (unsigned long long) ctx->addr, plugin->memdump_counter) < 0)
             goto done;
+
+        display_file = (const char*)file;
     }
     else
     {
-        if (asprintf(&file, "(not configured)") < 0)
-            goto done;
-
         // dry run, just print that the dump would be saved
         ret = true;
+        display_file = DUMP_NAME_PLACEHOLDER;
         goto printout;
     }
 
@@ -163,7 +166,7 @@ static bool dump_memory_region(drakvuf_t drakvuf, vmi_instance_t vmi, drakvuf_tr
         else
         {
             // unaccessible page, pad with zeros to ensure proper alignment of the data
-            uint8_t zeros[VMI_PS_4KB];
+            uint8_t zeros[VMI_PS_4KB] = {};
             fwrite(zeros, VMI_PS_4KB, 1, fp);
         }
     }
