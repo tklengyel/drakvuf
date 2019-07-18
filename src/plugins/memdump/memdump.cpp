@@ -121,10 +121,21 @@ static bool dump_memory_region(drakvuf_t drakvuf, vmi_instance_t vmi, drakvuf_tr
 
     plugin->memdump_counter++;
 
-    if ( asprintf(&file, "%s/%d-0x%llx-%04d.dmp", plugin->memdump_dir, info->proc_data.pid, (unsigned long long)ctx->addr, plugin->memdump_counter) < 0 )
+    if (plugin->memdump_dir)
     {
-        PRINT_DEBUG("[MEMDUMP] Failed asprintf\n");
-        goto done;
+        if (asprintf(&file, "%s/%d-0x%llx-%04d.dmp", plugin->memdump_dir, info->proc_data.pid,
+                     (unsigned long long) ctx->addr, plugin->memdump_counter) < 0)
+        {
+            PRINT_DEBUG("[MEMDUMP] Failed asprintf\n");
+            goto done;
+        }
+    }
+    else
+    {
+        // dry run, just print that the dump would be saved
+        file = "(not configured)";
+        ret = true;
+        goto printout;
     }
 
     access_ptrs = (void**)g_malloc(num_pages * sizeof(void*));
@@ -161,6 +172,7 @@ static bool dump_memory_region(drakvuf_t drakvuf, vmi_instance_t vmi, drakvuf_tr
     fclose(fp);
     ret = true;
 
+printout:
     switch (plugin->m_output_format)
     {
         case OUTPUT_CSV:
@@ -275,12 +287,8 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
     {
         ctx.addr = mmvad.starting_vpn << 12;
         size_t num_pages = mmvad.ending_vpn - mmvad.starting_vpn + 1;
-        PRINT_DEBUG("[MEMDUMP] Possible binary detected at address %llx in PID %d\n", (unsigned long long)ctx.addr, info->proc_data.pid);
-        if (!plugin->memdump_dir)
-        {
-            PRINT_DEBUG("[MEMDUMP] Not saving memory dump because --memdump-dir was not provided\n");
-        }
-        else if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, num_pages, "Possible binary detected"))
+
+        if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, num_pages, "Possible binary detected"))
         {
             PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
         }
