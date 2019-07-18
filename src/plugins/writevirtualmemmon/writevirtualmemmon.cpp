@@ -127,15 +127,6 @@ static vmi_pid_t get_pid_from_handle(drakvuf_t drakvuf, uint64_t handle, drakvuf
     return pid;
 }
 
-static char* get_process_name_by_id(drakvuf_t drakvuf, vmi_pid_t pid)
-{
-    addr_t process_addr = 0;
-    if (drakvuf_find_process(drakvuf, pid, nullptr, &process_addr))
-        return drakvuf_get_process_name(drakvuf, process_addr, true);
-
-    return "<UNKNOWN>";
-}
-
 static void extract_memory_allocation(drakvuf_t drakvuf, const drakvuf_trap_info_t* info,
  addr_t buffer, addr_t buffer_size, vmi_instance_t vmi, writevirtualmemmon* wvm)
 {
@@ -179,7 +170,16 @@ static event_response_t trap_NtWriteVirtualMemory_cb(drakvuf_t drakvuf, drakvuf_
     }
 
     vmi_pid_t target_pid = get_pid_from_handle(drakvuf, process_handle, info);
-    printf("FROM : [%d] %s TO : [%d] %s\n", info->proc_data.pid, drakvuf_escape_str(info->proc_data.name), target_pid, get_process_name_by_id(drakvuf, target_pid));
+    addr_t process_addr = 0;
+    char* target_name = nullptr;
+    if (drakvuf_find_process(drakvuf, target_pid, nullptr, &process_addr))
+        target_name = drakvuf_get_process_name(drakvuf, process_addr, true);
+
+    if (!target_name)
+        target_name = g_strdup("<UNKNOWN>");
+
+    printf("FROM : [%d] %s TO : [%d] %s\n", info->proc_data.pid, drakvuf_escape_str(info->proc_data.name), target_pid, target_name);
+    g_free(target_name);
     return 0;
 }
 
