@@ -125,6 +125,7 @@
 #include "librarymon/librarymon.h"
 #include "dkommon/dkommon.h"
 #include "wmimon/wmimon.h"
+#include "writevirtualmemmon/writevirtualmemmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -312,6 +313,11 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     this->plugins[plugin_id] = new wmimon(this->drakvuf, &config, this->output);
                     break;
                 }
+#endif
+#ifdef ENABLE_PLUGIN_WRITEVIRTUALMEMMON
+                case PLUGIN_WRITEVIRTUALMEMMON:
+                    this->plugins[plugin_id] = new writevirtualmemmon(this->drakvuf, this->output);
+                    break;
 #endif
                 case __DRAKVUF_PLUGIN_LIST_MAX: /* fall-through */
                 default:

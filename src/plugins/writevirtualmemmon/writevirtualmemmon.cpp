@@ -102,175 +102,104 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAKVUF_PLUGINS_H
-#define DRAKVUF_PLUGINS_H
+#include "writevirtualmemmon.h"
 
-#include <config.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <sys/time.h>
-#include <libdrakvuf/libdrakvuf.h>
+static vmi_pid_t get_pid_from_handle(drakvuf_t drakvuf, uint64_t handle, drakvuf_trap_info_t* info){
+    if (handle == 0 || handle == UINT64_MAX)
+        return info->proc_data.pid;
 
-struct plugins_options
+    if (!info->proc_data.base_addr)
+        return 0;
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    if(!obj)
+        return 0;
+    
+    vmi_pid_t pid;
+    addr_t object_header_body = 0;
+    if (!drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_HEADER", "Body", &object_header_body))
+        return 0;
+
+    addr_t eprocess_base = obj + object_header_body;
+    if (VMI_FAILURE == drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
+        return 0;
+
+    return pid;
+}
+
+static char* get_process_name_by_id(drakvuf_t drakvuf, vmi_pid_t pid)
 {
-    const char* dump_folder;            // PLUGIN_FILEDELETE
-    bool dump_modified_files;           // PLUGIN_FILEDELETE
-    bool filedelete_use_injector;       // PLUGIN_FILEDELETE
-    bool cpuid_stealth;                 // PLUGIN_CPUIDMON
-    const char* tcpip_profile;          // PLUGIN_SOCKETMON
-    const char* win32k_profile;         // PLUGIN_CLIPBOARDMON, PLUGIN_WINDOWMON
-    const char* sspicli_profile;        // PLUGIN_ENVMON
-    const char* kernel32_profile;       // PLUGIN_ENVMON
-    const char* kernelbase_profile;     // PLUGIN_ENVMON
-    const char* wow_kernel32_profile;   // PLUGIN_ENVMON
-    const char* iphlpapi_profile;       // PLUGIN_ENVMON
-    const char* mpr_profile;            // PLUGIN_ENVMON
-    const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
-    bool abort_on_bsod;                 // PLUGIN_BSODMON
-    const char* ntdll_profile;          // PLUGIN_LIBRARYMON
-    const char* ole32_profile;          // PLUGIN_WMIMON
-    const char* wow_ole32_profile;      // PLUGIN_WMIMON
-};
+    addr_t process_addr = 0;
+    if (drakvuf_find_process(drakvuf, pid, nullptr, &process_addr))
+        return drakvuf_get_process_name(drakvuf, process_addr, true);
 
-typedef enum drakvuf_plugin
+    return "<UNKNOWN>";
+}
+
+static void extract_memory_allocation(drakvuf_t drakvuf, const drakvuf_trap_info_t* info,
+ addr_t buffer, addr_t buffer_size, vmi_instance_t vmi)
 {
-    PLUGIN_SYSCALLS,
-    PLUGIN_POOLMON,
-    PLUGIN_FILETRACER,
-    PLUGIN_FILEDELETE,
-    PLUGIN_OBJMON,
-    PLUGIN_EXMON,
-    PLUGIN_SSDTMON,
-    PLUGIN_DEBUGMON,
-    PLUGIN_DELAYMON,
-    PLUGIN_CPUIDMON,
-    PLUGIN_SOCKETMON,
-    PLUGIN_REGMON,
-    PLUGIN_PROCMON,
-    PLUGIN_BSODMON,
-    PLUGIN_ENVMON,
-    PLUGIN_CRASHMON,
-    PLUGIN_CLIPBOARDMON,
-    PLUGIN_WINDOWMON,
-    PLUGIN_LIBRARYMON,
-    PLUGIN_DKOMMON,
-    PLUGIN_WMIMON,
-    PLUGIN_WRITEVIRTUALMEMMON,
-    __DRAKVUF_PLUGIN_LIST_MAX
-} drakvuf_plugin_t;
+    addr_t process_handle_val = 0;
+    addr_t base_address_val = 0;
+    addr_t buffer_val = buffer;
+    addr_t buffer_size_val = buffer_size;
 
-static const char* drakvuf_plugin_names[] =
-{
-    [PLUGIN_SYSCALLS] = "syscalls",
-    [PLUGIN_POOLMON] = "poolmon",
-    [PLUGIN_FILETRACER] = "filetracer",
-    [PLUGIN_FILEDELETE] = "filedelete",
-    [PLUGIN_OBJMON] = "objmon",
-    [PLUGIN_EXMON] = "exmon",
-    [PLUGIN_SSDTMON] = "ssdtmon",
-    [PLUGIN_DEBUGMON] = "debugmon",
-    [PLUGIN_DELAYMON] = "delaymon",
-    [PLUGIN_CPUIDMON] = "cpuidmon",
-    [PLUGIN_SOCKETMON] = "socketmon",
-    [PLUGIN_REGMON] = "regmon",
-    [PLUGIN_PROCMON] = "procmon",
-    [PLUGIN_BSODMON] = "bsodmon",
-    [PLUGIN_ENVMON] = "envmon",
-    [PLUGIN_CRASHMON] = "crashmon",
-    [PLUGIN_CLIPBOARDMON] = "clipboardmon",
-    [PLUGIN_WINDOWMON] = "windowmon",
-    [PLUGIN_LIBRARYMON] = "librarymon",
-    [PLUGIN_DKOMMON] = "dkommon",
-    [PLUGIN_WMIMON] = "wmimon",
-    [PLUGIN_WRITEVIRTUALMEMMON] = "writevirtualmemmon",
-};
-
-static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
-{
-    [PLUGIN_SYSCALLS]                 = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_POOLMON]                  = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_FILETRACER]               = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_FILEDELETE]               = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_OBJMON]                   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_EXMON]                    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_SSDTMON]                  = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_DEBUGMON]                 = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_DELAYMON]                 = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_CPUIDMON]                 = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_SOCKETMON]                = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_REGMON]                   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_PROCMON]                  = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_BSODMON]                  = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_ENVMON]                   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_CRASHMON]                 = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_CLIPBOARDMON]             = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_WINDOWMON]                = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_LIBRARYMON]               = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_DKOMMON]                  = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_WMIMON]                   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_WRITEVIRTUALMEMMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-};
-
-class plugin
-{
-public:
-    virtual ~plugin() = default;
-};
-
-class drakvuf_plugins
-{
-private:
-    drakvuf_t drakvuf;
-    output_format_t output;
-    os_t os;
-    plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = nullptr };
-
-public:
-    drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
-    ~drakvuf_plugins();
-    int start(drakvuf_plugin_t plugin, const plugins_options* config);
-};
-
-/***************************************************************************/
-
-struct vmi_lock_guard
-{
-    vmi_lock_guard(drakvuf_t drakvuf_) : drakvuf(drakvuf_), vmi()
-    {
-        lock();
-    }
-
-    vmi_instance_t lock()
-    {
-        if (!vmi)
-            vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-        return vmi;
-    }
-
-    bool unlock()
-    {
-        if (vmi)
-        {
-            drakvuf_release_vmi(drakvuf);
-            vmi = nullptr;
-            return true;
+    if(buffer_val != 0 && buffer_size_val != 0){
+        void* content = g_malloc(buffer_size_val);
+        access_context_t ctx;
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+        ctx.addr = buffer_val;
+        if ( VMI_FAILURE != vmi_read(vmi, &ctx, buffer_size_val, content, NULL )){
+            char* filename = NULL;
+            char* path = "./extracted_bin_files";
+            if(asprintf(&filename, "%s/" FORMAT_TIMEVAL "_%lu_write.bin", path, UNPACK_TIMEVAL(info->timestamp), buffer_val) >= 0){
+                FILE* file = fopen(filename, "wb");
+                fwrite(content, 1, buffer_size_val, file);
+                fclose(file);
+            }
         }
-        return false;
-
+        g_free(content);
     }
+}
 
-    bool is_lock() const { return vmi == nullptr ? true : false; }
+static event_response_t trap_NtWriteVirtualMemory_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    writevirtualmemmon* wvm = (writevirtualmemmon*)info->trap->data;
+    addr_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t base_address = drakvuf_get_function_argument(drakvuf, info, 2);
+    addr_t buffer = drakvuf_get_function_argument(drakvuf, info, 3);
+    addr_t buffer_size = drakvuf_get_function_argument(drakvuf, info, 4);
+    addr_t nb_bytes_written = drakvuf_get_function_argument(drakvuf, info, 5);
+                 
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    operator vmi_instance_t() const { return vmi; }
+    if(strcmp(info->trap->name, "NtWriteVirtualMemory") == 0) // && s->syscalls_virtual_memory_write)
+        extract_memory_allocation(drakvuf, info, buffer, buffer_size, vmi);
 
-    ~vmi_lock_guard()
-    {
-        unlock();
-    }
+    drakvuf_release_vmi(drakvuf);
+    vmi_pid_t target_pid = get_pid_from_handle(drakvuf, process_handle, info);
+    printf("FROM : [%d] %s TO : [%d] %s\n", info->proc_data.pid, drakvuf_escape_str(info->proc_data.name), target_pid, get_process_name_by_id(drakvuf, target_pid));
+    return 0;
+}
 
-    drakvuf_t drakvuf;
-    vmi_instance_t vmi;
-};
+static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
+                           drakvuf_trap_t* trap,
+                           event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
+{
+    if ( !drakvuf_get_function_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
 
-#endif
+    trap->name = syscall_name;
+    trap->cb   = hook_cb;
+
+    if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
+}
+
+writevirtualmemmon::writevirtualmemmon(drakvuf_t drakvuf, output_format_t output) : format{output}
+{
+    register_trap(drakvuf, "NtWriteVirtualMemory", &trap, trap_NtWriteVirtualMemory_cb);
+}
+
+writevirtualmemmon::~writevirtualmemmon(){
+
+}

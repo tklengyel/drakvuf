@@ -190,6 +190,10 @@ if PLUGIN_WMIMON
 sources += wmimon/wmimon.cpp
 endif
 
+if PLUGIN_WRITEVIRTUALMEMMON
+sources +=writevirtualmemmon/writevirtualmemmon.cpp
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h
 
