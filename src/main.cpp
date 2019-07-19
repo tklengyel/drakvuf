@@ -256,6 +256,10 @@ int main(int argc, char** argv)
                 "\t --rekall-wow-ole32 <rekall profile>\n"
                 "\t                           The Rekall profile for SysWOW64/ole32.dll\n"
 #endif
+#ifdef ENABLE_PLUGIN_MEMDUMP
+                "\t --memdump-dir <directory>\n"
+                "\t                           Where to store memory dumps\n"
+#endif
                );
         return rc;
     }
@@ -272,6 +276,7 @@ int main(int argc, char** argv)
         opt_rekall_mpr,
         opt_rekall_ole32,
         opt_rekall_wow_ole32,
+        opt_memdump_dir,
     };
     const option long_opts[] =
     {
@@ -290,6 +295,7 @@ int main(int argc, char** argv)
         {"verbose", no_argument, NULL, 'v'},
         {"rekall-ole32", required_argument, NULL, opt_rekall_ole32},
         {"rekall-wow-ole32", required_argument, NULL, opt_rekall_wow_ole32},
+        {"memdump-dir", required_argument, NULL, opt_memdump_dir},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:spT:S:Mc:nblgj:w:W:";
@@ -428,6 +434,11 @@ int main(int argc, char** argv)
                 break;
             case opt_rekall_wow_ole32:
                 options.wow_ole32_profile = optarg;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_MEMDUMP
+            case opt_memdump_dir:
+                options.memdump_dir = optarg;
                 break;
 #endif
             default:

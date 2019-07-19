@@ -102,176 +102,210 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAKVUF_PLUGINS_H
-#define DRAKVUF_PLUGINS_H
-
 #include <config.h>
-#include <stdlib.h>
+#include <glib.h>
 #include <inttypes.h>
-#include <sys/time.h>
-#include <libdrakvuf/libdrakvuf.h>
+#include <libvmi/libvmi.h>
+#include <assert.h>
+#include "memdump.h"
 
-struct plugins_options
+#define DUMP_NAME_PLACEHOLDER "(not configured)"
+
+static bool dump_memory_region(drakvuf_t drakvuf, vmi_instance_t vmi, drakvuf_trap_info_t* info, memdump* plugin, access_context_t* ctx, size_t num_pages, const char* reason)
 {
-    const char* dump_folder;            // PLUGIN_FILEDELETE
-    bool dump_modified_files;           // PLUGIN_FILEDELETE
-    bool filedelete_use_injector;       // PLUGIN_FILEDELETE
-    bool cpuid_stealth;                 // PLUGIN_CPUIDMON
-    const char* tcpip_profile;          // PLUGIN_SOCKETMON
-    const char* win32k_profile;         // PLUGIN_CLIPBOARDMON, PLUGIN_WINDOWMON
-    const char* sspicli_profile;        // PLUGIN_ENVMON
-    const char* kernel32_profile;       // PLUGIN_ENVMON
-    const char* kernelbase_profile;     // PLUGIN_ENVMON
-    const char* wow_kernel32_profile;   // PLUGIN_ENVMON
-    const char* iphlpapi_profile;       // PLUGIN_ENVMON
-    const char* mpr_profile;            // PLUGIN_ENVMON
-    const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
-    bool abort_on_bsod;                 // PLUGIN_BSODMON
-    const char* ntdll_profile;          // PLUGIN_LIBRARYMON
-    const char* ole32_profile;          // PLUGIN_WMIMON
-    const char* wow_ole32_profile;      // PLUGIN_WMIMON
-    const char* memdump_dir;            // PLUGIN_MEMDUMP
-};
+    char* file = nullptr;
+    const char* display_file = nullptr;
+    void** access_ptrs = nullptr;
+    FILE* fp = nullptr;
+    bool ret = false;
 
-typedef enum drakvuf_plugin
-{
-    PLUGIN_SYSCALLS,
-    PLUGIN_POOLMON,
-    PLUGIN_FILETRACER,
-    PLUGIN_FILEDELETE,
-    PLUGIN_OBJMON,
-    PLUGIN_EXMON,
-    PLUGIN_SSDTMON,
-    PLUGIN_DEBUGMON,
-    PLUGIN_DELAYMON,
-    PLUGIN_CPUIDMON,
-    PLUGIN_SOCKETMON,
-    PLUGIN_REGMON,
-    PLUGIN_PROCMON,
-    PLUGIN_BSODMON,
-    PLUGIN_ENVMON,
-    PLUGIN_CRASHMON,
-    PLUGIN_CLIPBOARDMON,
-    PLUGIN_WINDOWMON,
-    PLUGIN_LIBRARYMON,
-    PLUGIN_DKOMMON,
-    PLUGIN_WMIMON,
-    PLUGIN_MEMDUMP,
-    __DRAKVUF_PLUGIN_LIST_MAX
-} drakvuf_plugin_t;
+    gchar* escaped_pname = nullptr;
+    gchar* escaped_fname = nullptr;
 
-static const char* drakvuf_plugin_names[] =
-{
-    [PLUGIN_SYSCALLS] = "syscalls",
-    [PLUGIN_POOLMON] = "poolmon",
-    [PLUGIN_FILETRACER] = "filetracer",
-    [PLUGIN_FILEDELETE] = "filedelete",
-    [PLUGIN_OBJMON] = "objmon",
-    [PLUGIN_EXMON] = "exmon",
-    [PLUGIN_SSDTMON] = "ssdtmon",
-    [PLUGIN_DEBUGMON] = "debugmon",
-    [PLUGIN_DELAYMON] = "delaymon",
-    [PLUGIN_CPUIDMON] = "cpuidmon",
-    [PLUGIN_SOCKETMON] = "socketmon",
-    [PLUGIN_REGMON] = "regmon",
-    [PLUGIN_PROCMON] = "procmon",
-    [PLUGIN_BSODMON] = "bsodmon",
-    [PLUGIN_ENVMON] = "envmon",
-    [PLUGIN_CRASHMON] = "crashmon",
-    [PLUGIN_CLIPBOARDMON] = "clipboardmon",
-    [PLUGIN_WINDOWMON] = "windowmon",
-    [PLUGIN_LIBRARYMON] = "librarymon",
-    [PLUGIN_DKOMMON] = "dkommon",
-    [PLUGIN_WMIMON] = "wmimon",
-    [PLUGIN_MEMDUMP] = "memdump",
-};
+    plugin->memdump_counter++;
 
-static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
-{
-    [PLUGIN_SYSCALLS]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_POOLMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_FILETRACER]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_FILEDELETE]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_OBJMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_EXMON]        = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_SSDTMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_DEBUGMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_DELAYMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_CPUIDMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_SOCKETMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_REGMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_PROCMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_BSODMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_ENVMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_CRASHMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_CLIPBOARDMON] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_WINDOWMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_LIBRARYMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_DKOMMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_WMIMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_MEMDUMP]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-};
-
-class plugin
-{
-public:
-    virtual ~plugin() = default;
-};
-
-class drakvuf_plugins
-{
-private:
-    drakvuf_t drakvuf;
-    output_format_t output;
-    os_t os;
-    plugin* plugins[__DRAKVUF_PLUGIN_LIST_MAX] = { [0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = nullptr };
-
-public:
-    drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
-    ~drakvuf_plugins();
-    int start(drakvuf_plugin_t plugin, const plugins_options* config);
-};
-
-/***************************************************************************/
-
-struct vmi_lock_guard
-{
-    vmi_lock_guard(drakvuf_t drakvuf_) : drakvuf(drakvuf_), vmi()
+    if (plugin->memdump_dir)
     {
-        lock();
+        if (asprintf(&file, "%s/%d-0x%llx-%04d.dmp", plugin->memdump_dir, info->proc_data.pid,
+                     (unsigned long long) ctx->addr, plugin->memdump_counter) < 0)
+            goto done;
+
+        display_file = (const char*)file;
+    }
+    else
+    {
+        // dry run, just print that the dump would be saved
+        ret = true;
+        display_file = DUMP_NAME_PLACEHOLDER;
+        goto printout;
     }
 
-    vmi_instance_t lock()
-    {
-        if (!vmi)
-            vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    access_ptrs = (void**)g_malloc(num_pages * sizeof(void*));
 
-        return vmi;
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, access_ptrs))
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed mmap guest\n");
+        goto done;
     }
 
-    bool unlock()
+    fp = fopen(file, "w");
+
+    if (!fp)
     {
-        if (vmi)
+        PRINT_DEBUG("[MEMDUMP] Failed to open file\n");
+        goto done;
+    }
+
+    for (size_t i = 0; i < num_pages; i++)
+    {
+        if (access_ptrs[i])
         {
-            drakvuf_release_vmi(drakvuf);
-            vmi = nullptr;
-            return true;
+            fwrite(access_ptrs[i], VMI_PS_4KB, 1, fp);
+            munmap(access_ptrs[i], VMI_PS_4KB);
         }
-        return false;
-
+        else
+        {
+            // unaccessible page, pad with zeros to ensure proper alignment of the data
+            uint8_t zeros[VMI_PS_4KB] = {};
+            fwrite(zeros, VMI_PS_4KB, 1, fp);
+        }
     }
 
-    bool is_lock() const { return vmi == nullptr ? true : false; }
+    fclose(fp);
+    ret = true;
 
-    operator vmi_instance_t() const { return vmi; }
-
-    ~vmi_lock_guard()
+printout:
+    switch (plugin->m_output_format)
     {
-        unlock();
+        case OUTPUT_CSV:
+            printf("memdump," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",\"%s\",%d,%" PRIx64 ",%" PRIu64 ",\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, info->trap->name, reason, info->proc_data.pid, ctx->addr, num_pages * VMI_PS_4KB, display_file);
+            break;
+        case OUTPUT_KV:
+            printf("memdump Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,DumpReason=\"%s\",DumpPID=%d,DumpAddr=%" PRIx64 ",DumpSize=%" PRIu64 ",DumpFilename=\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   info->trap->name, reason, info->proc_data.pid, ctx->addr, num_pages * VMI_PS_4KB, display_file);
+            break;
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_fname = drakvuf_escape_str(display_file);
+            printf( "{"
+                    "\"Plugin\": \"memdump\","
+                    "\"TimeStamp\":" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": %s,"
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\": %d,"
+                    "\"PPID\": %d,"
+                    "\"Method\": \"%s\","
+                    "\"DumpReason\": \"%s\","
+                    "\"DumpPID\": %d,"
+                    "\"DumpAddr\": %" PRIx64 ","
+                    "\"DumpSize\": %" PRIu64 ","
+                    "\"DumpFilename\": %s"
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    info->trap->name, reason, info->proc_data.pid, ctx->addr,
+                    num_pages * VMI_PS_4KB, escaped_fname);
+            g_free(escaped_fname);
+            g_free(escaped_pname);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[MEMDUMP] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" Reason:\"%s\" Process:%d Base:0x%" PRIx64 " Size:%" PRIu64 " File:\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, reason, info->proc_data.pid, ctx->addr,
+                   num_pages * VMI_PS_4KB, display_file);
+            break;
     }
 
-    drakvuf_t drakvuf;
-    vmi_instance_t vmi;
-};
+    printf("\n");
 
-#endif
+done:
+    free(file);
+    g_free(access_ptrs);
+
+    return ret;
+}
+
+static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    // HANDLE ProcessHandle
+    uint64_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    // OUT PVOID *BaseAddress
+    addr_t mem_base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 2);
+
+    if (process_handle != 0xffffffffffffffffULL)
+    {
+        PRINT_DEBUG("[MEMDUMP] Process handle not pointing to self, ignore\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    auto plugin = get_trap_plugin<memdump>(info);
+    if (!plugin)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB, .dtb = info->regs->cr3 };
+    ctx.addr = mem_base_address_ptr;
+
+    addr_t mem_base_address;
+
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &mem_base_address))
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed to read base address in NtFreeVirtualMemory\n");
+        drakvuf_release_vmi(drakvuf);
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    mmvad_info_t mmvad;
+
+    if (VMI_SUCCESS != drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, mem_base_address, &mmvad))
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed to find MMVAD for memory passed to NtFreeVirtualMemory\n");
+        drakvuf_release_vmi(drakvuf);
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    ctx.addr = mem_base_address;
+    uint16_t magic;
+    char* magic_c = (char*)&magic;
+
+    if (VMI_SUCCESS != vmi_read_16(vmi, &ctx, &magic))
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed to access memory to be used with NtFreeVirtualMemory\n");
+        drakvuf_release_vmi(drakvuf);
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    if (magic_c[0] == 'M' && magic_c[1] == 'Z')
+    {
+        ctx.addr = mmvad.starting_vpn << 12;
+        size_t num_pages = mmvad.ending_vpn - mmvad.starting_vpn + 1;
+
+        if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, num_pages, "Possible binary detected"))
+        {
+            PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
+        }
+    }
+
+    drakvuf_release_vmi(drakvuf);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
+    : pluginex(drakvuf, output)
+{
+    this->memdump_dir = c->memdump_dir;
+    this->memdump_counter = 0;
+
+    breakpoint_in_system_process_searcher bp;
+    if (!register_trap<memdump>(drakvuf, nullptr, this, free_virtual_memory_hook_cb, bp.for_syscall_name("NtFreeVirtualMemory")))
+    {
+        throw -1;
+    }
+}
