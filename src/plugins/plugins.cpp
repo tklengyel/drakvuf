@@ -142,7 +142,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                            const plugins_options* options)
 {
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
-            plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
+         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
     {
         PRINT_DEBUG("Starting plugin %s\n", drakvuf_plugin_names[plugin_id]);
 

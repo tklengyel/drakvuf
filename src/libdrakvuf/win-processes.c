@@ -609,8 +609,7 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_p
             return false;
         }
 
-    }
-    while (next_list_entry != list_head);
+    } while (next_list_entry != list_head);
 
     return false;
 }
@@ -742,8 +741,7 @@ bool win_enumerate_processes( drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t 
             PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
             return false;
         }
-    }
-    while (next_list_entry != list_head);
+    } while (next_list_entry != list_head);
 
     return true;
 }
@@ -797,8 +795,7 @@ bool win_enumerate_processes_with_module( drakvuf_t drakvuf, const char* module_
             PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
             return false;
         }
-    }
-    while (next_list_entry != list_head);
+    } while (next_list_entry != list_head);
 
     return false;
 }

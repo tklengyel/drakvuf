@@ -211,7 +211,7 @@ int get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
         xc_dominfo_t info = { 0 };
 
         if ( 1 == xc_domain_getinfo(xen->xc, _domID, 1, &info)
-                && info.domid == _domID)
+             && info.domid == _domID)
         {
             _name = libxl_domid_to_name(xen->xl_ctx, _domID);
         }
@@ -336,6 +336,5 @@ void xen_force_resume(xen_interface_t* xen, domid_t domID)
         else
             break;
 
-    }
-    while (1);
+    } while (1);
 }

@@ -1431,8 +1431,8 @@ static addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char cons
         access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_PID, };
         addr_t module_list_head;
         if (VMI_SUCCESS == drakvuf_get_process_pid(drakvuf, eprocess_base, &ctx.pid) &&
-                drakvuf_get_module_list(drakvuf, eprocess_base, &module_list_head) &&
-                drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, lib, &module_ctx.module_addr))
+            drakvuf_get_module_list(drakvuf, eprocess_base, &module_list_head) &&
+            drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, lib, &module_ctx.module_addr))
         {
             drakvuf_enumerate_processes_with_module(drakvuf, lib, module_visitor, &module_ctx);
         }

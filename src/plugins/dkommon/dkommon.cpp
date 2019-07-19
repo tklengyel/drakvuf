@@ -196,7 +196,7 @@ static event_response_t check_hidden_process(drakvuf_t drakvuf, drakvuf_trap_inf
         goto err;
 
     if (list_entry_va == flink && flink == blink &&
-            std::find(d->processes_list.begin(), d->processes_list.end(), info->proc_data.pid) == d->processes_list.end())
+        std::find(d->processes_list.begin(), d->processes_list.end(), info->proc_data.pid) == d->processes_list.end())
     {
         d->processes_list.push_back(info->proc_data.pid);
         print_hidden_process_information(drakvuf, info);
@@ -351,8 +351,7 @@ static std::vector<std::string> enumerate_drivers(dkommon* d, drakvuf_t drakvuf)
             drivers_list.push_back(std::string(reinterpret_cast<char*>(name->contents)));
             vmi_free_unicode_str(name);
         }
-    }
-    while (entry != list_head);
+    } while (entry != list_head);
 
     return drivers_list;
 }

@@ -255,11 +255,11 @@ bool rekall_lookup_array(
     for (size_t i = 0; i < array_size; i++)
     {
         if (!rekall_lookup_in_json(
-                    symbol_subsymbol_array[i][0],
-                    symbol_subsymbol_array[i][1],
-                    &rva[i],
-                    size,
-                    rekall_profile_json)
+                symbol_subsymbol_array[i][0],
+                symbol_subsymbol_array[i][1],
+                &rva[i],
+                size,
+                rekall_profile_json)
            )
         {
             errors++;

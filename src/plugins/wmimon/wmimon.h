@@ -119,9 +119,15 @@ class wmimon: public pluginex
 {
 public:
     wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output);
-    ~wmimon() { delete[] m_offsets; };
+    ~wmimon()
+    {
+        delete[] m_offsets;
+    };
 
-    const size_t* Offsets() const  { return m_offsets; }
+    const size_t* Offsets() const
+    {
+        return m_offsets;
+    }
 
 private:
     size_t* m_offsets;

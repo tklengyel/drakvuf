@@ -463,7 +463,7 @@ static void extract_ca_file(filedelete* f,
             {
                 uint8_t page[4096];
 
-                if ( VMI_FAILURE == vmi_read_pa(vmi, VMI_BIT_MASK(12,48) & pte, 4096, &page, NULL) )
+                if ( VMI_FAILURE == vmi_read_pa(vmi, VMI_BIT_MASK(12, 48) & pte, 4096, &page, NULL) )
                     continue;
 
                 if ( !fseek ( fp, fileoffset, SEEK_SET ) )
@@ -727,7 +727,7 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         goto done;
 
     if ( !drakvuf_get_current_thread_id(drakvuf, info, &thread_id) ||
-            !injector->target_thread_id || thread_id != injector->target_thread_id )
+         !injector->target_thread_id || thread_id != injector->target_thread_id )
         goto done;
 
     if (info->regs->rax)
@@ -769,7 +769,7 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return 0;
 
     if ( !drakvuf_get_current_thread_id(drakvuf, info, &thread_id) ||
-            !injector->target_thread_id || thread_id != injector->target_thread_id )
+         !injector->target_thread_id || thread_id != injector->target_thread_id )
         return 0;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -855,7 +855,7 @@ static bool start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_ins
 
     uint32_t target_thread_id = 0;
     if ( !drakvuf_get_current_thread_id(drakvuf, info, &target_thread_id) ||
-            !target_thread_id )
+         !target_thread_id )
     {
         PRINT_DEBUG("[FILEDELETE2] Failed to get Thread ID\n");
         return 0;

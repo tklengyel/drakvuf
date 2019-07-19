@@ -158,7 +158,7 @@ bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap,
             vmi_free_unicode_str(us);
         }
 
-        if (out.contents && !strcmp((char*)out.contents,trap->breakpoint.module))
+        if (out.contents && !strcmp((char*)out.contents, trap->breakpoint.module))
         {
             g_free(out.contents);
             return inject_trap(drakvuf, trap, dllbase, pid);
