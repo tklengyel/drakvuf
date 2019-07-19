@@ -1,4 +1,4 @@
-dist: xenial
+dist: bionic
 language: c
 sudo: false
 compiler: clang
@@ -29,9 +29,11 @@ matrix:
 #
     - env:
         - TEST="astyle"
-      sudo: required
-      install:
-        - sudo apt-get install astyle
+      addons:
+        apt:
+            update: true
+            packages:
+                - astyle
       script:
         - export ARTISTIC_STYLE_OPTIONS=".astylerc" && astyle -Q `find . | egrep "\.c|\.h"` > astyle.out
         - TEST=$(cat astyle.out | wc -l)
@@ -50,6 +52,7 @@ matrix:
         - TEST="compile"
       addons:
         apt:
+            update: true
             sources:
                 - ubuntu-toolchain-r-test
             packages:
@@ -91,6 +94,7 @@ matrix:
       sudo: required
       addons:
         apt:
+            update: true
             sources:
                 - ubuntu-toolchain-r-test
             packages:
@@ -136,9 +140,9 @@ matrix:
         - TEST="scan-build"
       addons:
         apt:
+            update: true
             sources:
                 - ubuntu-toolchain-r-test
-                - llvm-toolchain-xenial-7
             packages:
                 - bison
                 - flex
@@ -177,9 +181,9 @@ matrix:
         - TEST="SonarCloud"
       addons:
         apt:
+            update: true
             sources:
                 - ubuntu-toolchain-r-test
-                - llvm-toolchain-xenial-7
             packages:
                 - bison
                 - flex
