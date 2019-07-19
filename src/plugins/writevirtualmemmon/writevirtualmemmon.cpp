@@ -128,7 +128,7 @@ static vmi_pid_t get_pid_from_handle(drakvuf_t drakvuf, uint64_t handle, drakvuf
 }
 
 static void extract_memory_allocation(drakvuf_t drakvuf, const drakvuf_trap_info_t* info,
- addr_t buffer, addr_t buffer_size, vmi_instance_t vmi, writevirtualmemmon* wvm)
+ addr_t buffer, addr_t buffer_size, vmi_instance_t vmi, char* filename)
 {
     addr_t process_handle_val = 0;
     addr_t base_address_val = 0;
@@ -142,12 +142,9 @@ static void extract_memory_allocation(drakvuf_t drakvuf, const drakvuf_trap_info
         ctx.dtb = info->regs->cr3;
         ctx.addr = buffer_val;
         if ( VMI_FAILURE != vmi_read(vmi, &ctx, buffer_size_val, content, NULL )){
-            char* filename = NULL;
-            if(asprintf(&filename, "%s/" FORMAT_TIMEVAL "_%d_write.bin", wvm->dump_folder, UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid) >= 0){
-                FILE* file = fopen(filename, "wb");
-                fwrite(content, 1, buffer_size_val, file);
-                fclose(file);
-            }
+            FILE* file = fopen(filename, "wb");
+            fwrite(content, 1, buffer_size_val, file);
+            fclose(file);
         }
         g_free(content);
     }
@@ -161,12 +158,17 @@ static event_response_t trap_NtWriteVirtualMemory_cb(drakvuf_t drakvuf, drakvuf_
     addr_t buffer = drakvuf_get_function_argument(drakvuf, info, 3);
     addr_t buffer_size = drakvuf_get_function_argument(drakvuf, info, 4);
     addr_t nb_bytes_written = drakvuf_get_function_argument(drakvuf, info, 5);
+    gchar* escaped_name = NULL;
+    gchar* escaped_target = NULL;
+    char* filename = NULL;
                  
     if(wvm->dump_folder)
     {
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        extract_memory_allocation(drakvuf, info, buffer, buffer_size, vmi, wvm);
-        drakvuf_release_vmi(drakvuf);
+        if(asprintf(&filename, "%s/" FORMAT_TIMEVAL "_%d_dump.bin", wvm->dump_folder, UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid) >= 0){ 
+            vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+            extract_memory_allocation(drakvuf, info, buffer, buffer_size, vmi, filename);
+            drakvuf_release_vmi(drakvuf);
+        }
     }
 
     vmi_pid_t target_pid = get_pid_from_handle(drakvuf, process_handle, info);
@@ -178,7 +180,59 @@ static event_response_t trap_NtWriteVirtualMemory_cb(drakvuf_t drakvuf, drakvuf_
     if (!target_name)
         target_name = g_strdup("<UNKNOWN>");
 
-    printf("FROM : [%d] %s TO : [%d] %s\n", info->proc_data.pid, drakvuf_escape_str(info->proc_data.name), target_pid, target_name);
+    switch (wvm->format)
+    {
+        case OUTPUT_CSV:
+            printf("writevirtualmemmon," FORMAT_TIMEVAL ",%d,%d,\"%s\",%s,%d,\"%s\",0x%" PRIx64 ",%lu,%s\n",
+                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                    info->proc_data.name, info->trap->name, target_pid, target_name, base_address,
+                    buffer_size, filename);
+            break;
+
+        case OUTPUT_KV:
+            printf("writevirtualmemmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
+                    "Method=%s,TargetPid=%d,TargetName=\"%s\",BaseAddress=0x%" PRIx64 ",Size=%lu,"
+                    "FileName=%s\n",
+                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                    info->proc_data.name, info->trap->name, target_pid, target_name, base_address,
+                    buffer_size, filename);
+            break;
+
+        case OUTPUT_JSON:
+            escaped_name = drakvuf_escape_str(info->proc_data.name);
+            escaped_target = drakvuf_escape_str(target_name);
+            printf("{"
+                    "\"Plugin\" : \"writevirtualmemmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"ProcessName\": %s,"
+                    "\"Method\" : \"%s\","
+                    "\"TargetPid\" : %d,"
+                    "\"TargetName\" : %s,"
+                    "\"BaseAddress\" : \"0x%" PRIx64 "\","
+                    "\"Size\" : %lu,"
+                    "\"FileName\": \"%s\""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    info->proc_data.pid, info->proc_data.ppid, escaped_name,
+                    info->trap->name, target_pid, escaped_target, 
+                    base_address, buffer_size, filename);
+            g_free(escaped_name);
+            g_free(escaped_target);
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[WRITEVIRTUALMEMMON] TIME:" FORMAT_TIMEVAL "VCPU:%" PRIu32 "CR3:0x%" PRIx64
+                   ", PID:%d, PPID %d \"%s\" %s:%" PRIi64 " %s, Target: PID:%d, \"%s\", Base: 0x%" PRIx64
+                   ", Size: %lu FileName: \"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
+                   info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name,
+                   target_pid, target_name, base_address, buffer_size, filename);
+            break;
+    }
     g_free(target_name);
     return 0;
 }
