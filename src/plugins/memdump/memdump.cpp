@@ -111,7 +111,45 @@
 
 #define DUMP_NAME_PLACEHOLDER "(not configured)"
 
-static bool dump_memory_region(drakvuf_t drakvuf, vmi_instance_t vmi, drakvuf_trap_info_t* info, memdump* plugin, access_context_t* ctx, size_t num_pages, const char* reason)
+// TODO move to common library, this is also used in procmon
+static vmi_pid_t get_pid_from_handle(memdump* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)
+{
+    if (handle == 0 || handle == UINT64_MAX)
+        return info->proc_data.pid;
+
+    if (!info->proc_data.base_addr)
+        return 0;
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    if (!obj)
+        return 0;
+
+    vmi_pid_t pid;
+    addr_t eprocess_base = obj + f->object_header_body;
+    if (VMI_FAILURE == drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
+        return 0;
+
+    return pid;
+}
+
+/**
+ * Dumps the memory specified by access context, from `ctx->addr` (first byte) to `ctx->addr + len_bytes - 1` (last byte).
+ * File is stored in a path provided in --memdump-dir command line option and named according to the scheme:
+ * <process_pid>_<base_address>_<counter>.dmp
+ *
+ * For some dumps, a custom structure `extras` may be optionally provided together with `printout_extras` method
+ * which will enrich the default data printout.
+ */
+static bool dump_memory_region(
+        drakvuf_t drakvuf,
+        vmi_instance_t vmi,
+        drakvuf_trap_info_t* info,
+        memdump* plugin,
+        access_context_t* ctx,
+        size_t len_bytes,
+        const char* reason,
+        void* extras,
+        void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, void* extras))
 {
     char* file = nullptr;
     const char* display_file = nullptr;
@@ -121,6 +159,13 @@ static bool dump_memory_region(drakvuf_t drakvuf, vmi_instance_t vmi, drakvuf_tr
 
     gchar* escaped_pname = nullptr;
     gchar* escaped_fname = nullptr;
+
+    addr_t input_addr;
+    addr_t aligned_addr;
+    addr_t intra_page_offset;
+    size_t aligned_len;
+    size_t len_remainder;
+    size_t num_pages;
 
     plugin->memdump_counter++;
 
@@ -140,6 +185,22 @@ static bool dump_memory_region(drakvuf_t drakvuf, vmi_instance_t vmi, drakvuf_tr
         goto printout;
     }
 
+    input_addr = ctx->addr;
+
+    aligned_addr = ctx->addr & ~(VMI_PS_4KB - 1);
+    intra_page_offset = ctx->addr & (VMI_PS_4KB - 1);
+
+    aligned_len = len_bytes & ~(VMI_PS_4KB - 1);
+    len_remainder = len_bytes & (VMI_PS_4KB - 1);
+
+    if (len_remainder)
+    {
+        aligned_len += VMI_PS_4KB;
+    }
+
+    ctx->addr = aligned_addr;
+    num_pages = aligned_len / VMI_PS_4KB;
+
     access_ptrs = (void**)g_malloc(num_pages * sizeof(void*));
 
     if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, access_ptrs))
@@ -158,17 +219,24 @@ static bool dump_memory_region(drakvuf_t drakvuf, vmi_instance_t vmi, drakvuf_tr
 
     for (size_t i = 0; i < num_pages; i++)
     {
+        // sometimes we are supposed to write less than the whole page
+        size_t write_length = len_bytes >= VMI_PS_4KB ? VMI_PS_4KB : len_bytes;
+
         if (access_ptrs[i])
         {
-            fwrite(access_ptrs[i], VMI_PS_4KB, 1, fp);
+            fwrite((char*)access_ptrs[i] + intra_page_offset, write_length, 1, fp);
             munmap(access_ptrs[i], VMI_PS_4KB);
         }
         else
         {
             // unaccessible page, pad with zeros to ensure proper alignment of the data
             uint8_t zeros[VMI_PS_4KB] = {};
-            fwrite(zeros, VMI_PS_4KB, 1, fp);
+            fwrite(zeros + intra_page_offset, write_length, 1, fp);
         }
+
+        // this applies only to the first page
+        intra_page_offset = 0;
+        len_bytes -= write_length;
     }
 
     fclose(fp);
@@ -178,14 +246,20 @@ printout:
     switch (plugin->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("memdump," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",\"%s\",%d,%" PRIx64 ",%" PRIu64 ",\"%s\"\n",
+            printf("memdump," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",\"%s\",%d,%" PRIx64 ",%" PRIu64 ",\"%s\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    info->proc_data.userid, info->trap->name, reason, info->proc_data.pid, ctx->addr, num_pages * VMI_PS_4KB, display_file);
+
+            if (printout_extras)
+                printout_extras(drakvuf, plugin->m_output_format, extras);
             break;
         case OUTPUT_KV:
-            printf("memdump Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,DumpReason=\"%s\",DumpPID=%d,DumpAddr=%" PRIx64 ",DumpSize=%" PRIu64 ",DumpFilename=\"%s\"\n",
+            printf("memdump Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,DumpReason=\"%s\",DumpPID=%d,DumpAddr=%" PRIx64 ",DumpSize=%" PRIu64 ",DumpFilename=\"%s\"",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    info->trap->name, reason, info->proc_data.pid, ctx->addr, num_pages * VMI_PS_4KB, display_file);
+
+            if (printout_extras)
+                printout_extras(drakvuf, plugin->m_output_format, extras);
             break;
         case OUTPUT_JSON:
             escaped_pname = drakvuf_escape_str(info->proc_data.name);
@@ -203,14 +277,16 @@ printout:
                     "\"DumpPID\": %d,"
                     "\"DumpAddr\": %" PRIx64 ","
                     "\"DumpSize\": %" PRIu64 ","
-                    "\"DumpFilename\": %s"
-                    "}\n",
+                    "\"DumpFilename\": %s",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
                     info->proc_data.pid, info->proc_data.ppid,
                     info->trap->name, reason, info->proc_data.pid, ctx->addr,
                     num_pages * VMI_PS_4KB, escaped_fname);
+            if (printout_extras)
+                printout_extras(drakvuf, plugin->m_output_format, extras);
+            printf("}");
             g_free(escaped_fname);
             g_free(escaped_pname);
             break;
@@ -220,6 +296,9 @@ printout:
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, reason, info->proc_data.pid, ctx->addr,
                    num_pages * VMI_PS_4KB, display_file);
+
+            if (printout_extras)
+                printout_extras(drakvuf, plugin->m_output_format, extras);
             break;
     }
 
@@ -285,14 +364,96 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
     if (magic_c[0] == 'M' && magic_c[1] == 'Z')
     {
         ctx.addr = mmvad.starting_vpn << 12;
-        size_t num_pages = mmvad.ending_vpn - mmvad.starting_vpn + 1;
+        size_t len_bytes = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
 
-        if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, num_pages, "Possible binary detected"))
+        if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len_bytes, "Possible binary detected", nullptr, nullptr))
         {
             PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
         }
     }
 
+    drakvuf_release_vmi(drakvuf);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+typedef struct write_virtual_memory_extras
+{
+    vmi_pid_t target_pid;
+    char* target_name;
+    addr_t base_address;
+} write_virtual_memory_extras_t;
+
+static void printout_write_virtual_memory(drakvuf_t drakvuf, output_format_t format, void* extras)
+{
+    auto* xtr = (write_virtual_memory_extras_t*)extras;
+
+    switch (format)
+    {
+        case OUTPUT_CSV:
+            printf(",%d,%" PRIx64 "",
+                   xtr->target_pid, xtr->base_address);
+            break;
+        case OUTPUT_KV:
+            printf(",TargetPID=%d,WriteAddr=%" PRIx64 "",
+            xtr->target_pid, xtr->base_address);
+            break;
+        case OUTPUT_JSON:
+            printf( ","
+                    "\"TargetPID\": %d,"
+                    "\"WriteAddr\": %" PRIx64,
+                    xtr->target_pid, xtr->base_address);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf(" TargetPID:%d WriteAddr:%" PRIx64 "",
+            xtr->target_pid, xtr->base_address);
+            break;
+    }
+}
+
+static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    // IN HANDLE ProcessHandle
+    addr_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+
+    // IN PVOID BaseAddress
+    addr_t base_address = drakvuf_get_function_argument(drakvuf, info, 2);
+
+    // IN PVOID Buffer
+    addr_t buffer_ptr = drakvuf_get_function_argument(drakvuf, info, 3);
+
+    // IN ULONG NumberOfBytesToWrite
+    addr_t buffer_size = drakvuf_get_function_argument(drakvuf, info, 4);
+
+    auto plugin = get_trap_plugin<memdump>(info);
+    if (!plugin)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB, .dtb = info->regs->cr3 };
+    ctx.addr = buffer_ptr;
+
+    vmi_pid_t target_pid = get_pid_from_handle(plugin, drakvuf, info, process_handle);
+    addr_t process_addr = 0;
+    char* target_name = nullptr;
+    if (drakvuf_find_process(drakvuf, target_pid, nullptr, &process_addr))
+        target_name = drakvuf_get_process_name(drakvuf, process_addr, true);
+
+    if (!target_name)
+        target_name = g_strdup("<UNKNOWN>");
+
+    write_virtual_memory_extras_t extras = {
+        .target_pid = target_pid,
+        .target_name = target_name,
+        .base_address = base_address,
+    };
+
+    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, buffer_size, "NtWriteVirtualMemory called", (void*)&extras, printout_write_virtual_memory))
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
+    }
+
+    g_free(target_name);
     drakvuf_release_vmi(drakvuf);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -303,8 +464,12 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
     this->memdump_dir = c->memdump_dir;
     this->memdump_counter = 0;
 
+    if (!drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_HEADER", "Body", &this->object_header_body))
+        throw -1;
+
     breakpoint_in_system_process_searcher bp;
-    if (!register_trap<memdump>(drakvuf, nullptr, this, free_virtual_memory_hook_cb, bp.for_syscall_name("NtFreeVirtualMemory")))
+    if (!register_trap<memdump>(drakvuf, nullptr, this, free_virtual_memory_hook_cb, bp.for_syscall_name("NtFreeVirtualMemory")) ||
+        !register_trap<memdump>(drakvuf, nullptr, this, write_virtual_memory_hook_cb, bp.for_syscall_name("NtWriteVirtualMemory")))
     {
         throw -1;
     }
