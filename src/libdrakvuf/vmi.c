@@ -209,7 +209,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
         drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
 
         if (trap->cb && trap->memaccess.type == POST &&
-                (trap->memaccess.access & pass->access))
+            (trap->memaccess.access & pass->access))
         {
             drakvuf_trap_info_t trap_info =
             {
@@ -291,7 +291,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             {
                 s->breakpoint.doubletrap = 0;
                 if ( VMI_FAILURE == vmi_write_8_pa(drakvuf->vmi,
-                                                   (pass->remapped_gfn->r << 12) + (*pa & VMI_BIT_MASK(0,11)),
+                                                   (pass->remapped_gfn->r << 12) + (*pa & VMI_BIT_MASK(0, 11)),
                                                    &bp) )
                 {
                     fprintf(stderr, "Critical error in re-copying remapped gfn\n");
@@ -378,7 +378,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
         drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
 
         if (trap->cb && trap->memaccess.type == PRE &&
-                (trap->memaccess.access & event->mem_event.out_access))
+            (trap->memaccess.access & event->mem_event.out_access))
         {
             trap_info.trap = trap;
             rsp |= trap->cb(drakvuf, &trap_info);
@@ -786,7 +786,7 @@ void remove_trap(drakvuf_t drakvuf,
                 }
 
                 if ( VMI_FAILURE == vmi_write_8_pa(drakvuf->vmi,
-                                                   (remapped_gfn->r << 12) + (container->breakpoint.pa & VMI_BIT_MASK(0,11)),
+                                                   (remapped_gfn->r << 12) + (container->breakpoint.pa & VMI_BIT_MASK(0, 11)),
                                                    &backup) )
                 {
                     fprintf(stderr, "Critical error in removing int3\n");
@@ -1088,7 +1088,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         goto err_exit;
     }
 
-    addr_t rpa = (remapped_gfn->r<<12) + (container->breakpoint.pa & VMI_BIT_MASK(0,11));
+    addr_t rpa = (remapped_gfn->r<<12) + (container->breakpoint.pa & VMI_BIT_MASK(0, 11));
     uint8_t test;
 
     if (VMI_FAILURE == vmi_read_8_pa(vmi, pa, &test))

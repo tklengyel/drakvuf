@@ -111,7 +111,7 @@ using std::string;
 using std::cout;
 using std::endl;
 
-void dump_buffer(const uint8_t buffer[], const size_t count, const size_t columns, addr_t base_addr,std::string header, std::string footer)
+void dump_buffer(const uint8_t buffer[], const size_t count, const size_t columns, addr_t base_addr, std::string header, std::string footer)
 {
     cout << header << endl;
 

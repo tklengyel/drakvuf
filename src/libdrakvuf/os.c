@@ -120,7 +120,7 @@ bool fill_offsets_from_rekall(drakvuf_t drakvuf, size_t size, const char* names 
         return 0;
 
     if (!drakvuf_get_struct_members_array_rva(
-                drakvuf, names, size, drakvuf->offsets))
+            drakvuf, names, size, drakvuf->offsets))
     {
         PRINT_DEBUG("Failed to find offsets for array of structure names and subsymbols.\n");
     }

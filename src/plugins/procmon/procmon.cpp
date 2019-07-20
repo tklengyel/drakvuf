@@ -735,9 +735,9 @@ procmon::procmon(drakvuf_t drakvuf, output_format_t output)
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap<procmon>(drakvuf, nullptr, this, create_user_process_hook_cb, bp.for_syscall_name("NtCreateUserProcess")) ||
-            !register_trap<procmon>(drakvuf, nullptr, this, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
-            !register_trap<procmon>(drakvuf, nullptr, this, open_process_hook_cb, bp.for_syscall_name("NtOpenProcess")) ||
-            !register_trap<procmon>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")))
+        !register_trap<procmon>(drakvuf, nullptr, this, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
+        !register_trap<procmon>(drakvuf, nullptr, this, open_process_hook_cb, bp.for_syscall_name("NtOpenProcess")) ||
+        !register_trap<procmon>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")))
     {
         throw -1;
     }
