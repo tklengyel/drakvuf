@@ -343,7 +343,7 @@ static void print_file_obj_info(drakvuf_t drakvuf,
             printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\"",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    info->trap->name, file_path);
-            if (!file_attr.empty()) printf(",%s",file_attr.data());
+            if (!file_attr.empty()) printf(",%s", file_attr.data());
             if (!security_flags.empty()) printf(",%s", security_flags.data());
             if (!owner.empty()) printf(",%s", owner.data());
             if (!group.empty()) printf(",%s", group.data());
@@ -437,7 +437,7 @@ string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs)
     addr_t security_descriptor = 0;
     ctx.addr = attrs + f->offsets[_OBJECT_ATTRIBUTES_SecurityDescriptor];
     if ( VMI_SUCCESS == vmi_read_addr(vmi_lg.vmi, &ctx, &security_descriptor)
-            && security_descriptor )
+         && security_descriptor )
     {
         // Get flags of security descriptor
         uint16_t se_ctrl = 0;

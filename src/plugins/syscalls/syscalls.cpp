@@ -583,7 +583,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 
             for (j=0; j<NUM_SYSCALLS_WIN; j++)
             {
-                if ( !strcmp(symbol->name,win_syscalls[j].name) )
+                if ( !strcmp(symbol->name, win_syscalls[j].name) )
                 {
                     wrapper->syscall_index=j;
                     break;
@@ -630,11 +630,11 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 
                 /* These are all variables, not syscalls */
                 if (!strncmp(symbol->name, "sys_dmi", 7)              ||
-                        !strcmp(symbol->name,  "sys_tz")                  || /* used by gettimeofday */
-                        !strcmp(symbol->name,  "sys_tracepoint_refcount") ||
-                        !strcmp(symbol->name,  "sys_table")               ||
-                        !strcmp(symbol->name,  "sys_perf_refcount_enter") ||
-                        !strcmp(symbol->name,  "sys_perf_refcount_exit")   )
+                    !strcmp(symbol->name,  "sys_tz")                  || /* used by gettimeofday */
+                    !strcmp(symbol->name,  "sys_tracepoint_refcount") ||
+                    !strcmp(symbol->name,  "sys_table")               ||
+                    !strcmp(symbol->name,  "sys_perf_refcount_enter") ||
+                    !strcmp(symbol->name,  "sys_perf_refcount_exit")   )
                     continue;
             }
             else if ( strncmp(symbol->name, "__x64_sys_", 10) )
@@ -714,8 +714,7 @@ static GHashTable* read_syscalls_filter(const char* filter_file)
         }
         else
             free(line);
-    }
-    while (read != -1);
+    } while (read != -1);
 
     fclose(f);
     return table;

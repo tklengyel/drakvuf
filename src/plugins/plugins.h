@@ -261,9 +261,15 @@ struct vmi_lock_guard
 
     }
 
-    bool is_lock() const { return vmi == nullptr ? true : false; }
+    bool is_lock() const
+    {
+        return vmi == nullptr ? true : false;
+    }
 
-    operator vmi_instance_t() const { return vmi; }
+    operator vmi_instance_t() const
+    {
+        return vmi;
+    }
 
     ~vmi_lock_guard()
     {

@@ -29,6 +29,7 @@ stamp-h1
 **/*.libs
 **/*.dirstamp
 **/*.save
+**/*.swp
 
 # drakvuf binaries
 drakvuf

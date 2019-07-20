@@ -328,13 +328,13 @@ int main(int argc, char** argv)
                 injection_timeout = atoi(optarg);
                 break;
             case 'm':
-                if (!strncmp(optarg,"shellexec",9))
+                if (!strncmp(optarg, "shellexec", 9))
                     injection_method = INJECT_METHOD_SHELLEXEC;
-                if (!strncmp(optarg,"createproc",10))
+                if (!strncmp(optarg, "createproc", 10))
                     injection_method = INJECT_METHOD_CREATEPROC;
-                if (!strncmp(optarg,"shellcode",9))
+                if (!strncmp(optarg, "shellcode", 9))
                     injection_method = INJECT_METHOD_SHELLCODE;
-                if (!strncmp(optarg,"doppelganging",13))
+                if (!strncmp(optarg, "doppelganging", 13))
 #ifdef ENABLE_DOPPELGANGING
                     injection_method = INJECT_METHOD_DOPP;
 #else
@@ -359,11 +359,11 @@ int main(int argc, char** argv)
                 options.dump_folder = optarg;
                 break;
             case 'o':
-                if (!strncmp(optarg,"csv",3))
+                if (!strncmp(optarg, "csv", 3))
                     output = OUTPUT_CSV;
-                if (!strncmp(optarg,"kv",2))
+                if (!strncmp(optarg, "kv", 2))
                     output = OUTPUT_KV;
-                if (!strncmp(optarg,"json",4))
+                if (!strncmp(optarg, "json", 4))
                     output = OUTPUT_JSON;
                 break;
             case 'x':

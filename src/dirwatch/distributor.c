@@ -263,14 +263,12 @@ int main(int argc, char** argv)
                     }
                     break;
                 }
-            }
-            while (!ret);
+            } while (!ret);
         }
         else if ( processed != jobs )
             sleep(1);
 
-    }
-    while (!ret);
+    } while (!ret);
 
     inotify_rm_watch( fd, wd );
     close(fd);

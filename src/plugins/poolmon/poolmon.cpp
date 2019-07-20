@@ -272,7 +272,7 @@ poolmon::poolmon(drakvuf_t drakvuf, output_format_t output)
     this->trap.breakpoint.pid = 4;
     this->trap.breakpoint.addr_type = ADDR_RVA;
 
-    if ( !drakvuf_get_function_rva(drakvuf,"ExAllocatePoolWithTag", &this->trap.breakpoint.rva) )
+    if ( !drakvuf_get_function_rva(drakvuf, "ExAllocatePoolWithTag", &this->trap.breakpoint.rva) )
         throw -1;
 
     this->trap.breakpoint.module = "ntoskrnl.exe";
