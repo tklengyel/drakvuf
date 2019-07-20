@@ -2728,7 +2728,6 @@ static void perform_dry_run(char** argv) {
     if (res == crash_mode || res == FAULT_NOBITS)
       SAYF(cGRA "    len = %u, map size = %u, exec speed = %llu us\n" cRST, 
            q->len, q->bitmap_size, q->exec_us);
-
     switch (res) {
 
       case FAULT_NONE:
