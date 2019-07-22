@@ -1,10 +1,8 @@
-#include <iostream>
 #include <unistd.h>
 #include <afl_injector.h>
 #include <sys/shm.h>
 #include <sys/wait.h>
-#include <fstream>
-
+#include <unistd.h>
 #include <config.h>
 #include <ctype.h>
 #include <getopt.h>
@@ -12,13 +10,13 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <string.h>
-#include <unistd.h>
 #include <glib.h>
 #include <gmodule.h>
 #include "libhijack/libhijack.h"
 #include "libdrakvuf/libdrakvuf.h"
 #include "colors.h"
 #include "plugins/plugins.h"
+#include <fcntl.h>
 
 void afl_setup();
 void afl_forkserver();
@@ -100,19 +98,13 @@ json_object *get_inputs(json_object *function){
 using namespace std;
 int main(int argc, char *argv[])
 {
-    fstream file;
-    file.open("/home/ajinkya/College/gsoc19/AFL/log.txt", fstream::in|fstream::out|fstream::app);
-    if(file.fail())
-        cout<<"Couldnt open the file \n";
-    file<<"Setting up afl\n";
-    afl_setup();
-    file<<"Starting forkserver\n";
+    // int file  = open("/home/ajinkya/College/gsoc19/AFL/log.txt", O_WRONLY | O_CREAT );
+    FILE *temp_stderr = stderr;
+    stderr = fopen("/home/ajinkya/College/gsoc19/AFL/log_stderr.txt", "w");
+    afl_setup();    
     afl_forkserver();
-    file.close();
+    fprintf(stderr, "--------------------------------\n");
     afl_area_ptr[1<<10] = 12;
-    
-    (void)freopen("/home/ajinkya/College/gsoc19/AFL/stdout.txt", "w", stdout);
-    (void)freopen("/home/ajinkya/College/gsoc19/AFL/stderr.txt", "w", stderr);
 
     char *domain=NULL, *rekall_profile=NULL, *rekall_wow_profile = NULL, *function_name = NULL;
     char *lib_name=NULL;
@@ -130,6 +122,12 @@ int main(int argc, char *argv[])
     (void)libvmi_conf;
     eprint_current_time();
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
+    int argc_ind = 0;
+    while(argc_ind<argc)
+    {
+      fprintf(stderr, "%s \n", argv[argc_ind]);
+      argc_ind++;
+    }
     if (argc < 4)
     {
         fprintf(stderr, "Required input:\n"
@@ -258,14 +256,18 @@ int main(int argc, char *argv[])
     // error:
     drakvuf_resume(drakvuf); 
     drakvuf_close(drakvuf, 0);
-    printf("[+] Successfull = %d", successfull);
+    fprintf(stderr,"[+] Successfull = %d\n", successfull);
+    fclose(stderr);
+    stderr = temp_stderr;
+    //give time to wait as immediate calling crashes
+    return successfull;
   
 }
 
 /* Fork server logic, invoked once we hit _start. */
 
 void afl_forkserver() {
-
+  int run_num = 0;
   static unsigned char tmp[4];
 
   if (!afl_area_ptr) return;
@@ -285,9 +287,7 @@ void afl_forkserver() {
     int status;
 
     /* Whoops, parent dead? */
-
     if (read(FORKSRV_FD, tmp, 4) != 4) exit(2);
-
     child_pid = fork();
     if (child_pid < 0) exit(4);
 
@@ -298,7 +298,6 @@ void afl_forkserver() {
       afl_fork_child = 1;
       close(FORKSRV_FD);
       close(FORKSRV_FD + 1);
-      printf("In child\n");
       return;
 
     }
@@ -308,10 +307,9 @@ void afl_forkserver() {
     if (write(FORKSRV_FD + 1, &child_pid, 4) != 4) exit(5);
 
     /* Get and relay exit status to parent. */
-
     if (waitpid(child_pid, &status, 0) < 0) exit(6);
     if (write(FORKSRV_FD + 1, &status, 4) != 4) exit(7);
-
+    run_num++;
   }
 
 }
@@ -344,7 +342,7 @@ void afl_setup()
 
     if (afl_area_ptr == (void*)-1)
     {
-        printf("shmat failed\n");
+        fprintf(stderr,"shmat failed\n");
         exit(1);
     }
 

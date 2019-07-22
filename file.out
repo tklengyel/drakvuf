@@ -1,0 +1,27 @@
+1563789136.291720 DRAKVUF v0.6-bb4577d
+STARTING FUZZING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+Generating Input iteration 0>>>>>>>>>>>>>>>>
+Calling DummyDriver.sys!add1, with 1 arguments
+Calling With Input >>>>>>>>>>>>>>>>
+[
+  {
+    "type":"INTEGER",
+    "value":1438281484
+  }
+]
+[46m[30m[+] In CR3 CB PID=6372, Process Name = \Device\HarddiskVolume2\Windows\System32\notepad.exeThreadId = 6376, PPID = 4960, BASE Addr = ffffb48f64b4a580, User Id = 1[1m[30m, cr3 = e8a10000[0m
+user dtb = 3d200000
+dtb = e8a10000
+in setup stack from json
+[
+  {
+    "type":"INTEGER",
+    "value":1438281484
+  }
+]
+Init int arg[0] with value 1438281484
+[43m [+] injector_stack : ffff9d8442499438[0m
+[42m[+] RAX = 1438281485[0m
+waiting for lock
+Returned >>>>>>>>>>>>>>>>
+[+] Successfull = 1
