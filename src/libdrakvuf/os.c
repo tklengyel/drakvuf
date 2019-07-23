@@ -374,3 +374,11 @@ status_t drakvuf_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mm
 
     return 0;
 }
+
+status_t drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)
+{
+    if ( drakvuf->osi.get_pid_from_handle )
+        return drakvuf->osi.get_pid_from_handle(drakvuf, info, handle, pid);
+
+    return 0;
+}

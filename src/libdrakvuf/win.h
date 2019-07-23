@@ -168,4 +168,6 @@ bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t li
 
 status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
 
+status_t win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
+
 #endif
