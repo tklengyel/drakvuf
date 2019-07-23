@@ -364,6 +364,8 @@ page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf);
 int drakvuf_get_address_width(drakvuf_t drakvuf);
 const char* drakvuf_get_rekall_profile(drakvuf_t drakvuf);
 json_object* drakvuf_get_rekall_profile_json(drakvuf_t drakvuf);
+const char* drakvuf_get_rekall_wow_profile(drakvuf_t drakvuf);
+json_object* drakvuf_get_rekall_wow_profile_json(drakvuf_t drakvuf);
 
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf);
 
@@ -413,6 +415,7 @@ typedef struct _mmvad_info
 
 bool drakvuf_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
 
+addr_t drakvuf_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
 bool drakvuf_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
 bool drakvuf_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
 bool drakvuf_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
@@ -479,6 +482,11 @@ bool drakvuf_is_crashreporter(drakvuf_t drakvuf,
 bool drakvuf_get_module_list(drakvuf_t drakvuf,
                              addr_t process_base,
                              addr_t* module_list);
+
+bool drakvuf_get_module_list_wow(drakvuf_t drakvuf,
+                                 access_context_t* ctx,
+                                 addr_t wow_peb,
+                                 addr_t* module_list);
 
 // ObReferenceObjectByHandle
 bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,

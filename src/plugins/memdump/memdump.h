@@ -177,6 +177,27 @@ typedef struct target_config_entry
     std::string function_name;
 } target_config_entry_t;
 
+// type of a pointer residing on stack
+enum sptr_type_t
+{
+    ERROR,   // problem with stack inspection
+    MAIN,    // pointer to a main module
+    LINKED,  // pointer to some linked DLL module
+    UNLINKED // pointer to some non-legit memory
+};
+
+sptr_type_t check_module_linked_wow(drakvuf_t drakvuf,
+                                    vmi_instance_t vmi,
+                                    memdump* plugin,
+                                    drakvuf_trap_info_t* info,
+                                    addr_t dll_base);
+
+sptr_type_t check_module_linked(drakvuf_t drakvuf,
+                                vmi_instance_t vmi,
+                                memdump* plugin,
+                                drakvuf_trap_info_t* info,
+                                addr_t dll_base);
+
 struct memdump_config
 {
     const char* memdump_dir;
@@ -189,6 +210,8 @@ public:
     // for memdump.cpp
     const char* memdump_dir;
     int memdump_counter;
+    addr_t dll_base_rva;
+    addr_t dll_base_wow_rva;
 
     // for userhook.cpp
     std::vector<target_config_entry_t> wanted_hooks;
