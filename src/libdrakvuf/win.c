@@ -473,6 +473,9 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.is_crashreporter = win_is_crashreporter;
     drakvuf->osi.find_mmvad = win_find_mmvad;
     drakvuf->osi.get_pid_from_handle = win_get_pid_from_handle;
+    drakvuf->osi.get_wow_context = win_get_wow_context;
+    drakvuf->osi.get_user_stack32 = win_get_user_stack32;
+    drakvuf->osi.get_user_stack64 = win_get_user_stack64;
 
     return true;
 }
