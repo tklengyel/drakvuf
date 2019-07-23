@@ -540,6 +540,8 @@ addr_t drakvuf_get_function_argument(drakvuf_t drakvuf,
                                      drakvuf_trap_info_t* info,
                                      int argument_number);
 
+status_t drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
+
 /*---------------------------------------------------------
  * Event FD functions
  */

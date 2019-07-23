@@ -199,6 +199,9 @@ typedef struct os_interface
     status_t (*find_mmvad)
     (drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
 
+    status_t (*get_pid_from_handle)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
+
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);

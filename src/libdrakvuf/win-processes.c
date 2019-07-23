@@ -992,3 +992,26 @@ status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_
 
     return VMI_FAILURE;
 }
+
+status_t win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)
+{
+    if (handle == 0 || handle == UINT64_MAX)
+    {
+        *pid = info->proc_data.pid;
+        return VMI_SUCCESS;
+    }
+
+    if (!info->proc_data.base_addr)
+    {
+        return VMI_FAILURE;
+    }
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    if (!obj)
+    {
+        return VMI_FAILURE;
+    }
+
+    addr_t eprocess_base = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
+    return drakvuf_get_process_pid(drakvuf, eprocess_base, pid);
+}
