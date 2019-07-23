@@ -448,7 +448,7 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap<memdump>(drakvuf, nullptr, this, free_virtual_memory_hook_cb, bp.for_syscall_name("NtFreeVirtualMemory")) ||
-            !register_trap<memdump>(drakvuf, nullptr, this, write_virtual_memory_hook_cb, bp.for_syscall_name("NtWriteVirtualMemory")))
+        !register_trap<memdump>(drakvuf, nullptr, this, write_virtual_memory_hook_cb, bp.for_syscall_name("NtWriteVirtualMemory")))
     {
         throw -1;
     }
