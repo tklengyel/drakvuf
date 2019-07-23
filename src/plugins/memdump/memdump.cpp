@@ -111,8 +111,6 @@
 
 #define DUMP_NAME_PLACEHOLDER "(not configured)"
 
-// TODO move to common library, this is also used in procmon
-
 /**
  * Dumps the memory specified by access context, from `ctx->addr` (first byte) to `ctx->addr + len_bytes - 1` (last byte).
  * File is stored in a path provided in --memdump-dir command line option and named according to the scheme:
