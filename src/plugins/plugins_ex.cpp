@@ -120,6 +120,9 @@ std::string FieldToString(const std::map<uint64_t, std::string>& maps, uint64_t 
 
 }// namespace print
 
+// Errors
+char ERROR_MSG_ADDING_TRAP[] = "Failed to add a trap";
+
 pluginex::pluginex(drakvuf_t drakvuf, output_format_t output)
     : m_output_format(output)
     , m_params()
@@ -129,22 +132,6 @@ pluginex::pluginex(drakvuf_t drakvuf, output_format_t output)
 pluginex::~pluginex()
 {
     g_slist_free_full(m_params, reinterpret_cast<void (*)(void*)>(destroy_plugin_params));
-}
-
-bool pluginex::module_trap_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* ctx)
-{
-    trap_context_dll const* data = reinterpret_cast<trap_context_dll*>(ctx);
-
-    PRINT_DEBUG("[PLUGIN_EX] trap_visitor: CR3[0x%lX] pid[0x%X] base_name[%s] load_address[0x%lX] full_name[%s]\n",
-                module_info->dtb, module_info->pid, module_info->base_name->contents, module_info->base_addr, module_info->full_name->contents);
-
-    if (module_info->is_wow != data->wow)
-        return false;
-
-    data->trap->breakpoint.pid = module_info->pid;
-    data->trap->breakpoint.addr = module_info->base_addr + data->function_rva;
-
-    return drakvuf_add_trap(drakvuf, data->trap);
 }
 
 void pluginex::attach_plugin_params(drakvuf_trap_t* data)

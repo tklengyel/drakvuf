@@ -213,6 +213,8 @@ void drakvuf_c::resume()
     drakvuf_resume(drakvuf);
 }
 
+
+
 int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                           uint32_t injection_tid,
                           const char* inject_cmd,

@@ -110,5 +110,12 @@ AM_CFLAGS = -Werror -Wall -Wextra $(CFLAGS)
 AM_CFLAGS += -Wno-missing-field-initializers
 AM_LDFLAGS = $(LDFLAGS) $(GLIB_LIBS)
 
+if SANITIZE
+# For some reason this doesn't work.
+
+#AM_CFLAGS += $(SANITIZE_CFLAGS)
+#AM_LDFLAGS += $(SANITIZE_LDFLAGS)
+endif
+
 noinst_LTLIBRARIES= libxenhelper.la
 libxenhelper_la_SOURCES= $(h_sources) $(c_sources)

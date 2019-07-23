@@ -156,13 +156,17 @@ librarymon::librarymon(drakvuf_t drakvuf, const librarymon_config* c, output_for
     }
 
     PRINT_DEBUG("Librarymon attempt to setup a trap for \"LdrLoadDll\"\n");
-    register_dll_trap(drakvuf, ntdll_profile, "ntdll.dll", "LdrLoadDll", load_library_cb, this);
+
+    breakpoint_in_dll_module_searcher bp(ntdll_profile, "ntdll.dll");
+    if (!register_trap(drakvuf, nullptr, this, load_library_cb, bp.for_syscall_name("LdrLoadDll")))
+        throw -1;
 
     PRINT_DEBUG("Librarymon attempt to setup a trap for \"LdrGetDllHandle\"\n");
-    register_dll_trap(drakvuf, ntdll_profile, "ntdll.dll", "LdrGetDllHandle", load_library_cb, this);
+    if (!register_trap(drakvuf, nullptr, this, load_library_cb, bp.for_syscall_name("LdrGetDllHandle")))
+        throw -1;
+
 
     json_object_put(ntdll_profile);
-    PRINT_DEBUG("[LIBRARYMON] librarymon constructor end.\n");
 }
 
 void librarymon::print_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const unicode_string_t& name, const unicode_string_t& path)

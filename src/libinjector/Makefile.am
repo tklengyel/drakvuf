@@ -118,6 +118,11 @@ if HARDENING
 AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 endif
 
+if SANITIZE
+AM_CFLAGS += $(SANITIZE_CFLAGS)
+AM_LDFLAGS += $(SANITIZE_LDFLAGS)
+endif
+
 # Note that -pg is incompatible with HARDENING
 if DEBUG
 AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
@@ -128,6 +133,7 @@ endif
 endif
 
 noinst_LTLIBRARIES= libinjector.la
+libinjector_la_CFLAGS = $(CFLAGS)
 libinjector_la_SOURCES= $(h_sources) $(c_sources)
 libinjector_la_LIBADD= ../xen_helper/libxenhelper.la
 libinjector_la_LIBADD+= ../libdrakvuf/libdrakvuf.la

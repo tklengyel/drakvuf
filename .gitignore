@@ -1,3 +1,21 @@
+#afl files
+afl-analyze
+afl-as
+afl-clang
+afl-clang++
+afl-fuzz
+afl-g++
+afl-gcc
+afl-gotcpu
+afl-showmap
+afl-tmin
+afl-as
+as
+#windows log files
+.tlog
+#IDE files
+.vscode
+
 # Object files
 *.o
 *.ko

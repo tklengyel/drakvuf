@@ -143,6 +143,7 @@ typedef enum
     STATUS_BP_HIT,
     STATUS_CREATE_OK,
     STATUS_RESUME_OK,
+    STATUS_RESTORE_OK,
     __STATUS_MAX
 } status_type_t;
 
@@ -154,6 +155,8 @@ struct argument
     void* data;
 };
 
+unicode_string_t* convert_utf8_to_utf16(char const* str);
+addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib, char const* fun, bool global_search);
 
 void init_argument(struct argument* arg,
                    argument_type_t type,

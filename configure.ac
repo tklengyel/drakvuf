@@ -316,6 +316,16 @@ if test x$plugin_dkommon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_DKOMMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_wmimon],
+  [AS_HELP_STRING([--disable-plugin-wmimon],
+    [Enable the windows kernel bugcheck watching plugin @<:@yes@:>@])],
+  [plugin_wmimon="$enableval"],
+  [plugin_wmimon="yes"])
+AM_CONDITIONAL([PLUGIN_WMIMON], [test x$plugin_wmimon = xyes])
+if test x$plugin_wmimon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_WMIMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -331,6 +341,13 @@ AC_ARG_ENABLE([debug],
   [debug="$enableval"],
   [debug="no"])
 AM_CONDITIONAL([DEBUG], [test x$debug = xyes])
+
+AC_ARG_ENABLE([sanitize],
+  [AS_HELP_STRING([--enable-sanitize],
+    [Enable sanitizers to be compiled @<:@no@:>@])],
+  [sanitize="$enableval"],
+  [sanitize="no"])
+AM_CONDITIONAL([SANITIZE], [test x$sanitize = xyes])
 
 AC_ARG_ENABLE([doppelganging],
   [AS_HELP_STRING([--enable-doppelganging-injection],
@@ -414,6 +431,46 @@ LD="$saved_LD"
 # AUTOHARDEN END
 #####################################################
 
+#####################################################
+# AUTOSANITIZE START
+
+saved_CC="$CC"
+saved_CXX="$CXX"
+saved_LD="$LD"
+flag_wrap="$srcdir/scripts/wrap-compiler-for-flag-check"
+CC="$flag_wrap $CC"
+CXX="$flag_wrap $CXX"
+LD="$flag_wrap $LD"
+
+SANITIZE_CFLAGS=""
+SANITIZE_CXXFLAGS=""
+SANITIZE_LDFLAGS=""
+
+AS_IF([test x"$fsanitize" != x"no"], [
+  check_cc_cxx_flag([-fsanitize=address],
+   [check_link_flag([-fsanitize=address],
+     [SANITIZE_CFLAGS="$SANITIZE_CFLAGS -fsanitize=address"
+      SANITIZE_CXXFLAGS="$SANITIZE_CXXFLAGS -fsanitize=address"
+      SANITIZE_LDFLAGS="$SANITIZE_LDFLAGS -fsanitize=address"])])
+
+  check_cc_cxx_flag([-fsanitize=leak],
+   [check_link_flag([-fsanitize=leak],
+     [SANITIZE_CFLAGS="$SANITIZE_CFLAGS -fsanitize=leak"
+      SANITIZE_CXXFLAGS="$SANITIZE_CXXFLAGS -fsanitize=leak"
+      SANITIZE_LDFLAGS="$SANITIZE_LDFLAGS -fsanitize=leak"])])
+])
+
+AC_SUBST([SANITIZE_CFLAGS])
+AC_SUBST([SANITIZE_CXXFLAGS])
+AC_SUBST([SANITIZE_LDFLAGS])
+
+# End of flag tests.
+CC="$saved_CC"
+CXX="$saved_CXX"
+LD="$saved_LD"
+# AUTOSANITIZE END
+#####################################################
+
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h malloc.h stdio.h stdlib.h string.h sys/time.h sys/mman.h sys/inotify.h syslog.h unistd.h errno.h pthread.h])
 
@@ -460,6 +517,7 @@ AC_CHECK_LIB([xentoollog], [xtl_logger_destroy])
 AC_CONFIG_FILES([Makefile src/Makefile
                  src/libdrakvuf/Makefile
                  src/libinjector/Makefile
+		src/libhijack/Makefile
                  src/xen_helper/Makefile
                  src/plugins/Makefile
                  src/dirwatch/Makefile
@@ -495,4 +553,5 @@ ClipboardMon: $plugin_clipboardmon
 WindowMon:    $plugin_windowmon
 LibraryMon:   $plugin_librarymon
 DKOMmon:      $plugin_dkommon
+WMIMon:       $plugin_wmimon
 -------------------------------------------------------------------------------])

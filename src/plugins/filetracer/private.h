@@ -105,6 +105,8 @@
 #ifndef FILETRACER_PRIVATE_H
 #define FILETRACER_PRIVATE_H
 
+#include "plugins/plugin_utils.h"
+
 struct pool_header_x86
 {
     union
@@ -137,6 +139,26 @@ struct pool_header_x64
     uint32_t pool_tag;
     uint64_t process_billed; // _EPROCESS *
 } __attribute__ ((packed));
+
+enum
+{
+    _OBJECT_ATTRIBUTES_ObjectName,
+    _OBJECT_ATTRIBUTES_RootDirectory,
+    _OBJECT_ATTRIBUTES_Attributes,
+    _OBJECT_ATTRIBUTES_SecurityDescriptor,
+    _SECURITY_DESCRIPTOR_Control,
+    _SECURITY_DESCRIPTOR_Owner,
+    _SECURITY_DESCRIPTOR_Group,
+    _SECURITY_DESCRIPTOR_Sacl,
+    _SECURITY_DESCRIPTOR_Dacl,
+    _SID_Revision,
+    _SID_SubAuthorityCount,
+    _SID_IdentifierAuthority,
+    _SID_SubAuthority,
+    _ACL_AceCount,
+    _ACL_AclSize,
+    __OFFSET_MAX
+};
 
 enum
 {
@@ -203,6 +225,8 @@ enum
     GENERIC_EXECUTE        = 0x20000000,
     GENERIC_WRITE          = 0x40000000,
     GENERIC_READ           = 0x80000000,
+    SPECIFIC_RIGHTS_ALL    = 0x0000FFFF,
+    STANDARD_RIGHTS_ALL    = 0x001F0000,
 };
 
 // File Access Rights
@@ -274,5 +298,26 @@ enum
     FILE_OPEN_NO_RECALL            = 0x00400000,
     FILE_OPEN_FOR_FREE_SPACE_QUERY = 0x00800000
 };
+
+// Security Descriptor Controls
+enum
+{
+    SE_OWNER_DEFAULTED       = 0x0001,
+    SE_GROUP_DEFAULTED       = 0x0002,
+    SE_DACL_PRESENT          = 0x0004,
+    SE_DACL_DEFAULTED        = 0x0008,
+    SE_SACL_PRESENT          = 0x0010,
+    SE_SACL_DEFAULTED        = 0x0020,
+    SE_DACL_AUTO_INHERIT_REQ = 0x0100,
+    SE_SACL_AUTO_INHERIT_REQ = 0x0200,
+    SE_DACL_AUTO_INHERITED   = 0x0400,
+    SE_SACL_AUTO_INHERITED   = 0x0800,
+    SE_DACL_PROTECTED        = 0x1000,
+    SE_SACL_PROTECTED        = 0x2000,
+    SE_RM_CONTROL_VALID      = 0x4000,
+    SE_SELF_RELATIVE         = 0x8000,
+};
+
+extern const flags_str_t generic_ar;
 
 #endif

@@ -568,7 +568,11 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
     }
 
     PRINT_DEBUG("envmon attempt to setup a trap for \"sspicli.dll\"\n");
-    register_dll_trap(drakvuf, sspicli_profile, "sspicli.dll", "SspipGetUserName", trap_SspipGetUserName_cb, this);
+    {
+        breakpoint_in_dll_module_searcher bp(sspicli_profile, "sspicli.dll");
+        if (!register_trap(drakvuf, nullptr, this, trap_SspipGetUserName_cb, bp.for_syscall_name("SspipGetUserName")))
+            throw -1;
+    }
     json_object_put(sspicli_profile);
 
     json_object* kernelbase_profile = json_object_from_file(c->kernelbase_profile);
@@ -579,7 +583,12 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
     }
 
     PRINT_DEBUG("envmon attempt to setup a trap for \"kernelbase.dll\"\n");
-    register_dll_trap(drakvuf, kernelbase_profile, "kernelbase.dll", "GetComputerNameExW", trap_GetComputerNameExW_cb, this);
+    {
+        breakpoint_in_dll_module_searcher bp(kernelbase_profile, "kernelbase.dll");
+        if (!register_trap(drakvuf, nullptr, this, trap_GetComputerNameExW_cb, bp.for_syscall_name("GetComputerNameExW")))
+            throw -1;
+
+    }
     json_object_put(kernelbase_profile);
 
     json_object* kernel32_profile = json_object_from_file(c->kernel32_profile);
@@ -590,12 +599,18 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
     }
 
     PRINT_DEBUG("envmon attempt to setup a trap for \"kernel32.dll\"\n");
-    register_dll_trap(drakvuf, kernel32_profile, "kernel32.dll", "GetComputerNameW", trap_GetComputerNameW_cb, this);
+    {
+        breakpoint_in_dll_module_searcher bp(kernel32_profile, "kernel32.dll");
+        if (!register_trap(drakvuf, nullptr, this, trap_GetComputerNameW_cb, bp.for_syscall_name("GetComputerNameW")))
+            throw -1;
+    }
 
     if (VMI_OS_WINDOWS_7 < winver)
     {
         PRINT_DEBUG("envmon attempt to setup a trap for \"kernel32.dll\"\n");
-        register_dll_trap(drakvuf, kernel32_profile, "kernel32.dll", "IsNativeVhdBoot", trap_IsNativeVhdBoot_cb, this);
+        breakpoint_in_dll_module_searcher bp(kernel32_profile, "kernel32.dll");
+        if (!register_trap(drakvuf, nullptr, this, trap_IsNativeVhdBoot_cb, bp.for_syscall_name("IsNativeVhdBoot")))
+            throw -1;
     }
     json_object_put(kernel32_profile);
 
@@ -611,7 +626,9 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
         if (VMI_OS_WINDOWS_7 < winver)
         {
             PRINT_DEBUG("envmon attempt to setup a trap for \"kernel32.dll\"\n");
-            register_dll_trap(drakvuf, wow_kernel32_profile, "kernel32.dll", "IsNativeVhdBoot", trap_IsNativeVhdBoot_cb, this);
+            breakpoint_in_dll_module_searcher bp(wow_kernel32_profile, "kernel32.dll", true);
+            if (!register_trap(drakvuf, nullptr, this, trap_IsNativeVhdBoot_cb, bp.for_syscall_name("IsNativeVhdBoot")))
+                throw -1;
         }
         json_object_put(wow_kernel32_profile);
     }
@@ -624,7 +641,12 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
     }
 
     PRINT_DEBUG("envmon attempt to setup a trap for \"iphlpapi.dll\"\n");
-    register_dll_trap(drakvuf, iphlpapi_profile, "iphlpapi.dll", "GetAdaptersAddresses", trap_GetAdaptersAddresses_cb, this);
+    {
+        breakpoint_in_dll_module_searcher bp(iphlpapi_profile, "iphlpapi.dll");
+        if (!register_trap(drakvuf, nullptr, this, trap_GetAdaptersAddresses_cb, bp.for_syscall_name("GetAdaptersAddresses")))
+            throw -1;
+
+    }
     json_object_put(iphlpapi_profile);
 
     json_object* mpr_profile = json_object_from_file(c->mpr_profile);
@@ -635,8 +657,11 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
     }
 
     PRINT_DEBUG("envmon attempt to setup a trap for \"mpr.dll\"\n");
-    register_dll_trap(drakvuf, mpr_profile, "mpr.dll", "WNetGetProviderNameW", trap_WNetGetProviderNameW_cb, this);
-    json_object_put(mpr_profile);
+    {
+        breakpoint_in_dll_module_searcher bp(mpr_profile, "mpr.dll");
+        if (!register_trap(drakvuf, nullptr, this, trap_WNetGetProviderNameW_cb, bp.for_syscall_name("WNetGetProviderNameW")))
+            throw -1;
+    }
 
-    PRINT_DEBUG("[ENVMON] envmon constructor end.\n");
+    json_object_put(mpr_profile);
 }

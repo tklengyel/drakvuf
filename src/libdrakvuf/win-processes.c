@@ -198,7 +198,8 @@ status_t win_get_last_error(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, 
     if (*err >= __WIN_ERROR_CODES_MAX)
         return VMI_FAILURE;
 
-    *err_str = win_error_code_names[*err];
+    if (win_error_code_names[*err])
+        *err_str = win_error_code_names[*err];
 
     return VMI_SUCCESS;
 }
@@ -459,7 +460,7 @@ bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module
 
 bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list )
 {
-    if ( wow_peb )
+    if ( wow_peb && drakvuf->wow_offsets)
     {
         vmi_instance_t vmi = drakvuf->vmi;
         addr_t ldr=0;
@@ -770,6 +771,7 @@ bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_
     if (!param)
     {
         PRINT_DEBUG("Error. Failed to get param\n");
+        free(cmdline);
         return false;
     }
 
@@ -778,9 +780,11 @@ bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_
     if (ERANGE == errno)
     {
         PRINT_DEBUG("Error. Failed to parse PID: the value is out of range\n");
+        free(cmdline);
         return false;
     }
 
+    free(cmdline);
     return true;
 }
 

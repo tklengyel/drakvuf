@@ -115,7 +115,7 @@ sources += poolmon/poolmon.cpp
 endif
 
 if PLUGIN_FILETRACER
-sources += filetracer/filetracer.cpp
+sources += filetracer/filetracer.cpp filetracer/win_acl.cpp
 endif
 
 if PLUGIN_FILEDELETE
@@ -186,8 +186,12 @@ if PLUGIN_DKOMMON
 sources += dkommon/dkommon.cpp
 endif
 
+if PLUGIN_WMIMON
+sources += wmimon/wmimon.cpp
+endif
+
 ###############################################################################
-sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h
+sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(CPPFLAGS)
@@ -205,6 +209,11 @@ if HARDENING
 AM_CXXFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 endif
 
+if SANITIZE
+AM_CXXFLAGS += $(SANITIZE_CFLAGS)
+AM_LDFLAGS += $(SANITIZE_LDFLAGS)
+endif
+
 # Note that -pg is incompatible with HARDENING
 if DEBUG
 AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
@@ -217,5 +226,7 @@ endif
 
 noinst_LTLIBRARIES= libdrakvufplugins.la
 libdrakvufplugins_la_SOURCES= $(sources)
+libdrakvufplugins_la_CXXFLAGS = $(AM_CXXFLAGS)
 libdrakvufplugins_la_LIBADD = ../xen_helper/libxenhelper.la
+libdrakvufplugins_la_LIBADD+=../libinjector/libinjector.la
 libdrakvufplugins_la_LIBADD += ../libdrakvuf/libdrakvuf.la

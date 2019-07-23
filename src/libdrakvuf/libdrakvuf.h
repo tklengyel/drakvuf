@@ -122,8 +122,9 @@ extern "C" {
  */
 
 // Additional signal number constants for Drakvuf
-#define SIGDRAKVUFERROR -1
+#define SIGDRAKVUFERROR   -1
 #define SIGDRAKVUFTIMEOUT -2
+#define SIGDRAKVUFCRASH   -3
 
 typedef enum lookup_type
 {

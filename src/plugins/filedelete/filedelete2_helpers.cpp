@@ -105,7 +105,6 @@
 #include "../plugins.h"
 #include "filedelete.h"
 #include "private.h"
-
 #include <libinjector/libinjector.h>
 
 void free_pool(std::map<addr_t, bool>& pools, addr_t va)

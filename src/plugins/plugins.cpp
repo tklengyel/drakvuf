@@ -124,6 +124,7 @@
 #include "windowmon/windowmon.h"
 #include "librarymon/librarymon.h"
 #include "dkommon/dkommon.h"
+#include "wmimon/wmimon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output, os_t os)
     : drakvuf{ drakvuf }, output{ output }, os{ os }
@@ -140,7 +141,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                            const plugins_options* options)
 {
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
-            plugin_id < __DRAKVUF_PLUGIN_LIST_MAX)
+            plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
     {
         PRINT_DEBUG("Starting plugin %s\n", drakvuf_plugin_names[plugin_id]);
 
@@ -238,7 +239,11 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #endif
 #ifdef ENABLE_PLUGIN_BSODMON
                 case PLUGIN_BSODMON:
-                    this->plugins[plugin_id] = new bsodmon(this->drakvuf, options->abort_on_bsod, this->output);
+                    this->plugins[plugin_id] = new bsodmon(this->drakvuf, options->abort_on_bsod
+                                                            , this->output
+                                                            , options->input
+                                                            , options->spin_lock
+                                                            , options->continue_fuzzing);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_ENVMON
@@ -250,6 +255,8 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .kernel32_profile = options->kernel32_profile,
                         .kernelbase_profile = options->kernelbase_profile,
                         .wow_kernel32_profile = options->wow_kernel32_profile,
+                        .iphlpapi_profile = options->iphlpapi_profile,
+                        .mpr_profile = options->mpr_profile,
                     };
                     this->plugins[plugin_id] = new envmon(this->drakvuf, &config, this->output);
                     break;
@@ -297,6 +304,18 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 case PLUGIN_DKOMMON:
                     this->plugins[plugin_id] = new dkommon(this->drakvuf, nullptr, this->output);
                     break;
+#endif
+#ifdef ENABLE_PLUGIN_WMIMON
+                case PLUGIN_WMIMON:
+                {
+                    wmimon_config config =
+                    {
+                        .ole32_profile = options->ole32_profile,
+                        .wow_ole32_profile = options->wow_ole32_profile,
+                    };
+                    this->plugins[plugin_id] = new wmimon(this->drakvuf, &config, this->output);
+                    break;
+                }
 #endif
                 default:
                     break;
