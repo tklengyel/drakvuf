@@ -112,25 +112,6 @@
 #define DUMP_NAME_PLACEHOLDER "(not configured)"
 
 // TODO move to common library, this is also used in procmon
-static vmi_pid_t get_pid_from_handle(memdump* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)
-{
-    if (handle == 0 || handle == UINT64_MAX)
-        return info->proc_data.pid;
-
-    if (!info->proc_data.base_addr)
-        return 0;
-
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
-    if (!obj)
-        return 0;
-
-    vmi_pid_t pid;
-    addr_t eprocess_base = obj + f->object_header_body;
-    if (VMI_FAILURE == drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
-        return 0;
-
-    return pid;
-}
 
 /**
  * Dumps the memory specified by access context, from `ctx->addr` (first byte) to `ctx->addr + len_bytes - 1` (last byte).
@@ -433,11 +414,13 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
     access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB, .dtb = info->regs->cr3 };
     ctx.addr = buffer_ptr;
 
-    vmi_pid_t target_pid = get_pid_from_handle(plugin, drakvuf, info, process_handle);
+    vmi_pid_t target_pid;
     addr_t process_addr = 0;
     char* target_name = nullptr;
-    if (drakvuf_find_process(drakvuf, target_pid, nullptr, &process_addr))
-        target_name = drakvuf_get_process_name(drakvuf, process_addr, true);
+
+    if (drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &target_pid) == VMI_SUCCESS)
+        if (drakvuf_find_process(drakvuf, target_pid, nullptr, &process_addr))
+            target_name = drakvuf_get_process_name(drakvuf, process_addr, true);
 
     if (!target_name)
         target_name = g_strdup("<UNKNOWN>");
@@ -464,9 +447,6 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
 {
     this->memdump_dir = c->memdump_dir;
     this->memdump_counter = 0;
-
-    if (!drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_HEADER", "Body", &this->object_header_body))
-        throw -1;
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap<memdump>(drakvuf, nullptr, this, free_virtual_memory_hook_cb, bp.for_syscall_name("NtFreeVirtualMemory")) ||

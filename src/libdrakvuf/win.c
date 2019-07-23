@@ -472,6 +472,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.enumerate_processes_with_module = win_enumerate_processes_with_module;
     drakvuf->osi.is_crashreporter = win_is_crashreporter;
     drakvuf->osi.find_mmvad = win_find_mmvad;
+    drakvuf->osi.get_pid_from_handle = win_get_pid_from_handle;
 
     return true;
 }
