@@ -1016,5 +1016,5 @@ status_t win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
     }
 
     addr_t eprocess_base = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
-    return drakvuf_get_process_pid(drakvuf, eprocess_base, pid) == VMI_SUCCESS;
+    return drakvuf_get_process_pid(drakvuf, eprocess_base, pid);
 }
