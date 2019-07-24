@@ -196,7 +196,7 @@ int main(int argc, char *argv[])
         return rc;
     }
     json_object *candidates = json_object_from_file(fuzz_candidates_path);
-    start_bsodmon(drakvuf, candidates);
+    // start_bsodmon(drakvuf, candidates);
 
     int successfull = 0;
     fprintf(stderr, "STARTING FUZZING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
@@ -258,7 +258,7 @@ int main(int argc, char *argv[])
     sleep(5);
     
     drakvuf_resume(drakvuf); 
-    stop_bsodmon();
+    // stop_bsodmon();
     drakvuf_close(drakvuf, 0);
     fprintf(stderr,"[+] Successfull = %d\n", successfull);
     fclose(stderr);

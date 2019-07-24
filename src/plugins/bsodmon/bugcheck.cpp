@@ -105,6 +105,7 @@
 #include <libdrakvuf/libdrakvuf.h>
 
 #include "bsodmon.h"
+#include "private.h"
 
 /*
  * Bugcheck code list:

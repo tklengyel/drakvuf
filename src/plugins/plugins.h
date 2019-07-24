@@ -133,6 +133,7 @@ struct plugins_options
     const char* ntdll_profile;          // PLUGIN_LIBRARYMON
     const char* ole32_profile;          // PLUGIN_WMIMON
     const char* wow_ole32_profile;      // PLUGIN_WMIMON
+    const char* memdump_dir;            // PLUGIN_MEMDUMP
 };
 
 typedef enum drakvuf_plugin
@@ -158,6 +159,7 @@ typedef enum drakvuf_plugin
     PLUGIN_LIBRARYMON,
     PLUGIN_DKOMMON,
     PLUGIN_WMIMON,
+    PLUGIN_MEMDUMP,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -184,6 +186,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_LIBRARYMON] = "librarymon",
     [PLUGIN_DKOMMON] = "dkommon",
     [PLUGIN_WMIMON] = "wmimon",
+    [PLUGIN_MEMDUMP] = "memdump",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -209,6 +212,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_LIBRARYMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_DKOMMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_WMIMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_MEMDUMP]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
 class plugin
@@ -260,9 +264,15 @@ struct vmi_lock_guard
 
     }
 
-    bool is_lock() const { return vmi == nullptr ? true : false; }
+    bool is_lock() const
+    {
+        return vmi == nullptr ? true : false;
+    }
 
-    operator vmi_instance_t() const { return vmi; }
+    operator vmi_instance_t() const
+    {
+        return vmi;
+    }
 
     ~vmi_lock_guard()
     {

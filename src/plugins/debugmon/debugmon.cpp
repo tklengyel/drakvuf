@@ -119,6 +119,7 @@
 
 #include <libvmi/libvmi.h>
 #include "../plugins.h"
+#include "private.h"
 #include "debugmon.h"
 
 # define HVMOP_TRAP_ext_int    0
@@ -198,9 +199,9 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 /* ----------------------------------------------------- */
 
-debugmon::debugmon(drakvuf_t drakvuf, output_format_t output)
-    : format{output}
-    , drakvuf{drakvuf}
+debugmon::debugmon(drakvuf_t _drakvuf, output_format_t _output)
+    : format{_output}
+    , drakvuf{_drakvuf}
 {
     this->debug.cb = debug_cb;
     this->debug.data = (void*)this;

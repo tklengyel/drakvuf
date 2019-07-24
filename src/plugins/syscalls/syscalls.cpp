@@ -282,7 +282,7 @@ static void print_default_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_
     printf("\n");
 }
 
-static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, unsigned char* args_data)
+static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data)
 {
     size_t nargs = sc->num_args;
     uint32_t* args_data32 = (uint32_t*)args_data;
@@ -290,7 +290,12 @@ static void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
     for ( size_t i=0; i<nargs; i++ )
     {
-        addr_t val = ( 4 == s->reg_size ) ? args_data32[i] : args_data64[i];
+        addr_t val = 0;
+
+        if ( 4 == s->reg_size )
+            memcpy(&val, &args_data32[i], sizeof(uint32_t));
+        else
+            memcpy(&val, &args_data64[i], sizeof(uint64_t));
 
         char* str = extract_string(drakvuf, info, sc->args[i], val);
 
@@ -338,7 +343,7 @@ static void print_footer(output_format_t format, uint32_t nargs)
 }
 
 // Builds the argument buffer from the current context, returns status
-static int linux_build_argbuf(uint8_t* buf, vmi_instance_t vmi, drakvuf_trap_info_t* info, const syscall_t* sc)
+static int linux_build_argbuf(void* buf, vmi_instance_t vmi, drakvuf_trap_info_t* info, const syscall_t* sc)
 {
     int nargs = 0;
     int rc = VMI_SUCCESS;
@@ -473,7 +478,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     unsigned int nargs = 0;
     size_t size = 0;
-    unsigned char* buf = NULL; // pointer to buffer to hold argument values
+    void* buf = NULL; // pointer to buffer to hold argument values
 
     syscall_wrapper_t* wrapper = (syscall_wrapper_t*)info->trap->data;
     syscalls* s = wrapper->sc;
@@ -578,7 +583,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 
             for (j=0; j<NUM_SYSCALLS_WIN; j++)
             {
-                if ( !strcmp(symbol->name,win_syscalls[j].name) )
+                if ( !strcmp(symbol->name, win_syscalls[j].name) )
                 {
                     wrapper->syscall_index=j;
                     break;
@@ -625,11 +630,11 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 
                 /* These are all variables, not syscalls */
                 if (!strncmp(symbol->name, "sys_dmi", 7)              ||
-                        !strcmp(symbol->name,  "sys_tz")                  || /* used by gettimeofday */
-                        !strcmp(symbol->name,  "sys_tracepoint_refcount") ||
-                        !strcmp(symbol->name,  "sys_table")               ||
-                        !strcmp(symbol->name,  "sys_perf_refcount_enter") ||
-                        !strcmp(symbol->name,  "sys_perf_refcount_exit")   )
+                    !strcmp(symbol->name,  "sys_tz")                  || /* used by gettimeofday */
+                    !strcmp(symbol->name,  "sys_tracepoint_refcount") ||
+                    !strcmp(symbol->name,  "sys_table")               ||
+                    !strcmp(symbol->name,  "sys_perf_refcount_enter") ||
+                    !strcmp(symbol->name,  "sys_perf_refcount_exit")   )
                     continue;
             }
             else if ( strncmp(symbol->name, "__x64_sys_", 10) )
@@ -709,8 +714,7 @@ static GHashTable* read_syscalls_filter(const char* filter_file)
         }
         else
             free(line);
-    }
-    while (read != -1);
+    } while (read != -1);
 
     fclose(f);
     return table;
@@ -829,7 +833,7 @@ syscalls::~syscalls()
     while (loop)
     {
         drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
-        g_free((char*)trap->name);
+        g_free(trap->_name);
         if (trap->data != (void*)this)
         {
             g_free(trap->data);

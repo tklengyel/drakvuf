@@ -200,7 +200,6 @@ static void print_process_creation_result(
     if (VMI_SUCCESS == vmi_read_addr(vmi_lg.vmi, &ctx, &curdir_handle))
         curdir = drakvuf_get_filename_from_handle(drakvuf, info, curdir_handle);
 
-    curdir = drakvuf_get_filename_from_handle(drakvuf, info, curdir_handle_addr);
     if (!curdir)
     {
         unicode_string_t* curdir_us = drakvuf_read_unicode(drakvuf, info, curdir_dospath_addr);
@@ -295,26 +294,6 @@ static void print_process_creation_result(
         vmi_free_unicode_str(dllpath_us);
 }
 
-static vmi_pid_t get_pid_from_handle(procmon* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)
-{
-    if (handle == 0 || handle == UINT64_MAX)
-        return info->proc_data.pid;
-
-    if (!info->proc_data.base_addr)
-        return 0;
-
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
-    if (!obj)
-        return 0;
-
-    vmi_pid_t pid;
-    addr_t eprocess_base = obj + f->object_header_body;
-    if (VMI_FAILURE == drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
-        return 0;
-
-    return pid;
-}
-
 static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto data = get_trap_params<procmon, process_creation_result_t<procmon>>(info);
@@ -325,7 +304,7 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu)))
+    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
 
     auto* plugin = data->plugin();
@@ -348,7 +327,9 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
 
     drakvuf_release_vmi(drakvuf);
 
-    vmi_pid_t new_pid = get_pid_from_handle(plugin, drakvuf, info, new_process_handle);
+    vmi_pid_t new_pid;
+    if (drakvuf_get_pid_from_handle(drakvuf, info, new_process_handle, &new_pid) != VMI_SUCCESS)
+        new_pid = 0;
 
     print_process_creation_result(plugin, drakvuf, info, status, new_pid, user_process_parameters_addr);
     return VMI_EVENT_RESPONSE_NONE;
@@ -379,7 +360,7 @@ static event_response_t create_user_process_hook(
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu));
+    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
     data->new_process_handle_addr = process_handle_addr;
     data->user_process_parameters_addr = user_process_parameters_addr;
     return VMI_EVENT_RESPONSE_NONE;
@@ -394,7 +375,9 @@ static event_response_t terminate_process_hook(
     if (!plugin)
         return VMI_EVENT_RESPONSE_NONE;
 
-    vmi_pid_t exit_pid = get_pid_from_handle(plugin, drakvuf, info, process_handle);
+    vmi_pid_t exit_pid;
+    if (drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &exit_pid) != VMI_SUCCESS)
+        exit_pid = 0;
 
     char exit_status_buf[NTSTATUS_MAX_FORMAT_STR_SIZE] = {0};
     const char* exit_status_str = ntstatus_to_string(ntstatus_t(exit_status));
@@ -476,7 +459,7 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu)))
+    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(drakvuf, info->trap);
@@ -579,7 +562,7 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu));
+    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
 
     // PHANDLE ProcessHandle
     data->process_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -608,6 +591,7 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
 static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
+    gchar* escaped_pname = NULL;
     // HANDLE ProcessHandle
     uint64_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
     // WIN32_PROTECTION_MASK NewProtectWin32
@@ -633,6 +617,7 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
             break;
 
         case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
             printf( "{"
                     "\"Plugin\" : \"procmon\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
@@ -644,8 +629,9 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
                     "\"NewProtectWin32\" : \"%s\""
                     "}",
                     UNPACK_TIMEVAL(info->timestamp),
-                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                    info->proc_data.pid, info->proc_data.ppid, escaped_pname,
                     info->trap->name,  process_handle, stringify_protection_attributes(new_protect).c_str());
+            g_free(escaped_pname);
             break;
 
         default:
@@ -688,6 +674,10 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx
                    UNPACK_TIMEVAL(t), data.name, data.pid, data.ppid);
             break;
 
+        case OUTPUT_JSON:
+            //TODO
+            break;
+
         default:
         case OUTPUT_DEFAULT:
             printf("[PROCMON] TIME:" FORMAT_TIMEVAL " PROCESS PID:%u PPID:%u FILE:\"%s\"\n",
@@ -727,14 +717,12 @@ procmon::procmon(drakvuf_t drakvuf, output_format_t output)
 
     this->current_directory_handle = current_directory_offset + curdir_handle_offset;
     this->current_directory_dospath = current_directory_offset + curdir_dospath_offset;
-    if (!drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_HEADER", "Body", &this->object_header_body))
-        throw -1;
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap<procmon>(drakvuf, nullptr, this, create_user_process_hook_cb, bp.for_syscall_name("NtCreateUserProcess")) ||
-            !register_trap<procmon>(drakvuf, nullptr, this, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
-            !register_trap<procmon>(drakvuf, nullptr, this, open_process_hook_cb, bp.for_syscall_name("NtOpenProcess")) ||
-            !register_trap<procmon>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")))
+        !register_trap<procmon>(drakvuf, nullptr, this, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
+        !register_trap<procmon>(drakvuf, nullptr, this, open_process_hook_cb, bp.for_syscall_name("NtOpenProcess")) ||
+        !register_trap<procmon>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")))
     {
         throw -1;
     }

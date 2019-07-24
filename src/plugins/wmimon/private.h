@@ -102,124 +102,45 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/prctl.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <dirent.h>
-#include <glib.h>
-#include <err.h>
+#ifndef WMIMON_PRIVATE_H
+#define WMIMON_PRIVATE_H
 
-#include <libvmi/libvmi.h>
-#include "../plugins.h"
-#include "private.h"
-#include "cpuidmon.h"
+#include <sstream>
+#include <iomanip>
 
-event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+using uuid_t = unsigned char[16];
+
+static const uuid_t CLSID_WbemLocator = { 0x11, 0xF8, 0x90, 0x45, 0x3A, 0x1D, 0xD0, 0x11, 0x89, 0x1F, 0x00, 0xAA, 0x00, 0x4B, 0x2E, 0x24 }; // "4590f811-1d3a-11d0-891f-00aa004b2e24"
+static const uuid_t IID_IWbemLocator  = { 0x87, 0xA6, 0x12, 0xDC, 0x7F, 0x73, 0xCF, 0x11, 0x88, 0x4D, 0x00, 0xAA, 0x00, 0x4B, 0x2E, 0x24 }; // "dc12a687-737f-11cf-884d-00aa004b2e24"
+
+enum offset
 {
+    LDR_DATA_TABLE_ENTRY_DLLBASE,
+    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
+    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
+    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
+    __OFFSET_MAX
+};
 
-    cpuidmon* s = (cpuidmon*)info->trap->data;
-    gchar* escaped_pname = NULL;
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("cpuidmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid);
-            break;
-
-        case OUTPUT_KV:
-            printf("cpuidmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
-                   "Leaf=0x%" PRIx32 ",Subleaf=0x%" PRIx32","
-                   "RAX=0x%" PRIx64 ",RBX=0x%" PRIx64 ",RCX=0x%" PRIx64 ",RDX=0x%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->cpuid->leaf, info->cpuid->subleaf,
-                   info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"cpuidmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"VCPU\": %" PRIu32 ","
-                    "\"CR3\": %" PRIu64 ","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Leaf\": %" PRIu32 ","
-                    "\"Subleaf\": %" PRIu32 ","
-                    "\"RAX\": %" PRIu64 ","
-                    "\"RBX\": %" PRIu64 ","
-                    "\"RCX\": %" PRIu64 ","
-                    "\"RDX\": %" PRIu64 ""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    info->vcpu, info->regs->cr3, escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    info->cpuid->leaf, info->cpuid->subleaf,
-                    info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[CPUIDMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64". "
-                   "Leaf: 0x%" PRIx32 ". Subleaf: 0x%" PRIx32". "
-                   "RAX: 0x%" PRIx64 " RBX: 0x%" PRIx64 " RCX: 0x%" PRIx64 " RDX: 0x%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
-                   info->cpuid->leaf, info->cpuid->subleaf,
-                   info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx
-                  );
-            break;
-    }
-
-    if ( s->stealth )
-    {
-        if ( info->cpuid->leaf == 1 )
-        {
-            info->regs->rcx &= ~0x80000000;
-        }
-
-        if ( info->cpuid->leaf >= 0x40000000 && info->cpuid->leaf <= 0x40000004 )
-        {
-            info->regs->rax = 0;
-            info->regs->rbx = 0;
-            info->regs->rcx = 0;
-            info->regs->rdx = 0;
-        }
-    }
-
-    return 0;
-}
-
-/* ----------------------------------------------------- */
-
-cpuidmon::cpuidmon(drakvuf_t _drakvuf, bool _stealth, output_format_t _output)
-    : format{_output}
-    , drakvuf{_drakvuf}
-    , stealth{_stealth}
+static const char* offset_names[__OFFSET_MAX][2] =
 {
-    this->cpuid.cb = cpuid_cb;
-    this->cpuid.data = (void*)this;
-    this->cpuid.type = CPUID;
+    [LDR_DATA_TABLE_ENTRY_DLLBASE]     = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
+    [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
+    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
+    [LDR_DATA_TABLE_ENTRY_FULLDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "FullDllName" },
+};
 
-    if ( !drakvuf_add_trap(drakvuf, &this->cpuid) )
-    {
-        fprintf(stderr, "Failed to register CPUIDMON plugin\n");
-        throw -1;
-    }
-}
+bool FAILED(unsigned long rax);
+int uuid_compare(const uuid_t uu1, const uuid_t uu2);
+event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t ExecMethod_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t GetObject_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t GetObject_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t ExecQuery_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t ExecQuery_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t ConnectServer_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t CoCreateInstanse_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t CoCreateInstanse_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-cpuidmon::~cpuidmon(void) {}
+#endif

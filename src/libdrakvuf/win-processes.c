@@ -117,6 +117,12 @@
 #include "win-error-codes.h"
 #include "win.h"
 
+#define MMVAD_MAX_DEPTH (100)
+
+#define POOL_TAG_VADL (0x6c646156)
+#define POOL_TAG_VAD (0x20646156)
+#define POOL_TAG_VADM (0x20646156)
+
 typedef enum dispatcher_object
 {
     __DISPATCHER_INVALID_OBJECT = 0,
@@ -129,18 +135,63 @@ bool win_search_modules( drakvuf_t drakvuf, const char* module_name, bool (*visi
 bool win_search_modules_wow( drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx, addr_t eprocess_addr, addr_t wow_peb, vmi_pid_t pid, access_context_t* ctx );
 addr_t win_get_wow_peb( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_process );
 
-addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
+addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     vmi_instance_t vmi = drakvuf->vmi;
-    addr_t thread;
-    addr_t prcb;
+    addr_t thread = 0;
+    addr_t prcb = 0;
+    addr_t kpcr = 0;
 
-    if (drakvuf->pm == VMI_PM_IA32E)
-        prcb=drakvuf->offsets[KPCR_PRCB];
+    // TODO: check whether we could use ss_arbytes here
+    unsigned int cpl = info->regs->cs_sel & 3;
+
+    if (VMI_PM_IA32E == drakvuf->pm)
+    {
+        prcb = drakvuf->offsets[KPCR_PRCB];
+        if ( cpl )
+        {
+            // TODO: Xen 4.13 will have the correct value in the info->regs->shadow_gs
+            if (VMI_FAILURE == vmi_get_vcpureg(vmi, &kpcr, SHADOW_GS, info->vcpu))
+                return 0;
+        }
+        else
+            kpcr = info->regs->gs_base;
+    }
     else
-        prcb=drakvuf->offsets[KPCR_PRCBDATA];
+    {
+        /*
+         * "In 32-bit Windows, entering kernel mode gets fs loaded with a GDT selector (0x0030)
+         * for a segment whose base address is that of the processor’s KPCR."
+         * https://www.geoffchappell.com/studies/windows/km/ntoskrnl/structs/kpcr.htm
+         * https://wiki.osdev.org/Global_Descriptor_Table
+         */
+        if ( cpl )
+        {
+            addr_t gdt;
 
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, drakvuf->kpcr[vcpu_id] + prcb + drakvuf->offsets[KPRCB_CURRENTTHREAD], 0, &thread))
+            // TODO: Xen 4.13 will have the value delivered in the info->regs->gdtr_base
+            if (VMI_FAILURE == vmi_get_vcpureg(vmi, &gdt, GDTR_BASE, info->vcpu))
+                return 0;
+
+            uint16_t fs_low = 0;
+            uint8_t fs_mid = 0, fs_high = 0;
+
+            if (VMI_FAILURE == vmi_read_16_va(vmi, gdt + 0x32, 0, &fs_low))
+                return 0;
+            if (VMI_FAILURE == vmi_read_8_va(vmi, gdt + 0x34, 0, &fs_mid))
+                return 0;
+            if (VMI_FAILURE == vmi_read_8_va(vmi, gdt + 0x37, 0, &fs_high))
+                return 0;
+
+            kpcr = ((uint32_t)fs_low) | ((uint32_t)fs_mid) << 16 | ((uint32_t)fs_high) << 24;
+        }
+        else
+            kpcr = info->regs->fs_base;
+
+        prcb = drakvuf->offsets[KPCR_PRCBDATA];
+    }
+
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, kpcr + prcb + drakvuf->offsets[KPRCB_CURRENTTHREAD], 0, &thread))
     {
         return 0;
     }
@@ -148,12 +199,12 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
     return thread;
 }
 
-addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
+addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t thread;
     addr_t process;
 
-    thread=win_get_current_thread(drakvuf,vcpu_id);
+    thread=win_get_current_thread(drakvuf, info);
 
     if (thread == 0 || VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_PROCESS], 0, &process))
     {
@@ -163,21 +214,21 @@ addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
     return process;
 }
 
-status_t win_get_last_error(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str)
+status_t win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str)
 {
     if (!err || !err_str)
         return VMI_FAILURE;
 
     vmi_instance_t vmi = drakvuf->vmi;
 
-    addr_t eprocess = win_get_current_process(drakvuf, vcpu_id);
+    addr_t eprocess = win_get_current_process(drakvuf, info);
     addr_t cr3 = 0;
     vmi_pid_t pid = 0;
     if (eprocess && VMI_SUCCESS == win_get_process_pid(drakvuf, eprocess, &pid))
         if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, pid, &cr3))
             return VMI_FAILURE;
 
-    addr_t kthread = win_get_current_thread(drakvuf, vcpu_id);
+    addr_t kthread = win_get_current_thread(drakvuf, info);
     if (!kthread)
         return VMI_FAILURE;
 
@@ -281,9 +332,9 @@ status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t*
     return vmi_read_32_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)pid);
 }
 
-char* win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath)
+char* win_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath)
 {
-    return win_get_process_name(drakvuf, win_get_current_process(drakvuf, vcpu_id), fullpath);
+    return win_get_process_name(drakvuf, win_get_current_process(drakvuf, info), fullpath);
 }
 
 int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
@@ -316,18 +367,18 @@ int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
     return (int64_t)userid;
 };
 
-int64_t win_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id)
+int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    return win_get_process_userid(drakvuf, win_get_current_process(drakvuf, vcpu_id));
+    return win_get_process_userid(drakvuf, win_get_current_process(drakvuf, info));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 
-bool win_get_current_thread_id(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* thread_id)
+bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id)
 {
     addr_t p_tid ;
-    addr_t ethread = win_get_current_thread(drakvuf, vcpu_id);
+    addr_t ethread = win_get_current_thread(drakvuf, info);
 
     if ( ethread )
     {
@@ -366,10 +417,10 @@ bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_
 }
 
 bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
-        uint64_t vcpu_id,
+        drakvuf_trap_info_t* info,
         privilege_mode_t* previous_mode )
 {
-    addr_t kthread = win_get_current_thread(drakvuf, vcpu_id);
+    addr_t kthread = win_get_current_thread(drakvuf, info);
 
     return win_get_thread_previous_mode(drakvuf, kthread, previous_mode);
 }
@@ -558,8 +609,7 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_p
             return false;
         }
 
-    }
-    while (next_list_entry != list_head);
+    } while (next_list_entry != list_head);
 
     return false;
 }
@@ -691,8 +741,7 @@ bool win_enumerate_processes( drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t 
             PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
             return false;
         }
-    }
-    while (next_list_entry != list_head);
+    } while (next_list_entry != list_head);
 
     return true;
 }
@@ -746,8 +795,7 @@ bool win_enumerate_processes_with_module( drakvuf_t drakvuf, const char* module_
             PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
             return false;
         }
-    }
-    while (next_list_entry != list_head);
+    } while (next_list_entry != list_head);
 
     return false;
 }
@@ -815,4 +863,155 @@ bool win_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv_t
     }
 
     return false;
+}
+
+status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad)
+{
+    int depth = 0;
+    addr_t node_addr = eprocess + drakvuf->offsets[EPROCESS_VADROOT] + drakvuf->offsets[VADROOT_BALANCED_ROOT];
+
+    while (node_addr)
+    {
+        addr_t left_child;
+        addr_t right_child;
+
+        uint64_t starting_vpn;
+        uint64_t ending_vpn;
+        uint64_t flags1;
+
+        if (depth > MMVAD_MAX_DEPTH)
+        {
+            PRINT_DEBUG("Error. Max depth exceeded when walking MMVAD tree.\n");
+            return VMI_FAILURE;
+        }
+
+        ++depth;
+
+        access_context_t ctx;
+        ctx.translate_mechanism = VMI_TM_PROCESS_PID;
+        ctx.pid = 4;
+        ctx.addr = node_addr + drakvuf->offsets[MMVAD_LEFT_CHILD];
+
+        if (vmi_read_addr(drakvuf->vmi, &ctx, &left_child) != VMI_SUCCESS)
+        {
+            return VMI_FAILURE;
+        }
+
+        ctx.addr = node_addr + drakvuf->offsets[MMVAD_RIGHT_CHILD];
+
+        if (vmi_read_addr(drakvuf->vmi, &ctx, &right_child) != VMI_SUCCESS)
+        {
+            return VMI_FAILURE;
+        }
+
+        ctx.addr = node_addr + drakvuf->offsets[MMVAD_STARTING_VPN];
+
+        if (vmi_read_64(drakvuf->vmi, &ctx, &starting_vpn) != VMI_SUCCESS)
+        {
+            return VMI_FAILURE;
+        }
+
+        ctx.addr = node_addr + drakvuf->offsets[MMVAD_ENDING_VPN];
+
+        if (vmi_read_64(drakvuf->vmi, &ctx, &ending_vpn) != VMI_SUCCESS)
+        {
+            return VMI_FAILURE;
+        }
+
+        if (starting_vpn == 0 && ending_vpn == 0)
+        {
+            // the root node seems to be empty with only right child pointer filled in
+            node_addr = right_child;
+        }
+        else if (starting_vpn * VMI_PS_4KB <= vaddr && (ending_vpn + 1) * VMI_PS_4KB > vaddr)
+        {
+            uint32_t pool_tag;
+            addr_t subsection;
+            addr_t control_area;
+            addr_t file_object;
+
+            out_mmvad->file_name_ptr = 0;
+
+            ctx.addr = node_addr + drakvuf->offsets[MMVAD_FLAGS1];
+
+            if (vmi_read_64(drakvuf->vmi, &ctx, &flags1) != VMI_SUCCESS)
+            {
+                return VMI_FAILURE;
+            }
+
+            // read Windows' PoolTag which is 12 bytes before the actual object
+            ctx.addr = node_addr - 0xC;
+            if (vmi_read_32(drakvuf->vmi, &ctx, &pool_tag) != VMI_SUCCESS)
+            {
+                return VMI_FAILURE;
+            }
+
+            // Windows MMVAD can have multiple types, can be differentiated with pool tags
+            // some types are shorter and don't even contain "Subsection" field
+            if (pool_tag == POOL_TAG_VADL || pool_tag == POOL_TAG_VAD || pool_tag == POOL_TAG_VADM)
+            {
+                ctx.addr = node_addr + drakvuf->offsets[MMVAD_SUBSECTION];
+
+                if (vmi_read_addr(drakvuf->vmi, &ctx, &subsection) == VMI_SUCCESS)
+                {
+                    ctx.addr = subsection + drakvuf->offsets[SUBSECTION_CONTROL_AREA];
+
+                    if (vmi_read_addr(drakvuf->vmi, &ctx, &control_area) == VMI_SUCCESS)
+                    {
+                        ctx.addr = control_area + drakvuf->offsets[CONTROL_AREA_FILEPOINTER];
+
+                        if (vmi_read_addr(drakvuf->vmi, &ctx, &file_object) == VMI_SUCCESS)
+                        {
+                            // file_object is a special _EX_FAST_REF pointer, we need to explicitly clear low bits
+                            file_object &= (~0xFULL);
+
+                            if ((void*)file_object != NULL)
+                            {
+                                out_mmvad->file_name_ptr = (file_object + drakvuf->offsets[FILEOBJECT_NAME]);
+                            }
+                        }
+                    }
+                }
+            }
+
+            out_mmvad->starting_vpn = starting_vpn;
+            out_mmvad->ending_vpn = ending_vpn;
+            out_mmvad->flags1 = flags1;
+
+            return VMI_SUCCESS;
+        }
+        else if (starting_vpn * VMI_PS_4KB > vaddr)
+        {
+            node_addr = left_child;
+        }
+        else
+        {
+            node_addr = right_child;
+        }
+    }
+
+    return VMI_FAILURE;
+}
+
+status_t win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)
+{
+    if (handle == 0 || handle == UINT64_MAX)
+    {
+        *pid = info->proc_data.pid;
+        return VMI_SUCCESS;
+    }
+
+    if (!info->proc_data.base_addr)
+    {
+        return VMI_FAILURE;
+    }
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    if (!obj)
+    {
+        return VMI_FAILURE;
+    }
+
+    addr_t eprocess_base = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
+    return drakvuf_get_process_pid(drakvuf, eprocess_base, pid);
 }

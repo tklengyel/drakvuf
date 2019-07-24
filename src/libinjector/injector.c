@@ -453,7 +453,7 @@ static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info
     if (!injector->target_tid)
     {
         uint32_t threadid = 0;
-        if (!drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, &threadid) || !threadid)
+        if (!drakvuf_get_current_thread_id(injector->drakvuf, info, &threadid) || !threadid)
             return false;
 
         injector->target_tid = threadid;
@@ -600,7 +600,7 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
     if (info->proc_data.pid != injector->target_pid)
         return 0;
 
-    addr_t thread = drakvuf_get_current_thread(drakvuf, info->vcpu);
+    addr_t thread = drakvuf_get_current_thread(drakvuf, info);
     if (!thread)
     {
         PRINT_DEBUG("Failed to find current thread\n");
@@ -608,7 +608,7 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
     }
 
     uint32_t threadid = 0;
-    if ( !drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, &threadid) || !threadid )
+    if ( !drakvuf_get_current_thread_id(injector->drakvuf, info, &threadid) || !threadid )
         return 0;
 
     PRINT_DEBUG("Thread @ 0x%lx. ThreadID: %u\n", thread, threadid);
@@ -868,7 +868,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     if (injector->target_tid)
     {
         uint32_t threadid = 0;
-        if (!drakvuf_get_current_thread_id(drakvuf, info->vcpu, &threadid) || threadid != injector->target_tid)
+        if (!drakvuf_get_current_thread_id(drakvuf, info, &threadid) || threadid != injector->target_tid)
             return 0;
     }
 
@@ -912,7 +912,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             else
             {
                 injector->error_code.valid = true;
-                drakvuf_get_last_error(injector->drakvuf, info->vcpu, &injector->error_code.code, &injector->error_code.string);
+                drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
             }
 
             injector->rc = info->regs->rax;
@@ -1120,7 +1120,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         else
         {
             injector->error_code.valid = true;
-            drakvuf_get_last_error(injector->drakvuf, info->vcpu, &injector->error_code.code, &injector->error_code.string);
+            drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
         }
 
         injector->rc = info->regs->rax;
@@ -1430,8 +1430,8 @@ addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib,
         access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_PID, };
         addr_t module_list_head;
         if (VMI_SUCCESS == drakvuf_get_process_pid(drakvuf, eprocess_base, &ctx.pid) &&
-                drakvuf_get_module_list(drakvuf, eprocess_base, &module_list_head) &&
-                drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, lib, &module_ctx.module_addr))
+            drakvuf_get_module_list(drakvuf, eprocess_base, &module_list_head) &&
+            drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, lib, &module_ctx.module_addr))
         {
             drakvuf_enumerate_processes_with_module(drakvuf, lib, module_visitor, &module_ctx);
         }

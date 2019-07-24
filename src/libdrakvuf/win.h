@@ -110,11 +110,11 @@
 #include "os.h"
 #include "win-exports.h"
 
-addr_t win_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id);
+addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-addr_t win_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id);
+addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-status_t win_get_last_error(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str);
+status_t win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
 
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
 
@@ -122,18 +122,18 @@ char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
 
 status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
 
-char* win_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath);
+char* win_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
 
 int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base);
 
-int64_t win_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id);
+int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-bool win_get_current_thread_id(drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* thread_id);
+bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
 
 bool win_get_thread_previous_mode(drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
 
 bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
-        uint64_t vcpu_id,
+        drakvuf_trap_info_t* info,
         privilege_mode_t* previous_mode);
 
 bool win_is_ethread(drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
@@ -165,5 +165,9 @@ char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int argument_number);
 
 bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
+
+status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
+
+status_t win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 
 #endif

@@ -156,7 +156,10 @@ struct allocator
 
     template<typename... _Args>
     inline T* allocate(std::size_t n, _Args&& ... args);
-    void deallocate(T* p, std::size_t n) { delete[] p; }
+    void deallocate(T* p, std::size_t n)
+    {
+        delete[] p;
+    }
 };
 
 template<typename T>
@@ -190,8 +193,14 @@ public:
     plugin_params(T* src) : source(src) {}
     virtual ~plugin_params() {}
 
-    T* operator()() const noexcept { return source; }
-    T* plugin() const noexcept { return source; }
+    T* operator()() const noexcept
+    {
+        return source;
+    }
+    T* plugin() const noexcept
+    {
+        return source;
+    }
 };
 
 struct breakpoint_in_system_process_searcher

@@ -684,17 +684,10 @@ static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     trap->type = BREAKPOINT;
     trap->data = w;
 
-    switch (w->s->winver)
-    {
-        case VMI_OS_WINDOWS_7:
-        case VMI_OS_WINDOWS_8:
-            trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? tcpl_x64_ret_cb : tcpl_x86_ret_cb;
-            break;
-        default:
-        case VMI_OS_WINDOWS_10:
-            trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? tcpl_win10_x64_ret_cb : NULL;
-            break;
-    }
+    if (w->s->winver == VMI_OS_WINDOWS_7 || w->s->winver == VMI_OS_WINDOWS_8)
+        trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? tcpl_x64_ret_cb : tcpl_x86_ret_cb;
+    else
+        trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? tcpl_win10_x64_ret_cb : NULL;
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
     {
@@ -731,17 +724,10 @@ static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     trap->type = BREAKPOINT;
     trap->data = w;
 
-    switch (w->s->winver)
-    {
-        case VMI_OS_WINDOWS_7:
-        case VMI_OS_WINDOWS_8:
-            trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_x64_ret_cb : udpa_x86_ret_cb;
-            break;
-        default:
-        case VMI_OS_WINDOWS_10:
-            trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_win10_x64_ret_cb : NULL;
-            break;
-    }
+    if ( w->s->winver == VMI_OS_WINDOWS_7 || w->s->winver == VMI_OS_WINDOWS_8 )
+        trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_x64_ret_cb : udpa_x86_ret_cb;
+    else
+        trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_win10_x64_ret_cb : NULL;
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
     {
