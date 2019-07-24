@@ -280,7 +280,7 @@ typedef struct process_data_priv
     vmi_pid_t ppid ;    /* Process parent pid */
     addr_t base_addr ;  /* Process base address */
     int64_t userid ;    /* Process SessionID/UID */
-    vmi_pid_t tid; /* Thread id for Linux*/ 
+    vmi_pid_t tid; /* Thread id for Linux*/
 } proc_data_priv_t ;
 
 struct memcb_pass

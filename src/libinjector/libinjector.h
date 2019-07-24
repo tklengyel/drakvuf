@@ -207,14 +207,14 @@ int injector_start_app_on_linux(drakvuf_t drakvuf,
                                 const char* binary_path,     // if -m = doppelganging
                                 const char* target_process,  // if -m = doppelganging
                                 bool break_loop_on_detection,
-                                bool global_search, // out: iff break_loop_on_detection is set 
+                                bool global_search, // out: iff break_loop_on_detection is set
                                 const char* args[],
-                                int args_count); 
-                                
+                                int args_count);
+
 bool setup_linux_stack(drakvuf_t drakvuf,
-                    drakvuf_trap_info_t* info,
-                    struct argument args[],
-                    int nb_args);
+                       drakvuf_trap_info_t* info,
+                       struct argument args[],
+                       int nb_args);
 
 #pragma GCC visibility pop
 

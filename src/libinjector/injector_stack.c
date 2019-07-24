@@ -454,7 +454,7 @@ static addr_t place_string_on_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_
     return status == VMI_FAILURE ? 0 : addr;
 }
 
-bool setup_linux_stack(drakvuf_t drakvuf,drakvuf_trap_info_t* info, struct argument args[], int nb_args)
+bool setup_linux_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, struct argument args[], int nb_args)
 {
     uint64_t nul64 = 0;
 
@@ -497,7 +497,7 @@ bool setup_linux_stack(drakvuf_t drakvuf,drakvuf_trap_info_t* info, struct argum
                     goto err;
             }
         }
-        
+
         //  x86-64: Maintain 16-byte stack alignment
         //  the stack pointer misaligned by 8 bytes on function entry
         if (addr % 0x10 == 0)

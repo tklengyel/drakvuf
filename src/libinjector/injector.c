@@ -417,7 +417,7 @@ static bool setup_create_process_regs_and_stack(injector_t injector, drakvuf_tra
 
     // int execlp(const char *file, const char *arg, ...);
 
-    PRINT_DEBUG("Target file : %s\n",injector->target_file);
+    PRINT_DEBUG("Target file : %s\n", injector->target_file);
     size_t sz = strlen(injector->target_file);
     init_argument(&arguments[0], ARGUMENT_STRING, sz, (char*)injector->target_file);
     init_argument(&arguments[1], ARGUMENT_STRING, sz, (char*)injector->target_file);
@@ -425,7 +425,7 @@ static bool setup_create_process_regs_and_stack(injector_t injector, drakvuf_tra
     {
         for (int i=0; i<injector->args_count; i++)
         {
-            PRINT_DEBUG("Argument %d : %s\n",i+1, (injector->args[i]));
+            PRINT_DEBUG("Argument %d : %s\n", i+1, (injector->args[i]));
             sz = strlen(injector->args[i]);
             init_argument(&arguments[i+2], ARGUMENT_STRING, sz, (char*)injector->args[i]);
         }
@@ -794,7 +794,7 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
     injector_t injector = info->trap->data;
 
     PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". TID: %u PID: %u PPID: %u\n",
-           info->regs->cr3, info->proc_data.tid, info->proc_data.pid, info->proc_data.ppid);
+                info->regs->cr3, info->proc_data.tid, info->proc_data.pid, info->proc_data.ppid);
 
     if (info->proc_data.pid != injector->target_pid || (uint32_t)info->proc_data.tid != injector->target_tid)
     {
@@ -888,11 +888,11 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
 
     if (injector->target_pid != info->proc_data.pid || injector->target_tid != (uint32_t)info->proc_data.pid)
     {
-        PRINT_DEBUG("%u|%u|%u|%u \n",info->proc_data.pid,injector->target_pid,info->proc_data.tid,injector->target_tid);
+        PRINT_DEBUG("%u|%u|%u|%u \n", info->proc_data.pid, injector->target_pid, info->proc_data.tid, injector->target_tid);
         return 0;
     }
 
-    
+
     if (injector->method == INJECT_METHOD_EXECPROC && injector->status == STATUS_CREATE_OK)
     {
         if (info->regs->rax == 0xffffffff)
@@ -906,7 +906,7 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
             return 0;
         }
     }
-    
+
     drakvuf_remove_trap(drakvuf, info->trap, NULL);
 
     injector->pid = injector->target_pid;
@@ -1171,10 +1171,10 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
             injector->detected = false;
 
             // Setup trap for injected process
-            if(false) // TO ESCAPE COMPILER WARNINGS NEED MORE DISCUSSION THIS
+            if (false) // TO ESCAPE COMPILER WARNINGS NEED MORE DISCUSSION THIS
             {
                 if (!setup_wait_for_injected_process_trap_linux(injector))
-                return 0;
+                    return 0;
             }
 
             // drakvuf_remove_trap(drakvuf, info->trap, NULL);
@@ -1591,7 +1591,7 @@ static event_response_t linux_injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_i
     // pid is thread group id in linux, and tid is thread id
     if ((uint32_t)info->proc_data.tid == injector->target_tid && info->proc_data.pid == injector->target_pid)
     {
-        PRINT_DEBUG("%u|%u|%u|%u \n",info->proc_data.pid,injector->target_pid,info->proc_data.tid,injector->target_tid);
+        PRINT_DEBUG("%u|%u|%u|%u \n", info->proc_data.pid, injector->target_pid, info->proc_data.tid, injector->target_tid);
 
         // kernel mode
 
@@ -1616,12 +1616,13 @@ static event_response_t linux_injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_i
         new_trap->data = injector;
 
         // Creating Trap at BP addr
-        if (!drakvuf_add_trap(drakvuf, new_trap)){
+        if (!drakvuf_add_trap(drakvuf, new_trap))
+        {
             PRINT_DEBUG("Failed to create a trap at BP address \n");
             return false;
         }
 
-        // rem int3 trap 
+        // rem int3 trap
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
     }
     return 0;
@@ -1957,14 +1958,14 @@ static bool initialize_linux_injector_functions(injector_t injector)
 {
     if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
     {
-        PRINT_DEBUG("file is %s\n",injector->target_file);
+        PRINT_DEBUG("file is %s\n", injector->target_file);
         if ( !load_file_to_memory(&injector->payload, &injector->payload_size, injector->target_file) )
         {
             PRINT_DEBUG("Failed to load file into memory\n");
             return false;
         }
-        PRINT_DEBUG("file address in memory %lx\n",injector->payload);
-        PRINT_DEBUG("file size in memory %lx\n",injector->payload_size);
+        PRINT_DEBUG("file address in memory %lx\n", injector->payload);
+        PRINT_DEBUG("file size in memory %lx\n", injector->payload_size);
         return true;
     }
     return true;

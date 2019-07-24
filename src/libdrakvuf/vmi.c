@@ -487,8 +487,8 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
 #ifdef DEBUG
     reg_t cr3 = event->x86_regs->cr3;
     PRINT_DEBUG("INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64". Insn_length: %u\n",
-           event->vcpu_id, event->slat_id, cr3, pa,
-           event->interrupt_event.gla, event->interrupt_event.insn_length);
+                event->vcpu_id, event->slat_id, cr3, pa,
+                event->interrupt_event.gla, event->interrupt_event.insn_length);
 #endif
 
     struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
@@ -522,7 +522,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
         }
         return 0;
     }
-    
+
     if ( s->breakpoint.doubletrap )
         event->interrupt_event.reinject = 1;
     else

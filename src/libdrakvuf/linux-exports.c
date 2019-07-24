@@ -142,7 +142,7 @@ addr_t linux_get_address_of_libc(drakvuf_t drakvuf, drakvuf_trap_info_t* info, v
     ctx.addr = mm_struct_address + drakvuf->offsets[MM_STRUCT_MMAP];
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mmap))
         return -1;
-    
+
     char* libname = "";
     addr_t vm_next, vm_start, nullp = 0;
 
@@ -178,8 +178,7 @@ addr_t linux_get_address_of_libc(drakvuf_t drakvuf, drakvuf_trap_info_t* info, v
 next:
         mmap = vm_next;
 
-    }
-    while (!strstr(libname,libc) && vm_next != nullp);
+    } while (!strstr(libname, libc) && vm_next != nullp);
 
 
     if (strstr(libname, libc))
