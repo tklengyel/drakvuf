@@ -218,7 +218,6 @@ int main(int argc, char **argv){
         else
         {
             fuzz_iterations++;
-            successfull++;
         }
         
         fprintf(stderr, "waiting for lock\n");
@@ -229,9 +228,8 @@ int main(int argc, char **argv){
         
     }
     // error:
-    drakvuf_resume(drakvuf); 
     drakvuf_close(drakvuf, 0);
-    printf("[+] Successfull = %d", successfull);
+    printf("[+] Successfull = %d", fuzz_iterations);
     
 
 }

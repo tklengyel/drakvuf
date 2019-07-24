@@ -42,14 +42,12 @@ bool start_bsodmon(drakvuf_t drakvuf, json_object *function)
     (void)function;
     plugins = new drakvuf_plugins(drakvuf, OUTPUT_DEFAULT, 
         drakvuf_get_os_type(drakvuf));
-    // options = {0};
-    // options.input = function;
-    // options.abort_on_bsod = true;
-    // options.continue_fuzzing = &continue_fuzzing;
-    // options.spin_lock = &spin_lock_held;
-    options.syscalls_filter_file = NULL;
-    // plugins->start(PLUGIN_BSODMON, &options);
-    plugins->start(PLUGIN_SYSCALLS, &options);
+    options = {0};
+    options.input = function;
+    options.abort_on_bsod = true;
+    options.continue_fuzzing = &continue_fuzzing;
+    options.spin_lock = &spin_lock_held;
+    plugins->start(PLUGIN_BSODMON, &options);
     return true;
 }
 
@@ -100,11 +98,14 @@ int main(int argc, char *argv[])
 {
     // int file  = open("/home/ajinkya/College/gsoc19/AFL/log.txt", O_WRONLY | O_CREAT );
     FILE *temp_stderr = stderr;
+    FILE *temp_stdout = stdout;
+    
+    stdout = fopen("/home/ajinkya/College/gsoc19/AFL/log_stdout.txt", "w");
     stderr = fopen("/home/ajinkya/College/gsoc19/AFL/log_stderr.txt", "w");
-    afl_setup();    
-    afl_forkserver();
+    // afl_setup();    
+    // afl_forkserver();
+    // afl_area_ptr[1<<10] = 12;
     fprintf(stderr, "--------------------------------\n");
-    afl_area_ptr[1<<10] = 12;
 
     char *domain=NULL, *rekall_profile=NULL, *rekall_wow_profile = NULL, *function_name = NULL;
     char *lib_name=NULL;
@@ -195,6 +196,8 @@ int main(int argc, char *argv[])
         return rc;
     }
     json_object *candidates = json_object_from_file(fuzz_candidates_path);
+    start_bsodmon(drakvuf, candidates);
+
     int successfull = 0;
     fprintf(stderr, "STARTING FUZZING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
     while(fuzz_iterations<num_iterations)
@@ -219,9 +222,8 @@ int main(int argc, char *argv[])
         json_object* args = hijack_get_arguments(function);
         num_args = hijack_get_num_arguments(args);
         driver_rekal_profile = hijack_get_module_rekall_profile(module);
+
         
-        
-        // start_bsodmon(drakvuf, inputs);
         fprintf(stderr, "Calling %s!%s, with %d arguments\n",lib_name, function_name, num_args);
         fprintf(stderr, "Calling With Input >>>>>>>>>>>>>>>>\n");
         fprintf(stderr, "%s\n", 
@@ -248,18 +250,24 @@ int main(int argc, char *argv[])
         
         fprintf(stderr, "waiting for lock\n");
         while(!g_atomic_int_compare_and_exchange(&spin_lock_held,false, true));
-        // stop_bsodmon();
         fprintf(stderr, "Returned >>>>>>>>>>>>>>>>\n");
         // sleep(1);
         
     }
     // error:
+    sleep(5);
+    
     drakvuf_resume(drakvuf); 
+    stop_bsodmon();
     drakvuf_close(drakvuf, 0);
     fprintf(stderr,"[+] Successfull = %d\n", successfull);
     fclose(stderr);
+    fclose(stdout);
     stderr = temp_stderr;
+    stdout = temp_stdout;
     //give time to wait as immediate calling crashes
+    sleep(5);
+
     return successfull;
   
 }

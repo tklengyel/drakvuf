@@ -111,8 +111,8 @@
 static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     bsodmon* f = static_cast<bsodmon*>(info->trap->data);
-    const char * inp_config = 
-        json_object_to_json_string_ext(f->input, JSON_C_TO_STRING_PRETTY);
+    // const char * inp_config = 
+    //     json_object_to_json_string_ext(f->input, JSON_C_TO_STRING_PRETTY);
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     access_context_t ctx;
@@ -214,7 +214,7 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     fprintf(stderr, "Crashing input = \n");
-    fprintf(stderr, "%s\n", inp_config);
+    // fprintf(stderr, "%s\n", inp_config);
     g_atomic_int_set(f->spin_lock, false);
     *f->continue_fuzzing = false;
 
