@@ -18,6 +18,7 @@
 #include "plugins/plugins.h"
 #include <fcntl.h>
 
+
 void afl_setup();
 void afl_forkserver();
 #define SEED 321651
@@ -91,7 +92,25 @@ json_object *get_inputs(json_object *function){
     return array;
 }
 
+void try_some_other_shit()
+{
+    FILE *fp;
+    char list_output[2048];
+    fp = popen("xl list", "r");
+    bool domain_live = false;
+    
+    while(fgets(list_output, 2047, fp) != NULL )
+    {
+        if(strstr(list_output, "win10"))
+        {
+            domain_live = true;
+        }
+    }
+    if(domain_live)
+    (void)system("xl destroy win10");
+    (void)system("./restore_script.sh");
 
+}
 
 using namespace std;
 int main(int argc, char *argv[])
@@ -102,9 +121,9 @@ int main(int argc, char *argv[])
     
     stdout = fopen("/home/ajinkya/College/gsoc19/AFL/log_stdout.txt", "w");
     stderr = fopen("/home/ajinkya/College/gsoc19/AFL/log_stderr.txt", "w");
-    // afl_setup();    
-    // afl_forkserver();
-    // afl_area_ptr[1<<10] = 12;
+    afl_setup();    
+    afl_forkserver();
+    afl_area_ptr[1<<10] = 12;
     fprintf(stderr, "--------------------------------\n");
 
     char *domain=NULL, *rekall_profile=NULL, *rekall_wow_profile = NULL, *function_name = NULL;
@@ -192,8 +211,12 @@ int main(int argc, char *argv[])
 
     if(!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf))
     {
-        fprintf(stderr, "Failed to initialize DRAKVUF\n %s", domain);
-        return rc;
+        try_some_other_shit();
+        if(!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf))
+        {
+            fprintf(stderr, "Failed to initialize DRAKVUF\n %s", domain);
+            return rc;
+        }
     }
     json_object *candidates = json_object_from_file(fuzz_candidates_path);
     // start_bsodmon(drakvuf, candidates);
@@ -255,7 +278,7 @@ int main(int argc, char *argv[])
         
     }
     // error:
-    sleep(5);
+    // sleep(5);
     
     drakvuf_resume(drakvuf); 
     // stop_bsodmon();

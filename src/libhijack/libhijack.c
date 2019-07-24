@@ -115,7 +115,7 @@ static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_
     }
     PRINT_DEBUG("[+] int3_cb for return \n");
     uint32_t tid;
-    drakvuf_get_current_thread_id(drakvuf, info->vcpu, &tid);
+    drakvuf_get_current_thread_id(drakvuf, info, &tid);
     PRINT_DEBUG(BGYELLOW BLACK"[+] In INT3 CB PID=%d, Process Name = %s ThreadId = %d " BLUE"cr3 = %lx"RESET"\n", info->proc_data.pid
                                                                         , info->proc_data.name
                                                                         , tid
@@ -226,7 +226,7 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
     }
 
     uint32_t tid;
-    drakvuf_get_current_thread_id(drakvuf, info->vcpu, &tid);
+    drakvuf_get_current_thread_id(drakvuf, info, &tid);
     
     fprintf(stderr, BGCYAN BLACK"[+] In CR3 CB PID=%d, Process Name = %s"
     "ThreadId = %d, PPID = %d, BASE Addr = %lx, "

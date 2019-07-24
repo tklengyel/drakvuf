@@ -228,13 +228,13 @@ done:
 }
 
 void bsodmon::register_trap(drakvuf_t drakvuf, const char* syscall_name,
-                            drakvuf_trap_t* trap,
+                            drakvuf_trap_t* sys_trap,
                             event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ))
 {
-    trap->name = syscall_name;
-    trap->cb   = hook_cb;
-    if ( !drakvuf_get_function_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
-    if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
+    sys_trap->name = syscall_name;
+    sys_trap->cb   = hook_cb;
+    if ( !drakvuf_get_function_rva( drakvuf, syscall_name, &sys_trap->breakpoint.rva) ) throw -1;
+    if ( ! drakvuf_add_trap( drakvuf, sys_trap ) ) throw -1;
 }
 
 bsodmon::bsodmon(drakvuf_t drakvuf, bool abort_on_bsod, output_format_t output,

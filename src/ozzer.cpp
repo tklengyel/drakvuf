@@ -170,7 +170,6 @@ int main(int argc, char **argv){
         return rc;
     }
     json_object *candidates = json_object_from_file(fuzz_candidates_path);
-    int successfull = 0;
     fprintf(stderr, "STARTING FUZZING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
     while(fuzz_iterations<num_iterations)
     {   
