@@ -262,9 +262,7 @@ static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t epr
                           eprocess_base + drakvuf->offsets[EPROCESS_PROCCREATIONINFO] + drakvuf->offsets[PROCCREATIONINFO_IMAGEFILENAME],
                           0, &image_file_name_addr) != VMI_SUCCESS )
     {
-#ifdef DRAKVUF_DEBUG
         PRINT_DEBUG("in win_get_process_full_name(...) couldn't read IMAGEFILENAME address\n");
-#endif
         return NULL;
     }
 
@@ -361,11 +359,9 @@ int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &userid) )
         return -1;
 
-#ifdef DRAKVUF_DEBUG
     /* It should be safe to stash userid into a int64_t as it seldom goes above INT_MAX */
     if ( userid > INT_MAX )
         PRINT_DEBUG("The process at 0x%" PRIx64 " has a userid larger then INT_MAX!\n", eprocess_base);
-#endif
 
     return (int64_t)userid;
 };
