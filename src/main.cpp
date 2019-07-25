@@ -353,6 +353,10 @@ int main(int argc, char** argv)
                     return rc;
                 }
 #endif
+                if (!strncmp(optarg, "execproc", 8))
+                    injection_method = INJECT_METHOD_EXECPROC;
+                if (!strncmp(optarg, "linuxshellcode", 14))
+                    injection_method = INJECT_METHOD_SHELLCODE_LINUX;
                 break;
 #ifdef ENABLE_DOPPELGANGING
             case 'B':

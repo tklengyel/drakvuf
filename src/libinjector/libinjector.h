@@ -200,14 +200,10 @@ int injector_start_app_on_win(drakvuf_t drakvuf,
 
 int injector_start_app_on_linux(drakvuf_t drakvuf,
                                 vmi_pid_t pid,
-                                uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
+                                uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used i.e, tid = pid
                                 const char* app,
                                 injection_method_t method,
                                 output_format_t format,
-                                const char* binary_path,     // if -m = doppelganging
-                                const char* target_process,  // if -m = doppelganging
-                                bool break_loop_on_detection,
-                                bool global_search, // out: iff break_loop_on_detection is set
                                 const char* args[],
                                 int args_count);
 

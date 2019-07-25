@@ -293,10 +293,6 @@ int main(int argc, char** argv)
                            inject_file,
                            injection_method,
                            OUTPUT_DEFAULT,
-                           binary_path,
-                           target_process,
-                           false,
-                           injection_global_search,
                            args,
                            args_count);
     }

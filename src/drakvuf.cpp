@@ -244,16 +244,15 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
     }
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {
+        if (injection_tid ==0)
+            injection_tid = injection_pid;
+
         rc = injector_start_app_on_linux(drakvuf,
                                          injection_pid,
                                          injection_tid,
                                          inject_cmd,
                                          method,
                                          format,
-                                         binary_path,
-                                         target_process,
-                                         true,
-                                         global_search,
                                          args,
                                          args_count);
     }

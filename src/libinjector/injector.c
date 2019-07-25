@@ -147,7 +147,7 @@ struct injector
     injection_method_t method;
     bool global_search;
     addr_t exec_func, libc_addr;
-    reg_t target_rsp;
+    reg_t target_rsp, target_rip;
 
     // For create process
     addr_t resume_thread;
@@ -1085,15 +1085,17 @@ static event_response_t inject_payload_linux(drakvuf_t drakvuf, drakvuf_trap_inf
         return 0;
     }
 
-    struct argument args[6] = { {0} };
-    init_int_argument(&args[0], 0);
-    init_int_argument(&args[1], 0);
-    init_int_argument(&args[2], 0);
-    init_int_argument(&args[3], 0);
-    init_int_argument(&args[4], 0);
-    init_int_argument(&args[5], 0);
+    info->regs->rip = injector->target_rip;
 
-    if (!setup_linux_stack(injector->drakvuf, info, args, 6))
+    // struct argument args[6] = { {0} };
+    // init_int_argument(&args[0], 0);
+    // init_int_argument(&args[1], 0);
+    // init_int_argument(&args[2], 0);
+    // init_int_argument(&args[3], 0);
+    // init_int_argument(&args[4], 0);
+    // init_int_argument(&args[5], 0);
+
+    if (!setup_linux_stack(injector->drakvuf, info, NULL, 6))
     {
         PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
         return 0;
@@ -1156,6 +1158,7 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
             return 0;
         }
 
+        injector->target_rip = info->regs->rip;
         info->regs->rip = injector->exec_func;
         PRINT_DEBUG("Rip is  : 0x%lx \n", info->regs->rip);
 
@@ -1171,7 +1174,9 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
             injector->detected = false;
 
             // Setup trap for injected process
-            if (false) // TO ESCAPE COMPILER WARNINGS NEED MORE DISCUSSION THIS
+            // TO ESCAPE COMPILER WARNINGS, NEED MORE DISCUSSION ON THIS
+            // Ctrl + C to stop drakvuf on successful injectiion
+            if (false) 
             {
                 if (!setup_wait_for_injected_process_trap_linux(injector))
                     return 0;
@@ -1196,6 +1201,8 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
         // Add memset offset to libc address
         // 000000000009ed40 -> memset@@GLIBC_2.2.5
         injector->exec_func = injector->libc_addr + 0x9ed40;
+
+        info->regs->rip = injector->target_rip;
 
         if (!setup_linux_memset_stack(injector, info))
         {
@@ -1692,13 +1699,12 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
         return false;
     }
 
-    // size_t temp = fread(data, payload_size, 1, fp);
-    // if ( payload_size != strlen((const char *)data)) // need correction for linux
-    // {
-    //     g_free(data);
-    //     fclose(fp);
-    //     return false;
-    // }
+    if ( payload_size != fread(data, 1, payload_size, fp))
+    {
+        g_free(data);
+        fclose(fp);
+        return false;
+    }
 
     *output = (addr_t)data;
     *size = payload_size;
@@ -1958,14 +1964,14 @@ static bool initialize_linux_injector_functions(injector_t injector)
 {
     if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
     {
-        PRINT_DEBUG("file is %s\n", injector->target_file);
+        PRINT_DEBUG("File is %s\n", injector->target_file);
         if ( !load_file_to_memory(&injector->payload, &injector->payload_size, injector->target_file) )
         {
             PRINT_DEBUG("Failed to load file into memory\n");
             return false;
         }
-        PRINT_DEBUG("file address in memory %lx\n", injector->payload);
-        PRINT_DEBUG("file size in memory %lx\n", injector->payload_size);
+        PRINT_DEBUG("File address in memory %lx\n", injector->payload);
+        PRINT_DEBUG("File size in memory %lx\n", injector->payload_size);
         return true;
     }
     return true;
@@ -2149,10 +2155,6 @@ int injector_start_app_on_linux(
     const char* file,
     injection_method_t method,
     output_format_t format,
-    const char* binary_path, // FOR SHELL CODE EXEC
-    const char* target_process, //REMOVE THIS
-    bool break_loop_on_detection,
-    bool global_search,
     const char* args[],
     int args_count)
 {
@@ -2169,11 +2171,7 @@ int injector_start_app_on_linux(
     injector->target_tid = tid; // tid is process id in linux
     injector->method = method;
     injector->target_file = file;
-    injector->global_search = global_search;
-    injector->binary_path = binary_path;
-    injector->target_process = target_process;
     injector->status = STATUS_NULL;
-    injector->break_loop_on_detection = break_loop_on_detection;
     injector->error_code.valid = false;
     injector->error_code.code = -1;
     injector->error_code.string = "<UNKNOWN>";
@@ -2221,16 +2219,7 @@ int injector_start_app_on_linux(
     rc = injector->rc;
     printf("Finished with injection. Ret: %i.\n", rc);
 
-    switch (method)
-    {
-        case INJECT_METHOD_EXECPROC:
-            free_injector(injector);
-            break;
-        default:
-            free_injector(injector);
-            break;
-    }
-    free_memtraps(injector);
+    free_injector(injector);
 
     return rc;
 }
