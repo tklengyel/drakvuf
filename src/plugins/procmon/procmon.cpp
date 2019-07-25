@@ -328,7 +328,7 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
     drakvuf_release_vmi(drakvuf);
 
     vmi_pid_t new_pid;
-    if (drakvuf_get_pid_from_handle(drakvuf, info, new_process_handle, &new_pid) != VMI_SUCCESS)
+    if (!drakvuf_get_pid_from_handle(drakvuf, info, new_process_handle, &new_pid))
         new_pid = 0;
 
     print_process_creation_result(plugin, drakvuf, info, status, new_pid, user_process_parameters_addr);
@@ -376,7 +376,7 @@ static event_response_t terminate_process_hook(
         return VMI_EVENT_RESPONSE_NONE;
 
     vmi_pid_t exit_pid;
-    if (drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &exit_pid) != VMI_SUCCESS)
+    if (!drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &exit_pid))
         exit_pid = 0;
 
     char exit_status_buf[NTSTATUS_MAX_FORMAT_STR_SIZE] = {0};

@@ -1430,7 +1430,7 @@ static addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char cons
         // First get modules load address to search for other process with same address
         access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_PID, };
         addr_t module_list_head;
-        if (VMI_SUCCESS == drakvuf_get_process_pid(drakvuf, eprocess_base, &ctx.pid) &&
+        if (drakvuf_get_process_pid(drakvuf, eprocess_base, &ctx.pid) &&
             drakvuf_get_module_list(drakvuf, eprocess_base, &module_list_head) &&
             drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, lib, &module_ctx.module_addr))
         {
