@@ -1176,7 +1176,7 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
             // Setup trap for injected process
             // TO ESCAPE COMPILER WARNINGS, NEED MORE DISCUSSION ON THIS
             // Ctrl + C to stop drakvuf on successful injectiion
-            if (false) 
+            if (false)
             {
                 if (!setup_wait_for_injected_process_trap_linux(injector))
                     return 0;
