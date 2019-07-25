@@ -114,13 +114,13 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-status_t win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
+bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
 
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
 
 char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
 
-status_t win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
+bool win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
 
 char* win_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
 
@@ -154,7 +154,7 @@ bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_n
 
 bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
 
-status_t win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, int32_t* ppid );
+bool win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, int32_t* ppid );
 
 bool win_get_process_data( drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data );
 
@@ -166,8 +166,8 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, i
 
 bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
 
-status_t win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
+bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
 
-status_t win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
+bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 
 #endif

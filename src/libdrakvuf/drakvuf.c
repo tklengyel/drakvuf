@@ -286,11 +286,8 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
                 if ( !drakvuf_find_process(drakvuf, pid, name, &process_base) )
                     return 0;
 
-                if (pid == -1)
-                {
-                    if ( drakvuf_get_process_pid(drakvuf, process_base, &pid) == VMI_FAILURE )
-                        return 0;
-                }
+                if ( pid == -1 && !drakvuf_get_process_pid(drakvuf, process_base, &pid) )
+                    return 0;
 
                 if ( !drakvuf_get_module_list(drakvuf, process_base, &module_list) )
                     return 0;

@@ -326,7 +326,7 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     mmvad_info_t mmvad;
 
-    if (VMI_SUCCESS != drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, mem_base_address, &mmvad))
+    if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, mem_base_address, &mmvad))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to find MMVAD for memory passed to NtFreeVirtualMemory\n");
         drakvuf_release_vmi(drakvuf);
@@ -424,9 +424,11 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
     addr_t process_addr = 0;
     char* target_name = nullptr;
 
-    if (drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &target_pid) == VMI_SUCCESS)
-        if (drakvuf_find_process(drakvuf, target_pid, nullptr, &process_addr))
-            target_name = drakvuf_get_process_name(drakvuf, process_addr, true);
+    if ( drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &target_pid) &&
+         drakvuf_find_process(drakvuf, target_pid, nullptr, &process_addr) )
+    {
+        target_name = drakvuf_get_process_name(drakvuf, process_addr, true);
+    }
 
     if (!target_name)
         target_name = g_strdup("<UNKNOWN>");

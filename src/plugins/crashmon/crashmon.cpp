@@ -163,7 +163,7 @@ static event_response_t check_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info
             if (tmp)
                 name = tmp;
 
-            if (VMI_FAILURE == drakvuf_get_process_ppid(drakvuf, eprocess, &ppid))
+            if (!drakvuf_get_process_ppid(drakvuf, eprocess, &ppid))
                 PRINT_DEBUG("[CRASHMON] Failed to get PPID for crashed process with PID %d\n", pid);
         }
         else
