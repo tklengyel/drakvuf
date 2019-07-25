@@ -226,7 +226,7 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
     }
 
     vmi_pid_t pid = 0;
-    if (VMI_SUCCESS != drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
+    if (!drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
     {
         PRINT_DEBUG("[CLIPBOARDMON] [Init] Failed to get PID of \"explorer.exe\"\n");
         return false;

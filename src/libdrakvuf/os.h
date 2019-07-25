@@ -115,7 +115,7 @@ typedef struct os_interface
     addr_t (*get_current_process)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-    status_t (*get_last_error)
+    bool (*get_last_error)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
 
     char* (*get_process_name)
@@ -130,7 +130,7 @@ typedef struct os_interface
     int64_t (*get_process_userid)
     (drakvuf_t drakvuf, addr_t process_base);
 
-    status_t (*get_process_pid)
+    bool (*get_process_pid)
     (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid);
 
     int64_t (*get_current_process_userid)
@@ -172,7 +172,7 @@ typedef struct os_interface
     addr_t (*exportsym_to_va)
     (drakvuf_t drakvuf, addr_t process_addr, const char* module, const char* sym);
 
-    status_t (*get_process_ppid)
+    bool (*get_process_ppid)
     (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid);
 
     bool (*get_process_data)
@@ -196,10 +196,10 @@ typedef struct os_interface
     bool (*is_crashreporter)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
 
-    status_t (*find_mmvad)
+    bool (*find_mmvad)
     (drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
 
-    status_t (*get_pid_from_handle)
+    bool (*get_pid_from_handle)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 
 } os_interface_t;
