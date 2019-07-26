@@ -768,8 +768,8 @@ bool win_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx)
         return false;
 
     addr_t tls_slot;
-    // like: NtCurrentTeb()->TlsSlots[WOW64_TLS_CPURESERVED]; WOW64_TLS_CPURESERVED == 1
-    tls_slot = teb_ptr + drakvuf->offsets[TEB_TLS_SLOTS] + (1 * sizeof(uint64_t));
+    // like: NtCurrentTeb()->TlsSlots[WOW64_TLS_CPURESERVED]
+    tls_slot = teb_ptr + drakvuf->offsets[TEB_TLS_SLOTS] + (WOW64_TLS_CPURESERVED * sizeof(uint64_t));
 
     addr_t tls_slot_val;
     ctx.addr = tls_slot;
