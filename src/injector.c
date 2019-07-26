@@ -261,10 +261,6 @@ int main(int argc, char** argv)
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
         return 1;
     }
-    if (injection_thread ==0 && drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
-    {
-        injection_thread = injection_pid;
-    }
 
     printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
 

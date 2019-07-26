@@ -102,89 +102,41 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <stdlib.h>
-#include <sys/prctl.h>
-#include <string.h>
-#include <strings.h>
-#include <errno.h>
-#include <sys/mman.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <limits.h>
-#include <glib.h>
-#include <libvmi/libvmi.h>
-#include <libvmi/peparse.h>
+#ifndef LIBINJECTOR_PRIVATE_H
+#define LIBINJECTOR_PRIVATE_H
 
-#include "private.h"
-#include "linux-exports.h"
-#include "linux-offsets.h"
+#ifdef DRAKVUF_DEBUG
 
-addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib)
+extern bool verbose;
+
+#define PRINT_DEBUG(args...) \
+    do { \
+        if(verbose) fprintf (stderr, args); \
+    } while (0)
+
+#else
+#define PRINT_DEBUG(args...) \
+    do {} while(0)
+#endif
+
+#define ARRAY_SIZE(arr) sizeof((arr)) / sizeof((arr)[0])
+
+#ifdef __clang_analyzer__
+#define vmi_free_unicode_str g_free
+#endif
+
+enum offset
 {
-    vmi_instance_t vmi = drakvuf->vmi;
+    KTHREAD_TRAPFRAME,
+    KTRAP_FRAME_RIP,
 
-    addr_t process_base = drakvuf_get_current_process(drakvuf, info);
+    OFFSET_MAX
+};
 
-    drakvuf_get_process_pid(drakvuf, process_base, &pid);
+static const char* offset_names[OFFSET_MAX][2] =
+{
+    [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
+    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
+};
 
-    addr_t mm_struct_address;
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT],
-        .pid = pid
-    };
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mm_struct_address))
-        return -1;
-
-    addr_t mmap;
-    ctx.addr = mm_struct_address + drakvuf->offsets[MM_STRUCT_MMAP];
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mmap))
-        return -1;
-
-    char* libname = "";
-    addr_t vm_next, vm_start, nullp = 0;
-
-    do
-    {
-        ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_START];
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_start))
-            return -1;
-
-        addr_t vm_end;
-        ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_END];
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_end))
-            return -1;
-
-        ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_NEXT];
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_next))
-            return -1;
-
-        addr_t file_address;
-        ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_FILE];
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &file_address))
-            goto next;
-
-        addr_t path_dentry;
-        ctx.addr = file_address + drakvuf->offsets[FILE_PATH] + drakvuf->offsets[PATH_DENTRY];
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &path_dentry))
-            goto next;
-
-        ctx.addr = path_dentry + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME] + 16;
-        libname = vmi_read_str(vmi, &ctx);
-        PRINT_DEBUG("LIB NAME is: %s \n", libname);
-
-next:
-        mmap = vm_next;
-
-    } while (!strstr(libname, lib) && vm_next != nullp);
-
-
-    if (strstr(libname, lib))
-        PRINT_DEBUG("Found %s address\n", lib);
-    else
-        PRINT_DEBUG("%s address NOT found!!\n", lib);
-
-    return vm_start;
-}
+#endif

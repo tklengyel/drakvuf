@@ -107,6 +107,6 @@
 
 #include <libvmi/libvmi.h>
 
-addr_t linux_get_address_of_libc(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* libc);
+addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib);
 
 #endif
