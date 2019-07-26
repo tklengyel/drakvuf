@@ -206,7 +206,7 @@ typedef struct os_interface
     (drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
 
     status_t (*get_user_stack32)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
 
     status_t (*get_user_stack64)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);

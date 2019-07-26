@@ -729,50 +729,52 @@ status_t win_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx)
     addr_t teb_ptr = 0;
 
     if (vmi_read_addr(drakvuf->vmi, &ctx, &teb_ptr) != VMI_SUCCESS)
-    {
         return VMI_FAILURE;
-    }
 
     addr_t eprocess;
     ctx.addr = ethread + drakvuf->offsets[KTHREAD_PROCESS];
 
     if (vmi_read_addr(drakvuf->vmi, &ctx, &eprocess) != VMI_SUCCESS)
-    {
         return VMI_FAILURE;
-    }
+
+    addr_t wow64process;
+    ctx.addr = eprocess + drakvuf->offsets[EPROCESS_WOW64PROCESS];
+
+    if ( vmi_get_winver( drakvuf->vmi ) == VMI_OS_WINDOWS_10 )
+        ctx.addr = eprocess + drakvuf->offsets[EPROCESS_WOW64PROCESS_WIN10];
+
+    if (vmi_read_addr(drakvuf->vmi, &ctx, &wow64process) != VMI_SUCCESS)
+        return VMI_FAILURE;
+
+    // seems like process is not a WOW64 process, so the data in TLS may be fake
+    if (!wow64process)
+        return VMI_FAILURE;
 
     pid_t pid;
 
     if (drakvuf_get_process_pid(drakvuf, eprocess, &pid) != VMI_SUCCESS)
-    {
         return VMI_FAILURE;
-    }
 
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
 
     if (vmi_pid_to_dtb(drakvuf->vmi, pid, &ctx.dtb) != VMI_SUCCESS)
-    {
         return VMI_FAILURE;
-    }
 
     addr_t self_teb_ptr;
     if (vmi_read_addr(drakvuf->vmi, &ctx, &self_teb_ptr) != VMI_SUCCESS)
-    {
         return VMI_FAILURE;
-    }
 
     addr_t tls_slot;
+    // like: NtCurrentTeb()->TlsSlots[WOW64_TLS_CPURESERVED]; WOW64_TLS_CPURESERVED == 1
     tls_slot = teb_ptr + drakvuf->offsets[TEB_TLS_SLOTS] + (1 * sizeof(uint64_t));
 
-    addr_t tls_slot_2;
+    addr_t tls_slot_val;
     ctx.addr = tls_slot;
 
-    if (vmi_read_addr(drakvuf->vmi, &ctx, &tls_slot_2) != VMI_SUCCESS)
-    {
+    if (vmi_read_addr(drakvuf->vmi, &ctx, &tls_slot_val) != VMI_SUCCESS)
         return VMI_FAILURE;
-    }
 
-    *wow_ctx = tls_slot_2 + WOW64_CONTEXT_PAD;
+    *wow_ctx = tls_slot_val + WOW64_CONTEXT_PAD;
     return VMI_SUCCESS;
 }
 
@@ -789,44 +791,43 @@ status_t win_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr
     ctx.addr = ethread + drakvuf->offsets[KTHREAD_TRAPFRAME];
 
     if (vmi_read_addr(drakvuf->vmi, &ctx, &ptrap_frame) != VMI_SUCCESS)
-    {
         return VMI_FAILURE;
-    }
 
     ctx.addr = ptrap_frame + drakvuf->offsets[KTRAP_FRAME_RSP];
 
     if (vmi_read_64(drakvuf->vmi, &ctx, &rsp) != VMI_SUCCESS)
-    {
         return VMI_FAILURE;
-    }
 
     *stack_ptr = rsp;
     return VMI_SUCCESS;
 }
 
-status_t win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr)
+status_t win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr)
 {
+    uint32_t esp;
+    uint32_t ebp;
+
     addr_t ethread = win_get_current_thread(drakvuf, info);
     addr_t wow_ctx;
 
     if (win_get_wow_context(drakvuf, ethread, &wow_ctx) != VMI_SUCCESS)
-    {
         return VMI_FAILURE;
-    }
 
     access_context_t ctx;
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
     ctx.addr = wow_ctx + drakvuf->wow_offsets[WOW_CONTEXT_ESP];
 
-    uint32_t esp;
-
     if (vmi_read_32(drakvuf->vmi, &ctx, &esp) != VMI_SUCCESS)
-    {
         return VMI_FAILURE;
-    }
+
+    ctx.addr = wow_ctx + drakvuf->wow_offsets[WOW_CONTEXT_EBP];
+
+    if (vmi_read_32(drakvuf->vmi, &ctx, &ebp) != VMI_SUCCESS)
+        return VMI_FAILURE;
 
     *stack_ptr = esp;
+    *frame_ptr = ebp;
     return VMI_SUCCESS;
 }
 

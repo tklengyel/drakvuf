@@ -391,10 +391,10 @@ status_t drakvuf_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_
     return 0;
 }
 
-status_t drakvuf_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr)
+status_t drakvuf_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr)
 {
     if ( drakvuf->osi.get_user_stack32 )
-        return drakvuf->osi.get_user_stack32(drakvuf, info, stack_ptr);
+        return drakvuf->osi.get_user_stack32(drakvuf, info, stack_ptr, frame_ptr);
 
     return 0;
 }
