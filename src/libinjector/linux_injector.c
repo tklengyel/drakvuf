@@ -155,6 +155,7 @@ struct injector
     x86_registers_t saved_regs;
 
     drakvuf_trap_t bp;
+    GSList* memtraps;
 
     // Results:
     int rc;
@@ -169,13 +170,27 @@ struct injector
     uint32_t pid, tid;
 };
 
+static void free_memtraps(injector_t injector)
+{
+    GSList* loop = injector->memtraps;
+    injector->memtraps = NULL;
+
+    while (loop)
+    {
+        drakvuf_remove_trap(injector->drakvuf, loop->data, (drakvuf_trap_free_t)free);
+        loop = loop->next;
+    }
+    g_slist_free(loop);
+}
+
 static void free_injector(injector_t injector)
 {
     if (!injector) return;
 
     PRINT_DEBUG("Injector freed\n");
 
-    g_free((void*)injector->target_file);
+    free_memtraps(injector);
+
     g_free((void*)injector->payload);
     g_free((void*)injector);
 }
@@ -665,6 +680,8 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
         PRINT_DEBUG("Starting injection loop\n");
         drakvuf_loop(drakvuf);
     }
+
+    free_memtraps(injector);
 
     drakvuf_remove_trap(drakvuf, &trap, NULL);
     return true;
