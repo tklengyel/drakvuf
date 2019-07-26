@@ -755,7 +755,7 @@ bool win_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx)
 
     pid_t pid;
 
-    if (drakvuf_get_process_pid(drakvuf, eprocess, &pid) != VMI_SUCCESS)
+    if (!win_get_process_pid(drakvuf, eprocess, &pid))
         return false;
 
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -812,7 +812,7 @@ bool win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* 
 
     addr_t wow_ctx;
 
-    if (win_get_wow_context(drakvuf, win_get_current_thread(drakvuf, info), &wow_ctx) != VMI_SUCCESS)
+    if (!win_get_wow_context(drakvuf, win_get_current_thread(drakvuf, info), &wow_ctx))
         return false;
 
     access_context_t ctx;
