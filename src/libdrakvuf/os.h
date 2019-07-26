@@ -202,6 +202,15 @@ typedef struct os_interface
     bool (*get_pid_from_handle)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 
+    bool (*get_wow_context)
+    (drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
+
+    bool (*get_user_stack32)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
+
+    bool (*get_user_stack64)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
+
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);
