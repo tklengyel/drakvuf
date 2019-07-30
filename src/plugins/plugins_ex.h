@@ -232,7 +232,7 @@ struct breakpoint_in_system_process_searcher
 
             trap->name = m_syscall_name;
 
-            if (!drakvuf_add_trap(drakvuf, &*trap))
+            if (!drakvuf_add_trap(drakvuf, trap))
                 return nullptr;
         }
         return trap;
@@ -273,7 +273,7 @@ struct breakpoint_in_dll_module_searcher
     {
         if (trap)
         {
-            context ctx(&*trap, m_is_wow);
+            context ctx(trap, m_is_wow);
             if (!rekall_get_function_rva(m_rekall_profile, m_syscall_name, &ctx.m_function_rva))
             {
                 PRINT_DEBUG("Failed to find a function %s::%s. %s\n", m_module_name, m_syscall_name, m_is_wow ? "WoW64 " : "");
@@ -339,7 +339,7 @@ struct breakpoint_by_dtb_searcher
 
             trap->name = info->trap->name;
 
-            if (!drakvuf_add_trap(drakvuf, &*trap))
+            if (!drakvuf_add_trap(drakvuf, trap))
                 return nullptr;
         }
         return trap;
@@ -375,7 +375,7 @@ struct breakpoint_by_pid_searcher
 
             trap->name = info->trap->name;
 
-            if (!drakvuf_add_trap(drakvuf, &*trap))
+            if (!drakvuf_add_trap(drakvuf, trap))
                 return nullptr;
         }
         return trap;
@@ -408,13 +408,13 @@ public:
         if (!init_memory(plugin, trap, params, hook_cb, trap_name, ap, at))
             return nullptr;
 
-        if (!init_breakpoint(drakvuf, info, &*trap))
+        if (!init_breakpoint(drakvuf, info, trap.get()))
         {
             PRINT_DEBUG("%s for %s\n", ERROR_MSG_ADDING_TRAP, trap_name ? trap_name : trap->name);
             return nullptr;
         }
 
-        attach_plugin_params(&*trap);
+        attach_plugin_params(trap.get());
         params.release();
         return trap.release();
     }
@@ -451,7 +451,7 @@ protected:
         }
 
         trap->cb = hook_cb;
-        trap->data = &*params;
+        trap->data = params.get();
         trap->name = trap_name;
         trap->type = BREAKPOINT;
         return true;
