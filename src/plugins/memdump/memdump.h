@@ -105,9 +105,95 @@
 #ifndef MEMDUMP_H
 #define MEMDUMP_H
 
+#include <vector>
+
 #include <glib.h>
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
+
+template<typename T>
+struct call_result_t : public plugin_params<T>
+{
+    call_result_t(T* src) : plugin_params<T>(src), target_cr3(), target_thread(), target_rsp() {}
+
+    void set_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
+    {
+        target_thread = thread;
+        target_cr3 = info->regs->cr3;
+        target_rsp = info->regs->rsp;
+    }
+
+    bool verify_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
+    {
+        return (info->regs->cr3 != target_cr3 ||
+                !thread || thread != target_thread ||
+                info->regs->rsp <= target_rsp) ? false : true;
+    }
+
+    reg_t target_cr3;
+    addr_t target_thread;
+    addr_t target_rsp;
+};
+
+template<typename T>
+struct copy_on_write_result_t: public call_result_t<T>
+{
+    copy_on_write_result_t(T* src) : call_result_t<T>(src), vaddr(), pte(), old_cow_pa() {}
+
+    addr_t vaddr;
+    addr_t pte;
+    addr_t old_cow_pa;
+};
+
+template<typename T>
+struct map_view_of_section_result_t: public call_result_t<T>
+{
+    map_view_of_section_result_t(T* src) : call_result_t<T>(src), section_handle(), process_handle(), base_address_ptr() {}
+
+    uint64_t section_handle;
+    uint64_t process_handle;
+    addr_t base_address_ptr;
+};
+
+enum target_hook_state
+{
+    HOOK_FIRST_TRY,
+    HOOK_PAGEFAULT_RETRY,
+    HOOK_FAILED,
+    HOOK_OK
+};
+
+typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
+class memdump;
+
+typedef struct hook_target_entry
+{
+    vmi_pid_t pid;
+    std::string target_name;
+    callback_t callback;
+    target_hook_state state;
+    drakvuf_trap_t* trap;
+    memdump* plugin;
+
+    hook_target_entry(std::string target_name, callback_t callback, memdump* plugin)
+        : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
+} hook_target_entry_t;
+
+typedef struct user_dll
+{
+    // relevant while loading
+    addr_t dtb;
+    uint32_t thread_id;
+    addr_t real_dll_base;
+    bool is_hooked;
+
+    // internal, for page faults
+    addr_t pf_current_addr;
+    addr_t pf_max_addr;
+
+    // one entry per hooked function
+    std::vector<hook_target_entry_t> targets;
+} user_dll_t;
 
 struct memdump_config
 {
@@ -117,10 +203,27 @@ struct memdump_config
 class memdump: public pluginex
 {
 public:
+    // for memdump.cpp
     const char* memdump_dir;
     int memdump_counter;
 
+    // for userhook.cpp
+    // map dtb -> list of hooked dlls
+    std::map<addr_t, std::vector<user_dll_t>> loaded_dlls;
+
     memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
+    void userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output);
 };
+
+bool dump_memory_region(
+        drakvuf_t drakvuf,
+        vmi_instance_t vmi,
+        drakvuf_trap_info_t* info,
+        memdump* plugin,
+        access_context_t* ctx,
+        size_t len_bytes,
+        const char* reason,
+        void* extras,
+        void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, void* extras));
 
 #endif
