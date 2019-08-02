@@ -117,6 +117,7 @@
 
 #include "libdrakvuf/libdrakvuf.h"
 #include <libinjector/libinjector.h>
+#include "private.h"
 #include "win_private.h"
 
 typedef enum

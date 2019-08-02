@@ -102,7 +102,7 @@
 #                                                                         #
 #*************************************************************************#
 
-h_sources = libinjector.h win_private.h linux_private.h
+h_sources = libinjector.h private.h win_private.h
 c_sources = win_injector.c linux_injector.c injector_stack.c
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
