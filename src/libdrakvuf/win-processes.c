@@ -119,9 +119,9 @@
 
 #define MMVAD_MAX_DEPTH (100)
 
-#define POOL_TAG_VADL (0x6c646156)
-#define POOL_TAG_VAD (0x20646156)
-#define POOL_TAG_VADM (0x20646156)
+#define POOL_TAG_VAD    (0x20646156) // daV
+#define POOL_TAG_VADL   (0x6c646156) // ldaV
+#define POOL_TAG_VADM   (0x6d646156) // mdaV
 
 typedef enum dispatcher_object
 {
