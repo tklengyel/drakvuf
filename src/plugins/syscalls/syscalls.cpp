@@ -780,17 +780,15 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
     this->traps = create_trap_config(drakvuf, this, symbols);
     this->format = output;
 
+    drakvuf_free_symbols(symbols);
+    symbols = NULL;
+
     if ( !this->traps )
-    {
-        drakvuf_free_symbols(symbols);
         throw -1;
-    }
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->reg_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
     drakvuf_release_vmi(drakvuf);
-
-    drakvuf_free_symbols(symbols);
 
     bool error = 0;
     GSList* loop = this->traps;
