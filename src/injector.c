@@ -262,6 +262,12 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
+    {
+        if (injection_thread == 0)
+            injection_thread = injection_pid;
+    }
+
     printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
 
     int injection_result = 0;

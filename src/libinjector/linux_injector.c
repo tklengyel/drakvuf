@@ -140,7 +140,7 @@ struct injector
     drakvuf_t drakvuf;
     bool hijacked, detected;
     injection_method_t method;
-    addr_t exec_func, libc_addr;
+    addr_t exec_func;
     reg_t target_rsp, target_rip;
 
     // for exec()
@@ -303,11 +303,7 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
     vmi_get_vcpureg(vmi, &rip, RIP, 0);
     PRINT_DEBUG("Rip is 0x%lx \n", rip);
 
-    // find libc address of the process and add offset of exec*
-    injector->libc_addr = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "libc-2.27.so");
-    PRINT_DEBUG("Addr of libc is : 0x%lx \n", injector->libc_addr);
-
-    // Add exec offset
+    // exec offset reference
     // 00000000000e5160 -> GLIBC_2.2.5 execl
     // 00000000000e4fa0 -> GLIBC_2.2.5 execv
     // 00000000000e5490 -> GLIBC_2.11  execvpe
@@ -322,12 +318,18 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
 
     if (injector->method == INJECT_METHOD_EXECPROC)
     {
-        injector->exec_func = injector->libc_addr + 0xe5300;
+        injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "libc-2.27.so", "execlp");
         PRINT_DEBUG("Addr of execlp function is :0x%lx \n", injector->exec_func);
     }
+
+    // failing to grab some symbols due to relocation
     else if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
     {
-        injector->exec_func = injector->libc_addr + 0x97070;
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        printf("Under Construction!!");
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+        injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "libc-2.27.so", "malloc");
         PRINT_DEBUG("Addr of malloc function is :0x%lx \n", injector->exec_func);
     }
 
@@ -547,7 +549,8 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
 
         // Add memset offset to libc address
         // 000000000009ed40 -> memset@@GLIBC_2.2.5
-        injector->exec_func = injector->libc_addr + 0x9ed40;
+        // injector->exec_func = injector->libc_addr + 0x9ed40;
+        // injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "libc-2.27.so", "memset");
 
         info->regs->rip = injector->target_rip;
 
@@ -899,10 +902,7 @@ int injector_start_app_on_linux(
     }
     injector->drakvuf = drakvuf;
     injector->target_pid = pid;  // Pid = Thread Group Id in Linux
-    if (tid == 0) // tid is process id in linux
-        injector->target_tid = injector->target_pid;
-    else
-        injector->target_tid = tid;
+    injector->target_tid = tid;
     injector->method = method;
     injector->target_file = file;
     injector->status = STATUS_NULL;

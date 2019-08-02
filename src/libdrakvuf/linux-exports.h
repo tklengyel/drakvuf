@@ -107,6 +107,6 @@
 
 #include <libvmi/libvmi.h>
 
-addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib);
+addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib, const char* sym);
 
 #endif
