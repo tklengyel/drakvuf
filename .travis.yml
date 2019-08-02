@@ -135,6 +135,8 @@ matrix:
 #
     - env:
         - TEST="SonarCloud"
+      dist: xenial
+      edge: true
       addons:
         sonarcloud:
             organization: "drakvuf"
