@@ -70,9 +70,13 @@ json_object *get_inputs(json_object *function){
     {
         json_object *temp_obj = json_object_new_object();
         json_object *arg = json_object_array_get_idx(args, i);
-        const char* arg_type = json_object_get_string(arg);
+        json_object *jarg_type;
+        json_object_object_get_ex(arg, "type", &jarg_type);
+        const char* arg_type = json_object_get_string(jarg_type);
+        json_object *jarg_val;
+        json_object_object_get_ex(arg, "value", &jarg_val);
+        int num = json_object_get_int(jarg_val);
         if(!strcmp(arg_type, "INTEGER")){
-            int num = g_rand_int(grand);
             num = num>=0?num:(-num);
             json_object *val = json_object_new_int(num);
             json_object *jtype = json_object_new_string(arg_type);
@@ -116,16 +120,22 @@ using namespace std;
 int main(int argc, char *argv[])
 {
     // int file  = open("/home/ajinkya/College/gsoc19/AFL/log.txt", O_WRONLY | O_CREAT );
-    FILE *temp_stderr = stderr;
-    FILE *temp_stdout = stdout;
-    
-    stdout = fopen("/home/ajinkya/College/gsoc19/AFL/log_stdout.txt", "w");
-    stderr = fopen("/home/ajinkya/College/gsoc19/AFL/log_stderr.txt", "w");
-    afl_setup();    
-    afl_forkserver();
-    afl_area_ptr[1<<10] = 12;
-    fprintf(stderr, "--------------------------------\n");
-
+    char *afl = getenv(SHM_ENV_VAR);
+    FILE *temp_stderr ;
+    FILE *temp_stdout ;
+    temp_stderr = NULL;
+    temp_stdout = NULL;
+    if(afl){
+        temp_stderr = stderr;
+        temp_stdout = stdout;
+        stdout = fopen("/home/ajinkya/College/gsoc19/AFL/log_stdout.txt", "w");
+        stderr = fopen("/home/ajinkya/College/gsoc19/AFL/log_stderr.txt", "w");
+        afl_setup();    
+        afl_forkserver();
+        afl_area_ptr[1<<10] = 12;
+        fprintf(stderr, "--------------------------------\n");
+    }
+    printf("here");
     char *domain=NULL, *rekall_profile=NULL, *rekall_wow_profile = NULL, *function_name = NULL;
     char *lib_name=NULL;
     char *driver_rekal_profile=NULL;
@@ -239,8 +249,10 @@ int main(int argc, char *argv[])
         json_object *function = json_object_array_get_idx(function_list, func_no);
 
         json_object *inputs = get_inputs(function);
-
+        //XXX
+        printf("%s\n"json_object_to_json_string_ext(inputs, JSON_C_TO_STRING_PRETTY));
         lib_name = hijack_get_module_name(module);
+        printf("")
         function_name = hijack_get_fucntion_name(function);
         json_object* args = hijack_get_arguments(function);
         num_args = hijack_get_num_arguments(args);
