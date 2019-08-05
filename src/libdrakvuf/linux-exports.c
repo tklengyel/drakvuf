@@ -125,6 +125,7 @@
 #define VM_WRITE	0x00000002
 #define VM_EXEC		0x00000004
 #define VM_SHARED	0x00000008
+#define R_X86_64_GLOB_DAT	0x00000006
 
 
 
@@ -157,8 +158,6 @@ addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pi
     addr_t text_segment_address = 0;
     addr_t data_segment_address = 0;
     addr_t text_segment_size = 0;
-    // addr_t data_segment_size;
-
     do
     {
         addr_t vm_start;
@@ -214,10 +213,7 @@ addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pi
 next:
         mmap = vm_next;
 
-    } while (vm_next != nullp); // use strcasecmp
-
-    // printf("text_segment_size: %lx", text_segment_size);
-    // printf("data_segment_address: %lx", data_segment_address);
+    } while (vm_next != nullp);
 
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
@@ -238,9 +234,10 @@ next:
     ctx.addr = text_segment_address + drakvuf->offsets[ELF64HDR_PHENTSIZE];
     if (VMI_FAILURE == vmi_read_16(vmi, &ctx, &size_of_program_headers))
         return -1;
+
     // Extracting DYNAMIC SEGMENT offset program headers
 
-    addr_t dynamic_section_offset=0, dynamic_section_size=0;
+    addr_t dynamic_section_offset=0;
     int counter =0;
     addr_t offset =0;
     while (counter < num_of_program_headers)
@@ -264,7 +261,6 @@ next:
         if (ph_type == 2)
         {
             dynamic_section_offset = ph_offset;
-            dynamic_section_size = ph_memsz;
             break;
         }
         offset += size_of_program_headers;
@@ -274,15 +270,16 @@ next:
     // Exracting address of dynsym and dynstr sections from Dynamic section table entries
 
     addr_t dynsym_offset = 0, dynstr_offset = 0;
-    // addr_t rela_section_offset =0, rela_section_size=0;
+    addr_t dynsym_entry_size = 0x18, dynstr_size = 0;
+    // addr_t rela_section_offset =0, rela_section_size=0, rela_section_entry=0x18; // set defaults incase not defined
+
     ctx.addr = text_segment_address + dynamic_section_offset;
 
     if ( dynamic_section_offset > text_segment_size)
         ctx.addr = data_segment_address - text_segment_size + dynamic_section_offset;
 
     addr_t word, ptr;
-    offset=0x0;
-    while (offset < dynamic_section_size)
+    while (word != 0x0 && ptr != 0x0)
     {
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &word))
             return -1;
@@ -291,36 +288,27 @@ next:
             return -1;
         ctx.addr += 0x8;
 
-        if (word == 0x5) //dynstr section offset
-        {
+        if (word == 0x5) // .strtab section offset
             dynstr_offset = ptr;
-        }
-
-        if (word == 0x6) //dynsym section offset
-        {
+        if (word == 0x6) // .symtab section offset
             dynsym_offset = ptr;
-            break;
-        }
-        // if (word == 0x7)
-        // {
+        // if (word == 0x7) // address of .rela.dyn section
         //     rela_section_offset = ptr;
-        // }
-        // if (word == 0x8)
-        // {
+        // if (word == 0x8) // total size of .rela.dyn section
         //     rela_section_size = ptr;
-        //     break;
-        // }
-        offset+=0x10;
+        // if (word == 0x9) // size of an entry in .rela.dyn section
+        //     rela_section_entry = ptr;
+        if (word == 0xa) // size of .strtab section
+            dynstr_size = ptr;
+        if (word == 0xb) // size of an entry in .symtab section
+            dynsym_entry_size = ptr;
     }
 
-    // printf("rela offset is %lx\n", rela_section_offset);
-    // printf("rela size is %lx\n", rela_section_size);
-
     // Reading Relocatable files
+    // addr_t rela_addend, rela_info, rela_offset;
     // offset = 0x0;
-    // while (offset < 0x30)
+    // while (offset < rela_section_size)
     // {
-    //     addr_t rela_addend, rela_info, rela_offset;
     //     ctx.addr = rela_section_offset + offset + drakvuf->offsets[ELF64RELA_ADDEND];
     //     if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &rela_addend))
     //         printf("rela_addend is: %lx\n", rela_addend);
@@ -328,51 +316,42 @@ next:
     //     ctx.addr = rela_section_offset + offset + drakvuf->offsets[ELF64RELA_INFO];
     //     if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &rela_info))
     //         printf("rela_info is: %lx\n", rela_info);
+    //     rela_info = rela_info & 0xf;
 
     //     ctx.addr = rela_section_offset + offset + drakvuf->offsets[ELF64RELA_OFFSET];
     //     if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &rela_offset))
     //         printf("rela_offset is: %lx\n\n", rela_offset);
 
-    //     addr_t virt_addr = text_segment_address + rela_offset;
-
-    //     ctx.addr = virt_addr;
-    //     if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &rela_offset))
-    //         printf("virt addr is: %lx\n\n", rela_offset);
-    //     else
-    //         printf("Failed");
-
-    //     offset+=0x18;
+    //     addr_t num;
+    //     if (rela_info == R_X86_64_GLOB_DAT)
+    //     {
+    //         ctx.addr = rela_section_offset + offset + drakvuf->offsets[ELF64RELA_INFO] + 0x4;
+    //         if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &num))
+    //             printf("symbol offset is -> %ld\n", num);
+    //         break;
+    //     }
+    //     offset+=rela_section_entry;
     // }
 
-    // // Reading symbol name mapping in dynstr table
+    // Reading symbol name mapping in dynstr table
 
-    // return text_segment_address;
-
-    offset=0x0;
-    addr_t dynstr_size = dynsym_offset - dynstr_offset;
-    uint32_t symbol_map = 0;
-    bool found = false;
-    int c=0;
-    while (symbol_map < dynstr_size)
+    uint32_t symbol_offset = 1;
+    bool sym_found = false;
+    while (symbol_offset < dynstr_size)
     {
         char* symbol_name;
-        ctx.addr = dynstr_offset + offset;
+        ctx.addr = dynstr_offset + symbol_offset;
         symbol_name = vmi_read_str(vmi, &ctx);
         addr_t symbol_size = strlen(symbol_name);
-        // printf("%s\n", symbol_name);
         if (strcmp(symbol_name, sym) == 0)
         {
-            found = true;
+            sym_found = true;
             break;
         }
-        offset += symbol_size+0x1;
-        symbol_map += symbol_size+1;
-        c++;
-        if (c==3500) // to prevent from infinite loop
-            break;
+        symbol_offset += symbol_size+1;
     }
 
-    if (!found)
+    if (!sym_found)
         return -1;
 
     // Mapping symbol name to address in dynsym table
@@ -390,9 +369,10 @@ next:
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &value))
             return -1;
 
-        if (key == symbol_map)
+        if (key == symbol_offset)
             break;
-        offset += 0x18;
+
+        offset += dynsym_entry_size;
     }
     return text_segment_address + value;
 }

@@ -319,7 +319,7 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
     if (injector->method == INJECT_METHOD_EXECPROC)
     {
         injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "libc-2.27.so", "execlp");
-        PRINT_DEBUG("Addr of execlp function is :0x%lx \n", injector->exec_func);
+        PRINT_DEBUG("Address of execlp symbol is: 0x%lx \n", injector->exec_func);
     }
 
     // failing to grab some symbols due to relocation
@@ -330,7 +330,7 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
         drakvuf_release_vmi(drakvuf);
         return 0;
         injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "libc-2.27.so", "malloc");
-        PRINT_DEBUG("Addr of malloc function is :0x%lx \n", injector->exec_func);
+        PRINT_DEBUG("Address of malloc symbol is: 0x%lx \n", injector->exec_func);
     }
 
     injector->target_base = drakvuf_get_current_process(drakvuf, info);
@@ -470,7 +470,6 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
     PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
     if (info->regs->rip != info->trap->breakpoint.addr)
     {
-        PRINT_DEBUG("Wrong Process cb!!\n");
         return 0;
     }
     injector_t injector = info->trap->data;
@@ -531,7 +530,8 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
                     return 0;
             }
 
-            // drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+            drakvuf_interrupt(drakvuf, SIGINT);
         }
         else if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
         {
@@ -615,6 +615,21 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
+static bool setup_linux_int3_trap_in_userspace(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
+{
+    drakvuf_trap_t* new_trap = g_malloc0(sizeof(drakvuf_trap_t));
+    new_trap->type = BREAKPOINT;
+    new_trap->name = "entry";
+    new_trap->breakpoint.lookup_type = LOOKUP_PID;
+    new_trap->breakpoint.pid = info->proc_data.tid;
+    new_trap->breakpoint.addr_type = ADDR_VA;
+    new_trap->breakpoint.addr = bp_addr;
+    new_trap->cb = wait_for_process_in_userspace;
+    new_trap->data = injector;
+
+    return drakvuf_add_trap(injector->drakvuf, new_trap);
+}
+
 static event_response_t linux_injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
@@ -630,33 +645,21 @@ static event_response_t linux_injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_i
 
         // rcx -> value of rip in usermode && kernelmode
         // TESTING REQUIRED FOR 100% ASSURITY
-        // otherwise acquire it from stack in kernel mode
+        // otherwise acquire it from stack now
 
         // setting TRAP on BP addr -> rcx -> rip
         addr_t bp_addr = info->regs->rcx;
-        injector->target_rsp = bp_addr;
+        injector->target_rip = bp_addr;
         PRINT_DEBUG("Usermode Breakpoint addr: %lx \n", bp_addr);
 
-        // allocate space for trap malloc
-        drakvuf_trap_t* new_trap = g_malloc0(sizeof(drakvuf_trap_t));
-        new_trap->type = BREAKPOINT;
-        new_trap->name = "entry";
-        new_trap->breakpoint.lookup_type = LOOKUP_PID;
-        new_trap->breakpoint.pid = info->proc_data.tid;
-        new_trap->breakpoint.addr_type = ADDR_VA;
-        new_trap->breakpoint.addr = bp_addr;
-        new_trap->cb = wait_for_process_in_userspace;
-        new_trap->data = injector;
-
-        // Creating Trap at BP addr
-        if (!drakvuf_add_trap(drakvuf, new_trap))
+        if (setup_linux_int3_trap_in_userspace(injector, info, bp_addr))
         {
-            PRINT_DEBUG("Failed to create a trap at BP address \n");
-            return false;
+            PRINT_DEBUG("Got return address 0x%lx and it's now trapped in usermode!\n", bp_addr);
+            // Unsubscribe from the CR3 trap
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
         }
-
-        // rem int3 trap
-        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        else
+            PRINT_DEBUG("Failed to trap trapframe return address\n");
     }
     return 0;
 }
@@ -686,7 +689,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
 
     free_memtraps(injector);
 
-    drakvuf_remove_trap(drakvuf, &trap, NULL);
+    // drakvuf_remove_trap(drakvuf, &trap, NULL);
     return true;
 }
 
