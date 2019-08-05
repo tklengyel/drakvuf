@@ -530,8 +530,8 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
                     return 0;
             }
 
-            drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
-            drakvuf_interrupt(drakvuf, SIGINT);
+            // drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+            // drakvuf_interrupt(drakvuf, SIGINT);
         }
         else if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
         {
