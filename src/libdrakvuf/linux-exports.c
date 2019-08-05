@@ -225,37 +225,29 @@ next:
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &program_header_offset))
         return -1;
 
-    short unsigned int num_of_program_headers;
+    uint16_t num_of_program_headers;
     ctx.addr = text_segment_address + drakvuf->offsets[ELF64HDR_PHNUM];
     if (VMI_FAILURE == vmi_read_16(vmi, &ctx, &num_of_program_headers))
         return -1;
 
-    short unsigned int size_of_program_headers;
+    uint16_t size_of_program_headers;
     ctx.addr = text_segment_address + drakvuf->offsets[ELF64HDR_PHENTSIZE];
     if (VMI_FAILURE == vmi_read_16(vmi, &ctx, &size_of_program_headers))
         return -1;
 
     // Extracting DYNAMIC SEGMENT offset program headers
 
-    addr_t dynamic_section_offset=0;
-    int counter =0;
-    addr_t offset =0;
+    int counter = 0;
+    uint32_t ph_type;
+    addr_t dynamic_section_offset = 0, offset = 0, ph_offset;
     while (counter < num_of_program_headers)
     {
-
-        unsigned int ph_type;
         ctx.addr = text_segment_address + offset + program_header_offset + drakvuf->offsets[ELF64PHDR_TYPE];
         if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &ph_type))
             return -1;
 
-        addr_t ph_offset;
         ctx.addr = text_segment_address + offset + program_header_offset + drakvuf->offsets[ELF64PHDR_OFFSET];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ph_offset))
-            return -1;
-
-        addr_t ph_memsz;
-        ctx.addr = text_segment_address + offset + program_header_offset + drakvuf->offsets[ELF64PHDR_MEMSZ];
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ph_memsz))
             return -1;
 
         if (ph_type == 2)
@@ -278,8 +270,8 @@ next:
     if ( dynamic_section_offset > text_segment_size)
         ctx.addr = data_segment_address - text_segment_size + dynamic_section_offset;
 
-    addr_t word, ptr;
-    while (word != 0x0 && ptr != 0x0)
+    addr_t word , ptr;
+    do
     {
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &word))
             return -1;
@@ -302,7 +294,7 @@ next:
             dynstr_size = ptr;
         if (word == 0xb) // size of an entry in .symtab section
             dynsym_entry_size = ptr;
-    }
+    } while (word != 0x0 && ptr != 0x0);
 
     // Reading Relocatable files
     // addr_t rela_addend, rela_info, rela_offset;
