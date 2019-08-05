@@ -270,7 +270,7 @@ next:
     if ( dynamic_section_offset > text_segment_size)
         ctx.addr = data_segment_address - text_segment_size + dynamic_section_offset;
 
-    addr_t word , ptr;
+    addr_t word, ptr;
     do
     {
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &word))
