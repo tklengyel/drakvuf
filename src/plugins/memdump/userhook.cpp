@@ -692,32 +692,28 @@ void memdump::load_wanted_targets(const memdump_config* c)
     if (!c->dll_hooks_list)
         return;
 
-    std::ifstream ifs;
-    ifs.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-    try
-    {
-        ifs.open(c->dll_hooks_list, std::ifstream::in);
+    std::ifstream ifs(c->dll_hooks_list, std::ifstream::in);
 
-        std::string line;
-        while (std::getline(ifs, line))
-        {
-            if (line.empty())
-                continue;
-
-            std::stringstream ss(line);
-            target_config_entry_t e;
-
-            if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
-                throw -1;
-            if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
-                throw -1;
-
-            this->wanted_hooks.push_back(e);
-        }
-    }
-    catch (std::ifstream::failure e)
+    if (!ifs)
     {
         throw -1;
+    }
+
+    std::string line;
+    while (std::getline(ifs, line))
+    {
+        if (line.empty())
+            continue;
+
+        std::stringstream ss(line);
+        target_config_entry_t e;
+
+        if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
+            throw -1;
+        if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
+            throw -1;
+
+        this->wanted_hooks.push_back(e);
     }
 }
 
