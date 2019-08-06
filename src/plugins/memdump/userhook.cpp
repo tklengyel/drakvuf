@@ -102,6 +102,18 @@
  *                                                                         *
  ***************************************************************************/
 
+/**
+ * User mode hooking module of MEMDUMP plugin.
+ *
+ * (1) Observes when a process is loading a new DLL through the side effects
+ * of NtMapViewOfSection or NtProtectVirtualMemory being called.
+ * (2) Finds the DLL export information and checks if it's fully readable,
+ * if not, triggers a page fault to force system to load it into memory.
+ * (3) Translates given export symbols to virtual addresses, checks if
+ * the underlying memory is available (if not, again triggers page fault)
+ * and finally adds a standard DRAKVUF trap.
+ */
+
 #include <config.h>
 #include <glib.h>
 #include <inttypes.h>
