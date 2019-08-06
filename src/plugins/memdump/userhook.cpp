@@ -114,6 +114,9 @@
  * and finally adds a standard DRAKVUF trap.
  */
 
+#include <fstream>
+#include <sstream>
+
 #include <config.h>
 #include <glib.h>
 #include <inttypes.h>
@@ -220,14 +223,12 @@ static bool populate_hook_targets(drakvuf_t drakvuf, memdump* plugin, const mmva
 
     if (dll_name && dll_name->contents)
     {
-        if (strstr((const char*) dll_name->contents, "advapi32.dll") != 0)
+        for (auto const& wanted_hook : plugin->wanted_hooks)
         {
-            dll_meta->targets.emplace_back("CryptAcquireContextA", usermode_hook_cb, plugin);
-            dll_meta->targets.emplace_back("CryptAcquireContextW", usermode_hook_cb, plugin);
-        }
-        else if (strstr((const char*) dll_name->contents, "ws2_32.dll") != 0)
-        {
-            dll_meta->targets.emplace_back("WSAStartup", usermode_hook_cb, plugin);
+            if (strstr((const char*) dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
+            {
+                dll_meta->targets.emplace_back(wanted_hook.function_name.c_str(), usermode_hook_cb, plugin);
+            }
         }
     }
 
@@ -686,8 +687,40 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+void memdump::load_wanted_targets(const memdump_config* c)
+{
+    std::ifstream ifs(c->dll_hooks_list, std::ifstream::in);
+
+    std::string line;
+    while (std::getline(ifs, line))
+    {
+        if (line.empty())
+            continue;
+
+        std::stringstream ss(line);
+        target_config_entry_t e;
+
+        if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
+            throw -1;
+        if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
+            throw -1;
+
+        this->wanted_hooks.push_back(e);
+    }
+}
+
 void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
 {
+    try
+    {
+        this->load_wanted_targets(c);
+    }
+    catch (int e)
+    {
+        printf("Malformed hook config for MEMDUMP plugin\n");
+        throw -1;
+    }
+
     breakpoint_in_system_process_searcher bp;
     if (!register_trap<memdump>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
         !register_trap<memdump>(drakvuf, nullptr, this, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection")) ||
