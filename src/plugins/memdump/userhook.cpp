@@ -729,6 +729,12 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
         throw -1;
     }
 
+    if (this->wanted_hooks.empty())
+    {
+        // don't load this part of plugin if there is nothing to do
+        return;
+    }
+
     breakpoint_in_system_process_searcher bp;
     if (!register_trap<memdump>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
         !register_trap<memdump>(drakvuf, nullptr, this, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection")) ||
