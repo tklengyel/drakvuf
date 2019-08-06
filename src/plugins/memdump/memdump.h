@@ -112,30 +112,6 @@
 #include "plugins/plugins_ex.h"
 
 template<typename T>
-struct call_result_t : public plugin_params<T>
-{
-    call_result_t(T* src) : plugin_params<T>(src), target_cr3(), target_thread(), target_rsp() {}
-
-    void set_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
-    {
-        target_thread = thread;
-        target_cr3 = info->regs->cr3;
-        target_rsp = info->regs->rsp;
-    }
-
-    bool verify_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
-    {
-        return (info->regs->cr3 != target_cr3 ||
-                !thread || thread != target_thread ||
-                info->regs->rsp <= target_rsp) ? false : true;
-    }
-
-    reg_t target_cr3;
-    addr_t target_thread;
-    addr_t target_rsp;
-};
-
-template<typename T>
 struct copy_on_write_result_t: public call_result_t<T>
 {
     copy_on_write_result_t(T* src) : call_result_t<T>(src), vaddr(), pte(), old_cow_pa() {}
