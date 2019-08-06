@@ -689,23 +689,35 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
 
 void memdump::load_wanted_targets(const memdump_config* c)
 {
-    std::ifstream ifs(c->dll_hooks_list, std::ifstream::in);
+    if (!c->dll_hooks_list)
+        return;
 
-    std::string line;
-    while (std::getline(ifs, line))
+    std::ifstream ifs;
+    ifs.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    try
     {
-        if (line.empty())
-            continue;
+        ifs.open(c->dll_hooks_list, std::ifstream::in);
 
-        std::stringstream ss(line);
-        target_config_entry_t e;
+        std::string line;
+        while (std::getline(ifs, line))
+        {
+            if (line.empty())
+                continue;
 
-        if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
-            throw -1;
-        if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
-            throw -1;
+            std::stringstream ss(line);
+            target_config_entry_t e;
 
-        this->wanted_hooks.push_back(e);
+            if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
+                throw -1;
+            if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
+                throw -1;
+
+            this->wanted_hooks.push_back(e);
+        }
+    }
+    catch (std::ifstream::failure e)
+    {
+        throw -1;
     }
 }
 
@@ -717,7 +729,7 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
     }
     catch (int e)
     {
-        printf("Malformed hook config for MEMDUMP plugin\n");
+        fprintf(stderr, "Malformed DLL hook configuration for MEMDUMP plugin\n");
         throw -1;
     }
 
