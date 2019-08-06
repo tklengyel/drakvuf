@@ -219,6 +219,9 @@ static bool populate_hook_targets(drakvuf_t drakvuf, memdump* plugin, const mmva
         }
     }
 
+    if (dll_name)
+        vmi_free_unicode_str(dll_name);
+
     drakvuf_release_vmi(drakvuf);
     return !dll_meta->targets.empty();
 }
@@ -266,12 +269,14 @@ static user_dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, m
         return nullptr;
 
     PRINT_DEBUG("[MEMDUMP-USER] Found DLL which is worth processing %llx\n", (unsigned long long)mmvad.starting_vpn << 12);
+    addr_t vad_start = mmvad.starting_vpn << 12;
+    size_t vad_length = (mmvad.ending_vpn - mmvad.starting_vpn + 1) << 12;
 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = mmvad.starting_vpn << 12
+        .addr = vad_start
     };
 
     addr_t export_header_rva = 0;
@@ -294,8 +299,19 @@ static user_dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, m
     export_header_rva = peparse_get_idd_rva(IMAGE_DIRECTORY_ENTRY_EXPORT, &magic, optional_header, NULL, NULL);
     export_header_size = peparse_get_idd_size(IMAGE_DIRECTORY_ENTRY_EXPORT, &magic, optional_header, NULL, NULL);
 
-    dll_meta.pf_current_addr = (mmvad.starting_vpn << 12) + export_header_rva & ~(VMI_PS_4KB - 1);
-    dll_meta.pf_max_addr = (mmvad.starting_vpn << 12) + export_header_rva + export_header_size;
+    if (export_header_rva >= vad_length)
+    {
+        PRINT_DEBUG("[MEMDUMP-USER] Export header RVA is forwarded outside VAD\n");
+        return nullptr;
+    }
+    else if (export_header_size >= vad_length - export_header_rva)
+    {
+        PRINT_DEBUG("[MEMDUMP-USER] Export header size is forwarded outside VAD\n");
+        return nullptr;
+    }
+
+    dll_meta.pf_current_addr = vad_start + export_header_rva & ~(VMI_PS_4KB - 1);
+    dll_meta.pf_max_addr = vad_start + export_header_rva + export_header_size;
 
     if (dll_meta.pf_max_addr & VMI_PS_4KB)
     {
@@ -438,12 +454,12 @@ static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* in
  */
 static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    // HANDLE ProcessHandle
+    // IN HANDLE ProcessHandle
     uint64_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    // ...
+    // IN OUT PVOID *BaseAddress
     addr_t base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 2);
 
-    if (process_handle != 0xffffffffffffffffULL)
+    if (process_handle != ~0ULL)
         return VMI_EVENT_RESPONSE_NONE;
 
     auto plugin = get_trap_plugin<memdump>(info);
