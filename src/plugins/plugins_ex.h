@@ -491,4 +491,33 @@ P* get_trap_plugin(const drakvuf_trap_info_t* info)
     return (*reinterpret_cast<T*>(info->trap->data))();
 }
 
+template<typename T>
+struct call_result_t : public plugin_params<T>
+{
+    call_result_t(T* src) : plugin_params<T>(src), target_cr3(), target_thread(), target_rsp() {}
+
+    void set_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
+    {
+        target_thread = thread;
+        target_cr3 = info->regs->cr3;
+        target_rsp = info->regs->rsp;
+    }
+
+    bool verify_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
+    {
+        if (info->regs->cr3 != target_cr3 ||
+            !thread || thread != target_thread ||
+            info->regs->rsp <= target_rsp)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    reg_t target_cr3;
+    addr_t target_thread;
+    addr_t target_rsp;
+};
+
 #endif // PLUGIN_EX_H

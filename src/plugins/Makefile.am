@@ -191,7 +191,7 @@ sources += wmimon/wmimon.cpp
 endif
 
 if PLUGIN_MEMDUMP
-sources += memdump/memdump.cpp
+sources += memdump/memdump.cpp memdump/userhook.cpp
 endif
 
 ###############################################################################
