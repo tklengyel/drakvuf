@@ -351,7 +351,6 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
 
 static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-
     PRINT_DEBUG("Injected process callback !!\n");
     injector_t injector = info->trap->data;
     PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
@@ -361,7 +360,6 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
         PRINT_DEBUG("%u|%u|%u|%u \n", info->proc_data.pid, injector->target_pid, info->proc_data.tid, injector->target_tid);
         return 0;
     }
-
 
     if (injector->method == INJECT_METHOD_EXECPROC && injector->status == STATUS_CREATE_OK)
     {
@@ -375,14 +373,18 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
             drakvuf_interrupt(drakvuf, SIGINT);
             return 0;
         }
+        if (strncmp(info->proc_data.name, injector->target_file, 15) != 0)
+        {
+            PRINT_DEBUG("%s || %s \n", info->proc_data.name, injector->target_file);
+            return 0;
+        }
     }
-
-    drakvuf_remove_trap(drakvuf, info->trap, NULL);
 
     injector->pid = injector->target_pid;
     injector->tid = injector->target_tid;
 
     printf("Process start detected %i -> 0x%lx\n", injector->pid, info->regs->cr3);
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
     drakvuf_interrupt(drakvuf, SIGINT);
 
@@ -516,22 +518,8 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
                 return 0;
             injector->status = STATUS_CREATE_OK;
 
-            printf("Check your VNC for successful startup of process!!\n");
-            printf("If exec fails/returns -1, it will be catched definately\n");
-            injector->rc = 1;
-            injector->detected = false;
-
-            // Setup trap for injected process
-            // TO ESCAPE COMPILER WARNINGS, NEED MORE DISCUSSION ON THIS
-            // Ctrl + C to stop drakvuf on successful injectiion
-            if (false)
-            {
-                if (!setup_wait_for_injected_process_trap_linux(injector))
-                    return 0;
-            }
-
-            // drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
-            // drakvuf_interrupt(drakvuf, SIGINT);
+            if (!setup_wait_for_injected_process_trap_linux(injector))
+                return 0;
         }
         else if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
         {
@@ -579,26 +567,19 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
         PRINT_DEBUG("Return back after execve() execution!!\n");
         PRINT_DEBUG("*RAX: 0x%lx\n", info->regs->rax);
 
-        if (injector->method == INJECT_METHOD_EXECPROC && injector->status == STATUS_CREATE_OK)
+        if (info->regs->rax == 0xffffffff)
         {
-            if (info->regs->rax == 0xffffffff)
-            {
-                printf("\n*Process start failed!! as execve() returned -1 \n");
-                injector->rc = 0;
-                injector->detected = false;
-                drakvuf_remove_trap(drakvuf, info->trap, NULL);
-                // reset the process registers, if exec fails
-                drakvuf_interrupt(drakvuf, SIGINT);
-                memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
-                return VMI_EVENT_RESPONSE_SET_REGISTERS;
-            }
+            PRINT_DEBUG("\n*Process start failed!! as execve() returned -1 \n");
+            injector->rc = 0;
+            injector->detected = false;
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_interrupt(drakvuf, SIGINT);
+            // reset the process registers, if exec fails
+            memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
-
-        // Hopefully this will never run for exec
-        drakvuf_remove_trap(drakvuf, info->trap, NULL);
-        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
-        memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
-        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        return 0;
     }
 
     if (injector->method == INJECT_METHOD_SHELLCODE_LINUX && injector->status == STATUS_EXEC_OK)
