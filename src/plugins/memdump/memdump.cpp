@@ -106,6 +106,7 @@
 #include <glib.h>
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
+#include <libvmi/peparse.h>
 #include <assert.h>
 #include "memdump.h"
 
@@ -119,7 +120,7 @@
  * For some dumps, a custom structure `extras` may be optionally provided together with `printout_extras` method
  * which will enrich the default data printout.
  */
-static bool dump_memory_region(
+bool dump_memory_region(
     drakvuf_t drakvuf,
     vmi_instance_t vmi,
     drakvuf_trap_info_t* info,
@@ -462,4 +463,6 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
     {
         throw -1;
     }
+
+    this->userhook_init(drakvuf, c, output);
 }
