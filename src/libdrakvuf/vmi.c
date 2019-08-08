@@ -117,6 +117,7 @@
 
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
+#include <libvmi/slat.h>
 
 #include "../xen_helper/xen_helper.h"
 
@@ -1061,10 +1062,18 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         PRINT_DEBUG("Activating remapped gfns in the altp2m views!\n");
         remapped_gfn->active = 1;
 
-        xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID,
-                             drakvuf->altp2m_idx, current_gfn, remapped_gfn->r);
-        xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID,
-                             drakvuf->altp2m_idr, remapped_gfn->r, drakvuf->zero_page_gfn);
+        if (VMI_FAILURE == vmi_slat_change_gfn(
+                drakvuf->vmi, drakvuf->altp2m_idx, current_gfn, remapped_gfn->r))
+        {
+            PRINT_DEBUG("%s: Failed to change gfn on view %u\n", __FUNCTION__, drakvuf->altp2m_idx);
+            goto err_exit;
+        }
+        if (VMI_FAILURE == vmi_slat_change_gfn(
+                drakvuf->vmi, drakvuf->altp2m_idx, remapped_gfn->r, drakvuf->zero_page_gfn))
+        {
+            PRINT_DEBUG("%s: Failed to change gfn on view %u\n", __FUNCTION__, drakvuf->altp2m_idr);
+            goto err_exit;
+        }
     }
 
     /*
@@ -1459,10 +1468,13 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
      * The idx view is used primarily during DRAKVUF execution. In this view all breakpointed
      * pages will have their shadow copies activated.
      */
-    rc = xc_altp2m_create_view(drakvuf->xen->xc, drakvuf->domID, (xenmem_access_t)0, &drakvuf->altp2m_idx);
-    PRINT_DEBUG("Altp2m view X created? %i with ID %u\n", rc, drakvuf->altp2m_idx);
-    if (rc < 0)
+    status = vmi_slat_create(drakvuf->vmi, &drakvuf->altp2m_idx);
+    if (VMI_FAILURE == status)
+    {
+        PRINT_DEBUG("Altp2m view X creation failed\n");
         return 0;
+    }
+    PRINT_DEBUG("Altp2m view X created with ID %u\n", drakvuf->altp2m_idx);
 
     /*
      * TODO: We will use the idr view to map all shadow pages to the zero (empty) page in case
@@ -1472,10 +1484,13 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
      * be avoided if we cache all pages separately that have been written to and use emulate with
      * custom read data to only return the change in the page on the gfn it was written to.
      */
-    rc = xc_altp2m_create_view(drakvuf->xen->xc, drakvuf->domID, (xenmem_access_t)0, &drakvuf->altp2m_idr);
-    PRINT_DEBUG("Altp2m view R created? %i with ID %u\n", rc, drakvuf->altp2m_idr);
-    if (rc < 0)
+    status = vmi_slat_create(drakvuf->vmi, &drakvuf->altp2m_idr);
+    if (VMI_FAILURE == status)
+    {
+        PRINT_DEBUG("Altp2m view R creation failed\n");
         return 0;
+    }
+    PRINT_DEBUG("Altp2m view R created with ID %u\n", drakvuf->altp2m_idr);
 
     SETUP_INTERRUPT_EVENT(&drakvuf->interrupt_event, int3_cb);
     drakvuf->interrupt_event.data = drakvuf;
@@ -1495,10 +1510,13 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         return 0;
     }
 
-    rc = xc_altp2m_switch_to_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx);
-    PRINT_DEBUG("Switched Altp2m view to X? %i\n", rc);
-    if (rc < 0)
+    status = vmi_slat_switch(drakvuf->vmi, drakvuf->altp2m_idx);
+    PRINT_DEBUG("Switched Altp2m view to X\n");
+    if (VMI_FAILURE == status)
+    {
+        PRINT_DEBUG("Failed to switch Altp2m view to X\n");
         return 0;
+    }
 
     //setup a mem event for the empty page
     drakvuf->guard0.type = MEMACCESS;
@@ -1532,7 +1550,8 @@ void close_vmi(drakvuf_t drakvuf)
         ghashtable_foreach(drakvuf->memaccess_lookup_gfn, i, key, s)
         {
             vmi_set_mem_event(drakvuf->vmi, s->memaccess.gfn, VMI_MEMACCESS_N, drakvuf->altp2m_idx);
-            xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx, s->memaccess.gfn, ~0);
+            if (VMI_FAILURE == vmi_slat_change_gfn(drakvuf->vmi, drakvuf->altp2m_idx, s->memaccess.gfn, ~(addr_t)0))
+                PRINT_DEBUG("%s: Failed to change gfn in view %u\n", __FUNCTION__, drakvuf->altp2m_idx);
             g_slist_free(s->traps);
             s->traps = NULL;
         }
@@ -1540,12 +1559,6 @@ void close_vmi(drakvuf_t drakvuf)
     }
 
     remove_trap(drakvuf, &drakvuf->guard0);
-
-    if (drakvuf->vmi)
-    {
-        vmi_destroy(drakvuf->vmi);
-        drakvuf->vmi = NULL;
-    }
 
     if (drakvuf->breakpoint_lookup_gfn)
     {
@@ -1576,8 +1589,10 @@ void close_vmi(drakvuf_t drakvuf)
         struct remapped_gfn* remapped_gfn = NULL;
         ghashtable_foreach(drakvuf->remapped_gfns, i, key, remapped_gfn)
         {
-            xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx, remapped_gfn->o, ~0);
-            xc_altp2m_change_gfn(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr, remapped_gfn->r, ~0);
+            if (VMI_FAILURE == vmi_slat_change_gfn(drakvuf->vmi, drakvuf->altp2m_idx, remapped_gfn->o, ~(addr_t)0))
+                PRINT_DEBUG("%s: Failed to change gfn in view %u\n", __FUNCTION__, drakvuf->altp2m_idx);
+            if (VMI_FAILURE == vmi_slat_change_gfn(drakvuf->vmi, drakvuf->altp2m_idr, remapped_gfn->r, ~(addr_t)0))
+                PRINT_DEBUG("%s: Failed to change gfn in view %u\n", __FUNCTION__, drakvuf->altp2m_idr);
             xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &remapped_gfn->r);
         }
         g_hash_table_destroy(drakvuf->remapped_gfns);
@@ -1619,12 +1634,16 @@ void close_vmi(drakvuf_t drakvuf)
         drakvuf->step_event[i] = NULL;
     }
 
-    xc_altp2m_switch_to_view(drakvuf->xen->xc, drakvuf->domID, 0);
+    if (VMI_FAILURE == vmi_slat_switch(drakvuf->vmi, 0))
+        PRINT_DEBUG("Failed to switch on default view\n");
     if (drakvuf->altp2m_idx)
-        xc_altp2m_destroy_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idx);
+        if (VMI_FAILURE == vmi_slat_destroy(drakvuf->vmi, drakvuf->altp2m_idx))
+            PRINT_DEBUG("Altp2m view X %u destruction failed\n", drakvuf->altp2m_idx);
     if (drakvuf->altp2m_idr)
-        xc_altp2m_destroy_view(drakvuf->xen->xc, drakvuf->domID, drakvuf->altp2m_idr);
-    xc_altp2m_set_domain_state(drakvuf->xen->xc, drakvuf->domID, 0);
+        if (VMI_FAILURE == vmi_slat_destroy(drakvuf->vmi, drakvuf->altp2m_idr))
+            PRINT_DEBUG("Altp2m view R %u destruction failed\n", drakvuf->altp2m_idr);
+    if (VMI_FAILURE == vmi_slat_set_domain_state(drakvuf->vmi, false))
+        PRINT_DEBUG("Failed to disable alternate SLAT\n");
 
     if (drakvuf->zero_page_gfn)
         xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &drakvuf->zero_page_gfn);
@@ -1633,6 +1652,12 @@ void close_vmi(drakvuf_t drakvuf)
     drakvuf->altp2m_idx = 0;
     drakvuf->altp2m_idr = 0;
     drakvuf->zero_page_gfn = 0;
+
+    if (drakvuf->vmi)
+    {
+        vmi_destroy(drakvuf->vmi);
+        drakvuf->vmi = NULL;
+    }
 
     drakvuf_resume(drakvuf);
 
