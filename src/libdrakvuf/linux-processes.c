@@ -329,7 +329,7 @@ bool linux_get_current_thread_id( drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
 
 bool linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid )
 {
-    status_t ret;
+    status_t status;
     addr_t parent_proc_base = 0;
     access_context_t ctx =
     {

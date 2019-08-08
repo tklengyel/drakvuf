@@ -152,14 +152,6 @@ addr_t drakvuf_export_linux_sym_to_va(drakvuf_t drakvuf, drakvuf_trap_info_t* in
     return 0;
 }
 
-status_t drakvuf_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str)
-{
-    if ( drakvuf->osi.get_last_error )
-        return drakvuf->osi.get_last_error(drakvuf, info, err, err_str);
-
-    return false;
-}
-
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     if ( drakvuf->osi.get_current_process )

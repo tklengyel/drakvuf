@@ -121,9 +121,6 @@ typedef struct os_interface
     addr_t (*export_linux_sym_to_va)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib, const char* sym);
 
-    status_t (*get_last_error)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
-
     char* (*get_process_name)
     (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
 
