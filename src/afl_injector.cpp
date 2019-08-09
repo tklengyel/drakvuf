@@ -18,9 +18,21 @@
 #include "plugins/plugins.h"
 #include <fcntl.h>
 
+#define NUM_LOCATIONS 2000
 
 void afl_setup();
 void afl_forkserver();
+
+int cur_loc[NUM_LOCATIONS], prev_loc = 0;
+
+#define AFL_BRANCH_INSTRUMENT \
+do\
+{\
+    afl_area_ptr[cur_loc[__LINE__] ^ prev_loc]++;\
+    prev_loc = cur_loc[__LINE__] >> 1;\
+}\
+while(0)
+
 #define SEED 321651
 GRand *grand;
 static drakvuf_t drakvuf;
@@ -57,14 +69,18 @@ void stop_bsodmon()
     delete plugins;
 }
 
-// char * generate_random_string()
-// {
+void initialize_locations()
+{
+    for(int i = 0; i<NUM_LOCATIONS; i++)
+    {
+        cur_loc[i] = g_rand_int_range(grand, 0,((1<<16)-1));
+    }   
+}
 
-// }
-
-json_object *get_inputs(json_object *function){
-    json_object *args = hijack_get_arguments(function);
-    int len = hijack_get_num_arguments(args);
+json_object *get_inputs(json_object *call){
+    json_object *args;
+    json_object_object_get_ex(call, "arguments", &args);
+    int len = json_object_array_length(args);
     json_object *array = json_object_new_array();
     for(int i = 0; i<len; i++)
     {
@@ -77,7 +93,6 @@ json_object *get_inputs(json_object *function){
         json_object_object_get_ex(arg, "value", &jarg_val);
         int num = json_object_get_int(jarg_val);
         if(!strcmp(arg_type, "INTEGER")){
-            num = num>=0?num:(-num);
             json_object *val = json_object_new_int(num);
             json_object *jtype = json_object_new_string(arg_type);
             json_object_object_add(temp_obj, "type", jtype);
@@ -96,6 +111,20 @@ json_object *get_inputs(json_object *function){
     return array;
 }
 
+const char *get_json_string(json_object *obj, const char *key)
+{
+    json_object *str_obj;
+    json_object_object_get_ex(obj, key, &str_obj);
+    return json_object_get_string(str_obj);
+}
+
+int64_t get_json_int(json_object *obj, const char *key)
+{
+    json_object *int_obj;
+    json_object_object_get_ex(obj, key, &int_obj);
+    return json_object_get_int64(int_obj);
+}
+
 void try_some_other_shit()
 {
     FILE *fp;
@@ -110,10 +139,16 @@ void try_some_other_shit()
             domain_live = true;
         }
     }
+    pclose(fp);
     if(domain_live)
-    (void)system("xl destroy win10");
-    (void)system("./restore_script.sh");
-
+     (void)system("xl destroy win10");
+    fp = popen("./restore_script.sh", "r");
+    
+    while(fgets(list_output, 2047, fp) != NULL )
+    {
+        fprintf(stderr, "%s",list_output);
+    }
+    pclose(fp);
 }
 
 using namespace std;
@@ -125,6 +160,7 @@ int main(int argc, char *argv[])
     FILE *temp_stdout ;
     temp_stderr = NULL;
     temp_stdout = NULL;
+    grand = g_rand_new_with_seed(SEED);
     if(afl){
         temp_stderr = stderr;
         temp_stdout = stdout;
@@ -132,22 +168,21 @@ int main(int argc, char *argv[])
         stderr = fopen("/home/ajinkya/College/gsoc19/AFL/log_stderr.txt", "w");
         afl_setup();    
         afl_forkserver();
-        afl_area_ptr[1<<10] = 12;
-        fprintf(stderr, "--------------------------------\n");
+        initialize_locations();
+        fprintf(stderr,"---------Releasing forkserver--------------\n");
     }
-    printf("here");
-    char *domain=NULL, *rekall_profile=NULL, *rekall_wow_profile = NULL, *function_name = NULL;
-    char *lib_name=NULL;
-    char *driver_rekal_profile=NULL;
+    char *domain=NULL, *rekall_profile=NULL, *rekall_wow_profile = NULL;
+    const char *lib_name=NULL;
+    const char *driver_rekal_profile=NULL;
+    const char *function_name = NULL;
     char *fuzz_candidates_path=NULL;
     int injection_pid = 0;
     uint32_t injection_tid = 0;
-    int num_iterations = 0;
+    int num_calls = 0;
     bool verbose = false,  libvmi_conf = false;
     char c;
-    int num_libs = 0, num_functions = 0, num_args=0, fuzz_iterations=0;
+    int num_args=0, call_idx=0;
     int rc = -1;
-    grand = g_rand_new_with_seed(SEED);
     (void)rekall_wow_profile;
     (void)libvmi_conf;
     eprint_current_time();
@@ -197,9 +232,6 @@ int main(int argc, char *argv[])
                 verbose = true;
                 break;
 #endif            
-            case 'c':
-                num_iterations = atoi(optarg);
-                break;
             default:
                 if (isalnum(c))
                     fprintf(stderr, "Unrecognized option: %c\n", c);
@@ -223,41 +255,59 @@ int main(int argc, char *argv[])
     {
         try_some_other_shit();
         if(!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf))
-        {
+        {    sleep(5);
+
             fprintf(stderr, "Failed to initialize DRAKVUF\n %s", domain);
             return rc;
         }
     }
+    int successfull = 0;
     json_object *candidates = json_object_from_file(fuzz_candidates_path);
+    if( candidates == NULL)
+    {
+        AFL_BRANCH_INSTRUMENT;
+        fprintf(stderr, RED "[+] Could not read candidates" RESET "\n");
+        goto error;
+    }
+    AFL_BRANCH_INSTRUMENT;
     // start_bsodmon(drakvuf, candidates);
 
-    int successfull = 0;
     fprintf(stderr, "STARTING FUZZING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
-    while(fuzz_iterations<num_iterations)
+
+    json_object *calls;
+    json_object_object_get_ex(candidates, "calls", &calls);
+    if(calls == NULL)
+    {
+        fprintf(stderr, RED "[+]Could not parse candidates" RESET "\n");
+    }
+    num_calls = json_object_array_length(calls);
+
+
+    while(call_idx<num_calls)
     {   
-        // sleep(5);
+        AFL_BRANCH_INSTRUMENT;    
         if(!continue_fuzzing)
             break;
-        fprintf(stderr, "Generating Input iteration %d>>>>>>>>>>>>>>>>\n", fuzz_iterations);     
-        json_object *modules_list = hijack_get_modules(candidates);
-        num_libs = hijack_get_num_modules(modules_list);
-        int lib_no = g_rand_int_range(grand, 0,num_libs);
-        json_object *module = json_object_array_get_idx(modules_list, lib_no);
-        json_object *function_list = hijack_get_functions(module);
-        num_functions = hijack_get_num_functions(function_list);
-        int func_no = g_rand_int_range(grand, 0, num_functions);
-        json_object *function = json_object_array_get_idx(function_list, func_no);
+        fprintf(stderr, "Generating Input iteration %d >>>>>>>>>>>>>>>>\n", call_idx);     
+        json_object *call = json_object_array_get_idx(calls, call_idx);
+        if(call == NULL)
+        {
 
-        json_object *inputs = get_inputs(function);
-        //XXX
-        printf("%s\n"json_object_to_json_string_ext(inputs, JSON_C_TO_STRING_PRETTY));
-        lib_name = hijack_get_module_name(module);
-        printf("")
-        function_name = hijack_get_fucntion_name(function);
-        json_object* args = hijack_get_arguments(function);
-        num_args = hijack_get_num_arguments(args);
-        driver_rekal_profile = hijack_get_module_rekall_profile(module);
+            fprintf(stderr, RED "[+]Could not parse call" RESET "\n");
+            goto error;
+        }
 
+        json_object *inputs;
+        json_object_object_get_ex(call, "arguments", &inputs);
+        if(inputs == NULL)
+        {
+            fprintf(stderr, RED "[+]Could not parse get inputs" RESET "\n");
+            goto error;
+        }
+        lib_name = get_json_string(call, "module-name");
+        function_name = get_json_string(call, "function-name");
+        driver_rekal_profile = get_json_string(call, "module-rekall-profile");
+        num_args = json_object_array_length(inputs);
         
         fprintf(stderr, "Calling %s!%s, with %d arguments\n",lib_name, function_name, num_args);
         fprintf(stderr, "Calling With Input >>>>>>>>>>>>>>>>\n");
@@ -267,31 +317,33 @@ int main(int argc, char *argv[])
         !hijack(drakvuf, 
             injection_pid, 
             injection_tid,
-            function_name, 
-            driver_rekal_profile,
-            lib_name,
+            (char *)function_name, 
+            (char *)driver_rekal_profile,
+            (char *)lib_name,
             inputs, 
             &spin_lock_held)
         )
         {
+            AFL_BRANCH_INSTRUMENT;
             fprintf(stderr, BGRED WHITE "[+] Hijack Failed" RESET "\n");
             // goto error;
         }
         else
         {
-            fuzz_iterations++;
+            AFL_BRANCH_INSTRUMENT;
+            call_idx++;
             successfull++;
         }
-        
+        AFL_BRANCH_INSTRUMENT;
         fprintf(stderr, "waiting for lock\n");
         while(!g_atomic_int_compare_and_exchange(&spin_lock_held,false, true));
         fprintf(stderr, "Returned >>>>>>>>>>>>>>>>\n");
         // sleep(1);
         
     }
-    // error:
+    error:
     // sleep(5);
-    
+    AFL_BRANCH_INSTRUMENT;
     drakvuf_resume(drakvuf); 
     // stop_bsodmon();
     drakvuf_close(drakvuf, 0);
@@ -301,7 +353,6 @@ int main(int argc, char *argv[])
     stderr = temp_stderr;
     stdout = temp_stdout;
     //give time to wait as immediate calling crashes
-    sleep(5);
 
     return successfull;
   
@@ -355,7 +406,7 @@ void afl_forkserver() {
     run_num++;
   }
 
-}
+AFL_BRANCH_INSTRUMENT;}
 
 void afl_setup()
 {
@@ -398,3 +449,4 @@ void afl_setup()
   }
 
 }
+

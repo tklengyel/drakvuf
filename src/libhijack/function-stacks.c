@@ -7,7 +7,7 @@ bool setup_stack_from_json(hijacker_t hijacker, drakvuf_trap_info_t *info)
     (void)offset_names;
     drakvuf_t drakvuf = hijacker->drakvuf;
     json_object *jargs = hijacker->args;
-    fprintf(stderr, "in setup stack from json\n"
+    PRINT_DEBUG("in setup stack from json\n"
                     "%s\n", json_object_to_json_string_ext(jargs, JSON_C_TO_STRING_PRETTY));
     int len = json_object_array_length(jargs);
     struct argument *args = g_malloc0(len*sizeof(struct argument)) ; 
