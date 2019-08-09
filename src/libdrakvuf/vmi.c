@@ -1444,6 +1444,30 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     }
 
     /*
+     * Ensure altp2m enabled
+     */
+    uint64_t param_altp2m;
+
+    rc = xc_hvm_param_get(drakvuf->xen->xc, drakvuf->domID, HVM_PARAM_ALTP2M, &param_altp2m);
+    if (rc < 0)
+    {
+        PRINT_DEBUG("Failed to get HVM_PARAM_ALTP2M, RC: %i\n", rc);
+        return 0;
+    }
+
+    if (param_altp2m != XEN_ALTP2M_external)
+    {
+        PRINT_DEBUG("Force ALTP2M to be set to external mode, current mode: %lu\n", param_altp2m);
+
+        rc = xc_hvm_param_set(drakvuf->xen->xc, drakvuf->domID, HVM_PARAM_ALTP2M, XEN_ALTP2M_external);
+        if (rc < 0)
+        {
+            PRINT_DEBUG("Failed to set HVM_PARAM_ALTP2M, RC: %i\n", rc);
+            return 0;
+        }
+    }
+
+    /*
      * Create altp2m view
      */
     rc = xc_altp2m_set_domain_state(drakvuf->xen->xc, drakvuf->domID, 1);
