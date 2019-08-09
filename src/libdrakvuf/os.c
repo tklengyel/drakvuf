@@ -152,6 +152,14 @@ addr_t drakvuf_export_linux_sym_to_va(drakvuf_t drakvuf, drakvuf_trap_info_t* in
     return 0;
 }
 
+addr_t drakvuf_export_lib_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib)
+{
+    if (drakvuf->osi.export_lib_address)
+        return drakvuf->osi.export_lib_address(drakvuf, info, pid, lib);
+
+    return 0;
+}
+
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     if ( drakvuf->osi.get_current_process )

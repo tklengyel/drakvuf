@@ -209,8 +209,6 @@ int main(int argc, char** argv)
                 break;
             case 'f':
                 args[args_count] = optarg;
-                printf("arg is :%s\n", args[args_count]);
-                printf("arg _count is :%d\n", args_count);
                 args_count++;
                 break;
             case 'g':

@@ -239,6 +239,7 @@ bool linux_get_process_tid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ti
 
     return false;
 }
+
 char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath)
 {
     UNUSED(fullpath);

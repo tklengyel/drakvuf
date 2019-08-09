@@ -109,4 +109,6 @@
 
 addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib, const char* sym);
 
+addr_t get_lib_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib);
+
 #endif

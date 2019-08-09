@@ -149,6 +149,7 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.get_process_ppid = linux_get_process_ppid;
     drakvuf->osi.get_process_data = linux_get_process_data;
     drakvuf->osi.export_linux_sym_to_va = process_sym2va;
+    drakvuf->osi.export_lib_address = get_lib_address;
 
     return 1;
 }

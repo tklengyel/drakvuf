@@ -132,6 +132,7 @@ struct injector
 {
     // Inputs:
     const char* target_file;
+    const char* target_file_name;
     vmi_pid_t target_pid;
     addr_t target_base;
     uint32_t target_tid;
@@ -293,12 +294,6 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    // if (!drakvuf_get_struct_members_array_rva(drakvuf, linux_offset_names, LINUX_OFFSET_MAX, injector->linux_offsets))
-    // {
-    //     PRINT_DEBUG("Could not populate offset names! \n");
-    //     goto done;
-    // }
-
     addr_t rip = info->regs->rip;
     vmi_get_vcpureg(vmi, &rip, RIP, 0);
     PRINT_DEBUG("Rip is 0x%lx \n", rip);
@@ -325,12 +320,13 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
     // failing to grab some symbols due to relocation
     else if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
     {
+        injector->exec_func = drakvuf_export_lib_address(drakvuf, info, injector->target_pid, "libc-2.27.so");
+        PRINT_DEBUG("Address of libc is: 0x%lx \n", injector->exec_func);
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         printf("Under Construction!!");
         drakvuf_release_vmi(drakvuf);
+        drakvuf_interrupt(drakvuf, SIGINT);
         return 0;
-        injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "libc-2.27.so", "malloc");
-        PRINT_DEBUG("Address of malloc symbol is: 0x%lx \n", injector->exec_func);
     }
 
     injector->target_base = drakvuf_get_current_process(drakvuf, info);
@@ -373,9 +369,9 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
             drakvuf_interrupt(drakvuf, SIGINT);
             return 0;
         }
-        if (strncmp(info->proc_data.name, injector->target_file, 15) != 0)
+        if (strncmp(info->proc_data.name, injector->target_file_name, 15) != 0)
         {
-            PRINT_DEBUG("%s || %s \n", info->proc_data.name, injector->target_file);
+            PRINT_DEBUG("%s || %s \n", info->proc_data.name, injector->target_file_name);
             return 0;
         }
     }
@@ -889,12 +885,16 @@ int injector_start_app_on_linux(
     injector->target_tid = tid;
     injector->method = method;
     injector->target_file = file;
+    char* file_name = g_strrstr(file, "/");
+    if (file_name != NULL)
+        injector->target_file_name = file_name + 1;
+    else
+        injector->target_file_name = file;
     injector->status = STATUS_NULL;
     injector->error_code.valid = false;
     injector->error_code.code = -1;
     injector->error_code.string = "<UNKNOWN>";
     injector->args_count = args_count;
-    // injector->args = args;
     for (int i=0; i<args_count; i++)
         injector->args[i] = args[i];
 

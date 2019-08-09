@@ -199,15 +199,16 @@ addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pi
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_flags))
             goto next;
 
-        if (strstr(libname, lib) && (vm_flags & VM_READ) && (vm_flags & VM_EXEC))
+        if (g_strcmp0(libname, lib) == 0 && (vm_flags & VM_READ) && (vm_flags & VM_EXEC))
         {
             text_segment_address = vm_start;
         }
 
-        if (strstr(libname, lib) && (vm_flags & VM_READ) && !(vm_flags & VM_WRITE)&& !(vm_flags & VM_EXEC))
+        if (g_strcmp0(libname, lib) == 0 && (vm_flags & VM_READ) && !(vm_flags & VM_WRITE)&& !(vm_flags & VM_EXEC))
         {
             data_segment_address = vm_start;
             text_segment_size = pgoffset;
+            break;
         }
 
 next:
@@ -367,4 +368,70 @@ next:
         offset += dynsym_entry_size;
     }
     return text_segment_address + value;
+}
+
+addr_t get_lib_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    addr_t process_base = drakvuf_get_current_process(drakvuf, info);
+
+    drakvuf_get_process_pid(drakvuf, process_base, &pid);
+
+    addr_t mm_struct_address;
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT],
+        .pid = pid
+    };
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mm_struct_address))
+        return -1;
+
+    addr_t mmap;
+    ctx.addr = mm_struct_address + drakvuf->offsets[MM_STRUCT_MMAP];
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mmap))
+        return -1;
+
+    char* libname = "";
+    addr_t vm_next, nullp = 0;
+    do
+    {
+        addr_t vm_start;
+        ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_START];
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_start))
+            return -1;
+
+        addr_t vm_end;
+        ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_END];
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_end))
+            return -1;
+
+        ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_NEXT];
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_next))
+            return -1;
+
+        addr_t file_address;
+        ctx.addr = mmap + drakvuf->offsets[VM_AREA_STRUCT_FILE];
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &file_address))
+            goto next;
+
+        addr_t path_dentry;
+        ctx.addr = file_address + drakvuf->offsets[FILE_PATH] + drakvuf->offsets[PATH_DENTRY];
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &path_dentry))
+            goto next;
+
+        ctx.addr = path_dentry + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME] + 16;
+        libname = vmi_read_str(vmi, &ctx);
+        PRINT_DEBUG("LIB NAME is: %s \n", libname);
+
+        if (g_strcmp0(libname, lib) == 0)
+            return vm_start;
+
+next:
+        mmap = vm_next;
+
+    } while (vm_next != nullp);
+
+    return 0;
 }
