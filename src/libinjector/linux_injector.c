@@ -315,6 +315,14 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
     {
         injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "libc-2.27.so", "execlp");
         PRINT_DEBUG("Address of execlp symbol is: 0x%lx \n", injector->exec_func);
+        if (injector->exec_func == 0xffff)
+        {
+            printf("Error finding symbol address!!\n");
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_release_vmi(drakvuf);
+            drakvuf_interrupt(drakvuf, SIGINT);
+            return 0;
+        }
     }
 
     // failing to grab some symbols due to relocation
@@ -705,8 +713,6 @@ static void print_injection_info(output_format_t format, const char* file, injec
         arguments = g_strconcat(arguments, injector->args[i], NULL);
         arguments = g_strconcat(arguments, " ", NULL);
     }
-    arguments = g_strstrip(arguments);
-    char* escaped_arguments = g_strescape(arguments, NULL);
 
     switch (injector->result)
     {
@@ -715,12 +721,12 @@ static void print_injection_info(output_format_t format, const char* file, injec
             {
                 case OUTPUT_CSV:
                     printf("inject," FORMAT_TIMEVAL ",Success,%u,\"%s\",\"%s\",%u,%u\n",
-                           UNPACK_TIMEVAL(t), injector->target_pid, file, escaped_arguments, injector->pid, injector->tid);
+                           UNPACK_TIMEVAL(t), injector->target_pid, file, arguments, injector->pid, injector->tid);
                     break;
 
                 case OUTPUT_KV:
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=Success,PID=%u,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
-                           UNPACK_TIMEVAL(t), injector->target_pid, file, escaped_arguments, injector->pid, injector->tid);
+                           UNPACK_TIMEVAL(t), injector->target_pid, file, arguments, injector->pid, injector->tid);
                     break;
 
                 case OUTPUT_JSON:
@@ -737,7 +743,7 @@ static void print_injection_info(output_format_t format, const char* file, injec
                             UNPACK_TIMEVAL(t),
                             injector->target_pid,
                             file,
-                            escaped_arguments,
+                            arguments,
                             injector->pid,
                             injector->tid,
                             injector->method);
@@ -746,7 +752,7 @@ static void print_injection_info(output_format_t format, const char* file, injec
                 default:
                 case OUTPUT_DEFAULT:
                     printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:SUCCESS PID:%u FILE:\"%s\" ARGUMENTS:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
-                           UNPACK_TIMEVAL(t), injector->target_pid, file, escaped_arguments, injector->pid, injector->tid);
+                           UNPACK_TIMEVAL(t), injector->target_pid, file, arguments, injector->pid, injector->tid);
                     break;
             }
             break;
@@ -858,9 +864,6 @@ static void print_injection_info(output_format_t format, const char* file, injec
             }
             break;
     }
-
-    g_free(escaped_arguments);
-    g_free(arguments);
 }
 
 static bool initialize_linux_injector_functions(injector_t injector)
