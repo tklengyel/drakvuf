@@ -378,9 +378,9 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
             drakvuf_interrupt(drakvuf, SIGINT);
             return 0;
         }
-        PRINT_DEBUG("%s || %s \n", info->proc_data.name, injector->target_file_name);
         if (strncmp(info->proc_data.name, injector->target_file_name, 15) != 0)
         {
+            PRINT_DEBUG("%s || %s \n", info->proc_data.name, injector->target_file_name);
             return 0;
         }
     }
