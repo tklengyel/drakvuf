@@ -106,103 +106,20 @@
 #define MEMDUMP_H
 
 #include <vector>
+#include <memory>
 
 #include <glib.h>
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
-
-template<typename T>
-struct copy_on_write_result_t: public call_result_t<T>
-{
-    copy_on_write_result_t(T* src) : call_result_t<T>(src), vaddr(), pte(), old_cow_pa() {}
-
-    addr_t vaddr;
-    addr_t pte;
-    addr_t old_cow_pa;
-};
-
-template<typename T>
-struct map_view_of_section_result_t: public call_result_t<T>
-{
-    map_view_of_section_result_t(T* src) : call_result_t<T>(src), section_handle(), process_handle(), base_address_ptr() {}
-
-    uint64_t section_handle;
-    uint64_t process_handle;
-    addr_t base_address_ptr;
-};
-
-enum target_hook_state
-{
-    HOOK_FIRST_TRY,
-    HOOK_PAGEFAULT_RETRY,
-    HOOK_FAILED,
-    HOOK_OK
-};
-
-typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
-class memdump;
-
-typedef struct hook_target_entry
-{
-    vmi_pid_t pid;
-    std::string target_name;
-    callback_t callback;
-    target_hook_state state;
-    drakvuf_trap_t* trap;
-    memdump* plugin;
-
-    hook_target_entry(std::string target_name, callback_t callback, memdump* plugin)
-        : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
-} hook_target_entry_t;
-
-typedef struct user_dll
-{
-    // relevant while loading
-    addr_t dtb;
-    uint32_t thread_id;
-    addr_t real_dll_base;
-    bool is_hooked;
-
-    // internal, for page faults
-    addr_t pf_current_addr;
-    addr_t pf_max_addr;
-
-    // one entry per hooked function
-    std::vector<hook_target_entry_t> targets;
-} user_dll_t;
-
-typedef struct target_config_entry
-{
-    std::string dll_name;
-    std::string function_name;
-} target_config_entry_t;
-
-// type of a pointer residing on stack
-enum sptr_type_t
-{
-    ERROR,   // problem with stack inspection
-    MAIN,    // pointer to a main module
-    LINKED,  // pointer to some linked DLL module
-    UNLINKED // pointer to some non-legit memory
-};
-
-sptr_type_t check_module_linked_wow(drakvuf_t drakvuf,
-                                    vmi_instance_t vmi,
-                                    memdump* plugin,
-                                    drakvuf_trap_info_t* info,
-                                    addr_t dll_base);
-
-sptr_type_t check_module_linked(drakvuf_t drakvuf,
-                                vmi_instance_t vmi,
-                                memdump* plugin,
-                                drakvuf_trap_info_t* info,
-                                addr_t dll_base);
 
 struct memdump_config
 {
     const char* memdump_dir;
     const char* dll_hooks_list;
 };
+
+struct target_config_entry_t;
+struct user_dll_t;
 
 class memdump: public pluginex
 {
