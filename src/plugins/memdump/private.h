@@ -106,16 +106,6 @@
 #define MEMDUMP_PRIVATE_H
 
 template<typename T>
-struct copy_on_write_result_t: public call_result_t<T>
-{
-    copy_on_write_result_t(T* src) : call_result_t<T>(src), vaddr(), pte(), old_cow_pa() {}
-
-    addr_t vaddr;
-    addr_t pte;
-    addr_t old_cow_pa;
-};
-
-template<typename T>
 struct map_view_of_section_result_t: public call_result_t<T>
 {
     map_view_of_section_result_t(T* src) : call_result_t<T>(src), section_handle(), process_handle(), base_address_ptr() {}
@@ -136,7 +126,7 @@ enum target_hook_state
 typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
 class memdump;
 
-struct hook_target_entry_t
+typedef struct hook_target_entry
 {
     vmi_pid_t pid;
     std::string target_name;
@@ -145,11 +135,22 @@ struct hook_target_entry_t
     drakvuf_trap_t* trap;
     memdump* plugin;
 
-    hook_target_entry_t(std::string target_name, callback_t callback, memdump* plugin)
-        : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
+    hook_target_entry(std::string target_name, callback_t callback, memdump* plugin)
+            : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
+} hook_target_entry_t;
+
+template<typename T>
+struct copy_on_write_result_t: public call_result_t<T>
+{
+    copy_on_write_result_t(T* src) : call_result_t<T>(src), vaddr(), pte(), old_cow_pa() {}
+
+    addr_t vaddr;
+    addr_t pte;
+    addr_t old_cow_pa;
+    std::vector<hook_target_entry_t*> hooks;
 };
 
-struct user_dll_t
+typedef struct user_dll
 {
     // relevant while loading
     addr_t dtb;
@@ -163,13 +164,13 @@ struct user_dll_t
 
     // one entry per hooked function
     std::vector<hook_target_entry_t> targets;
-};
+} user_dll_t;
 
-struct target_config_entry_t
+typedef struct target_config_entry
 {
     std::string dll_name;
     std::string function_name;
-};
+} target_config_entry_t;
 
 // type of a pointer residing on stack
 enum sptr_type_t

@@ -339,7 +339,7 @@ static user_dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, m
     return &it->second.back();
 }
 
-static bool make_trap(drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func)
+static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry* target, addr_t exec_func)
 {
     target->pid = info->proc_data.pid;
 
@@ -348,10 +348,18 @@ static bool make_trap(drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_en
     trap->name = target->target_name.c_str();
     trap->cb = target->callback;
     trap->data = target;
-    trap->breakpoint.lookup_type = LOOKUP_DTB;
-    trap->breakpoint.dtb = info->regs->cr3;
-    trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = exec_func;
+
+    page_info pageInfo;
+    int ret = vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pageInfo);
+
+    if(ret != VMI_SUCCESS)
+    {
+        goto fail;
+    }
+
+    trap->breakpoint.lookup_type = LOOKUP_NONE;
+    trap->breakpoint.addr_type = ADDR_PA;
+    trap->breakpoint.addr = pageInfo.paddr;
 
     if (drakvuf_add_trap(drakvuf, trap))
     {
@@ -359,6 +367,7 @@ static bool make_trap(drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_en
         return true;
     }
 
+    fail:
     PRINT_DEBUG("[MEMDUMP-USER] Failed to add trap :(\n");
     return false;
 }
@@ -429,7 +438,7 @@ static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* in
                 }
                 else
                 {
-                    if (make_trap(drakvuf, info, &target, exec_func))
+                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
                         target.state = HOOK_OK;
                 }
             }
@@ -440,7 +449,7 @@ static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* in
 
                 if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pinfo) == VMI_SUCCESS)
                 {
-                    if (make_trap(drakvuf, info, &target, exec_func))
+                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
                         target.state = HOOK_OK;
                 }
             }
@@ -704,7 +713,7 @@ void memdump::load_wanted_targets(const memdump_config* c)
     std::string line;
     while (std::getline(ifs, line))
     {
-        if (line.empty())
+        if (line.empty() || line[0] == '#')
             continue;
 
         std::stringstream ss(line);
@@ -717,6 +726,126 @@ void memdump::load_wanted_targets(const memdump_config* c)
 
         this->wanted_hooks.push_back(e);
     }
+}
+
+static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto data = get_trap_params<memdump, copy_on_write_result_t<memdump>>(info);
+    memdump* plugin = data->plugin();
+    if (!data || !plugin)
+    {
+        PRINT_DEBUG("[MEMDUMP-USER] copy_on_write_ret_cb invalid trap params!\n");
+        drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    plugin->destroy_trap(drakvuf, info->trap);
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    page_info_t pinfo;
+    addr_t pa;
+
+    if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, data->vaddr, &pinfo) != VMI_SUCCESS)
+    {
+        PRINT_DEBUG("[MEMDUMP-USER] failed to get pa");
+        goto end;
+    }
+
+    pa = pinfo.paddr;
+
+    if (data->old_cow_pa == pa)
+    {
+        PRINT_DEBUG("[MEMDUMP-USER] PA after CoW remained the same, wtf? Nothing to do here...\n");
+        goto end;
+    }
+
+    PRINT_DEBUG("[MEMDUMP-USER] new PA %lx\n", pa);
+
+    for(auto &hook : data->hooks)
+    {
+        addr_t hook_va = ((data->vaddr >> 12) << 12) + (hook->trap->breakpoint.addr & 0xFFF);
+        PRINT_DEBUG("adding hook at %lx\n", hook_va);
+
+        make_trap(vmi, drakvuf, info, hook, hook_va);
+    }
+
+    end:
+    drakvuf_release_vmi(drakvuf);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin = get_trap_plugin<memdump>(info);
+    if (!plugin)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    addr_t vaddr = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t pte = drakvuf_get_function_argument(drakvuf, info, 2);
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    page_info_t pinfo;
+    addr_t pa;
+    if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, vaddr, &pinfo) != VMI_SUCCESS)
+    {
+        PRINT_DEBUG("[MEMDUMP-USER] failed to get pa");
+        drakvuf_release_vmi(drakvuf);
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    pa = pinfo.paddr;
+
+    drakvuf_release_vmi(drakvuf);
+
+
+    std::vector < hook_target_entry_t* > hooks;
+    for (auto &dll : plugin->loaded_dlls[info->regs->cr3]) {
+        for(auto &hook : dll.targets) {
+            addr_t hook_addr = hook.trap->breakpoint.addr;
+            if(hook_addr >> 12 == pa >> 12)
+            {
+                hooks.push_back(&hook);
+            }
+        }
+    }
+
+    PRINT_DEBUG("[MEMDUMP-USER] copy on write called: vaddr: %llx pte: %llx, pid: %d, cr3: %llx\n", (unsigned long long)vaddr, (unsigned long long)pte, info->proc_data.pid, (unsigned long long)info->regs->cr3);
+    PRINT_DEBUG("[MEMDUMP-USER] old CoW PA: %llx\n", (unsigned long long)pa);
+
+    if(!hooks.empty())
+    {
+        PRINT_DEBUG("MEMDUMP-USER] Found %zu hooks on CoW page, registering return trap\n", hooks.size());
+
+        auto trap = plugin->register_trap<memdump, copy_on_write_result_t<memdump>>(
+                drakvuf,
+                info,
+                plugin,
+                copy_on_write_ret_cb,
+                breakpoint_by_pid_searcher());
+        if (!trap)
+            return VMI_EVENT_RESPONSE_NONE;
+
+        auto data = get_trap_params<memdump, copy_on_write_result_t<memdump>>(trap);
+        if (!data)
+        {
+            plugin->destroy_plugin_params(plugin->detach_plugin_params(trap));
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+
+        data->vaddr = vaddr;
+        data->pte = pte;
+        data->old_cow_pa = pa;
+        data->hooks = hooks;
+    }
+
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
@@ -741,7 +870,8 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
     if (!register_trap<memdump>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
         !register_trap<memdump>(drakvuf, nullptr, this, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection")) ||
         !register_trap<memdump>(drakvuf, nullptr, this, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler")) ||
-        !register_trap<memdump>(drakvuf, nullptr, this, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")))
+        !register_trap<memdump>(drakvuf, nullptr, this, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
+        !register_trap<memdump>(drakvuf, nullptr, this, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite")))
     {
         throw -1;
     }
