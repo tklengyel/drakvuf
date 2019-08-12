@@ -204,8 +204,8 @@ int injector_start_app_on_linux(drakvuf_t drakvuf,
                                 const char* app,
                                 injection_method_t method,
                                 output_format_t format,
-                                const char* args[],
-                                int args_count);
+                                int args_count,
+                                const char* args[]);
 
 bool setup_linux_stack(drakvuf_t drakvuf,
                        drakvuf_trap_info_t* info,

@@ -121,13 +121,11 @@
 #include "linux-offsets.h"
 
 #define PAGE_SHIFT 12
-#define VM_READ		0x00000001
-#define VM_WRITE	0x00000002
-#define VM_EXEC		0x00000004
-#define VM_SHARED	0x00000008
+#define VM_READ		        0x00000001
+#define VM_WRITE	        0x00000002
+#define VM_EXEC		        0x00000004
+#define VM_SHARED	        0x00000008
 #define R_X86_64_GLOB_DAT	0x00000006
-
-
 
 addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib, const char* sym)
 {
@@ -135,7 +133,8 @@ addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pi
 
     addr_t process_base = drakvuf_get_current_process(drakvuf, info);
 
-    drakvuf_get_process_pid(drakvuf, process_base, &pid);
+    if (!drakvuf_get_process_pid(drakvuf, process_base, &pid))
+        return -1;
 
     addr_t mm_struct_address;
     access_context_t ctx =
@@ -285,12 +284,15 @@ next:
             dynstr_offset = ptr;
         if (word == 0x6) // .symtab section offset
             dynsym_offset = ptr;
+
+        // Offsets for Relocation table section
         // if (word == 0x7) // address of .rela.dyn section
         //     rela_section_offset = ptr;
         // if (word == 0x8) // total size of .rela.dyn section
         //     rela_section_size = ptr;
         // if (word == 0x9) // size of an entry in .rela.dyn section
         //     rela_section_entry = ptr;
+
         if (word == 0xa) // size of .strtab section
             dynstr_size = ptr;
         if (word == 0xb) // size of an entry in .symtab section
@@ -298,33 +300,37 @@ next:
     } while (word != 0x0 && ptr != 0x0);
 
     // Reading Relocatable files
-    // addr_t rela_addend, rela_info, rela_offset;
-    // offset = 0x0;
-    // while (offset < rela_section_size)
-    // {
-    //     ctx.addr = rela_section_offset + offset + drakvuf->offsets[ELF64RELA_ADDEND];
-    //     if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &rela_addend))
-    //         printf("rela_addend is: %lx\n", rela_addend);
+    // Symbol mapping of relocated symbols is not yet done.
+    // Offsets are found but mapping is to symbol name is not completed
 
-    //     ctx.addr = rela_section_offset + offset + drakvuf->offsets[ELF64RELA_INFO];
-    //     if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &rela_info))
-    //         printf("rela_info is: %lx\n", rela_info);
-    //     rela_info = rela_info & 0xf;
+    /* addr_t rela_addend, rela_info, rela_offset;
+    offset = 0x0;
+    while (offset < rela_section_size)
+    {
+        ctx.addr = rela_section_offset + offset + drakvuf->offsets[ELF64RELA_ADDEND];
+        if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &rela_addend))
+            printf("rela_addend is: %lx\n", rela_addend);
 
-    //     ctx.addr = rela_section_offset + offset + drakvuf->offsets[ELF64RELA_OFFSET];
-    //     if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &rela_offset))
-    //         printf("rela_offset is: %lx\n\n", rela_offset);
+        ctx.addr = rela_section_offset + offset + drakvuf->offsets[ELF64RELA_INFO];
+        if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &rela_info))
+            printf("rela_info is: %lx\n", rela_info);
+        rela_info = rela_info & 0xf;
 
-    //     addr_t num;
-    //     if (rela_info == R_X86_64_GLOB_DAT)
-    //     {
-    //         ctx.addr = rela_section_offset + offset + drakvuf->offsets[ELF64RELA_INFO] + 0x4;
-    //         if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &num))
-    //             printf("symbol offset is -> %ld\n", num);
-    //         break;
-    //     }
-    //     offset+=rela_section_entry;
-    // }
+        ctx.addr = rela_section_offset + offset + drakvuf->offsets[ELF64RELA_OFFSET];
+        if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &rela_offset))
+            printf("rela_offset is: %lx\n\n", rela_offset);
+
+        addr_t num;
+        if (rela_info == R_X86_64_GLOB_DAT)
+        {
+            ctx.addr = rela_section_offset + offset + drakvuf->offsets[ELF64RELA_INFO] + 0x4;
+            if (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &num))
+                printf("symbol offset is -> %ld\n", num);
+            break;
+        }
+        offset+=rela_section_entry;
+    }
+    */
 
     // Reading symbol name mapping in dynstr table
 
@@ -376,7 +382,10 @@ addr_t get_lib_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t p
 
     addr_t process_base = drakvuf_get_current_process(drakvuf, info);
 
-    drakvuf_get_process_pid(drakvuf, process_base, &pid);
+    if (drakvuf_get_process_pid(drakvuf, process_base, &pid))
+    {
+        return -1;
+    }
 
     addr_t mm_struct_address;
     access_context_t ctx =

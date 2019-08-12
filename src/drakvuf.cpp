@@ -222,8 +222,8 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                           const char* target_process,
                           int timeout,
                           bool global_search,
-                          const char* args[],
-                          int args_count)
+                          int args_count,
+                          const char* args[])
 {
     GThread* timeout_thread = startup_timer(this, timeout);
     int rc = 0;
@@ -244,7 +244,7 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
     }
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {
-        if (injection_tid ==0)
+        if (!injection_tid)
             injection_tid = injection_pid;
 
         rc = injector_start_app_on_linux(drakvuf,
@@ -253,8 +253,8 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                                          inject_cmd,
                                          method,
                                          format,
-                                         args,
-                                         args_count);
+                                         args_count,
+                                         args);
     }
 
 

@@ -141,7 +141,7 @@ struct injector
     drakvuf_t drakvuf;
     bool hijacked, detected;
     injection_method_t method;
-    addr_t exec_func;
+    addr_t exec_func, libc_addr;
     reg_t target_rsp, target_rip;
 
     // for exec()
@@ -320,8 +320,9 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
     // failing to grab some symbols due to relocation
     else if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
     {
-        injector->exec_func = drakvuf_export_lib_address(drakvuf, info, injector->target_pid, "libc-2.27.so");
-        PRINT_DEBUG("Address of libc is: 0x%lx \n", injector->exec_func);
+        injector->libc_addr = drakvuf_export_lib_address(drakvuf, info, injector->target_pid, "libc-2.27.so");
+        PRINT_DEBUG("Address of libc is: 0x%lx \n", injector->libc_addr);
+        injector->exec_func= injector->libc_addr + 0x97070;
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         printf("Under Construction!!");
         drakvuf_release_vmi(drakvuf);
@@ -369,9 +370,9 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
             drakvuf_interrupt(drakvuf, SIGINT);
             return 0;
         }
+        PRINT_DEBUG("%s || %s \n", info->proc_data.name, injector->target_file_name);
         if (strncmp(info->proc_data.name, injector->target_file_name, 15) != 0)
         {
-            PRINT_DEBUG("%s || %s \n", info->proc_data.name, injector->target_file_name);
             return 0;
         }
     }
@@ -410,11 +411,6 @@ static event_response_t inject_payload_linux(drakvuf_t drakvuf, drakvuf_trap_inf
 {
     injector_t injector = info->trap->data;
 
-    // injector->payload_addr = info->regs->rax;
-    // Doesnt work?
-    // input value was 0x555555768280
-    // while returned was 0x7ffff77e9f50
-
     // Write payload into guest's memory
     access_context_t ctx =
     {
@@ -433,14 +429,6 @@ static event_response_t inject_payload_linux(drakvuf_t drakvuf, drakvuf_trap_inf
     }
 
     info->regs->rip = injector->target_rip;
-
-    // struct argument args[6] = { {0} };
-    // init_int_argument(&args[0], 0);
-    // init_int_argument(&args[1], 0);
-    // init_int_argument(&args[2], 0);
-    // init_int_argument(&args[3], 0);
-    // init_int_argument(&args[4], 0);
-    // init_int_argument(&args[5], 0);
 
     if (!setup_linux_stack(injector->drakvuf, info, NULL, 6))
     {
@@ -497,7 +485,6 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
 
         if (!success)
         {
-            // God forgive me
             PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
             drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
@@ -533,8 +520,8 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
 
         // Add memset offset to libc address
         // 000000000009ed40 -> memset@@GLIBC_2.2.5
-        // injector->exec_func = injector->libc_addr + 0x9ed40;
-        // injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "libc-2.27.so", "memset");
+
+        injector->exec_func = injector->libc_addr + 0x9ed40;
 
         info->regs->rip = injector->target_rip;
 
@@ -621,8 +608,7 @@ static event_response_t linux_injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_i
         // kernel mode
 
         // rcx -> value of rip in usermode && kernelmode
-        // TESTING REQUIRED FOR 100% ASSURITY
-        // otherwise acquire it from stack now
+        // otherwise acquire it from stack here
 
         // setting TRAP on BP addr -> rcx -> rip
         addr_t bp_addr = info->regs->rcx;
@@ -712,38 +698,14 @@ static void print_injection_info(output_format_t format, const char* file, injec
 {
     GTimeVal t;
     g_get_current_time(&t);
+    char* arguments = "";
 
-    char* process_name = NULL;
-    char* arguments = NULL;
-
-    char* splitter = " ";
-    const char* begin_proc_name = &file[0];
-
-    if (file[0] == '"')
+    for (int i=0; i<injector->args_count; i++)
     {
-        splitter = "\"";
-        begin_proc_name = &file[1];
+        arguments = g_strconcat(arguments, injector->args[i], NULL);
+        arguments = g_strconcat(arguments, " ", NULL);
     }
-
-    char** split_results = g_strsplit_set(begin_proc_name, splitter, 2);
-    char** split_results_iterator = split_results;
-
-    if (*split_results_iterator)
-    {
-        process_name = *(split_results_iterator++);
-    }
-
-    if (*split_results_iterator)
-    {
-        arguments = *(split_results_iterator++);
-        if (arguments[0] == ' ')
-            arguments++;
-    }
-    else
-    {
-        arguments = "";
-    }
-
+    arguments = g_strstrip(arguments);
     char* escaped_arguments = g_strescape(arguments, NULL);
 
     switch (injector->result)
@@ -753,18 +715,38 @@ static void print_injection_info(output_format_t format, const char* file, injec
             {
                 case OUTPUT_CSV:
                     printf("inject," FORMAT_TIMEVAL ",Success,%u,\"%s\",\"%s\",%u,%u\n",
-                           UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                           UNPACK_TIMEVAL(t), injector->target_pid, file, escaped_arguments, injector->pid, injector->tid);
                     break;
 
                 case OUTPUT_KV:
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=Success,PID=%u,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
-                           UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                           UNPACK_TIMEVAL(t), injector->target_pid, file, escaped_arguments, injector->pid, injector->tid);
+                    break;
+
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Inject TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                            "\"Status\" : \"Success\","
+                            "\"Pid\" : %d,"
+                            "\"Injected File\": \"%s\","
+                            "\"Arguments\": \"%s\","
+                            "\"Injected Pid\": %u,"
+                            "\"Injected Tid\": %u,"
+                            "\"Method\" : %d"
+                            "}\n",
+                            UNPACK_TIMEVAL(t),
+                            injector->target_pid,
+                            file,
+                            escaped_arguments,
+                            injector->pid,
+                            injector->tid,
+                            injector->method);
                     break;
 
                 default:
                 case OUTPUT_DEFAULT:
                     printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:SUCCESS PID:%u FILE:\"%s\" ARGUMENTS:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
-                           UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                           UNPACK_TIMEVAL(t), injector->target_pid, file, escaped_arguments, injector->pid, injector->tid);
                     break;
             }
             break;
@@ -777,6 +759,14 @@ static void print_injection_info(output_format_t format, const char* file, injec
 
                 case OUTPUT_KV:
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=Timeout\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Inject TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                            "\"Status\" : \"Timeout\""
+                            "}\n",
+                            UNPACK_TIMEVAL(t));
                     break;
 
                 default:
@@ -796,6 +786,14 @@ static void print_injection_info(output_format_t format, const char* file, injec
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=Crash\n", UNPACK_TIMEVAL(t));
                     break;
 
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Inject TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                            "\"Status\" : \"Crash\""
+                            "}\n",
+                            UNPACK_TIMEVAL(t));
+                    break;
+
                 default:
                 case OUTPUT_DEFAULT:
                     printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Crash\n", UNPACK_TIMEVAL(t));
@@ -811,6 +809,14 @@ static void print_injection_info(output_format_t format, const char* file, injec
 
                 case OUTPUT_KV:
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=PrematureBreak\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Inject TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                            "\"Status\" : \"PrematureBreak\""
+                            "}\n",
+                            UNPACK_TIMEVAL(t));
                     break;
 
                 default:
@@ -832,6 +838,18 @@ static void print_injection_info(output_format_t format, const char* file, injec
                            UNPACK_TIMEVAL(t), injector->error_code.code, injector->error_code.string);
                     break;
 
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Inject TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                            "\"Status\" : \"Error\","
+                            "\"Error Code\": %d,"
+                            "\"Error\" : \"%s\""
+                            "}\n",
+                            UNPACK_TIMEVAL(t),
+                            injector->error_code.code,
+                            injector->error_code.string);
+                    break;
+
                 default:
                 case OUTPUT_DEFAULT:
                     printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Error ERROR_CODE:%d ERROR:\"%s\"\n",
@@ -842,7 +860,7 @@ static void print_injection_info(output_format_t format, const char* file, injec
     }
 
     g_free(escaped_arguments);
-    g_strfreev(split_results);
+    g_free(arguments);
 }
 
 static bool initialize_linux_injector_functions(injector_t injector)
@@ -869,11 +887,10 @@ int injector_start_app_on_linux(
     const char* file,
     injection_method_t method,
     output_format_t format,
-    const char* args[],
-    int args_count)
+    int args_count,
+    const char* args[])
 {
-    int rc = 0;
-    printf("Target PID %u to inject '%s'\n", pid, file);
+    int rc = 0, i = 0;
     injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
     if (!injector)
     {
@@ -895,7 +912,7 @@ int injector_start_app_on_linux(
     injector->error_code.code = -1;
     injector->error_code.string = "<UNKNOWN>";
     injector->args_count = args_count;
-    for (int i=0; i<args_count; i++)
+    for (i=0; i<args_count; i++)
         injector->args[i] = args[i];
 
     if (!initialize_linux_injector_functions(injector))

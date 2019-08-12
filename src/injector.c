@@ -131,7 +131,7 @@ static inline void print_help(void)
             "\t -l                        Use libvmi.conf\n"
             "\t -m <inject_method>        The injection method [WIN] (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
             "\t -f <args for exec>        [LINUX] - Arguments specified for exec to include (requires -m execproc)\n"
-            "\t                           [LINUX] (execproc -> int execlp(const char *file, const char *arg0, ..., const char *argn, (char *)0); for Linux kernel 4.18+, 64bit only)\n"
+            "\t                           [LINUX] (execproc -> int execlp(const char *file, const char *arg0, ..., const char *argn, (char *)0); for Linux kernel 4.18+, 64bit only) (Maximum 10 args)\n"
             "\t [-B] <path>               The host path of the windows binary to inject (requires -m doppelganging)\n"
             "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
             "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i) (LINUX: Injects to TGID Thread if ThreadID not specified)\n"
@@ -243,6 +243,18 @@ int main(int argc, char** argv)
         print_help();
         return 1;
     }
+    if (injection_method != INJECT_METHOD_EXECPROC && args_count)
+    {
+        printf("Arguments not supported! \n");
+        print_help();
+        return 1;
+    }
+    if (args_count > 10)
+    {
+        printf("Arguments count is greater than 10! \n");
+        print_help();
+        return 1;
+    }
 
     /* for a clean exit */
     struct sigaction act;
@@ -261,10 +273,8 @@ int main(int argc, char** argv)
     }
 
     if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
-    {
-        if (injection_thread == 0)
+        if (!injection_thread)
             injection_thread = injection_pid;
-    }
 
     printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
 
@@ -293,8 +303,8 @@ int main(int argc, char** argv)
                            inject_file,
                            injection_method,
                            OUTPUT_DEFAULT,
-                           args,
-                           args_count);
+                           args_count,
+                           args);
     }
 
     if (injection_result)

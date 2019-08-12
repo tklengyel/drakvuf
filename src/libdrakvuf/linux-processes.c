@@ -222,7 +222,7 @@ bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pi
     return false;
 }
 
-bool linux_get_process_tid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* tid )
+bool linux_get_process_tid(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid )
 {
     /*
      * On Linux PID is actually the thread ID....... ... ...
@@ -234,7 +234,7 @@ bool linux_get_process_tid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ti
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]
     };
 
-    if ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)tid))
+    if ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, tid))
         return true;
 
     return false;

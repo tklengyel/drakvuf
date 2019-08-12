@@ -192,7 +192,7 @@ bool drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* 
     return false;
 }
 
-bool drakvuf_get_process_tid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* tid)
+bool drakvuf_get_process_tid(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid)
 {
     if ( drakvuf->osi.get_process_tid )
         return drakvuf->osi.get_process_tid(drakvuf, process_base, tid);
