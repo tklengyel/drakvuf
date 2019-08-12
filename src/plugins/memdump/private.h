@@ -146,7 +146,7 @@ struct hook_target_entry_t
     memdump* plugin;
 
     hook_target_entry_t(std::string target_name, callback_t callback, memdump* plugin)
-            : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
+        : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
 };
 
 struct user_dll_t
@@ -193,14 +193,14 @@ sptr_type_t check_module_linked(drakvuf_t drakvuf,
                                 addr_t dll_base);
 
 bool dump_memory_region(
-        drakvuf_t drakvuf,
-        vmi_instance_t vmi,
-        drakvuf_trap_info_t* info,
-        memdump* plugin,
-        access_context_t* ctx,
-        size_t len_bytes,
-        const char* reason,
-        void* extras,
-        void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, void* extras));
+    drakvuf_t drakvuf,
+    vmi_instance_t vmi,
+    drakvuf_trap_info_t* info,
+    memdump* plugin,
+    access_context_t* ctx,
+    size_t len_bytes,
+    const char* reason,
+    void* extras,
+    void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, void* extras));
 
 #endif
