@@ -51,7 +51,7 @@ static addr_t hijack_get_function_address(hijacker_t hijacker, char* function_na
         if(!rva)
             return 0;
         PRINT_DEBUG("Returned RVA = %"PRIx64"\n", rva);        
-        return  drakvuf_exportksym_to_va(hijacker->drakvuf, 4, function_name, lib_name, rva);;
+        return  drakvuf_exportksym_to_va(hijacker->drakvuf, 4, function_name, lib_name, rva);
 }
 
 static void release_ozzer_lock(hijacker_t hijacker)

@@ -22,7 +22,7 @@ as
 *.obj
 *.elf
 *.Po
-
+ozzer
 # Libraries
 **/*.lib
 **/*.a

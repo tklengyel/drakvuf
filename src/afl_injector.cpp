@@ -20,6 +20,7 @@
 
 #define NUM_LOCATIONS 2000
 
+char *afl_mode;
 void afl_setup();
 void afl_forkserver();
 
@@ -28,16 +29,102 @@ int cur_loc[NUM_LOCATIONS], prev_loc = 0;
 #define AFL_BRANCH_INSTRUMENT \
 do\
 {\
-    afl_area_ptr[cur_loc[__LINE__] ^ prev_loc]++;\
-    prev_loc = cur_loc[__LINE__] >> 1;\
+    if(afl_mode)\
+    {\
+        afl_area_ptr[cur_loc[__LINE__] ^ prev_loc]++;\
+        prev_loc = cur_loc[__LINE__] >> 1;\
+    }\
 }\
 while(0)
 
 #define SEED 321651
+
+GHashTable *ke_func_index;      //Mapping from kernel function to index in AFL-SHM
 GRand *grand;
 static drakvuf_t drakvuf;
 static bool continue_fuzzing = true;
 volatile int spin_lock_held = false;
+
+int prev;
+struct afl_map_update_data
+{
+    char *function_name;
+    int curr;
+};
+
+event_response_t afl_map_update_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+{
+    (void)(drakvuf);
+    struct afl_map_update_data *afl_data = 
+        (struct afl_map_update_data *)info->trap->data;
+    (void)(afl_data);
+    // printf(BGYELLOW BLACK "In afl_map_update_cb for function"
+    //     "%s with pid = %d" RESET "\n",afl_data->function_name, info->proc_data.pid);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+bool init_kernel_func_indices(drakvuf_t drakvuf)
+{
+    (void)(drakvuf);
+    json_object *rekall_profile = drakvuf_get_rekall_profile_json(drakvuf);
+    char *f_name;
+    addr_t f_addr;
+    addr_t f_rva;
+    json_object *functions;
+    if(!json_object_object_get_ex(rekall_profile, "$FUNCTIONS", &functions))
+    {
+        fprintf(stderr, "Couldn't find function in rekall profile of guest\n");
+        return false;
+    }
+    json_object_iterator it, END;
+    it = json_object_iter_begin(functions);
+    END = json_object_iter_end(functions);
+    while( !json_object_iter_equal(&it, &END) )
+    {
+        f_name = (char *)json_object_iter_peek_name(&it);
+        f_addr = json_object_get_int64(json_object_iter_peek_value(&it));
+        int index = g_rand_int_range(grand, 0, 1<<16);
+        g_hash_table_insert(ke_func_index, f_name, (void *)(uintptr_t)index);
+        
+        //Insert Trap
+        if( !drakvuf_get_function_rva(drakvuf, f_name, &f_rva))
+        {
+            fprintf(stderr, "FATAL Couldn't get function rva\n");
+            return false;
+        }
+        f_addr = drakvuf_exportksym_to_va(drakvuf, 4, f_name, "ntoskrnl.exe", f_rva);
+        if(!f_addr)
+        {
+            fprintf(stderr, "Couldn't export ksym to va\n");
+            return false;
+        }
+        drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
+        
+        trap->type = BREAKPOINT;
+        trap->breakpoint.lookup_type = LOOKUP_PID;
+        trap->breakpoint.pid = 4;
+        trap->breakpoint.addr_type = ADDR_RVA;
+        trap->breakpoint.module = "ntoskrnl.exe";
+        trap->breakpoint.rva = f_rva;
+        
+        struct afl_map_update_data *afl_data =
+            (struct afl_map_update_data *) g_malloc0(sizeof(struct afl_map_update_data));
+        afl_data->function_name = g_strdup(f_name);
+        afl_data->curr = index;
+    
+        trap->data = afl_data;
+        trap->cb = afl_map_update_cb;
+
+        if(!drakvuf_add_trap(drakvuf, trap))
+        {
+            fprintf(stderr, "Couldn't add trap for function %s\n", f_name);
+            return false;
+        }
+        json_object_iter_next(&it);
+    }
+    fprintf(stderr, GREEN "Traps added successfully for kernel functions" RESET "\n");
+    return true;
+}
 
 static void close_handler(int sig)
 {
@@ -125,7 +212,9 @@ int64_t get_json_int(json_object *obj, const char *key)
     return json_object_get_int64(int_obj);
 }
 
-void try_some_other_shit()
+
+
+void retry_creating_domain()
 {
     FILE *fp;
     char list_output[2048];
@@ -155,13 +244,13 @@ using namespace std;
 int main(int argc, char *argv[])
 {
     // int file  = open("/home/ajinkya/College/gsoc19/AFL/log.txt", O_WRONLY | O_CREAT );
-    char *afl = getenv(SHM_ENV_VAR);
+    afl_mode = getenv(SHM_ENV_VAR);
     FILE *temp_stderr ;
     FILE *temp_stdout ;
     temp_stderr = NULL;
     temp_stdout = NULL;
     grand = g_rand_new_with_seed(SEED);
-    if(afl){
+    if(afl_mode){
         temp_stderr = stderr;
         temp_stdout = stdout;
         stdout = fopen("/home/ajinkya/College/gsoc19/AFL/log_stdout.txt", "w");
@@ -183,16 +272,12 @@ int main(int argc, char *argv[])
     char c;
     int num_args=0, call_idx=0;
     int rc = -1;
+    json_object *candidates;
+    int successfull = 0;
     (void)rekall_wow_profile;
     (void)libvmi_conf;
     eprint_current_time();
     fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
-    int argc_ind = 0;
-    while(argc_ind<argc)
-    {
-      fprintf(stderr, "%s \n", argv[argc_ind]);
-      argc_ind++;
-    }
     if (argc < 4)
     {
         fprintf(stderr, "Required input:\n"
@@ -253,7 +338,7 @@ int main(int argc, char *argv[])
 
     if(!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf))
     {
-        try_some_other_shit();
+        retry_creating_domain();
         if(!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf))
         {    sleep(5);
 
@@ -261,8 +346,13 @@ int main(int argc, char *argv[])
             return rc;
         }
     }
-    int successfull = 0;
-    json_object *candidates = json_object_from_file(fuzz_candidates_path);
+
+    //setup ke_function_breakpoints
+    ke_func_index = g_hash_table_new_full(g_str_hash, g_int_equal, free, NULL);
+    init_kernel_func_indices(drakvuf);
+
+    successfull = 0;
+    candidates = json_object_from_file(fuzz_candidates_path);
     if( candidates == NULL)
     {
         AFL_BRANCH_INSTRUMENT;
@@ -283,7 +373,7 @@ int main(int argc, char *argv[])
     num_calls = json_object_array_length(calls);
 
 
-    while(call_idx<num_calls)
+    while(true)
     {   
         AFL_BRANCH_INSTRUMENT;    
         if(!continue_fuzzing)
@@ -331,7 +421,7 @@ int main(int argc, char *argv[])
         else
         {
             AFL_BRANCH_INSTRUMENT;
-            call_idx++;
+            // call_idx++;
             successfull++;
         }
         AFL_BRANCH_INSTRUMENT;
@@ -406,7 +496,7 @@ void afl_forkserver() {
     run_num++;
   }
 
-AFL_BRANCH_INSTRUMENT;}
+}
 
 void afl_setup()
 {
