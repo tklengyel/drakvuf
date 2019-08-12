@@ -138,5 +138,6 @@ void print_sharing_info(xen_interface_t* xen, domid_t domID);
 bool xen_pause(xen_interface_t* xen, domid_t domID);
 void xen_resume(xen_interface_t* xen, domid_t domID);
 void xen_force_resume(xen_interface_t* xen, domid_t domID);
+bool xen_enable_altp2m(xen_interface_t* xen, domid_t domID);
 
 #endif
