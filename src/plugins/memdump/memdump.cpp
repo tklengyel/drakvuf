@@ -147,6 +147,8 @@ bool dump_memory_region(
     size_t len_remainder;
     size_t num_pages;
 
+    size_t tmp_len_bytes = len_bytes;
+
     plugin->memdump_counter++;
 
     if (plugin->memdump_dir)
@@ -200,7 +202,7 @@ bool dump_memory_region(
     for (size_t i = 0; i < num_pages; i++)
     {
         // sometimes we are supposed to write less than the whole page
-        size_t write_length = len_bytes >= VMI_PS_4KB ? VMI_PS_4KB : len_bytes;
+        size_t write_length = tmp_len_bytes >= VMI_PS_4KB ? VMI_PS_4KB : tmp_len_bytes;
 
         if (access_ptrs[i])
         {
@@ -216,7 +218,7 @@ bool dump_memory_region(
 
         // this applies only to the first page
         intra_page_offset = 0;
-        len_bytes -= write_length;
+        tmp_len_bytes -= write_length;
     }
 
     fclose(fp);
