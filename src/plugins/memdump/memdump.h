@@ -140,15 +140,4 @@ public:
     void load_wanted_targets(const memdump_config* c);
 };
 
-bool dump_memory_region(
-    drakvuf_t drakvuf,
-    vmi_instance_t vmi,
-    drakvuf_trap_info_t* info,
-    memdump* plugin,
-    access_context_t* ctx,
-    size_t len_bytes,
-    const char* reason,
-    void* extras,
-    void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, void* extras));
-
 #endif
