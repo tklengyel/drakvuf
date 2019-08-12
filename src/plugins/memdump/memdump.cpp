@@ -298,7 +298,7 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
     // OUT PVOID *BaseAddress
     addr_t mem_base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 2);
 
-    if (process_handle != 0xffffffffffffffffULL)
+    if (process_handle != ~OULL)
     {
         PRINT_DEBUG("[MEMDUMP] Process handle not pointing to self, ignore\n");
         return VMI_EVENT_RESPONSE_NONE;
@@ -408,6 +408,10 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
 
     // IN ULONG NumberOfBytesToWrite
     addr_t buffer_size = drakvuf_get_function_argument(drakvuf, info, 4);
+
+    // don't dump self-writes
+    if (process_handle == ~OULL)
+        return VMI_EVENT_RESPONSE_NONE;
 
     auto plugin = get_trap_plugin<memdump>(info);
     if (!plugin)
