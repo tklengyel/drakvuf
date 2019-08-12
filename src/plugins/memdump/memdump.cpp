@@ -366,31 +366,40 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
         //bool page_write = p_info.x86_ia32e.pte_value & (1UL << 1);
         bool page_execute = (~p_info.x86_ia32e.pte_value) & (1UL << 63);
 
-        if (page_valid && page_execute && mmvad.file_name_ptr) {
+        if (page_valid && page_execute && mmvad.file_name_ptr)
+        {
             sptr_type_t res = check_module_linked(drakvuf, vmi, plugin, info, mmvad.starting_vpn << 12);
 
-            if (res == ERROR) {
+            if (res == ERROR)
+            {
                 PRINT_DEBUG("[MEMDUMP] Something is corrupted\n");
                 continue;
             }
 
-            if (res == LINKED) {
+            if (res == LINKED)
+            {
                 PRINT_DEBUG("[MEMDUMP] Linked stack entry %llx\n", (unsigned long long) stack_val);
                 continue;
-            } else if (res == UNLINKED) {
+            }
+            else if (res == UNLINKED)
+            {
                 PRINT_DEBUG("[MEMDUMP] UNLINKED stack entry %llx\n", (unsigned long long) stack_val);
-            } else if (res == MAIN) {
+            }
+            else if (res == MAIN)
+            {
                 PRINT_DEBUG("[MEMDUMP] MAIN stack entry %llx\n", (unsigned long long) stack_val);
             }
         }
 
-        if (page_valid && page_execute) {
+        if (page_valid && page_execute)
+        {
             PRINT_DEBUG("[MEMDUMP] VX stack entry %llx\n", (unsigned long long) stack_val);
 
             ctx.addr = begin;
 
             if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len, "NtTerminateProcess called",
-                                    nullptr, nullptr)) {
+                                    nullptr, nullptr))
+            {
                 PRINT_DEBUG("[MEMDUMP] Failed to save memory dump - internal error\n");
             }
 
