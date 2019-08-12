@@ -1443,39 +1443,14 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         return 0;
     }
 
-    /*
-     * Ensure altp2m enabled
-     */
-    uint64_t param_altp2m;
-
-    rc = xc_hvm_param_get(drakvuf->xen->xc, drakvuf->domID, HVM_PARAM_ALTP2M, &param_altp2m);
-    if (rc < 0)
-    {
-        PRINT_DEBUG("Failed to get HVM_PARAM_ALTP2M, RC: %i\n", rc);
+    bool altp2m = xen_enable_altp2m(drakvuf->xen, drakvuf->domID);
+    PRINT_DEBUG("Altp2m enabled? %i\n", altp2m);
+    if (!altp2m)
         return 0;
-    }
-
-    if (param_altp2m != XEN_ALTP2M_external)
-    {
-        PRINT_DEBUG("Force ALTP2M to be set to external mode, current mode: %lu\n", param_altp2m);
-
-        rc = xc_hvm_param_set(drakvuf->xen->xc, drakvuf->domID, HVM_PARAM_ALTP2M, XEN_ALTP2M_external);
-        if (rc < 0)
-        {
-            PRINT_DEBUG("Failed to set HVM_PARAM_ALTP2M, RC: %i\n", rc);
-            return 0;
-        }
-    }
 
     /*
      * Create altp2m view
-     */
-    rc = xc_altp2m_set_domain_state(drakvuf->xen->xc, drakvuf->domID, 1);
-    PRINT_DEBUG("Altp2m enabled? %i\n", rc);
-    if (rc < 0)
-        return 0;
-
-    /*
+     *
      * The idx view is used primarily during DRAKVUF execution. In this view all breakpointed
      * pages will have their shadow copies activated.
      */
