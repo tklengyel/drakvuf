@@ -351,59 +351,50 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
         memcpy(&stack_val, buf+i, is_32bit ? 4 : 8);
 
         mmvad_info_t mmvad;
-        if (drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, stack_val, &mmvad))
-        {
-            addr_t begin = mmvad.starting_vpn << 12;
-            size_t len = (mmvad.ending_vpn - mmvad.starting_vpn + 1) << 12;
+        if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, stack_val, &mmvad))
+            continue;
 
-            page_info_t p_info = {0};
+        addr_t begin = mmvad.starting_vpn << 12;
+        size_t len = (mmvad.ending_vpn - mmvad.starting_vpn + 1) << 12;
 
-            if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, stack_val, &p_info) != VMI_SUCCESS)
+        page_info_t p_info = {0};
+
+        if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, stack_val, &p_info) != VMI_SUCCESS)
+            continue;
+
+        bool page_valid = p_info.x86_ia32e.pte_value & (1UL << 0);
+        //bool page_write = p_info.x86_ia32e.pte_value & (1UL << 1);
+        bool page_execute = (~p_info.x86_ia32e.pte_value) & (1UL << 63);
+
+        if (page_valid && page_execute && mmvad.file_name_ptr) {
+            sptr_type_t res = check_module_linked(drakvuf, vmi, plugin, info, mmvad.starting_vpn << 12);
+
+            if (res == ERROR) {
+                PRINT_DEBUG("[MEMDUMP] Something is corrupted\n");
                 continue;
-
-            bool page_valid = p_info.x86_ia32e.pte_value & (1UL << 0);
-            //bool page_write = p_info.x86_ia32e.pte_value & (1UL << 1);
-            bool page_execute = (~p_info.x86_ia32e.pte_value) & (1UL << 63);
-
-            if (page_valid && page_execute && mmvad.file_name_ptr)
-            {
-                sptr_type_t res = check_module_linked(drakvuf, vmi, plugin, info, mmvad.starting_vpn << 12);
-
-                if (res == ERROR)
-                {
-                    PRINT_DEBUG("[MEMDUMP] Something is corrupted\n");
-                    continue;
-                }
-
-                if (res == LINKED)
-                {
-                    PRINT_DEBUG("[MEMDUMP] Linked stack entry %llx\n", (unsigned long long)stack_val);
-                    continue;
-                }
-                else if (res == UNLINKED)
-                {
-                    PRINT_DEBUG("[MEMDUMP] UNLINKED stack entry %llx\n", (unsigned long long)stack_val);
-                }
-                else if (res == MAIN)
-                {
-                    PRINT_DEBUG("[MEMDUMP] MAIN stack entry %llx\n", (unsigned long long)stack_val);
-                }
             }
 
-            if (page_valid && page_execute)
-            {
-                PRINT_DEBUG("[MEMDUMP] VX stack entry %llx\n", (unsigned long long)stack_val);
-
-                ctx.addr = begin;
-
-                if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len, "NtTerminateProcess called",
-                                        nullptr, nullptr))
-                {
-                    PRINT_DEBUG("[MEMDUMP] Failed to save memory dump - internal error\n");
-                }
-
-                break;
+            if (res == LINKED) {
+                PRINT_DEBUG("[MEMDUMP] Linked stack entry %llx\n", (unsigned long long) stack_val);
+                continue;
+            } else if (res == UNLINKED) {
+                PRINT_DEBUG("[MEMDUMP] UNLINKED stack entry %llx\n", (unsigned long long) stack_val);
+            } else if (res == MAIN) {
+                PRINT_DEBUG("[MEMDUMP] MAIN stack entry %llx\n", (unsigned long long) stack_val);
             }
+        }
+
+        if (page_valid && page_execute) {
+            PRINT_DEBUG("[MEMDUMP] VX stack entry %llx\n", (unsigned long long) stack_val);
+
+            ctx.addr = begin;
+
+            if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len, "NtTerminateProcess called",
+                                    nullptr, nullptr)) {
+                PRINT_DEBUG("[MEMDUMP] Failed to save memory dump - internal error\n");
+            }
+
+            break;
         }
     }
 
