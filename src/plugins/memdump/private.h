@@ -102,78 +102,105 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_H
-#define WIN_H
+#ifndef MEMDUMP_PRIVATE_H
+#define MEMDUMP_PRIVATE_H
 
-#include <libvmi/libvmi.h>
-#include "libdrakvuf.h"
-#include "os.h"
-#include "win-exports.h"
+template<typename T>
+struct copy_on_write_result_t: public call_result_t<T>
+{
+    copy_on_write_result_t(T* src) : call_result_t<T>(src), vaddr(), pte(), old_cow_pa() {}
 
-addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    addr_t vaddr;
+    addr_t pte;
+    addr_t old_cow_pa;
+};
 
-addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+template<typename T>
+struct map_view_of_section_result_t: public call_result_t<T>
+{
+    map_view_of_section_result_t(T* src) : call_result_t<T>(src), section_handle(), process_handle(), base_address_ptr() {}
 
-bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
+    uint64_t section_handle;
+    uint64_t process_handle;
+    addr_t base_address_ptr;
+};
 
-char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
+enum target_hook_state
+{
+    HOOK_FIRST_TRY,
+    HOOK_PAGEFAULT_RETRY,
+    HOOK_FAILED,
+    HOOK_OK
+};
 
-char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
+typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
+class memdump;
 
-bool win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
+struct hook_target_entry_t
+{
+    vmi_pid_t pid;
+    std::string target_name;
+    callback_t callback;
+    target_hook_state state;
+    drakvuf_trap_t* trap;
+    memdump* plugin;
 
-char* win_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
+    hook_target_entry_t(std::string target_name, callback_t callback, memdump* plugin)
+        : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
+};
 
-int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base);
+struct user_dll_t
+{
+    // relevant while loading
+    addr_t dtb;
+    uint32_t thread_id;
+    addr_t real_dll_base;
+    bool is_hooked;
 
-int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    // internal, for page faults
+    addr_t pf_current_addr;
+    addr_t pf_max_addr;
 
-bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
+    // one entry per hooked function
+    std::vector<hook_target_entry_t> targets;
+};
 
-bool win_get_thread_previous_mode(drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
+struct target_config_entry_t
+{
+    std::string dll_name;
+    std::string function_name;
+};
 
-bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info,
-        privilege_mode_t* previous_mode);
+// type of a pointer residing on stack
+enum sptr_type_t
+{
+    ERROR,   // problem with stack inspection
+    MAIN,    // pointer to a main module
+    LINKED,  // pointer to some linked DLL module
+    UNLINKED // pointer to some non-legit memory
+};
 
-bool win_is_ethread(drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
+sptr_type_t check_module_linked_wow(drakvuf_t drakvuf,
+                                    vmi_instance_t vmi,
+                                    memdump* plugin,
+                                    drakvuf_trap_info_t* info,
+                                    addr_t dll_base);
 
-bool win_is_eprocess(drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
+sptr_type_t check_module_linked(drakvuf_t drakvuf,
+                                vmi_instance_t vmi,
+                                memdump* plugin,
+                                drakvuf_trap_info_t* info,
+                                addr_t dll_base);
 
-bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module_list);
-bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list );
-
-bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
-bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
-module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );
-module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );
-
-bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* eprocess_addr);
-
-bool win_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx);
-bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
-
-bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
-
-bool win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, int32_t* ppid );
-
-bool win_get_process_data( drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data );
-
-gchar* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle );
-
-char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
-
-addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int argument_number);
-
-bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
-
-bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
-
-bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
-
-addr_t win_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
-bool win_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
-bool win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
-bool win_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
+bool dump_memory_region(
+    drakvuf_t drakvuf,
+    vmi_instance_t vmi,
+    drakvuf_trap_info_t* info,
+    memdump* plugin,
+    access_context_t* ctx,
+    size_t len_bytes,
+    const char* reason,
+    void* extras,
+    void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, void* extras));
 
 #endif

@@ -552,6 +552,16 @@ json_object* drakvuf_get_rekall_profile_json(drakvuf_t drakvuf)
     return drakvuf->rekall_profile_json;
 }
 
+const char* drakvuf_get_rekall_wow_profile(drakvuf_t drakvuf)
+{
+    return drakvuf->rekall_wow_profile;
+}
+
+json_object* drakvuf_get_rekall_wow_profile_json(drakvuf_t drakvuf)
+{
+    return drakvuf->rekall_wow_profile_json;
+}
+
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf)
 {
     return drakvuf->kernbase;

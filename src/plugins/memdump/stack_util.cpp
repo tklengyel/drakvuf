@@ -102,78 +102,127 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_H
-#define WIN_H
-
+#include <config.h>
 #include <libvmi/libvmi.h>
-#include "libdrakvuf.h"
-#include "os.h"
-#include "win-exports.h"
 
-addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+#include "memdump.h"
+#include "private.h"
 
-addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+sptr_type_t check_module_linked_wow(drakvuf_t drakvuf,
+                                    vmi_instance_t vmi,
+                                    memdump* plugin,
+                                    drakvuf_trap_info_t* info,
+                                    addr_t dll_base)
+{
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    };
 
-bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
+    addr_t wow_peb = drakvuf_get_wow_peb(drakvuf, &ctx, info->proc_data.base_addr);
 
-char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
+    if (!wow_peb)
+        return ERROR;
 
-char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
+    addr_t module_list_head;
 
-bool win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
+    if (!drakvuf_get_module_list_wow(drakvuf, &ctx, wow_peb, &module_list_head))
+        return ERROR;
 
-char* win_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
+    addr_t next_module = module_list_head;
+    bool is_first = true;
+    sptr_type_t ret = UNLINKED;
 
-int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base);
+    while (1)
+    {
+        uint32_t tmp_next = 0;
+        ctx.addr = next_module;
+        if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &tmp_next))
+        {
+            ret = ERROR;
+            break;
+        }
 
-int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+        if (module_list_head == (addr_t)tmp_next || !tmp_next)
+            break;
 
-bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
+        uint32_t tmp_dll_base;
+        ctx.addr = next_module + plugin->dll_base_wow_rva;
+        if (vmi_read_32(vmi, &ctx, &tmp_dll_base) == VMI_SUCCESS)
+        {
+            if (dll_base == (addr_t)tmp_dll_base)
+            {
+                ret = LINKED;
+                break;
+            }
+        }
 
-bool win_get_thread_previous_mode(drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
+        next_module = (addr_t)tmp_next;
+        is_first = false;
+    }
 
-bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info,
-        privilege_mode_t* previous_mode);
+    if (is_first && ret == LINKED)
+        ret = MAIN;
 
-bool win_is_ethread(drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
+    return ret;
+}
 
-bool win_is_eprocess(drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
+sptr_type_t check_module_linked(drakvuf_t drakvuf,
+                                vmi_instance_t vmi,
+                                memdump* plugin,
+                                drakvuf_trap_info_t* info,
+                                addr_t dll_base)
+{
+    sptr_type_t sub_ret = check_module_linked_wow(drakvuf, vmi, plugin, info, dll_base);
 
-bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module_list);
-bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list );
+    if (sub_ret != ERROR && sub_ret != UNLINKED)
+        return sub_ret;
 
-bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
-bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
-module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );
-module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );
+    addr_t module_list_head;
+    if (!drakvuf_get_module_list(drakvuf, info->proc_data.base_addr, &module_list_head))
+        return ERROR;
 
-bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* eprocess_addr);
+    addr_t next_module = module_list_head;
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    };
 
-bool win_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx);
-bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
+    bool is_first = true;
+    sptr_type_t ret = UNLINKED;
 
-bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
+    while (1)
+    {
+        addr_t tmp_next = 0;
+        ctx.addr = next_module;
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &tmp_next))
+        {
+            ret = ERROR;
+            break;
+        }
 
-bool win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, int32_t* ppid );
+        if (module_list_head == tmp_next || !tmp_next)
+            break;
 
-bool win_get_process_data( drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data );
+        addr_t tmp_dll_base;
+        ctx.addr = next_module + plugin->dll_base_rva;
+        if (vmi_read_addr(vmi, &ctx, &tmp_dll_base) == VMI_SUCCESS)
+        {
+            if (dll_base == tmp_dll_base)
+            {
+                ret = LINKED;
+                break;
+            }
+        }
 
-gchar* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle );
+        is_first = false;
+        next_module = tmp_next;
+    }
 
-char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
+    if (is_first && ret == LINKED)
+        ret = MAIN;
 
-addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int argument_number);
-
-bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
-
-bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
-
-bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
-
-addr_t win_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
-bool win_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
-bool win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
-bool win_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
-
-#endif
+    return ret;
+}
