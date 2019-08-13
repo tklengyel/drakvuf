@@ -251,6 +251,14 @@ bool drakvuf_get_module_list(drakvuf_t drakvuf, addr_t process_base, addr_t* mod
     return 0;
 }
 
+bool drakvuf_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list )
+{
+    if ( drakvuf->osi.get_module_list_wow )
+        return drakvuf->osi.get_module_list_wow(drakvuf, ctx, wow_peb, module_list);
+
+    return 0;
+}
+
 bool drakvuf_find_process(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* process_addr)
 {
     if ( drakvuf->osi.find_process )
@@ -403,6 +411,14 @@ bool drakvuf_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr
 {
     if ( drakvuf->osi.get_user_stack64 )
         return drakvuf->osi.get_user_stack64(drakvuf, info, stack_ptr);
+
+    return 0;
+}
+
+addr_t drakvuf_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess)
+{
+    if ( drakvuf->osi.get_wow_peb )
+        return drakvuf->osi.get_wow_peb(drakvuf, ctx, eprocess);
 
     return 0;
 }

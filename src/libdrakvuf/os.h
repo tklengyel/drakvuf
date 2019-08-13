@@ -154,6 +154,9 @@ typedef struct os_interface
     bool (*get_module_list)
     (drakvuf_t drakvuf, addr_t process_base, addr_t* module_list);
 
+    bool (*get_module_list_wow)
+    (drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list);
+
     bool (*find_process)
     (drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* process_addr);
 
@@ -210,6 +213,9 @@ typedef struct os_interface
 
     bool (*get_user_stack64)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
+
+    addr_t (*get_wow_peb)
+    (drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
 
 } os_interface_t;
 
