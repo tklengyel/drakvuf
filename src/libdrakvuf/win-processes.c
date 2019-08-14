@@ -139,9 +139,15 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     addr_t thread = 0;
     addr_t prcb = 0;
     addr_t kpcr = 0;
+    uint64_t ss_arbytes = info->regs->ss_arbytes;
 
-    // TODO: check whether we could use ss_arbytes here
-    unsigned int cpl = info->regs->cs_sel & 3;
+    // TODO This for Xen 4.8-4.11 only
+    if (!ss_arbytes && VMI_FAILURE == vmi_get_vcpureg(vmi, &ss_arbytes, SS_ARBYTES, info->vcpu))
+        return 0;
+
+    // From Intel SDM (325462-067US), Volume 3, 24.4.1:
+    // The value of the DPL field for SS is always equal to the logical processor’s current privilege level (CPL).
+    unsigned int cpl = (ss_arbytes >> 5) & 3;
 
     if (VMI_PM_IA32E == drakvuf->pm)
     {

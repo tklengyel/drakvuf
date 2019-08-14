@@ -540,7 +540,8 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.timestamp = timestamp;
     trap_info.trap_pa = pa;
 
-    drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data );
+    if (!drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data ))
+        PRINT_DEBUG("Failed to read process data\n");
 
     trap_info.proc_data.base_addr = proc_data.base_addr;
     trap_info.proc_data.name      = proc_data.name;
@@ -605,7 +606,8 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.vcpu = event->vcpu_id;
     trap_info.timestamp = timestamp;
 
-    drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data );
+    if (!drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data ))
+        PRINT_DEBUG("Failed to read process data\n");
 
     trap_info.proc_data.base_addr = proc_data.base_addr;
     trap_info.proc_data.name      = proc_data.name;
