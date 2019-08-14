@@ -313,9 +313,9 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
 
     if (injector->method == INJECT_METHOD_EXECPROC)
     {
-        injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "libc-2.27.so", "execlp");
+        injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "(libc)(-)(2)(\\.)(.)(.)(\\.)(so)", "execlp");
         PRINT_DEBUG("Address of execlp symbol is: 0x%lx \n", injector->exec_func);
-        if (injector->exec_func == 0xffff)
+        if (injector->exec_func == 0xffffffffffffffff)
         {
             printf("Error finding symbol address!!\n");
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
@@ -328,7 +328,7 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
     // failing to grab some symbols due to relocation
     else if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
     {
-        injector->libc_addr = drakvuf_export_lib_address(drakvuf, info, injector->target_pid, "libc-2.27.so");
+        injector->libc_addr = drakvuf_export_lib_address(drakvuf, info, injector->target_pid, "(libc)(-)(2)(\\.)(.)(.)(\\.)(so)");
         PRINT_DEBUG("Address of libc is: 0x%lx \n", injector->libc_addr);
         injector->exec_func= injector->libc_addr + 0x97070;
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
