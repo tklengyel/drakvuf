@@ -156,6 +156,8 @@ struct injector
     x86_registers_t saved_regs;
 
     drakvuf_trap_t bp;
+    drakvuf_trap_t* cr3_trap;
+    drakvuf_trap_t* int3_trap;
     GSList* memtraps;
 
     // Results:
@@ -313,9 +315,9 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
 
     if (injector->method == INJECT_METHOD_EXECPROC)
     {
-        injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "(libc)(-)(2)(\\.)(.)(.)(\\.)(so)", "execlp");
+        injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "libc-", "execlp");
         PRINT_DEBUG("Address of execlp symbol is: 0x%lx \n", injector->exec_func);
-        if (injector->exec_func == 0xffffffffffffffff)
+        if (injector->exec_func == ~0ull)
         {
             printf("Error finding symbol address!!\n");
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
@@ -328,7 +330,7 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
     // failing to grab some symbols due to relocation
     else if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
     {
-        injector->libc_addr = drakvuf_export_lib_address(drakvuf, info, injector->target_pid, "(libc)(-)(2)(\\.)(.)(.)(\\.)(so)");
+        injector->libc_addr = drakvuf_export_lib_address(drakvuf, info, injector->target_pid, "libc-");
         PRINT_DEBUG("Address of libc is: 0x%lx \n", injector->libc_addr);
         injector->exec_func= injector->libc_addr + 0x97070;
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
@@ -368,12 +370,12 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
 
     if (injector->method == INJECT_METHOD_EXECPROC && injector->status == STATUS_CREATE_OK)
     {
-        if (info->regs->rax == 0xffffffff)
+        if (info->regs->rax == ~0u)
         {
             printf("Process start failed!! Exec returned -1 \n");
             injector->rc = 0;
             injector->detected = false;
-            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_remove_trap(drakvuf, injector->int3_trap, NULL);
             drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
             drakvuf_interrupt(drakvuf, SIGINT);
             return 0;
@@ -388,8 +390,8 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
     injector->pid = injector->target_pid;
     injector->tid = injector->target_tid;
 
-    printf("Process start detected %i -> 0x%lx\n", injector->pid, info->regs->cr3);
-    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+    PRINT_DEBUG("Process start detected %i -> 0x%lx\n", injector->pid, info->regs->cr3);
+    drakvuf_remove_trap(drakvuf, injector->int3_trap, NULL);
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
     drakvuf_interrupt(drakvuf, SIGINT);
 
@@ -411,6 +413,7 @@ static bool setup_wait_for_injected_process_trap_linux(injector_t injector)
         PRINT_DEBUG("Failed to setup wait_for_injected_process trap!\n");
         return false;
     }
+    injector->cr3_trap = trap;
     PRINT_DEBUG("Waiting for injected process\n");
     return true;
 }
@@ -556,15 +559,15 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
     if (injector->method == INJECT_METHOD_EXECPROC && injector->status == STATUS_CREATE_OK)
     {
         PRINT_DEBUG("Return back after execve() execution!!\n");
-        PRINT_DEBUG("*RAX: 0x%lx\n", info->regs->rax);
+        PRINT_DEBUG("* RAX: 0x%lx\n", info->regs->rax);
 
-        if (info->regs->rax == 0xffffffff)
+        if (info->regs->rax == ~0u)
         {
-            PRINT_DEBUG("\n*Process start failed!! as execve() returned -1 \n");
+            PRINT_DEBUG("\n* Process start failed!!, As exec returned -1 \n");
             injector->rc = 0;
             injector->detected = false;
-            drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_remove_trap(drakvuf, injector->cr3_trap, NULL);
+            drakvuf_remove_trap(drakvuf, info->trap,  (drakvuf_trap_free_t)free);
             drakvuf_interrupt(drakvuf, SIGINT);
             // reset the process registers, if exec fails
             memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
@@ -583,7 +586,6 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
     drakvuf_remove_trap(drakvuf, info->trap, NULL);
     drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
-    PRINT_DEBUG("Setting back register to orginial state \n");
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
@@ -599,7 +601,11 @@ static bool setup_linux_int3_trap_in_userspace(injector_t injector, drakvuf_trap
     new_trap->cb = wait_for_process_in_userspace;
     new_trap->data = injector;
 
-    return drakvuf_add_trap(injector->drakvuf, new_trap);
+    if (!drakvuf_add_trap(injector->drakvuf, new_trap))
+        return false;
+
+    injector->int3_trap = new_trap;
+    return true;
 }
 
 static event_response_t linux_injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)

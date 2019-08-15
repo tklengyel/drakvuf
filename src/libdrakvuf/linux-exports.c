@@ -113,7 +113,6 @@
 #include <unistd.h>
 #include <limits.h>
 #include <glib.h>
-#include <regex.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
 
@@ -121,22 +120,15 @@
 #include "linux-exports.h"
 #include "linux-offsets.h"
 
-#define PAGE_SHIFT 12
+#define PAGE_SHIFT          12
 #define VM_READ		        0x00000001
 #define VM_WRITE	        0x00000002
 #define VM_EXEC		        0x00000004
 #define VM_SHARED	        0x00000008
 #define R_X86_64_GLOB_DAT	0x00000006
 
-addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib_regex, const char* sym)
+addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib, const char* sym)
 {
-    // create re expression
-    regex_t re;
-    if (regcomp(&re, lib_regex, REG_EXTENDED|REG_NOSUB) != 0)
-    {
-        return -1;
-    }
-
     vmi_instance_t vmi = drakvuf->vmi;
 
     addr_t process_base = drakvuf_get_current_process(drakvuf, info);
@@ -206,12 +198,12 @@ addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pi
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_flags))
             goto next;
 
-        if (regexec(&re, libname, (size_t) 0, NULL, 0) == 0 && (vm_flags & VM_READ) && (vm_flags & VM_EXEC))
+        if (strncmp(libname, lib, strlen(lib)) == 0 && (vm_flags & VM_READ) && (vm_flags & VM_EXEC))
         {
             text_segment_address = vm_start;
         }
 
-        if (regexec(&re, libname, (size_t) 0, NULL, 0) == 0 && (vm_flags & VM_READ) && !(vm_flags & VM_WRITE)&& !(vm_flags & VM_EXEC))
+        if (strncmp(libname, lib, strlen(lib)) == 0 && (vm_flags & VM_READ) && !(vm_flags & VM_WRITE)&& !(vm_flags & VM_EXEC))
         {
             data_segment_address = vm_start;
             text_segment_size = pgoffset;
@@ -225,7 +217,6 @@ next:
 
     if (text_segment_address == 0)
         return -1;
-    regfree(&re);
 
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
@@ -388,15 +379,8 @@ next:
     return text_segment_address + value;
 }
 
-addr_t get_lib_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib_regex)
+addr_t get_lib_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib)
 {
-    // create re expression
-    regex_t re;
-    if (regcomp(&re, lib_regex, REG_EXTENDED|REG_NOSUB) != 0)
-    {
-        return -1;
-    }
-
     vmi_instance_t vmi = drakvuf->vmi;
 
     addr_t process_base = drakvuf_get_current_process(drakvuf, info);
@@ -451,11 +435,8 @@ addr_t get_lib_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t p
         libname = vmi_read_str(vmi, &ctx);
         PRINT_DEBUG("LIB NAME is: %s \n", libname);
 
-        if (regexec(&re, libname, (size_t) 0, NULL, 0) == 0)
-        {
-            regfree(&re);
+        if (strncmp(libname, lib, strlen(lib)) == 0)
             return vm_start;
-        }
 
 next:
         mmap = vm_next;
