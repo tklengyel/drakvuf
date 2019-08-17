@@ -105,6 +105,9 @@
 #ifndef MEMDUMP_H
 #define MEMDUMP_H
 
+#include <vector>
+#include <memory>
+
 #include <glib.h>
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
@@ -112,15 +115,29 @@
 struct memdump_config
 {
     const char* memdump_dir;
+    const char* dll_hooks_list;
 };
+
+struct target_config_entry_t;
+struct user_dll_t;
 
 class memdump: public pluginex
 {
 public:
+    // for memdump.cpp
     const char* memdump_dir;
     int memdump_counter;
+    addr_t dll_base_rva;
+    addr_t dll_base_wow_rva;
+
+    // for userhook.cpp
+    std::vector<target_config_entry_t> wanted_hooks;
+    // map dtb -> list of hooked dlls
+    std::map<addr_t, std::vector<user_dll_t>> loaded_dlls;
 
     memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
+    void userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output);
+    void load_wanted_targets(const memdump_config* c);
 };
 
 #endif

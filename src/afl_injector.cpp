@@ -17,6 +17,7 @@
 #include "colors.h"
 #include "plugins/plugins.h"
 #include <fcntl.h>
+#include <capstone/capstone.h>
 
 #define NUM_LOCATIONS 2000
 
@@ -80,6 +81,13 @@ event_response_t afl_map_update_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
     (void)(afl_data);
     printf(BGYELLOW BLACK "In afl_map_update_cb for function"
         "%s with pid = %d" RESET "\n",afl_data->function_name, info->proc_data.pid);
+    char code[100];
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    size_t read;
+    access_context_t ctx;
+    ctx.addr = info->regs->rip;
+    ctx.pid = 4;
+    vmi_read(vmi, &ctx,100, code, &read);
     return VMI_EVENT_RESPONSE_NONE;
 }
 

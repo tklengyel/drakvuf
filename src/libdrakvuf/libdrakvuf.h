@@ -364,6 +364,8 @@ page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf);
 int drakvuf_get_address_width(drakvuf_t drakvuf);
 const char* drakvuf_get_rekall_profile(drakvuf_t drakvuf);
 json_object* drakvuf_get_rekall_profile_json(drakvuf_t drakvuf);
+const char* drakvuf_get_rekall_wow_profile(drakvuf_t drakvuf);
+json_object* drakvuf_get_rekall_wow_profile_json(drakvuf_t drakvuf);
 
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf);
 
@@ -372,10 +374,10 @@ addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
 
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
                                   drakvuf_trap_info_t* info);
-status_t drakvuf_get_last_error(drakvuf_t drakvuf,
-                                drakvuf_trap_info_t* info,
-                                uint32_t* err,
-                                const char** err_str);
+bool drakvuf_get_last_error(drakvuf_t drakvuf,
+                            drakvuf_trap_info_t* info,
+                            uint32_t* err,
+                            const char** err_str);
 
 /* Caller must free the returned string */
 char* drakvuf_get_process_name(drakvuf_t drakvuf,
@@ -388,9 +390,9 @@ char* drakvuf_get_process_commandline(drakvuf_t drakvuf,
                                       addr_t process_base);
 
 
-status_t drakvuf_get_process_pid( drakvuf_t drakvuf,
-                                  addr_t process_base,
-                                  vmi_pid_t* pid);
+bool drakvuf_get_process_pid(drakvuf_t drakvuf,
+                             addr_t process_base,
+                             vmi_pid_t* pid);
 
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
@@ -411,7 +413,12 @@ typedef struct _mmvad_info
     addr_t file_name_ptr;
 } mmvad_info_t;
 
-status_t drakvuf_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
+bool drakvuf_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
+
+addr_t drakvuf_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
+bool drakvuf_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
+bool drakvuf_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
+bool drakvuf_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
 
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
                                    drakvuf_trap_info_t* info,
@@ -476,6 +483,11 @@ bool drakvuf_get_module_list(drakvuf_t drakvuf,
                              addr_t process_base,
                              addr_t* module_list);
 
+bool drakvuf_get_module_list_wow(drakvuf_t drakvuf,
+                                 access_context_t* ctx,
+                                 addr_t wow_peb,
+                                 addr_t* module_list);
+
 // ObReferenceObjectByHandle
 bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
                                drakvuf_trap_info_t* info,
@@ -510,9 +522,9 @@ bool drakvuf_get_module_base_addr_ctx( drakvuf_t drakvuf,
                                        const char* module_name,
                                        addr_t* base_addr_out );
 
-status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
-                                   addr_t process_base,
-                                   vmi_pid_t* ppid );
+bool drakvuf_get_process_ppid(drakvuf_t drakvuf,
+                              addr_t process_base,
+                              vmi_pid_t* ppid );
 
 gchar* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf,
                                   drakvuf_trap_info_t* info,
@@ -540,7 +552,7 @@ addr_t drakvuf_get_function_argument(drakvuf_t drakvuf,
                                      drakvuf_trap_info_t* info,
                                      int argument_number);
 
-status_t drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
+bool drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 
 /*---------------------------------------------------------
  * Event FD functions

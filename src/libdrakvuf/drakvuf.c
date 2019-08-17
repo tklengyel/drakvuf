@@ -286,11 +286,8 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
                 if ( !drakvuf_find_process(drakvuf, pid, name, &process_base) )
                     return 0;
 
-                if (pid == -1)
-                {
-                    if ( drakvuf_get_process_pid(drakvuf, process_base, &pid) == VMI_FAILURE )
-                        return 0;
-                }
+                if ( pid == -1 && !drakvuf_get_process_pid(drakvuf, process_base, &pid) )
+                    return 0;
 
                 if ( !drakvuf_get_module_list(drakvuf, process_base, &module_list) )
                     return 0;
@@ -553,6 +550,16 @@ const char* drakvuf_get_rekall_profile(drakvuf_t drakvuf)
 json_object* drakvuf_get_rekall_profile_json(drakvuf_t drakvuf)
 {
     return drakvuf->rekall_profile_json;
+}
+
+const char* drakvuf_get_rekall_wow_profile(drakvuf_t drakvuf)
+{
+    return drakvuf->rekall_wow_profile;
+}
+
+json_object* drakvuf_get_rekall_wow_profile_json(drakvuf_t drakvuf)
+{
+    return drakvuf->rekall_wow_profile_json;
 }
 
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf)

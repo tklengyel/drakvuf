@@ -1,4 +1,4 @@
-#include <config.h>
+    #include <config.h>
 #include <ctype.h>
 #include <getopt.h>
 #include <stdio.h>
@@ -12,6 +12,7 @@
 #include "libdrakvuf/libdrakvuf.h"
 #include "colors.h"
 #include "plugins/plugins.h"
+#include "capstone/capstone.h"
 
 #define SEED 321651
 GRand *grand;

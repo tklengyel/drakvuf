@@ -1444,15 +1444,14 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         return 0;
     }
 
-    /*
-     * Create altp2m view
-     */
-    rc = xc_altp2m_set_domain_state(drakvuf->xen->xc, drakvuf->domID, 1);
-    PRINT_DEBUG("Altp2m enabled? %i\n", rc);
-    if (rc < 0)
+    bool altp2m = xen_enable_altp2m(drakvuf->xen, drakvuf->domID);
+    PRINT_DEBUG("Altp2m enabled? %i\n", altp2m);
+    if (!altp2m)
         return 0;
 
     /*
+     * Create altp2m view
+     *
      * The idx view is used primarily during DRAKVUF execution. In this view all breakpointed
      * pages will have their shadow copies activated.
      */

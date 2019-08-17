@@ -117,30 +117,6 @@ namespace
 {
 
 template<typename T>
-struct call_result_t : public plugin_params<T>
-{
-    call_result_t(T* src) : plugin_params<T>(src), target_cr3(), target_thread(), target_rsp() {}
-
-    void set_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
-    {
-        target_thread = thread;
-        target_cr3 = info->regs->cr3;
-        target_rsp = info->regs->rsp;
-    }
-
-    bool verify_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
-    {
-        return (info->regs->cr3 != target_cr3 ||
-                !thread || thread != target_thread ||
-                info->regs->rsp <= target_rsp) ? false : true;
-    }
-
-    reg_t target_cr3;
-    addr_t target_thread;
-    addr_t target_rsp;
-};
-
-template<typename T>
 struct open_process_result_t: public call_result_t<T>
 {
     open_process_result_t(T* src) : call_result_t<T>(src), process_handle_addr(), desired_access(), object_attributes_addr(), client_id{} {}
@@ -328,7 +304,7 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
     drakvuf_release_vmi(drakvuf);
 
     vmi_pid_t new_pid;
-    if (drakvuf_get_pid_from_handle(drakvuf, info, new_process_handle, &new_pid) != VMI_SUCCESS)
+    if (!drakvuf_get_pid_from_handle(drakvuf, info, new_process_handle, &new_pid))
         new_pid = 0;
 
     print_process_creation_result(plugin, drakvuf, info, status, new_pid, user_process_parameters_addr);
@@ -376,7 +352,7 @@ static event_response_t terminate_process_hook(
         return VMI_EVENT_RESPONSE_NONE;
 
     vmi_pid_t exit_pid;
-    if (drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &exit_pid) != VMI_SUCCESS)
+    if (!drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &exit_pid))
         exit_pid = 0;
 
     char exit_status_buf[NTSTATUS_MAX_FORMAT_STR_SIZE] = {0};

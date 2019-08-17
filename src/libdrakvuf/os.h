@@ -115,7 +115,7 @@ typedef struct os_interface
     addr_t (*get_current_process)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-    status_t (*get_last_error)
+    bool (*get_last_error)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
 
     char* (*get_process_name)
@@ -130,7 +130,7 @@ typedef struct os_interface
     int64_t (*get_process_userid)
     (drakvuf_t drakvuf, addr_t process_base);
 
-    status_t (*get_process_pid)
+    bool (*get_process_pid)
     (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid);
 
     int64_t (*get_current_process_userid)
@@ -154,6 +154,9 @@ typedef struct os_interface
     bool (*get_module_list)
     (drakvuf_t drakvuf, addr_t process_base, addr_t* module_list);
 
+    bool (*get_module_list_wow)
+    (drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list);
+
     bool (*find_process)
     (drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* process_addr);
 
@@ -172,7 +175,7 @@ typedef struct os_interface
     addr_t (*exportsym_to_va)
     (drakvuf_t drakvuf, addr_t process_addr, const char* module, const char* sym);
 
-    status_t (*get_process_ppid)
+    bool (*get_process_ppid)
     (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid);
 
     bool (*get_process_data)
@@ -196,11 +199,23 @@ typedef struct os_interface
     bool (*is_crashreporter)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
 
-    status_t (*find_mmvad)
+    bool (*find_mmvad)
     (drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
 
-    status_t (*get_pid_from_handle)
+    bool (*get_pid_from_handle)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
+
+    bool (*get_wow_context)
+    (drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
+
+    bool (*get_user_stack32)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
+
+    bool (*get_user_stack64)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
+
+    addr_t (*get_wow_peb)
+    (drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
 
 } os_interface_t;
 

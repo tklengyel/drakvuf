@@ -60,7 +60,8 @@ matrix:
         - export CFLAGS="-I$PWD/usr/local/include"
         - git submodule update --init libvmi
         - cd libvmi
-        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DENABLE_KVM=OFF -DENABLE_FILE=OFF .
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
         - make
         - make install
         - cd ..
@@ -96,7 +97,8 @@ matrix:
         - export CFLAGS="-I$PWD/usr/local/include"
         - git submodule update --init libvmi
         - cd libvmi
-        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DENABLE_KVM=OFF -DENABLE_FILE=OFF .
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
         - make
         - make install
         - cd ..
@@ -120,7 +122,8 @@ matrix:
         - export CFLAGS="-I$PWD/usr/local/include"
         - git submodule update --init libvmi
         - cd libvmi
-        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DENABLE_KVM=OFF -DENABLE_FILE=OFF .
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
         - make
         - make install
         - cd ..
@@ -135,6 +138,8 @@ matrix:
 #
     - env:
         - TEST="SonarCloud"
+      dist: xenial
+      edge: true
       addons:
         sonarcloud:
             organization: "drakvuf"
@@ -152,7 +157,8 @@ matrix:
         - export CFLAGS="-I$PWD/usr/local/include"
         - git submodule update --init libvmi
         - cd libvmi
-        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DENABLE_KVM=OFF -DENABLE_FILE=OFF .
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
         - make
         - make install
         - cd ..

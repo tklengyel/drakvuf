@@ -377,7 +377,7 @@ int drakvuf_get_os_build_date(drakvuf_t drakvuf)
     int year = 0;
     int month = 0;
     int day = 0;
-    char junk[15] = {'\0'};
+    char junk[16] = {'\0'};
     char build_date[10] = {'\0'};
 
     if (!drakvuf->rekall_profile_json)
