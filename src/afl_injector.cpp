@@ -17,7 +17,7 @@
 #include "colors.h"
 #include "plugins/plugins.h"
 #include <fcntl.h>
-
+#include <capstone/capstone.h>
 #define NUM_LOCATIONS 2000
 
 char *afl_mode;
@@ -72,7 +72,7 @@ int64_t get_json_int(json_object *obj, const char *key)
     return json_object_get_int64(int_obj);
 }
 
-event_response_t afl_map_update_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+event_response_t function_entry_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
     (void)(drakvuf);
     struct afl_map_update_data *afl_data = 
@@ -87,6 +87,25 @@ event_response_t afl_map_update_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
     ctx.addr = info->regs->rip;
     ctx.pid = 4;
     vmi_read(vmi, &ctx,100, code, &read);
+		csh handle;
+		cs_insn *insn;
+		size_t count;
+		if(cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
+		{
+				fprintf(stderr, "Could not open capstone handle");
+				continue_fuzzing = false;
+		}
+		count = cs_disasm(handle,(const uint8_t *) code, sizeof(code)-1, 0x0, 0, &insn);
+		if(count > 0)
+		{
+				size_t j;
+				for(j = 0; j < count; j++)
+				{
+						printf("0x%" PRIx64 ":\t%s\t\t%s",insn[j].address, insn[j].mnemonic, insn[j].op_str);
+				}
+				cs_free(insn, count);
+		}
+		cs_close(&handle);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -193,7 +212,7 @@ bool init_kernel_func_indices(drakvuf_t drakvuf, json_object *candidates)
             afl_data->curr = index;
         
             trap->data = afl_data;
-            trap->cb = afl_map_update_cb;
+            trap->cb = function_entry_cb;
 
             if(!drakvuf_add_trap(drakvuf, trap))
             {

@@ -163,6 +163,7 @@ ozzer_LDADD += plugins/libdrakvufplugins.la
 
 # AFL-Fuzzer
 afl_injector_CXXFLAGS = $(AM_CXXFLAGS)
+afl_injector_LDFLAGS = $(CAPSTONE_LIBS)
 afl_injector_LDADD = libhijack/libhijack.la
 afl_injector_LDADD += libdrakvuf/libdrakvuf.la
 afl_injector_LDADD += xen_helper/libxenhelper.la
