@@ -237,10 +237,10 @@ void bsodmon::register_trap(drakvuf_t drakvuf, const char* syscall_name,
     if ( ! drakvuf_add_trap( drakvuf, sys_trap ) ) throw -1;
 }
 
-bsodmon::bsodmon(drakvuf_t drakvuf, bool abort_on_bsod, output_format_t output,
+bsodmon::bsodmon(drakvuf_t drakvuf, bool ab_on_bsod, output_format_t output,
                 json_object *inp, volatile int *sl, bool *cf)
     : format{output}
-    , abort_on_bsod{abort_on_bsod}
+    , abort_on_bsod{ab_on_bsod}
     , input{inp}
     , spin_lock{sl}
     , continue_fuzzing{cf}

@@ -145,8 +145,8 @@ struct hook_target_entry_t
     drakvuf_trap_t* trap;
     memdump* plugin;
 
-    hook_target_entry_t(std::string target_name, callback_t callback, memdump* plugin)
-        : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
+    hook_target_entry_t(std::string tar_name, callback_t in_callback, memdump* in_plugin)
+        : target_name(tar_name), callback(in_callback), state(HOOK_FIRST_TRY), plugin(in_plugin) {}
 };
 
 struct user_dll_t

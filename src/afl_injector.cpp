@@ -17,7 +17,6 @@
 #include "colors.h"
 #include "plugins/plugins.h"
 #include <fcntl.h>
-#include <capstone/capstone.h>
 
 #define NUM_LOCATIONS 2000
 
@@ -308,7 +307,6 @@ void retry_creating_domain()
     pclose(fp);
 }
 
-using namespace std;
 int main(int argc, char *argv[])
 {
     // int file  = open("/home/ajinkya/College/gsoc19/AFL/log.txt", O_WRONLY | O_CREAT );
