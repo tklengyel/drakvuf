@@ -106,6 +106,7 @@ event_response_t function_entry_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 				cs_free(insn, count);
 		}
 		cs_close(&handle);
+        continue_fuzzing = false;
     return VMI_EVENT_RESPONSE_NONE;
 }
 
