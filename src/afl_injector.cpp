@@ -72,6 +72,20 @@ int64_t get_json_int(json_object *obj, const char *key)
     return json_object_get_int64(int_obj);
 }
 
+status_t handle_insn(vmi_instance_t vmi, cs_insn *t)
+{
+    (void)(vmi);
+    cs_detail *d = t->detail;
+    for( int i = 0; i < d->groups_count; i++)
+    {
+        if(d->groups[i] == X86_GRP_JUMP)
+        {
+            
+        }
+    }
+    return VMI_SUCCESS;
+}
+
 event_response_t function_entry_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
     (void)(drakvuf);
@@ -101,7 +115,8 @@ event_response_t function_entry_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 				size_t j;
 				for(j = 0; j < count; j++)
 				{
-						printf("0x%" PRIx64 ":\t%s\t\t%s",insn[j].address, insn[j].mnemonic, insn[j].op_str);
+                    handle_insn(vmi, &insn[j]);
+                    printf("0x%" PRIx64 ":\t%s\t\t%s",insn[j].address, insn[j].mnemonic, insn[j].op_str);
 				}
 				cs_free(insn, count);
 		}
