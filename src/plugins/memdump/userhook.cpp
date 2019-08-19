@@ -765,7 +765,7 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
     PRINT_DEBUG("[MEMDUMP-USER] new PA %lx\n", pa);
 
-    for(auto& ook : data->hooks)
+    for (auto& hook : data->hooks)
     {
         addr_t hook_va = ((data->vaddr >> 12) << 12) + (hook->trap->breakpoint.addr & 0xFFF);
         PRINT_DEBUG("adding hook at %lx\n", hook_va);
@@ -806,7 +806,7 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
     std::vector < hook_target_entry_t* > hooks;
     for (auto& dll : plugin->loaded_dlls[info->regs->cr3])
     {
-        for(auto &hook : dll.targets)
+        for (auto& hook : dll.targets)
         {
             addr_t hook_addr = hook.trap->breakpoint.addr;
             if (hook_addr >> 12 == pa >> 12)
