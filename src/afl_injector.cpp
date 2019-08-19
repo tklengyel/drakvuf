@@ -18,7 +18,9 @@
 #include "plugins/plugins.h"
 #include <fcntl.h>
 #include <capstone/capstone.h>
-#define NUM_LOCATIONS 2000
+
+#define NUM_LOCATIONS 20000
+#define SEED 321651
 
 char *afl_mode;
 void afl_setup();
@@ -37,7 +39,20 @@ do\
 }\
 while(0)
 
-#define SEED 321651
+#define AFL_BRANCH_INSTRUMENT2(x) \
+do\
+{\
+    if(afl_mode)\
+    {\
+        afl_area_ptr[x&(MAP_SIZE-1) ^ prev_loc]++;\
+        prev_loc = cur_loc[x&(MAP_SIZE-1)] >> 1;\
+    }\
+}\
+while(0)
+
+#define VALUE_OF_REG(base, reg) *((uint64_t *)base + (offset((x86_reg)reg)/8))
+
+event_response_t afl_branch_bp(drakvuf_t drakvuf, drakvuf_trap_info_t *info);
 
 GHashTable *ke_func_index;      //Mapping from kernel function to index in AFL-SHM
 GRand *grand;
@@ -72,56 +87,174 @@ int64_t get_json_int(json_object *obj, const char *key)
     return json_object_get_int64(int_obj);
 }
 
-status_t handle_insn(vmi_instance_t vmi, cs_insn *t)
+int offset(x86_reg reg)
 {
-    (void)(vmi);
+    switch(reg)
+    {
+        case X86_REG_RAX:
+            return offsetof(x86_regs, rax);
+            break;
+        case X86_REG_RBX:
+            return offsetof(x86_regs, rbx);
+            break;
+        case X86_REG_RCX:
+            return offsetof(x86_regs, rcx);
+            break;
+        case X86_REG_RDX:
+            return offsetof(x86_regs, rdx);
+            break;
+        case X86_REG_RIP:
+            return offsetof(x86_regs, rip);
+            break;
+        case X86_REG_RSP:
+            return offsetof(x86_regs, rsp);
+            break;
+        case X86_REG_RBP:
+            return offsetof(x86_regs, rbp);
+            break;
+        case X86_REG_RSI:
+            return offsetof(x86_regs, rsi);
+            break;
+        case X86_REG_RDI:
+            return offsetof(x86_regs, rdi);
+            break;
+        default:
+            fprintf(stderr, "Register %d not handled\n", reg);
+            return -1;
+            break;
+    }
+}
+
+addr_t handle_insn(drakvuf_t drakvuf, cs_insn *t, drakvuf_trap_info_t *info)
+{
+    (void)(drakvuf);
     cs_detail *d = t->detail;
+    x86_op_mem om;
+    addr_t addr;
+    // vmi_instance_t vmi;
+    // access_context_t ctx;
+    x86_registers_t *r = info->regs;
     for( int i = 0; i < d->groups_count; i++)
     {
         if(d->groups[i] == X86_GRP_JUMP)
         {
-            
+            //There will only be one operand but just to cover all bases
+            for(int j = 0; j < d->x86.op_count; j++)
+            {
+                //should be called only when we are at a breakpoint on a jump insn
+                cs_x86_op op = d->x86.operands[j];
+                switch(op.type)
+                {
+                    case X86_OP_IMM:
+                        addr = op.imm;
+                        break;
+                    case X86_OP_REG:
+                        addr = VALUE_OF_REG(r, op.reg);
+                        break;
+                    case X86_OP_MEM:
+                        om = op.mem;
+                        addr = t->address + 
+                                om.index *  om.scale + om.disp;
+                        break;
+                    default:
+                        fprintf(stderr, "Unknown type of operand" RESET "\n");
+                }                
+            }
+            drakvuf_trap_t *trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+            trap->type = BREAKPOINT;
+            trap->breakpoint.addr = addr;
+            trap->breakpoint.dtb = info->regs->cr3;
+            trap->breakpoint.lookup_type = LOOKUP_DTB;
+            trap->cb = afl_branch_bp;
+            drakvuf_add_trap(drakvuf, trap);
+
+            t++;
+            drakvuf_trap_t *next_trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+            next_trap->type = BREAKPOINT;
+            next_trap->breakpoint.addr = t->address;
+            next_trap->breakpoint.dtb = info->regs->cr3;
+            next_trap->breakpoint.lookup_type = LOOKUP_DTB;
+            next_trap->cb = afl_branch_bp;
+            drakvuf_add_trap(drakvuf, next_trap);
+
+            printf(BGGREEN "Breakpoints set for branch target: %lx, and fall through: %lx" RESET "\n", trap->breakpoint.addr,
+                     next_trap->breakpoint.addr);
+
+            break;
+            return 1;
         }
     }
-    return VMI_SUCCESS;
+    return 0;
 }
 
-event_response_t function_entry_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+event_response_t afl_branch_bp(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
-    (void)(drakvuf);
+
+    AFL_BRANCH_INSTRUMENT2( info->regs->rip);
     struct afl_map_update_data *afl_data = 
         (struct afl_map_update_data *)info->trap->data;
     (void)(afl_data);
-    printf(BGYELLOW BLACK "In afl_map_update_cb for function"
-        "%s with pid = %d" RESET "\n",afl_data->function_name, info->proc_data.pid);
-    char code[100];
+    printf(BGYELLOW BLUE "In afl_map_update_cb for function"
+        "%s with pid = %d, rip = %" PRIx64 RESET "\n",afl_data->function_name, info->proc_data.pid, info->regs->rip);
+    sleep(5);
+    char code[1000];
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     size_t read;
     access_context_t ctx;
     ctx.addr = info->regs->rip;
     ctx.pid = 4;
-    vmi_read(vmi, &ctx,100, code, &read);
-		csh handle;
-		cs_insn *insn;
-		size_t count;
-		if(cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
-		{
-				fprintf(stderr, "Could not open capstone handle");
-				continue_fuzzing = false;
-		}
-		count = cs_disasm(handle,(const uint8_t *) code, sizeof(code)-1, 0x0, 0, &insn);
-		if(count > 0)
-		{
-				size_t j;
-				for(j = 0; j < count; j++)
-				{
-                    handle_insn(vmi, &insn[j]);
-                    printf("0x%" PRIx64 ":\t%s\t\t%s",insn[j].address, insn[j].mnemonic, insn[j].op_str);
-				}
-				cs_free(insn, count);
-		}
-		cs_close(&handle);
-        continue_fuzzing = false;
+    ctx.translate_mechanism = VMI_TM_PROCESS_PID;
+    bool continue_disassembly = true;
+
+    csh handle;
+    if(cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
+    {
+            fprintf(stderr, "Could not open capstone handle");
+            continue_fuzzing = false;
+            return VMI_EVENT_RESPONSE_NONE;
+    }
+    cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
+    while(continue_disassembly)
+    {
+        if(vmi_read(vmi, &ctx,1000, code, &read) != VMI_FAILURE)
+        {
+            drakvuf_release_vmi(drakvuf);
+            cs_insn *insn;
+            size_t count;
+            count = cs_disasm(handle,(const uint8_t *) code, sizeof(code)-1, info->regs->rip, 0, &insn);
+            if(count > 0)
+            {
+                    size_t j;
+
+                    //delibrately iterating over only count-2 insns because
+                    //the last instruction may lie across 1000 bytes boundary and may not have
+                    //been read
+                    for(j = 0; j < count-2; j++)
+                    {
+                        printf("0x%" PRIx64 ":\t%s\t\t%s\n",insn[j].address, insn[j].mnemonic, insn[j].op_str);
+                        if( !strcmp(insn[j].mnemonic, "ret") )
+                        {
+                            continue_disassembly = false;
+                            break;
+                        }
+                        if(handle_insn(drakvuf, &insn[j], info))
+                        {
+                            continue_disassembly = false;
+                            break;
+                        }
+                        ctx.addr = ctx.addr + insn[j].size;
+                    }
+                    cs_free(insn, count);
+            }
+        }
+        else 
+        {
+            drakvuf_release_vmi(drakvuf);
+            fprintf(stderr, RED "[+] Could not read binary from rip" RESET " \n");
+        }
+    }
+    cs_close(&handle);
+    continue_fuzzing = false;
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -217,10 +350,10 @@ bool init_kernel_func_indices(drakvuf_t drakvuf, json_object *candidates)
             
             trap->type = BREAKPOINT;
             trap->breakpoint.lookup_type = LOOKUP_PID;
-            trap->breakpoint.pid = 4;
-            trap->breakpoint.addr_type = ADDR_RVA;
-            trap->breakpoint.module = "ntoskrnl.exe";
-            trap->breakpoint.rva = f_rva;
+            trap->breakpoint.addr_type = ADDR_VA;
+            trap->breakpoint.addr = f_addr;
+            trap->name = f_name;
+
             
             struct afl_map_update_data *afl_data =
                 (struct afl_map_update_data *) g_malloc0(sizeof(struct afl_map_update_data));
@@ -228,13 +361,18 @@ bool init_kernel_func_indices(drakvuf_t drakvuf, json_object *candidates)
             afl_data->curr = index;
         
             trap->data = afl_data;
-            trap->cb = function_entry_cb;
+            trap->cb = afl_branch_bp;
 
             if(!drakvuf_add_trap(drakvuf, trap))
             {
                 fprintf(stderr, "Couldn't add trap for function %s\n", f_name);
-                return false;
+                // return false;
             }
+            else
+            {
+                fprintf(stderr, GREEN "Trap successfully added for %s" RESET "\n", f_name);
+            }
+            
             json_object_iter_next(&it);
         }
         loop = loop->next;
@@ -248,7 +386,6 @@ static void close_handler(int sig)
     drakvuf_interrupt(drakvuf, sig);
     continue_fuzzing  = false;
     g_atomic_int_set(&spin_lock_held, false);
-
 }
 
 plugins_options options;
@@ -333,13 +470,9 @@ void retry_creating_domain()
     pclose(fp);
     if(domain_live)
      (void)system("xl destroy win10");
-    fp = popen("./restore_script.sh", "r");
+    (void)system("./restore_script.sh");
     
-    while(fgets(list_output, 2047, fp) != NULL )
-    {
-        fprintf(stderr, "%s",list_output);
-    }
-    pclose(fp);
+    
 }
 
 int main(int argc, char *argv[])

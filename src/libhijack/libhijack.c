@@ -74,7 +74,7 @@ static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_
     PRINT_DEBUG("[+] int3_cb for return \n");
     uint32_t tid;
     drakvuf_get_current_thread_id(drakvuf, info, &tid);
-    PRINT_DEBUG(BGYELLOW BLACK"[+] In INT3 CB PID=%d, Process Name = %s ThreadId = %d " BLUE"cr3 = %lx"RESET"\n", info->proc_data.pid
+    PRINT_DEBUG("[+] In INT3 CB PID=%d, Process Name = %s ThreadId = %d cr3 = %lx\n", info->proc_data.pid
                                                                         , info->proc_data.name
                                                                         , tid
                                                                         , info->regs->cr3);
@@ -186,9 +186,9 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
     uint32_t tid;
     drakvuf_get_current_thread_id(drakvuf, info, &tid);
     
-    PRINT_DEBUG(BGCYAN BLACK"[+] In CR3 CB PID=%d, Process Name = %s"
+    PRINT_DEBUG("[+] In CR3 CB PID=%d, Process Name = %s"
     "ThreadId = %d, PPID = %d, BASE Addr = %lx, "
-    "User Id = %"PRIx64 BOLD BLACK", cr3 = %lx"RESET"\n", info->proc_data.pid
+    "User Id = %" PRIx64  ", cr3 = %lx\n", info->proc_data.pid
                                                 , info->proc_data.name
                                                 , tid
                                                 , info->proc_data.ppid
@@ -325,7 +325,7 @@ int hijack(
         PRINT_DEBUG("%s Address Not found\n",function_name);
         return 0;
     }
-    PRINT_DEBUG("Address for %s found: %"PRIx64"\n", function_name, hijacker->exec_func);
+    printf(BGYELLOW BLACK "Address for %s found: %"PRIx64 RESET "\n", function_name, hijacker->exec_func);
 
     drakvuf_trap_t trap =
     {

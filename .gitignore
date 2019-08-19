@@ -53,7 +53,7 @@ stamp-h1
 drakvuf
 injector
 xen_memclone
-
+src/afl_injector
 libtool
 ltmain.sh
 m4/*.m4
