@@ -352,7 +352,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
     page_info pageInfo;
     int ret = vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pageInfo);
 
-    if(ret != VMI_SUCCESS)
+    if (ret != VMI_SUCCESS)
     {
         goto fail;
     }
@@ -367,7 +367,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
         return true;
     }
 
-    fail:
+fail:
     PRINT_DEBUG("[MEMDUMP-USER] Failed to add trap :(\n");
     return false;
 }
@@ -765,7 +765,7 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
     PRINT_DEBUG("[MEMDUMP-USER] new PA %lx\n", pa);
 
-    for(auto &hook : data->hooks)
+    for(auto& ook : data->hooks)
     {
         addr_t hook_va = ((data->vaddr >> 12) << 12) + (hook->trap->breakpoint.addr & 0xFFF);
         PRINT_DEBUG("adding hook at %lx\n", hook_va);
@@ -773,7 +773,7 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
         make_trap(vmi, drakvuf, info, hook, hook_va);
     }
 
-    end:
+end:
     drakvuf_release_vmi(drakvuf);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -804,10 +804,12 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
 
 
     std::vector < hook_target_entry_t* > hooks;
-    for (auto &dll : plugin->loaded_dlls[info->regs->cr3]) {
-        for(auto &hook : dll.targets) {
+    for (auto& dll : plugin->loaded_dlls[info->regs->cr3])
+    {
+        for(auto &hook : dll.targets)
+        {
             addr_t hook_addr = hook.trap->breakpoint.addr;
-            if(hook_addr >> 12 == pa >> 12)
+            if (hook_addr >> 12 == pa >> 12)
             {
                 hooks.push_back(&hook);
             }
@@ -817,16 +819,16 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
     PRINT_DEBUG("[MEMDUMP-USER] copy on write called: vaddr: %llx pte: %llx, pid: %d, cr3: %llx\n", (unsigned long long)vaddr, (unsigned long long)pte, info->proc_data.pid, (unsigned long long)info->regs->cr3);
     PRINT_DEBUG("[MEMDUMP-USER] old CoW PA: %llx\n", (unsigned long long)pa);
 
-    if(!hooks.empty())
+    if (!hooks.empty())
     {
         PRINT_DEBUG("MEMDUMP-USER] Found %zu hooks on CoW page, registering return trap\n", hooks.size());
 
         auto trap = plugin->register_trap<memdump, copy_on_write_result_t<memdump>>(
-                drakvuf,
-                info,
-                plugin,
-                copy_on_write_ret_cb,
-                breakpoint_by_pid_searcher());
+                        drakvuf,
+                        info,
+                        plugin,
+                        copy_on_write_ret_cb,
+                        breakpoint_by_pid_searcher());
         if (!trap)
             return VMI_EVENT_RESPONSE_NONE;
 

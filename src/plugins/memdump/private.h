@@ -136,7 +136,7 @@ struct hook_target_entry_t
     memdump* plugin;
 
     hook_target_entry_t(std::string target_name, callback_t callback, memdump* plugin)
-            : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
+        : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
 };
 
 template<typename T>
