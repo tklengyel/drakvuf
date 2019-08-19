@@ -326,12 +326,11 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
             return 0;
         }
     }
-
-    // failing to grab some symbols due to relocation
     else if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
     {
         injector->libc_addr = drakvuf_export_lib_address(drakvuf, info, injector->target_pid, "libc-");
         PRINT_DEBUG("Address of libc is: 0x%lx \n", injector->libc_addr);
+        // failing to grab some symbols due to relocation
         injector->exec_func= injector->libc_addr + 0x97070;
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         printf("Under Construction!!");
@@ -358,13 +357,15 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
 
 static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    PRINT_DEBUG("Injected process callback !!\n");
+    PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". TID: %u PID: %u PPID: %u\n",
+                info->regs->cr3, info->proc_data.tid, info->proc_data.pid, info->proc_data.ppid);
+
     injector_t injector = info->trap->data;
     PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
 
     if (injector->target_pid != info->proc_data.pid || injector->target_tid != (uint32_t)info->proc_data.pid)
     {
-        PRINT_DEBUG("%u|%u|%u|%u \n", info->proc_data.pid, injector->target_pid, info->proc_data.tid, injector->target_tid);
+        PRINT_DEBUG("Pid: %u|%u, Tid: %u|%u \n", info->proc_data.pid, injector->target_pid, info->proc_data.tid, injector->target_tid);
         return 0;
     }
 
@@ -462,7 +463,6 @@ static event_response_t inject_payload_linux(drakvuf_t drakvuf, drakvuf_trap_inf
 
 static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    PRINT_DEBUG("Injected process callback in usermode!!\n");
     PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx.\n", info->regs->rip, info->regs->cr3);
     PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
     if (info->regs->rip != info->trap->breakpoint.addr)
@@ -559,11 +559,11 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
     if (injector->method == INJECT_METHOD_EXECPROC && injector->status == STATUS_CREATE_OK)
     {
         PRINT_DEBUG("Return back after execve() execution!!\n");
-        PRINT_DEBUG("* RAX: 0x%lx\n", info->regs->rax);
+        PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
 
         if (info->regs->rax == ~0u)
         {
-            PRINT_DEBUG("\n* Process start failed!!, As exec returned -1 \n");
+            PRINT_DEBUG("Process start failed!!, As exec returned -1 \n");
             injector->rc = 0;
             injector->detected = false;
             drakvuf_remove_trap(drakvuf, injector->cr3_trap, NULL);
@@ -617,11 +617,11 @@ static event_response_t linux_injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_i
     // pid is thread group id in linux, and tid is thread id
     if ((uint32_t)info->proc_data.tid == injector->target_tid && info->proc_data.pid == injector->target_pid)
     {
-        PRINT_DEBUG("%u|%u|%u|%u \n", info->proc_data.pid, injector->target_pid, info->proc_data.tid, injector->target_tid);
+        PRINT_DEBUG("Pid: %u|%u, Tid: %u|%u \n", info->proc_data.pid, injector->target_pid, info->proc_data.tid, injector->target_tid);
 
         // kernel mode
 
-        // rcx -> value of rip in usermode && kernelmode
+        // rcx -> value of rip in usermode
         // otherwise acquire it from stack here
 
         // setting TRAP on BP addr -> rcx -> rip
@@ -961,7 +961,7 @@ int injector_start_app_on_linux(
     }
 
     rc = injector->rc;
-    printf("Finished with injection. Ret: %i.\n", rc);
+    PRINT_DEBUG("Finished with injection. Ret: %i.\n", rc);
 
     free_injector(injector);
 
