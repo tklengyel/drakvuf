@@ -339,7 +339,7 @@ static user_dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, m
     return &it->second.back();
 }
 
-static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry* target, addr_t exec_func)
+static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func)
 {
     target->pid = info->proc_data.pid;
 
