@@ -126,7 +126,7 @@ enum target_hook_state
 typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
 class memdump;
 
-typedef struct hook_target_entry
+struct hook_target_entry_t
 {
     vmi_pid_t pid;
     std::string target_name;
@@ -137,7 +137,7 @@ typedef struct hook_target_entry
 
     hook_target_entry(std::string target_name, callback_t callback, memdump* plugin)
             : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
-} hook_target_entry_t;
+};
 
 template<typename T>
 struct copy_on_write_result_t: public call_result_t<T>
@@ -150,7 +150,7 @@ struct copy_on_write_result_t: public call_result_t<T>
     std::vector<hook_target_entry_t*> hooks;
 };
 
-typedef struct user_dll
+struct user_dll_t
 {
     // relevant while loading
     addr_t dtb;
@@ -164,13 +164,13 @@ typedef struct user_dll
 
     // one entry per hooked function
     std::vector<hook_target_entry_t> targets;
-} user_dll_t;
+};
 
-typedef struct target_config_entry
+struct target_config_entry_t
 {
     std::string dll_name;
     std::string function_name;
-} target_config_entry_t;
+};
 
 // type of a pointer residing on stack
 enum sptr_type_t
