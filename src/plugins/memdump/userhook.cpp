@@ -369,6 +369,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
 
 fail:
     PRINT_DEBUG("[MEMDUMP-USER] Failed to add trap :(\n");
+    g_free(trap);
     return false;
 }
 
