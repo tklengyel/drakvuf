@@ -114,6 +114,10 @@ sptr_type_t check_module_linked_wow(drakvuf_t drakvuf,
                                     drakvuf_trap_info_t* info,
                                     addr_t dll_base)
 {
+    // WOW64 NTDLL profile not provided
+    if (!plugin->dll_base_wow_rva)
+        return ERROR;
+
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
