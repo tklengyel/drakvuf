@@ -22,12 +22,6 @@
 #define NUM_LOCATIONS 20000
 #define SEED 321651
 
-char *afl_mode;
-void afl_setup();
-void afl_forkserver();
-
-int cur_loc[NUM_LOCATIONS], prev_loc = 0;
-
 #define AFL_BRANCH_INSTRUMENT \
 do\
 {\
@@ -52,32 +46,29 @@ while(0)
 
 #define VALUE_OF_REG(base, reg) *((uint64_t *)base + (offset((x86_reg)reg)/8))
 
+char *afl_mode;
+void afl_setup();
+void afl_forkserver();
+
+int cur_loc[NUM_LOCATIONS], prev_loc = 0;
+
+
+
+
 event_response_t afl_branch_bp(drakvuf_t drakvuf, drakvuf_trap_info_t *info);
 
-GHashTable *ke_func_index;      //Mapping from kernel function to index in AFL-SHM
 GRand *grand;
 static drakvuf_t drakvuf;
 static bool continue_fuzzing = true;
 volatile int spin_lock_held = false;
 
 int prev;
-struct afl_map_update_data
-{
-    char *function_name;
-    int curr;
-};
 
-struct module_data
-{
-    char *module_path;
-    char *module_name;
-};
-
-const char *get_json_string(json_object *obj, const char *key)
+char *get_json_string(json_object *obj, const char *key)
 {
     json_object *str_obj;
     json_object_object_get_ex(obj, key, &str_obj);
-    return json_object_get_string(str_obj);
+    return (char *)json_object_get_string(str_obj);
 }
 
 int64_t get_json_int(json_object *obj, const char *key)
@@ -165,8 +156,64 @@ addr_t handle_insn(drakvuf_t drakvuf, cs_insn *t, drakvuf_trap_info_t *info)
             trap->breakpoint.addr = addr;
             trap->breakpoint.dtb = info->regs->cr3;
             trap->breakpoint.lookup_type = LOOKUP_DTB;
+            trap->breakpoint.addr_type = ADDR_VA;
             trap->cb = afl_branch_bp;
-            drakvuf_add_trap(drakvuf, trap);
+            if( !drakvuf_add_trap(drakvuf, trap))
+                printf(RED "Could not setup breakpoint for branch target" RESET "\n");
+            else 
+                printf(BGGREEN "Breakpoints set for branch target: %lx " RESET "\n", 
+                    trap->breakpoint.addr);    
+            t++;
+            drakvuf_trap_t *next_trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+            next_trap->type = BREAKPOINT;
+            next_trap->breakpoint.addr_type = ADDR_VA;
+            next_trap->breakpoint.addr = t->address;
+            next_trap->breakpoint.dtb = info->regs->cr3;
+            next_trap->breakpoint.lookup_type = LOOKUP_DTB;
+            next_trap->cb = afl_branch_bp;
+            if( !drakvuf_add_trap(drakvuf, next_trap))
+                printf(RED "Could not setup breakpoint for branch fall through" RESET "\n");
+            else
+                printf(BGGREEN "Breakpoints set for branch fall through: %lx" RESET "\n",
+                     next_trap->breakpoint.addr);
+
+            return 1;
+        }
+        else if( d->groups[i] ==X86_GRP_CALL)
+        {
+            for(int j = 0; j < d->x86.op_count; j++)
+            {
+                //should be called only when we are at a breakpoint on a jump insn
+                cs_x86_op op = d->x86.operands[j];
+                switch(op.type)
+                {
+                    case X86_OP_IMM:
+                        addr = op.imm;
+                        break;
+                    case X86_OP_REG:
+                        addr = VALUE_OF_REG(r, op.reg);
+                        break;
+                    case X86_OP_MEM:
+                        om = op.mem;
+                        addr = t->address + 
+                                om.index *  om.scale + om.disp;
+                        break;
+                    default:
+                        fprintf(stderr, "Unknown type of operand" RESET "\n");
+                }                
+            }
+            drakvuf_trap_t *trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+            trap->type = BREAKPOINT;
+            trap->breakpoint.addr = addr;
+            trap->breakpoint.dtb = info->regs->cr3;
+            trap->breakpoint.lookup_type = LOOKUP_DTB;
+            trap->breakpoint.addr_type = ADDR_VA;
+            trap->cb = afl_branch_bp;
+            if( !drakvuf_add_trap(drakvuf, trap))
+                printf(RED "Could not setup breakpoint for call target" RESET "\n");
+            else 
+                printf(BGGREEN "Breakpoints set for call target: %lx " RESET "\n", 
+                    trap->breakpoint.addr);    
 
             t++;
             drakvuf_trap_t *next_trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
@@ -174,13 +221,14 @@ addr_t handle_insn(drakvuf_t drakvuf, cs_insn *t, drakvuf_trap_info_t *info)
             next_trap->breakpoint.addr = t->address;
             next_trap->breakpoint.dtb = info->regs->cr3;
             next_trap->breakpoint.lookup_type = LOOKUP_DTB;
+            next_trap->breakpoint.addr_type = ADDR_VA;
             next_trap->cb = afl_branch_bp;
-            drakvuf_add_trap(drakvuf, next_trap);
-
-            printf(BGGREEN "Breakpoints set for branch target: %lx, and fall through: %lx" RESET "\n", trap->breakpoint.addr,
+            if( !drakvuf_add_trap(drakvuf, next_trap))
+                printf(RED "Could not setup breakpoint for call fall through" RESET "\n");
+            else
+                printf(BGGREEN "Breakpoints set for call fall through: %lx" RESET "\n",
                      next_trap->breakpoint.addr);
-
-            break;
+            
             return 1;
         }
     }
@@ -191,12 +239,7 @@ event_response_t afl_branch_bp(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
 
     AFL_BRANCH_INSTRUMENT2( info->regs->rip);
-    struct afl_map_update_data *afl_data = 
-        (struct afl_map_update_data *)info->trap->data;
-    (void)(afl_data);
-    printf(BGYELLOW BLUE "In afl_map_update_cb for function"
-        "%s with pid = %d, rip = %" PRIx64 RESET "\n",afl_data->function_name, info->proc_data.pid, info->regs->rip);
-    sleep(5);
+    printf(CYAN "In breakpoint" RESET "\n");
     char code[1000];
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     size_t read;
@@ -235,11 +278,13 @@ event_response_t afl_branch_bp(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
                         if( !strcmp(insn[j].mnemonic, "ret") )
                         {
                             continue_disassembly = false;
+                            ctx.addr = ctx.addr + insn[j].size;
                             break;
                         }
-                        if(handle_insn(drakvuf, &insn[j], info))
+                        else if(handle_insn(drakvuf, &insn[j], info))
                         {
                             continue_disassembly = false;
+                            ctx.addr = ctx.addr + insn[j].size;
                             break;
                         }
                         ctx.addr = ctx.addr + insn[j].size;
@@ -254,129 +299,69 @@ event_response_t afl_branch_bp(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
         }
     }
     cs_close(&handle);
-    continue_fuzzing = false;
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-int find_string_cmp(const void *a, const void *b)
-{
-    return g_strcmp0( ((struct module_data *)a)->module_path, 
-                            ((struct module_data*)b)->module_path);
-}
 
-GList *collect_rekall_profiles(json_object *candidates)
-{
-    GList *files=NULL;
-    json_object *calls;
-    json_object_object_get_ex(candidates, "calls", &calls);
-    if(calls == NULL)
-    {
-        fprintf(stderr, RED "[+]Could not parse candidates" RESET "\n");
-    }
-    int num_calls = json_object_array_length(calls);
-    for(int call_idx = 0; call_idx < num_calls; call_idx++)
-    {
-        json_object *call = json_object_array_get_idx(calls, call_idx);
-        if(call == NULL)
-        {
-            fprintf(stderr, RED "[+]Could not parse call" RESET "\n");
-            return NULL;
-        }
-        json_object *mod_rekal_profile = NULL;
-        json_object_object_get_ex(call, "module-rekall-profile", &mod_rekal_profile);
-        char *rekall_path = (char *)json_object_get_string(mod_rekal_profile);
-        struct module_data *elem = (struct module_data*)
-                                        g_malloc0(sizeof(struct module_data));
-        elem->module_name = g_strdup(get_json_string(call, "module-name"));
-        elem->module_path = g_strdup(rekall_path);
-        if(!g_list_find_custom(files, elem, find_string_cmp))
-        {
-            files = g_list_append(files, elem);
-        }
-    }
-    
-    return files;
-}
-
-bool init_kernel_func_indices(drakvuf_t drakvuf, json_object *candidates)
+bool set_init_breakpoints(drakvuf_t drakvuf, json_object *candidates)
 {
     (void)(drakvuf);
     char *f_name;
     addr_t f_addr;
     addr_t f_rva;
-    json_object *functions=NULL;
     json_object *mod_rekall_profile = NULL;
+    char *mod_rekal_profile_path=NULL;
+    char *module_name = NULL;
     // json_object *guest_rekall = drakvuf_get_rekall_profile_json(drakvuf);
-    GList *loop = collect_rekall_profiles(candidates);
-    printf("length of the list %d", g_list_length(loop));
-    while(loop)
+    json_object *calls = NULL;
+    json_object_object_get_ex(candidates, "calls", &calls);
+    int len = json_object_array_length(calls);
+    for(int i=0; i<len; i++)
     {
-        struct module_data* mod = (struct module_data*)loop->data;
-        mod_rekall_profile = json_object_from_file(mod->module_path);
-        printf("Rekall Profile : %s\n", mod->module_path);
-        if(!json_object_object_get_ex(mod_rekall_profile, "$FUNCTIONS", &functions))
-        {
-            fprintf(stderr, "Couldn't find $FUNCTIONS in rekall profile of guest\n");
-            return false;
-        }
-        json_object_iterator it, END;
-        it = json_object_iter_begin(functions);
-        END = json_object_iter_end(functions);
-        while( !json_object_iter_equal(&it, &END) )
-        {
-            f_name = (char *)json_object_iter_peek_name(&it);
-            f_addr = json_object_get_int64(json_object_iter_peek_value(&it));
-            int index = g_rand_int_range(grand, 0, 1<<16);
-            g_hash_table_insert(ke_func_index, f_name, (void *)(uintptr_t)index);
+        json_object *call;
+        call = json_object_array_get_idx(calls, i);
+        f_name = get_json_string(call, "function-name");
+        mod_rekal_profile_path = get_json_string(call, "module-rekall-profile");
+        mod_rekall_profile = json_object_from_file(mod_rekal_profile_path);
             
-            //Insert Trap
-            if ( !rekall_get_function_rva(mod_rekall_profile, f_name, &f_rva) )
+        //Insert Trap
+        if ( !rekall_get_function_rva(mod_rekall_profile, f_name, &f_rva) )
+        {
+            if( !drakvuf_get_function_rva(drakvuf, f_name, &f_rva))
             {
-                if( !drakvuf_get_function_rva(drakvuf, f_name, &f_rva))
-                {
-                    fprintf(stderr, "FATAL Couldn't get function rva\n");
-                    return false;
-                }
-            }
-            
-            f_addr = drakvuf_exportksym_to_va(drakvuf, 4, f_name, mod->module_name, f_rva);
-            if(!f_addr)
-            {
-                drakvuf_exportksym_to_va(drakvuf, 4, f_name, "ntoskrnl.exe", f_rva);
-                fprintf(stderr, "Couldn't export ksym to va\n");
+                fprintf(stderr, "FATAL Couldn't get function rva\n");
                 return false;
             }
-            drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
-            
-            trap->type = BREAKPOINT;
-            trap->breakpoint.lookup_type = LOOKUP_PID;
-            trap->breakpoint.addr_type = ADDR_VA;
-            trap->breakpoint.addr = f_addr;
-            trap->name = f_name;
-
-            
-            struct afl_map_update_data *afl_data =
-                (struct afl_map_update_data *) g_malloc0(sizeof(struct afl_map_update_data));
-            afl_data->function_name = g_strdup(f_name);
-            afl_data->curr = index;
-        
-            trap->data = afl_data;
-            trap->cb = afl_branch_bp;
-
-            if(!drakvuf_add_trap(drakvuf, trap))
-            {
-                fprintf(stderr, "Couldn't add trap for function %s\n", f_name);
-                // return false;
-            }
-            else
-            {
-                fprintf(stderr, GREEN "Trap successfully added for %s" RESET "\n", f_name);
-            }
-            
-            json_object_iter_next(&it);
         }
-        loop = loop->next;
+        module_name = get_json_string(call, "module-name");
+        f_addr = drakvuf_exportksym_to_va(drakvuf, 4, f_name, module_name, f_rva);
+        if(!f_addr)
+        {
+            drakvuf_exportksym_to_va(drakvuf, 4, f_name, "ntoskrnl.exe", f_rva);
+            fprintf(stderr, "Couldn't export ksym to va\n");
+            return false;
+        }
+        drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
+        
+        trap->type = BREAKPOINT;
+        trap->breakpoint.lookup_type = LOOKUP_PID;
+        trap->breakpoint.addr_type = ADDR_VA;
+        trap->breakpoint.addr = f_addr;
+        trap->breakpoint.pid = 4;
+        trap->name = f_name;
+        trap->cb = afl_branch_bp;
+
+        if(!drakvuf_add_trap(drakvuf, trap))
+        {
+            fprintf(stderr, "Couldn't add trap for function %s\n", f_name);
+            // return false;
+        }
+        else
+        {
+            fprintf(stderr, GREEN "Trap successfully added for %s" RESET "\n", f_name);
+        }
     }
+    
     fprintf(stderr, "Traps added successfully for kernel functions" RESET "\n");
     return true;
 }
@@ -581,9 +566,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    //setup ke_function_breakpoints
-    ke_func_index = g_hash_table_new_full(g_str_hash, g_int_equal, free, NULL);
-
     successfull = 0;
     candidates = json_object_from_file(fuzz_candidates_path);
     if( candidates == NULL)
@@ -592,13 +574,14 @@ int main(int argc, char *argv[])
         fprintf(stderr, RED "[+] Could not read candidates" RESET "\n");
         goto error;
     }
-    if(!init_kernel_func_indices(drakvuf, candidates))
+    if(!set_init_breakpoints
+(drakvuf, candidates))
     {
         fprintf(stderr, RED "[+] Could not init kernel functions" RESET "\n");
         goto error;
     }
     AFL_BRANCH_INSTRUMENT;
-    // start_bsodmon(drakvuf, candidates);
+    start_bsodmon(drakvuf, candidates);
 
     fprintf(stderr, "STARTING FUZZING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
     json_object *calls;
@@ -671,7 +654,7 @@ int main(int argc, char *argv[])
     // sleep(5);
     AFL_BRANCH_INSTRUMENT;
     drakvuf_resume(drakvuf); 
-    // stop_bsodmon();
+    stop_bsodmon();
     drakvuf_close(drakvuf, 0);
     fprintf(stderr,"[+] Successfull = %d\n", successfull);
     fclose(stderr);

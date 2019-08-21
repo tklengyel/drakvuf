@@ -23,12 +23,12 @@ bool setup_stack_from_json(hijacker_t hijacker, drakvuf_trap_info_t *info)
         uint64_t val = json_object_get_int(jval);
         if(!strcmp(type, "INTEGER"))
         {
-            fprintf(stderr, "Init int arg[%d] with value %ld\n",i, val);
+            PRINT_DEBUG("Init int arg[%d] with value %ld\n",i, val);
             init_int_argument(&args[i], val);
         }
         else if(!strcmp(type, "STRING"))
         {
-            fprintf(stderr, "Init string arg[%d] with value %ld\n",i, val);
+            PRINT_DEBUG("Init string arg[%d] with value %ld\n",i, val);
         }
     }
     return setup_stack(drakvuf, info, args, len);
