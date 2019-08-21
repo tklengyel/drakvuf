@@ -513,7 +513,8 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     page_info_t p_info = {0};
 
-    if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, mem_base_address, &p_info) == VMI_SUCCESS) {
+    if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, mem_base_address, &p_info) == VMI_SUCCESS)
+    {
         bool pte_valid = (p_info.x86_ia32e.pte_value & (1UL << 0)) != 0;
         bool page_writeable = (p_info.x86_ia32e.pte_value & (1UL << 1)) != 0;
         bool page_executable = (p_info.x86_ia32e.pte_value & (1UL << 63)) == 0;
@@ -521,7 +522,8 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
         ctx.addr = mmvad.starting_vpn << 12;
         size_t len_bytes = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
 
-        if (len_bytes > 0x1000 && pte_valid && page_writeable && page_executable) {
+        if (len_bytes > 0x1000 && pte_valid && page_writeable && page_executable)
+        {
             if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len_bytes, "Interesting RWX memory", nullptr, nullptr))
             {
                 PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
