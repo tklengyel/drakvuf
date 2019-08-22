@@ -203,4 +203,16 @@ bool dump_memory_region(
     void* extras,
     void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, void* extras));
 
+bool inspect_stack_ptr(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    memdump* plugin,
+    size_t ptr_length,
+    addr_t stack_ptr);
+
+bool dump_from_stack(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    memdump* plugin);
+
 #endif
