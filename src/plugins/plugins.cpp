@@ -125,9 +125,10 @@
 #include "librarymon/librarymon.h"
 #include "dkommon/dkommon.h"
 #include "wmimon/wmimon.h"
+#include "memdump/memdump.h"
 
-drakvuf_plugins::drakvuf_plugins(const drakvuf_t drakvuf, output_format_t output, os_t os)
-    : drakvuf{ drakvuf }, output{ output }, os{ os }
+drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
+    : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
 {
 }
 
@@ -141,7 +142,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                            const plugins_options* options)
 {
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
-            plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
+         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
     {
         PRINT_DEBUG("Starting plugin %s\n", drakvuf_plugin_names[plugin_id]);
 
@@ -317,6 +318,19 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     break;
                 }
 #endif
+#ifdef ENABLE_PLUGIN_MEMDUMP
+                case PLUGIN_MEMDUMP:
+                {
+                    memdump_config config =
+                    {
+                        .memdump_dir = options->memdump_dir,
+                        .dll_hooks_list = options->dll_hooks_list
+                    };
+                    this->plugins[plugin_id] = new memdump(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+                case __DRAKVUF_PLUGIN_LIST_MAX: /* fall-through */
                 default:
                     break;
             }

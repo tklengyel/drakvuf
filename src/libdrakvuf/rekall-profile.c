@@ -255,11 +255,11 @@ bool rekall_lookup_array(
     for (size_t i = 0; i < array_size; i++)
     {
         if (!rekall_lookup_in_json(
-                    symbol_subsymbol_array[i][0],
-                    symbol_subsymbol_array[i][1],
-                    &rva[i],
-                    size,
-                    rekall_profile_json)
+                symbol_subsymbol_array[i][0],
+                symbol_subsymbol_array[i][1],
+                &rva[i],
+                size,
+                rekall_profile_json)
            )
         {
             errors++;
@@ -363,6 +363,8 @@ os_t rekall_get_os_type(json_object* rekall_profile_json)
         ret = VMI_OS_WINDOWS;
     else if ( !strcmp(kernel, "Ntkrpamp") )
         ret = VMI_OS_WINDOWS;
+    else if ( !strcmp(kernel, "Nt") )
+        ret = VMI_OS_WINDOWS;
 
 err_exit:
 
@@ -375,7 +377,7 @@ int drakvuf_get_os_build_date(drakvuf_t drakvuf)
     int year = 0;
     int month = 0;
     int day = 0;
-    char junk[15] = {'\0'};
+    char junk[16] = {'\0'};
     char build_date[10] = {'\0'};
 
     if (!drakvuf->rekall_profile_json)

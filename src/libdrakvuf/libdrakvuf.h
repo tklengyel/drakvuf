@@ -194,7 +194,12 @@ struct drakvuf_trap
     trap_type_t type;
     event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*);
     void* data;
-    const char* name; // Only used for informational/debugging purposes
+
+    union
+    {
+        const char* name; // Only used for informational/debugging purposes
+        void* _name;
+    };
 
     union
     {
@@ -358,22 +363,20 @@ page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf);
 int drakvuf_get_address_width(drakvuf_t drakvuf);
 const char* drakvuf_get_rekall_profile(drakvuf_t drakvuf);
 json_object* drakvuf_get_rekall_profile_json(drakvuf_t drakvuf);
+const char* drakvuf_get_rekall_wow_profile(drakvuf_t drakvuf);
+json_object* drakvuf_get_rekall_wow_profile_json(drakvuf_t drakvuf);
 
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf);
 
-/*
- * Specify either vcpu_id and/or regs. If regs don't have the required info
- * (for example Xen 4.6 doesn't actually send fs_base/gs_base), it falls back
- * on the vcpu id so it's best to specify both.
- */
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
-                                   uint64_t vcpu_id);
+                                   drakvuf_trap_info_t* info);
+
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
-                                  uint64_t vcpu_id);
-status_t drakvuf_get_last_error(drakvuf_t drakvuf,
-                                uint64_t vcpu_id,
-                                uint32_t* err,
-                                const char** err_str);
+                                  drakvuf_trap_info_t* info);
+bool drakvuf_get_last_error(drakvuf_t drakvuf,
+                            drakvuf_trap_info_t* info,
+                            uint32_t* err,
+                            const char** err_str);
 
 /* Caller must free the returned string */
 char* drakvuf_get_process_name(drakvuf_t drakvuf,
@@ -386,9 +389,9 @@ char* drakvuf_get_process_commandline(drakvuf_t drakvuf,
                                       addr_t process_base);
 
 
-status_t drakvuf_get_process_pid( drakvuf_t drakvuf,
-                                  addr_t process_base,
-                                  vmi_pid_t* pid);
+bool drakvuf_get_process_pid(drakvuf_t drakvuf,
+                             addr_t process_base,
+                             vmi_pid_t* pid);
 
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
@@ -398,8 +401,26 @@ bool drakvuf_get_process_data(drakvuf_t drakvuf,
                               addr_t process_base,
                               proc_data_t* proc_data);
 
+typedef struct _mmvad_info
+{
+    uint64_t starting_vpn;
+    uint64_t ending_vpn;
+    uint64_t flags1;
+
+    /* Pointer to the file name, if this MMVAD is backed by some file on disk.
+     * If not null, read with: drakvuf_read_unicode_va(drakvuf->vmi, mmvad->file_name_ptr, 0) */
+    addr_t file_name_ptr;
+} mmvad_info_t;
+
+bool drakvuf_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
+
+addr_t drakvuf_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
+bool drakvuf_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
+bool drakvuf_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
+bool drakvuf_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
+
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
-                                   uint64_t vcpu_id,
+                                   drakvuf_trap_info_t* info,
                                    uint32_t* thread_id);
 
 addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf,
@@ -412,7 +433,7 @@ addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
 // Microsoft PreviousMode KTHREAD explanation:
 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff559860(v=vs.85).aspx
 bool drakvuf_get_current_thread_previous_mode(drakvuf_t drakvuf,
-        uint64_t vcpu_id,
+        drakvuf_trap_info_t* info,
         privilege_mode_t* previous_mode);
 
 bool drakvuf_get_thread_previous_mode(drakvuf_t drakvuf,
@@ -461,6 +482,11 @@ bool drakvuf_get_module_list(drakvuf_t drakvuf,
                              addr_t process_base,
                              addr_t* module_list);
 
+bool drakvuf_get_module_list_wow(drakvuf_t drakvuf,
+                                 access_context_t* ctx,
+                                 addr_t wow_peb,
+                                 addr_t* module_list);
+
 // ObReferenceObjectByHandle
 bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
                                drakvuf_trap_info_t* info,
@@ -495,9 +521,9 @@ bool drakvuf_get_module_base_addr_ctx( drakvuf_t drakvuf,
                                        const char* module_name,
                                        addr_t* base_addr_out );
 
-status_t drakvuf_get_process_ppid( drakvuf_t drakvuf,
-                                   addr_t process_base,
-                                   vmi_pid_t* ppid );
+bool drakvuf_get_process_ppid(drakvuf_t drakvuf,
+                              addr_t process_base,
+                              vmi_pid_t* ppid );
 
 gchar* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf,
                                   drakvuf_trap_info_t* info,
@@ -525,6 +551,8 @@ addr_t drakvuf_get_function_argument(drakvuf_t drakvuf,
                                      drakvuf_trap_info_t* info,
                                      int argument_number);
 
+bool drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
+
 /*---------------------------------------------------------
  * Event FD functions
  */
@@ -547,7 +575,6 @@ typedef enum
     OUTPUT_CSV,
     OUTPUT_KV,
     OUTPUT_JSON,
-    __OUTPUT_MAX
 } output_format_t;
 
 // Printf helpers for timestamp.

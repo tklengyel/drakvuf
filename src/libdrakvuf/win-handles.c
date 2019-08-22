@@ -174,7 +174,7 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
             j = (j-k)/mid_count;
 
             if ( VMI_SUCCESS == vmi_read_addr_va(vmi, table_base + j, 0, &table) &&
-                    VMI_SUCCESS == vmi_read_addr_va(vmi, table + k, 0, &table2) )
+                 VMI_SUCCESS == vmi_read_addr_va(vmi, table + k, 0, &table2) )
                 vmi_read_addr_va(vmi, table2 + i * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj);
             break;
         }
@@ -189,15 +189,15 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
             return obj & ~EX_FAST_REF_MASK;
         case VMI_OS_WINDOWS_8:
             if ( drakvuf->pm == VMI_PM_IA32E )
-                return ((obj & VMI_BIT_MASK(19,63)) >> 16) | 0xFFFFE00000000000;
+                return ((obj & VMI_BIT_MASK(19, 63)) >> 16) | 0xFFFFE00000000000;
             else
-                return (obj & VMI_BIT_MASK(2,31));
+                return (obj & VMI_BIT_MASK(2, 31));
         case VMI_OS_WINDOWS_10:
             // We set Win10 as the default case as vmi_get_winver may not pinpoint it as VMI_OS_WINDOWS_10 if the buildid is not known
             if ( drakvuf->pm == VMI_PM_IA32E )
-                return ((obj & VMI_BIT_MASK(19,63)) >> 16) | 0xFFFF000000000000;
+                return ((obj & VMI_BIT_MASK(19, 63)) >> 16) | 0xFFFF000000000000;
             else
-                return (obj & VMI_BIT_MASK(2,31));
+                return (obj & VMI_BIT_MASK(2, 31));
         case VMI_OS_WINDOWS_2000:       /* fall-through */
         case VMI_OS_WINDOWS_2003:       /* fall-through */
         case VMI_OS_WINDOWS_UNKNOWN:    /* fall-through */
@@ -214,7 +214,7 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
         // This is Kernel Mode handle
         if (!drakvuf_find_process(drakvuf, 4, NULL, &process))
             return 0;
-        handle = handle & VMI_BIT_MASK(0,30);
+        handle = handle & VMI_BIT_MASK(0, 30);
         return drakvuf_get_obj_by_handle_impl(drakvuf, process, handle);
     }
 

@@ -142,6 +142,15 @@ extern bool verbose;
 
 #define UNUSED(x) (void)(x)
 
+/*
+ * How often should the VMI caches be flushed?
+ *
+ * TODO: develop intelligent cache-flush system that
+ *       catches the events that actually make flushes
+ *       necessary.
+ */
+#define VMI_FLUSH_RATE 100
+
 struct fd_info
 {
     int fd;
@@ -168,6 +177,7 @@ struct drakvuf
     xen_pfn_t zero_page_gfn;
 
     // VMI
+    unsigned long flush_counter;
     GMutex vmi_lock;
     vmi_instance_t vmi;
 
@@ -200,9 +210,6 @@ struct drakvuf
     addr_t kdtb;
 
     int address_width;
-
-    x86_registers_t* regs[16]; // vCPU specific registers recorded during the last event
-    addr_t kpcr[16]; // vCPU specific kpcr recorded on mov-to-cr3
 
     GHashTable* remapped_gfns; // Key: gfn
     // val: remapped gfn
@@ -289,7 +296,7 @@ struct memcb_pass
 void drakvuf_force_resume (drakvuf_t drakvuf);
 
 bool drakvuf_get_current_process_data(drakvuf_t drakvuf,
-                                      uint64_t vcpu_id,
+                                      drakvuf_trap_info_t* info,
                                       proc_data_priv_t* proc_data);
 
 bool drakvuf_get_process_data_priv(drakvuf_t drakvuf,
@@ -297,11 +304,11 @@ bool drakvuf_get_process_data_priv(drakvuf_t drakvuf,
                                    proc_data_priv_t* proc_data);
 
 char* drakvuf_get_current_process_name(drakvuf_t drakvuf,
-                                       uint64_t vcpu_id,
+                                       drakvuf_trap_info_t* info,
                                        bool fullpath);
 
 int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf,
-        uint64_t vcpu_id);
+        drakvuf_trap_info_t* info);
 
 bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap);

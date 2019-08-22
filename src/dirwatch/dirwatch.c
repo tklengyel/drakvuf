@@ -490,14 +490,12 @@ int main(int argc, char** argv)
                         }
                         break;
                     }
-                }
-                while (!shutting_down && !ret);
+                } while (!shutting_down && !ret);
             }
             else
                 sleep(1);
         }
-    }
-    while (!shutting_down && !ret);
+    } while (!shutting_down && !ret);
 
     inotify_rm_watch( fd, wd );
     close(fd);

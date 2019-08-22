@@ -110,13 +110,13 @@ typedef struct process_data_priv proc_data_priv_t;
 typedef struct os_interface
 {
     addr_t (*get_current_thread)
-    (drakvuf_t drakvuf, uint64_t vcpu_id);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     addr_t (*get_current_process)
-    (drakvuf_t drakvuf, uint64_t vcpu_id);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-    status_t (*get_last_error)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* err, const char** err_str);
+    bool (*get_last_error)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
 
     char* (*get_process_name)
     (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
@@ -125,25 +125,25 @@ typedef struct os_interface
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
 
     char* (*get_current_process_name)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
 
     int64_t (*get_process_userid)
     (drakvuf_t drakvuf, addr_t process_base);
 
-    status_t (*get_process_pid)
+    bool (*get_process_pid)
     (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid);
 
     int64_t (*get_current_process_userid)
-    (drakvuf_t drakvuf, uint64_t vcpu_id);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     bool (*get_current_thread_id)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* thread_id);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
 
     bool (*get_thread_previous_mode)
     (drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
 
     bool (*get_current_thread_previous_mode)
-    (drakvuf_t drakvuf, uint64_t vcpu_id, privilege_mode_t* previous_mode);
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t* previous_mode);
 
     bool (*is_process)
     (drakvuf_t drakvuf, addr_t dtb, addr_t process_addr);
@@ -153,6 +153,9 @@ typedef struct os_interface
 
     bool (*get_module_list)
     (drakvuf_t drakvuf, addr_t process_base, addr_t* module_list);
+
+    bool (*get_module_list_wow)
+    (drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list);
 
     bool (*find_process)
     (drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* process_addr);
@@ -172,7 +175,7 @@ typedef struct os_interface
     addr_t (*exportsym_to_va)
     (drakvuf_t drakvuf, addr_t process_addr, const char* module, const char* sym);
 
-    status_t (*get_process_ppid)
+    bool (*get_process_ppid)
     (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid);
 
     bool (*get_process_data)
@@ -195,6 +198,24 @@ typedef struct os_interface
 
     bool (*is_crashreporter)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
+
+    bool (*find_mmvad)
+    (drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
+
+    bool (*get_pid_from_handle)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
+
+    bool (*get_wow_context)
+    (drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
+
+    bool (*get_user_stack32)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
+
+    bool (*get_user_stack64)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
+
+    addr_t (*get_wow_peb)
+    (drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
 
 } os_interface_t;
 

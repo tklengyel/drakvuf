@@ -1,8 +1,11 @@
+style=allman
 indent-switches
 suffix=none
-style=allman
 align-pointer=type
 align-reference=type
 indent=spaces=4
-keep-one-line-blocks
 pad-header
+pad-comma
+min-conditional-indent=0
+max-continuation-indent=40
+attach-closing-while

@@ -102,32 +102,8 @@
 *                                                                         *
 ***************************************************************************/
 
-#include <sstream>
-#include <iomanip>
-
 #include "wmimon.h"
-
-using uuid_t = unsigned char[16];
-
-static const uuid_t CLSID_WbemLocator = { 0x11, 0xF8, 0x90, 0x45, 0x3A, 0x1D, 0xD0, 0x11, 0x89, 0x1F, 0x00, 0xAA, 0x00, 0x4B, 0x2E, 0x24 }; // "4590f811-1d3a-11d0-891f-00aa004b2e24"
-static const uuid_t IID_IWbemLocator  = { 0x87, 0xA6, 0x12, 0xDC, 0x7F, 0x73, 0xCF, 0x11, 0x88, 0x4D, 0x00, 0xAA, 0x00, 0x4B, 0x2E, 0x24 }; // "dc12a687-737f-11cf-884d-00aa004b2e24"
-
-enum offset
-{
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
-    __OFFSET_MAX
-};
-
-static const char* offset_names[__OFFSET_MAX][2] =
-{
-    [LDR_DATA_TABLE_ENTRY_DLLBASE]     = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
-    [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
-    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
-    [LDR_DATA_TABLE_ENTRY_FULLDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "FullDllName" },
-};
+#include "private.h"
 
 bool FAILED(unsigned long rax)
 {
@@ -265,8 +241,8 @@ struct search_breakpoint_by_addr
                 }
                 else
                 {
-                    context ctx(info->proc_data.pid, trap, false);
-                    if (!drakvuf_enumerate_processes_with_module(drakvuf, module_name, module_visitor, &ctx))
+                    context _ctx(info->proc_data.pid, trap, false);
+                    if (!drakvuf_enumerate_processes_with_module(drakvuf, module_name, module_visitor, &_ctx))
                     {
                         PRINT_DEBUG("Failed to search a other process with loaded module %s\n", module_name);
                         g_free(module_name);
@@ -290,30 +266,6 @@ struct search_breakpoint_by_addr
 
     addr_t m_addr;
     const wmimon* m_plugin;
-};
-
-template <typename T>
-struct call_result_t : public plugin_params<T>
-{
-    call_result_t(T* src) : plugin_params<T>(src), target_cr3(), target_thread(), target_rsp() {}
-
-    void set_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
-    {
-        target_thread = thread;
-        target_cr3 = info->regs->cr3;
-        target_rsp = info->regs->rsp;
-    }
-
-    bool verify_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
-    {
-        return (info->regs->cr3 != target_cr3 ||
-                !thread || thread != target_thread ||
-                info->regs->rsp <= target_rsp) ? false : true;
-    }
-
-    reg_t target_cr3;
-    addr_t target_thread;
-    addr_t target_rsp;
 };
 
 template <typename T>
@@ -399,7 +351,7 @@ event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu)))
+    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(drakvuf, info->trap);
@@ -507,7 +459,7 @@ event_response_t ExecMethod_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu));
+    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
     params->m_object = drakvuf_get_function_argument(drakvuf, info, 2);
     params->m_method = drakvuf_get_function_argument(drakvuf, info, 3);
     params->m_vtable = drakvuf_get_function_argument(drakvuf, info, 6);
@@ -526,7 +478,7 @@ event_response_t GetObject_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu)))
+    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(drakvuf, info->trap);
@@ -621,7 +573,7 @@ event_response_t GetObject_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu));
+    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
     params->m_object = drakvuf_get_function_argument(drakvuf, info, 2);
     params->m_vtable = drakvuf_get_function_argument(drakvuf, info, 5);
 
@@ -639,7 +591,7 @@ event_response_t ExecQuery_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu)))
+    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(drakvuf, info->trap);
@@ -734,7 +686,7 @@ event_response_t ExecQuery_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu));
+    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
     params->m_command = drakvuf_get_function_argument(drakvuf, info, 3);
     params->m_vtable = drakvuf_get_function_argument(drakvuf, info, 6);
 
@@ -752,7 +704,7 @@ event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_in
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu)))
+    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(drakvuf, info->trap);
@@ -867,7 +819,7 @@ event_response_t ConnectServer_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu));
+    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
     params->m_resource = drakvuf_get_function_argument(drakvuf, info, 2);
     params->m_vtable = drakvuf_get_function_argument(drakvuf, info, 9);
 
@@ -886,7 +838,7 @@ event_response_t CoCreateInstanse_return_handler(drakvuf_t drakvuf, drakvuf_trap
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu)) || FAILED(info->regs->rax))
+    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)) || FAILED(info->regs->rax))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(drakvuf, info->trap);
@@ -959,7 +911,7 @@ event_response_t CoCreateInstanse_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info->vcpu));
+    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
     params->CLSID = drakvuf_get_function_argument(drakvuf, info, 1);
     params->IID = drakvuf_get_function_argument(drakvuf, info, 4);
     params->m_vtable = drakvuf_get_function_argument(drakvuf, info, 5);
@@ -979,10 +931,10 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
     }
 
     uint8_t addr_width = 0;
-    win_ver_t winver = VMI_OS_WINDOWS_NONE;
+    //win_ver_t winver;
     {
         vmi_lock_guard guard(drakvuf);
-        winver = vmi_get_winver(guard);
+        //winver = vmi_get_winver(guard);
         addr_width = vmi_get_address_width(guard);
     }
 

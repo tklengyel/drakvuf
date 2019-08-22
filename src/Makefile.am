@@ -104,7 +104,7 @@
 
 bin_PROGRAMS = drakvuf xen_memclone injector ozzer afl_injector
 
-SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libhijack
+SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libhijack tests
 
 drakvuf_SOURCES = main.cpp drakvuf.cpp
 xen_memclone_SOURCES = xen_memclone.c
@@ -163,6 +163,7 @@ ozzer_LDADD += plugins/libdrakvufplugins.la
 
 # AFL-Fuzzer
 afl_injector_CXXFLAGS = $(AM_CXXFLAGS)
+afl_injector_LDFLAGS = $(CAPSTONE_LIBS)
 afl_injector_LDADD = libhijack/libhijack.la
 afl_injector_LDADD += libdrakvuf/libdrakvuf.la
 afl_injector_LDADD += xen_helper/libxenhelper.la

@@ -156,7 +156,10 @@ struct allocator
 
     template<typename... _Args>
     inline T* allocate(std::size_t n, _Args&& ... args);
-    void deallocate(T* p, std::size_t n) { delete[] p; }
+    void deallocate(T* p, std::size_t n)
+    {
+        delete[] p;
+    }
 };
 
 template<typename T>
@@ -190,8 +193,14 @@ public:
     plugin_params(T* src) : source(src) {}
     virtual ~plugin_params() {}
 
-    T* operator()() const noexcept { return source; }
-    T* plugin() const noexcept { return source; }
+    T* operator()() const noexcept
+    {
+        return source;
+    }
+    T* plugin() const noexcept
+    {
+        return source;
+    }
 };
 
 struct breakpoint_in_system_process_searcher
@@ -223,7 +232,7 @@ struct breakpoint_in_system_process_searcher
 
             trap->name = m_syscall_name;
 
-            if (!drakvuf_add_trap(drakvuf, &*trap))
+            if (!drakvuf_add_trap(drakvuf, trap))
                 return nullptr;
         }
         return trap;
@@ -264,7 +273,7 @@ struct breakpoint_in_dll_module_searcher
     {
         if (trap)
         {
-            context ctx(&*trap, m_is_wow);
+            context ctx(trap, m_is_wow);
             if (!rekall_get_function_rva(m_rekall_profile, m_syscall_name, &ctx.m_function_rva))
             {
                 PRINT_DEBUG("Failed to find a function %s::%s. %s\n", m_module_name, m_syscall_name, m_is_wow ? "WoW64 " : "");
@@ -330,7 +339,7 @@ struct breakpoint_by_dtb_searcher
 
             trap->name = info->trap->name;
 
-            if (!drakvuf_add_trap(drakvuf, &*trap))
+            if (!drakvuf_add_trap(drakvuf, trap))
                 return nullptr;
         }
         return trap;
@@ -366,7 +375,7 @@ struct breakpoint_by_pid_searcher
 
             trap->name = info->trap->name;
 
-            if (!drakvuf_add_trap(drakvuf, &*trap))
+            if (!drakvuf_add_trap(drakvuf, trap))
                 return nullptr;
         }
         return trap;
@@ -399,13 +408,13 @@ public:
         if (!init_memory(plugin, trap, params, hook_cb, trap_name, ap, at))
             return nullptr;
 
-        if (!init_breakpoint(drakvuf, info, &*trap))
+        if (!init_breakpoint(drakvuf, info, trap.get()))
         {
             PRINT_DEBUG("%s for %s\n", ERROR_MSG_ADDING_TRAP, trap_name ? trap_name : trap->name);
             return nullptr;
         }
 
-        attach_plugin_params(&*trap);
+        attach_plugin_params(trap.get());
         params.release();
         return trap.release();
     }
@@ -442,7 +451,7 @@ protected:
         }
 
         trap->cb = hook_cb;
-        trap->data = &*params;
+        trap->data = params.get();
         trap->name = trap_name;
         trap->type = BREAKPOINT;
         return true;
@@ -481,5 +490,34 @@ P* get_trap_plugin(const drakvuf_trap_info_t* info)
 
     return (*reinterpret_cast<T*>(info->trap->data))();
 }
+
+template<typename T>
+struct call_result_t : public plugin_params<T>
+{
+    call_result_t(T* src) : plugin_params<T>(src), target_cr3(), target_thread(), target_rsp() {}
+
+    void set_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
+    {
+        target_thread = thread;
+        target_cr3 = info->regs->cr3;
+        target_rsp = info->regs->rsp;
+    }
+
+    bool verify_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
+    {
+        if (info->regs->cr3 != target_cr3 ||
+            !thread || thread != target_thread ||
+            info->regs->rsp <= target_rsp)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    reg_t target_cr3;
+    addr_t target_thread;
+    addr_t target_rsp;
+};
 
 #endif // PLUGIN_EX_H

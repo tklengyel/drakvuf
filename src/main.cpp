@@ -256,6 +256,14 @@ int main(int argc, char** argv)
                 "\t --rekall-wow-ole32 <rekall profile>\n"
                 "\t                           The Rekall profile for SysWOW64/ole32.dll\n"
 #endif
+#ifdef ENABLE_PLUGIN_MEMDUMP
+                "\t --memdump-dir <directory>\n"
+                "\t                           Where to store memory dumps\n"
+                "\t --dll-hooks-list <file>\n"
+                "\t                           List of DLL functions to be hooked\n"
+                "\t                           each entry in a separate line of file\n"
+                "\t                           line format: dll_name,function_name\n"
+#endif
                );
         return rc;
     }
@@ -272,6 +280,8 @@ int main(int argc, char** argv)
         opt_rekall_mpr,
         opt_rekall_ole32,
         opt_rekall_wow_ole32,
+        opt_memdump_dir,
+        opt_dll_hooks_list,
     };
     const option long_opts[] =
     {
@@ -290,6 +300,8 @@ int main(int argc, char** argv)
         {"verbose", no_argument, NULL, 'v'},
         {"rekall-ole32", required_argument, NULL, opt_rekall_ole32},
         {"rekall-wow-ole32", required_argument, NULL, opt_rekall_wow_ole32},
+        {"memdump-dir", required_argument, NULL, opt_memdump_dir},
+        {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:spT:S:Mc:nblgj:w:W:";
@@ -322,13 +334,13 @@ int main(int argc, char** argv)
                 injection_timeout = atoi(optarg);
                 break;
             case 'm':
-                if (!strncmp(optarg,"shellexec",9))
+                if (!strncmp(optarg, "shellexec", 9))
                     injection_method = INJECT_METHOD_SHELLEXEC;
-                if (!strncmp(optarg,"createproc",10))
+                if (!strncmp(optarg, "createproc", 10))
                     injection_method = INJECT_METHOD_CREATEPROC;
-                if (!strncmp(optarg,"shellcode",9))
+                if (!strncmp(optarg, "shellcode", 9))
                     injection_method = INJECT_METHOD_SHELLCODE;
-                if (!strncmp(optarg,"doppelganging",13))
+                if (!strncmp(optarg, "doppelganging", 13))
 #ifdef ENABLE_DOPPELGANGING
                     injection_method = INJECT_METHOD_DOPP;
 #else
@@ -353,11 +365,11 @@ int main(int argc, char** argv)
                 options.dump_folder = optarg;
                 break;
             case 'o':
-                if (!strncmp(optarg,"csv",3))
+                if (!strncmp(optarg, "csv", 3))
                     output = OUTPUT_CSV;
-                if (!strncmp(optarg,"kv",2))
+                if (!strncmp(optarg, "kv", 2))
                     output = OUTPUT_KV;
-                if (!strncmp(optarg,"json",4))
+                if (!strncmp(optarg, "json", 4))
                     output = OUTPUT_JSON;
                 break;
             case 'x':
@@ -428,6 +440,14 @@ int main(int argc, char** argv)
                 break;
             case opt_rekall_wow_ole32:
                 options.wow_ole32_profile = optarg;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_MEMDUMP
+            case opt_memdump_dir:
+                options.memdump_dir = optarg;
+                break;
+            case opt_dll_hooks_list:
+                options.dll_hooks_list = optarg;
                 break;
 #endif
             default:

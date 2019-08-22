@@ -119,19 +119,12 @@
 #define STACK_SIZE_16K 0x3fff
 #define MIN_KERNEL_BOUNDARY 0x80000000
 
-addr_t linux_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
+static addr_t read_process_base(drakvuf_t drakvuf, addr_t rsp, access_context_t* ctx)
 {
-    addr_t process = 0;
     vmi_instance_t vmi = drakvuf->vmi;
+    addr_t process = 0;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->regs[vcpu_id]->cr3,
-        .addr = drakvuf->regs[vcpu_id]->gs_base + drakvuf->offsets[CURRENT_TASK],
-    };
-
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &process) || process < MIN_KERNEL_BOUNDARY )
+    if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &process) || process < MIN_KERNEL_BOUNDARY )
     {
         /*
          * The kernel stack also has a structure called thread_info that points
@@ -143,13 +136,48 @@ addr_t linux_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
          * something that resembles a kernel-address.
          * See https://www.cs.columbia.edu/~smb/classes/s06-4118/l06.pdf for more info.
          */
-        ctx.addr = drakvuf->kpcr[vcpu_id] & ~STACK_SIZE_16K;
-        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &process) || process < MIN_KERNEL_BOUNDARY )
+        ctx->addr = rsp & ~STACK_SIZE_16K;
+        if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &process) || process < MIN_KERNEL_BOUNDARY )
         {
-            ctx.addr = drakvuf->kpcr[vcpu_id] & ~STACK_SIZE_8K;
-            if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &process) || process < MIN_KERNEL_BOUNDARY )
+            ctx->addr = rsp & ~STACK_SIZE_8K;
+            if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &process) || process < MIN_KERNEL_BOUNDARY )
                 process = 0;
         }
+    }
+
+    return process;
+}
+
+addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t process = 0;
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+    };
+
+    if (info->regs->cs_sel & 3)
+    {
+        // Let's assume a modern kernel with KPTI enabled first
+        ctx.dtb = info->regs->cr3 & ~0x1fffull;
+        ctx.addr = info->regs->shadow_gs;
+    }
+    else
+    {
+        // Mask PCID bits
+        ctx.dtb = info->regs->cr3 & ~0xfffull;
+        ctx.addr = info->regs->gs_base;
+    }
+
+    ctx.addr += drakvuf->offsets[CURRENT_TASK];
+
+    process = read_process_base(drakvuf, info->regs->rsp, &ctx);
+
+    if ( !process && (info->regs->cs_sel & 3) )
+    {
+        // If that didn't work and we are in usermode, try without masking KPTI bits
+        ctx.dtb |= 0x1000ull;
+        process = read_process_base(drakvuf, info->regs->rsp, &ctx);
     }
 
     return process;
@@ -158,9 +186,9 @@ addr_t linux_get_current_process(drakvuf_t drakvuf, uint64_t vcpu_id)
 /*
  * Threads are really just processes on Linux.
  */
-addr_t linux_get_current_thread(drakvuf_t drakvuf, uint64_t vcpu_id)
+addr_t linux_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    return linux_get_current_process(drakvuf, vcpu_id);
+    return linux_get_current_process(drakvuf, info);
 }
 
 char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpath)
@@ -176,7 +204,7 @@ char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpa
     return vmi_read_str(drakvuf->vmi, &ctx);
 }
 
-status_t linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid )
+bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid )
 {
     /*
      * On Linux PID is actually a thread ID, while the TGID (Thread Group-ID) is
@@ -188,20 +216,24 @@ status_t linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t
         .pid = 0,
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_TGID]
     };
-    return vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)pid);;
+
+    if ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)pid) )
+        return true;
+
+    return false;
 }
 
-char* linux_get_current_process_name(drakvuf_t drakvuf, uint64_t vcpu_id, bool fullpath)
+char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath)
 {
     UNUSED(fullpath);
-    addr_t process_base = linux_get_current_process(drakvuf, vcpu_id);
+    addr_t process_base = linux_get_current_process(drakvuf, info);
     if ( !process_base )
         return NULL;
 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->regs[vcpu_id]->cr3,
+        .dtb = info->regs->cr3,
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]
     };
 
@@ -229,16 +261,16 @@ int64_t linux_get_process_userid(drakvuf_t drakvuf, addr_t process_base)
     return uid;
 };
 
-int64_t linux_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id)
+int64_t linux_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    addr_t process_base = linux_get_current_process(drakvuf, vcpu_id);
+    addr_t process_base = linux_get_current_process(drakvuf, info);
     if ( !process_base )
         return -1;
 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->regs[vcpu_id]->cr3,
+        .dtb = info->regs->cr3,
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_CRED]
     };
 
@@ -254,19 +286,19 @@ int64_t linux_get_current_process_userid(drakvuf_t drakvuf, uint64_t vcpu_id)
     return uid;
 }
 
-bool linux_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t* thread_id )
+bool linux_get_current_thread_id( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id )
 {
     /*
      * On Linux PID is actually the thread ID....... ... ...
      */
-    addr_t process_base = linux_get_current_process(drakvuf, vcpu_id);
+    addr_t process_base = linux_get_current_process(drakvuf, info);
     if ( !process_base )
         return false;
 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->regs[vcpu_id]->cr3,
+        .dtb = info->regs->cr3,
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]
     };
     uint32_t _thread_id;
@@ -279,9 +311,9 @@ bool linux_get_current_thread_id( drakvuf_t drakvuf, uint64_t vcpu_id, uint32_t*
     return true;
 }
 
-status_t linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid )
+bool linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid )
 {
-    status_t ret ;
+    status_t status;
     addr_t parent_proc_base = 0 ;
     access_context_t ctx =
     {
@@ -290,45 +322,46 @@ status_t linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_REALPARENT]
     };
 
-    ret = vmi_read_addr( drakvuf->vmi, &ctx, &parent_proc_base );
+    status = vmi_read_addr( drakvuf->vmi, &ctx, &parent_proc_base );
 
     /* If we were unable to get the "proc->real_parent *" get "proc->parent *"... */
     /* Assuming a parent_proc_base == 0 is a fail... */
-    if ( (ret == VMI_FAILURE ) || ! parent_proc_base )
+    if ( VMI_FAILURE == status || ! parent_proc_base )
     {
         ctx.addr = process_base + drakvuf->offsets[TASK_STRUCT_PARENT];
-        ret = vmi_read_addr( drakvuf->vmi, &ctx, &parent_proc_base );
+        status = vmi_read_addr( drakvuf->vmi, &ctx, &parent_proc_base );
     }
 
     /* Get pid from parent/real_parent...*/
-    if ( ( ret == VMI_SUCCESS ) && parent_proc_base )
+    if ( VMI_SUCCESS == status && parent_proc_base )
     {
         ctx.addr = parent_proc_base + drakvuf->offsets[TASK_STRUCT_TGID];
-        return vmi_read_32( drakvuf->vmi, &ctx, (uint32_t*)ppid );
+        if ( VMI_SUCCESS == vmi_read_32( drakvuf->vmi, &ctx, (uint32_t*)ppid ) )
+            return true;
     }
 
-    return VMI_FAILURE ;
+    return false;
 }
 
 bool linux_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv_t* proc_data )
 {
     proc_data->base_addr = base_addr;
 
-    if ( base_addr )
-    {
-        if ( linux_get_process_pid( drakvuf, base_addr, &proc_data->pid ) == VMI_SUCCESS )
-        {
-            proc_data->name = linux_get_process_name( drakvuf, base_addr, true );
+    if ( !base_addr )
+        return false;
 
-            if ( proc_data->name )
-            {
-                proc_data->userid = linux_get_process_userid( drakvuf, base_addr );
-                linux_get_process_ppid( drakvuf, base_addr, &proc_data->ppid );
+    if ( !linux_get_process_pid(drakvuf, base_addr, &proc_data->pid) )
+        return false;
 
-                return true;
-            }
-        }
-    }
+    proc_data->name = linux_get_process_name(drakvuf, base_addr, true);
+
+    if ( !proc_data->name )
+        return false;
+
+    proc_data->userid = linux_get_process_userid(drakvuf, base_addr);
+
+    if ( !linux_get_process_ppid(drakvuf, base_addr, &proc_data->ppid) )
+        PRINT_DEBUG("Failed to gather parent process' PID for %s:%u\n", proc_data->name, proc_data->pid);
 
     return false;
 }

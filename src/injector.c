@@ -184,13 +184,13 @@ int main(int argc, char** argv)
                 inject_cwd = optarg;
                 break;
             case 'm':
-                if (!strncmp(optarg,"shellexec",9))
+                if (!strncmp(optarg, "shellexec", 9))
                     injection_method = INJECT_METHOD_SHELLEXEC;
-                else if (!strncmp(optarg,"createproc",10))
+                else if (!strncmp(optarg, "createproc", 10))
                     injection_method = INJECT_METHOD_CREATEPROC;
-                else if (!strncmp(optarg,"shellcode",9))
+                else if (!strncmp(optarg, "shellcode", 9))
                     injection_method = INJECT_METHOD_SHELLCODE;
-                else if (!strncmp(optarg,"doppelganging",13))
+                else if (!strncmp(optarg, "doppelganging", 13))
                     injection_method = INJECT_METHOD_DOPP;
                 else
                 {

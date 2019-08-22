@@ -455,7 +455,7 @@ static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info
     if (!injector->target_tid)
     {
         uint32_t threadid = 0;
-        if (!drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, &threadid) || !threadid)
+        if (!drakvuf_get_current_thread_id(injector->drakvuf, info, &threadid) || !threadid)
             return false;
 
         injector->target_tid = threadid;
@@ -740,7 +740,7 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
     if (info->proc_data.pid != injector->target_pid)
         return 0;
 
-    addr_t thread = drakvuf_get_current_thread(drakvuf, info->vcpu);
+    addr_t thread = drakvuf_get_current_thread(drakvuf, info);
     if (!thread)
     {
         PRINT_DEBUG("Failed to find current thread\n");
@@ -748,7 +748,7 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
     }
 
     uint32_t threadid = 0;
-    if ( !drakvuf_get_current_thread_id(injector->drakvuf, info->vcpu, &threadid) || !threadid )
+    if ( !drakvuf_get_current_thread_id(injector->drakvuf, info, &threadid) || !threadid )
         return 0;
 
     PRINT_DEBUG("Thread @ 0x%lx. ThreadID: %u\n", thread, threadid);
@@ -1050,7 +1050,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     if (injector->target_tid)
     {
         uint32_t threadid = 0;
-        if (!drakvuf_get_current_thread_id(drakvuf, info->vcpu, &threadid) || threadid != injector->target_tid)
+        if (!drakvuf_get_current_thread_id(drakvuf, info, &threadid) || threadid != injector->target_tid)
             return 0;
     }
 
@@ -1094,7 +1094,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             else
             {
                 injector->error_code.valid = true;
-                drakvuf_get_last_error(injector->drakvuf, info->vcpu, &injector->error_code.code, &injector->error_code.string);
+                drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
             }
 
             injector->rc = info->regs->rax;
@@ -1302,7 +1302,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         else
         {
             injector->error_code.valid = true;
-            drakvuf_get_last_error(injector->drakvuf, info->vcpu, &injector->error_code.code, &injector->error_code.string);
+            drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
         }
 
         injector->rc = info->regs->rax;
@@ -1506,6 +1506,7 @@ static void print_injection_info(output_format_t format, const char* file, injec
         arguments = "";
     }
 
+    char* escaped_pname = g_strescape(process_name, NULL);
     char* escaped_arguments = g_strescape(arguments, NULL);
 
     switch (injector->result)
@@ -1521,6 +1522,19 @@ static void print_injection_info(output_format_t format, const char* file, injec
                 case OUTPUT_KV:
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=Success,PID=%u,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
                            UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                    break;
+
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Plugin\": \"inject\", "
+                            "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                            "\"Status\": \"Success\", "
+                            "\"ProcessName\": \"%s\", "
+                            "\"Arguments\": \"%s\", "
+                            "\"InjectedPid\": %d, "
+                            "\"InjectedTid\": %d"
+                            "}\n",
+                            UNPACK_TIMEVAL(t), escaped_pname, escaped_arguments, injector->pid, injector->tid);
                     break;
 
                 default:
@@ -1541,6 +1555,14 @@ static void print_injection_info(output_format_t format, const char* file, injec
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=Timeout\n", UNPACK_TIMEVAL(t));
                     break;
 
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Plugin\": \"inject\", "
+                            "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                            "\"Status\": \"Timeout\""
+                            "}\n", UNPACK_TIMEVAL(t));
+                    break;
+
                 default:
                 case OUTPUT_DEFAULT:
                     printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Timeout\n", UNPACK_TIMEVAL(t));
@@ -1558,6 +1580,14 @@ static void print_injection_info(output_format_t format, const char* file, injec
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=Crash\n", UNPACK_TIMEVAL(t));
                     break;
 
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Plugin\": \"inject\", "
+                            "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                            "\"Status\": \"Crash\""
+                            "}\n", UNPACK_TIMEVAL(t));
+                    break;
+
                 default:
                 case OUTPUT_DEFAULT:
                     printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Crash\n", UNPACK_TIMEVAL(t));
@@ -1573,6 +1603,14 @@ static void print_injection_info(output_format_t format, const char* file, injec
 
                 case OUTPUT_KV:
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=PrematureBreak\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Plugin\": \"inject\", "
+                            "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                            "\"Status\": \"PrematureBreak\""
+                            "}\n", UNPACK_TIMEVAL(t));
                     break;
 
                 default:
@@ -1594,6 +1632,17 @@ static void print_injection_info(output_format_t format, const char* file, injec
                            UNPACK_TIMEVAL(t), injector->error_code.code, injector->error_code.string);
                     break;
 
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Plugin\": \"inject\", "
+                            "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                            "\"Status\": \"Error\", "
+                            "\"ErrorCode\": %d, "
+                            "\"Error\": \"%s\""
+                            "}\n",
+                            UNPACK_TIMEVAL(t), injector->error_code.code, injector->error_code.string);
+                    break;
+
                 default:
                 case OUTPUT_DEFAULT:
                     printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Error ERROR_CODE:%d ERROR:\"%s\"\n",
@@ -1603,6 +1652,7 @@ static void print_injection_info(output_format_t format, const char* file, injec
             break;
     }
 
+    g_free(escaped_pname);
     g_free(escaped_arguments);
     g_strfreev(split_results);
 }
@@ -1649,9 +1699,9 @@ addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib,
         // First get modules load address to search for other process with same address
         access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_PID, };
         addr_t module_list_head;
-        if (VMI_SUCCESS == drakvuf_get_process_pid(drakvuf, eprocess_base, &ctx.pid) &&
-                drakvuf_get_module_list(drakvuf, eprocess_base, &module_list_head) &&
-                drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, lib, &module_ctx.module_addr))
+        if (drakvuf_get_process_pid(drakvuf, eprocess_base, &ctx.pid) &&
+            drakvuf_get_module_list(drakvuf, eprocess_base, &module_list_head) &&
+            drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, lib, &module_ctx.module_addr))
         {
             drakvuf_enumerate_processes_with_module(drakvuf, lib, module_visitor, &module_ctx);
         }

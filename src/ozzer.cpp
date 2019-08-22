@@ -1,4 +1,4 @@
-#include <config.h>
+    #include <config.h>
 #include <ctype.h>
 #include <getopt.h>
 #include <stdio.h>
@@ -12,6 +12,7 @@
 #include "libdrakvuf/libdrakvuf.h"
 #include "colors.h"
 #include "plugins/plugins.h"
+#include "capstone/capstone.h"
 
 #define SEED 321651
 GRand *grand;
@@ -170,7 +171,6 @@ int main(int argc, char **argv){
         return rc;
     }
     json_object *candidates = json_object_from_file(fuzz_candidates_path);
-    int successfull = 0;
     fprintf(stderr, "STARTING FUZZING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
     while(fuzz_iterations<num_iterations)
     {   
@@ -218,7 +218,6 @@ int main(int argc, char **argv){
         else
         {
             fuzz_iterations++;
-            successfull++;
         }
         
         fprintf(stderr, "waiting for lock\n");
@@ -229,9 +228,8 @@ int main(int argc, char **argv){
         
     }
     // error:
-    drakvuf_resume(drakvuf); 
     drakvuf_close(drakvuf, 0);
-    printf("[+] Successfull = %d", successfull);
+    printf("[+] Successfull = %d", fuzz_iterations);
     
 
 }

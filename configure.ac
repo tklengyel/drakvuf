@@ -326,6 +326,16 @@ if test x$plugin_wmimon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_WMIMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_memdump],
+  [AS_HELP_STRING([--disable-plugin-memdump],
+    [Enable the windows memory dumping plugin @<:@yes@:>@])],
+  [plugin_memdump="$enableval"],
+  [plugin_memdump="yes"])
+AM_CONDITIONAL([PLUGIN_MEMDUMP], [test x$plugin_memdump = xyes])
+if test x$plugin_memdump = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_MEMDUMP, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -496,7 +506,7 @@ AC_CHECK_LIB(pthread, pthread_create, [], [AC_ERROR([Pthread library is not func
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.28], [], [AC_ERROR([glib-2.0 (version 2.28+) has to be installed!])])
 PKG_CHECK_MODULES([VMI], [libvmi >= 0.11], [], [AC_ERROR([LibVMI not found])])
 PKG_CHECK_MODULES([JSONC], [json-c], [], [AC_ERROR([libjson-c not found])])
-
+PKG_CHECK_MODULES([CAPSTONE], [capstone], [], [AC_ERROR([libcapstone not found])])
 AC_CHECK_LIB([xencall], [xencall_buffers_never_fault])
 AC_CHECK_LIB([xenforeignmemory], [xenforeignmemory_map_resource])
 
@@ -521,6 +531,7 @@ AC_CONFIG_FILES([Makefile src/Makefile
                  src/xen_helper/Makefile
                  src/plugins/Makefile
                  src/dirwatch/Makefile
+		src/tests/Makefile
                ])
 
 AC_OUTPUT
@@ -554,4 +565,5 @@ WindowMon:    $plugin_windowmon
 LibraryMon:   $plugin_librarymon
 DKOMmon:      $plugin_dkommon
 WMIMon:       $plugin_wmimon
+MEMDump:      $plugin_memdump
 -------------------------------------------------------------------------------])

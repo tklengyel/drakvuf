@@ -158,7 +158,7 @@ bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap,
             vmi_free_unicode_str(us);
         }
 
-        if (out.contents && !strcmp((char*)out.contents,trap->breakpoint.module))
+        if (out.contents && !strcmp((char*)out.contents, trap->breakpoint.module))
         {
             g_free(out.contents);
             return inject_trap(drakvuf, trap, dllbase, pid);
@@ -458,6 +458,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.is_process = win_is_eprocess;
     drakvuf->osi.is_thread = win_is_ethread;
     drakvuf->osi.get_module_list = win_get_module_list;
+    drakvuf->osi.get_module_list_wow = win_get_module_list_wow;
     drakvuf->osi.find_process = win_find_eprocess;
     drakvuf->osi.inject_traps_modules = win_inject_traps_modules;
     drakvuf->osi.exportksym_to_va = ksym2va;
@@ -471,6 +472,12 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.enumerate_processes = win_enumerate_processes;
     drakvuf->osi.enumerate_processes_with_module = win_enumerate_processes_with_module;
     drakvuf->osi.is_crashreporter = win_is_crashreporter;
+    drakvuf->osi.find_mmvad = win_find_mmvad;
+    drakvuf->osi.get_pid_from_handle = win_get_pid_from_handle;
+    drakvuf->osi.get_wow_context = win_get_wow_context;
+    drakvuf->osi.get_user_stack32 = win_get_user_stack32;
+    drakvuf->osi.get_user_stack64 = win_get_user_stack64;
+    drakvuf->osi.get_wow_peb = win_get_wow_peb;
 
     return true;
 }

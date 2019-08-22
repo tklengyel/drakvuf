@@ -113,6 +113,10 @@
 
 #include "xen_helper.h"
 
+#ifndef XEN_ALTP2M_external
+#define XEN_ALTP2M_external 2
+#endif
+
 bool xen_init_interface(xen_interface_t** xen)
 {
 
@@ -211,7 +215,7 @@ int get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
         xc_dominfo_t info = { 0 };
 
         if ( 1 == xc_domain_getinfo(xen->xc, _domID, 1, &info)
-                && info.domid == _domID)
+             && info.domid == _domID)
         {
             _name = libxl_domid_to_name(xen->xl_ctx, _domID);
         }
@@ -336,6 +340,33 @@ void xen_force_resume(xen_interface_t* xen, domid_t domID)
         else
             break;
 
+    } while (1);
+}
+
+bool xen_enable_altp2m(xen_interface_t* xen, domid_t domID)
+{
+    uint64_t param_altp2m;
+
+    int rc = xc_hvm_param_get(xen->xc, domID, HVM_PARAM_ALTP2M, &param_altp2m);
+    if (rc < 0)
+    {
+        fprintf(stderr, "Failed to get HVM_PARAM_ALTP2M, RC: %i\n", rc);
+        return 0;
     }
-    while (1);
+
+    if (param_altp2m != XEN_ALTP2M_external)
+    {
+        rc = xc_hvm_param_set(xen->xc, domID, HVM_PARAM_ALTP2M, XEN_ALTP2M_external);
+        if (rc < 0)
+        {
+            fprintf(stderr, "Failed to set HVM_PARAM_ALTP2M, RC: %i\n", rc);
+            return 0;
+        }
+    }
+
+    rc = xc_altp2m_set_domain_state(xen->xc, domID, 1);
+    if (rc < 0)
+        return 0;
+
+    return 1;
 }

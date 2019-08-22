@@ -1,6 +1,6 @@
-dist: xenial
+dist: bionic
 language: c
-sudo: false
+sudo: true
 compiler: clang
 git:
     submodules: false
@@ -29,12 +29,12 @@ matrix:
 #
     - env:
         - TEST="astyle"
-      sudo: required
-      install:
-        - sudo apt-get install astyle
+      before_install:
+        - sudo apt-get update
+        - sudo apt-get -q -y install astyle
       script:
-        - export ARTISTIC_STYLE_OPTIONS=".astylerc" && astyle `find . | egrep "\.c|\.h"` > astyle.out
-        - TEST=$(cat astyle.out | grep Formatted | wc -l)
+        - export ARTISTIC_STYLE_OPTIONS=".astylerc" && astyle -Q `find . | egrep "\.c|\.h"` > astyle.out
+        - TEST=$(cat astyle.out | wc -l)
         - |
           if [[ $TEST -ne 0 ]]; then
             cat astyle.out
@@ -48,22 +48,9 @@ matrix:
 #
     - env:
         - TEST="compile"
-      addons:
-        apt:
-            sources:
-                - ubuntu-toolchain-r-test
-            packages:
-                - bison
-                - flex
-                - check
-                - libjson-c-dev
-                - autoconf-archive
-                - libyajl2
-                - uuid-dev
-                - libpixman-1-dev
-                - libaio-dev
-                - libxen-dev
       before_install:
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
@@ -73,7 +60,8 @@ matrix:
         - export CFLAGS="-I$PWD/usr/local/include"
         - git submodule update --init libvmi
         - cd libvmi
-        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DENABLE_KVM=OFF -DENABLE_FILE=OFF .
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
         - make
         - make install
         - cd ..
@@ -88,22 +76,7 @@ matrix:
 #
     - env:
         - TEST="Coverity"
-      sudo: required
       addons:
-        apt:
-            sources:
-                - ubuntu-toolchain-r-test
-            packages:
-                - bison
-                - flex
-                - check
-                - libjson-c-dev
-                - autoconf-archive
-                - libyajl2
-                - uuid-dev
-                - libpixman-1-dev
-                - libaio-dev
-                - libxen-dev
         coverity_scan:
             project:
                 name: "$COVERITY_PROJECT_NAME"
@@ -113,6 +86,8 @@ matrix:
             build_command:   "make"
             branch_pattern: $COVERITY_BRANCH_PATTERN
       before_install:
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
@@ -122,7 +97,8 @@ matrix:
         - export CFLAGS="-I$PWD/usr/local/include"
         - git submodule update --init libvmi
         - cd libvmi
-        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DENABLE_KVM=OFF -DENABLE_FILE=OFF .
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
         - make
         - make install
         - cd ..
@@ -134,23 +110,9 @@ matrix:
 #
     - env:
         - TEST="scan-build"
-      addons:
-        apt:
-            sources:
-                - ubuntu-toolchain-r-test
-                - llvm-toolchain-xenial-7
-            packages:
-                - bison
-                - flex
-                - check
-                - libjson-c-dev
-                - autoconf-archive
-                - libyajl2
-                - uuid-dev
-                - libpixman-1-dev
-                - libaio-dev
-                - libxen-dev
       before_install:
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
@@ -160,45 +122,32 @@ matrix:
         - export CFLAGS="-I$PWD/usr/local/include"
         - git submodule update --init libvmi
         - cd libvmi
-        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DENABLE_KVM=OFF -DENABLE_FILE=OFF .
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
         - make
         - make install
         - cd ..
       install:
         - ./autogen.sh
       script:
-        - scan-build --status-bugs --use-cc=clang ./configure --enable-debug
-        - cd src/libdrakvuf && scan-build --status-bugs --use-cc=clang make && cd ../..
-        - cd src/xen_helper && scan-build --status-bugs --use-cc=clang make && cd ../..
-        - cd src/libinjector && scan-build --status-bugs --use-cc=clang make && cd ../..
-        - cd src/dirwatch && scan-build --status-bugs --use-cc=clang make && cd ../..
+        - scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
+        - scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores make
 
 #
 # SonarCloud
 #
     - env:
         - TEST="SonarCloud"
+      dist: xenial
+      edge: true
       addons:
-        apt:
-            sources:
-                - ubuntu-toolchain-r-test
-                - llvm-toolchain-xenial-7
-            packages:
-                - bison
-                - flex
-                - check
-                - libjson-c-dev
-                - autoconf-archive
-                - libyajl2
-                - uuid-dev
-                - libpixman-1-dev
-                - libaio-dev
-                - libxen-dev
         sonarcloud:
             organization: "drakvuf"
             token:
                 secure: "$SONAR_TOKEN"
       before_install:
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
@@ -208,7 +157,8 @@ matrix:
         - export CFLAGS="-I$PWD/usr/local/include"
         - git submodule update --init libvmi
         - cd libvmi
-        - cmake -DCMAKE_INSTALL_PREFIX=${INSTALLDIR} -DENABLE_KVM=OFF -DENABLE_FILE=OFF .
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
         - make
         - make install
         - cd ..

@@ -119,6 +119,7 @@
 
 #include <libvmi/libvmi.h>
 #include "../plugins.h"
+#include "private.h"
 #include "cpuidmon.h"
 
 event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -205,10 +206,10 @@ event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 /* ----------------------------------------------------- */
 
-cpuidmon::cpuidmon(drakvuf_t drakvuf, bool stealth, output_format_t output)
-    : format{output}
-    , drakvuf{drakvuf}
-    , stealth{stealth}
+cpuidmon::cpuidmon(drakvuf_t _drakvuf, bool _stealth, output_format_t _output)
+    : format{_output}
+    , drakvuf{_drakvuf}
+    , stealth{_stealth}
 {
     this->cpuid.cb = cpuid_cb;
     this->cpuid.data = (void*)this;
