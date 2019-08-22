@@ -748,7 +748,7 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     // sometimes the physical address was incorrectly cached in this moment, so we need to flush it
-    vmi_v2pcache_flush(vmi);
+    vmi_v2pcache_flush(vmi, info->regs->cr3);
     addr_t pa;
 
     if (vmi_pagetable_lookup(vmi, info->regs->cr3, data->vaddr, &pa) != VMI_SUCCESS)
