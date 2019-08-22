@@ -757,8 +757,6 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
         goto end;
     }
 
-    pa = pinfo.paddr;
-
     if (data->old_cow_pa == pa)
     {
         PRINT_DEBUG("[MEMDUMP-USER] PA after CoW remained the same, wtf? Nothing to do here...\n");
