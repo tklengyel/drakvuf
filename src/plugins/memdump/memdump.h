@@ -126,7 +126,6 @@ class memdump: public pluginex
 public:
     // for memdump.cpp
     const char* memdump_dir;
-    int memdump_counter;
     addr_t dll_base_rva;
     addr_t dll_base_wow_rva;
 
