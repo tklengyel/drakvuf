@@ -1,3 +1,4 @@
+//aj
 #include <unistd.h>
 #include <afl_injector.h>
 #include <sys/shm.h>
@@ -472,8 +473,8 @@ int main(int argc, char *argv[])
     if(afl_mode){
         temp_stderr = stderr;
         temp_stdout = stdout;
-        stdout = fopen("/home/ajinkya/College/gsoc19/AFL/log_stdout.txt", "w");
-        stderr = fopen("/home/ajinkya/College/gsoc19/AFL/log_stderr.txt", "w");
+        stdout = fopen("../AFL/log_stdout.txt", "w");
+        stderr = fopen("../AFL/log_stderr.txt", "w");
         afl_setup();    
         afl_forkserver();
         initialize_locations();
