@@ -106,16 +106,6 @@
 #define MEMDUMP_PRIVATE_H
 
 template<typename T>
-struct copy_on_write_result_t: public call_result_t<T>
-{
-    copy_on_write_result_t(T* src) : call_result_t<T>(src), vaddr(), pte(), old_cow_pa() {}
-
-    addr_t vaddr;
-    addr_t pte;
-    addr_t old_cow_pa;
-};
-
-template<typename T>
 struct map_view_of_section_result_t: public call_result_t<T>
 {
     map_view_of_section_result_t(T* src) : call_result_t<T>(src), section_handle(), process_handle(), base_address_ptr() {}
@@ -147,6 +137,17 @@ struct hook_target_entry_t
 
     hook_target_entry_t(std::string target_name, callback_t callback, memdump* plugin)
         : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
+};
+
+template<typename T>
+struct copy_on_write_result_t: public call_result_t<T>
+{
+    copy_on_write_result_t(T* src) : call_result_t<T>(src), vaddr(), pte(), old_cow_pa() {}
+
+    addr_t vaddr;
+    addr_t pte;
+    addr_t old_cow_pa;
+    std::vector<hook_target_entry_t*> hooks;
 };
 
 struct user_dll_t
