@@ -351,9 +351,9 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
 
     // during CoW we need to find all traps placed on the same physical page
     // that's why we'll manually resolve vaddr and strore paddr under trap->breakpoint.addr
-    addr_t pa = vmi_pagetable_lookup(vmi, info->regs->cr3, exec_func);
+    addr_t pa;
 
-    if (pa == 0)
+    if (vmi_pagetable_lookup(vmi, info->regs->cr3, exec_func, &pa) != VMI_SUCCESS)
     {
         goto fail;
     }
@@ -749,9 +749,9 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
     // sometimes the physical address was incorrectly cached in this moment, so we need to flush it
     vmi_v2pcache_flush(vmi);
-    addr_t pa = vmi_pagetable_lookup(vmi, info->regs->cr3, data->vaddr);
+    addr_t pa;
 
-    if (pa == 0)
+    if (vmi_pagetable_lookup(vmi, info->regs->cr3, data->vaddr, &pa) != VMI_SUCCESS)
     {
         PRINT_DEBUG("[MEMDUMP-USER] failed to get pa");
         goto end;
@@ -791,9 +791,9 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    addr_t pa = vmi_pagetable_lookup(vmi, info->regs->cr3, vaddr);
+    addr_t pa;
 
-    if (pa == 0)
+    if (vmi_pagetable_lookup(vmi, info->regs->cr3, vaddr, &pa) != VMI_SUCCESS)
     {
         PRINT_DEBUG("[MEMDUMP-USER] failed to get pa");
         drakvuf_release_vmi(drakvuf);
