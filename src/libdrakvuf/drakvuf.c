@@ -601,8 +601,7 @@ bool drakvuf_get_process_data(drakvuf_t drakvuf, addr_t process_base, proc_data_
     proc_data->ppid = proc_data_priv.ppid;
     proc_data->base_addr = proc_data_priv.base_addr;
     proc_data->userid = proc_data_priv.userid;
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
-        proc_data->tid = proc_data_priv.tid;
+    proc_data->tid = proc_data_priv.tid;
     return success;
 }
 

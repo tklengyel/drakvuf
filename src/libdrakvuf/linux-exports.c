@@ -120,7 +120,7 @@
 #include "linux-exports.h"
 #include "linux-offsets.h"
 
-#define PAGE_SHIFT          12
+#define PAGE_SHIFT          	12
 #define VM_READ		        0x00000001
 #define VM_WRITE	        0x00000002
 #define VM_EXEC		        0x00000004

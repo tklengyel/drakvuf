@@ -364,24 +364,22 @@ bool linux_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv
 {
     proc_data->base_addr = base_addr;
 
-    if ( !base_addr )
-        return false;
-
-    if ( !linux_get_process_pid(drakvuf, base_addr, &proc_data->pid) )
-        return false;
-
-    proc_data->name = linux_get_process_name(drakvuf, base_addr, true);
-
-    if ( !proc_data->name )
-        return false;
-
-    proc_data->userid = linux_get_process_userid(drakvuf, base_addr);
-
-    if ( !linux_get_process_ppid(drakvuf, base_addr, &proc_data->ppid) )
-        PRINT_DEBUG("Failed to gather parent process' PID for %s:%u\n", proc_data->name, proc_data->pid);
-
-    if (!linux_get_process_tid(drakvuf, base_addr, &proc_data->tid))
-        PRINT_DEBUG("Failed to gather current process tid");
+    if ( base_addr )
+    {
+        if ( linux_get_process_pid( drakvuf, base_addr, &proc_data->pid ) )
+        {
+            proc_data->name = linux_get_process_name(drakvuf, base_addr, true);
+            if ( linux_get_process_ppid(drakvuf, base_addr, &proc_data->ppid))
+            {
+                proc_data->userid = linux_get_process_userid(drakvuf, base_addr);
+                linux_get_process_tid(drakvuf, base_addr, &proc_data->tid);
+                if ( proc_data->tid )
+                    return true;
+            }
+            else
+                PRINT_DEBUG("Failed to gather info for %s:%u\n", proc_data->name, proc_data->pid);
+        }
+    }
 
     return false;
 }
