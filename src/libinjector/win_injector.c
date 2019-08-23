@@ -524,7 +524,7 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     (void)drakvuf;
     injector_t injector = info->trap->data;
 
-    if ( info->proc_data.pid != injector->target_pid )
+    if ( info->proc_data.pid != injector->target_pid || ( injector->target_tid && (uint32_t)info->proc_data.tid != injector->target_tid ))
     {
         PRINT_DEBUG("MemX received but PID (%u) doesn't match target process (%u)\n",
                     info->proc_data.pid, injector->target_pid);
@@ -596,8 +596,8 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
 {
     injector_t injector = info->trap->data;
 
-    PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". PID: %u PPID: %u\n",
-                info->regs->cr3, info->proc_data.pid, info->proc_data.ppid);
+    PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". PID: %u PPID: %u TID: %u\n",
+                info->regs->cr3, info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid);
 
     if (info->proc_data.pid != injector->target_pid)
         return 0;
@@ -609,13 +609,7 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
         return 0;
     }
 
-    uint32_t threadid = 0;
-    if ( !drakvuf_get_current_thread_id(injector->drakvuf, info, &threadid) || !threadid )
-        return 0;
-
-    PRINT_DEBUG("Thread @ 0x%lx. ThreadID: %u\n", thread, threadid);
-
-    if (injector->target_tid && injector->target_tid != threadid)
+    if (injector->target_tid && injector->target_tid != (uint32_t)info->proc_data.tid)
         return 0;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -713,7 +707,7 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
 {
     injector_t injector = info->trap->data;
 
-    if (injector->pid != (uint32_t)info->proc_data.pid)
+    if (injector->pid != (uint32_t)info->proc_data.pid || injector->tid != (uint32_t)info->proc_data.tid)
         return 0;
 
     PRINT_DEBUG("Process start detected %i -> 0x%lx\n", injector->pid, info->regs->cr3);
@@ -867,11 +861,11 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     if (info->regs->rip != info->trap->breakpoint.addr)
         return 0;
 
-    if (injector->target_tid)
+    if (injector->target_tid && (uint32_t)info->proc_data.tid != injector->target_tid)
     {
-        uint32_t threadid = 0;
-        if (!drakvuf_get_current_thread_id(drakvuf, info, &threadid) || threadid != injector->target_tid)
-            return 0;
+        PRINT_DEBUG("INT3 received but '%s' TID (%u) doesn't match target process (%u)\n",
+                    info->proc_data.name, info->proc_data.tid, injector->target_tid);
+        return 0;
     }
 
     if (injector->target_rsp && info->regs->rsp <= injector->target_rsp)

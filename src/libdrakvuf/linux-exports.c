@@ -198,16 +198,16 @@ addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pi
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &vm_flags))
             goto next;
 
-        if (strncmp(libname, lib, strlen(lib)) == 0 && (vm_flags & VM_READ) && (vm_flags & VM_EXEC))
+        if (strncmp(libname, lib, strlen(lib)) == 0 )
         {
-            text_segment_address = vm_start;
-        }
-
-        if (strncmp(libname, lib, strlen(lib)) == 0 && (vm_flags & VM_READ) && !(vm_flags & VM_WRITE)&& !(vm_flags & VM_EXEC))
-        {
-            data_segment_address = vm_start;
-            text_segment_size = pgoffset;
-            break;
+            if ((vm_flags & VM_READ) && (vm_flags & VM_EXEC))
+                text_segment_address = vm_start;
+            else if ((vm_flags & VM_READ) && !(vm_flags & VM_WRITE)&& !(vm_flags & VM_EXEC))
+            {
+                data_segment_address = vm_start;
+                text_segment_size = pgoffset;
+                break;
+            }
         }
 
 next:
@@ -279,6 +279,7 @@ next:
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &word))
             return -1;
         ctx.addr += 0x8;
+
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ptr))
             return -1;
         ctx.addr += 0x8;
@@ -288,7 +289,8 @@ next:
         if (word == 0x6) // .symtab section offset
             dynsym_offset = ptr;
 
-        // Offsets for Relocation table section
+        // Offsets for Relocation table section for (TODO Section)
+        // Symbols offset of relocated symbols are not yet found.
         // if (word == 0x7) // address of .rela.dyn section
         //     rela_section_offset = ptr;
         // if (word == 0x8) // total size of .rela.dyn section
@@ -302,6 +304,7 @@ next:
             dynsym_entry_size = ptr;
     } while (word != 0x0 && ptr != 0x0);
 
+    // TODO
     // Reading Relocatable files
     // Symbol mapping of relocated symbols is not yet done.
     // Offsets are found but mapping is to symbol name is not completed
@@ -395,6 +398,7 @@ addr_t get_lib_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t p
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT],
         .pid = pid
     };
+
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mm_struct_address))
         return -1;
 

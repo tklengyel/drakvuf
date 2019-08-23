@@ -438,6 +438,7 @@ static addr_t place_string_on_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_
 
     size_t buf_len = orig_addr - addr;
     void* buf = g_malloc0(buf_len);
+
     if (!buf) return 0;
     memcpy(buf, str, str_len);
 
@@ -557,13 +558,6 @@ bool setup_linux_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, struct argu
     ctx.addr = addr;
     if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &info->regs->rip))
         goto err;
-
-
-    // // save the rbp (NOT needed)
-    // addr -= 0x8;
-    // ctx.addr = addr;
-    // if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &info->regs->rbp))
-    //     goto err;
 
     // grow the stack
     info->regs->rsp = addr;

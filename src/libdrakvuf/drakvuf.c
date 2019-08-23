@@ -585,7 +585,11 @@ int drakvuf_get_address_width(drakvuf_t drakvuf)
 bool drakvuf_get_current_process_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info, proc_data_priv_t* proc_data)
 {
     addr_t process_base = drakvuf_get_current_process(drakvuf, info);
-    return drakvuf_get_process_data_priv(drakvuf, process_base, proc_data);
+    if ( drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
+        return drakvuf_get_process_data_priv(drakvuf, process_base, proc_data);
+    else if ( drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
+        return drakvuf_get_process_data_priv(drakvuf, process_base, proc_data) && drakvuf_get_current_thread_id(drakvuf, info, (uint32_t*)&proc_data->tid);
+    return false;
 }
 
 bool drakvuf_get_process_data(drakvuf_t drakvuf, addr_t process_base, proc_data_t* proc_data)

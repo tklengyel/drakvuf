@@ -450,12 +450,10 @@ static event_response_t inject_payload_linux(drakvuf_t drakvuf, drakvuf_trap_inf
 
     info->regs->rip = injector->payload_addr;
 
-
     if (!injector_set_hijacked(injector, info))
         return 0;
+
     injector->status = STATUS_EXEC_OK;
-
-
     PRINT_DEBUG("Executing the payload..\n");
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -912,10 +910,7 @@ int injector_start_app_on_linux(
     injector->method = method;
     injector->target_file = file;
     char* file_name = g_strrstr(file, "/");
-    if (file_name != NULL)
-        injector->target_file_name = file_name + 1;
-    else
-        injector->target_file_name = file;
+    injector->target_file_name = file_name ? file_name + 1 : file;
     injector->status = STATUS_NULL;
     injector->error_code.valid = false;
     injector->error_code.code = -1;

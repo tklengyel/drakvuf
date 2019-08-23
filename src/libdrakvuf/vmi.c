@@ -370,6 +370,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.proc_data.pid       = proc_data.pid;
     trap_info.proc_data.ppid      = proc_data.ppid;
     trap_info.proc_data.userid    = proc_data.userid;
+    trap_info.proc_data.tid       = proc_data.tid;
 
     GSList* loop = s->traps;
     drakvuf->in_callback = 1;
@@ -547,8 +548,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.proc_data.pid       = proc_data.pid;
     trap_info.proc_data.ppid      = proc_data.ppid;
     trap_info.proc_data.userid    = proc_data.userid;
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
-        trap_info.proc_data.tid    = proc_data.tid;
+    trap_info.proc_data.tid       = proc_data.tid;
 
     drakvuf->in_callback = 1;
     GSList* loop = s->traps;
@@ -614,8 +614,7 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.proc_data.pid       = proc_data.pid;
     trap_info.proc_data.ppid      = proc_data.ppid;
     trap_info.proc_data.userid    = proc_data.userid;
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
-        trap_info.proc_data.tid    = proc_data.tid;
+    trap_info.proc_data.tid       = proc_data.tid;
 
     drakvuf->in_callback = 1;
     GSList* loop = drakvuf->cr3;
@@ -668,6 +667,7 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.proc_data.pid       = proc_data.pid;
     trap_info.proc_data.ppid      = proc_data.ppid;
     trap_info.proc_data.userid    = proc_data.userid;
+    trap_info.proc_data.tid       = proc_data.tid;
 
     drakvuf->in_callback = 1;
     GSList* loop = drakvuf->debug;
@@ -721,6 +721,7 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.proc_data.pid       = proc_data.pid;
     trap_info.proc_data.ppid      = proc_data.ppid;
     trap_info.proc_data.userid    = proc_data.userid;
+    trap_info.proc_data.tid       = proc_data.tid;
 
     drakvuf->in_callback = 1;
     GSList* loop = drakvuf->cpuid;

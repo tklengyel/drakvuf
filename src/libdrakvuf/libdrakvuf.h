@@ -168,7 +168,7 @@ typedef struct process_data
     vmi_pid_t ppid ;    /* Process parent pid */
     addr_t base_addr ;  /* Process base address */
     int64_t userid ;    /* Process SessionID/UID */
-    uint32_t tid ;    /* Thread Id for Linux */
+    uint32_t tid ;    /* Thread Id for Linux & Windows*/
 } proc_data_t ;
 
 typedef struct drakvuf* drakvuf_t;
