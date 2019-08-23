@@ -402,29 +402,6 @@ err:
     return 0;
 }
 
-bool setup_stack_locked(
-    drakvuf_t drakvuf,
-    vmi_instance_t vmi,
-    drakvuf_trap_info_t* info,
-    struct argument args[],
-    int nb_args)
-{
-    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    return is32bit ? setup_stack_32(vmi, info, args, nb_args) : setup_stack_64(vmi, info, args, nb_args);
-}
-
-bool setup_stack(
-    drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    struct argument args[],
-    int nb_args)
-{
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    bool success = setup_stack_locked(drakvuf, vmi, info, args, nb_args);
-    drakvuf_release_vmi(drakvuf);
-    return success;
-}
-
 static addr_t place_string_on_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void const* str, size_t str_len)
 {
     if (!str) return addr;
@@ -455,11 +432,9 @@ static addr_t place_string_on_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_
     return status == VMI_FAILURE ? 0 : addr;
 }
 
-bool setup_linux_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, struct argument args[], int nb_args)
+bool setup_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct argument args[], int nb_args)
 {
     uint64_t nul64 = 0;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     access_context_t ctx =
     {
@@ -563,10 +538,41 @@ bool setup_linux_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, struct argu
     info->regs->rsp = addr;
     info->regs->rbp = addr;
 
-    drakvuf_release_vmi(drakvuf);
-    return 1;
+    return true;
 
 err:
+    return false;
+}
+
+bool setup_stack_locked(
+    drakvuf_t drakvuf,
+    vmi_instance_t vmi,
+    drakvuf_trap_info_t* info,
+    struct argument args[],
+    int nb_args)
+{
+    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
+    {
+        bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+        return is32bit ? setup_stack_32(vmi, info, args, nb_args) : setup_stack_64(vmi, info, args, nb_args);
+    }
+    else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
+    {
+        return setup_linux_stack(vmi, info, args, nb_args);
+    }
+    else
+        return false;
+}
+
+bool setup_stack(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    struct argument args[],
+    int nb_args)
+{
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    bool success = setup_stack_locked(drakvuf, vmi, info, args, nb_args);
     drakvuf_release_vmi(drakvuf);
-    return 0;
+    return success;
 }

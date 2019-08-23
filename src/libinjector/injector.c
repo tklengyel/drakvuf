@@ -102,50 +102,54 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef LIBINJECTOR_PRIVATE_H
-#define LIBINJECTOR_PRIVATE_H
+#include <libinjector/libinjector.h>
+#include "private.h"
 
-#ifdef DRAKVUF_DEBUG
+int injector_start_app(
+    drakvuf_t drakvuf,
+    vmi_pid_t pid,
+    uint32_t tid,
+    const char* app,
+    const char* cwd,
+    injection_method_t method,
+    output_format_t format,
+    const char* binary_path,
+    const char* target_process,
+    bool break_loop_on_detection,
+    injector_t* injector_to_be_freed,
+    bool global_search,
+    int args_count,
+    const char* args[])
+{
+    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
+    {
+        return injector_start_app_on_win(drakvuf,
+                                         pid,
+                                         tid,
+                                         app,
+                                         cwd,
+                                         method,
+                                         format,
+                                         binary_path,
+                                         target_process,
+                                         break_loop_on_detection,
+                                         injector_to_be_freed,
+                                         global_search);
+    }
+    else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
+    {
+        if (!tid)
+            tid = pid;
 
-extern bool verbose;
-
-#define PRINT_DEBUG(args...) \
-    do { \
-        if(verbose) fprintf (stderr, args); \
-    } while (0)
-
-#else
-#define PRINT_DEBUG(args...) \
-    do {} while(0)
-#endif
-
-#define ARRAY_SIZE(arr) sizeof((arr)) / sizeof((arr)[0])
-
-#ifdef __clang_analyzer__
-#define vmi_free_unicode_str g_free
-#endif
-
-#endif
-
-int injector_start_app_on_linux(drakvuf_t drakvuf,
-                                vmi_pid_t pid,
-                                uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used i.e, tid = pid
-                                const char* app,
-                                injection_method_t method,
-                                output_format_t format,
-                                int args_count,
-                                const char* args[]);
-
-
-int injector_start_app_on_win(drakvuf_t drakvuf,
-                              vmi_pid_t pid,
-                              uint32_t tid,
-                              const char* app,
-                              const char* cwd,
-                              injection_method_t method,
-                              output_format_t format,
-                              const char* binary_path,
-                              const char* target_process,
-                              bool break_loop_on_detection,
-                              injector_t* injector_to_be_freed,
-                              bool global_search);
+        return injector_start_app_on_linux(drakvuf,
+                                           pid,
+                                           tid,
+                                           app,
+                                           method,
+                                           OUTPUT_DEFAULT,
+                                           args_count,
+                                           args);
+    }
+    else
+        return 0;
+}

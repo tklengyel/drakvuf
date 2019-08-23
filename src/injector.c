@@ -278,34 +278,21 @@ int main(int argc, char** argv)
 
     printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
 
-    int injection_result = 0;
-
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-    {
-        injection_result = injector_start_app_on_win(drakvuf,
-                           injection_pid,
-                           injection_thread,
-                           inject_file,
-                           inject_cwd,
-                           injection_method,
-                           OUTPUT_DEFAULT,
-                           binary_path,
-                           target_process,
-                           false,
-                           NULL,
-                           injection_global_search);
-    }
-    else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
-    {
-        injection_result = injector_start_app_on_linux(drakvuf,
-                           injection_pid,
-                           injection_thread,
-                           inject_file,
-                           injection_method,
-                           OUTPUT_DEFAULT,
-                           args_count,
-                           args);
-    }
+    int injection_result = injector_start_app(
+                               drakvuf,
+                               injection_pid,
+                               injection_thread,
+                               inject_file,
+                               inject_cwd,
+                               injection_method,
+                               OUTPUT_DEFAULT,
+                               binary_path,
+                               target_process,
+                               false,
+                               NULL,
+                               injection_global_search,
+                               args_count,
+                               args);
 
     if (injection_result)
         printf("Process startup success\n");

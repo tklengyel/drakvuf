@@ -220,7 +220,7 @@ static bool setup_create_process_regs_and_stack(injector_t injector, drakvuf_tra
         }
     }
     init_int_argument(&arguments[total_args-1], 0);
-    bool success = setup_linux_stack(injector->drakvuf, info, arguments, total_args);
+    bool success = setup_stack(injector->drakvuf, info, arguments, total_args);
     return success;
 }
 
@@ -233,7 +233,7 @@ static bool setup_malloc_function_stack(injector_t injector, drakvuf_trap_info_t
     init_int_argument(&args[0], injector->payload_size); // check for size to be allocated (binary size)
     init_int_argument(&args[1], 0);
 
-    return setup_linux_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+    return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
 }
 
 static bool setup_linux_memset_stack(injector_t injector, drakvuf_trap_info_t* info)
@@ -247,7 +247,7 @@ static bool setup_linux_memset_stack(injector_t injector, drakvuf_trap_info_t* i
     init_int_argument(&args[2], injector->payload_size); // check for (binary size)
     init_int_argument(&args[3], 0);
 
-    return setup_linux_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+    return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
 }
 
 static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info)
@@ -442,7 +442,7 @@ static event_response_t inject_payload_linux(drakvuf_t drakvuf, drakvuf_trap_inf
 
     info->regs->rip = injector->target_rip;
 
-    if (!setup_linux_stack(injector->drakvuf, info, NULL, 6))
+    if (!setup_stack(injector->drakvuf, info, NULL, 6))
     {
         PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
         return 0;

@@ -226,36 +226,21 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                           const char* args[])
 {
     GThread* timeout_thread = startup_timer(this, timeout);
-    int rc = 0;
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-    {
-        rc = injector_start_app_on_win(drakvuf,
-                                       injection_pid,
-                                       injection_tid,
-                                       inject_cmd,
-                                       cwd,
-                                       method,
-                                       format,
-                                       binary_path,
-                                       target_process,
-                                       true,
-                                       &injector_to_be_freed,
-                                       global_search);
-    }
-    else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
-    {
-        if (!injection_tid)
-            injection_tid = injection_pid;
 
-        rc = injector_start_app_on_linux(drakvuf,
-                                         injection_pid,
-                                         injection_tid,
-                                         inject_cmd,
-                                         method,
-                                         format,
-                                         args_count,
-                                         args);
-    }
+    int rc = injector_start_app(drakvuf,
+                                injection_pid,
+                                injection_tid,
+                                inject_cmd,
+                                cwd,
+                                method,
+                                format,
+                                binary_path,
+                                target_process,
+                                true,
+                                &injector_to_be_freed,
+                                global_search,
+                                args_count,
+                                args);
 
 
     if (!rc)
