@@ -13,8 +13,7 @@ afl-as
 as
 #windows log files
 .tlog
-#IDE files
-.vscode
+
 
 # Object files
 *.o
@@ -22,7 +21,6 @@ as
 *.obj
 *.elf
 *.Po
-ozzer
 # Libraries
 **/*.lib
 **/*.a
@@ -61,5 +59,7 @@ src/dirwatch/dirwatch
 src/dirwatch/distributor
 test-drive
 ylwrap
+ozzer
+afl-injector
 #vscode files
 *.vscode

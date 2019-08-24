@@ -7,7 +7,7 @@ bool setup_stack_from_json(hijacker_t hijacker, drakvuf_trap_info_t *info)
     (void)offset_names;
     drakvuf_t drakvuf = hijacker->drakvuf;
     json_object *jargs = hijacker->args;
-    PRINT_DEBUG("in setup stack from json\n"
+    PRINT_DEBUG("In setup stack from json\n"
                     "%s\n", json_object_to_json_string_ext(jargs, JSON_C_TO_STRING_PRETTY));
     int len = json_object_array_length(jargs);
     struct argument *args = g_malloc0(len*sizeof(struct argument)) ; 
@@ -20,15 +20,21 @@ bool setup_stack_from_json(hijacker_t hijacker, drakvuf_trap_info_t *info)
 
         json_object *jval;
         json_object_object_get_ex(jarg, "value", &jval);
-        uint64_t val = json_object_get_int(jval);
         if(!strcmp(type, "INTEGER"))
         {
+            uint64_t val = json_object_get_int(jval);
             PRINT_DEBUG("Init int arg[%d] with value %ld\n",i, val);
             init_int_argument(&args[i], val);
         }
         else if(!strcmp(type, "STRING"))
         {
             PRINT_DEBUG("Init string arg[%d] with value %ld\n",i, val);
+            char *str = json_object_get_string(jval);
+            unicode_string_t us;
+            us.contents = str;
+            us.encoding = "UTF-8";
+            us.length = strlen(str);
+            init_unicode_argument(&arg[i], &us);
         }
     }
     return setup_stack(drakvuf, info, args, len);

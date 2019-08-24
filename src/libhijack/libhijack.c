@@ -84,7 +84,8 @@ static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_
     }
 
     //TODO check rsp, vcpu
-    if(hijacker->int3_status == STATUS_NULL){
+    if(hijacker->int3_status == STATUS_NULL)
+    {
         /**
          * Two major tasks here
          *  1) Restoring the registers
@@ -216,22 +217,6 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
         return 0;
     }
 
-    // addr_t thread;
-    // thread = drakvuf_get_current_thread(drakvuf, info->vcpu);
-    // addr_t rsp;
-    // if(!hijack_get_user_rsp(hijacker, thread, &rsp))
-    // {
-    //     fprintf(stderr, "Getting user RSP failed \n");
-    //     drakvuf_remove_trap(drakvuf, info->trap, NULL);
-    //     goto error;
-    // }
-    // fprintf(stderr, BGMAGENTA BLACK "User RSP = %"PRIx64 RESET "\n", rsp);
-    // if(rsp == info->regs->rsp)
-    // {
-    //     PRINT_DEBUG("Callback with user rsp\n");
-    //     return 0;
-    // }
-
     if(info->regs->rsp < 0xffff800000000000)
     {
         PRINT_DEBUG(BGMAGENTA BLACK "We are with user RSP try again \n");
@@ -245,7 +230,6 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
         PRINT_DEBUG("[+] Saving register state\n");
         memcpy(&hijacker->saved_regs, info->regs, sizeof(x86_registers_t));
         PRINT_DEBUG("[+] Removing wait for kernel trap\n");
-        // UNUSED(hijack_setup_int3_trap);
         hijacker->cr3_status = STATUS_CREATE_OK;
         if(!setup_stack_from_json(hijacker, info))
         {
@@ -296,16 +280,10 @@ int hijack(
     hijacker->drakvuf = drakvuf;
     hijacker->target_pid = target_pid;
     hijacker->function_name = function_name;
-    // hijacker->target_tid = tid;
-    // hijacker->target_file_us = target_file_us;
     hijacker->global_search = true;
     hijacker->int3_status = STATUS_NULL;
     hijacker->cr3_status = STATUS_NULL;
     hijacker->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    // hijacker->break_loop_on_detection = break_loop_on_detection;
-    // hijacker->error_code.valid = false;
-    // hijacker->error_code.code = -1;
-    // hijacker->error_code.string = "<UNKNOWN>";
     hijacker->driver_rekall_profile_json = json_object_from_file(driver_rekall);
     hijacker->exec_func = hijack_get_function_address(hijacker, function_name, lib_name);
     hijacker->spin_lock = spin_lock;

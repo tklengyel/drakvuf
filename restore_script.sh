@@ -1,7 +1,9 @@
 #!/bin/bash
 set -x
-sudo lvremove /dev/xen/fuzz -y;
-sudo lvcreate -s -L 10G -n /dev/xen/fuzz /dev/xen/fuzz-saved
-sudo xl restore /home/ajinkya/College/gsoc19/xen-saved-vms/win10-fresh.sav
-remmina /home/ajinkya/.local/share/remmina/1561582469535.remmina &
+if [[ `sudo lvscan` == *$OS_FUZZ_XEN_DRIVE* ]]; then
+		sudo lvremove $OS_FUZZ_XEN_DRIVE -y;
+fi
+sudo lvcreate -s -L 10G -n $OS_FUZZ_XEN_DRIVE $OS_FUZZ_XEN_DRIVE_SAVED 
+sudo xl restore $OS_FUZZ_XEN_SAV_FILE
+remmina $OS_FUZZ_REMMINA_FILE &
 set +x

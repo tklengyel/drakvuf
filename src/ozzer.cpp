@@ -12,7 +12,6 @@
 #include "libdrakvuf/libdrakvuf.h"
 #include "colors.h"
 #include "plugins/plugins.h"
-#include "capstone/capstone.h"
 
 #define SEED 321651
 GRand *grand;
@@ -36,13 +35,7 @@ bool start_bsodmon(drakvuf_t drakvuf, json_object *function)
     (void)function;
     plugins = new drakvuf_plugins(drakvuf, OUTPUT_DEFAULT, 
         drakvuf_get_os_type(drakvuf));
-    // options = {0};
-    // options.input = function;
-    // options.abort_on_bsod = true;
-    // options.continue_fuzzing = &continue_fuzzing;
-    // options.spin_lock = &spin_lock_held;
     options.syscalls_filter_file = NULL;
-    // plugins->start(PLUGIN_BSODMON, &options);
     plugins->start(PLUGIN_SYSCALLS, &options);
     return true;
 }
@@ -51,11 +44,6 @@ void stop_bsodmon()
 {
     delete plugins;
 }
-
-// char * generate_random_string()
-// {
-
-// }
 
 json_object *get_inputs(json_object *function){
     json_object *args = hijack_get_arguments(function);
@@ -171,13 +159,12 @@ int main(int argc, char **argv){
         return rc;
     }
     json_object *candidates = json_object_from_file(fuzz_candidates_path);
-    fprintf(stderr, "STARTING FUZZING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
+    fprintf(stderr, "STARTING FUZZING \n");
     while(fuzz_iterations<num_iterations)
     {   
-        // sleep(5);
         if(!continue_fuzzing)
             break;
-        fprintf(stderr, "Generating Input iteration %d>>>>>>>>>>>>>>>>\n", fuzz_iterations);     
+        fprintf(stderr, "Generating Input iteration %d\n", fuzz_iterations);     
         json_object *modules_list = hijack_get_modules(candidates);
         num_libs = hijack_get_num_modules(modules_list);
         int lib_no = g_rand_int_range(grand, 0,num_libs);
@@ -198,7 +185,7 @@ int main(int argc, char **argv){
         
         // start_bsodmon(drakvuf, inputs);
         fprintf(stderr, "Calling %s!%s, with %d arguments\n",lib_name, function_name, num_args);
-        fprintf(stderr, "Calling With Input >>>>>>>>>>>>>>>>\n");
+        fprintf(stderr, "Calling With Input \n");
         fprintf(stderr, "%s\n", 
                 json_object_to_json_string_ext(inputs, JSON_C_TO_STRING_PRETTY));
         if(
@@ -223,14 +210,9 @@ int main(int argc, char **argv){
         fprintf(stderr, "waiting for lock\n");
         while(!g_atomic_int_compare_and_exchange(&spin_lock_held,false, true));
         // stop_bsodmon();
-        fprintf(stderr, "Returned >>>>>>>>>>>>>>>>\n");
-        // sleep(1);
-        
+        fprintf(stderr, "Returned \n");   
     }
-    // error:
     drakvuf_close(drakvuf, 0);
     printf("[+] Successfull = %d", fuzz_iterations);
-    
-
 }
 
