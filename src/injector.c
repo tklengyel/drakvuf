@@ -247,44 +247,44 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    if(drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
+    if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {
         printf("Injector starting %s through PID %u TID: %u\n on Linux", inject_file, injection_pid, injection_thread);
         printf("Injection under construction\n");
         injector_start_app_on_linux(
-                                drakvuf,
-                                injection_pid,
-                                injection_thread,
-                                inject_file,
-                                inject_cwd,
-                                injection_method,
-                                OUTPUT_DEFAULT,
-                                binary_path,
-                                target_process,
-                                false,
-                                NULL,
-                                injection_global_search);
-        
+            drakvuf,
+            injection_pid,
+            injection_thread,
+            inject_file,
+            inject_cwd,
+            injection_method,
+            OUTPUT_DEFAULT,
+            binary_path,
+            target_process,
+            false,
+            NULL,
+            injection_global_search);
+
     }
 
-    else if(drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
+    else if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
     {
-    
+
         printf("Injector starting %s through PID %u TID: %u on windows\n", inject_file, injection_pid, injection_thread);
 
         int injection_result = injector_start_app_on_windows(
-                                drakvuf,
-                                injection_pid,
-                                injection_thread,
-                                inject_file,
-                                inject_cwd,
-                                injection_method,
-                                OUTPUT_DEFAULT,
-                                binary_path,
-                                target_process,
-                                false,
-                                NULL,
-                                injection_global_search);
+                                   drakvuf,
+                                   injection_pid,
+                                   injection_thread,
+                                   inject_file,
+                                   inject_cwd,
+                                   injection_method,
+                                   OUTPUT_DEFAULT,
+                                   binary_path,
+                                   target_process,
+                                   false,
+                                   NULL,
+                                   injection_global_search);
 
         if (injection_result)
             printf("Process startup success\n");
@@ -298,7 +298,7 @@ int main(int argc, char** argv)
     {
         printf("Injection of OS not supported");
     }
-    
+
 
     drakvuf_resume(drakvuf);
 

@@ -507,7 +507,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
 static event_response_t injector_int3_linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-//TODO 
+//TODO
 
 static bool setup_int3_linux_trap(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
 {
@@ -613,48 +613,48 @@ static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drak
 
 static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-   (void)drakvuf;
+    (void)drakvuf;
 
     injector_t injector = info->trap->data;
 
-   
+
     if (info->proc_data.pid != injector->target_pid)
         return 0;
     PRINT_DEBUG("Target PID scheduled\n");
 
     addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
     pid_t pid = info->proc_data.pid;
-    
-    
+
+
 
     PRINT_DEBUG("PID = %d\n", pid);
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     status_t status;
     if (!injector->is32bit)
     {
-        if(!drakvuf_get_struct_members_array_rva(drakvuf, 
-            linux_offset_names, LINUX_OFFSET_MAX, injector->linux_offsets) ) 
+        if (!drakvuf_get_struct_members_array_rva(drakvuf,
+                linux_offset_names, LINUX_OFFSET_MAX, injector->linux_offsets) )
         {
             PRINT_DEBUG("COULD NOT POPULATE OFFSET NAMES\n");
             goto done;
-        }          
-        
-        
+        }
+
+
         addr_t task_struct_stack;
-        
+
         //get stack
         access_context_t ctx =
-        {   
+        {
             .translate_mechanism = VMI_TM_PROCESS_PID,
             .pid = 0,
             .addr = process + injector->linux_offsets[TASK_STRUCT_STACK]
         };
 
         status = vmi_read_64(vmi, &ctx, &task_struct_stack);
-        if(status == VMI_FAILURE)
+        if (status == VMI_FAILURE)
         {
             PRINT_DEBUG("COULD NOT READ TASK_STRUCT.STACK\n");
-            goto done;  
+            goto done;
         }
         PRINT_DEBUG("TASK_STRUCT.STACK = %"PRIX64"\n", task_struct_stack);
 
@@ -666,8 +666,8 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
         // assuming top_of_the_kernel_padding = 0
         task_struct_stack += (thread_size - top_of_kernel_padding);
         addr_t regs_addr = task_struct_stack-sizeof(struct pt_regs);
-        
-        
+
+
         uint64_t rip;
 
         ctx.translate_mechanism = VMI_TM_PROCESS_PID;
@@ -676,29 +676,29 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
 
         // simulating task_pt_regs
         status = vmi_read_64(vmi, &ctx, &rip);
-        if(status == VMI_FAILURE)
+        if (status == VMI_FAILURE)
         {
             PRINT_DEBUG("COULD NOT READ PTREGS->IP\n");
-            goto done;  
+            goto done;
         }
-        PRINT_DEBUG("pt_regs->ip = %"PRIX64"\n",rip);
+        PRINT_DEBUG("pt_regs->ip = %"PRIX64"\n", rip);
 
         // try getting ip from thread
-        
+
         // addr_t task_struct_thread = process + injector->linux_offsets[TASK_STRUCT_THREAD];
 
         // addr_t thread_sp0 = task_struct_thread + injector->linux_offsets[THREAD_SP0];
-        
-        
+
+
         // ctx.translate_mechanism = VMI_TM_PROCESS_PID;
         // ctx.pid = 0;
         // ctx.addr = thread_sp0;
-        // status = vmi_read_64(vmi, &ctx, &thread_sp0);    
+        // status = vmi_read_64(vmi, &ctx, &thread_sp0);
 
         // if(status == VMI_FAILURE)
         // {
         //     PRINT_DEBUG("COULD NOT READ THRREAD->sp0\n");
-        //     goto done;  
+        //     goto done;
         // }
         // PRINT_DEBUG("thread_sp0 = %"PRIX64"\n",thread_sp0);
 
@@ -708,19 +708,19 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
         // ctx.translate_mechanism = VMI_TM_PROCESS_PID;
         // ctx.pid = 0;
         // ctx.addr = thread_regs + injector->linux_offsets[PT_REGS_IP];
-        // status = vmi_read_64(vmi, &ctx, &ptregs_rip);    
+        // status = vmi_read_64(vmi, &ctx, &ptregs_rip);
 
         // if(status == VMI_FAILURE)
         // {
         //     PRINT_DEBUG("COULD NOT READ (sp0-sizeof(pt_regs))->IP\n");
-        //     goto done;  
+        //     goto done;
         // }
         // PRINT_DEBUG("regs->ip = %"PRIX64"\n",ptregs_rip);
 
-        
-        if(injector->inject_shell_code)
+
+        if (injector->inject_shell_code)
             setup_int3_linux_trap(injector, info, rip);
-        
+
     }
 
 
@@ -1014,14 +1014,15 @@ static event_response_t injector_int3_linux_cb(drakvuf_t drakvuf, drakvuf_trap_i
         .addr = info->regs->rip
     };
 
-    status_t status = vmi_write(vmi,&ctx, 24, shellcode, &bytes_written);
-    if(status == VMI_FAILURE){
+    status_t status = vmi_write(vmi, &ctx, 24, shellcode, &bytes_written);
+    if (status == VMI_FAILURE)
+    {
         PRINT_DEBUG("Could not write shellcode");
         drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
         drakvuf_resume(drakvuf);
         return 0;
     }
-    PRINT_DEBUG("Number of bytes injected = %lu\n",bytes_written);
+    PRINT_DEBUG("Number of bytes injected = %lu\n", bytes_written);
     PRINT_DEBUG("Shellcode injected\n");
     drakvuf_remove_trap(drakvuf, info->trap, NULL);
     injector->inject_shell_code = false;
@@ -1355,7 +1356,8 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
-static bool inject_on_linux(drakvuf_t drakvuf, injector_t injector){
+static bool inject_on_linux(drakvuf_t drakvuf, injector_t injector)
+{
     injector->hijacked = 0;
     injector->status = STATUS_NULL;
 
@@ -1776,7 +1778,7 @@ int injector_start_app_on_linux(
     injector_t* to_be_freed_later,
     bool global_search)
 {
-    
+
     int rc = 0;
     printf("Enterd start app on linux\n");
     PRINT_DEBUG("Target PID %u to start '%s' On linux\n", pid, file);
@@ -1825,16 +1827,16 @@ int injector_start_app_on_linux(
     (void)(drakvuf);
     (void)(to_be_freed_later);
     (void)(format);
-    
+
 
     PRINT_DEBUG("Inject on linux called");
-    
+
     // if ( !drakvuf_get_struct_members_array_rva(drakvuf, linux_offset_names, OFFSET_MAX, injector->offsets) )
     //     PRINT_DEBUG("Failed to find one of offsets.\n");
 
     inject_on_linux(drakvuf, injector);
-    
-    
+
+
     return true;
 
 }

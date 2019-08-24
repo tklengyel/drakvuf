@@ -11,9 +11,9 @@ afl-showmap
 afl-tmin
 afl-as
 as
+
 #windows log files
 .tlog
-
 
 # Object files
 *.o
@@ -21,6 +21,7 @@ as
 *.obj
 *.elf
 *.Po
+
 # Libraries
 **/*.lib
 **/*.a
@@ -61,5 +62,6 @@ test-drive
 ylwrap
 ozzer
 afl-injector
+
 #vscode files
 *.vscode
