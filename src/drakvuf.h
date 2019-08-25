@@ -168,7 +168,9 @@ public:
                    const char* binary_path,
                    const char* target_process,
                    int timeout,
-                   bool global_search);
+                   bool global_search,
+                   int args_count,
+                   const char* args[]);
     int start_plugins(const bool* plugin_list, const plugins_options* options);
 };
 

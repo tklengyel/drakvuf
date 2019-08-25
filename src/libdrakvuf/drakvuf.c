@@ -585,7 +585,8 @@ int drakvuf_get_address_width(drakvuf_t drakvuf)
 bool drakvuf_get_current_process_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info, proc_data_priv_t* proc_data)
 {
     addr_t process_base = drakvuf_get_current_process(drakvuf, info);
-    return drakvuf_get_process_data_priv(drakvuf, process_base, proc_data);
+    // TODO - Windows version of get process tid needed.
+    return drakvuf_get_process_data_priv(drakvuf, process_base, proc_data) && drakvuf_get_current_thread_id(drakvuf, info, (uint32_t*)&proc_data->tid);
 }
 
 bool drakvuf_get_process_data(drakvuf_t drakvuf, addr_t process_base, proc_data_t* proc_data)
@@ -597,6 +598,7 @@ bool drakvuf_get_process_data(drakvuf_t drakvuf, addr_t process_base, proc_data_
     proc_data->ppid = proc_data_priv.ppid;
     proc_data->base_addr = proc_data_priv.base_addr;
     proc_data->userid = proc_data_priv.userid;
+    proc_data->tid = proc_data_priv.tid;
     return success;
 }
 

@@ -125,14 +125,16 @@ static inline void print_help(void)
     fprintf(stderr, "Required input:\n"
             "\t -r <rekall profile>       The Rekall profile of the OS kernel\n"
             "\t -d <domain ID or name>    The domain's ID or name\n"
-            "\t -i <injection pid>        The PID of the process to hijack for injection\n"
+            "\t -i <injection pid>        The PID(WIN) | TGID(LINUX) of the process to hijack for injection\n"
             "\t -e <inject_file>          The executable to start with injection\n"
             "Optional inputs:\n"
             "\t -l                        Use libvmi.conf\n"
-            "\t -m <inject_method>        The injection method (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
+            "\t -m <inject_method>        The injection method [WIN] (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
+            "\t -f <args for exec>        [LINUX] - Arguments specified for exec to include (requires -m execproc)\n"
+            "\t                           [LINUX] (execproc -> int execlp(const char *file, const char *arg0, ..., const char *argn, (char *)0); for Linux kernel 4.18+, 64bit only) (Maximum 10 args)\n"
             "\t [-B] <path>               The host path of the windows binary to inject (requires -m doppelganging)\n"
             "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
-            "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
+            "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i) (LINUX: Injects to TGID Thread if ThreadID not specified)\n"
             "\t -c <current_working_dir>  The current working directory for injected executable\n"
 #ifdef DRAKVUF_DEBUG
             "\t -v                        Turn on verbose (debug) output\n"
@@ -156,6 +158,8 @@ int main(int argc, char** argv)
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     bool verbose = 0;
     bool libvmi_conf = false;
+    const char* args[10] = {};
+    int args_count = 0;
 
     if (argc < 4)
     {
@@ -163,7 +167,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:vlg")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:f:vlg")) != -1)
         switch (c)
         {
             case 'r':
@@ -193,11 +197,19 @@ int main(int argc, char** argv)
                     injection_method = INJECT_METHOD_SHELLCODE;
                 else if (!strncmp(optarg, "doppelganging", 13))
                     injection_method = INJECT_METHOD_DOPP;
+                else if (!strncmp(optarg, "execproc", 8))
+                    injection_method = INJECT_METHOD_EXECPROC;
+                else if (!strncmp(optarg, "linuxshellcode", 14))
+                    injection_method = INJECT_METHOD_SHELLCODE_LINUX;
                 else
                 {
                     fprintf(stderr, "Unrecognized injection method\n");
                     return rc;
                 }
+                break;
+            case 'f':
+                args[args_count] = optarg;
+                args_count++;
                 break;
             case 'g':
                 injection_global_search = true;
@@ -231,6 +243,18 @@ int main(int argc, char** argv)
         print_help();
         return 1;
     }
+    if (injection_method != INJECT_METHOD_EXECPROC && args_count)
+    {
+        printf("Arguments not supported! \n");
+        print_help();
+        return 1;
+    }
+    if (args_count > 10)
+    {
+        printf("Arguments count is greater than 10! \n");
+        print_help();
+        return 1;
+    }
 
     /* for a clean exit */
     struct sigaction act;
@@ -248,6 +272,10 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
+        if (!injection_thread)
+            injection_thread = injection_pid;
+
     printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
 
     int injection_result = injector_start_app(
@@ -262,7 +290,9 @@ int main(int argc, char** argv)
                                target_process,
                                false,
                                NULL,
-                               injection_global_search);
+                               injection_global_search,
+                               args_count,
+                               args);
 
     if (injection_result)
         printf("Process startup success\n");
