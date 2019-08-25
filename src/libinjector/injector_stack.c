@@ -402,6 +402,148 @@ err:
     return 0;
 }
 
+static addr_t place_string_on_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void const* str, size_t str_len)
+{
+    if (!str) return addr;
+    // String length with null terminator
+    size_t len = str_len + 2;
+    addr_t orig_addr = addr;
+
+    addr -= len;
+    // Align string address on 32B boundary (for SSE2 instructions).
+    addr &= ~0x1f;
+
+    size_t buf_len = orig_addr - addr;
+    void* buf = g_malloc0(buf_len);
+
+    if (!buf) return 0;
+    memcpy(buf, str, str_len);
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = addr,
+    };
+
+    status_t status = vmi_write(vmi, &ctx, buf_len, buf, NULL);
+    g_free(buf);
+
+    return status == VMI_FAILURE ? 0 : addr;
+}
+
+bool setup_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct argument args[], int nb_args)
+{
+    uint64_t nul64 = 0;
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    addr_t addr = info->regs->rsp;
+
+    // unsigned int cpl = info->regs->cs_sel & 3;
+    // PRINT_DEBUG("CPL value is : %d\n", cpl);
+
+    addr = info->regs->rsp;
+
+    if ( args )
+    {
+        // make room for strings and structs into guest's stack
+        for (int i = 0; i < nb_args; i++)
+        {
+            switch (args[i].type)
+            {
+                case ARGUMENT_STRING:
+                    addr = place_string_on_linux_stack(vmi, info, addr, args[i].data, args[i].size);
+                    if ( !addr ) goto err;
+                    args[i].data_on_stack = addr;
+                    break;
+                case ARGUMENT_STRUCT:
+                    addr = place_struct_on_stack_64(vmi, info, addr, args[i].data, args[i].size);
+                    if ( !addr ) goto err;
+                    args[i].data_on_stack = addr;
+                    break;
+                case ARGUMENT_INT:
+                    args[i].data_on_stack = (uint64_t)args[i].data;
+                    break;
+                default:
+                    goto err;
+            }
+        }
+
+        //  x86-64: Maintain 16-byte stack alignment
+        //  the stack pointer misaligned by 8 bytes on function entry
+        if (addr % 0x10 == 0)
+        {
+            addr -= 0x8;
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
+                goto err;
+        }
+        // Stack aligned before settting up registers
+
+        // first 6 arguments are sent by registers
+        // 1: rdi
+        // 2: rsi
+        // 3: rdx
+        // 4: rcx
+        // 5: r8
+        // 6: r9
+
+        // if number of arguments number > 6
+        // put them on stack
+        for (int i = nb_args-1; i > 5; i--)
+        {
+            addr -= 0x8;
+            ctx.addr = addr;
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &(args[i].data_on_stack)) )
+                goto err;
+        }
+
+        switch (nb_args)
+        {
+            default:
+                info->regs->r9 = args[5].data_on_stack;
+            // fall through
+            case 5:
+                info->regs->r8 = args[4].data_on_stack;
+            // fall through
+            case 4:
+                info->regs->rcx = args[3].data_on_stack;
+            // fall through
+            case 3:
+                info->regs->rdx = args[2].data_on_stack;
+            // fall through
+            case 2:
+                info->regs->rsi = args[1].data_on_stack;
+            // fall through
+            case 1:
+                info->regs->rdi = args[0].data_on_stack;
+            // fall through
+            case 0:
+                break;
+        }
+    }
+
+    // save the return address
+    addr -= 0x8;
+    ctx.addr = addr;
+    if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &info->regs->rip))
+        goto err;
+
+    // grow the stack
+    info->regs->rsp = addr;
+    info->regs->rbp = addr;
+
+    return true;
+
+err:
+    return false;
+}
+
 bool setup_stack_locked(
     drakvuf_t drakvuf,
     vmi_instance_t vmi,
@@ -409,8 +551,17 @@ bool setup_stack_locked(
     struct argument args[],
     int nb_args)
 {
-    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    return is32bit ? setup_stack_32(vmi, info, args, nb_args) : setup_stack_64(vmi, info, args, nb_args);
+    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
+    {
+        bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+        return is32bit ? setup_stack_32(vmi, info, args, nb_args) : setup_stack_64(vmi, info, args, nb_args);
+    }
+    else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
+    {
+        return setup_linux_stack(vmi, info, args, nb_args);
+    }
+    else
+        return false;
 }
 
 bool setup_stack(
@@ -419,6 +570,7 @@ bool setup_stack(
     struct argument args[],
     int nb_args)
 {
+
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     bool success = setup_stack_locked(drakvuf, vmi, info, args, nb_args);
     drakvuf_release_vmi(drakvuf);

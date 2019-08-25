@@ -125,18 +125,27 @@ extern bool verbose;
 #define vmi_free_unicode_str g_free
 #endif
 
-enum offset
-{
-    KTHREAD_TRAPFRAME,
-    KTRAP_FRAME_RIP,
-
-    OFFSET_MAX
-};
-
-static const char* offset_names[OFFSET_MAX][2] =
-{
-    [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
-    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
-};
-
 #endif
+
+int injector_start_app_on_linux(drakvuf_t drakvuf,
+                                vmi_pid_t pid,
+                                uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used i.e, tid = pid
+                                const char* app,
+                                injection_method_t method,
+                                output_format_t format,
+                                int args_count,
+                                const char* args[]);
+
+
+int injector_start_app_on_win(drakvuf_t drakvuf,
+                              vmi_pid_t pid,
+                              uint32_t tid,
+                              const char* app,
+                              const char* cwd,
+                              injection_method_t method,
+                              output_format_t format,
+                              const char* binary_path,
+                              const char* target_process,
+                              bool break_loop_on_detection,
+                              injector_t* injector_to_be_freed,
+                              bool global_search);

@@ -106,7 +106,7 @@ h_sources = libdrakvuf.h
 c_sources = drakvuf.c rekall-profile.c os.c vmi.c \
             win.c win-exports.c win-handles.c win-processes.c win-registry.c \
             win-files.c \
-            linux.c linux-processes.c
+            linux.c linux-processes.c linux-exports.c
 
 AM_CPPFLAGS = -I$(top_srcdir)
 AM_CPPFLAGS += $(CPPFLAGS)

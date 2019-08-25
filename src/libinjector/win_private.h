@@ -102,49 +102,16 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef LINUX_OFFSETS_H
-#define LINUX_OFFSETS_H
-
-/*
- * Easy-to-use structure offsets to be loaded from the Rekall profile.
- * Define actual mapping in linux-offsets-map.h
- */
-enum linux_offsets
+enum offset
 {
-    CURRENT_TASK,
-    TASK_STRUCT_COMM,
-    TASK_STRUCT_CRED,
-    TASK_STRUCT_PID,
-    TASK_STRUCT_TGID,
-    TASK_STRUCT_REALPARENT,
-    TASK_STRUCT_PARENT,
-    TASK_STRUCT_MMSTRUCT,
-    TASK_STRUCT_ACTIVE_MMSTRUCT,
-    MM_STRUCT_MMAP,
-    MM_STRUCT_PGD,
-    VM_AREA_STRUCT_FILE,
-    VM_AREA_STRUCT_START,
-    VM_AREA_STRUCT_END,
-    VM_AREA_STRUCT_NEXT,
-    VM_AREA_STRUCT_PGOFF,
-    VM_AREA_STRUCT_FLAGS,
-    FILE_PATH,
-    PATH_DENTRY,
-    DENTRY_D_NAME,
-    QSTR_NAME,
-    CRED_UID,
-    ELF64HDR_PHNUM,
-    ELF64HDR_PHENTSIZE,
-    ELF64HDR_PHOFF,
-    ELF64PHDR_TYPE,
-    ELF64PHDR_OFFSET,
-    ELF64SYM_NAME,
-    ELF64SYM_VALUE,
-    ELF64RELA_ADDEND,
-    ELF64RELA_INFO,
-    ELF64RELA_OFFSET,
+    KTHREAD_TRAPFRAME,
+    KTRAP_FRAME_RIP,
 
-    __LINUX_OFFSETS_MAX
+    OFFSET_MAX
 };
 
-#endif
+static const char* offset_names[OFFSET_MAX][2] =
+{
+    [KTHREAD_TRAPFRAME] = {"_KTHREAD", "TrapFrame" },
+    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip" },
+};

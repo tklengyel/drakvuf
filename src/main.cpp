@@ -172,6 +172,8 @@ int main(int argc, char** argv)
     char* rekall_wow_profile = nullptr;
     plugins_options options = { 0 };
     bool disabled_all = false; // Used to disable all plugin once
+    const char* args[10] = {};
+    int args_count = 0;
 
 
     eprint_current_time();
@@ -196,7 +198,9 @@ int main(int argc, char** argv)
                 "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
                 "\t -e <inject_file>          The executable to start with injection\n"
                 "\t -c <current_working_dir>  The current working directory for injected executable\n"
-                "\t -m <inject_method>        The injection method: createproc, shellexec, shellcode, doppelganging\n"
+                "\t -m <inject_method>        The injection method: [WIN]  : createproc, shellexec, shellcode, doppelganging\n"
+                "\t                                               : [LINUX]: execproc -> execlp(), linuxshellcode \n"
+                "\t -f <args for exec>        Additional args for exec() (requires -m execproc)\n"
                 "\t -g                        Search required for injection functions in all processes\n"
                 "\t -j, --injection-timeout <seconds>\n"
                 "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
@@ -304,7 +308,7 @@ int main(int argc, char** argv)
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:spT:S:Mc:nblgj:w:W:";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:w:W:";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
@@ -349,6 +353,10 @@ int main(int argc, char** argv)
                     return rc;
                 }
 #endif
+                if (!strncmp(optarg, "execproc", 8))
+                    injection_method = INJECT_METHOD_EXECPROC;
+                if (!strncmp(optarg, "linuxshellcode", 14))
+                    injection_method = INJECT_METHOD_SHELLCODE_LINUX;
                 break;
 #ifdef ENABLE_DOPPELGANGING
             case 'B':
@@ -377,6 +385,10 @@ int main(int argc, char** argv)
                 break;
             case 'a':
                 enable_plugin(optarg, plugin_list, &disabled_all);
+                break;
+            case 'f':
+                args[args_count] = optarg;
+                args_count++;
                 break;
             case 's':
                 options.cpuid_stealth = true;
@@ -502,7 +514,7 @@ int main(int argc, char** argv)
     if (injection_pid > 0 && inject_file)
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout, injection_global_search);
+        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout, injection_global_search, args_count, args);
         if (!ret)
             goto exit;
     }

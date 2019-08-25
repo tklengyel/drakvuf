@@ -117,10 +117,15 @@ typedef struct injector* injector_t;
 
 typedef enum
 {
+    // win
     INJECT_METHOD_CREATEPROC,
     INJECT_METHOD_SHELLEXEC,
     INJECT_METHOD_SHELLCODE,
     INJECT_METHOD_DOPP,
+    // linux
+    INJECT_METHOD_EXECPROC,
+    INJECT_METHOD_SHELLCODE_LINUX,
+
     __INJECT_METHOD_MAX
 }
 injection_method_t;
@@ -191,7 +196,9 @@ int injector_start_app(drakvuf_t drakvuf,
                        const char* target_process,  // if -m = doppelganging
                        bool break_loop_on_detection,
                        injector_t* injector_to_be_freed,
-                       bool global_search); // out: iff break_loop_on_detection is set
+                       bool global_search, // out: iff break_loop_on_detection is set
+                       int args_count,
+                       const char* args[]);
 
 #pragma GCC visibility pop
 
