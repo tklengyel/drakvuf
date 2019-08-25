@@ -107,8 +107,8 @@
 
 #include <libvmi/libvmi.h>
 
-addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib, const char* sym);
+addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib, const char* sym);
 
-addr_t get_lib_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib);
+addr_t get_lib_address(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib);
 
 #endif

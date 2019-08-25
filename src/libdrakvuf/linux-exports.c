@@ -127,24 +127,33 @@
 #define VM_SHARED	        0x00000008
 #define R_X86_64_GLOB_DAT	0x00000006
 
-addr_t process_sym2va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib, const char* sym)
+addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib, const char* sym)
 {
     vmi_instance_t vmi = drakvuf->vmi;
 
-    addr_t process_base = drakvuf_get_current_process(drakvuf, info);
-
-    if (!drakvuf_get_process_pid(drakvuf, process_base, &pid))
+    vmi_pid_t pid;
+    if (!drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
         return -1;
 
     addr_t mm_struct_address;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_PID,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT],
+        .addr = eprocess_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT],
         .pid = pid
     };
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mm_struct_address))
+    {
+        ctx.addr = eprocess_base + drakvuf->offsets[TASK_STRUCT_ACTIVE_MMSTRUCT];
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mm_struct_address))
+            return -1;
+    }
+
+    // get cr3 register value
+    ctx.addr = mm_struct_address + drakvuf->offsets[MM_STRUCT_PGD];
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.dtb))
         return -1;
+    ctx.dtb &= ~0u;
 
     addr_t mmap;
     ctx.addr = mm_struct_address + drakvuf->offsets[MM_STRUCT_MMAP];
@@ -219,8 +228,6 @@ next:
         return -1;
 
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
     // Parsing ELF header
 
     addr_t program_header_offset;
@@ -382,20 +389,19 @@ next:
     return text_segment_address + value;
 }
 
-addr_t get_lib_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib)
+addr_t get_lib_address(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib)
 {
     vmi_instance_t vmi = drakvuf->vmi;
 
-    addr_t process_base = drakvuf_get_current_process(drakvuf, info);
-
-    if (!drakvuf_get_process_pid(drakvuf, process_base, &pid))
+    vmi_pid_t pid;
+    if (!drakvuf_get_process_pid(drakvuf, eprocess_base, &pid))
         return -1;
 
     addr_t mm_struct_address;
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_PID,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT],
+        .addr = eprocess_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT],
         .pid = pid
     };
 

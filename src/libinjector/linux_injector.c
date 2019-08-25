@@ -312,10 +312,12 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
     // 0000000000097070 -> malloc@@GLIBC_2.2.5
     // 000000000009ed40 -> memset@@GLIBC_2.2.5
 
+    injector->target_base = drakvuf_get_current_process(drakvuf, info);
+    PRINT_DEBUG("Injector->target_base = 0x%lx \n", injector->target_base);
 
     if (injector->method == INJECT_METHOD_EXECPROC)
     {
-        injector->exec_func = drakvuf_export_linux_sym_to_va(drakvuf, info, injector->target_pid, "libc-", "execlp");
+        injector->exec_func = drakvuf_exportsym_to_va(drakvuf, injector->target_base, "libc-", "execlp");
         PRINT_DEBUG("Address of execlp symbol is: 0x%lx \n", injector->exec_func);
         if (injector->exec_func == ~0ull)
         {
@@ -328,7 +330,7 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
     }
     else if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
     {
-        injector->libc_addr = drakvuf_export_lib_address(drakvuf, info, injector->target_pid, "libc-");
+        injector->libc_addr = drakvuf_export_lib_address(drakvuf, injector->target_base, "libc-");
         PRINT_DEBUG("Address of libc is: 0x%lx \n", injector->libc_addr);
         // failing to grab some symbols due to relocation
         injector->exec_func= injector->libc_addr + 0x97070;
@@ -338,9 +340,6 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
         drakvuf_interrupt(drakvuf, SIGINT);
         return 0;
     }
-
-    injector->target_base = drakvuf_get_current_process(drakvuf, info);
-    PRINT_DEBUG("Injector->target_base = 0x%lx \n", injector->target_base);
 
     if (setup_linux_int3_trap(injector, info, rip))
     {

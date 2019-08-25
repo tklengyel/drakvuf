@@ -144,18 +144,10 @@ bool drakvuf_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32
     return false;
 }
 
-addr_t drakvuf_export_linux_sym_to_va(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib, const char* sym)
-{
-    if (drakvuf->osi.export_linux_sym_to_va)
-        return drakvuf->osi.export_linux_sym_to_va(drakvuf, info, pid, lib, sym);
-
-    return 0;
-}
-
-addr_t drakvuf_export_lib_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, const char* lib)
+addr_t drakvuf_export_lib_address(drakvuf_t drakvuf, addr_t process_addr, const char* lib)
 {
     if (drakvuf->osi.export_lib_address)
-        return drakvuf->osi.export_lib_address(drakvuf, info, pid, lib);
+        return drakvuf->osi.export_lib_address(drakvuf, process_addr, lib);
 
     return 0;
 }
@@ -192,7 +184,7 @@ bool drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* 
     return false;
 }
 
-bool drakvuf_get_process_tid(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid)
+bool drakvuf_get_process_thread_id(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid)
 {
     if ( drakvuf->osi.get_process_tid )
         return drakvuf->osi.get_process_tid(drakvuf, process_base, tid);
