@@ -183,18 +183,31 @@ bool setup_stack_locked(drakvuf_t drakvuf,
                         struct argument args[],
                         int nb_args);
 
-int injector_start_app(drakvuf_t drakvuf,
-                       vmi_pid_t pid,
-                       uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-                       const char* app,
-                       const char* cwd,
-                       injection_method_t method,
-                       output_format_t format,
-                       const char* binary_path,     // if -m = doppelganging
-                       const char* target_process,  // if -m = doppelganging
-                       bool break_loop_on_detection,
-                       injector_t* injector_to_be_freed,
-                       bool global_search); // out: iff break_loop_on_detection is set
+int injector_start_app_on_linux(drakvuf_t drakvuf,
+                                vmi_pid_t pid,
+                                uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
+                                const char* app,
+                                const char* cwd,
+                                injection_method_t method,
+                                output_format_t format,
+                                const char* binary_path,     // if -m = doppelganging
+                                const char* target_process,  // if -m = doppelganging
+                                bool break_loop_on_detection,
+                                injector_t* injector_to_be_freed,
+                                bool global_search); // out: iff break_loop_on_detection is set
+
+int injector_start_app_on_windows(drakvuf_t drakvuf,
+                                  vmi_pid_t pid,
+                                  uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
+                                  const char* app,
+                                  const char* cwd,
+                                  injection_method_t method,
+                                  output_format_t format,
+                                  const char* binary_path,     // if -m = doppelganging
+                                  const char* target_process,  // if -m = doppelganging
+                                  bool break_loop_on_detection,
+                                  injector_t* injector_to_be_freed,
+                                  bool global_search); // out: iff break_loop_on_detection is set
 
 #pragma GCC visibility pop
 

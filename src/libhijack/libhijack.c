@@ -20,7 +20,7 @@ addr_t hijack_get_user_dtb(drakvuf_t drakvuf, addr_t process, hijacker_t hijacke
     addr_t udtb = 0;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     vmi_read_64_va(vmi, process + hijacker->offsets[KPROCESS_USERDIRECTORYTABLEBASE],
-        hijacker->target_pid, &udtb);
+                   hijacker->target_pid, &udtb);
     drakvuf_release_vmi(drakvuf);
     return udtb;
 }
@@ -30,61 +30,64 @@ addr_t hijack_get_dtb(drakvuf_t drakvuf, addr_t process, hijacker_t hijacker)
     addr_t dtb = 0;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     vmi_read_64_va(vmi, process + hijacker->offsets[KPROCESS_DIRECTORYTABLEBASE],
-        hijacker->target_pid, &dtb);
+                   hijacker->target_pid, &dtb);
     drakvuf_release_vmi(drakvuf);
     return dtb;
 }
 
-bool hijack_get_driver_function_rva(hijacker_t hijacker, char *function_name, addr_t *rva)
+bool hijack_get_driver_function_rva(hijacker_t hijacker, char* function_name, addr_t* rva)
 {
     bool rva_found =  rekall_get_function_rva(hijacker->driver_rekall_profile_json, function_name, rva);
-    if(!rva_found){
+    if (!rva_found)
+    {
         rva_found = drakvuf_get_function_rva(hijacker->drakvuf, function_name, rva);
     }
     return rva_found;
 }
 
-static addr_t hijack_get_function_address(hijacker_t hijacker, char* function_name, char *lib_name){
-        PRINT_DEBUG("Trying to Get address for %s\n", function_name);
-        addr_t rva = 0;
-        hijack_get_driver_function_rva(hijacker, function_name, &rva);
-        if(!rva)
-            return 0;
-        PRINT_DEBUG("Returned RVA = %"PRIx64"\n", rva);        
-        return  drakvuf_exportksym_to_va(hijacker->drakvuf, 4, function_name, lib_name, rva);
+static addr_t hijack_get_function_address(hijacker_t hijacker, char* function_name, char* lib_name)
+{
+    PRINT_DEBUG("Trying to Get address for %s\n", function_name);
+    addr_t rva = 0;
+    hijack_get_driver_function_rva(hijacker, function_name, &rva);
+    if (!rva)
+        return 0;
+    PRINT_DEBUG("Returned RVA = %"PRIx64"\n", rva);
+    return  drakvuf_exportksym_to_va(hijacker->drakvuf, 4, function_name, lib_name, rva);
 }
 
 static void release_ozzer_lock(hijacker_t hijacker)
 {
-    g_atomic_int_set(hijacker->spin_lock, false);   
+    g_atomic_int_set(hijacker->spin_lock, false);
 
 }
 
-static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     //Return path
     hijacker_t hijacker = info->trap->data;
-    
+
     if ( info->proc_data.pid != hijacker->target_pid)
     {
         PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
                     info->proc_data.name, info->proc_data.pid, hijacker->target_pid);
         return 0;
     }
-    PRINT_DEBUG("[+] int3_cb for return \n");
+    PRINT_DEBUG("[+] int3_cb for return\n");
     uint32_t tid;
     drakvuf_get_current_thread_id(drakvuf, info, &tid);
     PRINT_DEBUG("[+] In INT3 CB PID=%d, Process Name = %s ThreadId = %d cr3 = %lx\n", info->proc_data.pid
-                                                                        , info->proc_data.name
-                                                                        , tid
-                                                                        , info->regs->cr3);
-    if(hijacker->target_tid != 0 && tid != hijacker->target_tid)
+                , info->proc_data.name
+                , tid
+                , info->regs->cr3);
+    if (hijacker->target_tid != 0 && tid != hijacker->target_tid)
     {
         return 0;
     }
 
     //TODO check rsp, vcpu
-    if(hijacker->int3_status == STATUS_NULL){
+    if (hijacker->int3_status == STATUS_NULL)
+    {
         /**
          * Two major tasks here
          *  1) Restoring the registers
@@ -94,14 +97,14 @@ static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_
         fprintf(stderr, BGGREEN "[+] RAX = %"PRId64 RESET  "\n", ret_value);
         hijacker->int3_status = STATUS_RESTORE_OK;
         PRINT_DEBUG("[+] Restoring registers\n");
-        memcpy(info->regs, &hijacker->saved_regs, sizeof(x86_registers_t));        
+        memcpy(info->regs, &hijacker->saved_regs, sizeof(x86_registers_t));
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
-    else if( hijacker->int3_status == STATUS_RESTORE_OK)
-    {   
+    else if ( hijacker->int3_status == STATUS_RESTORE_OK)
+    {
         /**
          * We reach here when the hijacked process is working fine
-         * 
+         *
          */
         drakvuf_pause(drakvuf);
         PRINT_DEBUG("[+] Removing return trap\n");
@@ -113,15 +116,15 @@ static event_response_t hijack_return_path(drakvuf_t drakvuf, drakvuf_trap_info_
          * in bfore hijacking.
          */
         release_ozzer_lock(hijacker);
-        drakvuf_interrupt(drakvuf,SIGINT);
+        drakvuf_interrupt(drakvuf, SIGINT);
         drakvuf_resume(drakvuf);
     }
     return 0;
 }
 
 static bool hijack_setup_int3_trap(hijacker_t hijacker, drakvuf_trap_info_t* info, addr_t bp_addr)
-{   
-    
+{
+
     hijacker->bp.type = BREAKPOINT;
     hijacker->bp.name = "returnpath";
     hijacker->bp.cb = hijack_return_path;
@@ -134,38 +137,38 @@ static bool hijack_setup_int3_trap(hijacker_t hijacker, drakvuf_trap_info_t* inf
     return drakvuf_add_trap(hijacker->drakvuf, &hijacker->bp);
 }
 
-bool hijack_get_user_rsp(hijacker_t hijacker, addr_t thread, addr_t *rsp)
+bool hijack_get_user_rsp(hijacker_t hijacker, addr_t thread, addr_t* rsp)
 {
     drakvuf_t drakvuf = hijacker->drakvuf;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     drakvuf_pause(drakvuf);
     addr_t ktrap_frame;
-    if( vmi_read_64_va(vmi, thread + hijacker->offsets[KTHREAD_TRAPFRAME],
-                                        hijacker->target_pid,
-                                        &ktrap_frame ) != VMI_SUCCESS)
+    if (vmi_read_64_va(vmi, thread + hijacker->offsets[KTHREAD_TRAPFRAME],
+                       hijacker->target_pid,
+                       &ktrap_frame ) != VMI_SUCCESS)
     {
-        fprintf(stderr, "Reading KTRAP_FRAME failed \n");   
+        fprintf(stderr, "Reading KTRAP_FRAME failed\n");
         goto error;
     }
-    PRINT_DEBUG("KTRAP_FRAME  = %lx \n", ktrap_frame);
-    if( vmi_read_64_va(vmi, ktrap_frame + hijacker->offsets[KTRAP_FRAME_RSP],
-                                        hijacker->target_pid,
-                                        rsp ) != VMI_SUCCESS )
+    PRINT_DEBUG("KTRAP_FRAME  = %lx\n", ktrap_frame);
+    if (vmi_read_64_va(vmi, ktrap_frame + hijacker->offsets[KTRAP_FRAME_RSP],
+                       hijacker->target_pid,
+                       rsp ) != VMI_SUCCESS )
     {
-        fprintf(stderr, "Reading TRAPFRAME_RSP failed \n");   
+        fprintf(stderr, "Reading TRAPFRAME_RSP failed\n");
         goto error;
     }
     drakvuf_resume(drakvuf);
     drakvuf_release_vmi(drakvuf);
     return true;
 
-    error:
+error:
     drakvuf_resume(drakvuf);
     drakvuf_release_vmi(drakvuf);
     return false;
 }
 
-static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     hijacker_t hijacker = info->trap->data;
     if ( info->proc_data.pid != hijacker->target_pid )
@@ -175,9 +178,9 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
         return 0;
     }
 
-   
+
     uint8_t cpl = info->regs->cs_sel & 3;
-    if(cpl != 0 )
+    if (cpl != 0 )
     {
         fprintf(stderr, "Something serverely wrong, Not in ring 0 Ring = %d\n", cpl);
         return 0;
@@ -185,18 +188,18 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
 
     uint32_t tid;
     drakvuf_get_current_thread_id(drakvuf, info, &tid);
-    
-    PRINT_DEBUG("[+] In CR3 CB PID=%d, Process Name = %s"
-    "ThreadId = %d, PPID = %d, BASE Addr = %lx, "
-    "User Id = %" PRIx64  ", cr3 = %lx\n", info->proc_data.pid
-                                                , info->proc_data.name
-                                                , tid
-                                                , info->proc_data.ppid
-                                                , info->proc_data.base_addr
-                                                , info->proc_data.userid
-                                                , info->regs->cr3);
 
-    if(hijacker->target_tid != 0 && tid != hijacker->target_tid)
+    PRINT_DEBUG("[+] In CR3 CB PID=%d, Process Name = %s"
+                "ThreadId = %d, PPID = %d, BASE Addr = %lx, "
+                "User Id = %" PRIx64  ", cr3 = %lx\n", info->proc_data.pid
+                , info->proc_data.name
+                , tid
+                , info->proc_data.ppid
+                , info->proc_data.base_addr
+                , info->proc_data.userid
+                , info->regs->cr3);
+
+    if (hijacker->target_tid != 0 && tid != hijacker->target_tid)
     {
         return 0;
     }
@@ -208,53 +211,37 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
     dtb = hijack_get_dtb(drakvuf, info->proc_data.base_addr, hijacker);
     PRINT_DEBUG("dtb = %"PRIx64"\n", dtb);
 
-    if(info->regs->cr3 != dtb)
+    if (info->regs->cr3 != dtb)
     {
         PRINT_DEBUG(BGYELLOW BLACK"[+] CR3 is userdtb PID=%d, "
-            "cr3 = %lx"RESET"\n", info->proc_data.pid
-                                , info->regs->cr3);
+                    "cr3 = %lx"RESET"\n", info->proc_data.pid
+                    , info->regs->cr3);
         return 0;
     }
 
-    // addr_t thread;
-    // thread = drakvuf_get_current_thread(drakvuf, info->vcpu);
-    // addr_t rsp;
-    // if(!hijack_get_user_rsp(hijacker, thread, &rsp))
-    // {
-    //     fprintf(stderr, "Getting user RSP failed \n");
-    //     drakvuf_remove_trap(drakvuf, info->trap, NULL);
-    //     goto error;
-    // }
-    // fprintf(stderr, BGMAGENTA BLACK "User RSP = %"PRIx64 RESET "\n", rsp);
-    // if(rsp == info->regs->rsp)
-    // {
-    //     PRINT_DEBUG("Callback with user rsp\n");
-    //     return 0;
-    // }
-
-    if(info->regs->rsp < 0xffff800000000000)
+    if (info->regs->rsp < 0xffff800000000000)
     {
-        PRINT_DEBUG(BGMAGENTA BLACK "We are with user RSP try again \n");
+        PRINT_DEBUG(BGMAGENTA BLACK "We are with user RSP try again\n");
         return 0;
     }
 
     drakvuf_remove_trap(drakvuf, info->trap, NULL);
-    
-    
-    if(hijacker->cr3_status == STATUS_NULL){
+
+
+    if (hijacker->cr3_status == STATUS_NULL)
+    {
         PRINT_DEBUG("[+] Saving register state\n");
         memcpy(&hijacker->saved_regs, info->regs, sizeof(x86_registers_t));
         PRINT_DEBUG("[+] Removing wait for kernel trap\n");
-        // UNUSED(hijack_setup_int3_trap);
         hijacker->cr3_status = STATUS_CREATE_OK;
-        if(!setup_stack_from_json(hijacker, info))
+        if (!setup_stack_from_json(hijacker, info))
         {
-            fprintf(stderr, "[+] Could not setup stack\n");  
-            goto error;          
+            fprintf(stderr, "[+] Could not setup stack\n");
+            goto error;
         }
-        
-        PRINT_DEBUG("[+] Hijacking to  %"PRIx64"\n",hijacker->exec_func);
-        if(!hijack_setup_int3_trap(hijacker, info, info->regs->rip))
+
+        PRINT_DEBUG("[+] Hijacking to  %"PRIx64"\n", hijacker->exec_func);
+        if (!hijack_setup_int3_trap(hijacker, info, info->regs->rip))
         {
             PRINT_DEBUG("[+] Could not setup return trap: leaving");
             return 0;
@@ -262,7 +249,7 @@ static event_response_t hijack_wait_for_kernel_cb(drakvuf_t drakvuf, drakvuf_tra
         info->regs->rip = hijacker->exec_func;
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
-    error:
+error:
     hijacker->rc = false;
     drakvuf_interrupt(drakvuf, 2);
     drakvuf_resume(drakvuf);
@@ -275,15 +262,15 @@ int hijack(
     drakvuf_t drakvuf,
     vmi_pid_t target_pid,
     uint32_t target_tid,
-    char *function_name,
-    char *driver_rekall,
-    char *lib_name,
-    json_object *args,
-    volatile  int *spin_lock
+    char* function_name,
+    char* driver_rekall,
+    char* lib_name,
+    json_object* args,
+    volatile  int* spin_lock
 )
 {
 
-    
+
     PRINT_DEBUG("[+] Hijacking PID %u to function %s\n", target_pid, function_name );
 
     hijacker_t hijacker = (hijacker_t)g_malloc0(sizeof(struct hijacker));
@@ -296,22 +283,16 @@ int hijack(
     hijacker->drakvuf = drakvuf;
     hijacker->target_pid = target_pid;
     hijacker->function_name = function_name;
-    // hijacker->target_tid = tid;
-    // hijacker->target_file_us = target_file_us;
     hijacker->global_search = true;
     hijacker->int3_status = STATUS_NULL;
     hijacker->cr3_status = STATUS_NULL;
     hijacker->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-    // hijacker->break_loop_on_detection = break_loop_on_detection;
-    // hijacker->error_code.valid = false;
-    // hijacker->error_code.code = -1;
-    // hijacker->error_code.string = "<UNKNOWN>";
     hijacker->driver_rekall_profile_json = json_object_from_file(driver_rekall);
     hijacker->exec_func = hijack_get_function_address(hijacker, function_name, lib_name);
     hijacker->spin_lock = spin_lock;
     hijacker->args = args;
     hijacker->rc = true;
-    if(target_tid != 0)
+    if (target_tid != 0)
     {
         hijacker->target_tid = target_tid;
     }
@@ -320,9 +301,9 @@ int hijack(
     if ( !drakvuf_get_struct_members_array_rva(drakvuf, offset_names, OFFSET_MAX, hijacker->offsets) )
         PRINT_DEBUG("Failed to find one of offsets.\n");
 
-    if(!hijacker->exec_func)
+    if (!hijacker->exec_func)
     {
-        PRINT_DEBUG("%s Address Not found\n",function_name);
+        PRINT_DEBUG("%s Address Not found\n", function_name);
         return 0;
     }
     printf(BGYELLOW BLACK "Address for %s found: %"PRIx64 RESET "\n", function_name, hijacker->exec_func);
@@ -335,15 +316,16 @@ int hijack(
         .data = hijacker
     };
 
-     if (!drakvuf_add_trap(drakvuf, &trap))
+    if (!drakvuf_add_trap(drakvuf, &trap))
         return false;
 
     PRINT_DEBUG("Starting injection loop\n");
     if (!drakvuf_is_interrupted(drakvuf))
     {
         drakvuf_loop(drakvuf);
-    }    
+    }
+    bool rc = hijacker->rc;
     g_free(hijacker);
     drakvuf_interrupt(drakvuf, 0);
-    return hijacker->rc;
+    return rc;
 }

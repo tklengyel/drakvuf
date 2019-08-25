@@ -241,10 +241,10 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #ifdef ENABLE_PLUGIN_BSODMON
                 case PLUGIN_BSODMON:
                     this->plugins[plugin_id] = new bsodmon(this->drakvuf, options->abort_on_bsod
-                                                            , this->output
-                                                            , options->input
-                                                            , options->spin_lock
-                                                            , options->continue_fuzzing);
+                                                           , this->output
+                                                           , options->input
+                                                           , options->spin_lock
+                                                           , options->continue_fuzzing);
                     break;
 #endif
 #ifdef ENABLE_PLUGIN_ENVMON

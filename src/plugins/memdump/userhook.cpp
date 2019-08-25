@@ -135,61 +135,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
         return VMI_EVENT_RESPONSE_NONE;
 
     PRINT_DEBUG("[MEMDUMP-USER] Usermode callback called %d!%s\n", info->proc_data.pid, info->trap->name);
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    bool is_syswow = false;
-    addr_t wow_ctx;
-
-    addr_t ethread = drakvuf_get_current_thread(drakvuf, info);
-
-    if (drakvuf_get_wow_context(drakvuf, ethread, &wow_ctx))
-    {
-        is_syswow = true;
-    }
-
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp
-    };
-
-    bool success = false;
-    addr_t ret_addr = 0;
-
-    if (is_syswow)
-    {
-        uint32_t ret_addr_tmp;
-
-        if (vmi_read_32(vmi, &ctx, &ret_addr_tmp) == VMI_SUCCESS)
-        {
-            success = true;
-            ret_addr = ret_addr_tmp;
-        }
-    }
-    else
-    {
-        success = vmi_read_64(vmi, &ctx, &ret_addr) == VMI_SUCCESS;
-    }
-
-    PRINT_DEBUG("[MEMDUMP] Return address %llx\n", (unsigned long long)ret_addr);
-    drakvuf_release_vmi(drakvuf);
-
-    mmvad_info_t mmvad;
-    if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, ret_addr, &mmvad))
-    {
-        PRINT_DEBUG("[MEMDUMP] Failed to find MMVAD\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    ctx.addr = mmvad.starting_vpn << 12;
-    size_t buffer_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) << 12;
-
-    if (!dump_memory_region(drakvuf, vmi, info, target->plugin, &ctx, buffer_size, "Usermode heuristic", nullptr, nullptr))
-    {
-        PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
-    }
+    dump_from_stack(drakvuf, info, target->plugin);
 
     return VMI_EVENT_RESPONSE_NONE;
 }

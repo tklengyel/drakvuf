@@ -50,7 +50,7 @@ matrix:
         - TEST="compile"
       before_install:
         - sudo apt-get update
-        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev libcapstone3 libcapstone-dev
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
@@ -112,7 +112,7 @@ matrix:
         - TEST="scan-build"
       before_install:
         - sudo apt-get update
-        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev libcapstone3 libcapstone-dev
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
@@ -147,7 +147,7 @@ matrix:
                 secure: "$SONAR_TOKEN"
       before_install:
         - sudo apt-get update
-        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev libcapstone3 libcapstone-dev
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include

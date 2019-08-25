@@ -108,7 +108,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 #pragma GCC visibility push(default)
 
 #include <glib.h>

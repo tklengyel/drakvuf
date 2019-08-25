@@ -143,7 +143,6 @@ struct injector
     bool global_search;
     addr_t exec_func;
     reg_t target_rsp;
-
     // For create process
     addr_t resume_thread;
 
@@ -151,6 +150,8 @@ struct injector
     addr_t payload, payload_addr, memset;
     size_t binary_size, payload_size;
     uint32_t status;
+    bool inject_shell_code;
+
 
     // For process doppelganging shellcode
     addr_t binary, binary_addr, saved_bp;
@@ -166,6 +167,7 @@ struct injector
     GSList* memtraps;
 
     size_t offsets[OFFSET_MAX];
+    size_t linux_offsets[LINUX_OFFSET_MAX];
 
     // Results:
     int rc;
@@ -503,6 +505,25 @@ static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* 
 
 static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
+static event_response_t injector_int3_linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+//TODO
+
+static bool setup_int3_linux_trap(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
+{
+    injector->bp.type = BREAKPOINT;
+    injector->bp.name = "entry";
+    injector->bp.cb = injector_int3_linux_cb;
+    injector->bp.data = injector;
+    injector->bp.breakpoint.lookup_type = LOOKUP_DTB;
+    injector->bp.breakpoint.dtb = info->regs->cr3;
+    injector->bp.breakpoint.addr_type = ADDR_VA;
+    injector->bp.breakpoint.addr = bp_addr;
+
+    return drakvuf_add_trap(injector->drakvuf, &injector->bp);
+}
+
+
 static bool setup_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
 {
     injector->bp.type = BREAKPOINT;
@@ -588,6 +609,125 @@ static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drak
     }
 
     return 0;
+}
+
+static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    (void)drakvuf;
+
+    injector_t injector = info->trap->data;
+
+
+    if (info->proc_data.pid != injector->target_pid)
+        return 0;
+    PRINT_DEBUG("Target PID scheduled\n");
+
+    addr_t process = drakvuf_get_current_process(drakvuf, info->vcpu);
+    pid_t pid = info->proc_data.pid;
+
+
+
+    PRINT_DEBUG("PID = %d\n", pid);
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    status_t status;
+    if (!injector->is32bit)
+    {
+        if (!drakvuf_get_struct_members_array_rva(drakvuf,
+                linux_offset_names, LINUX_OFFSET_MAX, injector->linux_offsets) )
+        {
+            PRINT_DEBUG("COULD NOT POPULATE OFFSET NAMES\n");
+            goto done;
+        }
+
+
+        addr_t task_struct_stack;
+
+        //get stack
+        access_context_t ctx =
+        {
+            .translate_mechanism = VMI_TM_PROCESS_PID,
+            .pid = 0,
+            .addr = process + injector->linux_offsets[TASK_STRUCT_STACK]
+        };
+
+        status = vmi_read_64(vmi, &ctx, &task_struct_stack);
+        if (status == VMI_FAILURE)
+        {
+            PRINT_DEBUG("COULD NOT READ TASK_STRUCT.STACK\n");
+            goto done;
+        }
+        PRINT_DEBUG("TASK_STRUCT.STACK = %"PRIX64"\n", task_struct_stack);
+
+        uint64_t thread_size, top_of_kernel_padding=0, thread_size_order, page_size;
+        page_size = 1UL << 12;
+        // assuming kasan stack order = 0;
+        thread_size_order = 2+0 ;
+        thread_size = page_size << thread_size_order;
+        // assuming top_of_the_kernel_padding = 0
+        task_struct_stack += (thread_size - top_of_kernel_padding);
+        addr_t regs_addr = task_struct_stack-sizeof(struct pt_regs);
+
+
+        uint64_t rip;
+
+        ctx.translate_mechanism = VMI_TM_PROCESS_PID;
+        ctx.pid = 0;
+        ctx.addr = regs_addr + injector->linux_offsets[PT_REGS_IP];
+
+        // simulating task_pt_regs
+        status = vmi_read_64(vmi, &ctx, &rip);
+        if (status == VMI_FAILURE)
+        {
+            PRINT_DEBUG("COULD NOT READ PTREGS->IP\n");
+            goto done;
+        }
+        PRINT_DEBUG("pt_regs->ip = %"PRIX64"\n", rip);
+
+        // try getting ip from thread
+
+        // addr_t task_struct_thread = process + injector->linux_offsets[TASK_STRUCT_THREAD];
+
+        // addr_t thread_sp0 = task_struct_thread + injector->linux_offsets[THREAD_SP0];
+
+
+        // ctx.translate_mechanism = VMI_TM_PROCESS_PID;
+        // ctx.pid = 0;
+        // ctx.addr = thread_sp0;
+        // status = vmi_read_64(vmi, &ctx, &thread_sp0);
+
+        // if(status == VMI_FAILURE)
+        // {
+        //     PRINT_DEBUG("COULD NOT READ THRREAD->sp0\n");
+        //     goto done;
+        // }
+        // PRINT_DEBUG("thread_sp0 = %"PRIX64"\n",thread_sp0);
+
+        // addr_t thread_regs = thread_sp0 - sizeof(struct pt_regs);
+
+        // addr_t ptregs_rip;
+        // ctx.translate_mechanism = VMI_TM_PROCESS_PID;
+        // ctx.pid = 0;
+        // ctx.addr = thread_regs + injector->linux_offsets[PT_REGS_IP];
+        // status = vmi_read_64(vmi, &ctx, &ptregs_rip);
+
+        // if(status == VMI_FAILURE)
+        // {
+        //     PRINT_DEBUG("COULD NOT READ (sp0-sizeof(pt_regs))->IP\n");
+        //     goto done;
+        // }
+        // PRINT_DEBUG("regs->ip = %"PRIX64"\n",ptregs_rip);
+
+
+        if (injector->inject_shell_code)
+            setup_int3_linux_trap(injector, info, rip);
+
+    }
+
+
+done:
+    drakvuf_release_vmi(drakvuf);
+    return 0;
+
 }
 
 static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -848,6 +988,49 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
+
+
+static event_response_t injector_int3_linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+    (void)drakvuf;
+    (void)injector;
+    PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx.\n", info->regs->rip, info->regs->cr3);
+
+    //setup shell code
+    unsigned char shellcode[] = "\x50\x48\x31\xd2\x48\x31\xf6\x48\xbb\x2f\
+        \x62\x69\x6e\x2f\x2f\x73\x68\x53\x54\x5f\xb0\x3b\x0f\x05";
+    //pause the vm
+    drakvuf_pause(drakvuf);
+    //inject the shell code
+    size_t bytes_written;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    PRINT_DEBUG("RIP value = %"PRIX64"\n", info->regs->rip);
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rip
+    };
+
+    status_t status = vmi_write(vmi, &ctx, 24, shellcode, &bytes_written);
+    if (status == VMI_FAILURE)
+    {
+        PRINT_DEBUG("Could not write shellcode");
+        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+        drakvuf_resume(drakvuf);
+        return 0;
+    }
+    PRINT_DEBUG("Number of bytes injected = %lu\n", bytes_written);
+    PRINT_DEBUG("Shellcode injected\n");
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    injector->inject_shell_code = false;
+    drakvuf_release_vmi(drakvuf);
+    drakvuf_resume(drakvuf);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 
 static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -1173,6 +1356,45 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
+static bool inject_on_linux(drakvuf_t drakvuf, injector_t injector)
+{
+    injector->hijacked = 0;
+    injector->status = STATUS_NULL;
+
+    drakvuf_trap_t trap =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .cb = wait_for_target_linux_process_cb,
+        .data = injector,
+    };
+    if (!drakvuf_add_trap(drakvuf, &trap))
+        return false;
+
+    drakvuf_trap_t trap_crashreporter =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .cb = wait_for_crash_of_target_process,
+        .data = injector,
+    };
+    if (!drakvuf_add_trap(drakvuf, &trap_crashreporter))
+        return false;
+
+    if (!drakvuf_is_interrupted(drakvuf))
+    {
+        PRINT_DEBUG("Starting injection loop\n");
+        drakvuf_loop(drakvuf);
+    }
+
+    free_memtraps(injector);
+
+    drakvuf_remove_trap(drakvuf, &trap, NULL);
+    drakvuf_remove_trap(drakvuf, &trap_crashreporter, NULL);
+
+    return true;
+}
+
 static bool inject(drakvuf_t drakvuf, injector_t injector)
 {
     injector->hijacked = 0;
@@ -1286,6 +1508,7 @@ static void print_injection_info(output_format_t format, const char* file, injec
         arguments = "";
     }
 
+    char* escaped_pname = g_strescape(process_name, NULL);
     char* escaped_arguments = g_strescape(arguments, NULL);
 
     switch (injector->result)
@@ -1301,6 +1524,19 @@ static void print_injection_info(output_format_t format, const char* file, injec
                 case OUTPUT_KV:
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=Success,PID=%u,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
                            UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                    break;
+
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Plugin\": \"inject\", "
+                            "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                            "\"Status\": \"Success\", "
+                            "\"ProcessName\": \"%s\", "
+                            "\"Arguments\": \"%s\", "
+                            "\"InjectedPid\": %d, "
+                            "\"InjectedTid\": %d"
+                            "}\n",
+                            UNPACK_TIMEVAL(t), escaped_pname, escaped_arguments, injector->pid, injector->tid);
                     break;
 
                 default:
@@ -1321,6 +1557,14 @@ static void print_injection_info(output_format_t format, const char* file, injec
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=Timeout\n", UNPACK_TIMEVAL(t));
                     break;
 
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Plugin\": \"inject\", "
+                            "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                            "\"Status\": \"Timeout\""
+                            "}\n", UNPACK_TIMEVAL(t));
+                    break;
+
                 default:
                 case OUTPUT_DEFAULT:
                     printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Timeout\n", UNPACK_TIMEVAL(t));
@@ -1338,6 +1582,14 @@ static void print_injection_info(output_format_t format, const char* file, injec
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=Crash\n", UNPACK_TIMEVAL(t));
                     break;
 
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Plugin\": \"inject\", "
+                            "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                            "\"Status\": \"Crash\""
+                            "}\n", UNPACK_TIMEVAL(t));
+                    break;
+
                 default:
                 case OUTPUT_DEFAULT:
                     printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Crash\n", UNPACK_TIMEVAL(t));
@@ -1353,6 +1605,14 @@ static void print_injection_info(output_format_t format, const char* file, injec
 
                 case OUTPUT_KV:
                     printf("inject Time=" FORMAT_TIMEVAL ",Status=PrematureBreak\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Plugin\": \"inject\", "
+                            "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                            "\"Status\": \"PrematureBreak\""
+                            "}\n", UNPACK_TIMEVAL(t));
                     break;
 
                 default:
@@ -1374,6 +1634,17 @@ static void print_injection_info(output_format_t format, const char* file, injec
                            UNPACK_TIMEVAL(t), injector->error_code.code, injector->error_code.string);
                     break;
 
+                case OUTPUT_JSON:
+                    printf( "{"
+                            "\"Plugin\": \"inject\", "
+                            "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                            "\"Status\": \"Error\", "
+                            "\"ErrorCode\": %d, "
+                            "\"Error\": \"%s\""
+                            "}\n",
+                            UNPACK_TIMEVAL(t), injector->error_code.code, injector->error_code.string);
+                    break;
+
                 default:
                 case OUTPUT_DEFAULT:
                     printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Error ERROR_CODE:%d ERROR:\"%s\"\n",
@@ -1383,6 +1654,7 @@ static void print_injection_info(output_format_t format, const char* file, injec
             break;
     }
 
+    g_free(escaped_pname);
     g_free(escaped_arguments);
     g_strfreev(split_results);
 }
@@ -1492,7 +1764,84 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
     return injector->exec_func != 0;
 }
 
-int injector_start_app(
+int injector_start_app_on_linux(
+    drakvuf_t drakvuf,
+    vmi_pid_t pid,
+    uint32_t tid,
+    const char* file,
+    const char* cwd,
+    injection_method_t method,
+    output_format_t format,
+    const char* binary_path,
+    const char* target_process,
+    bool break_loop_on_detection,
+    injector_t* to_be_freed_later,
+    bool global_search)
+{
+
+    int rc = 0;
+    printf("Enterd start app on linux\n");
+    PRINT_DEBUG("Target PID %u to start '%s' On linux\n", pid, file);
+
+    unicode_string_t* target_file_us = convert_utf8_to_utf16(file);
+    if (!target_file_us)
+    {
+        PRINT_DEBUG("Unable to convert file path from utf8 to utf16\n");
+        return 0;
+    }
+
+    unicode_string_t* cwd_us = NULL;
+    if (cwd)
+    {
+        cwd_us = convert_utf8_to_utf16(cwd);
+        if (!cwd_us)
+        {
+            PRINT_DEBUG("Unable to convert cwd from utf8 to utf16\n");
+            vmi_free_unicode_str(target_file_us);
+            return 0;
+        }
+    }
+
+    injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
+    if (!injector)
+    {
+        vmi_free_unicode_str(target_file_us);
+        vmi_free_unicode_str(cwd_us);
+        return 0;
+    }
+
+    injector->drakvuf = drakvuf;
+    injector->target_pid = pid;
+    injector->target_tid = tid;
+    injector->target_file_us = target_file_us;
+    injector->cwd_us = cwd_us;
+    injector->method = method;
+    injector->global_search = global_search;
+    injector->binary_path = binary_path;
+    injector->target_process = target_process;
+    injector->status = STATUS_NULL;
+    injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    injector->break_loop_on_detection = break_loop_on_detection;
+    injector->inject_shell_code = true;
+    (void)(rc);
+    (void)(drakvuf);
+    (void)(to_be_freed_later);
+    (void)(format);
+
+
+    PRINT_DEBUG("Inject on linux called");
+
+    // if ( !drakvuf_get_struct_members_array_rva(drakvuf, linux_offset_names, OFFSET_MAX, injector->offsets) )
+    //     PRINT_DEBUG("Failed to find one of offsets.\n");
+
+    inject_on_linux(drakvuf, injector);
+
+
+    return true;
+
+}
+
+int injector_start_app_on_windows(
     drakvuf_t drakvuf,
     vmi_pid_t pid,
     uint32_t tid,

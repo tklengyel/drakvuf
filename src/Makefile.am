@@ -104,10 +104,10 @@
 
 bin_PROGRAMS = drakvuf xen_memclone injector ozzer afl_injector
 
-SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libhijack tests
+SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libhijack
 
 drakvuf_SOURCES = main.cpp drakvuf.cpp
-xen_memclone_SOURCES  = xen_memclone.c
+xen_memclone_SOURCES = xen_memclone.c
 injector_SOURCES = injector.c
 ozzer_SOURCES = ozzer.cpp
 afl_injector_SOURCES = afl_injector.cpp afl_injector.h

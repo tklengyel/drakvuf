@@ -1,3 +1,4 @@
+//aj
 #include <unistd.h>
 #include <afl_injector.h>
 #include <sys/shm.h>
@@ -44,43 +45,50 @@ do\
 }\
 while(0)
 
-#define VALUE_OF_REG(base, reg) *((uint64_t *)base + (offset((x86_reg)reg)/8))
+#define VALUE_OF_REG(base, reg)* ((uint64_t* )base + (offset((x86_reg)reg)/8))
 
-char *afl_mode;
+char* afl_mode;
 void afl_setup();
 void afl_forkserver();
 
 int cur_loc[NUM_LOCATIONS], prev_loc = 0;
 
-
-
-
-event_response_t afl_branch_bp(drakvuf_t drakvuf, drakvuf_trap_info_t *info);
-
-GRand *grand;
+GRand* grand;
 static drakvuf_t drakvuf;
 static bool continue_fuzzing = true;
 volatile int spin_lock_held = false;
 
 int prev;
 
-char *get_json_string(json_object *obj, const char *key)
+event_response_t afl_branch_bp(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+/**
+ * Helper function to extract string value from a json object with given key
+ */
+char* get_json_string(json_object* obj, const char* key)
 {
-    json_object *str_obj;
+    json_object* str_obj;
     json_object_object_get_ex(obj, key, &str_obj);
-    return (char *)json_object_get_string(str_obj);
+    return (char* )json_object_get_string(str_obj);
 }
 
-int64_t get_json_int(json_object *obj, const char *key)
+/**
+ * Helper function to extract int value from a json object with given key
+ */
+int64_t get_json_int(json_object* obj, const char* key)
 {
-    json_object *int_obj;
+    json_object* int_obj;
     json_object_object_get_ex(obj, key, &int_obj);
     return json_object_get_int64(int_obj);
 }
 
+/**
+ * Takes in capstone register and return offset of that register in libvmi's
+ * struct x86_regs
+ */
 int offset(x86_reg reg)
 {
-    switch(reg)
+    switch (reg)
     {
         case X86_REG_RAX:
             return offsetof(x86_regs, rax);
@@ -116,25 +124,29 @@ int offset(x86_reg reg)
     }
 }
 
-addr_t handle_insn(drakvuf_t drakvuf, cs_insn *t, drakvuf_trap_info_t *info)
+
+/**
+ * Placed breakpoint before and after control transfer instructions
+ * Note: breakpoints placed after call instruction to continue recording path
+ * information in the called function resume calling path information after
+ * returning to caller.
+ */
+addr_t handle_insn(drakvuf_t drakvuf, cs_insn* t, drakvuf_trap_info_t* info)
 {
-    (void)(drakvuf);
-    cs_detail *d = t->detail;
+    cs_detail* d = t->detail;
     x86_op_mem om;
-    addr_t addr;
-    // vmi_instance_t vmi;
-    // access_context_t ctx;
-    x86_registers_t *r = info->regs;
-    for( int i = 0; i < d->groups_count; i++)
+    addr_t addr = 0;
+    x86_registers_t* r = info->regs;
+    for (int i = 0; i < d->groups_count; i++)
     {
-        if(d->groups[i] == X86_GRP_JUMP)
+        if (d->groups[i] == X86_GRP_JUMP)
         {
             //There will only be one operand but just to cover all bases
-            for(int j = 0; j < d->x86.op_count; j++)
+            for (int j = 0; j < d->x86.op_count; j++)
             {
                 //should be called only when we are at a breakpoint on a jump insn
                 cs_x86_op op = d->x86.operands[j];
-                switch(op.type)
+                switch (op.type)
                 {
                     case X86_OP_IMM:
                         addr = op.imm;
@@ -144,48 +156,48 @@ addr_t handle_insn(drakvuf_t drakvuf, cs_insn *t, drakvuf_trap_info_t *info)
                         break;
                     case X86_OP_MEM:
                         om = op.mem;
-                        addr = t->address + 
-                                om.index *  om.scale + om.disp;
+                        addr = t->address +
+                               om.index*   om.scale + om.disp;
                         break;
                     default:
                         fprintf(stderr, "Unknown type of operand" RESET "\n");
-                }                
+                }
             }
-            drakvuf_trap_t *trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+            drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
             trap->type = BREAKPOINT;
             trap->breakpoint.addr = addr;
             trap->breakpoint.dtb = info->regs->cr3;
             trap->breakpoint.lookup_type = LOOKUP_DTB;
             trap->breakpoint.addr_type = ADDR_VA;
             trap->cb = afl_branch_bp;
-            if( !drakvuf_add_trap(drakvuf, trap))
+            if (!drakvuf_add_trap(drakvuf, trap))
                 printf(RED "Could not setup breakpoint for branch target" RESET "\n");
-            else 
-                printf(BGGREEN "Breakpoints set for branch target: %lx " RESET "\n", 
-                    trap->breakpoint.addr);    
+            else
+                printf(BGGREEN "Breakpoints set for branch target: %lx " RESET "\n",
+                       trap->breakpoint.addr);
             t++;
-            drakvuf_trap_t *next_trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+            drakvuf_trap_t* next_trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
             next_trap->type = BREAKPOINT;
             next_trap->breakpoint.addr_type = ADDR_VA;
             next_trap->breakpoint.addr = t->address;
             next_trap->breakpoint.dtb = info->regs->cr3;
             next_trap->breakpoint.lookup_type = LOOKUP_DTB;
             next_trap->cb = afl_branch_bp;
-            if( !drakvuf_add_trap(drakvuf, next_trap))
+            if (!drakvuf_add_trap(drakvuf, next_trap))
                 printf(RED "Could not setup breakpoint for branch fall through" RESET "\n");
             else
                 printf(BGGREEN "Breakpoints set for branch fall through: %lx" RESET "\n",
-                     next_trap->breakpoint.addr);
+                       next_trap->breakpoint.addr);
 
             return 1;
         }
-        else if( d->groups[i] ==X86_GRP_CALL)
+        else if (d->groups[i] ==X86_GRP_CALL)
         {
-            for(int j = 0; j < d->x86.op_count; j++)
+            for (int j = 0; j < d->x86.op_count; j++)
             {
                 //should be called only when we are at a breakpoint on a jump insn
                 cs_x86_op op = d->x86.operands[j];
-                switch(op.type)
+                switch (op.type)
                 {
                     case X86_OP_IMM:
                         addr = op.imm;
@@ -195,50 +207,54 @@ addr_t handle_insn(drakvuf_t drakvuf, cs_insn *t, drakvuf_trap_info_t *info)
                         break;
                     case X86_OP_MEM:
                         om = op.mem;
-                        addr = t->address + 
-                                om.index *  om.scale + om.disp;
+                        addr = t->address +
+                               om.index*   om.scale + om.disp;
                         break;
                     default:
                         fprintf(stderr, "Unknown type of operand" RESET "\n");
-                }                
+                }
             }
-            drakvuf_trap_t *trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+            drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
             trap->type = BREAKPOINT;
             trap->breakpoint.addr = addr;
             trap->breakpoint.dtb = info->regs->cr3;
             trap->breakpoint.lookup_type = LOOKUP_DTB;
             trap->breakpoint.addr_type = ADDR_VA;
             trap->cb = afl_branch_bp;
-            if( !drakvuf_add_trap(drakvuf, trap))
-                printf(RED "Could not setup breakpoint for call target" RESET "\n");
-            else 
-                printf(BGGREEN "Breakpoints set for call target: %lx " RESET "\n", 
-                    trap->breakpoint.addr);    
+            if (!drakvuf_add_trap(drakvuf, trap))
+                fprintf(stderr, RED "Could not setup breakpoint for call target" RESET "\n");
+            else
+                fprintf(stderr, BGGREEN "Breakpoints set for call target: %lx " RESET "\n",
+                        trap->breakpoint.addr);
 
             t++;
-            drakvuf_trap_t *next_trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+            drakvuf_trap_t* next_trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
             next_trap->type = BREAKPOINT;
             next_trap->breakpoint.addr = t->address;
             next_trap->breakpoint.dtb = info->regs->cr3;
             next_trap->breakpoint.lookup_type = LOOKUP_DTB;
             next_trap->breakpoint.addr_type = ADDR_VA;
             next_trap->cb = afl_branch_bp;
-            if( !drakvuf_add_trap(drakvuf, next_trap))
-                printf(RED "Could not setup breakpoint for call fall through" RESET "\n");
+            if (!drakvuf_add_trap(drakvuf, next_trap))
+                fprintf(stderr, RED "Could not setup breakpoint for call fall through" RESET "\n");
             else
-                printf(BGGREEN "Breakpoints set for call fall through: %lx" RESET "\n",
-                     next_trap->breakpoint.addr);
-            
+                fprintf(stderr, BGGREEN "Breakpoints set for call fall through: %lx" RESET "\n",
+                        next_trap->breakpoint.addr);
             return 1;
         }
     }
     return 0;
 }
 
-event_response_t afl_branch_bp(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+/**
+ * Called first at the entry of the injection function. This function
+ * disassembles instruction from function_entry to first control transfer
+ * instruction and set breakpoints with callbacks to this function itself
+ */
+event_response_t afl_branch_bp(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
 
-    AFL_BRANCH_INSTRUMENT2( info->regs->rip);
+    AFL_BRANCH_INSTRUMENT2( info->regs->rip );
     printf(CYAN "In breakpoint" RESET "\n");
     char code[1000];
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -250,84 +266,86 @@ event_response_t afl_branch_bp(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
     bool continue_disassembly = true;
 
     csh handle;
-    if(cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
+    if (cs_open(CS_ARCH_X86, CS_MODE_64, &handle) != CS_ERR_OK)
     {
-            fprintf(stderr, "Could not open capstone handle");
-            continue_fuzzing = false;
-            return VMI_EVENT_RESPONSE_NONE;
+        fprintf(stderr, "Could not open capstone handle");
+        continue_fuzzing = false;
+        return VMI_EVENT_RESPONSE_NONE;
     }
     cs_option(handle, CS_OPT_DETAIL, CS_OPT_ON);
-    while(continue_disassembly)
+    while (continue_disassembly)
     {
-        if(vmi_read(vmi, &ctx,1000, code, &read) != VMI_FAILURE)
+        if (vmi_read(vmi, &ctx, 1000, code, &read) != VMI_FAILURE)
         {
             drakvuf_release_vmi(drakvuf);
-            cs_insn *insn;
+            cs_insn* insn;
             size_t count;
-            count = cs_disasm(handle,(const uint8_t *) code, sizeof(code)-1, info->regs->rip, 0, &insn);
-            if(count > 0)
+            count = cs_disasm(handle, (const uint8_t*) code, sizeof(code)-1, info->regs->rip, 0, &insn);
+            if (count > 0)
             {
-                    size_t j;
+                size_t j;
 
-                    //delibrately iterating over only count-2 insns because
-                    //the last instruction may lie across 1000 bytes boundary and may not have
-                    //been read
-                    for(j = 0; j < count-2; j++)
+                //delibrately iterating over only count-2 insns because
+                //the last instruction may lie across 1000 bytes boundary and may not have
+                //been read
+                for (j = 0; j < count-2; j++)
+                {
+                    printf("0x%" PRIx64 ":\t%s\t\t%s\n", insn[j].address, insn[j].mnemonic, insn[j].op_str);
+                    if ( !strcmp(insn[j].mnemonic, "ret") )
                     {
-                        printf("0x%" PRIx64 ":\t%s\t\t%s\n",insn[j].address, insn[j].mnemonic, insn[j].op_str);
-                        if( !strcmp(insn[j].mnemonic, "ret") )
-                        {
-                            continue_disassembly = false;
-                            ctx.addr = ctx.addr + insn[j].size;
-                            break;
-                        }
-                        else if(handle_insn(drakvuf, &insn[j], info))
-                        {
-                            continue_disassembly = false;
-                            ctx.addr = ctx.addr + insn[j].size;
-                            break;
-                        }
+                        continue_disassembly = false;
                         ctx.addr = ctx.addr + insn[j].size;
+                        break;
                     }
-                    cs_free(insn, count);
+                    else if (handle_insn(drakvuf, &insn[j], info))
+                    {
+                        continue_disassembly = false;
+                        ctx.addr = ctx.addr + insn[j].size;
+                        break;
+                    }
+                    ctx.addr = ctx.addr + insn[j].size;
+                }
+                cs_free(insn, count);
             }
         }
-        else 
+        else
         {
             drakvuf_release_vmi(drakvuf);
-            fprintf(stderr, RED "[+] Could not read binary from rip" RESET " \n");
+            fprintf(stderr, RED "[+] Could not read binary from rip" RESET "\n");
         }
     }
     cs_close(&handle);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-
-bool set_init_breakpoints(drakvuf_t drakvuf, json_object *candidates)
+/**
+ * Set breakpoints for all injection function candidates.
+ * Currently breakpoints are set for all the injection function candidates
+ * This should be optimized to add breakpoints only when function
+ * is to be injected.
+ */
+bool set_init_breakpoints(drakvuf_t drakvuf, json_object* candidates)
 {
-    (void)(drakvuf);
-    char *f_name;
+    char* f_name;
     addr_t f_addr;
     addr_t f_rva;
-    json_object *mod_rekall_profile = NULL;
-    char *mod_rekal_profile_path=NULL;
-    char *module_name = NULL;
-    // json_object *guest_rekall = drakvuf_get_rekall_profile_json(drakvuf);
-    json_object *calls = NULL;
+    json_object* mod_rekall_profile = NULL;
+    char* mod_rekal_profile_path=NULL;
+    char* module_name = NULL;
+    json_object* calls = NULL;
     json_object_object_get_ex(candidates, "calls", &calls);
     int len = json_object_array_length(calls);
-    for(int i=0; i<len; i++)
+    for (int i=0; i<len; i++)
     {
-        json_object *call;
+        json_object* call;
         call = json_object_array_get_idx(calls, i);
         f_name = get_json_string(call, "function-name");
         mod_rekal_profile_path = get_json_string(call, "module-rekall-profile");
         mod_rekall_profile = json_object_from_file(mod_rekal_profile_path);
-            
         //Insert Trap
-        if ( !rekall_get_function_rva(mod_rekall_profile, f_name, &f_rva) )
+        if (!rekall_get_function_rva(mod_rekall_profile, f_name, &f_rva) )
         {
-            if( !drakvuf_get_function_rva(drakvuf, f_name, &f_rva))
+            if (!drakvuf_get_function_rva(drakvuf, f_name, &f_rva))
             {
                 fprintf(stderr, "FATAL Couldn't get function rva\n");
                 return false;
@@ -335,14 +353,14 @@ bool set_init_breakpoints(drakvuf_t drakvuf, json_object *candidates)
         }
         module_name = get_json_string(call, "module-name");
         f_addr = drakvuf_exportksym_to_va(drakvuf, 4, f_name, module_name, f_rva);
-        if(!f_addr)
+        if (!f_addr)
         {
             drakvuf_exportksym_to_va(drakvuf, 4, f_name, "ntoskrnl.exe", f_rva);
             fprintf(stderr, "Couldn't export ksym to va\n");
             return false;
         }
-        drakvuf_trap_t *trap = (drakvuf_trap_t *)g_malloc0(sizeof(drakvuf_trap_t));
-        
+        drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+
         trap->type = BREAKPOINT;
         trap->breakpoint.lookup_type = LOOKUP_PID;
         trap->breakpoint.addr_type = ADDR_VA;
@@ -351,17 +369,16 @@ bool set_init_breakpoints(drakvuf_t drakvuf, json_object *candidates)
         trap->name = f_name;
         trap->cb = afl_branch_bp;
 
-        if(!drakvuf_add_trap(drakvuf, trap))
+        if (!drakvuf_add_trap(drakvuf, trap))
         {
             fprintf(stderr, "Couldn't add trap for function %s\n", f_name);
-            // return false;
         }
         else
         {
             fprintf(stderr, GREEN "Trap successfully added for %s" RESET "\n", f_name);
         }
     }
-    
+
     fprintf(stderr, "Traps added successfully for kernel functions" RESET "\n");
     return true;
 }
@@ -374,13 +391,13 @@ static void close_handler(int sig)
 }
 
 plugins_options options;
-drakvuf_plugins *plugins;
+drakvuf_plugins* plugins;
 
-bool start_bsodmon(drakvuf_t drakvuf, json_object *function)
+bool start_bsodmon(drakvuf_t drakvuf, json_object* function)
 {
     (void)function;
-    plugins = new drakvuf_plugins(drakvuf, OUTPUT_DEFAULT, 
-        drakvuf_get_os_type(drakvuf));
+    plugins = new drakvuf_plugins(drakvuf, OUTPUT_DEFAULT,
+                                  drakvuf_get_os_type(drakvuf));
     options = {0};
     options.input = function;
     options.abort_on_bsod = true;
@@ -397,93 +414,60 @@ void stop_bsodmon()
 
 void initialize_locations()
 {
-    for(int i = 0; i<NUM_LOCATIONS; i++)
+    for (int i = 0; i<NUM_LOCATIONS; i++)
     {
-        cur_loc[i] = g_rand_int_range(grand, 0,((1<<16)-1));
-    }   
-}
-
-json_object *get_inputs(json_object *call){
-    json_object *args;
-    json_object_object_get_ex(call, "arguments", &args);
-    int len = json_object_array_length(args);
-    json_object *array = json_object_new_array();
-    for(int i = 0; i<len; i++)
-    {
-        json_object *temp_obj = json_object_new_object();
-        json_object *arg = json_object_array_get_idx(args, i);
-        json_object *jarg_type;
-        json_object_object_get_ex(arg, "type", &jarg_type);
-        const char* arg_type = json_object_get_string(jarg_type);
-        json_object *jarg_val;
-        json_object_object_get_ex(arg, "value", &jarg_val);
-        int num = json_object_get_int(jarg_val);
-        if(!strcmp(arg_type, "INTEGER")){
-            json_object *val = json_object_new_int(num);
-            json_object *jtype = json_object_new_string(arg_type);
-            json_object_object_add(temp_obj, "type", jtype);
-            json_object_object_add(temp_obj, "value", val);
-            json_object_array_add(array, temp_obj);
-        }
-        // else if(strcmp(arg_type, "STRING")){
-        //     int num = g_rand_int(grand);
-        //     json_object *val = json_object_new_int64(num);
-        //     json_object *jtype = json_object_new_string(arg_type);
-        //     json_object_object_add(temp_obj, "arg_type", jtype);
-        //     json_object_object_add(temp_obj, "value", val);
-        //     json_object_array_add(array, temp_obj);
-        // }
+        cur_loc[i] = g_rand_int_range(grand, 0, ((1<<16)-1));
     }
-    return array;
 }
 
-
+/**
+ * If domain not available, recreate the domain
+ */
 void retry_creating_domain()
 {
-    FILE *fp;
+    FILE* fp;
     char list_output[2048];
     fp = popen("xl list", "r");
     bool domain_live = false;
-    
-    while(fgets(list_output, 2047, fp) != NULL )
+
+    while (fgets(list_output, 2047, fp) != NULL )
     {
-        if(strstr(list_output, "win10"))
+        if (strstr(list_output, "win10"))
         {
             domain_live = true;
         }
     }
     pclose(fp);
-    if(domain_live)
-     (void)system("xl destroy win10");
+    if (domain_live)
+        (void)system("xl destroy win10");
     (void)system("./restore_script.sh");
-    
-    
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char* argv[])
 {
-    // int file  = open("/home/ajinkya/College/gsoc19/AFL/log.txt", O_WRONLY | O_CREAT );
-    afl_mode = getenv(SHM_ENV_VAR);
-    FILE *temp_stderr ;
-    FILE *temp_stdout ;
+    afl_mode = getenv(SHM_ENV_VAR);         // If non null we are being run by afl
+    FILE* temp_stderr ;                     // Temp variable to store stderr and stdout
+    FILE* temp_stdout ;
     temp_stderr = NULL;
     temp_stdout = NULL;
-    grand = g_rand_new_with_seed(SEED);
-    if(afl_mode){
+    grand = g_rand_new_with_seed(SEED);     // Initialize random no generator
+    if (afl_mode)
+    {
+        // We are in AFL mode
         temp_stderr = stderr;
         temp_stdout = stdout;
-        stdout = fopen("/home/ajinkya/College/gsoc19/AFL/log_stdout.txt", "w");
-        stderr = fopen("/home/ajinkya/College/gsoc19/AFL/log_stderr.txt", "w");
-        afl_setup();    
-        afl_forkserver();
+        stdout = fopen("stdout.log", "w");  // since AFL redirects stderr and stdout
+        stderr = fopen("stderr.log", "w");  // we setup log files for stderr and stdout
+        afl_setup();                        // sets up the AFL shared memory
+        afl_forkserver();                   // spins up forkserver, and waits for command from afl
         initialize_locations();
-        fprintf(stderr,"---------Releasing forkserver--------------\n");
+        fprintf(stderr, "---------Releasing forkserver--------------\n");
     }
-    char *domain=NULL, *rekall_profile=NULL, *rekall_wow_profile = NULL;
-    const char *lib_name=NULL;
-    const char *driver_rekal_profile=NULL;
-    const char *function_name = NULL;
-    char *fuzz_candidates_path=NULL;
+    char* domain=NULL, *rekall_profile=NULL, *rekall_wow_profile = NULL;
+    const char* lib_name=NULL;
+    const char* driver_rekal_profile=NULL;
+    const char* function_name = NULL;
+    char* fuzz_candidates_path=NULL;
     int injection_pid = 0;
     uint32_t injection_tid = 0;
     int num_calls = 0;
@@ -491,7 +475,7 @@ int main(int argc, char *argv[])
     char c;
     int num_args=0, call_idx=0;
     int rc = -1;
-    json_object *candidates;
+    json_object* candidates;
     int successfull = 0;
     (void)rekall_wow_profile;
     (void)libvmi_conf;
@@ -505,14 +489,14 @@ int main(int argc, char *argv[])
                 "\t -d <domain ID or name>    The domain's ID or name\n"
                 "\t -f <fuzzing-candidates-file>\n"
                 "                             The file containing candidates for fuzzer\n"
-                "\t -i <injection-pid>        The pid of the process to be used for kernel hijacking\n" 
+                "\t -i <injection-pid>        The pid of the process to be used for kernel hijacking\n"
                 "\t -t <inection-tid>         Thread id to be used for injection\n"
                 "\t -c <iteration-count>      Fuzzing iteration count\n"
-            );
+               );
         return rc;
     }
-    const char *opts = "r:d:i:vf:t:c:";
-    
+    const char* opts = "r:d:i:vf:t:c:";
+
     while ((c = getopt (argc, argv, opts)) != -1)
         switch (c)
         {
@@ -535,7 +519,7 @@ int main(int argc, char *argv[])
             case 'v':
                 verbose = true;
                 break;
-#endif            
+#endif
             default:
                 if (isalnum(c))
                     fprintf(stderr, "Unrecognized option: %c\n", c);
@@ -543,23 +527,27 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "other error");
                 return rc;
         }
-	/* for a clean exit */
+    /* for a clean exit */
     struct sigaction act;
     act.sa_handler = close_handler;
     act.sa_flags = 0;
 
-    
+
     sigemptyset(&act.sa_mask);
     sigaction(SIGHUP, &act, NULL);
     sigaction(SIGTERM, &act, NULL);
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if(!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf))
+    // Initialize drakvuf
+    if (!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf))
     {
+        // Here drakvuf could not be initialized, assuming initialization failed because domain
+        // was not available try creating domain and retry initialization
         retry_creating_domain();
-        if(!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf))
-        {    sleep(5);
+        if (!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf))
+        {
+            sleep(5);
 
             fprintf(stderr, "Failed to initialize DRAKVUF\n %s", domain);
             return rc;
@@ -568,14 +556,13 @@ int main(int argc, char *argv[])
 
     successfull = 0;
     candidates = json_object_from_file(fuzz_candidates_path);
-    if( candidates == NULL)
+    if ( candidates == NULL)
     {
         AFL_BRANCH_INSTRUMENT;
         fprintf(stderr, RED "[+] Could not read candidates" RESET "\n");
         goto error;
     }
-    if(!set_init_breakpoints
-(drakvuf, candidates))
+    if (!set_init_breakpoints(drakvuf, candidates))
     {
         fprintf(stderr, RED "[+] Could not init kernel functions" RESET "\n");
         goto error;
@@ -583,32 +570,32 @@ int main(int argc, char *argv[])
     AFL_BRANCH_INSTRUMENT;
     start_bsodmon(drakvuf, candidates);
 
-    fprintf(stderr, "STARTING FUZZING >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
-    json_object *calls;
+    fprintf(stderr, "STARTING FUZZING\n");
+    json_object* calls;
     json_object_object_get_ex(candidates, "calls", &calls);
-    if(calls == NULL)
+    if (calls == NULL)
     {
         fprintf(stderr, RED "[+]Could not parse candidates" RESET "\n");
     }
     num_calls = json_object_array_length(calls);
 
-    while(call_idx < num_calls)
-    {   
-        AFL_BRANCH_INSTRUMENT;    
-        if(!continue_fuzzing)
+    while (call_idx < num_calls)
+    {
+        AFL_BRANCH_INSTRUMENT;
+        if (!continue_fuzzing)
             break;
-        fprintf(stderr, "Generating Input iteration %d >>>>>>>>>>>>>>>>\n", call_idx);     
-        json_object *call = json_object_array_get_idx(calls, call_idx);
-        if(call == NULL)
+        fprintf(stderr, "Generating Input iteration %d\n", call_idx);
+        json_object* call = json_object_array_get_idx(calls, call_idx);
+        if (call == NULL)
         {
 
             fprintf(stderr, RED "[+]Could not parse call" RESET "\n");
             goto error;
         }
 
-        json_object *inputs;
+        json_object* inputs;
         json_object_object_get_ex(call, "arguments", &inputs);
-        if(inputs == NULL)
+        if (inputs == NULL)
         {
             fprintf(stderr, RED "[+]Could not parse get inputs" RESET "\n");
             goto error;
@@ -617,25 +604,24 @@ int main(int argc, char *argv[])
         function_name = get_json_string(call, "function-name");
         driver_rekal_profile = get_json_string(call, "module-rekall-profile");
         num_args = json_object_array_length(inputs);
-        
-        fprintf(stderr, "Calling %s!%s, with %d arguments\n",lib_name, function_name, num_args);
-        fprintf(stderr, "Calling With Input >>>>>>>>>>>>>>>>\n");
-        fprintf(stderr, "%s\n", 
+
+        fprintf(stderr, "Calling %s!%s, with %d arguments\n", lib_name, function_name, num_args);
+        fprintf(stderr, "Calling With Input\n");
+        fprintf(stderr, "%s\n",
                 json_object_to_json_string_ext(inputs, JSON_C_TO_STRING_PRETTY));
-        if(
-        !hijack(drakvuf, 
-            injection_pid, 
-            injection_tid,
-            (char *)function_name, 
-            (char *)driver_rekal_profile,
-            (char *)lib_name,
-            inputs, 
-            &spin_lock_held)
+        if (
+            !hijack(drakvuf,
+                    injection_pid,
+                    injection_tid,
+                    (char*)function_name,
+                    (char*)driver_rekal_profile,
+                    (char*)lib_name,
+                    inputs,
+                    &spin_lock_held)
         )
         {
             AFL_BRANCH_INSTRUMENT;
             fprintf(stderr, BGRED WHITE "[+] Hijack Failed" RESET "\n");
-            // goto error;
         }
         else
         {
@@ -645,117 +631,105 @@ int main(int argc, char *argv[])
         }
         AFL_BRANCH_INSTRUMENT;
         fprintf(stderr, "waiting for lock\n");
-        while(!g_atomic_int_compare_and_exchange(&spin_lock_held,false, true));
-        fprintf(stderr, "Returned >>>>>>>>>>>>>>>>\n");
-        // sleep(1);
-        
+        while (!g_atomic_int_compare_and_exchange(&spin_lock_held, false, true));
+        fprintf(stderr, "Returned\n");
     }
-    error:
-    // sleep(5);
+error:
     AFL_BRANCH_INSTRUMENT;
-    drakvuf_resume(drakvuf); 
+    drakvuf_resume(drakvuf);
     stop_bsodmon();
     drakvuf_close(drakvuf, 0);
-    fprintf(stderr,"[+] Successfull = %d\n", successfull);
+    fprintf(stderr, "[+] Successfull = %d\n", successfull);
     fclose(stderr);
     fclose(stdout);
     stderr = temp_stderr;
     stdout = temp_stdout;
-    //give time to wait as immediate calling crashes
-
     return successfull;
-  
+
 }
 
 /* Fork server logic, invoked once we hit _start. */
 
-void afl_forkserver() {
-  int run_num = 0;
-  static unsigned char tmp[4];
+void afl_forkserver()
+{
+    int run_num = 0;
+    static unsigned char tmp[4];
 
-  if (!afl_area_ptr) return;
+    if (!afl_area_ptr) return;
 
-  /* Tell the parent that we're alive. If the parent doesn't want
-     to talk, assume that we're not running in forkserver mode. */
+    /* Tell the parent that we're alive. If the parent doesn't want
+       to talk, assume that we're not running in forkserver mode. */
 
-  if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
+    if (write(FORKSRV_FD + 1, tmp, 4) != 4) return;
 
-  afl_forksrv_pid = getpid();
+    afl_forksrv_pid = getpid();
 
-  /* All right, let's await orders... */
+    /* All right, let's await orders... */
 
-  while (1) {
+    while (1)
+    {
 
-    pid_t child_pid;
-    int status;
+        pid_t child_pid;
+        int status;
 
-    /* Whoops, parent dead? */
-    if (read(FORKSRV_FD, tmp, 4) != 4) exit(2);
-    child_pid = fork();
-    if (child_pid < 0) exit(4);
+        /* Whoops, parent dead? */
+        if (read(FORKSRV_FD, tmp, 4) != 4) exit(2);
+        child_pid = fork();
+        if (child_pid < 0) exit(4);
 
-    if (!child_pid) {
+        if (!child_pid)
+        {
 
-      /* Child process. Close descriptors and run free. */
+            /* Child process. Close descriptors and run free. */
 
-      afl_fork_child = 1;
-      close(FORKSRV_FD);
-      close(FORKSRV_FD + 1);
-      return;
+            afl_fork_child = 1;
+            close(FORKSRV_FD);
+            close(FORKSRV_FD + 1);
+            return;
 
+        }
+
+        /* Parent. */
+
+        if (write(FORKSRV_FD + 1, &child_pid, 4) != 4) exit(5);
+
+        /* Get and relay exit status to parent. */
+        if (waitpid(child_pid, &status, 0) < 0) exit(6);
+        if (write(FORKSRV_FD + 1, &status, 4) != 4) exit(7);
+        run_num++;
     }
-
-    /* Parent. */
-
-    if (write(FORKSRV_FD + 1, &child_pid, 4) != 4) exit(5);
-
-    /* Get and relay exit status to parent. */
-    if (waitpid(child_pid, &status, 0) < 0) exit(6);
-    if (write(FORKSRV_FD + 1, &status, 4) != 4) exit(7);
-    run_num++;
-  }
 
 }
 
 void afl_setup()
 {
 
-  char *id_str = getenv(SHM_ENV_VAR),
-       *inst_r = getenv("AFL_INST_RATIO");
+    char* id_str = getenv(SHM_ENV_VAR),
+          *inst_r = getenv("AFL_INST_RATIO");
 
-  int shm_id;
+    int shm_id;
 
-  if (inst_r) {
-
-    unsigned int r;
-
-    r = atoi(inst_r);
-
-    if (r > 100) r = 100;
-    if (!r) r = 1;
-
-    afl_inst_rms = MAP_SIZE * r / 100;
-
-  }
-
-  if (id_str) {
-
-    shm_id = atoi(id_str);
-    afl_area_ptr = (unsigned char *)shmat(shm_id, NULL, 0);
-
-    if (afl_area_ptr == (void*)-1)
+    if (inst_r)
     {
-        fprintf(stderr,"shmat failed\n");
-        exit(1);
+        unsigned int r;
+        r = atoi(inst_r);
+        if (r > 100) r = 100;
+        if (!r) r = 1;
+        afl_inst_rms = MAP_SIZE * r / 100;
     }
 
-    /* With AFL_INST_RATIO set to a low value, we want to touch the bitmap
-       so that the parent doesn't give up on us. */
+    if (id_str)
+    {
+        shm_id = atoi(id_str);
+        afl_area_ptr = (unsigned char*)shmat(shm_id, NULL, 0);
+        if (afl_area_ptr == (void*)-1)
+        {
+            fprintf(stderr, "shmat failed\n");
+            exit(1);
+        }
+        /* With AFL_INST_RATIO set to a low value, we want to touch the bitmap
+           so that the parent doesn't give up on us. */
 
-    if (inst_r) afl_area_ptr[0] = 1;
-
-
-  }
-
+        if (inst_r) afl_area_ptr[0] = 1;
+    }
 }
-
