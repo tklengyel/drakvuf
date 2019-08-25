@@ -10,4 +10,3 @@ static unsigned int afl_inst_rms = MAP_SIZE;
 static unsigned char* afl_area_ptr;
 static unsigned int afl_forksrv_pid;
 static int afl_fork_child = 0;
-

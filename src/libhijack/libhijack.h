@@ -89,4 +89,3 @@ char* hijack_get_argument_type(json_object* arg, int idx);
 #endif
 
 #endif //libhijack.h
-

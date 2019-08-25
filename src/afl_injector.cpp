@@ -733,4 +733,3 @@ void afl_setup()
         if (inst_r) afl_area_ptr[0] = 1;
     }
 }
-

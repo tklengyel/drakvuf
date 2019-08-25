@@ -215,4 +215,3 @@ int main(int argc, char** argv)
     drakvuf_close(drakvuf, 0);
     printf("[+] Successfull = %d", fuzz_iterations);
 }
-
