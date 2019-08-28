@@ -637,8 +637,12 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
     {
         for (auto& target : it.targets)
         {
-            PRINT_DEBUG("[MEMDUMP-USER] Erased trap for pid %d %s\n", info->proc_data.pid, target.target_name.c_str());
-            drakvuf_remove_trap(drakvuf, target.trap, NULL);
+            if(target.state == HOOK_OK)
+            {
+                PRINT_DEBUG("[MEMDUMP-USER] Erased trap for pid %d %s\n", info->proc_data.pid,
+                            target.target_name.c_str());
+                drakvuf_remove_trap(drakvuf, target.trap, NULL);
+            }
         }
     }
 
