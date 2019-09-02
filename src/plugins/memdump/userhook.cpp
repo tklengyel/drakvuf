@@ -757,10 +757,12 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
     {
         for (auto& hook : dll.targets)
         {
-            addr_t hook_addr = hook.trap->breakpoint.addr;
-            if (hook_addr >> 12 == pa >> 12)
+            if (hook.state == HOOK_OK)
             {
-                hooks.push_back(&hook);
+                addr_t hook_addr = hook.trap->breakpoint.addr;
+                if (hook_addr >> 12 == pa >> 12) {
+                    hooks.push_back(&hook);
+                }
             }
         }
     }
