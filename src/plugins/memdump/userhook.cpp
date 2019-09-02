@@ -760,7 +760,8 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
             if (hook.state == HOOK_OK)
             {
                 addr_t hook_addr = hook.trap->breakpoint.addr;
-                if (hook_addr >> 12 == pa >> 12) {
+                if (hook_addr >> 12 == pa >> 12)
+                {
                     hooks.push_back(&hook);
                 }
             }
