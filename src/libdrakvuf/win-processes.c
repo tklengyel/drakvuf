@@ -809,6 +809,9 @@ bool win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* 
 
     addr_t wow_ctx;
 
+    if (!drakvuf->wow_offsets)
+        return false;
+
     if (!win_get_wow_context(drakvuf, win_get_current_thread(drakvuf, info), &wow_ctx))
         return false;
 
