@@ -711,15 +711,16 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
 
     json_object* rekall_wow_profile = drakvuf_get_rekall_wow_profile_json(drakvuf);
 
-    if ( !rekall_wow_profile )
+    if (rekall_wow_profile)
     {
-        PRINT_DEBUG("Memdump plugin requires the Rekall profile for WoW64 NTDLL (-w)\n");
-        return;
+        if (!rekall_get_struct_member_rva(rekall_wow_profile, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_wow_rva))
+        {
+            throw -1;
+        }
     }
-
-    if (!rekall_get_struct_member_rva(rekall_wow_profile, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_wow_rva))
+    else
     {
-        throw -1;
+        PRINT_DEBUG("Memdump works better when there is a Rekall profile for WoW64 NTDLL (-w)\n");
     }
 
     breakpoint_in_system_process_searcher bp;
