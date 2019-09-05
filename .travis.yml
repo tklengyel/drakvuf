@@ -44,7 +44,7 @@ matrix:
           fi
 
 #
-# compile test
+# compile tests
 #
     - env:
         - TEST="compile"
@@ -68,7 +68,82 @@ matrix:
       install:
         - ./autogen.sh
       script:
+        - ./configure || cat config.log
+        - make
+
+    - env:
+        - TEST="compile with plugin disabled"
+      before_install:
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
+        - export INSTALLDIR=$PWD/usr/local/
+        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
+        - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export CPLUS_INCLUDE_PATH=$PWD/usr/local/include
+        - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
+        - export LDFLAGS="-L$PWD/usr/local/lib"
+        - export CFLAGS="-I$PWD/usr/local/include"
+        - git submodule update --init libvmi
+        - cd libvmi
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
+        - make
+        - make install
+        - cd ..
+      install:
+        - ./autogen.sh
+      script:
+        - ./configure --disable-plugin-syscalls || cat config.log
+        - make
+
+    - env:
+        - TEST="compile debug"
+      before_install:
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
+        - export INSTALLDIR=$PWD/usr/local/
+        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
+        - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export CPLUS_INCLUDE_PATH=$PWD/usr/local/include
+        - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
+        - export LDFLAGS="-L$PWD/usr/local/lib"
+        - export CFLAGS="-I$PWD/usr/local/include"
+        - git submodule update --init libvmi
+        - cd libvmi
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
+        - make
+        - make install
+        - cd ..
+      install:
+        - ./autogen.sh
+      script:
         - ./configure --enable-debug || cat config.log
+        - make
+
+    - env:
+        - TEST="compile debug with plugin disabled"
+      before_install:
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
+        - export INSTALLDIR=$PWD/usr/local/
+        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
+        - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export CPLUS_INCLUDE_PATH=$PWD/usr/local/include
+        - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
+        - export LDFLAGS="-L$PWD/usr/local/lib"
+        - export CFLAGS="-I$PWD/usr/local/include"
+        - git submodule update --init libvmi
+        - cd libvmi
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
+        - make
+        - make install
+        - cd ..
+      install:
+        - ./autogen.sh
+      script:
+        - ./configure --enable-debug --disable-plugin-syscalls || cat config.log
         - make
 
 #
