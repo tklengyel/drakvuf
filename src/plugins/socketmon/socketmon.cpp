@@ -767,8 +767,8 @@ static void print_dns_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketm
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
-                    "\"DnsName\": \"%s\""
-                    "\"Method\": \"%s\","
+                    "\"DnsName\": \"%s\","
+                    "\"Method\": \"%s\""
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,

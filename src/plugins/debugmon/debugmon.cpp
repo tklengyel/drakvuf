@@ -163,7 +163,7 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         case OUTPUT_JSON:
             escaped_pname = drakvuf_escape_str(info->proc_data.name);
             printf( "{"
-                    "\"Plugin\" : \"poolmon\","
+                    "\"Plugin\" : \"debugmon\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
                     "\"VCPU\": %" PRIu32 ","
                     "\"CR3\": %" PRIu64 ","
