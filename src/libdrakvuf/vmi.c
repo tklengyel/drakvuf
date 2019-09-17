@@ -1457,10 +1457,13 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         return 0;
     }
 
-    bool altp2m = xen_enable_altp2m(drakvuf->xen, drakvuf->domID);
-    PRINT_DEBUG("Altp2m enabled? %i\n", altp2m);
-    if (!altp2m)
+    status = vmi_slat_set_domain_state(drakvuf->vmi, true);
+    if (VMI_FAILURE == status)
+    {
+        PRINT_DEBUG("Failed to enable altp2m\n");
         return 0;
+    }
+    PRINT_DEBUG("Altp2m enabled\n");
 
     /*
      * Create altp2m view
