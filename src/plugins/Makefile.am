@@ -224,9 +224,8 @@ AM_CXXFLAGS += -Wno-missing-field-initializers -Wno-unused-parameter
 AM_CXXFLAGS += -Wno-initializer-overrides
 AM_CXXFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
                -Wpointer-arith -Winit-self -Wshadow \
-               -Wstrict-prototypes \
-               -Wmissing-prototypes -Wredundant-decls \
-               -Wfloat-equal -Wundef -Wvla
+               -Wredundant-decls -Wfloat-equal -Wundef \
+               -Wvla
 # Note that -pg is incompatible with HARDENING
 if !HARDENING
 AM_CXXFLAGS += -pg
