@@ -154,6 +154,8 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.dtb))
         return -1;
     ctx.dtb &= ~0u;
+    PRINT_DEBUG("Address of pgd is: 0x%lx \n", ctx.dtb);
+    // ctx.dtb -= 0x40000000;
 
     addr_t mmap;
     ctx.addr = mm_struct_address + drakvuf->offsets[MM_STRUCT_MMAP];

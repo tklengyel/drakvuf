@@ -198,7 +198,7 @@ int main(int argc, char** argv)
                 else if (!strncmp(optarg, "doppelganging", 13))
                     injection_method = INJECT_METHOD_DOPP;
                 else if (!strncmp(optarg, "execproc", 8))
-                    injection_method = INJECT_METHOD_EXECPROC;
+                    injection_method = INJECT_METHOD_CREATEPROC_LINUX;
                 else if (!strncmp(optarg, "linuxshellcode", 14))
                     injection_method = INJECT_METHOD_SHELLCODE_LINUX;
                 else
@@ -243,7 +243,7 @@ int main(int argc, char** argv)
         print_help();
         return 1;
     }
-    if (injection_method != INJECT_METHOD_EXECPROC && args_count)
+    if (injection_method != INJECT_METHOD_CREATEPROC_LINUX && args_count)
     {
         printf("Arguments not supported! \n");
         print_help();

@@ -354,7 +354,7 @@ int main(int argc, char** argv)
                 }
 #endif
                 if (!strncmp(optarg, "execproc", 8))
-                    injection_method = INJECT_METHOD_EXECPROC;
+                    injection_method = INJECT_METHOD_CREATEPROC_LINUX;
                 if (!strncmp(optarg, "linuxshellcode", 14))
                     injection_method = INJECT_METHOD_SHELLCODE_LINUX;
                 break;

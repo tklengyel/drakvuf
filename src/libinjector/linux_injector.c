@@ -141,7 +141,7 @@ struct injector
     drakvuf_t drakvuf;
     bool hijacked, detected;
     injection_method_t method;
-    addr_t exec_func, libc_addr;
+    addr_t fork_func, exec_func, libc_addr;
     reg_t target_rsp, target_rip;
 
     // for exec()
@@ -224,6 +224,18 @@ static bool setup_create_process_regs_and_stack(injector_t injector, drakvuf_tra
     return success;
 }
 
+// Linux - injector - fork process setup
+static bool setup_fork_function_stack(injector_t injector, drakvuf_trap_info_t* info)
+{
+    struct argument args[1] = { {0} };
+
+    // pid_t fork(void);
+
+    init_int_argument(&args[0], 0);
+
+    return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+}
+
 static bool setup_malloc_function_stack(injector_t injector, drakvuf_trap_info_t* info)
 {
     struct argument args[2] = { {0} };
@@ -286,8 +298,8 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
 {
     injector_t injector = info->trap->data;
 
-    PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". TID: %u PID: %u PPID: %u\n",
-                info->regs->cr3, info->proc_data.tid, info->proc_data.pid, info->proc_data.ppid);
+    PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". TID: %u PID: %u PPID: %u -----> looking for tid: %u, pid: %u \n",
+                info->regs->cr3, info->proc_data.tid, info->proc_data.pid, info->proc_data.ppid, injector->target_tid, injector->target_pid);
 
     if (info->proc_data.pid != injector->target_pid || (uint32_t)info->proc_data.tid != injector->target_tid)
     {
@@ -315,11 +327,14 @@ static event_response_t wait_for_target_linux_process_cb(drakvuf_t drakvuf, drak
     injector->target_base = drakvuf_get_current_process(drakvuf, info);
     PRINT_DEBUG("Injector->target_base = 0x%lx \n", injector->target_base);
 
-    if (injector->method == INJECT_METHOD_EXECPROC)
+    if (injector->method == INJECT_METHOD_CREATEPROC_LINUX && injector->status == STATUS_NULL)
     {
+        injector->fork_func = drakvuf_exportsym_to_va(drakvuf, injector->target_base, "libc-", "__libc_fork");
         injector->exec_func = drakvuf_exportsym_to_va(drakvuf, injector->target_base, "libc-", "execlp");
+        PRINT_DEBUG("Address of fork symbol is: 0x%lx \n", injector->fork_func);
         PRINT_DEBUG("Address of execlp symbol is: 0x%lx \n", injector->exec_func);
-        if (injector->exec_func == ~0ull)
+        PRINT_DEBUG("Address of cr3 reg is: 0x%lx \n", info->regs->cr3);
+        if (injector->exec_func == ~0ull || injector->fork_func == ~0ull)
         {
             printf("Error finding symbol address!!\n");
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
@@ -368,7 +383,7 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
         return 0;
     }
 
-    if (injector->method == INJECT_METHOD_EXECPROC && injector->status == STATUS_CREATE_OK)
+    if (injector->method == INJECT_METHOD_CREATEPROC_LINUX && injector->status == STATUS_EXEC_OK)
     {
         if (info->regs->rax == ~0u)
         {
@@ -462,8 +477,12 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
 {
     PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx.\n", info->regs->rip, info->regs->cr3);
     PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
+    PRINT_DEBUG("TID: %u\n", info->trap->breakpoint.pid);
+
     if (info->regs->rip != info->trap->breakpoint.addr)
     {
+        PRINT_DEBUG("Address of rip is: 0x%lx \n", info->regs->rip);
+        PRINT_DEBUG("Address of bpt.addr is: 0x%lx \n", info->trap->breakpoint.addr);
         return 0;
     }
     injector_t injector = info->trap->data;
@@ -471,12 +490,14 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
 
     if (!injector->hijacked && injector->status == STATUS_NULL)
     {
+        printf("fork!! \n");
         memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
         bool success = false;
         switch (injector->method)
         {
-            case INJECT_METHOD_EXECPROC:
-                success = setup_create_process_regs_and_stack(injector, info);
+            case INJECT_METHOD_CREATEPROC_LINUX:
+                printf("setup fork function stack!! \n");
+                success = setup_fork_function_stack(injector, info);
                 injector->target_rsp = info->regs->rsp;
                 break;
             case INJECT_METHOD_SHELLEXEC:
@@ -500,22 +521,86 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
         }
 
         injector->target_rip = info->regs->rip;
+        info->regs->rip = injector->fork_func;
+        PRINT_DEBUG("Rip is  : 0x%lx \n", info->regs->rip);
+
+        injector->status = STATUS_ALLOC_OK;
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+
+    if (injector->method == INJECT_METHOD_CREATEPROC_LINUX && injector->status == STATUS_ALLOC_OK)
+    {
+        printf("\n\nInside!!  \n\n");
+        u_int64_t tid = info->regs->rax;
+        if (tid == 0) return 0;
+
+        if ( tid == ~0u)
+        {
+            printf("Process start failed!! Fork returned -1 \n");
+            injector->rc = 0;
+            injector->detected = false;
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_interrupt(drakvuf, SIGINT);
+            memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        }
+
+        injector->target_tid = tid;
+        injector->target_pid = tid;
+        injector->status = STATUS_FORK_OK;
+
+        memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+
+        drakvuf_trap_t* trap = g_malloc0(sizeof(drakvuf_trap_t));
+        trap->type = REGISTER;
+        trap->reg = CR3;
+        trap->cb = wait_for_target_linux_process_cb;
+        trap->data = injector;
+        if (!drakvuf_add_trap(drakvuf, trap))
+        {
+            PRINT_DEBUG("Failed to setup wait_for_forked_process trap!\n");
+            return 0;
+        }
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+
+    if (!injector->hijacked && injector->method == INJECT_METHOD_CREATEPROC_LINUX && injector->status == STATUS_FORK_OK)
+    {
+        printf("here \n");
+        memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
+        bool success = false;
+
+        success = setup_create_process_regs_and_stack(injector, info);
+        injector->target_rsp = info->regs->rsp;
+
+        if (!success)
+        {
+            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+            return 0;
+        }
+
+        injector->target_rip = info->regs->rip;
         info->regs->rip = injector->exec_func;
         PRINT_DEBUG("Rip is  : 0x%lx \n", info->regs->rip);
 
-        if (injector->method == INJECT_METHOD_EXECPROC)
+        if (injector->method == INJECT_METHOD_CREATEPROC_LINUX)
         {
             if (!injector_set_hijacked(injector, info))
                 return 0;
-            injector->status = STATUS_CREATE_OK;
+            injector->status = STATUS_EXEC_OK;
 
             if (!setup_wait_for_injected_process_trap_linux(injector))
                 return 0;
         }
-        else if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
-        {
-            injector->status = STATUS_ALLOC_OK;
-        }
+        // else if (injector->method == INJECT_METHOD_SHELLCODE_LINUX)
+        // {
+        //     injector->status = STATUS_ALLOC_OK;
+        // }
 
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
@@ -553,7 +638,7 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
         return inject_payload_linux(drakvuf, info);
     }
 
-    if (injector->method == INJECT_METHOD_EXECPROC && injector->status == STATUS_CREATE_OK)
+    if (injector->method == INJECT_METHOD_CREATEPROC_LINUX && injector->status == STATUS_EXEC_OK)
     {
         PRINT_DEBUG("Return back after execve() execution!!\n");
         PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
@@ -580,6 +665,7 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
     }
 
     // Unexpected state
+    printf("This Unexpected state!!");
     drakvuf_remove_trap(drakvuf, info->trap, NULL);
     drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
@@ -626,6 +712,34 @@ static event_response_t linux_injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_i
         injector->target_rip = bp_addr;
         PRINT_DEBUG("Usermode Breakpoint addr: %lx \n", bp_addr);
 
+        if (bp_addr == 0x0)
+        {
+            vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+            access_context_t ctx =
+            {
+                .translate_mechanism = VMI_TM_PROCESS_DTB,
+                .dtb = info->regs->cr3,
+                .addr = info->regs->rsp + 0x18,
+            };
+
+            uint64_t rip_from_stack;
+            printf("rcx: %lx\n", info->regs->rcx);
+            vmi_read_64(vmi, &ctx, &rip_from_stack);
+            printf("stack: %lx\n", rip_from_stack);
+
+            if (rip_from_stack == 0 || rip_from_stack > 0x7fffffffffff)
+            {
+                drakvuf_release_vmi(drakvuf);
+                printf("Failed to acquire usermode rip value!!");
+                drakvuf_remove_trap(drakvuf, info->trap, NULL);
+                return 0;
+            }
+
+            bp_addr = rip_from_stack;
+        }
+
+        printf("bp_addr: %lx\n", bp_addr);
         if (setup_linux_int3_trap_in_userspace(injector, info, bp_addr))
         {
             PRINT_DEBUG("Got return address 0x%lx and it's now trapped in usermode!\n", bp_addr);
