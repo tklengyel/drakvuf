@@ -103,7 +103,7 @@
 #*************************************************************************#
 
 AC_PREREQ([2.60])
-AC_INIT([DRAKVUF], [0.6-m4_esyscmd_s([git describe --always])], [tamas@tklengyel.com], [], [https://drakvuf.com])
+AC_INIT([DRAKVUF], [0.7-m4_esyscmd_s([git describe --always])], [tamas@tklengyel.com], [], [https://drakvuf.com])
 AM_INIT_AUTOMAKE([1.10 no-define foreign subdir-objects])
 LT_INIT
 AC_CONFIG_HEADERS([config.h])
