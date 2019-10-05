@@ -118,7 +118,7 @@ matrix:
       install:
         - ./autogen.sh
       script:
-        - ./configure --enable-debug || cat config.log
+        - ./configure --enable-debug --enable-sanitize || cat config.log
         - make
 
     - env:
