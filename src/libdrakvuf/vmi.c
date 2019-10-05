@@ -819,7 +819,7 @@ void remove_trap(drakvuf_t drakvuf,
 
             if (!container->traps)
             {
-                if ( VMI_SUCCESS == vmi_set_mem_event(vmi, container->memaccess.gfn, VMI_MEMACCESS_N, drakvuf->altp2m_idx) )
+                if ( VMI_SUCCESS == vmi_slat_change_gfn(vmi, drakvuf->altp2m_idx, container->memaccess.gfn, ~(addr_t)0))
                 {
                     PRINT_DEBUG("Removed memtrap for GFN 0x%lx in altp2m view %u\n",
                                 container->memaccess.gfn, drakvuf->altp2m_idx);
