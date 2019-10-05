@@ -427,8 +427,8 @@ typedef struct
 {
     const char*     name;
     arg_direction_t dir;
-    type_t          type;
     const char*     dir_opt;
+    type_t          type;
 } arg_t;
 
 typedef struct

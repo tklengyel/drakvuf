@@ -391,8 +391,8 @@ static int linux_build_argbuf(void* buf, vmi_instance_t vmi, drakvuf_trap_info_t
             access_context_t ctx =
             {
                 .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3,
                 .addr = info->regs->rdi,
+                .dtb = info->regs->cr3
             };
 
             rc = vmi_read(vmi, &ctx, sizeof(lr), &lr, NULL);
