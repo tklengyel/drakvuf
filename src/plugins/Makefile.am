@@ -221,7 +221,8 @@ endif
 if DEBUG
 AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
 AM_CXXFLAGS += -Wno-missing-field-initializers -Wno-unused-parameter
-AM_CXXFLAGS += -Wno-initializer-overrides
+AM_CXXFLAGS += -Wno-initializer-overrides -Wno-unknown-warning-option
+AM_CXXFLAGS += -Wno-c99-designator -ferror-limit=0
 AM_CXXFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
                -Wpointer-arith -Winit-self -Wshadow \
                -Wredundant-decls -Wfloat-equal -Wundef \
