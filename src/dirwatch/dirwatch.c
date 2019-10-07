@@ -264,7 +264,7 @@ static struct start_drakvuf* prepare(struct start_drakvuf* start, int _threadid)
 
     if (!start)
     {
-        start = g_malloc0(sizeof(struct start_drakvuf));
+        start = g_try_malloc0(sizeof(struct start_drakvuf));
         start->threadid = threadid;
         g_mutex_init(&start->timer_lock);
     }

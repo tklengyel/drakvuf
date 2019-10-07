@@ -140,7 +140,7 @@ static char* win_reg_keycontrolblock_path( drakvuf_t drakvuf, drakvuf_trap_info_
         {
             if ( name_length && ( name_length < 240 ) )
             {
-                buf_ret = (char*)g_malloc0( name_length + 1 );
+                buf_ret = (char*)g_try_malloc0( name_length + 1 );
 
                 if ( buf_ret )
                 {

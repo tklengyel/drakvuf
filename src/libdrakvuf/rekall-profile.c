@@ -277,7 +277,7 @@ bool rekall_lookup_array(
 symbols_t* rekall_get_symbols_from_rekall(json_object* rekall_profile_json)
 {
 
-    symbols_t* ret = (symbols_t*)g_malloc0(sizeof(symbols_t));
+    symbols_t* ret = (symbols_t*)g_try_malloc0(sizeof(symbols_t));
     if ( !ret )
         return NULL;
 
@@ -299,7 +299,7 @@ symbols_t* rekall_get_symbols_from_rekall(json_object* rekall_profile_json)
     }
 
     ret->count = json_object_object_length(functions);
-    ret->symbols = (symbol_t*)g_malloc0(sizeof(symbol_t) * ret->count);
+    ret->symbols = (symbol_t*)g_try_malloc0(sizeof(symbol_t) * ret->count);
 
     PRINT_DEBUG("Rekall profile defines %lu symbols\n", ret->count);
 

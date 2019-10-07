@@ -653,7 +653,7 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         if (injector->curr_sequence_number < 0) injector->curr_sequence_number = ++f->sequence_number;
         const int curr_sequence_number = injector->curr_sequence_number;
 
-        void* buffer = g_malloc0(isb_size);
+        void* buffer = g_try_malloc0(isb_size);
 
         ctx.addr = injector->ntreadfile_info.out;
         if (VMI_FAILURE == vmi_read(vmi, &ctx, isb_size, buffer, NULL))
@@ -888,11 +888,11 @@ static bool start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_ins
      * Now we are sure this is new call to NtClose (not result of function injection) and
      * the Handle have been modified in NtWriteFile. So we should save it on the host.
      */
-    wrapper_t* injector = (wrapper_t*)g_malloc0(sizeof(wrapper_t));
+    wrapper_t* injector = (wrapper_t*)g_try_malloc0(sizeof(wrapper_t));
     if (!injector)
         return 0;
 
-    injector->bp = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+    injector->bp = (drakvuf_trap_t*)g_try_malloc0(sizeof(drakvuf_trap_t));
     if (!injector->bp)
     {
         g_free(injector);

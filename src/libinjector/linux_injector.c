@@ -403,7 +403,7 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
 
 static bool setup_wait_for_injected_process_trap_linux(injector_t injector)
 {
-    drakvuf_trap_t* trap = g_malloc0(sizeof(drakvuf_trap_t));
+    drakvuf_trap_t* trap = g_try_malloc0(sizeof(drakvuf_trap_t));
     trap->type = REGISTER;
     trap->reg = CR3;
     trap->cb = wait_for_injected_process_cb_linux;
@@ -588,7 +588,7 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
 
 static bool setup_linux_int3_trap_in_userspace(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
 {
-    drakvuf_trap_t* new_trap = g_malloc0(sizeof(drakvuf_trap_t));
+    drakvuf_trap_t* new_trap = g_try_malloc0(sizeof(drakvuf_trap_t));
     new_trap->type = BREAKPOINT;
     new_trap->name = "entry";
     new_trap->breakpoint.lookup_type = LOOKUP_PID;
@@ -681,7 +681,7 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
     payload_size = ftell (fp);
     rewind (fp);
 
-    data = g_malloc0(payload_size);
+    data = g_try_malloc0(payload_size);
     if ( !data )
     {
         fclose(fp);
@@ -897,7 +897,7 @@ int injector_start_app_on_linux(
     const char* args[])
 {
     int rc = 0, i = 0;
-    injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
+    injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
     if (!injector)
     {
         printf("Injector NOT initialized \n");

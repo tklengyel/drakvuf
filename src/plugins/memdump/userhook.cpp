@@ -289,7 +289,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
 {
     target->pid = info->proc_data.pid;
 
-    drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+    drakvuf_trap_t* trap = (drakvuf_trap_t*)g_try_malloc0(sizeof(drakvuf_trap_t));
     trap->type = BREAKPOINT;
     trap->name = target->target_name.c_str();
     trap->cb = target->callback;
