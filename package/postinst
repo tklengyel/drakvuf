@@ -1,0 +1,43 @@
+#!/bin/bash
+
+set -e
+
+case "$1" in
+    configure)
+        if command -v update-grub > /dev/null && [ -d /boot/grub ]; then
+            update-grub || :
+        fi
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+	echo "postinst called with unknown argument \`$1'" >&2
+	exit 1
+    ;;
+esac
+
+update-rc.d xencommons defaults 19 18
+
+if ! grep -q 'xenfs' '/etc/fstab'
+then
+    echo "add xenfs to /etc/fstab" >&2
+    echo "none /proc/xen xenfs defaults,nofail 0 0" >> /etc/fstab
+else
+    echo "xenfs is already added to /etc/fstab" >&2
+fi
+
+if ! egrep -q -wo 'ept' /proc/cpuinfo
+then
+    echo "------------------------------------------------------------------------" >&2
+    echo "" >&2
+    echo "Your processor doesn\'t seem to support Extended Page Tables (Intel EPT)" >&2
+    echo "DRAKVUF may not work properly on your machine" >&2
+    echo "" >&2
+    echo "------------------------------------------------------------------------" >&2
+else
+    echo "Intel EPT is supported by your CPU" >&2
+fi
+
+exit 0
