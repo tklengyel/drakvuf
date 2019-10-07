@@ -1,0 +1,81 @@
+#!/bin/sh
+#
+# mkdeb: package the dist/install output of a Xen build in a .deb
+
+set -e
+
+distro=$1
+
+if [ "$distro" = "" ]
+then
+    distro=generic
+fi
+
+version=$(grep 'PACKAGE_VERSION=' 'autom4te.cache/output.1' | head -n 1 | cut -f2 "-d'")
+
+# map the architecture, if necessary
+arch=amd64
+
+# Prepare the directory to package
+cp -a /build-xen/dist/install deb
+
+# Debian doesn't use /usr/lib64 for 64-bit libraries
+if test -d deb/usr/lib64 ; then
+  cp -a deb/usr/lib64/* deb/usr/lib/
+  rm -rf deb/usr/lib64
+fi
+
+# Fill in the debian boilerplate
+mkdir -p deb/DEBIAN
+cat >deb/DEBIAN/control <<EOF
+Package: drakvuf-bundle
+Source: drakvuf-bundle
+Version: $version
+Architecture: $arch
+Maintainer: Unmaintained snapshot
+Depends: libcurl4, libyajl2, libpixman-1-0, libjpeg8, libfdt1
+Conflicts: xen-hypervisor-4.6-amd64, xen-hypervisor-4.7-amd64, xen-hypervisor-4.8-amd64, xen-hypervisor-4.9-amd64, xen-hypervisor-4.10-amd64, xen-hypervisor-4.11-amd64, xen-hypervisor-4.12-amd64
+Section: admin
+Priority: optional
+Installed-Size: $(du -ks deb | cut -f1)
+Description: Testing build of DRAKVUF, LibVMI and Xen. Not supported. No guarantee.
+EOF
+# Find all /etc files and add them to conffiles
+find deb/etc -type f -printf /etc/%P\\n >deb/DEBIAN/conffiles
+cp package/postinst deb/DEBIAN/postinst
+cp package/postrm deb/DEBIAN/postrm
+
+# LibVMI
+mkdir -p deb/usr/bin/
+cp -av libvmi/examples/vmi-process-list deb/usr/bin/
+cp -av libvmi/examples/vmi-module-list deb/usr/bin/
+cp -av libvmi/examples/vmi-dump-memory deb/usr/bin/
+cp -av libvmi/examples/vmi-win-guid deb/usr/bin/
+cp -av libvmi/examples/vmi-win-offsets deb/usr/bin/
+
+mkdir -p deb/usr/lib/
+cp -av libvmi/libvmi/libvmi.so* deb/usr/lib/
+cp -av libvmi/libvmi/libvmi.a deb/usr/lib/
+cp -av libvmi/libvmi/libvmi.la deb/usr/lib/
+
+mkdir -p deb/usr/include/libvmi/
+cp -av libvmi/libvmi/libvmi.h deb/usr/include/libvmi/
+cp -av libvmi/libvmi/libvmi_extra.h deb/usr/include/libvmi/
+cp -av libvmi/libvmi/slat.h deb/usr/include/libvmi/
+cp -av libvmi/libvmi/x86.h deb/usr/include/libvmi/
+cp -av libvmi/libvmi/events.h deb/usr/include/libvmi/
+cp -av libvmi/libvmi/peparse.h deb/usr/include/libvmi/
+
+# DRAKVUF
+cp -av src/drakvuf deb/usr/bin/
+
+mkdir -p deb/etc/default/grub.d/
+mkdir -p deb/etc/modules-load.d/
+cp package/extra/etc/default/grub.d/xen.cfg deb/etc/default/grub.d/
+cp package/extra/etc/modules-load.d/xen.conf deb/etc/modules-load.d/
+
+# Package it up
+chown -R root:root deb
+dpkg-deb --build -z0 deb drakvuf-bundle-$version-$distro.deb
+
+cp drakvuf-bundle*.deb /out
