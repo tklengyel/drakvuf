@@ -350,7 +350,7 @@ static unicode_string_t* convert_utf8_to_utf16(char const* str)
 
     if (!us.contents) return NULL;
 
-    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+    unicode_string_t* out = (unicode_string_t*)g_try_malloc0(sizeof(unicode_string_t));
     if (!out)
     {
         g_free(us.contents);
@@ -675,7 +675,7 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
             page_info_t* page = loop->data;
             if (page->vaddr < 0x80000000 && USER_SUPERVISOR(page->x86_pae.pte_value))
             {
-                drakvuf_trap_t* new_trap = g_malloc0(sizeof(drakvuf_trap_t));
+                drakvuf_trap_t* new_trap = g_try_malloc0(sizeof(drakvuf_trap_t));
                 new_trap->type = MEMACCESS;
                 new_trap->cb = mem_callback;
                 new_trap->data = injector;
@@ -727,7 +727,7 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
 // Setup callback for waiting for first occurence of resumed thread
 static bool setup_wait_for_injected_process_trap(injector_t injector)
 {
-    drakvuf_trap_t* trap = g_malloc0(sizeof(drakvuf_trap_t));
+    drakvuf_trap_t* trap = g_try_malloc0(sizeof(drakvuf_trap_t));
     trap->type = REGISTER;
     trap->reg = CR3;
     trap->cb = wait_for_injected_process_cb;
@@ -1222,7 +1222,7 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
     payload_size = ftell (fp);
     rewind (fp);
 
-    data = g_malloc0(payload_size);
+    data = g_try_malloc0(payload_size);
     if ( !data )
     {
         fclose(fp);
@@ -1574,7 +1574,7 @@ int injector_start_app_on_win(
         }
     }
 
-    injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
+    injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
     if (!injector)
     {
         vmi_free_unicode_str(target_file_us);

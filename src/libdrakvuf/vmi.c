@@ -425,7 +425,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
          * There seems to be another trap still active
          * but it may already have another event queued that will clear it.
          */
-        struct memcb_pass* pass = (struct memcb_pass*)g_malloc0(sizeof(struct memcb_pass));
+        struct memcb_pass* pass = (struct memcb_pass*)g_try_malloc0(sizeof(struct memcb_pass));
         pass->drakvuf = drakvuf;
         pass->gfn = event->mem_event.gfn;
         pass->pa = pa;
@@ -930,7 +930,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
         status_t ret;
         xen_unshare_gfn(drakvuf->xen, drakvuf->domID, trap->memaccess.gfn);
 
-        s = (struct wrapper*)g_malloc0(sizeof(struct wrapper));
+        s = (struct wrapper*)g_try_malloc0(sizeof(struct wrapper));
         s->drakvuf = drakvuf;
         s->traps = g_slist_prepend(s->traps, trap);
         s->memaccess.gfn = trap->memaccess.gfn;
@@ -994,7 +994,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     if (s)
         old_access = s->memaccess.access;
 
-    container = (struct wrapper*)g_malloc0(sizeof(struct wrapper));
+    container = (struct wrapper*)g_try_malloc0(sizeof(struct wrapper));
     if ( !container )
         return 0;
 
@@ -1007,7 +1007,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 
     if ( !remapped_gfn )
     {
-        remapped_gfn = (struct remapped_gfn*)g_malloc0(sizeof(struct remapped_gfn));
+        remapped_gfn = (struct remapped_gfn*)g_try_malloc0(sizeof(struct remapped_gfn));
         if ( !remapped_gfn )
             goto err_exit;
 
@@ -1327,7 +1327,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     int rc;
     uint64_t flags = VMI_OS_WINDOWS == drakvuf->os ? VMI_PM_INITFLAG_TRANSITION_PAGES : 0;
 
-    vmi_init_data_t* init_data = (vmi_init_data_t*)g_malloc0(sizeof(vmi_init_data_t) + sizeof(vmi_init_data_entry_t));
+    vmi_init_data_t* init_data = (vmi_init_data_t*)g_try_malloc0(sizeof(vmi_init_data_t) + sizeof(vmi_init_data_entry_t));
     if ( !init_data )
         return 0;
 
@@ -1427,7 +1427,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
      */
     for (i = 0; i < drakvuf->vcpus && i < 16; i++)
     {
-        drakvuf->step_event[i] = (vmi_event_t*)g_malloc0(sizeof(vmi_event_t));
+        drakvuf->step_event[i] = (vmi_event_t*)g_try_malloc0(sizeof(vmi_event_t));
         SETUP_SINGLESTEP_EVENT(drakvuf->step_event[i], 1u << i, vmi_reset_trap, 0);
         drakvuf->step_event[i]->data = drakvuf;
         if (VMI_FAILURE == vmi_register_event(drakvuf->vmi, drakvuf->step_event[i]))

@@ -257,7 +257,7 @@ module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_he
             break;
         }
 
-        module_info_t* ret_module_info = (module_info_t*)g_malloc0( sizeof( module_info_t ) );
+        module_info_t* ret_module_info = (module_info_t*)g_try_malloc0( sizeof( module_info_t ) );
 
         if ( ret_module_info )
         {
@@ -313,7 +313,7 @@ module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_lis
             break;
         }
 
-        module_info_t* ret_module_info = (module_info_t*)g_malloc0( sizeof( module_info_t ) );
+        module_info_t* ret_module_info = (module_info_t*)g_try_malloc0( sizeof( module_info_t ) );
 
         if ( ret_module_info )
         {
@@ -404,7 +404,7 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, i
 
 bool fill_wow_offsets_from_rekall( drakvuf_t drakvuf, size_t size, const char* names [][2] )
 {
-    drakvuf->wow_offsets = (size_t*)g_malloc0(sizeof(addr_t) * size );
+    drakvuf->wow_offsets = (size_t*)g_try_malloc0(sizeof(addr_t) * size );
 
     if ( !drakvuf->wow_offsets )
         return 0;
@@ -427,7 +427,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     if ( !fill_offsets_from_rekall(drakvuf, __WIN_OFFSETS_MAX, win_offset_names) )
         return 0;
 
-    drakvuf->sizes = (size_t*)g_malloc0(sizeof(size_t) * __WIN_SIZES_MAX);
+    drakvuf->sizes = (size_t*)g_try_malloc0(sizeof(size_t) * __WIN_SIZES_MAX);
     if ( !drakvuf->sizes )
         return 0;
 

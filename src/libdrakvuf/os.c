@@ -115,7 +115,7 @@
 
 bool fill_offsets_from_rekall(drakvuf_t drakvuf, size_t size, const char* names [][2])
 {
-    drakvuf->offsets = (addr_t*)g_malloc0(sizeof(addr_t) * size );
+    drakvuf->offsets = (addr_t*)g_try_malloc0(sizeof(addr_t) * size );
     if ( !drakvuf->offsets )
         return 0;
 

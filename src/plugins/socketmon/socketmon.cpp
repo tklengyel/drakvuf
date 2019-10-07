@@ -660,7 +660,7 @@ static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_in
 
 static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    struct wrapper* w = (struct wrapper*)g_malloc0(sizeof(struct wrapper));
+    struct wrapper* w = (struct wrapper*)g_try_malloc0(sizeof(struct wrapper));
     w->s = (socketmon*)info->trap->data;
 
     addr_t rsp = 0;
@@ -676,7 +676,7 @@ static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return 0;
     }
 
-    drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+    drakvuf_trap_t* trap = (drakvuf_trap_t*)g_try_malloc0(sizeof(drakvuf_trap_t));
     trap->breakpoint.lookup_type = LOOKUP_PID;
     trap->breakpoint.pid = 4;
     trap->breakpoint.addr_type = ADDR_VA;
@@ -700,7 +700,7 @@ static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    struct wrapper* w = (struct wrapper*)g_malloc0(sizeof(struct wrapper));
+    struct wrapper* w = (struct wrapper*)g_try_malloc0(sizeof(struct wrapper));
     w->s = (socketmon*)info->trap->data;
 
     addr_t rsp = 0;
@@ -716,7 +716,7 @@ static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return 0;
     }
 
-    drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+    drakvuf_trap_t* trap = (drakvuf_trap_t*)g_try_malloc0(sizeof(drakvuf_trap_t));
     trap->breakpoint.lookup_type = LOOKUP_PID;
     trap->breakpoint.pid = 4;
     trap->breakpoint.addr_type = ADDR_VA;

@@ -120,7 +120,7 @@
 bool xen_init_interface(xen_interface_t** xen)
 {
 
-    *xen = g_malloc0(sizeof(xen_interface_t));
+    *xen = g_try_malloc0(sizeof(xen_interface_t));
 
     /* We create an xc interface to test connection to it */
     (*xen)->xc = xc_interface_open(0, 0, 0);

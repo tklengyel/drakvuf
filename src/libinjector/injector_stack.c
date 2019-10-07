@@ -174,7 +174,7 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* 
     addr &= ~0x1f;
 
     size_t buf_len = orig_addr - addr;
-    void* buf = g_malloc0(buf_len);
+    void* buf = g_try_malloc0(buf_len);
     if (!buf) return 0;
     memcpy(buf, str, str_len);
 
@@ -414,7 +414,7 @@ static addr_t place_string_on_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_
     addr &= ~0x1f;
 
     size_t buf_len = orig_addr - addr;
-    void* buf = g_malloc0(buf_len);
+    void* buf = g_try_malloc0(buf_len);
 
     if (!buf) return 0;
     memcpy(buf, str, str_len);

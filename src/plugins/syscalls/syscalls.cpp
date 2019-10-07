@@ -593,7 +593,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
             if ( wrapper->syscall_index==-1 )
                 PRINT_DEBUG("[SYSCALLS]: %s not found in argument list\n", symbol->name);
 
-            drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+            drakvuf_trap_t* trap = (drakvuf_trap_t*)g_try_malloc0(sizeof(drakvuf_trap_t));
             trap->breakpoint.lookup_type = LOOKUP_PID;
             trap->breakpoint.pid = 4;
             trap->breakpoint.addr_type = ADDR_VA;
@@ -642,7 +642,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
 
             PRINT_DEBUG("[SYSCALLS] Adding trap to %s at 0x%lx (kaslr 0x%lx)\n", symbol->name, symbol->rva + kaslr, kaslr);
 
-            drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
+            drakvuf_trap_t* trap = (drakvuf_trap_t*)g_try_malloc0(sizeof(drakvuf_trap_t));
             trap->breakpoint.lookup_type = LOOKUP_PID;
             trap->breakpoint.pid = 0;
             trap->breakpoint.addr_type = ADDR_VA;
@@ -724,7 +724,7 @@ static symbols_t* filter_symbols(const symbols_t* symbols, const char* filter_fi
 {
     GHashTable* filter = read_syscalls_filter(filter_file);
     if (!filter) return NULL;
-    symbols_t* ret = (symbols_t*)g_malloc0(sizeof(symbols_t));
+    symbols_t* ret = (symbols_t*)g_try_malloc0(sizeof(symbols_t));
     if (!ret)
     {
         g_hash_table_destroy(filter);
@@ -732,7 +732,7 @@ static symbols_t* filter_symbols(const symbols_t* symbols, const char* filter_fi
     }
 
     ret->count = symbols->count;
-    ret->symbols = (symbol_t*)g_malloc0(sizeof(symbol_t) * ret->count);
+    ret->symbols = (symbol_t*)g_try_malloc0(sizeof(symbol_t) * ret->count);
     if (!ret->symbols)
     {
         g_hash_table_destroy(filter);

@@ -171,7 +171,7 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
     verbose = _verbose;
 #endif
 
-    *drakvuf = (drakvuf_t)g_malloc0(sizeof(struct drakvuf));
+    *drakvuf = (drakvuf_t)g_try_malloc0(sizeof(struct drakvuf));
 
     (*drakvuf)->rekall_profile_json = json_object_from_file(rekall_profile);
     (*drakvuf)->rekall_profile = g_strdup(rekall_profile);
@@ -427,7 +427,7 @@ void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap,
 
         if (!free_wrapper)
         {
-            free_wrapper = (struct free_trap_wrapper*)g_malloc0(sizeof(struct free_trap_wrapper));
+            free_wrapper = (struct free_trap_wrapper*)g_try_malloc0(sizeof(struct free_trap_wrapper));
             free_wrapper->free_routine = free_routine;
             free_wrapper->trap = trap;
             g_hash_table_insert(drakvuf->remove_traps,
@@ -620,7 +620,7 @@ unicode_string_t* drakvuf_read_unicode_common(vmi_instance_t vmi, const access_c
     if ( !us )
         return NULL;
 
-    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+    unicode_string_t* out = (unicode_string_t*)g_try_malloc0(sizeof(unicode_string_t));
 
     if ( !out )
     {
@@ -672,7 +672,7 @@ unicode_string_t* drakvuf_read_unicode32_common(vmi_instance_t vmi, const access
     if ( !us )
         return NULL;
 
-    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+    unicode_string_t* out = (unicode_string_t*)g_try_malloc0(sizeof(unicode_string_t));
 
     if ( !out )
     {
@@ -743,7 +743,7 @@ unicode_string_t* drakvuf_read_wchar_array(vmi_instance_t vmi, const access_cont
     unicode_string_t us;
 
     us.length = length * 2;
-    us.contents = (uint8_t*)g_malloc0(sizeof(uint8_t) * (length * 2 + 2));
+    us.contents = (uint8_t*)g_try_malloc0(sizeof(uint8_t) * (length * 2 + 2));
 
     if ( !us.contents )
         return NULL;
@@ -759,7 +759,7 @@ unicode_string_t* drakvuf_read_wchar_array(vmi_instance_t vmi, const access_cont
     us.contents[us.length + 1] = 0;
     us.encoding = "UTF-16";
 
-    unicode_string_t* out = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+    unicode_string_t* out = (unicode_string_t*)g_try_malloc0(sizeof(unicode_string_t));
 
     if ( !out )
     {
@@ -842,10 +842,10 @@ static void drakvuf_event_fd_generate(drakvuf_t drakvuf)
     }
 
     /* allocate and populate new pollfd array and new fd_info_lookup array */
-    drakvuf->event_fds = (struct pollfd*) g_malloc0(sizeof(struct pollfd) * \
+    drakvuf->event_fds = (struct pollfd*) g_try_malloc0(sizeof(struct pollfd) * \
                          (g_slist_length(drakvuf->event_fd_info)));
 
-    drakvuf->fd_info_lookup = (fd_info_t) g_malloc0(sizeof(struct fd_info) * \
+    drakvuf->fd_info_lookup = (fd_info_t) g_try_malloc0(sizeof(struct fd_info) * \
                               (g_slist_length(drakvuf->event_fd_info)));
 
     int i = 0;
@@ -900,7 +900,7 @@ int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, event_cb_t event_cb, void* d
     PRINT_DEBUG("drakvuf_event_fd_add fd=%d\n", fd);
 
     /* add new fd_info */
-    fd_info_t new_fd_info = (fd_info_t) g_malloc0(sizeof(struct fd_info));
+    fd_info_t new_fd_info = (fd_info_t) g_try_malloc0(sizeof(struct fd_info));
     new_fd_info->fd = fd;
     new_fd_info->event_cb = event_cb;
     new_fd_info->data = data;

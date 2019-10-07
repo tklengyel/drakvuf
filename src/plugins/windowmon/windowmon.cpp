@@ -116,7 +116,7 @@ static char const* get_value_name(unicode_string_t* us)
         auto len = strlen((const char*)us->contents);
         auto full_len = len + 3;
 
-        name = (char*)g_malloc0(full_len);
+        name = (char*)g_try_malloc0(full_len);
 
         name[0] = '"';
         g_strlcpy(name + 1, (const char*)us->contents, len + 1);
