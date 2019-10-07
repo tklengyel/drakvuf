@@ -387,7 +387,7 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
     std::string result = rs.str();
     if (!result.empty()) result.erase(result.size() - 1);
 
-    unicode_string_t* data_us = (unicode_string_t*)g_malloc0(sizeof(unicode_string_t));
+    unicode_string_t* data_us = (unicode_string_t*)g_try_malloc0(sizeof(unicode_string_t));
     data_us->encoding = "UTF-8";
     data_us->contents = (uint8_t*)g_strdup(result.c_str());
     data_us->length = result.size() + 1;

@@ -197,7 +197,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     const char* str_format;
     const char* user_format;
     uint32_t first_chance;
-    char* trap_frame=(char*)g_malloc0(e->ktrap_frame_size);  // Generic pointer that allows addressing byte-aligned offests
+    char* trap_frame=(char*)g_try_malloc0(e->ktrap_frame_size);  // Generic pointer that allows addressing byte-aligned offests
 
     if (!trap_frame)
     {
@@ -356,7 +356,7 @@ exmon::exmon(drakvuf_t drakvuf, output_format_t output)
         throw -1;
 
     this->trap.cb = cb;
-    this->offsets = (addr_t*)g_malloc0(__OFFSET_MAX*sizeof(addr_t));
+    this->offsets = (addr_t*)g_try_malloc0(__OFFSET_MAX*sizeof(addr_t));
     this->ktrap_frame_size = 0;
 
     this->pm = drakvuf_get_page_mode(drakvuf);
