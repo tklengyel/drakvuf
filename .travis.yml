@@ -288,10 +288,11 @@ matrix:
         - make
         - make install
         - make dist
-      script:
-        - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
-        - tar czvf drakvuf-build.tar.gz usr/local
-        - travis_wait 60 sh package/build.sh
+      script: |
+          if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then \
+            tar czvf drakvuf-build.tar.gz usr/local && \
+            travis_wait 60 sh package/build.sh; \
+          fi
       before_deploy:
         - git config --local user.name "drakvuf-builds"
         - git config --local user.email "drakvuf-builds@tklsoftware.com"
@@ -301,8 +302,6 @@ matrix:
         provider: releases
         api_key:
           secure: "$GITHUB_TOKEN"
-        on:
-          all_branches: true
         repo: tklengyel/drakvuf-builds
         file:
           - drakvuf*.tar.gz

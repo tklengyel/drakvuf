@@ -31,14 +31,15 @@ RUN cd /build-xen && \
 
 COPY . /build
 RUN cd /build/libvmi && \
-    cmake -DENABLE_KVM=OFF -DENABLE_FILE=OFF -DENABLE_BAREFLANK=OFF -DCMAKE_INSTALL_PREFIX=/usr . && \
+    cmake -DENABLE_KVM=OFF -DENABLE_FILE=OFF -DENABLE_BAREFLANK=OFF -DCMAKE_INSTALL_PREFIX=/usr/local . && \
     make -j$(nproc) && \
     make install && \
     ldconfig
 RUN cd /build && \
     autoreconf -vi && \
-    ./configure && \
-    make -j$(nproc)
+    ./configure --prefix=/usr/local && \
+    make -j$(nproc) && \
+    make install
 
 WORKDIR /build
 RUN chmod +x package/mkdeb
