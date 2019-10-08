@@ -17,25 +17,6 @@ matrix:
     include:
 
 #
-# Build .deb package
-#
-    - env:
-        - TEST="build-deb"
-      script:
-        - git submodule init
-        - git submodule update
-        - travis_wait 60 sh package/build.sh
-      deploy:
-          provider: releases
-          api_key: "$GITHUB_OAUTH_TOKEN"
-          file_glob: true
-          file: out/**/*
-          skip_cleanup: true
-          draft: true
-          on:
-              tags: true
-
-#
 # Whitespace check
 #
     - env:
@@ -294,7 +275,7 @@ matrix:
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
         - export LDFLAGS="-L$PWD/usr/local/lib"
         - export CFLAGS="-I$PWD/usr/local/include"
-        - git submodule update --init libvmi
+        - git submodule update --init
       install:
         - cd libvmi
         - autoreconf -vif
@@ -309,6 +290,7 @@ matrix:
         - make dist
       script:
         - tar czvf drakvuf-build.tar.gz usr/local
+        - travis_wait 60 sh package/build.sh
       before_deploy:
         - git config --local user.name "drakvuf-builds"
         - git config --local user.email "drakvuf-builds@tklsoftware.com"
@@ -321,7 +303,9 @@ matrix:
         on:
           all_branches: true
         repo: tklengyel/drakvuf-builds
-        file: drakvuf*.tar.gz
+        file:
+          - drakvuf*.tar.gz
+          - out/**/*
         skip_cleanup: true
         file_glob: true
         tags: true
