@@ -1,6 +1,4 @@
 FROM ubuntu:18.04
-LABEL maintainer.name="CERT.PL " \
-      maintainer.email="michal.leszczynski@cert.pl"
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV USER root
