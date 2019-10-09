@@ -265,9 +265,7 @@ matrix:
 #
     - env:
         - TEST="package build"
-      before_install:
-        - sudo apt-get update
-        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
+      before_deploy:
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
@@ -275,8 +273,9 @@ matrix:
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
         - export LDFLAGS="-L$PWD/usr/local/lib"
         - export CFLAGS="-I$PWD/usr/local/include"
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
         - git submodule update --init
-      install:
         - cd libvmi
         - autoreconf -vif
         - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
@@ -288,12 +287,8 @@ matrix:
         - make
         - make install
         - make dist
-      script: |
-          if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then \
-            tar czvf drakvuf-build.tar.gz usr/local && \
-            travis_wait 60 sh package/build.sh; \
-          fi
-      before_deploy:
+        - tar czvf drakvuf-build.tar.gz usr/local
+        - travis_wait 60 sh package/build.sh;
         - git config --local user.name "drakvuf-builds"
         - git config --local user.email "drakvuf-builds@tklsoftware.com"
         - export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
