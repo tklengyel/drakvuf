@@ -265,6 +265,8 @@ matrix:
 #
     - env:
         - TEST="package build"
+      script:
+        - echo "Building binary packages"
       before_deploy:
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
