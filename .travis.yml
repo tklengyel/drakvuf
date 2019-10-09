@@ -268,40 +268,21 @@ matrix:
       script:
         - echo "Building binary packages"
       before_deploy:
-        - export INSTALLDIR=$PWD/usr/local/
-        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
-        - export C_INCLUDE_PATH=$PWD/usr/local/include
-        - export CPLUS_INCLUDE_PATH=$PWD/usr/local/include
-        - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
-        - export LDFLAGS="-L$PWD/usr/local/lib"
-        - export CFLAGS="-I$PWD/usr/local/include"
-        - sudo apt-get update
-        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
-        - git submodule update --init
-        - cd libvmi
-        - autoreconf -vif
-        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-        - make
-        - make install
-        - cd ..
-        - ./autogen.sh
-        - ./configure --prefix=${INSTALLDIR}
-        - make
-        - make install
-        - make dist
-        - tar czvf drakvuf-build.tar.gz usr/local
+        - git submodule update --init libvmi xen drakvuf-doppelganging
         - travis_wait 60 sh package/build.sh;
         - git config --local user.name "drakvuf-builds"
         - git config --local user.email "drakvuf-builds@tklsoftware.com"
         - export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
         - git tag $TRAVIS_TAG
+      cache:
+        directories:
+          - package/cache
       deploy:
         provider: releases
         api_key:
           secure: "$GITHUB_TOKEN"
         repo: tklengyel/drakvuf-builds
         file:
-          - drakvuf*.tar.gz
           - out/**/*
         skip_cleanup: true
         file_glob: true

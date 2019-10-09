@@ -17,7 +17,7 @@ version=$(grep 'PACKAGE_VERSION=' 'autom4te.cache/output.1' | head -n 1 | cut -f
 arch=amd64
 
 # Prepare the directory to package
-cp -a /build-xen/dist/install deb
+cp -a /dist-xen deb
 
 # Debian doesn't use /usr/lib64 for 64-bit libraries
 if test -d deb/usr/lib64 ; then
@@ -33,7 +33,7 @@ Source: drakvuf-bundle
 Version: $version
 Architecture: $arch
 Maintainer: Unmaintained snapshot
-Depends: libcurl4, libyajl2, libpixman-1-0, libjpeg8, libfdt1
+Depends: bpixman-1-0, libpng16-16, libjpeg-turbo8, libnettle6, libgnutls30, libfdt1, libglib2.0-0, libglib2.0-dev, libjson-c3
 Conflicts: xen-hypervisor-4.6-amd64, xen-hypervisor-4.7-amd64, xen-hypervisor-4.8-amd64, xen-hypervisor-4.9-amd64, xen-hypervisor-4.10-amd64, xen-hypervisor-4.11-amd64, xen-hypervisor-4.12-amd64
 Section: admin
 Priority: optional
@@ -78,4 +78,12 @@ cp package/extra/etc/modules-load.d/xen.conf deb/etc/modules-load.d/
 chown -R root:root deb
 dpkg-deb --build -z0 deb drakvuf-bundle-$version-$distro.deb
 
-cp drakvuf-bundle*.deb /out
+mv drakvuf-bundle*.deb /out
+rm -rf deb
+
+tar --exclude='./.git' --exclude='./package' -pczf /out/drakvuf-build.tar.gz .
+git config --local user.name "drakvuf-builds"
+git config --local user.email "drakvuf-builds@tklsoftware.com"
+export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
+git tag $TRAVIS_TAG
+
