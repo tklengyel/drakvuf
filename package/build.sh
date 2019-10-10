@@ -11,7 +11,7 @@ if [ ! -f "package/cache/xen-intermediate-$XEN_HASH.tar.gz" ]
 then
     echo Building Xen intermediate...
     docker build -f package/Dockerfile-xen -t xen-intermediate . 2>&1 >package/log/xen-build.log
-    if [ $? -ne 0 ]; then echo Xen intermediate image build failed, build log tail below ; tail package/log/xen-build.log ; exit 1 ; fi
+    if [ $? -ne 0 ]; then echo Xen intermediate image build failed, build log tail below ; tail -n 200 package/log/xen-build.log ; exit 1 ; fi
     echo Removing old Xen intermediate image...
     rm -f package/cache/xen-intermediate-*.tar.gz
     echo Saving Xen intermediate...
@@ -24,5 +24,5 @@ else
 fi
 
 echo Building final image...
-docker build -f package/Dockerfile-final -t deb-build . 2>&1 >package/log/final-build.log && docker run -v $(pwd)/package/out:/out deb-build
-if [ $? -ne 0 ]; then echo Failed to build final image, build log tail below ; tail package/log/final-build.log ; exit 1 ; fi
+docker build -f package/Dockerfile-final -t deb-build . && docker run -v $(pwd)/package/out:/out deb-build
+if [ $? -ne 0 ]; then echo Failed to build package ; exit 1 ; fi
