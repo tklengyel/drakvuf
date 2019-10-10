@@ -8,8 +8,8 @@ RUN mkdir -p /log && \
     sed -i 's/# deb-src/deb-src/g' /etc/apt/sources.list && \
     apt-get update && \
     echo Running apt-get install, this may take a few minutes... && \
-    apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive && \
-    apt-get --quiet --yes build-dep xen-utils-4.9 xen-hypervisor-4.9-amd64 && \
+    apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive clang && \
+    apt-get --quiet --yes build-dep xen && \
     apt-get autoremove -y && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists* /tmp/* /var/tmp/*
