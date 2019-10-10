@@ -77,11 +77,14 @@ cp package/extra/etc/modules-load.d/xen.conf deb/etc/modules-load.d/
 # Package it up
 chown -R root:root deb
 dpkg-deb --build -z0 deb drakvuf-bundle-$version-$distro.deb
-
 mv drakvuf-bundle*.deb /out
 rm -rf deb
 
-tar --exclude='./.git' --exclude='./package' -pczf /out/drakvuf-build.tar.gz .
+# Also make source package
+make dist
+mv drakvuf*.tar.gz /out
+
+# For Travis CI
 git config --local user.name "drakvuf-builds"
 git config --local user.email "drakvuf-builds@tklsoftware.com"
 export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}

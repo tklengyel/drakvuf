@@ -9,8 +9,7 @@ RUN cd /build/libvmi && \
 RUN cd /build && \
     autoreconf -vi && \
     ./configure --prefix=/usr && \
-    make -j$(nproc) && \
-    make install
+    make -j$(nproc)
 
 WORKDIR /build
 RUN chmod +x package/mkdeb
