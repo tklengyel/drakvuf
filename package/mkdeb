@@ -33,7 +33,7 @@ Source: drakvuf-bundle
 Version: $version
 Architecture: $arch
 Maintainer: Unmaintained snapshot
-Depends: libpixman-1-0, libpng16-16, libjpeg-turbo8, libnettle6, libgnutls30, libfdt1, libglib2.0-0, libglib2.0-dev, libjson-c3, libyajl2
+Depends: libpixman-1-0, libpng16-16, libnettle6, libgnutls30, libfdt1, libglib2.0-0, libglib2.0-dev, libjson-c3, libyajl2, libaio1
 Conflicts: xen-hypervisor-4.6-amd64, xen-hypervisor-4.7-amd64, xen-hypervisor-4.8-amd64, xen-hypervisor-4.9-amd64, xen-hypervisor-4.10-amd64, xen-hypervisor-4.11-amd64, xen-hypervisor-4.12-amd64
 Section: admin
 Priority: optional
