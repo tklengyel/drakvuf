@@ -283,7 +283,7 @@ matrix:
           secure: "$GITHUB_TOKEN"
         repo: tklengyel/drakvuf-builds
         file:
-          - out/**/*
+          - package/out/**/*
         skip_cleanup: true
         file_glob: true
         tags: true
