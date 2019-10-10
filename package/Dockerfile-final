@@ -15,4 +15,3 @@ RUN cd /build && \
 WORKDIR /build
 RUN chmod +x package/mkdeb
 CMD ./package/mkdeb ubuntu-18.04
-
