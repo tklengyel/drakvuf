@@ -2,6 +2,8 @@ dist: bionic
 language: c
 sudo: true
 compiler: clang
+services:
+    - docker
 git:
     submodules: false
 
@@ -33,7 +35,7 @@ matrix:
         - sudo apt-get update
         - sudo apt-get -q -y install astyle
       script:
-        - export ARTISTIC_STYLE_OPTIONS=".astylerc" && astyle -Q `find . | egrep "\.c|\.h"` > astyle.out
+        - export ARTISTIC_STYLE_OPTIONS=".astylerc" && astyle -Q `find . -name "*.c" -o -name ".h" -o -name ".cpp" -name ".hpp"` > astyle.out
         - TEST=$(cat astyle.out | wc -l)
         - |
           if [[ $TEST -ne 0 ]]; then
@@ -257,3 +259,31 @@ matrix:
         - ./configure --enable-debug
         - build-wrapper-linux-x86-64 --out-dir bw-output make -j2
         - sonar-scanner
+
+#
+# Build binary packages and push them as releases on drakvuf-builds
+#
+    - env:
+        - TEST="package build"
+      script:
+        - echo "Building binary packages"
+      before_deploy:
+        - git submodule update --init libvmi xen drakvuf-doppelganging
+        - travis_wait 60 sh package/build.sh;
+        - git config --local user.name "drakvuf-builds"
+        - git config --local user.email "drakvuf-builds@tklsoftware.com"
+        - export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
+        - git tag $TRAVIS_TAG
+      cache:
+        directories:
+          - package/cache
+      deploy:
+        provider: releases
+        api_key:
+          secure: "$GITHUB_TOKEN"
+        repo: tklengyel/drakvuf-builds
+        file:
+          - out/**/*
+        skip_cleanup: true
+        file_glob: true
+        tags: true
