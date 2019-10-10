@@ -15,4 +15,3 @@ If you have Docker, you can run the build process manually, even on your own com
 ```
 
 The built package should appear in `package/out` directory.
-
