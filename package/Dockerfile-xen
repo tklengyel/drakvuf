@@ -8,8 +8,7 @@ RUN mkdir -p /log && \
     sed -i 's/# deb-src/deb-src/g' /etc/apt/sources.list && \
     apt-get update && \
     echo Running apt-get install, this may take a few minutes... && \
-    # apt-get --quiet --yes install wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev bzip2 pciutils-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool libjson-c-dev libfuse-dev liblzma-dev autoconf-archive kpartx python-dev cmake libsdl-dev && \
-    apt-get --quiet --yes install build-essential git wget curl cmake && \
+    apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive && \
     apt-get --quiet --yes build-dep xen-utils-4.9 xen-hypervisor-4.9-amd64 && \
     apt-get autoremove -y && \
     apt-get clean && \
