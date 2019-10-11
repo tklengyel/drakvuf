@@ -47,27 +47,13 @@ cp package/postrm deb/DEBIAN/postrm
 
 # LibVMI
 mkdir -p deb/usr/bin/
-cp -av libvmi/examples/vmi-process-list deb/usr/bin/
-cp -av libvmi/examples/vmi-module-list deb/usr/bin/
-cp -av libvmi/examples/vmi-dump-memory deb/usr/bin/
-cp -av libvmi/examples/vmi-win-guid deb/usr/bin/
-cp -av libvmi/examples/vmi-win-offsets deb/usr/bin/
+cp -avr /build/usr/bin/* deb/usr/bin/
 
 mkdir -p deb/usr/lib/
-cp -av libvmi/libvmi/libvmi.so* deb/usr/lib/
-cp -av libvmi/libvmi/libvmi.a deb/usr/lib/
-cp -av libvmi/libvmi/libvmi.la deb/usr/lib/
+cp -avr /build/usr/lib/* deb/usr/lib/
 
 mkdir -p deb/usr/include/libvmi/
-cp -av libvmi/libvmi/libvmi.h deb/usr/include/libvmi/
-cp -av libvmi/libvmi/libvmi_extra.h deb/usr/include/libvmi/
-cp -av libvmi/libvmi/slat.h deb/usr/include/libvmi/
-cp -av libvmi/libvmi/x86.h deb/usr/include/libvmi/
-cp -av libvmi/libvmi/events.h deb/usr/include/libvmi/
-cp -av libvmi/libvmi/peparse.h deb/usr/include/libvmi/
-
-# DRAKVUF
-cp -av src/drakvuf deb/usr/bin/
+cp -avr /build/usr/include/* deb/usr/include/libvmi/
 
 mkdir -p deb/etc/default/grub.d/
 mkdir -p deb/etc/modules-load.d/
