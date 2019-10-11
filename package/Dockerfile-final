@@ -1,15 +1,25 @@
 FROM xen-intermediate
 
 COPY . /build
-RUN cd /build/libvmi && \
-    cmake -DENABLE_KVM=OFF -DENABLE_FILE=OFF -DENABLE_BAREFLANK=OFF -DCMAKE_INSTALL_PREFIX=/usr . && \
+RUN export INSTALL_PATH="/build/usr" && \
+    cd /build/libvmi && \
+    autoreconf -vif && \
+    ./configure --prefix=$INSTALL_PATH --disable-kvm --disable-file --disable-bareflank --disable-safety-checks && \
     make -j$(nproc) && \
     make install && \
     ldconfig
-RUN cd /build && \
-    autoreconf -vi && \
-    ./configure --prefix=/usr && \
-    make -j$(nproc)
+RUN export INSTALL_PATH="/build/usr" && \
+    cd /build && \
+    export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$INSTALL_PATH/lib" && \
+    export C_INCLUDE_PATH="$INSTALL_PATH/include" && \
+    export CPLUS_INCLUDE_PATH="$INSTALL_PATH/include" && \
+    export PKG_CONFIG_PATH="$INSTALL_PATH/lib/pkgconfig/" && \
+    export LDFLAGS="-L$INSTALL_PATH/lib" && \
+    export CFLAGS="-I$INSTALL_PATH/include" && \
+    autoreconf -vif && \
+    ./configure --prefix=$INSTALL_PATH && \
+    make -j$(nproc) && \
+    make install
 
 WORKDIR /build
 RUN chmod +x package/mkdeb
