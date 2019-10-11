@@ -105,7 +105,7 @@
 h_sources = libdrakvuf.h rekall-profile.h os.h private.h vmi.h \
             win.h win-error-codes.h win-exports.h win-handles.h win-offsets.h \
             win-offsets-map.h win-symbols.h win-wow-offsets.h win-wow-offsets-map.h \
-            linux-exports.h linux-offsets.h linux-offsets-map.h
+            linux.h linux-exports.h linux-offsets.h linux-offsets-map.h
 c_sources = drakvuf.c rekall-profile.c os.c vmi.c \
             win.c win-exports.c win-handles.c win-processes.c win-registry.c \
             win-files.c \
