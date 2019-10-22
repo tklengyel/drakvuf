@@ -374,7 +374,7 @@ static void print_file_obj_info(drakvuf_t drakvuf,
 
             if (!file_attr.empty())
                 printf(",\"ObjectAttributes\" : \"%s\"", file_attr.data());
-            if (!security_flags.empty() || !owner.empty() || ~group.empty())
+            if (!security_flags.empty() || !owner.empty() || !group.empty())
             {
                 printf(",\"SecurityDescriptor\" : {");
 
