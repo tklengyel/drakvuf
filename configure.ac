@@ -457,6 +457,12 @@ SANITIZE_CXXFLAGS=""
 SANITIZE_LDFLAGS=""
 
 AS_IF([test x"$fsanitize" != x"no"], [
+  check_cc_cxx_flag([-fno-omit-frame-pointer],
+   [check_link_flag([-fno-omit-frame-pointer],
+     [SANITIZE_CFLAGS="$SANITIZE_CFLAGS -fno-omit-frame-pointer"
+      SANITIZE_CXXFLAGS="$SANITIZE_CXXFLAGS -fno-omit-frame-pointer"
+      SANITIZE_LDFLAGS="$SANITIZE_LDFLAGS -fno-omit-frame-pointer"])])
+
   check_cc_cxx_flag([-fsanitize=address],
    [check_link_flag([-fsanitize=address],
      [SANITIZE_CFLAGS="$SANITIZE_CFLAGS -fsanitize=address"
@@ -468,6 +474,12 @@ AS_IF([test x"$fsanitize" != x"no"], [
      [SANITIZE_CFLAGS="$SANITIZE_CFLAGS -fsanitize=leak"
       SANITIZE_CXXFLAGS="$SANITIZE_CXXFLAGS -fsanitize=leak"
       SANITIZE_LDFLAGS="$SANITIZE_LDFLAGS -fsanitize=leak"])])
+
+  check_cc_cxx_flag([-fsanitize=undefined],
+   [check_link_flag([-fsanitize=undefined],
+     [SANITIZE_CFLAGS="$SANITIZE_CFLAGS -fsanitize=undefined"
+      SANITIZE_CXXFLAGS="$SANITIZE_CXXFLAGS -fsanitize=undefined"
+      SANITIZE_LDFLAGS="$SANITIZE_LDFLAGS -fsanitize=undefined"])])
 ])
 
 AC_SUBST([SANITIZE_CFLAGS])
