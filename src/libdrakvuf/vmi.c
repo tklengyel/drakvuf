@@ -804,8 +804,6 @@ void remove_trap(drakvuf_t drakvuf,
                 remove_trap(drakvuf, &container->breakpoint.guard2);
 
                 g_hash_table_remove(drakvuf->breakpoint_lookup_pa, &container->breakpoint.pa);
-
-                remapped_gfn->active = 0;
             }
 
             break;
