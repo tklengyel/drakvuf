@@ -780,7 +780,6 @@ void remove_trap(drakvuf_t drakvuf,
 
             if (!container->traps)
             {
-
                 struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &current_gfn);
                 uint8_t backup;
 
@@ -804,8 +803,6 @@ void remove_trap(drakvuf_t drakvuf,
                 remove_trap(drakvuf, &container->breakpoint.guard2);
 
                 g_hash_table_remove(drakvuf->breakpoint_lookup_pa, &container->breakpoint.pa);
-
-                remapped_gfn->active = 0;
             }
 
             break;
@@ -825,8 +822,14 @@ void remove_trap(drakvuf_t drakvuf,
                 {
                     PRINT_DEBUG("Removed memtrap for GFN 0x%lx in altp2m view %u\n",
                                 container->memaccess.gfn, drakvuf->altp2m_idx);
+
+                    struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &container->memaccess.gfn);
+                    if ( remapped_gfn )
+                        remapped_gfn->active = 0;
+
                     g_hash_table_remove(drakvuf->memaccess_lookup_trap, &trap);
                     g_hash_table_remove(drakvuf->memaccess_lookup_gfn, &container->memaccess.gfn);
+
                 }
                 return;
             }
