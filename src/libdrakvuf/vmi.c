@@ -180,6 +180,62 @@ void process_free_requests(drakvuf_t drakvuf)
         g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
 }
 
+/*
+ * Examine breakpoint location to ensure that no instructions preceding it
+ * can leak the breakpoint during execution. Certain instructions can fetch
+ * subsequent memory and store it in registers, thus potentially revealing
+ * the presence of the breakpoint. This is due to the fetch being performed
+ * as part of the instruction and thus no read-access is performed.
+ *
+ * This is an extra hardening step against code that may try to detect the
+ * presence of DRAKVUF. When it is deemed unsafe to use the breakpoint
+ * instruction itself, DRAKVUF reverts to a fallback mode using
+ * memory permission based monitor and simulated int3 events. This backup
+ * mode is a bit slower then using actual breakpoints but otherwise should
+ * work without any sideeffect or the libdrakvuf caller having to know
+ * where and when it is safe to use breakpoints.
+ *
+ * We employ a whitelist of instructions that are allowed to precede the
+ * breakpoint based on empiricial observation. This is overly cautious and
+ * we may easily have excluded instructions that would be no problem. But
+ * for now this list is working and can be extended in the future in case
+ * anyone has a need for it.
+ *
+ */
+static const unsigned long inst_whitelist[] =
+{
+    0x0, 0x90, 0xc3, 0xcc, 0xff
+};
+static inline status_t write_breakpoint(vmi_instance_t vmi, addr_t pa, addr_t rpa)
+{
+    uint8_t preceding_inst;
+    if ( VMI_FAILURE == vmi_read_8_pa(vmi, pa-1, &preceding_inst) )
+    {
+        fprintf(stderr, "Unable to read preceding inst from 0x%lx\n", pa-1);
+        return VMI_FAILURE;;
+    }
+
+    bool whitelisted = false;
+    int c = sizeof(inst_whitelist)/sizeof(unsigned long);
+    while (c--)
+    {
+        if ( preceding_inst == inst_whitelist[c] )
+        {
+            whitelisted = true;
+            break;
+        }
+    };
+
+    if ( !whitelisted )
+    {
+        fprintf(stderr, "Unable to place breakpoint because preceding instruction is not whitelisted: 0x%x\n", preceding_inst);
+        fprintf(stderr, "If you believe this to be an error, you can extend the whitelist manually or send a bugreport.\n");
+        return VMI_FAILURE;
+    }
+
+    return vmi_write_8_pa(vmi, rpa, &bp);
+}
+
 /* Here we are in singlestep mode already and this is a singlstep cb */
 event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
 {
@@ -291,12 +347,16 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             else
             {
                 s->breakpoint.doubletrap = 0;
-                if ( VMI_FAILURE == vmi_write_8_pa(drakvuf->vmi,
-                                                   (pass->remapped_gfn->r << 12) + (*pa & VMI_BIT_MASK(0, 11)),
-                                                   &bp) )
+                if ( VMI_FAILURE == write_breakpoint(drakvuf->vmi, *pa, (pass->remapped_gfn->r << 12) + (*pa & VMI_BIT_MASK(0, 11))) )
                 {
-                    fprintf(stderr, "Critical error in re-copying remapped gfn\n");
-                    drakvuf->interrupted = -1;
+                    /* Breakpoint location may no longer be safe, so we are switching to backup mode */
+                    remove_trap(drakvuf, &s->breakpoint.guard);
+
+                    s->breakpoint.guard.memaccess.access |= VMI_MEMACCESS_X;
+
+                    if ( !inject_trap_mem(drakvuf, &s->breakpoint.guard, 0) )
+                        drakvuf->interrupted = -1;
+
                     return 0;
                 }
             }
@@ -1095,18 +1155,6 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     container->breakpoint.guard2.memaccess.type = PRE;
     container->breakpoint.guard2.memaccess.gfn = remapped_gfn->r;
 
-    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard, 0) )
-    {
-        PRINT_DEBUG("Failed to create guard trap for the breakpoint!\n");
-        goto err_exit;
-    }
-
-    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard2, 1) )
-    {
-        PRINT_DEBUG("Failed to create guard2 trap for the breakpoint!\n");
-        goto err_exit;
-    }
-
     addr_t rpa = (remapped_gfn->r<<12) + (container->breakpoint.pa & VMI_BIT_MASK(0, 11));
     uint8_t test;
 
@@ -1125,11 +1173,23 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     {
         container->breakpoint.doubletrap = 0;
 
-        if (VMI_FAILURE == vmi_write_8_pa(vmi, rpa, &bp))
+        if (VMI_FAILURE == write_breakpoint(vmi, container->breakpoint.pa, rpa))
         {
-            PRINT_DEBUG("FAILED TO INJECT TRAP @ 0x%lx !\n", container->breakpoint.pa);
-            goto err_exit;
+            PRINT_DEBUG("Using breakpoint instruction @ 0x%lx is not possible. Using fallback.\n", container->breakpoint.pa);
+            container->breakpoint.guard.memaccess.access |= VMI_MEMACCESS_X;
         }
+    }
+
+    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard, 0) )
+    {
+        PRINT_DEBUG("Failed to create guard trap for the breakpoint!\n");
+        goto err_exit;
+    }
+
+    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard2, 1) )
+    {
+        PRINT_DEBUG("Failed to create guard2 trap for the breakpoint!\n");
+        goto err_exit;
     }
 
     // list of traps on this page
@@ -1138,14 +1198,11 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 
     // save trap location into lookup tree
     uint64_t _current_gfn = current_gfn;
-    g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, g_memdup(&_current_gfn, sizeof(uint64_t)),
-                        traps);
-    g_hash_table_insert(drakvuf->breakpoint_lookup_pa, g_memdup(&container->breakpoint.pa, sizeof(addr_t)),
-                        container);
-    g_hash_table_insert(drakvuf->breakpoint_lookup_trap, g_memdup(&trap, sizeof(void*)),
-                        container);
+    g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, g_memdup(&_current_gfn, sizeof(uint64_t)), traps);
+    g_hash_table_insert(drakvuf->breakpoint_lookup_pa, g_memdup(&container->breakpoint.pa, sizeof(addr_t)), container);
+    g_hash_table_insert(drakvuf->breakpoint_lookup_trap, g_memdup(&trap, sizeof(void*)), container);
 
-    PRINT_DEBUG("\t\tTrap added @ PA 0x%" PRIx64 " RPA 0x%" PRIx64 " Page %" PRIu64 " for %s. \n",
+    PRINT_DEBUG("\t\tTrap added @ PA 0x%" PRIx64 " RPA 0x%" PRIx64 " Page %" PRIu64 " for %s.\n",
                 container->breakpoint.pa, rpa, pa >> 12, trap->name);
     return 1;
 
