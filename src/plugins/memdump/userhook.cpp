@@ -851,7 +851,12 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
 void memdump::load_wanted_targets(const memdump_config* c)
 {
     if (!c->dll_hooks_list)
+    {
+        // if the DLL hook list was not provided, we provide some simple defaults
+        this->wanted_hooks.emplace_back("ws2_32.dll", "WSAStartup", 2);
+        this->wanted_hooks.emplace_back("ntdll.dll", "RtlExitUserProcess", 1);
         return;
+    }
 
     std::ifstream ifs(c->dll_hooks_list, std::ifstream::in);
 
@@ -921,6 +926,14 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     {
         addr_t hook_va = ((data->vaddr >> 12) << 12) + (hook->trap->breakpoint.addr & 0xFFF);
         PRINT_DEBUG("adding hook at %lx\n", hook_va);
+
+        if (hook->trap)
+        {
+            drakvuf_remove_trap(drakvuf, hook->trap, nullptr);
+            delete hook->trap;
+            hook->state = HOOK_FAILED;
+            hook->trap = nullptr;
+        }
 
         make_trap(vmi, drakvuf, info, hook, hook_va);
     }
@@ -1005,6 +1018,14 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
 
 void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
 {
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
+
+    if (pm != VMI_PM_IA32E)
+    {
+        PRINT_DEBUG("[MEMDUMP-USER] Usermode hooking is not yet supported on this architecture/bitness.\n");
+        return;
+    }
+
     try
     {
         this->load_wanted_targets(c);
@@ -1029,5 +1050,22 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
         !register_trap<memdump>(drakvuf, nullptr, this, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite")))
     {
         throw -1;
+    }
+}
+
+void memdump::userhook_destroy(memdump* plugin)
+{
+    for (auto& it : plugin->loaded_dlls)
+    {
+        for (auto& loaded_dll : it.second)
+        {
+            for (auto& target : loaded_dll.targets)
+            {
+                if (target.state == HOOK_OK)
+                {
+                    delete target.trap;
+                }
+            }
+        }
     }
 }
