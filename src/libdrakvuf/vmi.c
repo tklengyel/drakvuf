@@ -202,24 +202,46 @@ void process_free_requests(drakvuf_t drakvuf)
  * anyone has a need for it.
  *
  */
-static const unsigned long inst_whitelist[] =
+static const uint16_t inst_whitelist[][2] =
 {
-    0x0, 0x90, 0xc3, 0xcc, 0xff
+    //instb1   instb2
+    {~0,      0},
+    {~0,      0x90},
+    {~0,      0xc3},
+    {~0,      0xcc},
+    {~0,      0xff},
+    {0xeb,    ~0},
+    {0xff,    0xd0},
+    {0xff,    0xd2},
+    {0x0f,    0x05},
 };
+static const size_t inst_whitelist_size = sizeof(inst_whitelist)/sizeof(uint16_t[2]);
+
 static inline status_t write_breakpoint(vmi_instance_t vmi, addr_t pa, addr_t rpa)
 {
-    uint8_t preceding_inst;
-    if ( VMI_FAILURE == vmi_read_8_pa(vmi, pa-1, &preceding_inst) )
+    uint16_t placeholder = ~0;
+    uint16_t inst;
+    if ( VMI_FAILURE == vmi_read_16_pa(vmi, pa-2, &inst) )
     {
-        fprintf(stderr, "Unable to read preceding inst from 0x%lx\n", pa-1);
+        fprintf(stderr, "Unable to read preceding inst from 0x%lx\n", pa-2);
         return VMI_FAILURE;;
     }
 
     bool whitelisted = false;
-    int c = sizeof(inst_whitelist)/sizeof(unsigned long);
+    uint8_t* preceding_inst = (uint8_t*)&inst;
+    size_t c = inst_whitelist_size;
+
     while (c--)
     {
-        if ( preceding_inst == inst_whitelist[c] )
+        bool b1 = inst_whitelist[c][0] == placeholder;
+        if ( !b1 && inst_whitelist[c][0] == preceding_inst[0] )
+            b1 = true;
+
+        bool b2 = inst_whitelist[c][0] == placeholder;
+        if ( !b2 && inst_whitelist[c][1] == preceding_inst[1] )
+            b2 = true;
+
+        if ( b1 && b2 )
         {
             whitelisted = true;
             break;
@@ -228,7 +250,8 @@ static inline status_t write_breakpoint(vmi_instance_t vmi, addr_t pa, addr_t rp
 
     if ( !whitelisted )
     {
-        fprintf(stderr, "Unable to place breakpoint because preceding instruction is not whitelisted: 0x%x\n", preceding_inst);
+        fprintf(stderr, "Unable to place breakpoint @ 0x%lx because preceding instruction is not whitelisted: 0x%x 0x%x\n",
+                pa, preceding_inst[0], preceding_inst[1]);
         fprintf(stderr, "If you believe this to be an error, you can extend the whitelist manually or send a bugreport.\n");
         return VMI_FAILURE;
     }
