@@ -20,7 +20,10 @@ esac
 
 update-rc.d xencommons defaults 19 18
 
-if ! grep -q 'xenfs' '/etc/fstab'
+EXIT_CODE=0
+grep -q 'xenfs' '/etc/fstab' || EXIT_CODE=$?
+
+if [[ $EXIT_CODE -ne 0 ]]
 then
     echo "add xenfs to /etc/fstab" >&2
     echo "none /proc/xen xenfs defaults,nofail 0 0" >> /etc/fstab
@@ -28,12 +31,32 @@ else
     echo "xenfs is already added to /etc/fstab" >&2
 fi
 
-if ! egrep -q -wo 'ept' /proc/cpuinfo
+EXIT_CODE=0
+command -v xen-detect 2>&1 >/dev/null || EXIT_CODE=$?
+RUNNING_XEN=0
+
+if [[ $EXIT_CODE -eq 0 ]]
+then
+    xen-detect -N || RUNNING_XEN=$?
+fi
+
+EPT_SUPPORTED=0
+
+if [[ $RUNNING_XEN -eq 0 ]]
+then
+    echo "Detected system is not running on Xen, checking EPT support in /proc/cpuinfo..." >&2
+    ! egrep -q -wo 'ept' /proc/cpuinfo || EPT_SUPPORTED=$?
+else
+    echo "Detected system is running on Xen, checking EPT support in xl dmesg..." >&2
+    ! xl dmesg | grep -q -- '- Extended Page Tables' || EPT_SUPPORTED=$?
+fi
+
+if [[ $EPT_SUPPORTED -eq 0 ]]
 then
     echo "------------------------------------------------------------------------" >&2
     echo "" >&2
-    echo "Your processor doesn\'t seem to support Extended Page Tables (Intel EPT)" >&2
-    echo "DRAKVUF may not work properly on your machine" >&2
+    echo "Your processor doesn't seem to support Extended Page Tables (Intel EPT) " >&2
+    echo "DRAKVUF may not work properly on your machine." >&2
     echo "" >&2
     echo "------------------------------------------------------------------------" >&2
 else
