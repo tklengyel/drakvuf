@@ -379,7 +379,9 @@ static void print_file_obj_info(drakvuf_t drakvuf,
                 printf(",\"SecurityDescriptor\" : {");
 
                 if (!security_flags.empty())
-                    printf(",\"Control\" : \"%s\"", security_flags.data());
+                    printf("\"Control\" : \"%s\"", security_flags.data());
+                else
+                    printf("\"Control\" : null");
                 if (!owner.empty()) printf(",%s", owner.data());
                 if (!group.empty()) printf(",%s", group.data());
                 if (!sacl.empty()) printf(",%s", sacl.data());
