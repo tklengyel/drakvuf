@@ -141,14 +141,15 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     poolmon* p = (poolmon*)info->trap->data;
     page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-    reg_t pool_type;
-    reg_t size;
+    reg_t pool_type = 0;
+    reg_t size = 0;
     char tag[5] = { [0 ... 4] = '\0' };
     struct pooltag* s = NULL;
     const char* pool_type_str;
     gchar* escaped_pname = NULL;
 
     access_context_t ctx;
+    memset(&ctx, 0, sizeof(access_context_t));
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 

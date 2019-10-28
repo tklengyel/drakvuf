@@ -496,6 +496,7 @@ static event_response_t win_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     access_context_t ctx;
+    memset(&ctx, 0, sizeof(access_context_t));
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
