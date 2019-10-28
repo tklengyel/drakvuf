@@ -179,6 +179,7 @@ static bool get_file_object_flags(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
     addr_t fileflags = file + f->offsets[FILE_OBJECT_FLAGS];
 
     access_context_t ctx;
+    memset(&ctx, 0, sizeof(access_context_t));
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.addr = fileflags;
     ctx.dtb = info->regs->cr3;
@@ -215,6 +216,7 @@ static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_
         *out_filetype = filetype;
 
     access_context_t ctx;
+    memset(&ctx, 0, sizeof(access_context_t));
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.addr = filetype;
     ctx.dtb = info->regs->cr3;
@@ -949,9 +951,11 @@ static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     {
         uint8_t del = 0;
         access_context_t ctx;
+        memset(&ctx, 0, sizeof(access_context_t));
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
         ctx.dtb = info->regs->cr3;
         ctx.addr = fileinfo;
+
         if ( VMI_FAILURE == vmi_read_8(vmi, &ctx, &del) )
             goto done;
 
