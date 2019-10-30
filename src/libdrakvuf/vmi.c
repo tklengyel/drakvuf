@@ -339,7 +339,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     flush_vmi(drakvuf);
 
-    if (event->mem_event.gfn == drakvuf->zero_page_gfn)
+    if (event->mem_event.gfn == drakvuf->sink_page_gfn)
     {
         PRINT_DEBUG("Somebody try to do something to the empty page, let's emulate it\n");
         return rsp | VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
@@ -1084,7 +1084,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             goto err_exit;
         }
         if (VMI_FAILURE == vmi_slat_change_gfn(
-                drakvuf->vmi, drakvuf->altp2m_idx, remapped_gfn->r, drakvuf->zero_page_gfn))
+                drakvuf->vmi, drakvuf->altp2m_idx, remapped_gfn->r, drakvuf->sink_page_gfn))
         {
             PRINT_DEBUG("%s: Failed to change gfn on view %u\n", __FUNCTION__, drakvuf->altp2m_idr);
             goto err_exit;
@@ -1455,15 +1455,15 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     if (rc < 0)
         return 0;
 
-    drakvuf->zero_page_gfn = ++(drakvuf->max_gpfn);
+    drakvuf->sink_page_gfn = ++(drakvuf->max_gpfn);
 
-    rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &drakvuf->zero_page_gfn);
+    rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &drakvuf->sink_page_gfn);
     PRINT_DEBUG("Physmap populated? %i\n", rc);
     if (rc < 0)
         return 0;
 
     uint8_t fmask[VMI_PS_4KB] = {[0 ... VMI_PS_4KB-1] = 0xFF};
-    if (VMI_FAILURE == vmi_write_pa(drakvuf->vmi, drakvuf->zero_page_gfn<<12, VMI_PS_4KB, &fmask, NULL))
+    if (VMI_FAILURE == vmi_write_pa(drakvuf->vmi, drakvuf->sink_page_gfn<<12, VMI_PS_4KB, &fmask, NULL))
     {
         PRINT_DEBUG("Failed to mask FF to the empty page\n");
         return 0;
@@ -1489,12 +1489,8 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     PRINT_DEBUG("Altp2m view X created with ID %u\n", drakvuf->altp2m_idx);
 
     /*
-     * TODO: We will use the idr view to map all shadow pages to the zero (empty) page in case
-     * something is trying to check the contents of these pages. However, since all shadow pages
-     * will point to the zero page, if someone writes to one, the change will appear through the
-     * other shadow pages as well, thus potentially revealing the presence of DRAKVUF. This can
-     * be avoided if we cache all pages separately that have been written to and use emulate with
-     * custom read data to only return the change in the page on the gfn it was written to.
+     * We will use the idr view to map all shadow pages to the sink page in case
+     * something is trying to check the contents of the shadow pages.
      */
     status = vmi_slat_create(drakvuf->vmi, &drakvuf->altp2m_idr);
     if (VMI_FAILURE == status)
@@ -1534,7 +1530,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     drakvuf->guard0.type = MEMACCESS;
     drakvuf->guard0.memaccess.access = VMI_MEMACCESS_RWX;
     drakvuf->guard0.memaccess.type = PRE;
-    drakvuf->guard0.memaccess.gfn = drakvuf->zero_page_gfn;
+    drakvuf->guard0.memaccess.gfn = drakvuf->sink_page_gfn;
 
     if (!inject_trap_mem(drakvuf, &drakvuf->guard0, 0))
     {
@@ -1657,13 +1653,13 @@ void close_vmi(drakvuf_t drakvuf)
     if (VMI_FAILURE == vmi_slat_set_domain_state(drakvuf->vmi, false))
         PRINT_DEBUG("Failed to disable alternate SLAT\n");
 
-    if (drakvuf->zero_page_gfn)
-        xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &drakvuf->zero_page_gfn);
+    if (drakvuf->sink_page_gfn)
+        xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &drakvuf->sink_page_gfn);
     xc_domain_setmaxmem(drakvuf->xen->xc, drakvuf->domID, drakvuf->init_memsize);
 
     drakvuf->altp2m_idx = 0;
     drakvuf->altp2m_idr = 0;
-    drakvuf->zero_page_gfn = 0;
+    drakvuf->sink_page_gfn = 0;
 
     if (drakvuf->vmi)
     {

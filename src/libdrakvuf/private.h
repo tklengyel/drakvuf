@@ -174,7 +174,7 @@ struct drakvuf
     os_interface_t osi;
     uint16_t altp2m_idx, altp2m_idr;
 
-    xen_pfn_t zero_page_gfn;
+    xen_pfn_t sink_page_gfn;
 
     // VMI
     unsigned long flush_counter;
