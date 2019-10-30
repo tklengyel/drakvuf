@@ -318,7 +318,7 @@ done:
     return ret;
 }
 
-bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plugin, size_t ptr_length, addr_t stack_ptr)
+bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plugin, bool is_32bit, addr_t stack_ptr)
 {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     access_context_t ctx =
@@ -337,8 +337,8 @@ bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* pl
 
     for (size_t i = 0; i < bytes_read; i++)
     {
-        addr_t stack_val = 0;
-        memcpy(&stack_val, buf+i, ptr_length);
+        uint64_t stack_val = 0;
+        memcpy(&stack_val, buf+i, is_32bit ? 4 : 8);
 
         mmvad_info_t mmvad;
         if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, stack_val, &mmvad))
@@ -424,7 +424,7 @@ bool dump_from_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plug
     }
 
     PRINT_DEBUG("[MEMDUMP] Got stack pointer: %llx\n", (unsigned long long)stack_ptr);
-    return inspect_stack_ptr(drakvuf, info, plugin, is_32bit ? 4 : 8, stack_ptr);
+    return inspect_stack_ptr(drakvuf, info, plugin, is_32bit, stack_ptr);
 }
 
 static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)

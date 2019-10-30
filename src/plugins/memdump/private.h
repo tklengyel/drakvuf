@@ -208,7 +208,7 @@ bool inspect_stack_ptr(
     drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     memdump* plugin,
-    size_t ptr_length,
+    bool is_32bit,
     addr_t stack_ptr);
 
 bool dump_from_stack(
