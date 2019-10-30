@@ -424,7 +424,7 @@ bool dump_from_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plug
     }
 
     PRINT_DEBUG("[MEMDUMP] Got stack pointer: %llx\n", (unsigned long long)stack_ptr);
-    return inspect_stack_ptr(drakvuf, info, plugin, is_32bit);
+    return inspect_stack_ptr(drakvuf, info, plugin, is_32bit, stack_ptr);
 }
 
 static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
