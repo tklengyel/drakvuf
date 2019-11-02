@@ -4,16 +4,28 @@
 
 set -e
 
-distro=$1
+distro="$1"
 
 if [ "$distro" = "" ]
 then
     distro=generic
 fi
 
-version=$(grep 'PACKAGE_VERSION=' 'autom4te.cache/output.1' | head -n 1 | cut -f2 "-d'")
+if [ "$2" = "" ]
+then
+    version=$(grep 'PACKAGE_VERSION' 'src/Makefile' | head -n 1 | cut -f2 "-d=" | xargs echo -n)
+    echo "Auto-detected version: $version"
 
-# map the architecture, if necessary
+    if [ "$version" = "" ]
+    then
+        echo "Unable to recognize package version automatically, please provide it explicitly by the command line:"
+       echo "package/mkdeb <distro> <version>"
+    fi
+else
+    version="$2"
+    echo "Using version: $version"
+fi
+
 arch=amd64
 
 # Prepare the directory to package
@@ -62,7 +74,7 @@ cp package/extra/etc/modules-load.d/xen.conf deb/etc/modules-load.d/
 
 # Package it up
 chown -R root:root deb
-dpkg-deb --build -z0 deb drakvuf-bundle-$version-$distro.deb
+dpkg-deb --build -z0 deb "drakvuf-bundle-$version-$distro.deb"
 mv drakvuf-bundle*.deb /out
 rm -rf deb
 
