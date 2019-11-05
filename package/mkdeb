@@ -52,10 +52,6 @@ Priority: optional
 Installed-Size: $(du -ks deb | cut -f1)
 Description: Testing build of DRAKVUF, LibVMI and Xen. Not supported. No guarantee.
 EOF
-# Find all /etc files and add them to conffiles
-find deb/etc -type f -printf /etc/%P\\n >deb/DEBIAN/conffiles
-cp package/postinst deb/DEBIAN/postinst
-cp package/postrm deb/DEBIAN/postrm
 
 # LibVMI
 mkdir -p deb/usr/bin/
@@ -71,6 +67,11 @@ mkdir -p deb/etc/default/grub.d/
 mkdir -p deb/etc/modules-load.d/
 cp package/extra/etc/default/grub.d/xen.cfg deb/etc/default/grub.d/
 cp package/extra/etc/modules-load.d/xen.conf deb/etc/modules-load.d/
+
+# Find all /etc files and add them to conffiles
+find deb/etc -type f -printf /etc/%P\\n >deb/DEBIAN/conffiles
+cp package/postinst deb/DEBIAN/postinst
+cp package/postrm deb/DEBIAN/postrm
 
 # Package it up
 chown -R root:root deb
