@@ -176,8 +176,7 @@ void process_free_requests(drakvuf_t drakvuf)
     }
 
     g_hash_table_destroy(drakvuf->remove_traps);
-    drakvuf->remove_traps =
-        g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->remove_traps = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
 }
 
 /* Here we are in singlestep mode already and this is a singlstep cb */
@@ -1027,16 +1026,9 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             goto err_exit;
 
         remapped_gfn->o = current_gfn;
-
-        int rc;
-        /* = xc_domain_increase_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
-        PRINT_DEBUG("Reservation increased? %u with new gfn: 0x%lx\n", rc, remapped_gfn->r);
-        if (rc < 0 || !remapped_gfn->r)
-            return 0;*/
-
         remapped_gfn->r = ++(drakvuf->max_gpfn);
 
-        rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
+        int rc = xc_domain_populate_physmap_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, 0, &remapped_gfn->r);
         PRINT_DEBUG("Physmap populated? %i\n", rc);
         if (rc < 0)
         {
@@ -1417,20 +1409,13 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     PRINT_DEBUG("Max GPFN: 0x%lx\n", drakvuf->max_gpfn);
 
     // Crete tables to lookup breakpoints
-    drakvuf->breakpoint_lookup_pa =
-        g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free);
-    drakvuf->breakpoint_lookup_gfn =
-        g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
-    drakvuf->breakpoint_lookup_trap =
-        g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
-    drakvuf->memaccess_lookup_gfn =
-        g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free);
-    drakvuf->memaccess_lookup_trap =
-        g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
-    drakvuf->remapped_gfns =
-        g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, g_free);
-    drakvuf->remove_traps =
-        g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->breakpoint_lookup_pa = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free);
+    drakvuf->breakpoint_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->breakpoint_lookup_trap = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->memaccess_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free);
+    drakvuf->memaccess_lookup_trap = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->remapped_gfns = g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, g_free);
+    drakvuf->remove_traps = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
 
     unsigned int i;
     /*
