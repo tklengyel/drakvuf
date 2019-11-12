@@ -627,6 +627,7 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
 static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx)
 {
     struct process_visitor_ctx* ctx = reinterpret_cast<struct process_visitor_ctx*>(visitor_ctx);
+    gchar* escaped_pname = NULL;
 
     proc_data_t data = {};
     if (!drakvuf_get_process_data(drakvuf, process, &data))
@@ -651,7 +652,18 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx
             break;
 
         case OUTPUT_JSON:
-            //TODO
+            escaped_pname = drakvuf_escape_str(data.name);
+            printf( "{"
+                    "\"Plugin\" : \"procmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"ProcessName\": %s,"
+                    "\"Method\": null"
+                    "}\n",
+                    UNPACK_TIMEVAL(t),
+                    data.pid, data.ppid, escaped_pname);
+            g_free(escaped_pname);
             break;
 
         default:
