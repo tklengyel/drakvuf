@@ -424,6 +424,24 @@ To see all available options:
 <pre><code>./src/drakvuf</code></pre>
 
 <h3>
+<a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Optional: Generate usermode profiles</h3>
+
+DRAKVUF&trade; has some enhanced functionality which can be enabled by providing necessary Rekall profiles for particular <code>.dll</code> or <code>.sys</code> files. For instance, network monitoring plugin (socketmon) requires the creation of a Rekall profile for the <code>tcpip.sys</code> kernel module, which is normally located at <code>C:\Windows\System32\drivers\tcpip.sys</code>. You will need to copy this file to where you will be generating the Rekall profile at. To generate a Rekall profile for it you can use the <code>pdbparse</code> project to obtain the PDB:
+
+<pre><code>apt-get install python-construct python-pefile
+git clone https://github.com/moyix/pdbparse
+cd pdbparse
+python setup.py build
+cd examples
+./symchk.py -e tcpip.sys</code></pre>
+
+Then you can use Rekall to create the profile:
+
+<pre><code>rekall parse_pdb tcpip.pdb &gt; tcpip.json</code></pre>
+
+You should provide the path to the profile by using DRAKVUF&trade;'s <code>-T</code> or <code>--rekall-tcpip</code> command line option. Type <code>drakvuf --help</code> in order to display the list of auxilary Rekall profiles that are accepted by DRAKVUF&trade; and the corresponding command line options.
+
+<h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Citation</h3>
 
 If you use DRAKVUF&trade; in an academic project, please cite using the following bibtex key:
