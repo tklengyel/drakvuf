@@ -231,6 +231,7 @@ struct drakvuf
     struct pollfd* event_fds;  // auto-generated pollfd for poll()
     int event_fd_cnt;          // auto-generated for poll()
     fd_info_t fd_info_lookup;  // auto-generated for fast drakvuf_loop lookups
+    int poll_rc;
 };
 
 struct breakpoint

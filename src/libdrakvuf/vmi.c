@@ -1273,7 +1273,7 @@ void drakvuf_vmi_event_callback (int fd, void* data)
 {
     UNUSED(fd);
     drakvuf_t drakvuf = *(drakvuf_t*) data;
-    status_t status = vmi_events_listen(drakvuf->vmi, 0);
+    status_t status = vmi_events_listen(drakvuf->vmi, drakvuf->poll_rc);
     if (VMI_SUCCESS != status)
     {
         PRINT_DEBUG("Error waiting for events or timeout, quitting...\n");
@@ -1284,8 +1284,9 @@ void drakvuf_vmi_event_callback (int fd, void* data)
 static void drakvuf_poll(drakvuf_t drakvuf, unsigned int timeout)
 {
     int rc = poll(drakvuf->event_fds, drakvuf->event_fd_cnt, timeout);
+    drakvuf->poll_rc = rc;
 
-    if (rc == 0)
+    if (!rc && timeout)
         return;
 
     else if (rc < 0)
@@ -1301,7 +1302,7 @@ static void drakvuf_poll(drakvuf_t drakvuf, unsigned int timeout)
     /* check and process each fd if it was raised */
     for (int poll_ix=0; poll_ix<drakvuf->event_fd_cnt; poll_ix++)
     {
-        if ( !(drakvuf->event_fds[poll_ix].revents & (POLLIN | POLLERR)) )
+        if (timeout && !(drakvuf->event_fds[poll_ix].revents & (POLLIN | POLLERR)) )
             continue;
 
         fd_info_t fd_info = &drakvuf->fd_info_lookup[poll_ix];
