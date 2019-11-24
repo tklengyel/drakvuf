@@ -251,7 +251,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
         if ( VMI_FAILURE == vmi_pause_vm(drakvuf->vmi) )
             return 0;
 
-        uint8_t backup[VMI_PS_4KB] = {0};
+        uint8_t backup[VMI_PS_4KB];
 
         if ( VMI_FAILURE == vmi_read_pa(drakvuf->vmi, pass->remapped_gfn->o<<12, VMI_PS_4KB, &backup, NULL) )
         {
@@ -364,7 +364,8 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     GTimeVal timestamp;
     g_get_current_time(&timestamp);
 
-    proc_data_priv_t proc_data = {0};
+    proc_data_priv_t proc_data;
+    memset(&proc_data, 0, sizeof(proc_data_priv_t));
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
@@ -542,7 +543,8 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     GTimeVal timestamp;
     g_get_current_time(&timestamp);
 
-    proc_data_priv_t proc_data = {0};
+    proc_data_priv_t proc_data;
+    memset(&proc_data, 0, sizeof(proc_data_priv_t));
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
@@ -609,7 +611,8 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     GTimeVal timestamp;
     g_get_current_time(&timestamp);
 
-    proc_data_priv_t proc_data = {0};
+    proc_data_priv_t proc_data;
+    memset(&proc_data, 0, sizeof(proc_data_priv_t));
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
@@ -661,7 +664,8 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
     GTimeVal timestamp;
     g_get_current_time(&timestamp);
 
-    proc_data_priv_t proc_data = {0};
+    proc_data_priv_t proc_data;
+    memset(&proc_data, 0, sizeof(proc_data_priv_t));
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
@@ -715,7 +719,8 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
     GTimeVal timestamp;
     g_get_current_time(&timestamp);
 
-    proc_data_priv_t proc_data = {0};
+    proc_data_priv_t proc_data;
+    memset(&proc_data, 0, sizeof(proc_data_priv_t));
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
@@ -1047,7 +1052,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
      */
     if (!g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &remapped_gfn->o) )
     {
-        uint8_t backup[VMI_PS_4KB] = {0};
+        uint8_t backup[VMI_PS_4KB];
         if ( VMI_FAILURE == vmi_read_pa(drakvuf->vmi, current_gfn<<12, VMI_PS_4KB, &backup, NULL) )
         {
             fprintf(stderr, "Copying trapped page to new location FAILED\n");
@@ -1425,6 +1430,12 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     for (i = 0; i < drakvuf->vcpus && i < 16; i++)
     {
         drakvuf->step_event[i] = (vmi_event_t*)g_try_malloc0(sizeof(vmi_event_t));
+        if ( !drakvuf->step_event[i] )
+        {
+            fprintf(stderr, "Out of memory during initialization\n");
+            return 0;
+        }
+
         SETUP_SINGLESTEP_EVENT(drakvuf->step_event[i], 1u << i, vmi_reset_trap, 0);
         drakvuf->step_event[i]->data = drakvuf;
         if (VMI_FAILURE == vmi_register_event(drakvuf->vmi, drakvuf->step_event[i]))
@@ -1503,23 +1514,16 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         return 0;
     }
 
-    status = vmi_slat_switch(drakvuf->vmi, drakvuf->altp2m_idx);
-    PRINT_DEBUG("Switched Altp2m view to X\n");
-    if (VMI_FAILURE == status)
+    if (VMI_FAILURE == vmi_set_mem_event(drakvuf->vmi, drakvuf->sink_page_gfn, VMI_MEMACCESS_RWX, drakvuf->altp2m_idx))
     {
-        PRINT_DEBUG("Failed to switch Altp2m view to X\n");
+        PRINT_DEBUG("Sink page protection failed\n");
         return 0;
     }
 
-    //setup a mem event for the empty page
-    drakvuf->guard0.type = MEMACCESS;
-    drakvuf->guard0.memaccess.access = VMI_MEMACCESS_RWX;
-    drakvuf->guard0.memaccess.type = PRE;
-    drakvuf->guard0.memaccess.gfn = drakvuf->sink_page_gfn;
-
-    if (!inject_trap_mem(drakvuf, &drakvuf->guard0, 0))
+    status = vmi_slat_switch(drakvuf->vmi, drakvuf->altp2m_idx);
+    if (VMI_FAILURE == status)
     {
-        PRINT_DEBUG("Failed to create guard trap for the empty page!\n");
+        PRINT_DEBUG("Failed to switch Altp2m view to X\n");
         return 0;
     }
 
@@ -1535,6 +1539,15 @@ void close_vmi(drakvuf_t drakvuf)
 
     drakvuf_pause(drakvuf);
 
+    if (VMI_FAILURE == vmi_slat_switch(drakvuf->vmi, 0))
+        PRINT_DEBUG("Failed to switch on default view\n");
+    if (drakvuf->altp2m_idx && VMI_FAILURE == vmi_slat_destroy(drakvuf->vmi, drakvuf->altp2m_idx))
+        fprintf(stderr, "Altp2m view X %u destruction failed\n", drakvuf->altp2m_idx);
+    if (drakvuf->altp2m_idr && VMI_FAILURE == vmi_slat_destroy(drakvuf->vmi, drakvuf->altp2m_idr))
+        fprintf(stderr, "Altp2m view R %u destruction failed\n", drakvuf->altp2m_idr);
+    if (VMI_FAILURE == vmi_slat_set_domain_state(drakvuf->vmi, false))
+        PRINT_DEBUG("Failed to disable alternate SLAT\n");
+
     if (drakvuf->memaccess_lookup_gfn)
     {
         GHashTableIter i;
@@ -1542,16 +1555,11 @@ void close_vmi(drakvuf_t drakvuf)
         struct wrapper* s = NULL;
         ghashtable_foreach(drakvuf->memaccess_lookup_gfn, i, key, s)
         {
-            vmi_set_mem_event(drakvuf->vmi, s->memaccess.gfn, VMI_MEMACCESS_N, drakvuf->altp2m_idx);
-            if (VMI_FAILURE == vmi_slat_change_gfn(drakvuf->vmi, drakvuf->altp2m_idx, s->memaccess.gfn, ~(addr_t)0))
-                PRINT_DEBUG("%s: Failed to change gfn in view %u\n", __FUNCTION__, drakvuf->altp2m_idx);
             g_slist_free(s->traps);
             s->traps = NULL;
         }
         // gets freed later
     }
-
-    remove_trap(drakvuf, &drakvuf->guard0);
 
     if (drakvuf->breakpoint_lookup_gfn)
     {
@@ -1559,7 +1567,10 @@ void close_vmi(drakvuf_t drakvuf)
         uint64_t* key = NULL;
         GSList* list = NULL;
         ghashtable_foreach(drakvuf->breakpoint_lookup_gfn, i, key, list)
-        g_slist_free(list);
+        {
+            g_slist_free(list);
+        }
+
         g_hash_table_destroy(drakvuf->breakpoint_lookup_gfn);
         drakvuf->breakpoint_lookup_gfn = NULL;
     }
@@ -1570,7 +1581,10 @@ void close_vmi(drakvuf_t drakvuf)
         addr_t* key = NULL;
         struct wrapper* s = NULL;
         ghashtable_foreach(drakvuf->breakpoint_lookup_pa, i, key, s)
-        g_slist_free(s->traps);
+        {
+            g_slist_free(s->traps);
+        }
+
         g_hash_table_destroy(drakvuf->breakpoint_lookup_pa);
         drakvuf->breakpoint_lookup_pa = NULL;
     }
@@ -1582,12 +1596,9 @@ void close_vmi(drakvuf_t drakvuf)
         struct remapped_gfn* remapped_gfn = NULL;
         ghashtable_foreach(drakvuf->remapped_gfns, i, key, remapped_gfn)
         {
-            if (VMI_FAILURE == vmi_slat_change_gfn(drakvuf->vmi, drakvuf->altp2m_idx, remapped_gfn->o, ~(addr_t)0))
-                PRINT_DEBUG("%s: Failed to change gfn in view %u\n", __FUNCTION__, drakvuf->altp2m_idx);
-            if (VMI_FAILURE == vmi_slat_change_gfn(drakvuf->vmi, drakvuf->altp2m_idr, remapped_gfn->r, ~(addr_t)0))
-                PRINT_DEBUG("%s: Failed to change gfn in view %u\n", __FUNCTION__, drakvuf->altp2m_idr);
             xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &remapped_gfn->r);
         }
+
         g_hash_table_destroy(drakvuf->remapped_gfns);
         drakvuf->remapped_gfns = NULL;
     }
@@ -1617,26 +1628,19 @@ void close_vmi(drakvuf_t drakvuf)
     unsigned int i;
     for (i = 0; i < drakvuf->vcpus; i++)
     {
-        if ( drakvuf->step_event[i] && drakvuf->step_event[i]->data != drakvuf )
+        if ( !drakvuf->step_event[i] )
+            continue;
+
+        if ( drakvuf->step_event[i]->data != drakvuf )
         {
             struct memcb_pass* pass = (struct memcb_pass*)drakvuf->step_event[i]->data;
             g_free((gpointer)pass->proc_data.name);
             g_free((gpointer)pass);
         }
+
         g_free(drakvuf->step_event[i]);
         drakvuf->step_event[i] = NULL;
     }
-
-    if (VMI_FAILURE == vmi_slat_switch(drakvuf->vmi, 0))
-        PRINT_DEBUG("Failed to switch on default view\n");
-    if (drakvuf->altp2m_idx)
-        if (VMI_FAILURE == vmi_slat_destroy(drakvuf->vmi, drakvuf->altp2m_idx))
-            PRINT_DEBUG("Altp2m view X %u destruction failed\n", drakvuf->altp2m_idx);
-    if (drakvuf->altp2m_idr)
-        if (VMI_FAILURE == vmi_slat_destroy(drakvuf->vmi, drakvuf->altp2m_idr))
-            PRINT_DEBUG("Altp2m view R %u destruction failed\n", drakvuf->altp2m_idr);
-    if (VMI_FAILURE == vmi_slat_set_domain_state(drakvuf->vmi, false))
-        PRINT_DEBUG("Failed to disable alternate SLAT\n");
 
     if (drakvuf->sink_page_gfn)
         xc_domain_decrease_reservation_exact(drakvuf->xen->xc, drakvuf->domID, 1, 0, &drakvuf->sink_page_gfn);
@@ -1648,6 +1652,8 @@ void close_vmi(drakvuf_t drakvuf)
 
     if (drakvuf->vmi)
     {
+        // clear the generic mem_event to speed up shutdown
+        vmi_clear_event(drakvuf->vmi, &drakvuf->mem_event, NULL);
         vmi_destroy(drakvuf->vmi);
         drakvuf->vmi = NULL;
     }
