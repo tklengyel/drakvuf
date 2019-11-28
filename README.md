@@ -21,6 +21,7 @@ Supported guests
 ------
 
 DRAKVUF currently supports:
+ - Windows XP 32-bit
  - Windows 7 - 8, both 32 and 64-bit
  - Windows 10 64-bit
  - Linux 2.6.x - 5.x, both 32-bit and 64-bit
