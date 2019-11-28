@@ -229,6 +229,7 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
     return 1;
 
 err:
+    drakvuf_resume(*drakvuf);  // 失败的时候恢复暂停系统，否则只能强制关闭虚拟机 
     drakvuf_close(*drakvuf, 1);
     *drakvuf = NULL;
 

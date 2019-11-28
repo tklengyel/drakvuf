@@ -363,6 +363,8 @@ os_t rekall_get_os_type(json_object* rekall_profile_json)
         ret = VMI_OS_WINDOWS;
     else if ( !strcmp(kernel, "Ntkrpamp") )
         ret = VMI_OS_WINDOWS;
+    else if ( !strcmp(kernel, "Ntoskrnl") )
+        ret = VMI_OS_WINDOWS;
     else if ( !strcmp(kernel, "Nt") )
         ret = VMI_OS_WINDOWS;
 
