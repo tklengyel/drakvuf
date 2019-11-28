@@ -148,6 +148,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [KPCR_PRCBDATA] = {"_KPCR", "PrcbData" },
     [KPRCB_CURRENTTHREAD] = { "_KPRCB", "CurrentThread" },
     [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
+    [ETHREAD_PROCESS_XP] = {"_ETHREAD", "ThreadsProcess"},   // xp use this value 
     [KTHREAD_PREVIOUSMODE] = { "_KTHREAD", "PreviousMode" },
     [KTHREAD_HEADER] = { "_KTHREAD", "Header" },
     [KTHREAD_TEB] = { "_KTHREAD", "Teb" },

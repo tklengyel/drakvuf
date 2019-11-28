@@ -200,11 +200,29 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t thread;
-    addr_t process;
+    addr_t process = 0;
 
     thread=win_get_current_thread(drakvuf, info);
 
-    if (thread == 0 || VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_PROCESS], 0, &process))
+    if (thread == 0)
+    {
+        return 0;
+    }
+    if (drakvuf->offsets[KTHREAD_PROCESS] != 0)
+    {
+        if ( VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_PROCESS], 0, &process) )
+        {
+            return 0;
+        }
+    }
+    else if (drakvuf->offsets[ETHREAD_PROCESS_XP] != 0)
+    {
+        if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[ETHREAD_PROCESS_XP], 0, &process) )
+        {
+            return 0;
+        }
+    }
+    else 
     {
         return 0;
     }
