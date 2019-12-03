@@ -607,11 +607,7 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (info->regs->cr3 != injector->target_cr3)
         return 0;
 
-    uint32_t thread_id = 0;
-    if (!drakvuf_get_current_thread_id(drakvuf, info, &thread_id))
-        return 0;
-
-    if (thread_id != injector->target_thread_id)
+    if (info->proc_data.tid != injector->target_thread_id)
         return 0;
 
     auto response = 0;
@@ -704,7 +700,7 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 err:
     PRINT_DEBUG("[FILEDELETE2] [ReadFile] Error. Stop processing (CR3 0x%lx, TID %d, FileName '%s', status 0x%lx).\n",
-                info->regs->cr3, thread_id, f->files[std::make_pair(info->proc_data.pid, injector->handle)].c_str(), info->regs->rax);
+                info->regs->cr3, info->proc_data.tid, f->files[std::make_pair(info->proc_data.pid, injector->handle)].c_str(), info->regs->rax);
 
 handled:
     response = finish_readfile(drakvuf, info, vmi, is_success);
@@ -721,15 +717,13 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     wrapper_t* injector = (wrapper_t*)info->trap->data;
 
     auto response = 0;
-    uint32_t thread_id = 0;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     if (info->regs->cr3 != injector->target_cr3)
         goto done;
 
-    if ( !drakvuf_get_current_thread_id(drakvuf, info, &thread_id) ||
-         !injector->target_thread_id || thread_id != injector->target_thread_id )
+    if (info->proc_data.tid != injector->target_thread_id)
         goto done;
 
     if (info->regs->rax)
@@ -750,7 +744,7 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 err:
     PRINT_DEBUG("[FILEDELETE2] [ExAllocatePoolWithTag] Error. Stop processing (CR3 0x%lx, TID %d).\n",
-                info->regs->cr3, thread_id);
+                info->regs->cr3, info->proc_data.tid);
 
     response = finish_readfile(drakvuf, info, vmi, false);
 
@@ -765,13 +759,11 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     wrapper_t* injector = (wrapper_t*)info->trap->data;
 
     auto response = 0;
-    uint32_t thread_id = 0;
 
     if (info->regs->cr3 != injector->target_cr3)
         return 0;
 
-    if ( !drakvuf_get_current_thread_id(drakvuf, info, &thread_id) ||
-         !injector->target_thread_id || thread_id != injector->target_thread_id )
+    if (info->proc_data.tid != injector->target_thread_id)
         return 0;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -821,7 +813,7 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 err:
     PRINT_DEBUG("[FILEDELETE2] [QueryObject] Error. Stop processing (CR3 0x%lx, TID %d).\n",
-                info->regs->cr3, thread_id);
+                info->regs->cr3, info->proc_data.tid);
 
 handled:
     response = finish_readfile(drakvuf, info, vmi, false);
@@ -832,42 +824,41 @@ done:
     return response;
 }
 
+typedef enum
+{
+    START_READFILE_INVALID,
+    START_READFILE_ERROR,
+    START_READFILE_SUCCEED
+} start_readfile_t;
+
 /*
  * Drakvuf must be locked/unlocked in the caller
  */
-static bool start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle, const char* filename, event_response_t* response)
+static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, handle_t handle, const char* filename, event_response_t* response)
 {
     *response = VMI_EVENT_RESPONSE_NONE;
     filedelete* f = (filedelete*)info->trap->data;
 
     uint64_t fo_flags = 0;
     if (!get_file_object_flags(drakvuf, info, vmi, f, handle, &fo_flags))
-        return 0;
+        return START_READFILE_ERROR;
 
     bool is_synchronous = (fo_flags & FO_SYNCHRONOUS_IO);
     if (!is_synchronous)
-        return 0;
+        return START_READFILE_ERROR;
 
     if ( 0 == info->proc_data.base_addr )
     {
         PRINT_DEBUG("[FILEDELETE2] Failed to get process base on vCPU 0x%d\n",
                     info->vcpu);
-        return 0;
-    }
-
-    uint32_t target_thread_id = 0;
-    if ( !drakvuf_get_current_thread_id(drakvuf, info, &target_thread_id) ||
-         !target_thread_id )
-    {
-        PRINT_DEBUG("[FILEDELETE2] Failed to get Thread ID\n");
-        return 0;
+        return START_READFILE_ERROR;
     }
 
     /*
      * Check if process/thread is being processed. If so skip it. Add it into
      * regestry otherwise.
      */
-    auto thread = std::make_pair(info->regs->cr3, target_thread_id);
+    auto thread = std::make_pair(info->regs->cr3, info->proc_data.tid);
     auto thread_it = f->closing_handles.find(thread);
     auto map_end = f->closing_handles.end();
     if (map_end != thread_it)
@@ -879,7 +870,7 @@ static bool start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_ins
             f->closing_handles.erase(thread);
         }
 
-        return 0;
+        return START_READFILE_SUCCEED;
     }
     else
         f->closing_handles[thread] = false;
@@ -892,13 +883,13 @@ static bool start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_ins
      */
     wrapper_t* injector = (wrapper_t*)g_try_malloc0(sizeof(wrapper_t));
     if (!injector)
-        return 0;
+        return START_READFILE_ERROR;
 
     injector->bp = (drakvuf_trap_t*)g_try_malloc0(sizeof(drakvuf_trap_t));
     if (!injector->bp)
     {
         g_free(injector);
-        return 0;
+        return START_READFILE_ERROR;
     }
 
     injector->f = f;
@@ -909,18 +900,18 @@ static bool start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_ins
     injector->target_cr3 = info->regs->cr3;
     injector->curr_sequence_number = -1;
     injector->eprocess_base = info->proc_data.base_addr;
-    injector->target_thread_id = target_thread_id;
+    injector->target_thread_id = info->proc_data.tid;
 
     memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
     if (inject_queryobject(drakvuf, info, vmi, injector))
     {
         *response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-        return 1;
+        return START_READFILE_SUCCEED;
     }
 
     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
-    return 0;
+    return START_READFILE_ERROR;
 }
 
 /*
@@ -1012,7 +1003,7 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         if (filename.empty())
             goto done;
 
-        if ( start_readfile(drakvuf, info, vmi, handle, filename.c_str(), &response) )
+        if ( START_READFILE_SUCCEED == start_readfile(drakvuf, info, vmi, handle, filename.c_str(), &response) )
             goto done;
     }
 
