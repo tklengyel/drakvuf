@@ -138,7 +138,29 @@ void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     f->closing_handles[std::make_pair(info->regs->cr3, injector->target_thread_id)] = true;
     free_pool(f->pools, injector->pool);
 
-    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+    // One could not restore all registers at once like this:
+    //     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t)),
+    // because thus kernel structures could be affected.
+    // For example on Windows 7 x64 GS BASE stores pointer to KPCR. If save
+    // GS BASE on vCPU0 and start injections Windows scheduler could switch
+    // thread to other vCPU1. After restoring all registers vCPU1's GS BASE
+    // would point to KPCR of vCPU0.
+    info->regs->rax = injector->saved_regs.rax;
+    info->regs->rcx = injector->saved_regs.rcx;
+    info->regs->rdx = injector->saved_regs.rdx;
+    info->regs->rbx = injector->saved_regs.rbx;
+    info->regs->rbp = injector->saved_regs.rbp;
+    info->regs->rsp = injector->saved_regs.rsp;
+    info->regs->rdi = injector->saved_regs.rdi;
+    info->regs->rsi = injector->saved_regs.rsi;
+    info->regs->r8 = injector->saved_regs.r8;
+    info->regs->r9 = injector->saved_regs.r9;
+    info->regs->r10 = injector->saved_regs.r10;
+    info->regs->r11 = injector->saved_regs.r11;
+    info->regs->r12 = injector->saved_regs.r12;
+    info->regs->r13 = injector->saved_regs.r13;
+    info->regs->r14 = injector->saved_regs.r14;
+    info->regs->r15 = injector->saved_regs.r15;
 
     drakvuf_remove_trap(drakvuf, injector->bp, (drakvuf_trap_free_t)free);
 
