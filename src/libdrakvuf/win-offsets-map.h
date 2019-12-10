@@ -123,6 +123,19 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [EPROCESS_WOW64PROCESS] = { "_EPROCESS", "Wow64Process" },
     [EPROCESS_WOW64PROCESS_WIN10] = { "_EPROCESS", "WoW64Process" },
     [EPROCESS_VADROOT] = { "_EPROCESS", "VadRoot" },
+
+    // Windows >=8 specific
+    [RTL_AVL_TREE_ROOT] = { "_RTL_AVL_TREE", "Root"},
+    [RTL_BALANCED_NODE_LEFT] = {"_RTL_BALANCED_NODE", "Left"},
+    [RTL_BALANCED_NODE_RIGHT] = {"_RTL_BALANCED_NODE", "Right"},
+    [RTL_BALANCED_NODE_PARENTVALUE] = {"_RTL_BALANCED_NODE", "ParentValue"},
+    [MMVAD_CORE] = {"_MMVAD", "Core"},
+    [MMVAD_SHORT_STARTING_VPN] = {"_MMVAD_SHORT", "StartingVpn"},
+    [MMVAD_SHORT_STARTING_VPN_HIGH] = {"_MMVAD_SHORT", "StartingVpnHigh"},
+    [MMVAD_SHORT_ENDING_VPN] = {"_MMVAD_SHORT", "EndingVpn"},
+    [MMVAD_SHORT_ENDING_VPN_HIGH] = {"_MMVAD_SHORT", "EndingVpnHigh"},
+    [MMVAD_SHORT_FLAGS1] = { "_MMVAD_SHORT", "u1" },
+
     [VADROOT_BALANCED_ROOT] = { "VadRoot", "BalancedRoot" },
     [MMVAD_LEFT_CHILD] = { "_MMVAD", "LeftChild" },
     [MMVAD_RIGHT_CHILD] = { "_MMVAD", "RightChild" },
