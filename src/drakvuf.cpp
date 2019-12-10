@@ -162,15 +162,15 @@ int drakvuf_c::start_plugins(const bool* plugin_list, const plugins_options* opt
 }
 
 drakvuf_c::drakvuf_c(const char* domain,
-                     const char* rekall_profile,
-                     const char* rekall_wow_profile,
+                     const char* json_kernel_path,
+                     const char* json_wow_path,
                      output_format_t output,
                      bool verbose,
                      bool leave_paused,
                      bool libvmi_conf)
     : leave_paused{ leave_paused }
 {
-    if (!drakvuf_init(&drakvuf, domain, rekall_profile, rekall_wow_profile, verbose, libvmi_conf))
+    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, verbose, libvmi_conf))
         throw std::runtime_error("drakvuf_init() failed");
 
     plugins = new drakvuf_plugins(drakvuf, output, drakvuf_get_os_type(drakvuf));

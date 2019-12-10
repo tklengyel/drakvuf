@@ -139,7 +139,7 @@ struct start_drakvuf
 static GThreadPool* pool;
 static const char* domain_name;
 static const char* domain_config;
-static const char* rekall_profile;
+static const char* json_kernel_path;
 static const char* in_folder;
 static const char* run_folder;
 static const char* out_folder;
@@ -303,7 +303,7 @@ restart:
     g_mutex_lock(&start->timer_lock);
     timer = g_thread_new("timer", timer_thread, start);
 
-    command = g_strdup_printf(CONFIG_CMD, config_script, rekall_profile, start->cloneID, injection_pid, start->threadid+1, run_folder, start->input, out_folder, start->utime);
+    command = g_strdup_printf(CONFIG_CMD, config_script, json_kernel_path, start->cloneID, injection_pid, start->threadid+1, run_folder, start->input, out_folder, start->utime);
     printf("[%i] ** RUNNING COMMAND: %s\n", start->threadid, command);
     g_spawn_command_line_sync(command, NULL, NULL, &rc, NULL);
     g_free(command);
@@ -322,7 +322,7 @@ restart:
     g_mutex_lock(&start->timer_lock);
     timer = g_thread_new("timer", timer_thread, start);
 
-    command = g_strdup_printf(DRAKVUF_CMD, drakvuf_script, rekall_profile, start->cloneID, injection_pid, start->threadid+1, run_folder, start->input, out_folder, start->utime);
+    command = g_strdup_printf(DRAKVUF_CMD, drakvuf_script, json_kernel_path, start->cloneID, injection_pid, start->threadid+1, run_folder, start->input, out_folder, start->utime);
     printf("[%i] ** RUNNING COMMAND: %s\n", start->threadid, command);
     g_spawn_command_line_sync(command, NULL, NULL, &rc, NULL);
     g_free(command);
@@ -370,7 +370,7 @@ int main(int argc, char** argv)
     if (argc!=15)
     {
         printf("Not enough arguments: %i!\n", argc);
-        printf("%s <loop (0) or poll (1)> <origin domain name> <domain config> <rekall_profile> <injection pid> <watch folder> <serve folder> <output folder> <max clones> <clone_script> <config_script> <drakvuf_script> <cleanup_script> <tcpdump_script>\n", argv[0]);
+        printf("%s <loop (0) or poll (1)> <origin domain name> <domain config> <path to kernel json> <injection pid> <watch folder> <serve folder> <output folder> <max clones> <clone_script> <config_script> <drakvuf_script> <cleanup_script> <tcpdump_script>\n", argv[0]);
         return 1;
     }
 
@@ -388,7 +388,7 @@ int main(int argc, char** argv)
     int do_poll = atoi(argv[1]);
     domain_name = argv[2];
     domain_config = argv[3];
-    rekall_profile = argv[4];
+    json_kernel_path = argv[4];
     injection_pid = atoi(argv[5]);
     in_folder = argv[6];
     run_folder = argv[7];

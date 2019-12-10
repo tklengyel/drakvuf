@@ -118,6 +118,7 @@
 #include "libdrakvuf.h"
 #include "vmi.h"
 #include "os.h"
+#include "json-profile.h"
 #include "../xen_helper/xen_helper.h"
 
 #include <sys/poll.h>
@@ -164,11 +165,12 @@ struct drakvuf
 {
     char* dom_name;
     domid_t domID;
-    char* rekall_profile;
-    json_object* rekall_profile_json;
     os_t os;
-    char* rekall_wow_profile;
-    json_object* rekall_wow_profile_json;
+
+    char* json_kernel_path;
+    json_object* json_kernel;
+    char* json_wow_path;
+    json_object* json_wow;
 
     xen_interface_t* xen;
     os_interface_t osi;

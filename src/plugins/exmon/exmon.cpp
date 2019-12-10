@@ -353,7 +353,7 @@ done:
 exmon::exmon(drakvuf_t drakvuf, output_format_t output)
     : format{output}
 {
-    if ( !drakvuf_get_function_rva(drakvuf, "KiDispatchException", &this->trap.breakpoint.rva) )
+    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiDispatchException", &this->trap.breakpoint.rva) )
         throw -1;
 
     this->trap.cb = cb;
@@ -364,9 +364,9 @@ exmon::exmon(drakvuf_t drakvuf, output_format_t output)
 
     int i;
     for (i=0; i<__OFFSET_MAX; i++)
-        drakvuf_get_struct_member_rva(drakvuf, offset_names[i][0], offset_names[i][1], &this->offsets[i]);
+        drakvuf_get_kernel_struct_member_rva(drakvuf, offset_names[i][0], offset_names[i][1], &this->offsets[i]);
 
-    if ( !drakvuf_get_struct_size(drakvuf, "_KTRAP_FRAME", &this->ktrap_frame_size) )
+    if ( !drakvuf_get_kernel_struct_size(drakvuf, "_KTRAP_FRAME", &this->ktrap_frame_size) )
     {
         g_free(this->offsets);
         throw -1;

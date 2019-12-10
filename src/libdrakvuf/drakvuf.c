@@ -108,7 +108,7 @@
 
 #include "libdrakvuf.h"
 #include "private.h"
-#include "rekall-profile.h"
+#include "json-profile.h"
 
 #ifdef DRAKVUF_DEBUG
 bool verbose = 0;
@@ -140,31 +140,31 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
         xen_free_interface(drakvuf->xen);
     }
 
-    if (drakvuf->rekall_profile_json)
+    if (drakvuf->json_kernel)
     {
-        json_object_put(drakvuf->rekall_profile_json);
-        drakvuf->rekall_profile_json = NULL;
+        json_object_put(drakvuf->json_kernel);
+        drakvuf->json_kernel = NULL;
     }
 
-    if (drakvuf->rekall_wow_profile_json)
+    if (drakvuf->json_wow)
     {
-        json_object_put(drakvuf->rekall_wow_profile_json);
-        drakvuf->rekall_wow_profile_json = NULL;
+        json_object_put(drakvuf->json_wow);
+        drakvuf->json_wow = NULL;
     }
 
     g_free(drakvuf->offsets);
     g_free(drakvuf->sizes);
     g_mutex_clear(&drakvuf->vmi_lock);
     g_free(drakvuf->dom_name);
-    g_free(drakvuf->rekall_profile);
-    g_free(drakvuf->rekall_wow_profile);
+    g_free(drakvuf->json_kernel_path);
+    g_free(drakvuf->json_wow_path);
     g_free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_profile, const char* rekall_wow_profile, bool _verbose, bool libvmi_conf)
+bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool _verbose, bool libvmi_conf)
 {
 
-    if ( !domain || !rekall_profile )
+    if ( !domain || !json_kernel_path )
         return 0;
 
 #ifdef DRAKVUF_DEBUG
@@ -173,20 +173,16 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* rekall_pro
 
     *drakvuf = (drakvuf_t)g_try_malloc0(sizeof(struct drakvuf));
 
-    (*drakvuf)->rekall_profile_json = json_object_from_file(rekall_profile);
-    (*drakvuf)->rekall_profile = g_strdup(rekall_profile);
-    (*drakvuf)->os = rekall_get_os_type((*drakvuf)->rekall_profile_json);
+    (*drakvuf)->json_kernel = json_object_from_file(json_kernel_path);
+    (*drakvuf)->json_kernel_path = g_strdup(json_kernel_path);
 
-    if ( (*drakvuf)->os == VMI_OS_WINDOWS )
+    if ( json_wow_path )
     {
-        if ( rekall_wow_profile )
-        {
-            (*drakvuf)->rekall_wow_profile_json = json_object_from_file(rekall_wow_profile);
-            (*drakvuf)->rekall_wow_profile      = g_strdup(rekall_wow_profile);
-        }
-        else
-            PRINT_DEBUG("drakvuf_init: Rekall WoW64 profile not used\n");
+        (*drakvuf)->json_wow = json_object_from_file(json_wow_path);
+        (*drakvuf)->json_wow_path = g_strdup(json_wow_path);
     }
+    else
+        PRINT_DEBUG("drakvuf_init: Rekall WoW64 profile not used\n");
 
     g_mutex_init(&(*drakvuf)->vmi_lock);
 
@@ -471,95 +467,63 @@ void drakvuf_force_resume (drakvuf_t drakvuf)
     xen_force_resume(drakvuf->xen, drakvuf->domID);
 }
 
-bool rekall_get_struct_size( json_object* rekall_profile_json,
-                             const char* struct_name,
-                             size_t* size)
+bool json_get_struct_size(json_object* json_profile,
+                          const char* struct_name,
+                          size_t* size)
 {
-    return rekall_lookup(
-               rekall_profile_json,
+    return json_lookup(
+               json_profile,
                struct_name,
                NULL,
                NULL,
                size);
 }
-bool drakvuf_get_struct_size(drakvuf_t drakvuf,
-                             const char* struct_name,
-                             size_t* size)
-{
-    return rekall_get_struct_size(
-               drakvuf->rekall_profile_json,
-               struct_name,
-               size);
-}
 
-bool rekall_get_struct_member_rva( json_object* rekall_profile_json,
-                                   const char* struct_name,
-                                   const char* symbol,
-                                   addr_t* rva)
+bool json_get_struct_member_rva(json_object* json,
+                                const char* struct_name,
+                                const char* symbol,
+                                addr_t* rva)
 {
-    return rekall_lookup(
-               rekall_profile_json,
+    return json_lookup(
+               json,
                struct_name,
                symbol,
                rva,
                NULL);
 }
-bool drakvuf_get_struct_member_rva(drakvuf_t drakvuf,
-                                   const char* struct_name,
-                                   const char* symbol,
-                                   addr_t* rva)
-{
-    return rekall_get_struct_member_rva(
-               drakvuf->rekall_profile_json,
-               struct_name,
-               symbol,
-               rva);
-}
 
-bool rekall_get_struct_members_array_rva(
-    json_object* rekall_profile_json,
+bool json_get_struct_members_array_rva(
+    json_object* json,
     const char* struct_name_symbol_array[][2],
     addr_t array_size,
     addr_t* rva)
 {
-    return rekall_lookup_array(
-               rekall_profile_json,
+    return json_lookup_array(
+               json,
                struct_name_symbol_array,
                array_size,
                rva,
                NULL);
 }
-bool drakvuf_get_struct_members_array_rva(
-    drakvuf_t drakvuf,
-    const char* struct_name_symbol_array[][2],
-    addr_t array_size,
-    addr_t* rva)
+
+const char* drakvuf_get_json_kernel_path(drakvuf_t drakvuf)
 {
-    return rekall_get_struct_members_array_rva(
-               drakvuf->rekall_profile_json,
-               struct_name_symbol_array,
-               array_size,
-               rva);
+    return drakvuf->json_kernel_path;
 }
 
-const char* drakvuf_get_rekall_profile(drakvuf_t drakvuf)
+json_object* drakvuf_get_json_kernel(drakvuf_t drakvuf)
 {
-    return drakvuf->rekall_profile;
+    return drakvuf->json_kernel;
 }
 
-json_object* drakvuf_get_rekall_profile_json(drakvuf_t drakvuf)
+const char* drakvuf_get_json_wow_path(drakvuf_t drakvuf)
 {
-    return drakvuf->rekall_profile_json;
+    return drakvuf->json_wow_path;
 }
 
-const char* drakvuf_get_rekall_wow_profile(drakvuf_t drakvuf)
+json_object* drakvuf_get_json_wow(drakvuf_t drakvuf)
 {
-    return drakvuf->rekall_wow_profile;
-}
-
-json_object* drakvuf_get_rekall_wow_profile_json(drakvuf_t drakvuf)
-{
-    return drakvuf->rekall_wow_profile_json;
+    return drakvuf->json_wow;
 }
 
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf)

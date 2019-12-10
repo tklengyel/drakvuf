@@ -195,51 +195,26 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static bool get_constant_rva(json_object* profile_json, const char* constant, addr_t* rva)
-{
-    if (!profile_json)
-    {
-        fprintf(stderr, "Rekall profile json is NULL!\n");
-        return false;
-    }
-
-    json_object* constants = NULL, *jsymbol = NULL;
-    if (!json_object_object_get_ex(profile_json, "$CONSTANTS", &constants))
-    {
-        PRINT_DEBUG("Rekall profile: no $CONSTANTS section found\n");
-        return false;
-    }
-
-    if (!json_object_object_get_ex(constants, constant, &jsymbol))
-    {
-        PRINT_DEBUG("Rekall profile: no '%s' found\n", constant);
-        return false;
-    }
-
-    *rva = json_object_get_int64(jsymbol);
-    return true;
-}
-
 static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const char* function_name,
                            drakvuf_trap_t* trap,
                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
     addr_t func_rva = 0;
-    if ( !rekall_get_function_rva(profile_json, function_name, &func_rva) )
+    if ( !json_get_symbol_rva(profile_json, function_name, &func_rva) )
     {
         PRINT_DEBUG("[WINDOWMON] Failed to get RVA of win32k!%s\n", function_name);
         return false;
     }
 
     addr_t w32pst_rva = 0;
-    if ( !get_constant_rva(profile_json, "W32pServiceTable", &w32pst_rva) )
+    if ( !json_get_symbol_rva(profile_json, "W32pServiceTable", &w32pst_rva) )
     {
         PRINT_DEBUG("[WINDOWMON] Failed to get RVA of win32k!W32pServiceTable\n");
         return false;
     }
 
     addr_t sdt_rva = 0;
-    if ( !drakvuf_get_constant_rva( drakvuf, "KeServiceDescriptorTableShadow", &sdt_rva) )
+    if ( !drakvuf_get_kernel_symbol_rva( drakvuf, "KeServiceDescriptorTableShadow", &sdt_rva) )
     {
         PRINT_DEBUG("[WINDOWMON] [Init] Failed to get RVA of nt!KeServiceDescriptorTableShadow\n");
         return false;
@@ -311,14 +286,14 @@ windowmon::windowmon(drakvuf_t drakvuf, const windowmon_config* c, output_format
 {
     if ( !c->win32k_profile )
     {
-        PRINT_DEBUG("Windowmon plugin requires the Rekall profile for win32k.sys!\n");
+        PRINT_DEBUG("Windowmon plugin requires the JSON profile for win32k.sys!\n");
         return;
     }
 
     json_object* profile_json = json_object_from_file(c->win32k_profile);
     if (!profile_json)
     {
-        PRINT_DEBUG("Windowmon plugin fails to load rekall profile for win32k.sys\n");
+        PRINT_DEBUG("Windowmon plugin fails to load JSON debug info for win32k.sys\n");
         throw -1;
     }
 

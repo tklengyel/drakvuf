@@ -613,7 +613,7 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
     {
         addr_t rva = 0;
 
-        if ( !drakvuf_get_constant_rva(drakvuf, "_text", &rva) )
+        if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "_text", &rva) )
             return NULL;
 
         addr_t kaslr = drakvuf_get_kernel_base(drakvuf) - rva;
@@ -758,10 +758,10 @@ static symbols_t* filter_symbols(const symbols_t* symbols, const char* filter_fi
 
 syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output)
 {
-    symbols_t* symbols = drakvuf_get_symbols_from_rekall(drakvuf);
+    symbols_t* symbols = drakvuf_get_kernel_symbols(drakvuf);
     if (!symbols)
     {
-        fprintf(stderr, "Failed to get symbols from Rekall profile\n");
+        fprintf(stderr, "Failed to get kernel symbols\n");
         throw -1;
     }
 

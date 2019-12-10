@@ -123,7 +123,7 @@ static void close_handler(int sig)
 static inline void print_help(void)
 {
     fprintf(stderr, "Required input:\n"
-            "\t -r <rekall profile>       The Rekall profile of the OS kernel\n"
+            "\t -r <path to json>         The OS kernel's JSON\n"
             "\t -d <domain ID or name>    The domain's ID or name\n"
             "\t -i <injection pid>        The PID(WIN) | TGID(LINUX) of the process to hijack for injection\n"
             "\t -e <inject_file>          The executable to start with injection\n"
@@ -148,7 +148,7 @@ int main(int argc, char** argv)
     vmi_pid_t injection_pid = 0;
     uint32_t injection_thread = 0;
     char c;
-    char* rekall_profile = NULL;
+    char* json_kernel_path = NULL;
     char* domain = NULL;
     char* inject_file = NULL;
     char* inject_cwd = NULL;
@@ -171,7 +171,7 @@ int main(int argc, char** argv)
         switch (c)
         {
             case 'r':
-                rekall_profile = optarg;
+                json_kernel_path = optarg;
                 break;
             case 'd':
                 domain = optarg;
@@ -233,7 +233,7 @@ int main(int argc, char** argv)
                 return rc;
         }
 
-    if ( !rekall_profile || !domain || !injection_pid || !inject_file )
+    if ( !json_kernel_path || !domain || !injection_pid || !inject_file )
     {
         print_help();
         return 1;
@@ -266,7 +266,7 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if (!drakvuf_init(&drakvuf, domain, rekall_profile, NULL, verbose, libvmi_conf))
+    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, verbose, libvmi_conf))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
         return 1;
