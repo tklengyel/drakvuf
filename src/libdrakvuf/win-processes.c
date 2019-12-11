@@ -1008,7 +1008,8 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
     {
         ctx.addr = eprocess + drakvuf->offsets[EPROCESS_VADROOT] + drakvuf->offsets[RTL_AVL_TREE_ROOT];
 
-        if (vmi_read_addr(drakvuf->vmi, &ctx, &node_addr) != VMI_SUCCESS) {
+        if (vmi_read_addr(drakvuf->vmi, &ctx, &node_addr) != VMI_SUCCESS)
+        {
             PRINT_DEBUG("MMVAD failed for node addr\n");
             return false;
         }
