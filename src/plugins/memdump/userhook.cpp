@@ -122,10 +122,133 @@
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
+#include <libdrakvuf/private.h>
 #include <assert.h>
 
 #include "memdump.h"
 #include "private.h"
+
+bool is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t wow_ctx;
+    addr_t ethread = drakvuf_get_current_thread(drakvuf, info);
+    return drakvuf_get_wow_context(drakvuf, ethread, &wow_ctx);
+}
+
+addr_t get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg)
+{
+    bool is32 = is_wow64(drakvuf, info);
+    if (!is32)
+    {
+        switch (narg)
+        {
+            case 1:
+                return info->regs->rcx;
+            case 2:
+                return info->regs->rdx;
+            case 3:
+                return info->regs->r8;
+            case 4:
+                return info->regs->r9;
+        }
+    }
+
+    access_context_t ctx =
+            {
+                    .translate_mechanism = VMI_TM_PROCESS_DTB,
+                    .dtb = info->regs->cr3,
+                    .addr = info->regs->rsp + narg * (is32 ? 4 : 8),
+            };
+
+    if (is32)
+    {
+        uint32_t ret;
+        if (VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &ret))
+            return 0;
+        return ret;
+    }
+    uint64_t ret;
+    if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
+        return 0;
+    return ret;
+}
+
+void print_arguments(std::list < uint64_t > arguments)
+{
+    size_t i = 0;
+    for (auto it = arguments.begin(); it != arguments.end(); it++, i++)
+    {
+        printf("0x%lX", *it);
+        if (i < arguments.size() - 1)
+            printf(",");
+    }
+    printf("]");
+}
+
+static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
+{
+    return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)info->trap->data;
+    if (info->proc_data.pid != ret_target->pid)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    auto plugin = ret_target->plugin;
+
+    gchar* escaped_pname;
+    switch (plugin->m_output_format)
+    {
+        case OUTPUT_CSV:
+            printf("memdump-userhok," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",0x%" PRIx64 ",\"",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, info->trap->name, info->regs->rip);
+            print_arguments(ret_target->arguments);
+            printf("\"");
+            break;
+        case OUTPUT_KV:
+            printf("memdump, Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",Arguments=\"",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, info->trap->name, info->regs->rip);
+            print_arguments(ret_target->arguments);
+            printf("\"");
+            break;
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\": \"memdump-userhook\", "
+                    "\"TimeStamp\":" "\"" FORMAT_TIMEVAL "\", "
+                    "\"ProcessName\": %s, "
+                    "\"UserName\": \"%s\", "
+                    "\"UserId\": %" PRIu64 ", "
+                    "\"PID\": %d, "
+                    "\"PPID\": %d, "
+                    "\"Method\": \"%s\", "
+                    "\"CalledFrom\": 0x%" PRIx64 ", "
+                    "\"Arguments\": [",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid,
+                    info->trap->name,
+                    info->regs->rip);
+
+            print_arguments(ret_target->arguments);
+            printf("}");
+            g_free(escaped_pname);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[MEMDUMP-USERHOOK] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 " ProcessName:\"%s\" UserID:%" PRIi64 " Method:\"%s\" CalledFrom:0x%" PRIx64 " Arguments:\"",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, info->trap->name, info->regs->rip);
+            print_arguments(ret_target->arguments);
+            printf("\"");
+            break;
+    }
+    printf("\n");
+
+    drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+	delete ret_target;
+    return VMI_EVENT_RESPONSE_NONE;
+}
 
 static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
@@ -134,8 +257,80 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     if (target->pid != info->proc_data.pid)
         return VMI_EVENT_RESPONSE_NONE;
 
-    PRINT_DEBUG("[MEMDUMP-USER] Usermode callback called %d!%s\n", info->proc_data.pid, info->trap->name);
     dump_from_stack(drakvuf, info, target->plugin);
+    bool is_syswow = is_wow64(drakvuf, info);
+
+    access_context_t ctx =
+            {
+                    .translate_mechanism = VMI_TM_PROCESS_DTB,
+                    .dtb = info->regs->cr3,
+                    .addr = info->regs->rsp
+            };
+
+    bool success = false;
+    addr_t ret_addr = 0;
+
+    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    if (is_syswow)
+    {
+        uint32_t ret_addr_tmp;
+
+        if (vmi_read_32(vmi, &ctx, &ret_addr_tmp) == VMI_SUCCESS)
+        {
+            success = true;
+            ret_addr = ret_addr_tmp;
+        }
+    }
+    else
+    {
+        success = vmi_read_64(vmi, &ctx, &ret_addr) == VMI_SUCCESS;
+    }
+    drakvuf_release_vmi(drakvuf);
+
+	return_hook_target_entry_t* ret_target = new return_hook_target_entry_t();
+    drakvuf_trap_t* trap = new drakvuf_trap_t;
+
+	for (size_t i = 1; i <= target->args_num; i++)
+	{
+		uint64_t argument = get_function_argument(drakvuf, info, i);
+		ret_target->arguments.push_back(argument);
+	}
+	ret_target->plugin = target->plugin;
+
+	addr_t paddr;
+	vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    vmi_v2pcache_flush(vmi, info->regs->cr3);
+    if ( VMI_SUCCESS != vmi_pagetable_lookup(vmi, info->regs->cr3, ret_addr, &paddr) )
+    {
+        delete ret_target;
+        delete trap;
+        drakvuf_release_vmi(drakvuf);
+        return VMI_EVENT_RESPONSE_NONE;
+
+    }
+    drakvuf_release_vmi(drakvuf);
+
+    ret_target->pid = target->pid;
+
+    trap->type = BREAKPOINT;
+    trap->name = target->target_name.c_str();
+    trap->cb = usermode_return_hook_cb;
+    trap->data = ret_target;
+    trap->breakpoint.lookup_type = LOOKUP_DTB;
+    trap->breakpoint.dtb = info->regs->cr3;
+    trap->breakpoint.addr_type = ADDR_VA;
+    trap->breakpoint.addr = ret_addr;
+
+    if (drakvuf_add_trap(drakvuf, trap))
+    {
+        ret_target->trap = trap;
+    }
+    else
+    {
+        PRINT_DEBUG("[MEMDUMP-USER] Failed to add trap :(\n");
+        delete trap;
+		delete ret_target;
+    }
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -175,7 +370,7 @@ static bool populate_hook_targets(drakvuf_t drakvuf, memdump* plugin, const mmva
         {
             if (strstr((const char*) dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
             {
-                dll_meta->targets.emplace_back(wanted_hook.function_name.c_str(), usermode_hook_cb, plugin);
+                dll_meta->targets.emplace_back(wanted_hook.function_name.c_str(), usermode_hook_cb, wanted_hook.args_num, plugin);
             }
         }
     }
@@ -316,7 +511,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
 
 fail:
     PRINT_DEBUG("[MEMDUMP-USER] Failed to add trap :(\n");
-    g_free(trap);
+    delete trap;
     return false;
 }
 
@@ -671,10 +866,15 @@ void memdump::load_wanted_targets(const memdump_config* c)
         std::stringstream ss(line);
         target_config_entry_t e;
 
+		std::string args_num_s;
         if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
             throw -1;
         if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
             throw -1;
+		if (!std::getline(ss, args_num_s, ',') || args_num_s.empty())
+			throw - 1;
+
+		e.args_num = std::stoi(args_num_s);
 
         this->wanted_hooks.push_back(e);
     }
@@ -713,8 +913,6 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
         PRINT_DEBUG("[MEMDUMP-USER] PA after CoW remained the same, wtf? Nothing to do here...\n");
         goto end;
     }
-
-    PRINT_DEBUG("[MEMDUMP-USER] new PA %lx\n", pa);
 
     for (auto& hook : data->hooks)
     {
