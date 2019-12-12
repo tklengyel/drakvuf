@@ -572,7 +572,16 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
         {
             const struct symbol* symbol = &symbols->symbols[i];
 
+            if (strlen(symbol->name) <= 2)
+                continue;
+
             if (strncmp(symbol->name, "Nt", 2))
+                continue;
+
+            if (g_ascii_islower(symbol->name[2]))
+                continue;
+
+            if (!strcmp(symbol->name, "NtInitialUserProcess"))
                 continue;
 
             PRINT_DEBUG("[SYSCALLS] Adding trap to %s\n", symbol->name);
@@ -799,6 +808,7 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
 
         if ( !drakvuf_add_trap(drakvuf, trap) )
         {
+            PRINT_DEBUG("Failed to trap syscall %s\n", trap->name);
             error = 1;
             break;
         }
