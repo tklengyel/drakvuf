@@ -257,9 +257,11 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     if (target->pid != info->proc_data.pid)
         return VMI_EVENT_RESPONSE_NONE;
 
+    dump_from_stack(drakvuf, info, target->plugin);
+
+    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
     vmi_v2pcache_flush(vmi, info->regs->cr3);
 
-    dump_from_stack(drakvuf, info, target->plugin);
     bool is_syswow = is_wow64(drakvuf, info);
 
     access_context_t ctx =
@@ -272,7 +274,6 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     bool success = false;
     addr_t ret_addr = 0;
 
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
     if (is_syswow)
     {
         uint32_t ret_addr_tmp;
@@ -301,6 +302,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
 
 	addr_t paddr;
 	vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
     if ( VMI_SUCCESS != vmi_pagetable_lookup(vmi, info->regs->cr3, ret_addr, &paddr) )
     {
         delete ret_target;
