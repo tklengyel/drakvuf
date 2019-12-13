@@ -171,7 +171,10 @@ drakvuf_c::drakvuf_c(const char* domain,
     : leave_paused{ leave_paused }
 {
     if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, verbose, libvmi_conf))
+    {
+        drakvuf_close(drakvuf, leave_paused);
         throw std::runtime_error("drakvuf_init() failed");
+    }
 
     plugins = new drakvuf_plugins(drakvuf, output, drakvuf_get_os_type(drakvuf));
 }

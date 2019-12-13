@@ -644,6 +644,14 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
                     !strcmp(symbol->name,  "sys_tracepoint_refcount") ||
                     !strcmp(symbol->name,  "sys_table")               ||
                     !strcmp(symbol->name,  "sys_perf_refcount_enter") ||
+                    !strcmp(symbol->name,  "sys_x86_64.c") ||
+                    !strcmp(symbol->name,  "sys_target") ||
+                    !strcmp(symbol->name,  "sys_copyarea") ||
+                    !strcmp(symbol->name,  "sys_data") ||
+                    !strcmp(symbol->name,  "sys_fillrect") ||
+                    !strcmp(symbol->name,  "sys_ia32.c") ||
+                    !strcmp(symbol->name,  "sys_imageblit") ||
+                    !strcmp(symbol->name,  "sys_ni.c") ||
                     !strcmp(symbol->name,  "sys_perf_refcount_exit")   )
                     continue;
             }
