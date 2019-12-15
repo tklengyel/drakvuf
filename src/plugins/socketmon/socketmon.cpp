@@ -962,7 +962,7 @@ static void register_tcpip_trap( drakvuf_t drakvuf, json_object* tcpip_profile_j
                                  drakvuf_trap_t* trap,
                                  event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
-    if ( !json_get_symbol_rva(tcpip_profile_json, function_name, &trap->breakpoint.rva) ) throw -1;
+    if ( !json_get_symbol_rva(drakvuf, tcpip_profile_json, function_name, &trap->breakpoint.rva) ) throw -1;
 
     trap->name = function_name;
     trap->cb   = hook_cb;

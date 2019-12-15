@@ -168,7 +168,6 @@ struct drakvuf
     os_t os;
 
     char* json_kernel_path;
-    json_object* json_kernel;
     char* json_wow_path;
     json_object* json_wow;
 

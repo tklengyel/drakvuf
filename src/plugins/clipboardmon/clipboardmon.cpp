@@ -160,14 +160,14 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
     addr_t func_rva = 0;
-    if ( !json_get_symbol_rva(profile_json, function_name, &func_rva) )
+    if ( !json_get_symbol_rva(drakvuf, profile_json, function_name, &func_rva) )
     {
         PRINT_DEBUG("[CLIPBOARDMON] Failed to get RVA of win32k!%s\n", function_name);
         return false;
     }
 
     addr_t w32pst_rva = 0;
-    if ( !json_get_symbol_rva(profile_json, "W32pServiceTable", &w32pst_rva) )
+    if ( !json_get_symbol_rva(drakvuf, profile_json, "W32pServiceTable", &w32pst_rva) )
     {
         PRINT_DEBUG("[CLIPBOARDMON] Failed to get RVA of win32k!W32pServiceTable\n");
         return false;

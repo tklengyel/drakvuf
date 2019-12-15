@@ -622,7 +622,11 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
     {
         addr_t rva = 0;
 
-        if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "_text", &rva) )
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+        status_t status = vmi_get_symbol_addr_from_json(vmi, vmi_get_kernel_json(vmi), "_text", &rva);
+        drakvuf_release_vmi(drakvuf);
+
+        if ( VMI_FAILURE == status )
             return NULL;
 
         addr_t kaslr = drakvuf_get_kernel_base(drakvuf) - rva;
@@ -775,7 +779,11 @@ static symbols_t* filter_symbols(const symbols_t* symbols, const char* filter_fi
 
 syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output)
 {
-    symbols_t* symbols = drakvuf_get_kernel_symbols(drakvuf);
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    symbols_t* symbols = json_get_symbols(vmi_get_kernel_json(vmi));
+    this->reg_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
+    drakvuf_release_vmi(drakvuf);
+
     if (!symbols)
     {
         fprintf(stderr, "Failed to get kernel symbols\n");
@@ -803,10 +811,6 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
 
     if ( !this->traps )
         throw -1;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->reg_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
-    drakvuf_release_vmi(drakvuf);
 
     bool error = 0;
     GSList* loop = this->traps;

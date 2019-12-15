@@ -713,7 +713,7 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
 
     if (json_wow)
     {
-        if (!json_get_struct_member_rva(json_wow, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_wow_rva))
+        if (!json_get_struct_member_rva(drakvuf, json_wow, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_wow_rva))
         {
             throw -1;
         }

@@ -115,108 +115,8 @@
 #include "private.h"
 #include "json-profile.h"
 
-bool json_lookup(
-    json_object* json,
-    const char* symbol,
-    const char* subsymbol,
-    addr_t* rva,
-    addr_t* size)
-{
-    bool ret = false;
-
-    if (!symbol)
-        return ret;
-
-    if (!subsymbol && !size)
-    {
-        json_object* symbols = NULL;
-        json_object* jsymbol = NULL;
-        json_object* address = NULL;
-        if (!json_object_object_get_ex(json, "symbols", &symbols))
-        {
-            PRINT_DEBUG("No symbols section found\n");
-            goto exit;
-        }
-
-        if (!json_object_object_get_ex(symbols, symbol, &jsymbol))
-        {
-            PRINT_DEBUG("Symbol '%s' not found\n", symbol);
-            goto exit;
-        }
-
-        if (!json_object_object_get_ex(jsymbol, "address", &address))
-        {
-            PRINT_DEBUG("Symbol '%s' has no address\n", symbol);
-            goto exit;
-        }
-
-        *rva = json_object_get_int64(address);
-
-        ret = true;
-    }
-    else
-    {
-        json_object* user_types = NULL;
-        json_object* jstruct = NULL;
-        json_object* jstruct2 = NULL;
-        json_object* jmember = NULL;
-        json_object* jvalue = NULL;
-
-        if (!json_object_object_get_ex(json, "user_types", &user_types))
-        {
-            PRINT_DEBUG("No user_types section found\n");
-            goto exit;
-        }
-        if (!json_object_object_get_ex(user_types, symbol, &jstruct))
-        {
-            PRINT_DEBUG("JSON profile: no '%s' found\n", symbol);
-            goto exit;
-        }
-
-        if (size)
-        {
-            json_object* jsize = NULL;
-
-            if (!json_object_object_get_ex(jstruct, "size", &jsize))
-            {
-                PRINT_DEBUG("Struct size not found\n");
-                goto exit;
-            }
-
-            *size = json_object_get_int64(jsize);
-
-            ret = true;
-            goto exit;
-        }
-
-        if (!json_object_object_get_ex(jstruct, "fields", &jstruct2))
-        {
-            PRINT_DEBUG("Struct '%s' has no fields\n", symbol);
-            goto exit;
-        }
-
-        if (!json_object_object_get_ex(jstruct2, subsymbol, &jmember))
-        {
-            PRINT_DEBUG("Struct '%s' has no '%s' member\n", symbol, subsymbol);
-            goto exit;
-        }
-
-        if (!json_object_object_get_ex(jmember, "offset", &jvalue))
-        {
-            PRINT_DEBUG("Struct '%s:%s' has no offset\n", symbol, subsymbol);
-            goto exit;
-        }
-
-        *rva = json_object_get_int64(jvalue);
-
-        ret = true;
-    }
-
-exit:
-    return ret;
-}
-
 bool json_lookup_array(
+    drakvuf_t drakvuf,
     json_object* json,
     const char* symbol_subsymbol_array[][2],
     addr_t array_size,
@@ -234,17 +134,30 @@ bool json_lookup_array(
     int errors = 0;
     for (size_t i = 0; i < array_size; i++)
     {
-        if (!json_lookup(
-                json,
-                symbol_subsymbol_array[i][0],
-                symbol_subsymbol_array[i][1],
-                &rva[i],
-                size)
-           )
+        if (!symbol_subsymbol_array[i][0])
         {
             errors++;
-            PRINT_DEBUG("Failed to find offset for %s:%s\n",
-                        symbol_subsymbol_array[i][0], symbol_subsymbol_array[i][1]);
+            continue;
+        }
+
+        if (!symbol_subsymbol_array[i][1])
+        {
+            if ( rva && VMI_FAILURE == vmi_get_symbol_addr_from_json(drakvuf->vmi, json, symbol_subsymbol_array[i][0], &rva[i]) )
+            {
+                errors++;
+                PRINT_DEBUG("Failed to find address for symbol %s\n", symbol_subsymbol_array[i][0]);
+            }
+
+            if ( size && VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, json, symbol_subsymbol_array[i][0], &size[i]) )
+            {
+                errors++;
+                PRINT_DEBUG("Failed to find address for symbol %s\n", symbol_subsymbol_array[i][0]);
+            }
+        }
+        else if ( VMI_FAILURE == vmi_get_struct_member_offset_from_json(drakvuf->vmi, json, symbol_subsymbol_array[i][0], symbol_subsymbol_array[i][1], &rva[i]) )
+        {
+            errors++;
+            PRINT_DEBUG("Failed to find offset for %s:%s\n", symbol_subsymbol_array[i][0], symbol_subsymbol_array[i][1]);
         }
     }
 
@@ -256,6 +169,8 @@ bool json_lookup_array(
 
 symbols_t* json_get_symbols(json_object* json)
 {
+    bool ist = true;
+
     if (!json)
     {
         fprintf(stderr, "No json object specified!\n");
@@ -269,8 +184,12 @@ symbols_t* json_get_symbols(json_object* json)
     json_object* symbols = NULL;
     if (!json_object_object_get_ex(json, "symbols", &symbols))
     {
-        PRINT_DEBUG("No symbols section found\n");
-        goto err_exit;
+        ist = false;
+        if (!json_object_object_get_ex(json, "$FUNCTIONS", &symbols))
+        {
+            if (!json_object_object_get_ex(json, "$CONSTANTS", &symbols))
+                goto err_exit;
+        }
     }
 
     ret->count = json_object_object_length(symbols);
@@ -284,16 +203,24 @@ symbols_t* json_get_symbols(json_object* json)
 
     while (!json_object_iter_equal(&it, &itEnd) && i < ret->count)
     {
-        json_object* address = NULL;
-
-        if (!json_object_object_get_ex(json_object_iter_peek_value(&it), "address", &address))
+        if ( ist )
         {
-            PRINT_DEBUG("No address found for %s section found\n", json_object_iter_peek_name(&it));
-            goto err_exit;
-        }
+            json_object* address = NULL;
 
-        ret->symbols[i].name = g_strdup(json_object_iter_peek_name(&it));
-        ret->symbols[i].rva = json_object_get_int64(address);
+            if (!json_object_object_get_ex(json_object_iter_peek_value(&it), "address", &address))
+            {
+                PRINT_DEBUG("No address found for %s section found\n", json_object_iter_peek_name(&it));
+                goto err_exit;
+            }
+
+            ret->symbols[i].name = g_strdup(json_object_iter_peek_name(&it));
+            ret->symbols[i].rva = json_object_get_int64(address);
+        }
+        else
+        {
+            ret->symbols[i].name = g_strdup(json_object_iter_peek_name(&it));
+            ret->symbols[i].rva = json_object_get_int64(json_object_iter_peek_value(&it));
+        }
 
         /* This may not be an rva but a full VA that needs to made canonical (Linux addr) */
         if ( VMI_GET_BIT(ret->symbols[i].rva, 47) )
@@ -310,43 +237,6 @@ err_exit:
     return NULL;
 }
 
-bool json_get_symbol_rva(json_object* json, const char* symbol, addr_t* rva)
-{
-    if (!json)
-    {
-        fprintf(stderr, "JSON is NULL!\n");
-        goto err_exit;
-    }
-
-    json_object* symbols = NULL;
-    json_object* jsymbol = NULL;
-    json_object* address = NULL;
-
-    if (!json_object_object_get_ex(json, "symbols", &symbols))
-    {
-        PRINT_DEBUG("No symbols found\n");
-        goto err_exit;
-    }
-
-    if (!json_object_object_get_ex(symbols, symbol, &jsymbol))
-    {
-        PRINT_DEBUG("No '%s' found\n", symbol);
-        goto err_exit;
-    }
-
-    if (!json_object_object_get_ex(jsymbol, "address", &address))
-    {
-        PRINT_DEBUG("No '%s' address found\n", symbol);
-        goto err_exit;
-    }
-
-    *rva = json_object_get_int64(address);
-    return true;
-
-err_exit:
-    return false;
-}
-
 void drakvuf_free_symbols(symbols_t* symbols)
 {
     uint32_t i;
@@ -358,4 +248,51 @@ void drakvuf_free_symbols(symbols_t* symbols)
     }
     g_free(symbols->symbols);
     g_free(symbols);
+}
+
+bool drakvuf_get_kernel_symbol_rva(drakvuf_t drakvuf,
+                                   const char* function,
+                                   addr_t* rva)
+{
+    return VMI_SUCCESS == vmi_get_symbol_addr_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), function, rva);
+}
+
+bool drakvuf_get_kernel_struct_size(drakvuf_t drakvuf,
+                                    const char* struct_name,
+                                    size_t* size)
+{
+    return VMI_SUCCESS == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), struct_name, size);
+}
+
+bool drakvuf_get_kernel_struct_member_rva(drakvuf_t drakvuf,
+        const char* struct_name,
+        const char* symbol,
+        addr_t* rva)
+{
+    return VMI_SUCCESS == vmi_get_struct_member_offset_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), struct_name, symbol, rva);
+}
+
+bool json_get_symbol_rva(drakvuf_t drakvuf,
+                         json_object* json,
+                         const char* function,
+                         addr_t* rva)
+{
+    return VMI_SUCCESS == vmi_get_symbol_addr_from_json(drakvuf->vmi, json, function, rva);
+}
+
+bool json_get_struct_size(drakvuf_t drakvuf,
+                          json_object* json,
+                          const char* struct_name,
+                          size_t* size)
+{
+    return VMI_SUCCESS == vmi_get_struct_size_from_json(drakvuf->vmi, json, struct_name, size);
+}
+
+bool json_get_struct_member_rva(drakvuf_t drakvuf,
+                                json_object* json,
+                                const char* struct_name,
+                                const char* symbol,
+                                addr_t* rva)
+{
+    return VMI_SUCCESS == vmi_get_struct_member_offset_from_json(drakvuf->vmi, json, struct_name, symbol, rva);
 }

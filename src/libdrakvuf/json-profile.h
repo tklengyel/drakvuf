@@ -105,14 +105,8 @@
 #ifndef JSON_PROFILE_H
 #define JSON_PROFILE_H
 
-bool json_lookup(
-    json_object* json,
-    const char* symbol,
-    const char* subsymbol,
-    addr_t* rva,
-    addr_t* size);
-
 bool json_lookup_array(
+    drakvuf_t drakvuf,
     json_object* json,
     const char* symbol_subsymbol_array[][2],
     addr_t array_size,

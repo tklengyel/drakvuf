@@ -359,7 +359,7 @@ static bool find_kernbase(drakvuf_t drakvuf)
         return 0;
     }
 
-    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "PsInitialSystemProcess", &sysproc_rva) )
+    if ( VMI_FAILURE == vmi_get_symbol_addr_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "PsInitialSystemProcess", &sysproc_rva) )
     {
         fprintf(stderr, "Failed to get PsInitialSystemProcess RVA from JSON profile!\n");
         return 0;
@@ -409,7 +409,7 @@ bool fill_wow_offsets( drakvuf_t drakvuf, size_t size, const char* names [][2] )
     if ( !drakvuf->wow_offsets )
         return 0;
 
-    if ( !json_get_struct_members_array_rva( drakvuf->json_wow, names, size, drakvuf->wow_offsets ) )
+    if ( !json_get_struct_members_array_rva(drakvuf, drakvuf->json_wow, names, size, drakvuf->wow_offsets) )
     {
         PRINT_DEBUG("Failed to find WoW64 offsets for array of structure names and subsymbols.\n");
     }
@@ -424,8 +424,7 @@ bool set_os_windows(drakvuf_t drakvuf)
         return 0;
 
     // Get the offsets from the JSON profile
-    if ( !fill_kernel_offsets(drakvuf, __WIN_OFFSETS_MAX, win_offset_names) )
-        return 0;
+    fill_kernel_offsets(drakvuf, __WIN_OFFSETS_MAX, win_offset_names);
 
     drakvuf->sizes = (size_t*)g_try_malloc0(sizeof(size_t) * __WIN_SIZES_MAX);
     if ( !drakvuf->sizes )
@@ -439,8 +438,10 @@ bool set_os_windows(drakvuf_t drakvuf)
         PRINT_DEBUG("Loaded WoW64 offsets...\n");
     }
 
-    if ( !drakvuf_get_kernel_struct_size(drakvuf, "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY]) )
+    if ( VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY]) )
+    {
         return 0;
+    }
 
     drakvuf->osi.get_current_thread = win_get_current_thread;
     drakvuf->osi.get_current_process = win_get_current_process;

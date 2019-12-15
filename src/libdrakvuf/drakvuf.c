@@ -140,12 +140,6 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
         xen_free_interface(drakvuf->xen);
     }
 
-    if (drakvuf->json_kernel)
-    {
-        json_object_put(drakvuf->json_kernel);
-        drakvuf->json_kernel = NULL;
-    }
-
     if (drakvuf->json_wow)
     {
         json_object_put(drakvuf->json_wow);
@@ -173,7 +167,6 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
 
     *drakvuf = (drakvuf_t)g_try_malloc0(sizeof(struct drakvuf));
 
-    (*drakvuf)->json_kernel = json_object_from_file(json_kernel_path);
     (*drakvuf)->json_kernel_path = g_strdup(json_kernel_path);
 
     if ( json_wow_path )
@@ -467,53 +460,20 @@ void drakvuf_force_resume (drakvuf_t drakvuf)
     xen_force_resume(drakvuf->xen, drakvuf->domID);
 }
 
-bool json_get_struct_size(json_object* json_profile,
-                          const char* struct_name,
-                          size_t* size)
-{
-    return json_lookup(
-               json_profile,
-               struct_name,
-               NULL,
-               NULL,
-               size);
-}
-
-bool json_get_struct_member_rva(json_object* json,
-                                const char* struct_name,
-                                const char* symbol,
-                                addr_t* rva)
-{
-    return json_lookup(
-               json,
-               struct_name,
-               symbol,
-               rva,
-               NULL);
-}
-
 bool json_get_struct_members_array_rva(
+    drakvuf_t drakvuf,
     json_object* json,
     const char* struct_name_symbol_array[][2],
     addr_t array_size,
     addr_t* rva)
 {
     return json_lookup_array(
+               drakvuf,
                json,
                struct_name_symbol_array,
                array_size,
                rva,
                NULL);
-}
-
-const char* drakvuf_get_json_kernel_path(drakvuf_t drakvuf)
-{
-    return drakvuf->json_kernel_path;
-}
-
-json_object* drakvuf_get_json_kernel(drakvuf_t drakvuf)
-{
-    return drakvuf->json_kernel;
 }
 
 const char* drakvuf_get_json_wow_path(drakvuf_t drakvuf)

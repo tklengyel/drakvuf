@@ -274,7 +274,7 @@ struct breakpoint_in_dll_module_searcher
         if (trap)
         {
             context ctx(trap, m_is_wow);
-            if (!json_get_symbol_rva(m_json, m_syscall_name, &ctx.m_function_rva))
+            if (!json_get_symbol_rva(drakvuf, m_json, m_syscall_name, &ctx.m_function_rva))
             {
                 PRINT_DEBUG("Failed to find a function %s::%s. %s\n", m_module_name, m_syscall_name, m_is_wow ? "WoW64 " : "");
                 return nullptr;
