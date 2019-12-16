@@ -134,7 +134,7 @@ struct hook_target_entry_t
     vmi_pid_t pid;
     std::string target_name;
     callback_t callback;
-	size_t args_num;
+    size_t args_num;
     target_hook_state state;
     drakvuf_trap_t* trap;
     memdump* plugin;
@@ -182,7 +182,7 @@ struct target_config_entry_t
 {
     std::string dll_name;
     std::string function_name;
-	size_t args_num;
+    size_t args_num;
 };
 
 // type of a pointer residing on stack
