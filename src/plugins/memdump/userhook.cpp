@@ -246,7 +246,7 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     printf("\n");
 
     drakvuf_remove_trap(drakvuf, info->trap, nullptr);
-	delete ret_target;
+    delete ret_target;
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -293,15 +293,15 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     return_hook_target_entry_t* ret_target = new return_hook_target_entry_t();
     drakvuf_trap_t* trap = new drakvuf_trap_t;
 
-	for (size_t i = 1; i <= target->args_num; i++)
-	{
-		uint64_t argument = get_function_argument(drakvuf, info, i);
-		ret_target->arguments.push_back(argument);
-	}
-	ret_target->plugin = target->plugin;
+    for (size_t i = 1; i <= target->args_num; i++)
+    {
+        uint64_t argument = get_function_argument(drakvuf, info, i);
+        ret_target->arguments.push_back(argument);
+    }
+    ret_target->plugin = target->plugin;
 
-	addr_t paddr;
-	vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    addr_t paddr;
+    vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     if ( VMI_SUCCESS != vmi_pagetable_lookup(vmi, info->regs->cr3, ret_addr, &paddr) )
     {
@@ -332,7 +332,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     {
         PRINT_DEBUG("[MEMDUMP-USER] Failed to add trap :(\n");
         delete trap;
-		delete ret_target;
+        delete ret_target;
     }
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -869,15 +869,15 @@ void memdump::load_wanted_targets(const memdump_config* c)
         std::stringstream ss(line);
         target_config_entry_t e;
 
-		std::string args_num_s;
+        std::string args_num_s;
         if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
             throw -1;
         if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
             throw -1;
-		if (!std::getline(ss, args_num_s, ',') || args_num_s.empty())
-			throw - 1;
+        if (!std::getline(ss, args_num_s, ',') || args_num_s.empty())
+            throw - 1;
 
-		e.args_num = std::stoi(args_num_s);
+        e.args_num = std::stoi(args_num_s);
 
         this->wanted_hooks.push_back(e);
     }
