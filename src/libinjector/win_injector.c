@@ -768,7 +768,7 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
             return 0;
         }
 
-        // Get address of PspCallProcessNotifyRoutines() from the rekall profile
+        // Get address of PspCallProcessNotifyRoutines() from the JSON debug info
         if ( !drakvuf_get_function_rva(drakvuf, "PspCallProcessNotifyRoutines", &process_notify_rva) )
         {
             PRINT_DEBUG("[-] Error getting PspCallProcessNotifyRoutines RVA\n");
@@ -1492,7 +1492,7 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
         return false;
 
     // Get the offsets from the Rekall profile
-    if ( !drakvuf_get_struct_members_array_rva(drakvuf, offset_names, OFFSET_MAX, injector->offsets) )
+    if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, OFFSET_MAX, injector->offsets) )
         PRINT_DEBUG("Failed to find one of offsets.\n");
 
     if (INJECT_METHOD_CREATEPROC == injector->method)
@@ -1513,14 +1513,6 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
 
         if (INJECT_METHOD_DOPP == injector->method)
         {
-            // Check for Windows 10 version 1803 or higher
-            int build_1803 = 20180410;
-            if ( drakvuf_get_os_build_date(drakvuf) < build_1803 )
-            {
-                PRINT_DEBUG("This injection method requires Windows 10 version 1803 or higher!\n");
-                return false;
-            }
-
             // Read binary to inject from a file
             if ( !load_file_to_memory(&injector->binary, &injector->binary_size, binary_path) )
                 return false;

@@ -121,7 +121,7 @@
 #include "win-wow-offsets.h"
 #include "win-wow-offsets-map.h"
 
-bool fill_wow_offsets_from_rekall( drakvuf_t drakvuf, size_t size, const char* names [][2] );
+bool fill_wow_offsets(drakvuf_t drakvuf, size_t size, const char* names [][2]);
 
 bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap,
                               addr_t list_head, vmi_pid_t pid)
@@ -359,9 +359,9 @@ static bool find_kernbase(drakvuf_t drakvuf)
         return 0;
     }
 
-    if ( !drakvuf_get_constant_rva(drakvuf, "PsInitialSystemProcess", &sysproc_rva) )
+    if ( VMI_FAILURE == vmi_get_symbol_addr_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "PsInitialSystemProcess", &sysproc_rva) )
     {
-        fprintf(stderr, "Failed to get PsInitialSystemProcess RVA from Rekall profile!\n");
+        fprintf(stderr, "Failed to get PsInitialSystemProcess RVA from JSON profile!\n");
         return 0;
     }
 
@@ -402,14 +402,14 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, i
     return addr;
 }
 
-bool fill_wow_offsets_from_rekall( drakvuf_t drakvuf, size_t size, const char* names [][2] )
+bool fill_wow_offsets( drakvuf_t drakvuf, size_t size, const char* names [][2] )
 {
     drakvuf->wow_offsets = (size_t*)g_try_malloc0(sizeof(addr_t) * size );
 
     if ( !drakvuf->wow_offsets )
         return 0;
 
-    if ( !rekall_get_struct_members_array_rva( drakvuf->rekall_wow_profile_json, names, size, drakvuf->wow_offsets ) )
+    if ( !json_get_struct_members_array_rva(drakvuf, drakvuf->json_wow, names, size, drakvuf->wow_offsets) )
     {
         PRINT_DEBUG("Failed to find WoW64 offsets for array of structure names and subsymbols.\n");
     }
@@ -423,24 +423,25 @@ bool set_os_windows(drakvuf_t drakvuf)
     if ( !find_kernbase(drakvuf) )
         return 0;
 
-    // Get the offsets from the Rekall profile
-    if ( !fill_offsets_from_rekall(drakvuf, __WIN_OFFSETS_MAX, win_offset_names) )
-        return 0;
+    // Get the offsets from the JSON profile
+    fill_kernel_offsets(drakvuf, __WIN_OFFSETS_MAX, win_offset_names);
 
     drakvuf->sizes = (size_t*)g_try_malloc0(sizeof(size_t) * __WIN_SIZES_MAX);
     if ( !drakvuf->sizes )
         return 0;
 
     // Get the WoW64 offsets if WoW64 profile is provided...
-    if ( drakvuf->rekall_wow_profile_json )
+    if ( drakvuf->json_wow )
     {
-        if ( !fill_wow_offsets_from_rekall(drakvuf, __WIN_WOW_OFFSETS_MAX, win_wow_offset_names) )
+        if ( !fill_wow_offsets(drakvuf, __WIN_WOW_OFFSETS_MAX, win_wow_offset_names) )
             return 0;
         PRINT_DEBUG("Loaded WoW64 offsets...\n");
     }
 
-    if ( !drakvuf_get_struct_size(drakvuf, "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY]) )
+    if ( VMI_FAILURE == vmi_get_struct_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), "_HANDLE_TABLE_ENTRY", &drakvuf->sizes[HANDLE_TABLE_ENTRY]) )
+    {
         return 0;
+    }
 
     drakvuf->osi.get_current_thread = win_get_current_thread;
     drakvuf->osi.get_current_process = win_get_current_process;

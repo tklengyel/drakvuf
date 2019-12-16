@@ -381,11 +381,11 @@ dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
     : format(output)
     , offsets(new size_t[__OFFSET_MAX])
 {
-    if ( !drakvuf_get_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets) )
+    if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets) )
         throw -1;
 
     addr_t ml_rva = 0;
-    if ( !drakvuf_get_constant_rva( drakvuf, "PsLoadedModuleList", &ml_rva) )
+    if ( !drakvuf_get_kernel_symbol_rva( drakvuf, "PsLoadedModuleList", &ml_rva) )
         throw -1;
 
     if (!(modules_list_va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, "ntoskrnl.exe", ml_rva)))

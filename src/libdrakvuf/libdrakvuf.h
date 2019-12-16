@@ -113,6 +113,7 @@ extern "C" {
 
 #include <glib.h>
 #include <libvmi/libvmi.h>
+#include <libvmi/libvmi_extra.h>
 #include <libvmi/events.h>
 #include <json-c/json.h>
 
@@ -262,6 +263,11 @@ typedef enum object_manager_object
 
 ////////////////////////////////////////////////////////////////////////////
 
+vmi_instance_t drakvuf_lock_and_get_vmi(drakvuf_t drakvuf);
+void drakvuf_release_vmi(drakvuf_t drakvuf);
+
+////////////////////////////////////////////////////////////////////////////
+
 /*---------------------------------------------------------
  * Reading in Rekall profile informations
  */
@@ -281,54 +287,56 @@ typedef struct symbols
     uint64_t count;
 } symbols_t;
 
-symbols_t* rekall_get_symbols_from_rekall(json_object* rekall_profile_json);
-symbols_t* drakvuf_get_symbols_from_rekall(drakvuf_t drakvuf);
+const char* drakvuf_get_json_wow_path(drakvuf_t drakvuf);
+json_object* drakvuf_get_json_wow(drakvuf_t drakvuf);
+
+symbols_t* json_get_symbols(json_object* json_profile);
 void drakvuf_free_symbols(symbols_t* symbols);
 
-bool drakvuf_get_function_rva(drakvuf_t drakvuf,
-                              const char* function,
-                              addr_t* rva);
-bool rekall_get_function_rva(json_object* rekall_profile_json,
-                             const char* function,
-                             addr_t* rva);
-
-bool drakvuf_get_constant_rva(drakvuf_t drakvuf,
-                              const char* constant,
-                              addr_t* rva);
-bool rekall_get_constant_rva( json_object* rekall_profile_json,
-                              const char* constant,
-                              addr_t* rva);
-
-bool drakvuf_get_struct_size(drakvuf_t drakvuf,
-                             const char* struct_name,
-                             size_t* size);
-bool rekall_get_struct_size( json_object* rekall_profile_json,
-                             const char* struct_name,
-                             size_t* size);
-
-bool drakvuf_get_struct_member_rva(drakvuf_t drakvuf,
-                                   const char* struct_name,
-                                   const char* symbol,
+bool drakvuf_get_kernel_symbol_rva(drakvuf_t drakvuf,
+                                   const char* function,
                                    addr_t* rva);
-bool rekall_get_struct_member_rva( json_object* rekall_profile_json,
-                                   const char* struct_name,
-                                   const char* symbol,
-                                   addr_t* rva);
+bool drakvuf_get_kernel_struct_size(drakvuf_t drakvuf,
+                                    const char* struct_name,
+                                    size_t* size);
+bool drakvuf_get_kernel_struct_member_rva(drakvuf_t drakvuf,
+                                          const char* struct_name,
+                                          const char* symbol,
+                                          addr_t* rva);
+bool json_get_symbol_rva(drakvuf_t drakvuf,
+                         json_object *json,
+                         const char* function,
+                         addr_t* rva);
+bool json_get_struct_size(drakvuf_t drakvuf,
+                         json_object *json,
+                         const char* struct_name,
+                         size_t* size);
+bool json_get_struct_member_rva(drakvuf_t drakvuf,
+                                json_object *json,
+                                const char* struct_name,
+                                const char* symbol,
+                                addr_t* rva);
 
-bool drakvuf_get_struct_members_array_rva(
+bool json_get_struct_members_array_rva(
+    drakvuf_t drakvuf,
+    json_object* json_profile,
+    const char* struct_name_subsymbol_array[][2],
+    addr_t array_size,
+    addr_t* rva);
+static inline
+bool drakvuf_get_kernel_struct_members_array_rva(
     drakvuf_t drakvuf,
     const char* struct_name_subsymbol_array[][2],
     addr_t array_size,
-    addr_t* rva);
-bool rekall_get_struct_members_array_rva(
-    json_object* rekall_profile_json,
-    const char* struct_name_subsymbol_array[][2],
-    addr_t array_size,
-    addr_t* rva);
+    addr_t* rva)
+{
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    bool ret = json_get_struct_members_array_rva(drakvuf, vmi_get_kernel_json(vmi), struct_name_subsymbol_array, array_size, rva);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
+}
 
-int drakvuf_get_os_build_date(drakvuf_t drakvuf);
-
-//---- end of paired drakvuf_* and rekall_* functions ----
+//---- end of paired drakvuf_* and json_* functions ----
 
 typedef void (*drakvuf_trap_free_t)(drakvuf_trap_t* trap);
 
@@ -336,8 +344,8 @@ typedef void (*event_cb_t) (int fd, void* data);
 
 bool drakvuf_init (drakvuf_t* drakvuf,
                    const char* domain,
-                   const char* rekall_profile,
-                   const char* rekall_wow_profile,
+                   const char* json_profile,
+                   const char* json_wow_profile,
                    const bool verbose,
                    const bool libvmi_conf);
 void drakvuf_close (drakvuf_t drakvuf, const bool pause);
@@ -353,9 +361,6 @@ int drakvuf_is_interrupted(drakvuf_t drakvuf);
 void drakvuf_pause (drakvuf_t drakvuf);
 void drakvuf_resume (drakvuf_t drakvuf);
 
-vmi_instance_t drakvuf_lock_and_get_vmi(drakvuf_t drakvuf);
-void drakvuf_release_vmi(drakvuf_t drakvuf);
-
 addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
                                  addr_t process,
                                  uint64_t handle);
@@ -363,10 +368,6 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
 os_t drakvuf_get_os_type(drakvuf_t drakvuf);
 page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf);
 int drakvuf_get_address_width(drakvuf_t drakvuf);
-const char* drakvuf_get_rekall_profile(drakvuf_t drakvuf);
-json_object* drakvuf_get_rekall_profile_json(drakvuf_t drakvuf);
-const char* drakvuf_get_rekall_wow_profile(drakvuf_t drakvuf);
-json_object* drakvuf_get_rekall_wow_profile_json(drakvuf_t drakvuf);
 
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf);
 

@@ -224,9 +224,9 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 objmon::objmon(drakvuf_t drakvuf, output_format_t output)
 {
-    if ( !drakvuf_get_function_rva(drakvuf, "ObCreateObject", &this->trap.breakpoint.rva) )
+    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "ObCreateObject", &this->trap.breakpoint.rva) )
         throw -1;
-    if ( !drakvuf_get_struct_member_rva(drakvuf, "_OBJECT_TYPE", "Key", &this->key_offset) )
+    if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "_OBJECT_TYPE", "Key", &this->key_offset) )
         throw -1;
 
     this->trap.cb = cb;

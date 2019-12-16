@@ -1050,7 +1050,7 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
                            drakvuf_trap_t* trap,
                            event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
-    if ( !drakvuf_get_function_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
+    if ( !drakvuf_get_kernel_symbol_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
 
     trap->name = syscall_name;
     trap->cb   = hook_cb;
@@ -1061,7 +1061,7 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
 static addr_t get_function_va(drakvuf_t drakvuf, const char* lib, const char* func_name)
 {
     addr_t rva;
-    if ( !drakvuf_get_function_rva( drakvuf, func_name, &rva) )
+    if ( !drakvuf_get_kernel_symbol_rva( drakvuf, func_name, &rva) )
     {
         PRINT_DEBUG("[FILEDELETE2] [Init] Failed to get RVA of %s\n", func_name);
         throw -1;
@@ -1117,10 +1117,10 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
 
     this->offsets = (size_t*)malloc(sizeof(size_t)*__OFFSET_MAX);
 
-    if ( !drakvuf_get_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, this->offsets) )
+    if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, this->offsets) )
         throw -1;
 
-    if ( !drakvuf_get_struct_size(drakvuf, "_CONTROL_AREA", &this->control_area_size) )
+    if ( !drakvuf_get_kernel_struct_size(drakvuf, "_CONTROL_AREA", &this->control_area_size) )
         throw -1;
 
     if ( VMI_PM_LEGACY == this->pm )

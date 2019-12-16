@@ -134,7 +134,7 @@ bool set_os_linux(drakvuf_t drakvuf)
         return 0;
 
     // Get the offsets from the Rekall profile
-    if ( !fill_offsets_from_rekall(drakvuf, __LINUX_OFFSETS_MAX, linux_offset_names) )
+    if ( !fill_kernel_offsets(drakvuf, __LINUX_OFFSETS_MAX, linux_offset_names) )
         return 0;
 
     drakvuf->osi.get_current_thread = linux_get_current_thread;

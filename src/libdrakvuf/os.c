@@ -113,13 +113,13 @@
 
 #include "private.h"
 
-bool fill_offsets_from_rekall(drakvuf_t drakvuf, size_t size, const char* names [][2])
+bool fill_kernel_offsets(drakvuf_t drakvuf, size_t size, const char* names [][2])
 {
     drakvuf->offsets = (addr_t*)g_try_malloc0(sizeof(addr_t) * size );
     if ( !drakvuf->offsets )
         return 0;
 
-    if (!drakvuf_get_struct_members_array_rva(
+    if (!drakvuf_get_kernel_struct_members_array_rva(
             drakvuf, names, size, drakvuf->offsets))
     {
         PRINT_DEBUG("Failed to find offsets for array of structure names and subsymbols.\n");

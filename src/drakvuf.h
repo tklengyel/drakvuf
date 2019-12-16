@@ -146,8 +146,8 @@ public:
     int interrupted { 0 };
 
     drakvuf_c(const char* domain,
-              const char* rekall_profile,
-              const char* rekall_wow_profile,
+              const char* json_kernel_path,
+              const char* json_wow_path,
               output_format_t output,
               bool verbose,
               bool leave_paused,

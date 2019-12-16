@@ -526,44 +526,44 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
     auto winver = get_win_ver(drakvuf);
     if (!c->sspicli_profile)
     {
-        PRINT_DEBUG("envmon plugin requires the Rekall profile for sspicli.dll!\n");
+        PRINT_DEBUG("envmon plugin requires the JSON debug info profile for sspicli.dll!\n");
         return;
     }
 
     if (!c->kernel32_profile)
     {
-        PRINT_DEBUG("envmon plugin requires the Rekall profile for kernel32.dll!\n");
+        PRINT_DEBUG("envmon plugin requires the JSON debug ingo profile for kernel32.dll!\n");
         return;
     }
 
     if (!c->kernelbase_profile)
     {
-        PRINT_DEBUG("envmon plugin requires the Rekall profile for KernelBase.dll!\n");
+        PRINT_DEBUG("envmon plugin requires the JSON debug ingo profile for KernelBase.dll!\n");
         return;
     }
 
     if (ARCH_X64 == get_arch(drakvuf) && !c->wow_kernel32_profile)
     {
-        PRINT_DEBUG("envmon plugin requires the Rekall profile for SysWOW64/kernel32.dll!\n");
+        PRINT_DEBUG("envmon plugin requires the JSON debug ingo profile for SysWOW64/kernel32.dll!\n");
         return;
     }
 
     if (!c->iphlpapi_profile)
     {
-        PRINT_DEBUG("envmon plugin requires the Rekall profile for iphlpapi.dll!\n");
+        PRINT_DEBUG("envmon plugin requires the JSON debug ingo profile for iphlpapi.dll!\n");
         return;
     }
 
     if (!c->mpr_profile)
     {
-        PRINT_DEBUG("envmon plugin requires the Rekall profile for mpr.dll!\n");
+        PRINT_DEBUG("envmon plugin requires the JSON debug ingo profile for mpr.dll!\n");
         return;
     }
 
     json_object* sspicli_profile = json_object_from_file(c->sspicli_profile);
     if (!sspicli_profile)
     {
-        PRINT_DEBUG("envmon plugin fails to load rekall profile for sspicli.dll\n");
+        PRINT_DEBUG("envmon plugin fails to load JSON debug ingo profile for sspicli.dll\n");
         return;
     }
 
@@ -578,7 +578,7 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
     json_object* kernelbase_profile = json_object_from_file(c->kernelbase_profile);
     if (!kernelbase_profile)
     {
-        PRINT_DEBUG("envmon plugin fails to load rekall profile for KernelBase.dll\n");
+        PRINT_DEBUG("envmon plugin fails to load JSON debug ingo profile for KernelBase.dll\n");
         throw -1;
     }
 
@@ -594,7 +594,7 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
     json_object* kernel32_profile = json_object_from_file(c->kernel32_profile);
     if (!kernel32_profile)
     {
-        PRINT_DEBUG("envmon plugin fails to load rekall profile for kernel32.dll\n");
+        PRINT_DEBUG("envmon plugin fails to load JSON debug ingo profile for kernel32.dll\n");
         throw -1;
     }
 
@@ -619,7 +619,7 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
         json_object* wow_kernel32_profile = json_object_from_file(c->wow_kernel32_profile);
         if (!wow_kernel32_profile)
         {
-            PRINT_DEBUG("envmon plugin failed to load rekall profile for SysWOW64/kernel32.dll\n");
+            PRINT_DEBUG("envmon plugin failed to load JSON debug ingo profile for SysWOW64/kernel32.dll\n");
             throw -1;
         }
 
@@ -636,7 +636,7 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
     json_object* iphlpapi_profile = json_object_from_file(c->iphlpapi_profile);
     if (!iphlpapi_profile)
     {
-        PRINT_DEBUG("envmon plugin fails to load rekall profile for iphlpapi.dll\n");
+        PRINT_DEBUG("envmon plugin fails to load JSON debug ingo profile for iphlpapi.dll\n");
         throw -1;
     }
 
@@ -652,7 +652,7 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
     json_object* mpr_profile = json_object_from_file(c->mpr_profile);
     if (!mpr_profile)
     {
-        PRINT_DEBUG("envmon plugin fails to load rekall profile for mpr.dll\n");
+        PRINT_DEBUG("envmon plugin fails to load JSON debug ingo profile for mpr.dll\n");
         throw -1;
     }
 

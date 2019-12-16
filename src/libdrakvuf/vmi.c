@@ -124,7 +124,6 @@
 #include "private.h"
 #include "libdrakvuf.h"
 #include "vmi.h"
-#include "rekall-profile.h"
 
 static uint8_t bp = TRAP;
 
@@ -1369,36 +1368,17 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     }
     PRINT_DEBUG("init_vmi: initializing vmi paging done\n");
 
-    os_t os = VMI_OS_UNKNOWN;
-
     if (libvmi_conf)
-        os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL);
-
-    if (VMI_OS_UNKNOWN == os)
+        drakvuf->os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL);
+    else
     {
         GHashTable* config = g_hash_table_new(g_str_hash, g_str_equal);
-        g_hash_table_insert(config, "rekall_profile", drakvuf->rekall_profile);
-
-        switch (drakvuf->os)
-        {
-            case VMI_OS_WINDOWS:
-                g_hash_table_insert(config, "os_type", "Windows");
-                break;
-            case VMI_OS_LINUX:
-                g_hash_table_insert(config, "os_type", "Linux");
-                break;
-            case VMI_OS_FREEBSD: /* fall-through */
-            case VMI_OS_UNKNOWN: /* fall-through */
-            default:
-                break;
-        }
-
-        os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GHASHTABLE, config, NULL);
-
+        g_hash_table_insert(config, "volatility_ist", drakvuf->json_kernel_path);
+        drakvuf->os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GHASHTABLE, config, NULL);
         g_hash_table_destroy(config);
     }
 
-    if ( os != drakvuf->os )
+    if ( drakvuf->os == VMI_OS_UNKNOWN )
     {
         PRINT_DEBUG("Failed to init LibVMI library.\n");
         return 0;

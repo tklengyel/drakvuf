@@ -682,25 +682,25 @@ procmon::procmon(drakvuf_t drakvuf, output_format_t output)
     struct process_visitor_ctx ctx = { .format = output };
     drakvuf_enumerate_processes(drakvuf, process_visitor, &ctx);
 
-    if (!drakvuf_get_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "CommandLine", &this->command_line))
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "CommandLine", &this->command_line))
         throw -1;
 
-    if (!drakvuf_get_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &this->image_path_name))
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &this->image_path_name))
         throw -1;
 
-    if (!drakvuf_get_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "DllPath", &this->dll_path))
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "DllPath", &this->dll_path))
         throw -1;
 
     addr_t current_directory_offset;
-    if (!drakvuf_get_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "CurrentDirectory", &current_directory_offset))
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "CurrentDirectory", &current_directory_offset))
         throw -1;
 
     addr_t curdir_handle_offset;
-    if (!drakvuf_get_struct_member_rva(drakvuf, "_CURDIR", "Handle", &curdir_handle_offset))
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_CURDIR", "Handle", &curdir_handle_offset))
         throw -1;
 
     addr_t curdir_dospath_offset;
-    if (!drakvuf_get_struct_member_rva(drakvuf, "_CURDIR", "DosPath", &curdir_dospath_offset))
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_CURDIR", "DosPath", &curdir_dospath_offset))
         throw -1;
 
     this->current_directory_handle = current_directory_offset + curdir_handle_offset;

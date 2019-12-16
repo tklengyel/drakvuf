@@ -219,7 +219,7 @@ struct breakpoint_in_system_process_searcher
     {
         if (trap)
         {
-            if (!drakvuf_get_function_rva(drakvuf, m_syscall_name, &trap->breakpoint.rva))
+            if (!drakvuf_get_kernel_symbol_rva(drakvuf, m_syscall_name, &trap->breakpoint.rva))
             {
                 PRINT_DEBUG("Failed to receive addr of function %s\n", m_syscall_name);
                 return nullptr;
@@ -243,10 +243,10 @@ struct breakpoint_in_system_process_searcher
 
 struct breakpoint_in_dll_module_searcher
 {
-    breakpoint_in_dll_module_searcher(json_object* rekall_profile,
+    breakpoint_in_dll_module_searcher(json_object* json,
                                       const char* module,
                                       bool wow = false)
-        : m_is_wow(wow), m_rekall_profile(rekall_profile), m_module_name(module), m_syscall_name()
+        : m_is_wow(wow), m_json(json), m_module_name(module), m_syscall_name()
     {}
 
     static bool module_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* ctx)
@@ -274,7 +274,7 @@ struct breakpoint_in_dll_module_searcher
         if (trap)
         {
             context ctx(trap, m_is_wow);
-            if (!rekall_get_function_rva(m_rekall_profile, m_syscall_name, &ctx.m_function_rva))
+            if (!json_get_symbol_rva(drakvuf, m_json, m_syscall_name, &ctx.m_function_rva))
             {
                 PRINT_DEBUG("Failed to find a function %s::%s. %s\n", m_module_name, m_syscall_name, m_is_wow ? "WoW64 " : "");
                 return nullptr;
@@ -305,7 +305,7 @@ struct breakpoint_in_dll_module_searcher
     };
 
     bool m_is_wow;
-    json_object* m_rekall_profile;
+    json_object* m_json;
     const char* m_module_name;
     const char* m_syscall_name;
 };

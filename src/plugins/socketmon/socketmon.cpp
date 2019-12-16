@@ -962,7 +962,7 @@ static void register_tcpip_trap( drakvuf_t drakvuf, json_object* tcpip_profile_j
                                  drakvuf_trap_t* trap,
                                  event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
-    if ( !rekall_get_function_rva(tcpip_profile_json, function_name, &trap->breakpoint.rva) ) throw -1;
+    if ( !json_get_symbol_rva(drakvuf, tcpip_profile_json, function_name, &trap->breakpoint.rva) ) throw -1;
 
     trap->name = function_name;
     trap->cb   = hook_cb;
@@ -1063,7 +1063,7 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
 
     if ( !c->tcpip_profile )
     {
-        PRINT_DEBUG("Socketmon plugin requires the Rekall profile for tcpip.sys!\n");
+        PRINT_DEBUG("Socketmon plugin requires the JSON debug info for tcpip.sys!\n");
         return;
     }
 
@@ -1092,7 +1092,7 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
     json_object* tcpip_profile_json = json_object_from_file(c->tcpip_profile);
     if (!tcpip_profile_json)
     {
-        PRINT_DEBUG("Socketmon plugin fails to load rekall profile for tcpip.sys\n");
+        PRINT_DEBUG("Socketmon plugin fails to load JSON debug info for tcpip.sys\n");
         throw -1;
     }
 
