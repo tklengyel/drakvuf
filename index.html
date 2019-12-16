@@ -136,7 +136,7 @@
 
 <p>To build DRAKVUF&trade; from source the following packages are normally required Debian based Linux distros.</p>
 
-<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev bzip2 pciutils-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool libjson-c-dev libfuse-dev liblzma-dev autoconf-archive kpartx python-dev
+<pre><code>sudo apt-get install wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev bzip2 pciutils-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool libjson-c-dev libfuse-dev liblzma-dev autoconf-archive kpartx python3-dev python3-construct python3-pefile python-dev
 </code></pre>
 
 <pre><code>cd ~
@@ -216,39 +216,21 @@ vif = [ 'type=ioemu,model=e1000,bridge=xenbr0,mac=00:06:5B:BA:7C:01' ]
 disk = [ 'phy:/dev/vg/windows7-sp1,hda,w', 'file:/path/to/your/windows7.iso,hdc:cdrom,r' ]
 </pre></code>
 
-Enter the LibVMI folder in the drakvuf folder and build it:
+Enter the LibVMI folder in and build it:
 
 <pre><code>cd ~/drakvuf/libvmi
-cmake -DENABLE_KVM=OFF -DENABLE_FILE=OFF -DENABLE_BAREFLANK=OFF .
+autoreconf -vif
+./configure --disable-kvm --disable-bareflank --disable-file
 make
 sudo make install
 sudo echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
 </code></pre>
 
-Rekall is unfortunately buggy with newer versions of Python3 so we have to stick to Python 3.5.7:
-
-<pre><code>wget https://www.python.org/ftp/python/3.5.7/Python-3.5.7.tar.xz
-tar xvf Python-3.5.7.tar.xz
-cd Python-3.5.7
-./configure --enable-optimizations --prefix=/opt/python3.5.7
-sudo make altinstall
-cd ..
+<pre><code>cd ~/drakvuf/volatility3
+python3 ./setup.py build
 </code></pre>
 
-Now lets make Python 3 the default and install some required packages:
-
-<pre><code>sudo update-alternatives --install /usr/bin/python python /opt/python3.5.7/bin/python3.5 1
-sudo /opt/python3.5.7/bin/pip3.5 install fastchunking wheel future==0.16.0
-</code></pre>
-
-Install Rekall from the submodule:
-
-<pre><code>cd rekall/rekall-core
-./setup.py build
-sudo ./setup.py install
-</code></pre>
-
-Now we will create the Rekall profile for the Windows domain. First, we need to get the debug information for the Windows kernel via the LibVMI vmi-win-guid tool. For example, in the following my domain is named windows7-sp1-x86:
+Now we will create the JSON configuration file for the Windows domain. First, we need to get the debug information for the Windows kernel via the LibVMI vmi-win-guid tool. For example, in the following my domain is named windows7-sp1-x86:
 
 <pre><code>$ sudo xl list
 Name                                        ID   Mem VCPUs	State	Time(s)
@@ -298,30 +280,24 @@ The important fields are:
 Kernel filename: ntkrpamp.pdb
 </code></pre>
 
-If vmi-win-guid fails to find the Windows kernel in memory, you can use Rekall to examine ntoskrnl.exe on the disk:
+If vmi-win-guid fails to find the Windows kernel in memory, you can gather the required information from the VM's disk directly by examining ntoskrnl.exe:
 <pre><code>sudo su
 kpartx -a /dev/vg/windows7
-mount -o ro /dev/vg/windows7p1 /mnt
-python3 rekal peinfo -f /mnt/Windows/System32/ntoskrnl.exe > /tmp/peinfo.txt
+mount -o ro /dev/mapper/vg-windows7p1 /mnt
+python3 tools/pdbguid.py /mnt/Windows/System32/ntoskrnl.exe
 umount /mnt
 kpartx -d /dev/vg/windows7
 </code></pre>
 
-The generated /tmp/peinfo.txt file will contain the required PDB filename and GUID.
-
-Now generate the Rekall profile (make sure to adjust the kernel name and GUID as necessary):
+Now generate the JSON configuration file (make sure to adjust the kernel name and GUID as necessary):
 <pre><code>cd /tmp
-python3 rekall fetch_pdb ntkrpamp 684da42a30cc450f81c535b4d18944b12
-python3 rekall parse_pdb ntkrpamp > windows7-sp1.rekall.json
-sudo mv windows7-sp1.rekall.json /root
+python3 ~/drakvuf/volatility3/volatility/framework/symbols/windows/pdbconv.py --guid 684da42a30cc450f81c535b4d18944b12 -p ntkrpamp.pdb -o windows7-sp1.json
+sudo mv windows7-sp1.json /root
 </code></pre>
 
 With this profile ready we can create the LibVMI config:
 <pre><code>sudo su
-printf "windows7-sp1 { \n\
-    ostype = \"Windows\"; \n\
-    rekall_profile = \"/root/windows7-sp1.rekall.json\"; \n\
-}" >> /etc/libvmi.conf
+printf "windows7-sp1 {\n\tvolatility_ist = \"/root/windows7-sp1.json\";\n}" >> /etc/libvmi.conf
 exit
 </code></pre>
 
@@ -329,7 +305,7 @@ Test if LibVMI is working by running vmi-process-list:
 <pre><code>sudo vmi-process-list windows7-sp1</code></pre>
 
 Output should be something similar:
-<pre><code>Process listing for VM windows7-sp1-x86 (id=7)
+<pre><code>Process listing for VM windows7-sp1 (id=7)
 [    4] System (struct addr:84aba980)
 [  220] smss.exe (struct addr:85a44020)
 [  300] csrss.exe (struct addr:85f67a68)
@@ -359,20 +335,23 @@ Output should be something similar:
 [  256] WmiPrvSE.exe (struct addr:854014a0)
 </code></pre>
 
-For Linux you need to build the initial kernel profile in the guest itself.
+For Linux you need to install the target kernel's debug package (to get the DWARF symbols for the kernel):
 <pre><code>ssh root@linux
-apt-get install git zip linux-headers-$(uname -r) build-essential
-git clone --depth=1 https://github.com/google/rekall
-cd rekall/tools/linux
-make
+echo "Copy the following: export kernel_version="$(uname -r)
+apt-get install linux-image-$(uname -r)-dbg
+exit
 </code></pre>
 
-This will generate a ZIP file with your kernel-version as filename. For example, 3.16.0-4-amd64.zip. Copy this file to your DRAKVUF&trade; host (for example using scp). There we will convert it to the proper JSON Rekall profile.
-<pre><code>rekal convert_profile 3.16.0-4-amd64.zip /root/linux.json
-sudo printf "linux { \n\
-    ostype = \"Linux\"; \n\
-    rekall_profile = \"/root/linux.json\"; \n\
-}" >> /etc/libvmi.conf
+Make note of the kernel_version line that was printed above, you'll need to copy-paste that into the session on your host. We will use the dwarf2json tool to convert the debug information into the required JSON configuration file:
+<pre><code>sudo su
+cd ~/drakvuf/dwarf2json
+go build
+kpartx -a /dev/vg/linux
+mount -o ro /dev/mapper/vg-linux1 /mnt
+./dwarf2json linux --system-map /mnt/boot/System.map-$(kernel_version) --elf /mnt/usr/lib/debug/vmlinux-$(kernel_version) > /root/linux.json
+umount /mnt
+kpartx -d /dev/vg/linux
+printf "linux {\n\tvolatility_ist = \"/root/linux.json\";\n}" >> /etc/libvmi.conf
 </code></pre>
 
 Now running vmi-process-list should show a similar output:
@@ -423,23 +402,18 @@ For example:
 To see all available options:
 <pre><code>./src/drakvuf</code></pre>
 
+
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Optional: Generate usermode profiles</h3>
 
-DRAKVUF&trade; has some enhanced functionality which can be enabled by providing necessary Rekall profiles for particular <code>.dll</code> or <code>.sys</code> files. For instance, network monitoring plugin (socketmon) requires the creation of a Rekall profile for the <code>tcpip.sys</code> kernel module, which is normally located at <code>C:\Windows\System32\drivers\tcpip.sys</code>. You will need to copy this file to where you will be generating the Rekall profile at. To generate a Rekall profile for it you can use the <code>pdbparse</code> project to obtain the PDB:
+DRAKVUF&trade; has some enhanced functionality which can be enabled by providing necessary Rekall profiles for particular <code>.dll</code> or <code>.sys</code> files. For instance, network monitoring plugin (socketmon) requires the creation of a Rekall profile for the <code>tcpip.sys</code> kernel module, which is normally located at <code>C:\Windows\System32\drivers\tcpip.sys</code>. You will need to copy this file to where you will be generating the JSON configuration file at. You can generate the JSON configuration file for it similar to how you generated the one for the Windows kernel:
 
-<pre><code>apt-get install python-construct python-pefile
-git clone https://github.com/moyix/pdbparse
-cd pdbparse
-python setup.py build
-cd examples
-./symchk.py -e tcpip.sys</code></pre>
+<pre><code>
+python3 ~/drakvuf/tools/pdbguid.py tcpip.sys
+python3 ~/drakvuf/volatility3/volatility/framework/symbols/windows/pdbconv.py --guid <guid_from_above> -p <filename_from_above> -o tcpip.json</code></pre>
 
-Then you can use Rekall to create the profile:
+You should provide the path to the JSON configuration file by using DRAKVUF&trade;'s <code>-T</code> or <code>--json-tcpip</code> command line option. Type <code>drakvuf --help</code> in order to display the list of auxilary JSON configuration files that are accepted by DRAKVUF&trade; and the corresponding command line options.
 
-<pre><code>rekall parse_pdb tcpip.pdb &gt; tcpip.json</code></pre>
-
-You should provide the path to the profile by using DRAKVUF&trade;'s <code>-T</code> or <code>--rekall-tcpip</code> command line option. Type <code>drakvuf --help</code> in order to display the list of auxilary Rekall profiles that are accepted by DRAKVUF&trade; and the corresponding command line options.
 
 <h3>
 <a name="designer-templates" class="anchor" href="#designer-templates"><span class="octicon octicon-link"></span></a>Citation</h3>
