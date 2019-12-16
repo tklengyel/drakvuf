@@ -734,3 +734,8 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
 
     this->userhook_init(drakvuf, c, output);
 }
+
+memdump::~memdump()
+{
+    userhook_destroy(this);
+}

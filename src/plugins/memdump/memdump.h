@@ -135,7 +135,10 @@ public:
     std::map<addr_t, std::vector<user_dll_t>> loaded_dlls;
 
     memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
+    ~memdump();
+
     void userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output);
+    void userhook_destroy(memdump* plugin);
     void load_wanted_targets(const memdump_config* c);
 };
 
