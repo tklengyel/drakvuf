@@ -409,7 +409,7 @@ To see all available options:
 DRAKVUF&trade; has some enhanced functionality which can be enabled by providing necessary JSON configuration file for particular <code>.dll</code> or <code>.sys</code> files. For instance, network monitoring plugin (socketmon) requires the creation of a JSON config file for the <code>tcpip.sys</code> kernel module, which is normally located at <code>C:\Windows\System32\drivers\tcpip.sys</code>. You will need to copy this file to where you will be generating the JSON configuration file at. You can generate the JSON configuration file for it similar to how you generated the one for the Windows kernel:
 
 <pre><code>python3 ~/drakvuf/tools/pdbguid.py tcpip.sys
-python3 ~/drakvuf/volatility3/volatility/framework/symbols/windows/pdbconv.py --guid <guid_from_above> -p <filename_from_above> -o tcpip.json</code></pre>
+python3 ~/drakvuf/volatility3/volatility/framework/symbols/windows/pdbconv.py --guid abb23d00ee7e4165b6aff66f2df02eb22 -p tcpip.pdb -o tcpip.json</code></pre>
 
 <p>You should provide the path to the JSON configuration file by using DRAKVUF&trade;'s <code>-T</code> or <code>--json-tcpip</code> command line option. Type <code>drakvuf --help</code> in order to display the list of auxilary JSON configuration files that are accepted by DRAKVUF&trade; and the corresponding command line options.</p>
 
