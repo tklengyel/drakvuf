@@ -158,7 +158,8 @@ int main(int argc, char** argv)
     int injection_timeout = 0;
     bool injection_global_search = false;
     char* domain = nullptr;
-    char* rekall_profile = nullptr;
+    char* json_kernel_path = nullptr;
+    char* json_wow_path = nullptr;
     char* binary_path = nullptr;
     char* target_process = nullptr;
     vmi_pid_t injection_pid = -1;
@@ -169,7 +170,6 @@ int main(int argc, char** argv)
     bool verbose = false;
     bool leave_paused = false;
     bool libvmi_conf = false;
-    char* rekall_wow_profile = nullptr;
     plugins_options options = { 0 };
     bool disabled_all = false; // Used to disable all plugin once
     const char* args[10] = {};
@@ -189,8 +189,8 @@ int main(int argc, char** argv)
     if (argc < 4)
     {
         fprintf(stderr, "Required input:\n"
-                "\t -r, --rekall-kernel <rekall profile>\n"
-                "\t                           The Rekall profile of the OS kernel\n"
+                "\t -r, --json-kernel <path to json>\n"
+                "\t                           The OS kernel's json profile\n"
                 "\t -d <domain ID or name>    The domain's ID or name\n"
                 "Optional inputs:\n"
                 "\t -l                        Use libvmi.conf\n"
@@ -219,8 +219,8 @@ int main(int argc, char** argv)
                 "\t -n                        Use extraction method based on function injection (requires -D)\n"
 #endif
 #ifdef ENABLE_PLUGIN_SOCKETMON
-                "\t -T, --rekall-tcpip <rekall profile>\n"
-                "\t                           The Rekall profile for tcpip.sys\n"
+                "\t -T, --json-tcpip <path to json>\n"
+                "\t                           The JSON profile for tcpip.sys\n"
 #endif
 #ifdef ENABLE_PLUGIN_CPUIDMON
                 "\t -s                        Hide Hypervisor bits and signature in CPUID\n"
@@ -234,31 +234,31 @@ int main(int argc, char** argv)
 #ifdef ENABLE_PLUGIN_BSODMON
                 "\t -b                        Exit from execution as soon as a BSoD is detected\n"
 #endif
-                "\t -w, --rekall-wow <rekall profile>\n"
-                "\t                           The Rekall profile for WoW64 NTDLL\n"
+                "\t -w, --json-wow <path to json>\n"
+                "\t                           The JSON profile for WoW64 NTDLL\n"
 #ifdef ENABLE_PLUGIN_CLIPBOARDMON
-                "\t -W, --rekall-win32k <rekall profile>\n"
-                "\t                           The Rekall profile for win32k.sys\n"
+                "\t -W, --json-win32k <path to json>\n"
+                "\t                           The JSON profile for win32k.sys\n"
 #endif
-                "\t --rekall-sspicli <rekall profile>\n"
-                "\t                           The Rekall profile for sspicli.dll\n"
-                "\t --rekall-kernel32 <rekall profile>\n"
-                "\t                           The Rekall profile for kernel32.dll\n"
-                "\t --rekall-kernelbase <rekall profile>\n"
-                "\t                           The Rekall profile for KernelBase.dll\n"
-                "\t --rekall-wow-kernel32 <rekall profile>\n"
-                "\t                           The Rekall profile for SysWOW64/kernel32.dll\n"
-                "\t --rekall-ntdll <rekall profile>\n"
-                "\t                           The Rekall profile for ntdll.dll\n"
-                "\t --rekall-iphlpapi <rekall profile>\n"
-                "\t                           The Rekall profile for iphlpapi.dll\n"
+                "\t --json-sspicli <path to json>\n"
+                "\t                           The JSON profile for sspicli.dll\n"
+                "\t --json-kernel32 <path to json>\n"
+                "\t                           The JSON profile for kernel32.dll\n"
+                "\t --json-kernelbase <path to json>\n"
+                "\t                           The JSON profile for KernelBase.dll\n"
+                "\t --json-wow-kernel32 <path to json>\n"
+                "\t                           The JSON profile for SysWOW64/kernel32.dll\n"
+                "\t --json-ntdll <path to json>\n"
+                "\t                           The JSON profile for ntdll.dll\n"
+                "\t --json-iphlpapi <path to json>\n"
+                "\t                           The JSON profile for iphlpapi.dll\n"
 #ifdef ENABLE_PLUGIN_WMIMON
-                "\t --rekall-mpr <rekall profile>\n"
-                "\t                           The Rekall profile for mpr.dll\n"
-                "\t --rekall-ole32 <rekall profile>\n"
-                "\t                           The Rekall profile for ole32.dll\n"
-                "\t --rekall-wow-ole32 <rekall profile>\n"
-                "\t                           The Rekall profile for SysWOW64/ole32.dll\n"
+                "\t --json-mpr <path to json>\n"
+                "\t                           The JSON profile for mpr.dll\n"
+                "\t --json-ole32 <path to json>\n"
+                "\t                           The JSON profile for ole32.dll\n"
+                "\t --json-wow-ole32 <path to json>\n"
+                "\t                           The JSON profile for SysWOW64/ole32.dll\n"
 #endif
 #ifdef ENABLE_PLUGIN_MEMDUMP
                 "\t --memdump-dir <directory>\n"
@@ -275,35 +275,35 @@ int main(int argc, char** argv)
     int long_index = 0;
     enum
     {
-        opt_rekall_sspicli = 1000,
-        opt_rekall_kernel32,
-        opt_rekall_kernelbase,
-        opt_rekall_wow_kernel32,
-        opt_rekall_ntdll,
-        opt_rekall_iphlpapi,
-        opt_rekall_mpr,
-        opt_rekall_ole32,
-        opt_rekall_wow_ole32,
+        opt_json_sspicli = 1000,
+        opt_json_kernel32,
+        opt_json_kernelbase,
+        opt_json_wow_kernel32,
+        opt_json_ntdll,
+        opt_json_iphlpapi,
+        opt_json_mpr,
+        opt_json_ole32,
+        opt_json_wow_ole32,
         opt_memdump_dir,
         opt_dll_hooks_list,
     };
     const option long_opts[] =
     {
-        {"rekall-kernel", required_argument, NULL, 'r'},
-        {"rekall-kernel32", required_argument, NULL, opt_rekall_kernel32},
-        {"rekall-kernelbase", required_argument, NULL, opt_rekall_kernelbase},
-        {"rekall-sspicli", required_argument, NULL, opt_rekall_sspicli},
-        {"rekall-tcpip", required_argument, NULL, 'T'},
-        {"rekall-win32k", required_argument, NULL, 'W'},
-        {"rekall-wow", required_argument, NULL, 'w'},
-        {"rekall-wow-kernel32", required_argument, NULL, opt_rekall_wow_kernel32},
-        {"rekall-ntdll", required_argument, NULL, opt_rekall_ntdll},
-        {"rekall-iphlpapi", required_argument, NULL, opt_rekall_iphlpapi},
-        {"rekall-mpr", required_argument, NULL, opt_rekall_mpr},
+        {"json-kernel", required_argument, NULL, 'r'},
+        {"json-kernel32", required_argument, NULL, opt_json_kernel32},
+        {"json-kernelbase", required_argument, NULL, opt_json_kernelbase},
+        {"json-sspicli", required_argument, NULL, opt_json_sspicli},
+        {"json-tcpip", required_argument, NULL, 'T'},
+        {"json-win32k", required_argument, NULL, 'W'},
+        {"json-wow", required_argument, NULL, 'w'},
+        {"json-wow-kernel32", required_argument, NULL, opt_json_wow_kernel32},
+        {"json-ntdll", required_argument, NULL, opt_json_ntdll},
+        {"json-iphlpapi", required_argument, NULL, opt_json_iphlpapi},
+        {"json-mpr", required_argument, NULL, opt_json_mpr},
         {"injection-timeout", required_argument, NULL, 'j'},
         {"verbose", no_argument, NULL, 'v'},
-        {"rekall-ole32", required_argument, NULL, opt_rekall_ole32},
-        {"rekall-wow-ole32", required_argument, NULL, opt_rekall_wow_ole32},
+        {"json-ole32", required_argument, NULL, opt_json_ole32},
+        {"json-wow-ole32", required_argument, NULL, opt_json_wow_ole32},
         {"memdump-dir", required_argument, NULL, opt_memdump_dir},
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
         {NULL, 0, NULL, 0}
@@ -314,7 +314,7 @@ int main(int argc, char** argv)
         switch (c)
         {
             case 'r':
-                rekall_profile = optarg;
+                json_kernel_path = optarg;
                 break;
             case 'd':
                 domain = optarg;
@@ -423,34 +423,34 @@ int main(int argc, char** argv)
                 libvmi_conf = true;
                 break;
             case 'w':
-                rekall_wow_profile = optarg;
+                json_wow_path = optarg;
                 break;
-            case opt_rekall_sspicli:
+            case opt_json_sspicli:
                 options.sspicli_profile = optarg;
                 break;
-            case opt_rekall_kernel32:
+            case opt_json_kernel32:
                 options.kernel32_profile = optarg;
                 break;
-            case opt_rekall_kernelbase:
+            case opt_json_kernelbase:
                 options.kernelbase_profile = optarg;
                 break;
-            case opt_rekall_wow_kernel32:
+            case opt_json_wow_kernel32:
                 options.wow_kernel32_profile = optarg;
                 break;
-            case opt_rekall_ntdll:
+            case opt_json_ntdll:
                 options.ntdll_profile = optarg;
                 break;
-            case opt_rekall_iphlpapi:
+            case opt_json_iphlpapi:
                 options.iphlpapi_profile = optarg;
                 break;
-            case opt_rekall_mpr:
+            case opt_json_mpr:
                 options.mpr_profile = optarg;
                 break;
 #ifdef ENABLE_PLUGIN_WMIMON
-            case opt_rekall_ole32:
+            case opt_json_ole32:
                 options.ole32_profile = optarg;
                 break;
-            case opt_rekall_wow_ole32:
+            case opt_json_wow_ole32:
                 options.wow_ole32_profile = optarg;
                 break;
 #endif
@@ -476,9 +476,9 @@ int main(int argc, char** argv)
         return rc;
     }
 
-    if (!rekall_profile)
+    if (!json_kernel_path)
     {
-        fprintf(stderr, "No Rekall profile specified (-r)!\n");
+        fprintf(stderr, "No kernel JSON profile specified (-r)!\n");
         return rc;
     }
 
@@ -492,7 +492,7 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = new drakvuf_c(domain, rekall_profile, rekall_wow_profile, output, verbose, leave_paused, libvmi_conf);
+        drakvuf = new drakvuf_c(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf);
     }
     catch (const std::exception& e)
     {

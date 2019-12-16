@@ -704,23 +704,23 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
 {
     this->memdump_dir = c->memdump_dir;
 
-    if (!drakvuf_get_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_rva))
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_rva))
     {
         throw -1;
     }
 
-    json_object* rekall_wow_profile = drakvuf_get_rekall_wow_profile_json(drakvuf);
+    json_object* json_wow = drakvuf_get_json_wow(drakvuf);
 
-    if (rekall_wow_profile)
+    if (json_wow)
     {
-        if (!rekall_get_struct_member_rva(rekall_wow_profile, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_wow_rva))
+        if (!json_get_struct_member_rva(drakvuf, json_wow, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_wow_rva))
         {
             throw -1;
         }
     }
     else
     {
-        PRINT_DEBUG("Memdump works better when there is a Rekall profile for WoW64 NTDLL (-w)\n");
+        PRINT_DEBUG("Memdump works better when there is a JSON profile for WoW64 NTDLL (-w)\n");
     }
 
     breakpoint_in_system_process_searcher bp;

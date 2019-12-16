@@ -182,12 +182,12 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, output_format_t output)
     addr_t kiservicelimit_rva = 0;
     addr_t kernbase = 0;
 
-    if ( !drakvuf_get_constant_rva(drakvuf, "KiServiceTable", &kiservicetable_rva) )
+    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiServiceTable", &kiservicetable_rva) )
     {
         PRINT_DEBUG("SSDT plugin can't find KiServiceTable RVA\n");
         throw -1;
     }
-    if ( !drakvuf_get_constant_rva(drakvuf, "KiServiceLimit", &kiservicelimit_rva) )
+    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiServiceLimit", &kiservicelimit_rva) )
     {
         PRINT_DEBUG("SSDT plugin can't find KiServiceLimit RVA\n");
         throw -1;

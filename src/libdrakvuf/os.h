@@ -228,6 +228,6 @@ typedef struct os_interface
 bool set_os_windows(drakvuf_t drakvuf);
 bool set_os_linux(drakvuf_t drakvuf);
 
-bool fill_offsets_from_rekall(drakvuf_t drakvuf, size_t size, const char* names [][2]);
+bool fill_kernel_offsets(drakvuf_t drakvuf, size_t size, const char* names[][2]);
 
 #endif

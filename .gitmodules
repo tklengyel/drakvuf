@@ -10,7 +10,11 @@
 	path = drakvuf-doppelganging
 	url = https://github.com/tklengyel/drakvuf-doppelganging.git
 	ignore = dirty
-[submodule "rekall"]
-	path = rekall
-	url = https://github.com/google/rekall
+[submodule "volatility3"]
+	path = volatility3
+	url = https://github.com/tklengyel/volatility3
+	ignore = dirty
+[submodule "dwarf2json"]
+	path = dwarf2json
+	url = https://github.com/tklengyel/dwarf2json
 	ignore = dirty

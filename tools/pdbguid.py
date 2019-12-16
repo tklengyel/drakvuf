@@ -102,52 +102,40 @@
 #                                                                         #
 #*************************************************************************#
 
-h_sources = libdrakvuf.h json-profile.h os.h private.h vmi.h \
-            win.h win-error-codes.h win-exports.h win-handles.h win-offsets.h \
-            win-offsets-map.h win-wow-offsets.h win-wow-offsets-map.h \
-            linux.h linux-exports.h linux-offsets.h linux-offsets-map.h
-c_sources = drakvuf.c json-profile.c os.c vmi.c \
-            win.c win-exports.c win-handles.c win-processes.c win-registry.c \
-            win-files.c \
-            linux.c linux-processes.c linux-exports.c
+import sys
+import pefile
+import construct
+import binascii
+from binascii import hexlify
+from pefile import DEBUG_TYPE
+from construct import *
 
-AM_CPPFLAGS = -I$(top_srcdir)
-AM_CPPFLAGS += $(CPPFLAGS)
-AM_CPPFLAGS += $(VMI_CFLAGS)
-AM_CPPFLAGS += $(GLIB_CFLAGS)
-AM_CPPFLAGS += $(JSONC_CFLAGS)
+def GUID(name):
+    return name / Struct(
+        "Data1" / Int32ul,
+        "Data2" / Int16ul,
+        "Data3" / Int16ul,
+        "Data4" / Bytes(8),
+    )
 
-AM_LDFLAGS =  $(LDFLAGS)
-AM_LDFLAGS += $(GLIB_LIBS)
-AM_LDFLAGS += $(VMI_LIBS)
-AM_LDFLAGS += $(JSONC_LIBS)
+CV_RSDS_HEADER = "CV_RSDS" / Struct(
+    "Signature" / Const(b"RSDS", Bytes(4)),
+    GUID("GUID"),
+    "Age" / Int32ul,
+    "Filename" / CString(encoding = "utf8"),
+)
 
-AM_CFLAGS =  $(CFLAGS)
-if HARDENING
-AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
-endif
 
-if SANITIZE
-AM_CFLAGS += $(SANITIZE_CFLAGS)
-AM_LDFLAGS += $(SANITIZE_LDFLAGS)
-endif
+pe = pefile.PE(sys.argv[1], fast_load = True)
+pe.parse_data_directories()
+for debug in pe.DIRECTORY_ENTRY_DEBUG:
+    if debug.struct.Type != DEBUG_TYPE[u'IMAGE_DEBUG_TYPE_CODEVIEW']:
+        continue
 
-# Note that -pg is incompatible with HARDENING
-if DEBUG
-AM_CFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -g -ggdb3
-AM_CFLAGS += -Wno-missing-field-initializers
-AM_CFLAGS += -Werror
-AM_CFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
-             -Wpointer-arith -Winit-self -Wshadow \
-             -Wswitch-enum -Wstrict-prototypes \
-             -Wmissing-prototypes -Wredundant-decls \
-             -Wfloat-equal -Wundef -Wvla \
-             -Wc++-compat
-if !HARDENING
-AM_CFLAGS += -pg
-endif
-endif
-
-noinst_LTLIBRARIES= libdrakvuf.la
-libdrakvuf_la_SOURCES= $(h_sources) $(c_sources)
-libdrakvuf_la_LIBADD= ../xen_helper/libxenhelper.la
+    off = debug.struct.PointerToRawData
+    size = debug.struct.SizeOfData
+    dbg = CV_RSDS_HEADER.parse(pe.__data__[off:off + size])
+    guidstr = u"%08x%04x%04x%s%x" % (dbg.GUID.Data1, dbg.GUID.Data2, dbg.GUID.Data3, binascii.hexlify(dbg.GUID.Data4).decode('ascii'), dbg.Age)
+    print("GUID: %s" % guidstr)
+    print("Filename: %s" % dbg.Filename)
+    break

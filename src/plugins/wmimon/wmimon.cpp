@@ -924,7 +924,7 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
     : pluginex(drakvuf, output)
     , m_offsets(new size_t[__OFFSET_MAX])
 {
-    if (!drakvuf_get_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, m_offsets))
+    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, m_offsets))
     {
         PRINT_DEBUG("[WMIMon] plugin failed to receive the offset a members of eprocess struct\n");
         return;
@@ -940,20 +940,20 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
 
     if (!c->ole32_profile)
     {
-        PRINT_DEBUG("[WMIMon] plugin requires the rekall profile for \"ole32.dll\"!\n");
+        PRINT_DEBUG("[WMIMon] plugin requires the JSON debug info for \"ole32.dll\"!\n");
         return;
     }
 
     if (addr_width == 8 && !c->wow_ole32_profile)
     {
-        PRINT_DEBUG("[WMIMon] plugin requires the rekall profile for \"SysWOW64/ole32.dll\"!\n");
+        PRINT_DEBUG("[WMIMon] plugin requires the JSON debug info for \"SysWOW64/ole32.dll\"!\n");
         return;
     }
 
     json_object* ole32_profile = json_object_from_file(c->ole32_profile);
     if (!ole32_profile)
     {
-        PRINT_DEBUG("[WMIMon] plugin fails to load rekall profile for \"ole32.dll\"\n");
+        PRINT_DEBUG("[WMIMon] plugin fails to load JSON debug info for \"ole32.dll\"\n");
         throw - 1;
     }
 
@@ -964,11 +964,11 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
 
     // if (c->wow_ole32_profile)
     // {
-    //     PRINT_DEBUG("[WMIMon] plugin rekall profile for \"SysWOW64/ole32.dll\":%s\n", c->wow_ole32_profile);
+    //     PRINT_DEBUG("[WMIMon] plugin JSON debug info for \"SysWOW64/ole32.dll\":%s\n", c->wow_ole32_profile);
     //     json_object* wow_ole32_profile = json_object_from_file(c->wow_ole32_profile);
     //     if (!wow_ole32_profile)
     //     {
-    //         PRINT_DEBUG("[WMIMon] plugin failed to load rekall profile for \"SysWOW64/ole32.dll\"\n");
+    //         PRINT_DEBUG("[WMIMon] plugin failed to load JSON debug info for \"SysWOW64/ole32.dll\"\n");
     //         throw -1;
     //     }
 

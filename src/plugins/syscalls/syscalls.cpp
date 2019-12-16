@@ -572,7 +572,16 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
         {
             const struct symbol* symbol = &symbols->symbols[i];
 
+            if (strlen(symbol->name) <= 2)
+                continue;
+
             if (strncmp(symbol->name, "Nt", 2))
+                continue;
+
+            if (g_ascii_islower(symbol->name[2]))
+                continue;
+
+            if (!strcmp(symbol->name, "NtInitialUserProcess"))
                 continue;
 
             PRINT_DEBUG("[SYSCALLS] Adding trap to %s\n", symbol->name);
@@ -613,7 +622,11 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
     {
         addr_t rva = 0;
 
-        if ( !drakvuf_get_constant_rva(drakvuf, "_text", &rva) )
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+        status_t status = vmi_get_symbol_addr_from_json(vmi, vmi_get_kernel_json(vmi), "_text", &rva);
+        drakvuf_release_vmi(drakvuf);
+
+        if ( VMI_FAILURE == status )
             return NULL;
 
         addr_t kaslr = drakvuf_get_kernel_base(drakvuf) - rva;
@@ -635,6 +648,14 @@ static GSList* create_trap_config(drakvuf_t drakvuf, syscalls* s, symbols_t* sym
                     !strcmp(symbol->name,  "sys_tracepoint_refcount") ||
                     !strcmp(symbol->name,  "sys_table")               ||
                     !strcmp(symbol->name,  "sys_perf_refcount_enter") ||
+                    !strcmp(symbol->name,  "sys_x86_64.c") ||
+                    !strcmp(symbol->name,  "sys_target") ||
+                    !strcmp(symbol->name,  "sys_copyarea") ||
+                    !strcmp(symbol->name,  "sys_data") ||
+                    !strcmp(symbol->name,  "sys_fillrect") ||
+                    !strcmp(symbol->name,  "sys_ia32.c") ||
+                    !strcmp(symbol->name,  "sys_imageblit") ||
+                    !strcmp(symbol->name,  "sys_ni.c") ||
                     !strcmp(symbol->name,  "sys_perf_refcount_exit")   )
                     continue;
             }
@@ -758,10 +779,14 @@ static symbols_t* filter_symbols(const symbols_t* symbols, const char* filter_fi
 
 syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output)
 {
-    symbols_t* symbols = drakvuf_get_symbols_from_rekall(drakvuf);
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    symbols_t* symbols = json_get_symbols(vmi_get_kernel_json(vmi));
+    this->reg_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
+    drakvuf_release_vmi(drakvuf);
+
     if (!symbols)
     {
-        fprintf(stderr, "Failed to get symbols from Rekall profile\n");
+        fprintf(stderr, "Failed to get kernel symbols\n");
         throw -1;
     }
 
@@ -787,10 +812,6 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
     if ( !this->traps )
         throw -1;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->reg_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
-    drakvuf_release_vmi(drakvuf);
-
     bool error = 0;
     GSList* loop = this->traps;
     while (loop)
@@ -799,6 +820,7 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
 
         if ( !drakvuf_add_trap(drakvuf, trap) )
         {
+            PRINT_DEBUG("Failed to trap syscall %s\n", trap->name);
             error = 1;
             break;
         }

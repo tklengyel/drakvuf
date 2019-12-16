@@ -102,17 +102,15 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_SYMBOLS_H_
-#define WIN_SYMBOLS_H_
+#ifndef JSON_PROFILE_H
+#define JSON_PROFILE_H
 
-#include <libvmi/libvmi.h>
-
-status_t
-rekall_lookup(
-    const char* rekall_profile,
-    const char* symbol,
-    const char* subsymbol,
+bool json_lookup_array(
+    drakvuf_t drakvuf,
+    json_object* json,
+    const char* symbol_subsymbol_array[][2],
+    addr_t array_size,
     addr_t* address,
     addr_t* size);
 
-#endif /* WIN_SYMBOLS_H_ */
+#endif /* JSON_PROFILE_H */

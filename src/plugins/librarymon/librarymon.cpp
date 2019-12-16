@@ -144,14 +144,14 @@ librarymon::librarymon(drakvuf_t drakvuf, const librarymon_config* c, output_for
 {
     if (!c->ntdll_profile)
     {
-        PRINT_DEBUG("Librarymon plugin requires the rekall profile for ntdll.dll!\n");
+        PRINT_DEBUG("Librarymon plugin requires the JSON debug info for ntdll.dll!\n");
         return;
     }
 
     json_object* ntdll_profile = json_object_from_file(c->ntdll_profile);
     if (!ntdll_profile)
     {
-        PRINT_DEBUG("Librarymon plugin fails to load rekall profile for ntdll.dll\n");
+        PRINT_DEBUG("Librarymon plugin fails to load JSON debug info for ntdll.dll\n");
         return;
     }
 
