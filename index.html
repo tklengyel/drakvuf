@@ -337,18 +337,18 @@ Output should be something similar:
 
 For Linux you need to install the target kernel's debug package (to get the DWARF symbols for the kernel):
 <pre><code>ssh root@linux
-echo "Copy the following: export kernel_version="$(uname -r)
+echo "Kernel version: "$(uname -r)
 apt-get install linux-image-$(uname -r)-dbg
 exit
 </code></pre>
 
-Make note of the kernel_version line that was printed above, you'll need to copy-paste that into the session on your host. We will use the dwarf2json tool to convert the debug information into the required JSON configuration file:
-<pre><code>sudo su
-cd ~/drakvuf/dwarf2json
+We will use the dwarf2json tool to convert the debug information into the required JSON configuration file. Make note of the Kernel version of the target and make sure to update the System.map and vmlinux paths to reflect the correct kernel version:
+<pre><code>cd ~/drakvuf/dwarf2json
 go build
+sudo su
 kpartx -a /dev/vg/linux
 mount -o ro /dev/mapper/vg-linux1 /mnt
-./dwarf2json linux --system-map /mnt/boot/System.map-$(kernel_version) --elf /mnt/usr/lib/debug/vmlinux-$(kernel_version) > /root/linux.json
+./dwarf2json linux --system-map /mnt/boot/System.map-5.3.0-0.bpo.2-amd64 --elf /mnt/usr/lib/debug/vmlinux-5.3.0-0.bpo.2-amd64 > /root/linux.json
 umount /mnt
 kpartx -d /dev/vg/linux
 printf "linux {\n\tvolatility_ist = \"/root/linux.json\";\n}" >> /etc/libvmi.conf
