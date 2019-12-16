@@ -105,6 +105,9 @@
 #ifndef MEMDUMP_PRIVATE_H
 #define MEMDUMP_PRIVATE_H
 
+#include <vector>
+#include <list>
+
 template<typename T>
 struct map_view_of_section_result_t: public call_result_t<T>
 {
@@ -131,12 +134,21 @@ struct hook_target_entry_t
     vmi_pid_t pid;
     std::string target_name;
     callback_t callback;
+    size_t args_num;
     target_hook_state state;
     drakvuf_trap_t* trap;
     memdump* plugin;
 
-    hook_target_entry_t(std::string target_name, callback_t callback, memdump* plugin)
-        : target_name(target_name), callback(callback), state(HOOK_FIRST_TRY), plugin(plugin) {}
+    hook_target_entry_t(std::string target_name, callback_t callback, size_t args_num, memdump* plugin)
+        : target_name(target_name), callback(callback), args_num(args_num), state(HOOK_FIRST_TRY), plugin(plugin) {}
+};
+
+struct return_hook_target_entry_t
+{
+	vmi_pid_t pid;
+	drakvuf_trap_t* trap;
+	memdump* plugin;
+	std::list < uint64_t > arguments;
 };
 
 template<typename T>
@@ -170,6 +182,7 @@ struct target_config_entry_t
 {
     std::string dll_name;
     std::string function_name;
+    size_t args_num;
 };
 
 // type of a pointer residing on stack
