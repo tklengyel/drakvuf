@@ -580,10 +580,9 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     {
         PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u\n", event->vcpu_id);
         event->slat_id = 0;
-        drakvuf->step_event[event->vcpu_id]->callback = vmi_reset_trap;
-        drakvuf->step_event[event->vcpu_id]->data = drakvuf;
+        event->next_slat_id = drakvuf->altp2m_idx;
         return rsp |
-               VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Enable singlestep
+               VMI_EVENT_RESPONSE_FAST_SINGLESTEP | // Enable singlestep
                VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
     }
 
