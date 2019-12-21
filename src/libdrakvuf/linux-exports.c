@@ -142,18 +142,12 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
         .addr = eprocess_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT],
         .pid = pid
     };
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mm_struct_address))
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mm_struct_address) || !mm_struct_address)
     {
         ctx.addr = eprocess_base + drakvuf->offsets[TASK_STRUCT_ACTIVE_MMSTRUCT];
         if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mm_struct_address))
             return -1;
     }
-
-    // get cr3 register value
-    ctx.addr = mm_struct_address + drakvuf->offsets[MM_STRUCT_PGD];
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ctx.dtb))
-        return -1;
-    ctx.dtb &= ~0u;
 
     addr_t mmap;
     ctx.addr = mm_struct_address + drakvuf->offsets[MM_STRUCT_MMAP];
