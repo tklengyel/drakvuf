@@ -218,6 +218,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                 .proc_data.pid       = pass->proc_data.pid,
                 .proc_data.ppid      = pass->proc_data.ppid,
                 .proc_data.userid    = pass->proc_data.userid,
+                .proc_data.tid       = pass->proc_data.tid,
                 .trap_pa = pass->pa,
                 .regs = event->x86_regs,
                 .vcpu = event->vcpu_id,
