@@ -112,6 +112,7 @@
 #include "ntstatus.h"
 #include "procmon.h"
 #include "winnt.h"
+#include "privileges.h"
 
 namespace
 {
@@ -624,6 +625,109 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    std::string privileges;
+    gchar* escaped_pname = NULL;
+    struct TOKEN_PRIVILEGES* newstate = nullptr;
+    // HANDLE TokenHandle
+    uint32_t token_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    bool disable_all = drakvuf_get_function_argument(drakvuf, info, 2);
+    addr_t newstate_va = drakvuf_get_function_argument(drakvuf, info, 3);
+
+    auto plugin = get_trap_plugin<procmon>(info);
+    if (!plugin)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    if (disable_all)
+        privileges = "DisableAll=1";
+    else
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+
+        access_context_t ctx =
+        {
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = newstate_va,
+        };
+
+        newstate = (struct TOKEN_PRIVILEGES*)g_malloc0(sizeof(struct TOKEN_PRIVILEGES));
+        if (!newstate ||
+            VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(struct TOKEN_PRIVILEGES), newstate, nullptr) ||
+            !newstate->privilege_count)
+            goto done;
+        if (newstate->privilege_count > 1)
+        {
+            auto count = newstate->privilege_count - 1;
+            auto size = sizeof(struct TOKEN_PRIVILEGES) + sizeof(struct LUID_AND_ATTRIBUTES) * count;
+            g_free(newstate);
+            newstate = (struct TOKEN_PRIVILEGES*)g_malloc0(size);
+            if (!newstate ||
+                VMI_SUCCESS != vmi_read(vmi, &ctx, size, newstate, nullptr) ||
+                !newstate->privilege_count)
+                goto done;
+        }
+
+        privileges = stringify_privilege(newstate->privileges[0]);
+        for (size_t i = 1; i < newstate->privilege_count; ++i)
+        {
+            privileges.append(",");
+            privileges.append(stringify_privilege(newstate->privileges[i]));
+        }
+    }
+
+    switch (plugin->m_output_format)
+    {
+        case OUTPUT_CSV:
+            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,0x%" PRIx64 ",\"%s\"",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->proc_data.userid, info->trap->name, token_handle, privileges.c_str());
+            break;
+
+        case OUTPUT_KV:
+            printf("procmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
+                   "Method=%s,ProcessHandle=0x%" PRIx64 ",%s",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   info->trap->name, token_handle, privileges.c_str());
+            break;
+
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\" : \"procmon\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"ProcessName\": %s,"
+                    "\"Method\" : \"%s\","
+                    "\"ProcessHandle\" : %" PRIu64 ","
+                    "\"NewState\" : \"%s\""
+                    "}",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    info->proc_data.pid, info->proc_data.ppid, escaped_pname,
+                    info->trap->name,  token_handle, privileges.c_str());
+            g_free(escaped_pname);
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[PROCMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64
+                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 ":%s:0x%" PRIx64 ":\"%s\"",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr,
+                   info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, token_handle,
+                   privileges.c_str());
+            break;
+    }
+    printf("\n");
+
+done:
+    if (newstate)
+        g_free(newstate);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx)
 {
     struct process_visitor_ctx* ctx = reinterpret_cast<struct process_visitor_ctx*>(visitor_ctx);
@@ -710,7 +814,8 @@ procmon::procmon(drakvuf_t drakvuf, output_format_t output)
     if (!register_trap<procmon>(drakvuf, nullptr, this, create_user_process_hook_cb, bp.for_syscall_name("NtCreateUserProcess")) ||
         !register_trap<procmon>(drakvuf, nullptr, this, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
         !register_trap<procmon>(drakvuf, nullptr, this, open_process_hook_cb, bp.for_syscall_name("NtOpenProcess")) ||
-        !register_trap<procmon>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")))
+        !register_trap<procmon>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
+        !register_trap<procmon>(drakvuf, nullptr, this, adjust_privileges_token_cb, bp.for_syscall_name("NtAdjustPrivilegesToken")))
     {
         throw -1;
     }

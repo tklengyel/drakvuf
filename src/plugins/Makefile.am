@@ -187,6 +187,8 @@ sources += procmon/ntstatus.cpp
 sources += procmon/winnt.cpp
 sources += procmon/winnt.h
 sources += procmon/ntstatus.h
+sources += procmon/privileges.cpp
+sources += procmon/privileges.h
 endif
 
 if PLUGIN_BSODMON
