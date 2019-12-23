@@ -582,7 +582,6 @@ static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drak
     {
         injector->rc = 0;
         injector->detected = false;
-        PRINT_DEBUG("Target process crash detected\n");
 
         drakvuf_interrupt(drakvuf, SIGDRAKVUFCRASH);
     }
@@ -1615,21 +1614,27 @@ int injector_start_app_on_win(
     {
         if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
         {
+            PRINT_DEBUG("Injection timeout\n");
             injector->result = INJECT_RESULT_TIMEOUT;
             print_injection_info(format, file, injector);
         }
         else if (SIGDRAKVUFCRASH == drakvuf_is_interrupted(drakvuf))
         {
+            PRINT_DEBUG("Target process crash detected\n");
             injector->result = INJECT_RESULT_CRASH;
             print_injection_info(format, file, injector);
         }
         else if (injector->error_code.valid)
         {
+            PRINT_DEBUG("Injection failed with error '%s' (%d)\n",
+                        injector->error_code.string,
+                        injector->error_code.code);
             injector->result = INJECT_RESULT_ERROR_CODE;
             print_injection_info(format, file, injector);
         }
         else
         {
+            PRINT_DEBUG("Injection premature break\n");
             injector->result = INJECT_RESULT_PREMATURE;
             print_injection_info(format, file, injector);
         }
