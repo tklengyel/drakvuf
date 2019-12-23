@@ -128,7 +128,7 @@ using flags_str_t = std::map<uint64_t, std::string>;
  * Return a string of all known set flags. Return empty otherwise.
  */
 std::string parse_flags(uint64_t flags,
-                        flags_str_t flags_map,
+                        const flags_str_t& flags_map,
                         output_format_t format = OUTPUT_DEFAULT,
                         std::string empty = std::string());
 

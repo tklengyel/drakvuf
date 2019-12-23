@@ -159,7 +159,7 @@ static std::string format_flag(string flag, output_format_t format)
     return flag + " | ";
 }
 
-std::string parse_flags(uint64_t flags, flags_str_t flags_map, output_format_t format, std::string empty)
+std::string parse_flags(uint64_t flags, const flags_str_t& flags_map, output_format_t format, std::string empty)
 {
     string output;
 
