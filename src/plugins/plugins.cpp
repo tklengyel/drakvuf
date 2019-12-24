@@ -321,7 +321,8 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     memdump_config config =
                     {
                         .memdump_dir = options->memdump_dir,
-                        .dll_hooks_list = options->dll_hooks_list
+                        .dll_hooks_list = options->dll_hooks_list,
+                        .compatible_file_name = options->compatible_file_name
                     };
                     this->plugins[plugin_id] = new memdump(this->drakvuf, &config, this->output);
                     break;

@@ -116,6 +116,7 @@ struct memdump_config
 {
     const char* memdump_dir;
     const char* dll_hooks_list;
+    bool compatible_file_name;
 };
 
 struct target_config_entry_t;
@@ -124,6 +125,8 @@ struct user_dll_t;
 class memdump: public pluginex
 {
 public:
+    int dumps_count;
+    bool compatible_file_name;
     // for memdump.cpp
     const char* memdump_dir;
     addr_t dll_base_rva;

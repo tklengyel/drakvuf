@@ -133,6 +133,7 @@ struct plugins_options
     const char* combase_profile;        // PLUGIN_WMIMON
     const char* memdump_dir;            // PLUGIN_MEMDUMP
     const char* dll_hooks_list;         // PLUGIN_MEMDUMP
+    bool compatible_file_name;          // PLUGIN_MEMDUMP
 };
 
 typedef enum drakvuf_plugin

@@ -230,6 +230,9 @@ static void print_usage()
             "\t                           List of DLL functions to be hooked\n"
             "\t                           each entry in a separate line of file\n"
             "\t                           line format: dll_name,function_name\n"
+            "\t --compatible-file-name\n"
+            "\t                           Use file name format for memory dumps\n"
+            "\t                           compatible with filedelete one\n"
 #endif
             "\t -h, --help                Show this help\n"
             );
@@ -289,6 +292,7 @@ int main(int argc, char** argv)
         opt_json_combase,
         opt_memdump_dir,
         opt_dll_hooks_list,
+        opt_compatible_file_name,
     };
     const option long_opts[] =
     {
@@ -311,6 +315,7 @@ int main(int argc, char** argv)
         {"json-combase", required_argument, NULL, opt_json_combase},
         {"memdump-dir", required_argument, NULL, opt_memdump_dir},
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
+        {"compatible-file-name", no_argument, NULL, opt_compatible_file_name},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:w:W:h";
@@ -468,6 +473,9 @@ int main(int argc, char** argv)
                 break;
             case opt_dll_hooks_list:
                 options.dll_hooks_list = optarg;
+                break;
+            case opt_compatible_file_name:
+                options.compatible_file_name = true;
                 break;
 #endif
             case 'h':
