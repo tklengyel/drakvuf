@@ -176,7 +176,6 @@ bool dump_memory_region(
     bool ret = false;
 
     gchar* escaped_pname = nullptr;
-    gchar* escaped_fname = nullptr;
 
     const gchar* chk_str = nullptr;
 

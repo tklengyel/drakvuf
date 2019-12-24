@@ -1491,20 +1491,20 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
         return false;
 
     // Get the offsets from the Rekall profile
-   if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_KTHREAD", "TrapFrame", &injector->offsets[0]))
-       PRINT_DEBUG("Failed to find _KTHREAD:TrapFrame.\n");
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_KTHREAD", "TrapFrame", &injector->offsets[0]))
+        PRINT_DEBUG("Failed to find _KTHREAD:TrapFrame.\n");
 
-   page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-   if (VMI_PM_IA32E == pm)
-   {
-       if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_KTRAP_FRAME", "Rip", &injector->offsets[1]))
-           PRINT_DEBUG("Failed to find _KTRAP_FRAME:Rip.\n");
-   }
-   else
-   {
-       if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_KTRAP_FRAME", "Eip", &injector->offsets[1]))
-           PRINT_DEBUG("Failed to find _KTRAP_FRAME:Eip.\n");
-   }
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
+    if (VMI_PM_IA32E == pm)
+    {
+        if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_KTRAP_FRAME", "Rip", &injector->offsets[1]))
+            PRINT_DEBUG("Failed to find _KTRAP_FRAME:Rip.\n");
+    }
+    else
+    {
+        if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_KTRAP_FRAME", "Eip", &injector->offsets[1]))
+            PRINT_DEBUG("Failed to find _KTRAP_FRAME:Eip.\n");
+    }
 
 
     if (INJECT_METHOD_CREATEPROC == injector->method)

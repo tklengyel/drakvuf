@@ -680,14 +680,14 @@ static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_tr
     switch (plugin->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,0x%" PRIx64 ",\"%s\"",
+            printf("procmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,0x%" PRIx32 ",\"%s\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    info->proc_data.userid, info->trap->name, token_handle, privileges.c_str());
             break;
 
         case OUTPUT_KV:
             printf("procmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
-                   "Method=%s,ProcessHandle=0x%" PRIx64 ",%s",
+                   "Method=%s,ProcessHandle=0x%" PRIx32 ",%s",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    info->trap->name, token_handle, privileges.c_str());
             break;
@@ -701,7 +701,7 @@ static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_tr
                     "\"PPID\": %d,"
                     "\"ProcessName\": %s,"
                     "\"Method\" : \"%s\","
-                    "\"ProcessHandle\" : %" PRIu64 ","
+                    "\"ProcessHandle\" : %" PRIu32 ","
                     "\"NewState\" : \"%s\""
                     "}",
                     UNPACK_TIMEVAL(info->timestamp),
@@ -713,7 +713,7 @@ static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_tr
         default:
         case OUTPUT_DEFAULT:
             printf("[PROCMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64
-                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 ":%s:0x%" PRIx64 ":\"%s\"",
+                   ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 ":%s:0x%" PRIx32 ":\"%s\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr,
                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, token_handle,

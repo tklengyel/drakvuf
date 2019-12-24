@@ -952,7 +952,7 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
 
     if (VMI_OS_WINDOWS_7 < winver && !c->combase_profile)
     {
-        PRINT_DEBUG("[WMIMon] plugin requires the JSON profile for \"combase.dll\"!\n");
+        PRINT_DEBUG("[WMIMon] plugin fails to load JSON debug info for \"combase.dll\"\n");
         return;
     }
 
@@ -961,7 +961,7 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
     json_object* profile = json_object_from_file(dll_profile);
     if (!profile)
     {
-        PRINT_DEBUG("[WMIMon] plugin fails to load JSON profile for \"%s\"\n", dll_name);
+        PRINT_DEBUG("[WMIMon] plugin fails to load JSON debug info for \"%s\"\n", dll_name);
         throw - 1;
     }
 

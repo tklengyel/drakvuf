@@ -128,7 +128,7 @@ std::string stringify_privilege(struct LUID_AND_ATTRIBUTES& privilege)
         default:
         {
             char tmp[32] = {0};
-            snprintf(tmp, 32, "0x%" PRIx32, privilege);
+            snprintf(tmp, 32, "0x%" PRIx32, privilege.attributes);
             attribute = tmp;
         }
     }
@@ -205,8 +205,8 @@ std::string stringify_privilege(struct LUID_AND_ATTRIBUTES& privilege)
             return std::string("SE_CREATE_SYMBOLIC_LINK_PRIVILEGE") + std::string("=") + attribute;
         default:
         {
-            char tmp[32] = {0};
-            snprintf(tmp, 32, "0x%" PRIx32, privilege);
+            char tmp[64] = {0};
+            snprintf(tmp, 64, "0x%" PRIx64, privilege.luid);
             return std::string(tmp) + std::string("=") + attribute;
         }
     }

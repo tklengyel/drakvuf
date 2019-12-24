@@ -398,7 +398,9 @@ static void print_file_obj_info(drakvuf_t drakvuf,
                 printf(",\"SecurityDescriptor\" : {");
 
                 if (!security_flags.empty())
-                    printf(",\"Control\" : \"%s\"", security_flags.data());
+                    printf("\"Control\" : \"%s\"", security_flags.data());
+                else
+                    printf("\"Control\" : null");
                 if (!owner.empty()) printf(",%s", owner.data());
                 if (!group.empty()) printf(",%s", group.data());
                 if (!sacl.empty()) printf(",%s", sacl.data());
@@ -414,7 +416,7 @@ static void print_file_obj_info(drakvuf_t drakvuf,
 
         default:
         case OUTPUT_DEFAULT:
-            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" HANDLE:0x%" PRIx32 " %s:%" PRIi64 " %s,%s",
+            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%sHANDLE:0x%" PRIx32,
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, file_path, handle);
             if (!file_attr.empty()) printf(",\"%s\"", file_attr.data());
@@ -599,7 +601,7 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     switch (f->format)
     {
         case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,%s, 0x%" PRIx64 "\n",
+            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,%s, 0x%" PRIx32 "\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
                    syscall_name, operation_name, file, handle);
             break;
@@ -647,7 +649,7 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     g_free(file);
 }
 
-static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t src_file_handle, addr_t fileinfo)
+static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo)
 {
     gchar* escaped_pname = NULL;
     gchar* escaped_fname_src = NULL;
@@ -889,7 +891,8 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     );
     */
     filetracer* f = (filetracer*)info->trap->data;
-    struct wrapper* w = new wrapper;
+    struct wrapper* w = (struct wrapper*)g_try_malloc0(sizeof(struct wrapper));
+    if (!w) return 0;
     w->f = f;
     w->rsp = info->regs->rsp;
 
