@@ -233,6 +233,14 @@ bool dump_memory_region(
 
     chk_str = g_checksum_get_string(checksum);
 
+    // The file name format for the memory dump file is:
+    // <dump base address>_<contents hash>
+    // This was set in order to satisfy the following issues:
+    // * when disassembling, it is required to know the dump's image base, here it could be obtained
+    //   just by looking at the file name which is handy both for humans and automated processing
+    // * de-duplication - sometimes, different heuristics may want to dump the same piece of memory;
+    //   unless there is a change in image base or contents, repeated memory dumps would get exactly
+    //   the same file name
     if (asprintf(&file, "%llx_%.16s", (unsigned long long) ctx->addr, chk_str) < 0)
         goto done;
 
