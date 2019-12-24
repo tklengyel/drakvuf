@@ -113,6 +113,7 @@ struct wmimon_config
 {
     const char* ole32_profile;
     const char* wow_ole32_profile;
+    const char* combase_profile;
 };
 
 class wmimon: public pluginex

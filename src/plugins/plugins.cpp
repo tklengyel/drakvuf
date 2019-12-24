@@ -309,6 +309,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     {
                         .ole32_profile = options->ole32_profile,
                         .wow_ole32_profile = options->wow_ole32_profile,
+                        .combase_profile = options->ole32_profile,
                     };
                     this->plugins[plugin_id] = new wmimon(this->drakvuf, &config, this->output);
                     break;

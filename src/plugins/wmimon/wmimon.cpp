@@ -931,10 +931,10 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
     }
 
     uint8_t addr_width = 0;
-    //win_ver_t winver;
+    win_ver_t winver;
     {
         vmi_lock_guard guard(drakvuf);
-        //winver = vmi_get_winver(guard);
+        winver = vmi_get_winver(guard);
         addr_width = vmi_get_address_width(guard);
     }
 
@@ -950,15 +950,23 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
         return;
     }
 
-    json_object* ole32_profile = json_object_from_file(c->ole32_profile);
-    if (!ole32_profile)
+    if (VMI_OS_WINDOWS_7 < winver && !c->combase_profile)
     {
-        PRINT_DEBUG("[WMIMon] plugin fails to load JSON debug info for \"ole32.dll\"\n");
+        PRINT_DEBUG("[WMIMon] plugin requires the JSON profile for \"combase.dll\"!\n");
+        return;
+    }
+
+    auto dll_profile = VMI_OS_WINDOWS_7 < winver ? c->combase_profile : c->ole32_profile;
+    auto dll_name = VMI_OS_WINDOWS_7 < winver ? "combase.dll" : "ole32.dll";
+    json_object* profile = json_object_from_file(dll_profile);
+    if (!profile)
+    {
+        PRINT_DEBUG("[WMIMon] plugin fails to load JSON profile for \"%s\"\n", dll_name);
         throw - 1;
     }
 
-    PRINT_DEBUG("[WMIMon] attempt to setup a trap for \"CoCreateInstance\"\n");
-    breakpoint_in_dll_module_searcher bp(ole32_profile, "ole32.dll");
+    PRINT_DEBUG("[WMIMon] attempt to setup a trap for \"%s::CoCreateInstance\"\n", dll_name);
+    breakpoint_in_dll_module_searcher bp(profile, dll_name);
     if (!register_trap<wmimon>(drakvuf, nullptr, this, CoCreateInstanse_handler, bp.for_syscall_name("CoCreateInstance")))
         throw -1;
 
@@ -980,5 +988,5 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
     //     json_object_put(wow_ole32_profile);
     // }
 
-    json_object_put(ole32_profile);
+    json_object_put(profile);
 }
