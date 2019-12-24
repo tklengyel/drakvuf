@@ -306,39 +306,62 @@ struct ExecMethodParams : public call_result_t<T>
     addr_t m_vtable;
 };
 
-static bool read_vtable_elements(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr, void* buffer, size_t count)
+class vtable
 {
-    access_context_t ctx =
+public:
+    vtable(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t va, size_t count)
+        : m_address_width(drakvuf_get_address_width(drakvuf))
+        , m_mask((1ULL << m_address_width * 8) - 1)
+        , m_buffer(count * m_address_width)
     {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = addr
-    };
-
-    addr_t vtable_addr;
-    vmi_lock_guard lock(drakvuf);
-    if (VMI_SUCCESS != vmi_read_addr(lock, &ctx, &vtable_addr))
-    {
-        PRINT_DEBUG("[WMIMon] Failed to read addr of vtable. Step 1\n");
-        return false;
+        if (!read_vtable_elements(drakvuf, info, va, count))
+            throw std::runtime_error("[WMIMon] Failed to read a vtable\n");
     }
 
-    ctx.addr = vtable_addr;
-    if (VMI_SUCCESS != vmi_read_addr(lock, &ctx, &vtable_addr))
+    uint64_t operator[](size_t index) const
     {
-        PRINT_DEBUG("[WMIMon] Failed to read addr of vtable. Step 2\n");
-        return false;
+        return *reinterpret_cast<const uint64_t*>(&m_buffer[index * m_address_width]) & m_mask;
     }
 
-    ctx.addr = vtable_addr;
-    if (VMI_SUCCESS != vmi_read(lock, &ctx, count, buffer, nullptr))
-    {
-        PRINT_DEBUG("[WMIMon] Failed to read addr of vtable. Step 3\n");
-        return false;
-    }
+private:
+    int m_address_width;
+    uint64_t m_mask;
+    std::vector<uint8_t> m_buffer;
 
-    return true;
-}
+    inline bool read_vtable_elements(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t va, size_t count)
+    {
+        access_context_t ctx =
+        {
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = va
+        };
+
+        addr_t vtable_addr;
+        vmi_lock_guard lock(drakvuf);
+        if (VMI_SUCCESS != vmi_read_addr(lock, &ctx, &vtable_addr))
+        {
+            PRINT_DEBUG("[WMIMon] Failed to read addr of vtable. Step 1\n");
+            return false;
+        }
+
+        ctx.addr = vtable_addr;
+        if (VMI_SUCCESS != vmi_read_addr(lock, &ctx, &vtable_addr))
+        {
+            PRINT_DEBUG("[WMIMon] Failed to read addr of vtable. Step 2\n");
+            return false;
+        }
+
+        ctx.addr = vtable_addr;
+        if (VMI_SUCCESS != vmi_read(lock, &ctx, count * m_address_width, m_buffer.data(), nullptr))
+        {
+            PRINT_DEBUG("[WMIMon] Failed to read addr of vtable. Step 3\n");
+            return false;
+        }
+
+        return true;
+    }
+};
 
 event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -726,15 +749,6 @@ event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_in
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    addr_t vtable[26]; // IUnknown
-    if (!read_vtable_elements(drakvuf, info, data->m_vtable, &vtable, sizeof(vtable)))
-    {
-        PRINT_DEBUG("[WMIMon] Failed to read a vtable of IWbemServices\n");
-        g_free(resource->contents);
-        g_free(resource);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
     switch (plugin->m_output_format)
     {
         case OUTPUT_CSV:
@@ -778,15 +792,24 @@ event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_in
 
     vmi_free_unicode_str(resource);
 
-    search_breakpoint_by_addr bp(plugin, vtable[20]);
-    plugin->register_trap<wmimon>(drakvuf, info, plugin, ExecQuery_handler,
-                                  bp, "ExecQuery");
+    try
+    {
+        vtable vt(drakvuf, info, data->m_vtable, 26);
 
-    plugin->register_trap<wmimon>(drakvuf, info, plugin, GetObject_handler,
-                                  bp.set_addr(vtable[6]), "GetObject");
+        search_breakpoint_by_addr bp(plugin, vt[20]);
+        plugin->register_trap<wmimon>(drakvuf, info, plugin, ExecQuery_handler,
+                                      bp, "ExecQuery");
 
-    plugin->register_trap<wmimon>(drakvuf, info, plugin, ExecMethod_handler,
-                                  bp.set_addr(vtable[24]), "ExecMethod");
+        plugin->register_trap<wmimon>(drakvuf, info, plugin, GetObject_handler,
+                                      bp.set_addr(vt[6]), "GetObject");
+
+        plugin->register_trap<wmimon>(drakvuf, info, plugin, ExecMethod_handler,
+                                      bp.set_addr(vt[24]), "ExecMethod");
+    }
+    catch (const std::exception& e)
+    {
+        PRINT_DEBUG("[WMIMon] Failed to read a vtable of IWbemServices\n");
+    }
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -843,15 +866,17 @@ event_response_t CoCreateInstanse_return_handler(drakvuf_t drakvuf, drakvuf_trap
 
     plugin->destroy_trap(drakvuf, info->trap);
 
-    addr_t vtable[4]; // IUnknown
-    if (!read_vtable_elements(drakvuf, info, data->m_vtable, &vtable, sizeof(vtable)))
+    try
+    {
+        vtable vt(drakvuf, info, data->m_vtable, 4);
+
+        plugin->register_trap<wmimon>(drakvuf, info, plugin, ConnectServer_handler,
+                                      search_breakpoint_by_addr(plugin, vt[3]), "ConnectServer");
+    }
+    catch (const std::exception& e)
     {
         PRINT_DEBUG("[WMIMon] Failed to read a vtable of IWbemLocator\n");
-        return VMI_EVENT_RESPONSE_NONE;
     }
-
-    plugin->register_trap<wmimon>(drakvuf, info, plugin, ConnectServer_handler,
-                                  search_breakpoint_by_addr(plugin, vtable[3]), "ConnectServer");
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -931,10 +956,10 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
     }
 
     uint8_t addr_width = 0;
-    //win_ver_t winver;
+    win_ver_t winver;
     {
         vmi_lock_guard guard(drakvuf);
-        //winver = vmi_get_winver(guard);
+        winver = vmi_get_winver(guard);
         addr_width = vmi_get_address_width(guard);
     }
 
@@ -950,15 +975,23 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
         return;
     }
 
-    json_object* ole32_profile = json_object_from_file(c->ole32_profile);
-    if (!ole32_profile)
+    if (VMI_OS_WINDOWS_7 < winver && !c->combase_profile)
     {
-        PRINT_DEBUG("[WMIMon] plugin fails to load JSON debug info for \"ole32.dll\"\n");
+        PRINT_DEBUG("[WMIMon] plugin fails to load JSON debug info for \"combase.dll\"\n");
+        return;
+    }
+
+    auto dll_profile = VMI_OS_WINDOWS_7 < winver ? c->combase_profile : c->ole32_profile;
+    auto dll_name = VMI_OS_WINDOWS_7 < winver ? "combase.dll" : "ole32.dll";
+    json_object* profile = json_object_from_file(dll_profile);
+    if (!profile)
+    {
+        PRINT_DEBUG("[WMIMon] plugin fails to load JSON debug info for \"%s\"\n", dll_name);
         throw - 1;
     }
 
-    PRINT_DEBUG("[WMIMon] attempt to setup a trap for \"CoCreateInstance\"\n");
-    breakpoint_in_dll_module_searcher bp(ole32_profile, "ole32.dll");
+    PRINT_DEBUG("[WMIMon] attempt to setup a trap for \"%s::CoCreateInstance\"\n", dll_name);
+    breakpoint_in_dll_module_searcher bp(profile, dll_name);
     if (!register_trap<wmimon>(drakvuf, nullptr, this, CoCreateInstanse_handler, bp.for_syscall_name("CoCreateInstance")))
         throw -1;
 
@@ -980,5 +1013,5 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
     //     json_object_put(wow_ole32_profile);
     // }
 
-    json_object_put(ole32_profile);
+    json_object_put(profile);
 }
