@@ -582,7 +582,6 @@ static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drak
     {
         injector->rc = 0;
         injector->detected = false;
-        PRINT_DEBUG("Target process crash detected\n");
 
         drakvuf_interrupt(drakvuf, SIGDRAKVUFCRASH);
     }
@@ -1492,8 +1491,21 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
         return false;
 
     // Get the offsets from the Rekall profile
-    if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, OFFSET_MAX, injector->offsets) )
-        PRINT_DEBUG("Failed to find one of offsets.\n");
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_KTHREAD", "TrapFrame", &injector->offsets[0]))
+        PRINT_DEBUG("Failed to find _KTHREAD:TrapFrame.\n");
+
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
+    if (VMI_PM_IA32E == pm)
+    {
+        if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_KTRAP_FRAME", "Rip", &injector->offsets[1]))
+            PRINT_DEBUG("Failed to find _KTRAP_FRAME:Rip.\n");
+    }
+    else
+    {
+        if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_KTRAP_FRAME", "Eip", &injector->offsets[1]))
+            PRINT_DEBUG("Failed to find _KTRAP_FRAME:Eip.\n");
+    }
+
 
     if (INJECT_METHOD_CREATEPROC == injector->method)
     {
@@ -1602,21 +1614,27 @@ int injector_start_app_on_win(
     {
         if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
         {
+            PRINT_DEBUG("Injection timeout\n");
             injector->result = INJECT_RESULT_TIMEOUT;
             print_injection_info(format, file, injector);
         }
         else if (SIGDRAKVUFCRASH == drakvuf_is_interrupted(drakvuf))
         {
+            PRINT_DEBUG("Target process crash detected\n");
             injector->result = INJECT_RESULT_CRASH;
             print_injection_info(format, file, injector);
         }
         else if (injector->error_code.valid)
         {
+            PRINT_DEBUG("Injection failed with error '%s' (%d)\n",
+                        injector->error_code.string,
+                        injector->error_code.code);
             injector->result = INJECT_RESULT_ERROR_CODE;
             print_injection_info(format, file, injector);
         }
         else
         {
+            PRINT_DEBUG("Injection premature break\n");
             injector->result = INJECT_RESULT_PREMATURE;
             print_injection_info(format, file, injector);
         }
