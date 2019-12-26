@@ -689,7 +689,7 @@ bool win_search_modules_wow( drakvuf_t drakvuf,
 addr_t win_get_wow_peb( drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess )
 {
     // 'Wow64Process' could not be the first member of '_EPROCESS' so this is cheap check
-    if (!drakvuf->offsets[EPROCESS_WOW64PROCESS])
+    if (!drakvuf->offsets[EPROCESS_WOW64PROCESS] && !drakvuf->offsets[EPROCESS_WOW64PROCESS_WIN10])
         return 0;
 
     addr_t ret_peb_addr = 0 ;
