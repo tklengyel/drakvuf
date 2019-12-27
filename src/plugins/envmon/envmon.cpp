@@ -177,6 +177,14 @@ static const std::map<uint64_t, std::string> flags_name_formats
     { GAA_FLAG_INCLUDE_TUNNEL_BINDINGORDER, "GAA_FLAG_INCLUDE_TUNNEL_BINDINGORDER"  }
 };
 
+static const std::map<uint64_t, std::string> define_dos_device_flags
+{
+    { DDD_RAW_TARGET_PATH,       "DDD_RAW_TARGET_PATH" },
+    { DDD_REMOVE_DEFINITION,     "DDD_REMOVE_DEFINITION" },
+    { DDD_EXACT_MATCH_ON_REMOVE, "DDD_EXACT_MATCH_ON_REMOVE" },
+    { DDD_NO_BROADCAST_SYSTEM,   "DDD_NO_BROADCAST_SYSTEM" }
+};
+
 static event_response_t trap_SspipGetUserName_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto p = get_trap_plugin<envmon>(info);
@@ -232,6 +240,86 @@ static event_response_t trap_SspipGetUserName_cb(drakvuf_t drakvuf, drakvuf_trap
             printf(" EXTENDEDNAMEFORMAT:%lu EXTENDEDNAMEFORMATSTR:\"%s\"\n", ex_name_fmt, ex_name_fmt_str);
             break;
     }
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t trap_DefineDosDeviceW_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto p = get_trap_plugin<envmon>(info);
+    if (!p)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    const auto flags = print::FieldToString(define_dos_device_flags, std::bitset<64>(drakvuf_get_function_argument(drakvuf, info, 1)));
+    addr_t device_name_va = drakvuf_get_function_argument(drakvuf, info, 2);
+    addr_t target_path_va = drakvuf_get_function_argument(drakvuf, info, 3);
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = device_name_va
+    };
+
+    vmi_lock_guard wmi_lock(drakvuf);
+
+    auto device_name_us = drakvuf_read_wchar_string(wmi_lock, &ctx);
+    const char* device_name = device_name_us ?
+                              reinterpret_cast<char*>(device_name_us->contents) :
+                              "<UNKNOWN>";
+
+    ctx.addr = target_path_va;
+    auto target_path_us = drakvuf_read_wchar_string(wmi_lock, &ctx);
+    const char* target_path = target_path_us ?
+                              reinterpret_cast<char*>(target_path_us->contents) :
+                              "<UNKNOWN>";
+
+    wmi_lock.unlock();
+
+    switch (p->m_output_format)
+    {
+        case OUTPUT_CSV:
+            printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s,\"%s\",\"%s\",\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
+                   info->proc_data.name, info->trap->name, flags.c_str(), device_name, target_path);
+            break;
+        case OUTPUT_KV:
+            printf("envmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Flags=\"%s\",DeviceName=\"%s\",TargetPath=\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
+                   info->proc_data.name, info->trap->name, flags.c_str(), device_name, target_path);
+            break;
+        case OUTPUT_JSON:
+        {
+            gchar_ptr proc_name(drakvuf_escape_str(info->proc_data.name));
+            printf("{"
+                   "\"Plugin\" : \"envmon\","
+                   "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                   "\"ProcessName\": \"%s\","
+                   "\"PID\" : %d,"
+                   "\"PPID\": %d,"
+                   "\"Method\" : \"%s\","
+                   "\"Flags\" : \"%s\","
+                   "\"DeviceName\" : \"%s\","
+                   "\"TargetPath\" : \"%s\""
+                   "}\n",
+                   UNPACK_TIMEVAL(info->timestamp),
+                   proc_name.get(),
+                   info->proc_data.pid,
+                   info->proc_data.ppid,
+                   info->trap->name,
+                   flags.c_str(), device_name, target_path);
+            break;
+        }
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[ENVMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s FLAGS:\"%s\" DEVNAME:\"%s\" TARGETPATH:\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   info->trap->name, flags.c_str(), device_name, target_path);
+            break;
+    }
+
+    vmi_free_unicode_str(device_name_us);
+    vmi_free_unicode_str(target_path_us);
+
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -588,6 +676,12 @@ envmon::envmon(drakvuf_t drakvuf, const envmon_config* c, output_format_t output
         if (!register_trap(drakvuf, nullptr, this, trap_GetComputerNameExW_cb, bp.for_syscall_name("GetComputerNameExW")))
             throw -1;
 
+    }
+
+    {
+        breakpoint_in_dll_module_searcher bp(kernelbase_profile, "kernelbase.dll");
+        if (!register_trap(drakvuf, nullptr, this, trap_DefineDosDeviceW_cb, bp.for_syscall_name("DefineDosDeviceW")))
+            throw -1;
     }
     json_object_put(kernelbase_profile);
 
