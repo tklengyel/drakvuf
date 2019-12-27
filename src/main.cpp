@@ -220,6 +220,8 @@ static void print_usage()
             "\t                           The JSON profile for ole32.dll\n"
             "\t --json-wow-ole32 <path to json>\n"
             "\t                           The JSON profile for SysWOW64/ole32.dll\n"
+            "\t --json-combase <path to json>\n"
+            "\t                           The JSON profile for combase.dll\n"
 #endif
 #ifdef ENABLE_PLUGIN_MEMDUMP
             "\t --memdump-dir <directory>\n"
@@ -284,6 +286,7 @@ int main(int argc, char** argv)
         opt_json_mpr,
         opt_json_ole32,
         opt_json_wow_ole32,
+        opt_json_combase,
         opt_memdump_dir,
         opt_dll_hooks_list,
     };
@@ -305,6 +308,7 @@ int main(int argc, char** argv)
         {"help", no_argument, NULL, 'h'},
         {"json-ole32", required_argument, NULL, opt_json_ole32},
         {"json-wow-ole32", required_argument, NULL, opt_json_wow_ole32},
+        {"json-combase", required_argument, NULL, opt_json_combase},
         {"memdump-dir", required_argument, NULL, opt_memdump_dir},
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
         {NULL, 0, NULL, 0}
@@ -453,6 +457,9 @@ int main(int argc, char** argv)
                 break;
             case opt_json_wow_ole32:
                 options.wow_ole32_profile = optarg;
+                break;
+            case opt_json_combase:
+                options.combase_profile = optarg;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_MEMDUMP
