@@ -107,6 +107,7 @@
 
 #include <sstream>
 #include <iomanip>
+#include <vector>
 
 using uuid_t = unsigned char[16];
 
