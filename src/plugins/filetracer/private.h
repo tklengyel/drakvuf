@@ -323,6 +323,6 @@ extern const flags_str_t generic_ar;
 
 using std::string;
 
-string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs);
+string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs, uint32_t handle = 0);
 
 #endif
