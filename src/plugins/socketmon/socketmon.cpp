@@ -359,71 +359,6 @@ static void print_tcpe(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* 
     }
 }
 
-static void print_tcpl_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data, int addressfamily, char const* lip, int port)
-{
-    gchar* escaped_pname = NULL;
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",\"%s\",%" PRIi64 ",%d,%d,%s,listener,%s,%d\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                   tcp_addressfamily_string(addressfamily),
-                   lip, port);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ","
-                   "Owner=\"%s\",OwnerId=%" PRIi64 ",OwnerPID=%d,OwnerPPID=%d,Protocol=%s,ListenerIp=%s,ListenerPort=%d\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->proc_data.userid,
-                   owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                   tcp_addressfamily_string(addressfamily),
-                   lip, port);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": \"%s\","
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Owner\": \"%s\","
-                    "\"OwnerId\": %" PRIi64 ","
-                    "\"OwnerPID\" : %d,"
-                    "\"OwnerPPID\": %d,"
-                    "\"Protocol\": \"%s\","
-                    "\"ListenerIp\": \"%s\","
-                    "\"ListenerPort\": %d"
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                    tcp_addressfamily_string(addressfamily),
-                    lip, port);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s listener %s:%d\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
-                   owner_proc_data.name, USERIDSTR(drakvuf), owner_proc_data.userid,
-                   tcp_addressfamily_string(addressfamily),
-                   lip, port);
-            break;
-    }
-}
-
 template<typename udp_endpoint_struct, typename inetaf_struct, typename local_address_struct>
 static event_response_t udpa_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -579,129 +514,18 @@ static event_response_t tcpe_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     return tcpe_cb<tcp_endpoint_x64, inetaf_x64, addr_info_x64, local_address_x64>(drakvuf, info);
 }
 
+static event_response_t tcpe_win81_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    return tcpe_cb<tcp_endpoint_win81_x64, inetaf_win81_x64, addr_info_x64, local_address_x64>(drakvuf, info);
+}
+
 static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     return tcpe_cb<tcp_endpoint_win10_x64, inetaf_win10_x64, addr_info_x64, local_address_x64>(drakvuf, info);
 }
 
-template<typename tcp_listener_struct, typename inetaf_struct, typename local_address_struct>
-static event_response_t tcpl_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    struct wrapper* w = (struct wrapper*)info->trap->data;
-    socketmon* s = w->s;
-
-    addr_t p1 = 0;
-    char* lip = NULL;
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    proc_data_t owner_proc_data = {};
-    tcp_listener_struct tcpl = {};
-    inetaf_struct inetaf = {};
-    local_address_struct local = {};
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    ctx.addr = w->obj - sizeof(tcpl);
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(tcpl), &tcpl, NULL) )
-        goto done;
-
-    // Convert port to little endian
-    tcpl.port = __bswap_16(tcpl.port);
-
-    ctx.addr = tcpl.inetaf;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(inetaf), &inetaf, NULL) )
-        goto done;
-
-    if ( tcpl.localaddr )
-    {
-        ctx.addr = tcpl.localaddr;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(local), &local, NULL) )
-            goto done;
-    }
-
-    if ( local.pdata )
-    {
-        ctx.addr = local.pdata;
-        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-            goto done;
-    }
-
-    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
-    if (!lip) goto done;
-
-    if (!drakvuf_get_process_data(drakvuf, tcpl.owner, &owner_proc_data))
-        goto done;
-
-    print_tcpl_ret(drakvuf, info, s, owner_proc_data, inetaf.addressfamily, lip, tcpl.port);
-
-done:
-    g_free(const_cast<char*>(owner_proc_data.name));
-    g_free(lip);
-    drakvuf_release_vmi(drakvuf);
-    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
-
-    return 0;
-}
-
-static event_response_t tcpl_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    return tcpl_ret_cb<tcp_listener_x86, inetaf_x86, local_address_x86>(drakvuf, info);
-}
-
-static event_response_t tcpl_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    return tcpl_ret_cb<tcp_listener_x64, inetaf_x64, local_address_x64>(drakvuf, info);
-}
-
-static event_response_t tcpl_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    return tcpl_ret_cb<tcp_listener_win10_x64, inetaf_win10_x64, local_address_x64>(drakvuf, info);
-}
-
-static event_response_t tcpl_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    struct wrapper* w = (struct wrapper*)g_try_malloc0(sizeof(struct wrapper));
-    w->s = (socketmon*)info->trap->data;
-
-    addr_t rsp = 0;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    vmi_read_addr_va(vmi, info->regs->rsp, 0, &rsp);
-    drakvuf_release_vmi(drakvuf);
-
-    w->obj = drakvuf_get_function_argument(drakvuf, info, 1);
-
-    if ( !w->obj )
-    {
-        g_free(w);
-        return 0;
-    }
-
-    drakvuf_trap_t* trap = (drakvuf_trap_t*)g_try_malloc0(sizeof(drakvuf_trap_t));
-    trap->breakpoint.lookup_type = LOOKUP_PID;
-    trap->breakpoint.pid = 4;
-    trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = rsp;
-    trap->type = BREAKPOINT;
-    trap->data = w;
-
-    if (w->s->winver == VMI_OS_WINDOWS_7 || w->s->winver == VMI_OS_WINDOWS_8)
-        trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? tcpl_x64_ret_cb : tcpl_x86_ret_cb;
-    else
-        trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? tcpl_win10_x64_ret_cb : NULL;
-
-    if ( !drakvuf_add_trap(drakvuf, trap) )
-    {
-        printf("Failed to trap return at 0x%lx\n", rsp);
-        g_free(w);
-    }
-
-    return 0;
-}
-
-static event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+// TODO Return static qualifier after fixing UDP monitor
+event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     struct wrapper* w = (struct wrapper*)g_try_malloc0(sizeof(struct wrapper));
     w->s = (socketmon*)info->trap->data;
@@ -1096,21 +920,34 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
         throw -1;
     }
 
-    event_response_t(*tcpe_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) =
-        ((pm == VMI_PM_IA32E) ?
-         ((winver == VMI_OS_WINDOWS_10) ?
-          tcpe_win10_x64_cb :
-          tcpe_x64_cb) :
-         tcpe_x86_cb);
+    event_response_t(*tcpe_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) = nullptr;
+    if (pm == VMI_PM_IA32E)
+    {
+        switch (winver)
+        {
+            case VMI_OS_WINDOWS_8:
+                // Tested on Windows 8.1 update 1 x64
+                tcpe_cb = tcpe_win81_x64_cb;
+                break;
+            case VMI_OS_WINDOWS_10:
+                // Tested on Windows 10 1803 x64
+                tcpe_cb = tcpe_win10_x64_cb;
+                break;
+            default:
+                // Tested on Windows 7 SP1 x64
+                tcpe_cb = tcpe_x64_cb;
+                break;
+        }
+    }
+    else
+    {
+        // Tested on Windows 7 SP1 x86
+        tcpe_cb = tcpe_x86_cb;
+    }
 
-    assert(sizeof(tcpip_traps) / sizeof(tcpip_traps[0]) > 6);
-    register_tcpip_trap(drakvuf, tcpip_profile_json, "TcpTcbDelay", &this->tcpip_traps[0], tcpe_cb);
-    register_tcpip_trap(drakvuf, tcpip_profile_json, "TcpFinAcknowledged", &this->tcpip_traps[1], tcpe_cb);
-    register_tcpip_trap(drakvuf, tcpip_profile_json,  "TcpDisconnectTcb", &this->tcpip_traps[2], tcpe_cb);
-    register_tcpip_trap(drakvuf, tcpip_profile_json, "TcpShutdownTcb", &this->tcpip_traps[3], tcpe_cb);
-    register_tcpip_trap(drakvuf, tcpip_profile_json, "TcpSetSockOptTcb", &this->tcpip_traps[4], tcpe_cb);
-    register_tcpip_trap(drakvuf, tcpip_profile_json, "UdpSetSockOptEndpoint", &this->tcpip_traps[5], udpb_cb);
-    register_tcpip_trap(drakvuf, tcpip_profile_json, "TcpCreateListenerWorkQueueRoutine", &this->tcpip_traps[6], tcpl_cb);
+    // TODO Test and fix UDP monitor
+    // register_tcpip_trap(drakvuf, tcpip_profile_json, "UdpSetSockOptEndpoint", &this->tcpip_traps[5], udpb_cb);
+    register_tcpip_trap(drakvuf, tcpip_profile_json, "TcpCreateAndConnectTcbComplete", &this->tcpip_trap, tcpe_cb);
 
     json_object_put(tcpip_profile_json);
 
