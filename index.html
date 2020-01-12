@@ -233,6 +233,7 @@ sudo echo "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
 
 <pre><code>cd ~/drakvuf/volatility3
 python3 ./setup.py build
+sudo python3 ./setup.py install
 </code></pre>
 
 Now we will create the JSON configuration file for the Windows domain. First, we need to get the debug information for the Windows kernel via the LibVMI vmi-win-guid tool. For example, in the following my domain is named windows7-sp1-x86:
