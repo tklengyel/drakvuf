@@ -107,6 +107,9 @@
 
 #ifdef __cplusplus
 extern "C" {
+#define NOEXCEPT noexcept
+#else
+#define NOEXCEPT
 #endif
 
 #pragma GCC visibility push(default)
@@ -163,13 +166,13 @@ struct argument
 void init_argument(struct argument* arg,
                    argument_type_t type,
                    size_t size,
-                   void* data);
+                   void* data) NOEXCEPT;
 
 void init_int_argument(struct argument* arg,
-                       uint64_t value);
+                       uint64_t value) NOEXCEPT;
 
 void init_unicode_argument(struct argument* arg,
-                           unicode_string_t* us);
+                           unicode_string_t* us) NOEXCEPT;
 
 #define init_struct_argument(arg, sv) \
     init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
@@ -177,13 +180,13 @@ void init_unicode_argument(struct argument* arg,
 bool setup_stack(drakvuf_t drakvuf,
                  drakvuf_trap_info_t* info,
                  struct argument args[],
-                 int nb_args);
+                 int nb_args) NOEXCEPT;
 
 bool setup_stack_locked(drakvuf_t drakvuf,
                         vmi_instance_t vmi,
                         drakvuf_trap_info_t* info,
                         struct argument args[],
-                        int nb_args);
+                        int nb_args) NOEXCEPT;
 
 int injector_start_app(drakvuf_t drakvuf,
                        vmi_pid_t pid,
@@ -198,7 +201,7 @@ int injector_start_app(drakvuf_t drakvuf,
                        injector_t* injector_to_be_freed,
                        bool global_search, // out: iff break_loop_on_detection is set
                        int args_count,
-                       const char* args[]);
+                       const char* args[]) NOEXCEPT;
 
 #pragma GCC visibility pop
 
