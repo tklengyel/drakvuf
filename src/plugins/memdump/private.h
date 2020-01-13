@@ -108,6 +108,27 @@
 #include <vector>
 #include <list>
 
+typedef enum
+  {
+   INVALID,
+   WriteVirtualMemoryExtras,
+   __MAX_EXTRAX__
+  } extras_type_t;
+
+typedef struct
+{
+  extras_type_t type;
+  union
+  {
+    struct
+    {
+      vmi_pid_t target_pid;
+      char* target_name;
+      addr_t base_address;
+    } write_virtual_memory_extras;
+  };
+} extras_t;
+
 template<typename T>
 struct map_view_of_section_result_t: public call_result_t<T>
 {
@@ -218,8 +239,8 @@ bool dump_memory_region(
     access_context_t* ctx,
     size_t len_bytes,
     const char* reason,
-    void* extras,
-    void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, void* extras));
+    extras_t* extras,
+    void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, extras_t* extras));
 
 bool inspect_stack_ptr(
     drakvuf_t drakvuf,

@@ -124,6 +124,7 @@ struct user_dll_t;
 class memdump: public pluginex
 {
 public:
+    int dumps_count;
     // for memdump.cpp
     const char* memdump_dir;
     addr_t dll_base_rva;
