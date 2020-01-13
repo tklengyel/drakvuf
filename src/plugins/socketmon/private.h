@@ -190,8 +190,24 @@ struct tcp_endpoint_win81_x64
     addr_t owner;         // +0x258
 } __attribute__((packed));
 
-// Tested for Windows 10 build 1803
+// That worked with Windows 10 before 1803
 struct tcp_endpoint_win10_x64
+{
+    addr_t _pad1[2];
+    addr_t inetaf; // inetaf_win10_x64
+    addr_t addrinfo;
+    uint8_t _pad2[0x4c];
+    uint32_t state;
+    uint16_t localport;
+    uint16_t remoteport;
+    uint8_t _pad3[0x1E4];
+    addr_t owner;
+    addr_t _pad4;
+    addr_t createtime;
+} __attribute__((packed));
+
+// Tested for Windows 10 build 1803
+struct tcp_endpoint_win10_x64_1803
 {
     addr_t _pad1[2];      // +0x0
     addr_t inetaf;        // +0x10 -> inetaf_win10_x64
@@ -256,6 +272,8 @@ struct inetaf_win81_x64
     uint8_t addressfamily;
 } __attribute__ ((packed));
 
+using inetaf_win10_x64 = inetaf_win81_x64;
+
 /* UdpA */
 struct udp_endpoint_x86
 {
@@ -292,7 +310,6 @@ struct udp_endpoint_win10_x64
     uint16_t port;
     addr_t localaddr; // local_address_win10_udp_x64
 } __attribute__ ((packed));
-using inetaf_win10_x64 = inetaf_win81_x64;
 
 // This is yet another type of Windows string representation
 // specific for undocumented DnsQueryExW(...) function.

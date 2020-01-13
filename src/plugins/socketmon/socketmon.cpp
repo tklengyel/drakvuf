@@ -524,6 +524,11 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     return tcpe_cb<tcp_endpoint_win10_x64, inetaf_win10_x64, addr_info_x64, local_address_x64>(drakvuf, info);
 }
 
+static event_response_t tcpe_win10_x64_1803_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+  return tcpe_cb<tcp_endpoint_win10_x64_1803, inetaf_win10_x64, addr_info_x64, local_address_x64>(drakvuf, info);
+}
+
 // TODO Return static qualifier after fixing UDP monitor
 event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -879,6 +884,14 @@ static win_ver_t get_win_ver(drakvuf_t drakvuf)
     return winver;
 }
 
+static uint16_t get_win_build_number(drakvuf_t drakvuf)
+{
+  vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+  uint16_t build = vmi_get_win_buildnumber(vmi);
+  drakvuf_release_vmi(drakvuf);
+  return build;
+}
+
 socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format_t output)
     : format{output}
 {
@@ -930,8 +943,12 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
                 tcpe_cb = tcpe_win81_x64_cb;
                 break;
             case VMI_OS_WINDOWS_10:
-                // Tested on Windows 10 1803 x64
-                tcpe_cb = tcpe_win10_x64_cb;
+                if (get_win_build_number(drakvuf) < 1734)
+                    // Tested on Windows 10 x64 before 1803
+                    tcpe_cb = tcpe_win10_x64_cb;
+                else
+                    // Tested on Windows 10 1803 x64
+                    tcpe_cb = tcpe_win10_x64_1803_cb;
                 break;
             default:
                 // Tested on Windows 7 SP1 x64
