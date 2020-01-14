@@ -151,14 +151,7 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (VMI_PM_IA32E == drakvuf->pm)
     {
         prcb = drakvuf->offsets[KPCR_PRCB];
-        if ( cpl )
-        {
-            // TODO: Xen 4.13 will have the correct value in the info->regs->shadow_gs
-            if (VMI_FAILURE == vmi_get_vcpureg(vmi, &kpcr, SHADOW_GS, info->vcpu))
-                return 0;
-        }
-        else
-            kpcr = info->regs->gs_base;
+        kpcr = cpl ? info->regs->shadow_gs : info->regs->gs_base;
     }
     else
     {
@@ -170,14 +163,10 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
          */
         if ( cpl )
         {
-            addr_t gdt;
-
-            // TODO: Xen 4.13 will have the value delivered in the info->regs->gdtr_base
-            if (VMI_FAILURE == vmi_get_vcpureg(vmi, &gdt, GDTR_BASE, info->vcpu))
-                return 0;
-
             uint16_t fs_low = 0;
             uint8_t fs_mid = 0, fs_high = 0;
+
+            addr_t gdt = info->regs->gdtr_base;
 
             if (VMI_FAILURE == vmi_read_16_va(vmi, gdt + 0x32, 0, &fs_low))
                 return 0;
