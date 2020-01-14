@@ -259,16 +259,28 @@ static void save_file_metadata(filedelete* f,
     if (!fp)
         return;
 
-    fprintf(fp, "FileName: \"%s\"\n", filename ?: "<UNKNOWN>");
-    fprintf(fp, "FileSize: %zu\n", file_size);
-    fprintf(fp, "FileFlags: 0x%lx (%s)\n", fo_flags, parse_flags(fo_flags, fo_flags_map, OUTPUT_DEFAULT, "0").c_str());
-    fprintf(fp, "SequenceNumber: %d\n", sequence_number);
-    fprintf(fp, "ControlArea: 0x%lx\n", control_area);
-    fprintf(fp, "PID: %" PRIu64 "\n", static_cast<uint64_t>(info->proc_data.pid));
-    fprintf(fp, "PPID: %" PRIu64 "\n", static_cast<uint64_t>(info->proc_data.ppid));
-    fprintf(fp, "ProcessName: \"%s\"\n", info->proc_data.name);
-    if (ntstatus)
-        fprintf(fp, "WARNING: The file have been read partially with status 0x%x\n", ntstatus);
+    // TODO string escaping
+    fprintf(fp, "{\n");
+    fprintf(fp, "  \"FileName\": \"%s\",\n", filename ?: "<UNKNOWN>");
+    fprintf(fp, "  \"FileSize\": %zu,\n", file_size);
+    fprintf(fp, "  \"FileFlags\": \"0x%lx (%s)\",\n", fo_flags, parse_flags(fo_flags, fo_flags_map, OUTPUT_DEFAULT, "0").c_str());
+    fprintf(fp, "  \"SequenceNumber\": %d,\n", sequence_number);
+    fprintf(fp, "  \"ControlArea\": \"0x%lx\",\n", control_area);
+    fprintf(fp, "  \"PID\": %" PRIu64 ",\n", static_cast<uint64_t>(info->proc_data.pid));
+    fprintf(fp, "  \"PPID\": %" PRIu64 ",\n", static_cast<uint64_t>(info->proc_data.ppid));
+    fprintf(fp, "  \"ProcessName\": \"%s\",\n", info->proc_data.name);
+    if (!ntstatus)
+    {
+        fprintf(fp, "  \"FullReadSuccess\": true\n");
+    }
+    else
+    {
+        fprintf(fp, "  \"FullReadSuccess\": false,\n");
+        // if the file have been read partially, also note what was the NTSTATUS of failing operation
+        fprintf(fp, "  \"ReadNtStatus\": %d\n", ntstatus);
+    }
+
+    fprintf(fp, "}\n");
 
     fclose(fp);
 }

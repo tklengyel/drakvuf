@@ -132,20 +132,24 @@ static void save_file_metadata(const drakvuf_trap_info_t* info,
     if (!fp)
         return;
 
-    fprintf(fp, "Method: \"%s\"\n", method);
-    fprintf(fp, "DumpReason: \"%s\"\n", dump_reason);
-    fprintf(fp, "DumpAddress: 0x%" PRIx64 "\n", dump_address);
-    fprintf(fp, "DumpSize: 0x%" PRIx64 "\n", dump_size);
-    fprintf(fp, "PID: %" PRId32 "\n", info->proc_data.pid);
-    fprintf(fp, "PPID: %" PRId32 "\n", info->proc_data.ppid);
-    fprintf(fp, "ProcessName: \"%s\"\n", info->proc_data.name);
+    // TODO string escaping?
+
+    fprintf(fp, "{\n");
+    fprintf(fp, "  \"Method\": \"%s\",\n", method);
+    fprintf(fp, "  \"DumpReason\": \"%s\",\n", dump_reason);
+    fprintf(fp, "  \"DumpAddress\": \"0x%" PRIx64 "\",\n", dump_address);
+    fprintf(fp, "  \"DumpSize\": \"0x%" PRIx64 "\",\n", dump_size);
+    fprintf(fp, "  \"PID\": %" PRId32 ",\n", info->proc_data.pid);
+    fprintf(fp, "  \"PPID\": %" PRId32 ",\n", info->proc_data.ppid);
+    fprintf(fp, "  \"ProcessName\": \"%s\",\n", info->proc_data.name);
     if (extras && extras->type == WriteVirtualMemoryExtras)
     {
-        fprintf(fp, "TargetPID: %" PRId32 "\n", extras->write_virtual_memory_extras.target_pid);
-        fprintf(fp, "TargetProcessName: \"%s\"\n", extras->write_virtual_memory_extras.target_name);
-        fprintf(fp, "TargetBaseAddress: %" PRIx64 "\n", extras->write_virtual_memory_extras.base_address);
+        fprintf(fp, "  \"TargetPID\": %" PRId32 ",\n", extras->write_virtual_memory_extras.target_pid);
+        fprintf(fp, "  \"TargetProcessName\": \"%s\",\n", extras->write_virtual_memory_extras.target_name);
+        fprintf(fp, "  \"TargetBaseAddress\": \"0x%" PRIx64 "\",\n", extras->write_virtual_memory_extras.base_address);
     }
-    fprintf(fp, "DataFileName: \"%s\"\n", data_file_name);
+    fprintf(fp, "  \"DataFileName\": \"%s\"\n", data_file_name);
+    fprintf(fp, "}\n");
 
     fclose(fp);
 }
