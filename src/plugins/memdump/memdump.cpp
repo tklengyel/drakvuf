@@ -114,6 +114,42 @@
 
 #define DUMP_NAME_PLACEHOLDER "(not configured)"
 
+static void save_file_metadata(const drakvuf_trap_info_t* info,
+                               const char* file_path,
+                               const char* data_file_name,
+                               size_t dump_size,
+                               addr_t dump_address,
+                               const char* method,
+                               const char* dump_reason,
+                               extras_t* extras)
+{
+    char* file = NULL;
+    if ( asprintf(&file, "%s.metadata", file_path) < 0 )
+        return;
+
+    FILE* fp = fopen(file, "w");
+    free(file);
+    if (!fp)
+        return;
+
+    fprintf(fp, "Method: \"%s\"\n", method);
+    fprintf(fp, "DumpReason: \"%s\"\n", dump_reason);
+    fprintf(fp, "DumpAddress: 0x%" PRIx64 "\n", dump_address);
+    fprintf(fp, "DumpSize: 0x%" PRIx64 "\n", dump_size);
+    fprintf(fp, "PID: %" PRId32 "\n", info->proc_data.pid);
+    fprintf(fp, "PPID: %" PRId32 "\n", info->proc_data.ppid);
+    fprintf(fp, "ProcessName: \"%s\"\n", info->proc_data.name);
+    if (extras && extras->type == WriteVirtualMemoryExtras)
+    {
+        fprintf(fp, "TargetPID: %" PRId32 "\n", extras->write_virtual_memory_extras.target_pid);
+        fprintf(fp, "TargetProcessName: \"%s\"\n", extras->write_virtual_memory_extras.target_name);
+        fprintf(fp, "TargetBaseAddress: %" PRIx64 "\n", extras->write_virtual_memory_extras.base_address);
+    }
+    fprintf(fp, "DataFileName: \"%s\"\n", data_file_name);
+
+    fclose(fp);
+}
+
 /**
  * Dumps the memory specified by access context, from `ctx->addr` (first byte) to `ctx->addr + len_bytes - 1` (last byte).
  * File is stored in a path provided in --memdump-dir command line option and named according to the scheme:
@@ -130,9 +166,10 @@ bool dump_memory_region(
     access_context_t* ctx,
     size_t len_bytes,
     const char* reason,
-    void* extras,
-    void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, void* extras))
+    extras_t* extras,
+    void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, extras_t* extras))
 {
+    char* metafile = nullptr;
     char* file = nullptr;
     char* file_path = nullptr;
     char* tmp_file_path = nullptr;
@@ -253,6 +290,11 @@ bool dump_memory_region(
     if (rename(tmp_file_path, file_path) != 0)
         goto done;
 
+    if (asprintf(&metafile, "%s/memdump.%06d", plugin->memdump_dir, ++plugin->dumps_count) < 0)
+      goto done;
+
+    save_file_metadata(info, metafile, file, len_bytes, ctx->addr, info->trap->name, reason, extras);
+
     ret = true;
 
 printout:
@@ -267,16 +309,15 @@ printout:
                 printout_extras(drakvuf, plugin->m_output_format, extras);
             break;
         case OUTPUT_KV:
-            printf("memdump Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,DumpReason=\"%s\",DumpPID=%d,DumpAddr=%" PRIx64 ",DumpSize=%" PRIu64 ",DumpFilename=\"%s\"",
+            printf("memdump Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,DumpReason=\"%s\",DumpPID=%d,DumpAddr=%" PRIx64 ",DumpSize=%" PRIu64 ",SN=%d",
                    UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, reason, info->proc_data.pid, ctx->addr, len_bytes, display_file);
+                   info->trap->name, reason, info->proc_data.pid, ctx->addr, len_bytes, plugin->dumps_count);
 
             if (printout_extras)
                 printout_extras(drakvuf, plugin->m_output_format, extras);
             break;
         case OUTPUT_JSON:
             escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            escaped_fname = drakvuf_escape_str(display_file);
             printf( "{"
                     "\"Plugin\": \"memdump\", "
                     "\"TimeStamp\":" "\"" FORMAT_TIMEVAL "\", "
@@ -612,37 +653,28 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-typedef struct write_virtual_memory_extras
+static void printout_write_virtual_memory(drakvuf_t drakvuf, output_format_t format, extras_t* xtr)
 {
-    vmi_pid_t target_pid;
-    char* target_name;
-    addr_t base_address;
-} write_virtual_memory_extras_t;
-
-static void printout_write_virtual_memory(drakvuf_t drakvuf, output_format_t format, void* extras)
-{
-    auto* xtr = (write_virtual_memory_extras_t*)extras;
-
     switch (format)
     {
         case OUTPUT_CSV:
             printf(",%d,%" PRIx64 "",
-                   xtr->target_pid, xtr->base_address);
+                   xtr->write_virtual_memory_extras.target_pid, xtr->write_virtual_memory_extras.base_address);
             break;
         case OUTPUT_KV:
             printf(",TargetPID=%d,WriteAddr=%" PRIx64 "",
-                   xtr->target_pid, xtr->base_address);
+                   xtr->write_virtual_memory_extras.target_pid, xtr->write_virtual_memory_extras.base_address);
             break;
         case OUTPUT_JSON:
             printf( ", "
                     "\"TargetPID\": %d, "
                     "\"WriteAddr\": \"0x%" PRIx64 "\"",
-                    xtr->target_pid, xtr->base_address);
+                    xtr->write_virtual_memory_extras.target_pid, xtr->write_virtual_memory_extras.base_address);
             break;
         default:
         case OUTPUT_DEFAULT:
             printf(" TargetPID:%d WriteAddr:%" PRIx64 "",
-                   xtr->target_pid, xtr->base_address);
+                   xtr->write_virtual_memory_extras.target_pid, xtr->write_virtual_memory_extras.base_address);
             break;
     }
 }
@@ -690,14 +722,18 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
     if (!target_name)
         target_name = g_strdup("<UNKNOWN>");
 
-    write_virtual_memory_extras_t extras =
+    extras_t extras =
     {
-        .target_pid = target_pid,
-        .target_name = target_name,
-        .base_address = base_address,
+        .type = WriteVirtualMemoryExtras,
+        .write_virtual_memory_extras =
+        {
+            .target_pid = target_pid,
+            .target_name = target_name,
+            .base_address = base_address,
+        },
     };
 
-    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, buffer_size, "NtWriteVirtualMemory called", (void*)&extras, printout_write_virtual_memory))
+    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, buffer_size, "NtWriteVirtualMemory called", &extras, printout_write_virtual_memory))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
     }
@@ -709,6 +745,7 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
 
 memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
     : pluginex(drakvuf, output)
+    , dumps_count()
 {
     this->memdump_dir = c->memdump_dir;
 
