@@ -102,13 +102,14 @@
 #                                                                         #
 #*************************************************************************#
 
-bin_PROGRAMS = drakvuf xen_memclone injector
+bin_PROGRAMS = drakvuf xen_memclone injector proc_stat
 
 SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch
 
 drakvuf_SOURCES = main.cpp drakvuf.cpp drakvuf.h
 xen_memclone_SOURCES  = xen_memclone.c
 injector_SOURCES = injector.c
+proc_stat_SOURCES = proc_stat.cpp
 
 AM_CPPFLAGS = $(CPPFLAGS)
 AM_CPPFLAGS += $(VMI_CFLAGS)
@@ -158,5 +159,7 @@ endif
 
 injector_LDADD = libdrakvuf/libdrakvuf.la
 injector_LDADD += libinjector/libinjector.la
+
+proc_stat_LDADD = libdrakvuf/libdrakvuf.la
 
 xen_memclone_LDADD = xen_helper/libxenhelper.la
