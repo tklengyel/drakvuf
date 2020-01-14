@@ -35,6 +35,7 @@ stamp-h1
 drakvuf
 injector
 xen_memclone
+proc_stat
 
 libtool
 ltmain.sh
