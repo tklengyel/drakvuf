@@ -868,6 +868,7 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
 done:
     delete w;
+    w->f->traps_to_free = g_slist_remove(w->f->traps_to_free, info->trap);
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)g_free);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -941,6 +942,8 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         printf("Failed to trap return at 0x%lx\n", rsp);
         delete w;
     }
+
+    f->traps_to_free = g_slist_prepend(f->traps_to_free, trap);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -1073,6 +1076,7 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
 filetracer::filetracer(drakvuf_t drakvuf, output_format_t output)
     : format{output}
     , offsets(new size_t[__OFFSET_MAX])
+    , traps_to_free(NULL)
 {
     int addr_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
 
@@ -1097,5 +1101,16 @@ filetracer::filetracer(drakvuf_t drakvuf, output_format_t output)
 
 filetracer::~filetracer()
 {
+    if ( traps_to_free )
+    {
+        GSList *loop = traps_to_free;
+        while (loop)
+        {
+            g_free(loop->data);
+            loop = loop->next;
+        }
+        g_slist_free(traps_to_free);
+    }
+
     delete[] offsets;
 }

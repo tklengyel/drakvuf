@@ -130,6 +130,7 @@ public:
         }
     };
 
+    GSList *traps_to_free;
     filetracer(drakvuf_t drakvuf, output_format_t output);
     ~filetracer();
 };
