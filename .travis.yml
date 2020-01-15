@@ -186,23 +186,10 @@ matrix:
 # clang scan-build
 #
     - env:
-        - TEST="scan-build" CXX_COMPILER=clang++-10 CXX_STDLIB=g++-9
-      addons:
-        apt:
-          packages:
-            - clang-10
-            - clang-tools-10
-            - g++-9
-            - bison
-            - flex
-            - libjson-c-dev
-            - autoconf-archive
-            - libxen-dev
-          sources:
-            - sourceline: 'ppa:ubuntu-toolchain-r/test'
-            - sourceline: 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic main'
-              key_url: 'https://apt.llvm.org/llvm-snapshot.gpg.key'
+        - TEST="scan-build"
       before_install:
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
@@ -220,8 +207,8 @@ matrix:
         - cd ..
         - ./autogen.sh
       script:
-        - scan-build-10 --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
-        - scan-build-10 --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores make
+        - scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
+        - scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores make
 
 #
 # SonarCloud
