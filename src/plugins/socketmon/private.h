@@ -112,50 +112,6 @@
  */
 #define CR3_COUNT_BEFORE_BAIL 1000
 
-/* _pad fields are unknown/unlabeled members */
-struct tcp_listener_x86   // 44h
-{
-    uint32_t _pad1[6];
-    uint32_t owner;
-    uint32_t _pad2;
-    uint64_t createtime;
-    uint32_t _pad3[3];
-    uint32_t localaddr;
-    uint32_t inetaf;
-    uint16_t _pad4;
-    uint16_t port;
-    uint32_t _pad5;
-} __attribute__ ((packed));
-
-struct tcp_listener_x64   //78h
-{
-    uint64_t _pad[5];
-    uint64_t owner;
-    uint64_t _pad2;
-    uint64_t createtime;
-    uint64_t _pad3[3];
-    uint64_t localaddr;
-    uint64_t inetaf;
-    uint16_t _pad4;
-    uint16_t port;
-    uint8_t _pad5[12];
-} __attribute__ ((packed));
-
-struct tcp_listener_win10_x64
-{
-    uint64_t _pad[5];
-    uint64_t inetaf; // inetaf_win10_x64
-    uint64_t owner;
-    uint64_t _pad2;
-    uint64_t createtime;
-    uint64_t _pad3[3];
-    uint64_t localaddr;
-    uint64_t _pad4;
-    uint16_t _pad5;
-    uint16_t port;
-    uint8_t _pad6[12];
-} __attribute__ ((packed));
-
 /* TcpE */
 enum tcp_state
 {
@@ -220,6 +176,21 @@ struct tcp_endpoint_x64
     uint64_t owner;
 } __attribute__ ((packed));
 
+// Tested for Windows 8.1
+struct tcp_endpoint_win81_x64
+{
+    addr_t _pad1[2];      // +0x0
+    addr_t inetaf;        // +0x10 -> inetaf_win10_x64
+    addr_t addrinfo;      // +0x18
+    uint8_t _pad2[0x4c];  // +0x20
+    uint32_t state;       // +0x6c
+    uint16_t localport;   // +0x70
+    uint16_t remoteport;  // +0x72
+    uint8_t _pad3[0x1e4]; // +0x74
+    addr_t owner;         // +0x258
+} __attribute__((packed));
+
+// That worked with Windows 10 before 1803
 struct tcp_endpoint_win10_x64
 {
     addr_t _pad1[2];
@@ -233,6 +204,20 @@ struct tcp_endpoint_win10_x64
     addr_t owner;
     addr_t _pad4;
     addr_t createtime;
+} __attribute__((packed));
+
+// Tested for Windows 10 build 1803
+struct tcp_endpoint_win10_x64_1803
+{
+    addr_t _pad1[2];      // +0x0
+    addr_t inetaf;        // +0x10 -> inetaf_win10_x64
+    addr_t addrinfo;      // +0x18
+    uint8_t _pad2[0x4c];  // +0x20
+    uint32_t state;       // +0x6c
+    uint16_t localport;   // +0x70
+    uint16_t remoteport;  // +0x72
+    uint8_t _pad3[0x204]; // +0x74
+    addr_t owner;         // +0x278
 } __attribute__((packed));
 
 struct addr_info_x86
@@ -281,11 +266,13 @@ struct inetaf_x64
     uint8_t addressfamily;
 } __attribute__ ((packed));
 
-struct inetaf_win10_x64
+struct inetaf_win81_x64
 {
     uint8_t _pad[0x18];
     uint8_t addressfamily;
 } __attribute__ ((packed));
+
+using inetaf_win10_x64 = inetaf_win81_x64;
 
 /* UdpA */
 struct udp_endpoint_x86
