@@ -112,18 +112,27 @@
 struct syscalls_config
 {
     const char* syscalls_filter_file;
+    const char* win32k_profile;
 };
 
 class syscalls: public plugin
 {
-
-private:
-    GSList* traps;
-
 public:
+    GSList *traps;
+    GHashTable *filter;
+    json_object* win32k_json;
+
     uint8_t reg_size;
+    page_mode_t pm;
     output_format_t format;
     os_t os;
+
+    size_t *offsets;
+
+    addr_t sst[2][2]; // [0=nt][base, limit],[1=win32k][base,limit]
+
+    addr_t kernel_base;
+    addr_t win32k_base;
 
     syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     ~syscalls();
