@@ -409,7 +409,7 @@ static int linux_build_argbuf(void* buf, vmi_instance_t vmi, drakvuf_trap_info_t
             if ( nargs > 2 )
                 buf64[2] = lr.rdx;
             if ( nargs > 3 )
-                buf64[3] = lr.r10;
+                buf64[3] = lr.rcx;
             if ( nargs > 4 )
                 buf64[4] = lr.r8;
             if ( nargs > 5 )
@@ -425,7 +425,7 @@ static int linux_build_argbuf(void* buf, vmi_instance_t vmi, drakvuf_trap_info_t
             if ( nargs > 2 )
                 buf64[2] = info->regs->rdx;
             if ( nargs > 3 )
-                buf64[3] = info->regs->r10;
+                buf64[3] = info->regs->rcx;
             if ( nargs > 4 )
                 buf64[4] = info->regs->r8;
             if ( nargs > 5 )
