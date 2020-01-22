@@ -229,7 +229,7 @@ static void print_usage()
             "\t --dll-hooks-list <file>\n"
             "\t                           List of DLL functions to be hooked\n"
             "\t                           each entry in a separate line of file\n"
-            "\t                           line format: dll_name,function_name\n"
+            "\t                           line format: dll_name,function_name,num_of_arguments\n"
 #endif
             "\t -h, --help                Show this help\n"
             );
