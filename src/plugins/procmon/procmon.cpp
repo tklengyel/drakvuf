@@ -108,8 +108,9 @@
 #include <libvmi/x86.h>
 #include <assert.h>
 
+#include <libdrakvuf/ntstatus.h>
+
 #include "../plugins.h"
-#include "ntstatus.h"
 #include "procmon.h"
 #include "winnt.h"
 #include "privileges.h"
