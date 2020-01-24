@@ -867,9 +867,9 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     }
 
 done:
-    delete w;
     w->f->traps_to_free = g_slist_remove(w->f->traps_to_free, info->trap);
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)g_free);
+    delete w;
 
     return VMI_EVENT_RESPONSE_NONE;
 }
