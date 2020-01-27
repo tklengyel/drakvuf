@@ -888,7 +888,7 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
     if (vmi_pagetable_lookup(vmi, info->regs->cr3, data->vaddr, &pa) != VMI_SUCCESS)
     {
-        PRINT_DEBUG("[MEMDUMP-USER] failed to get pa");
+        PRINT_DEBUG("[MEMDUMP-USER] failed to get pa\n");
         goto end;
     }
 
@@ -1001,7 +1001,6 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
         PRINT_DEBUG("[MEMDUMP-USER] Usermode hooking is not yet supported on this architecture/bitness.\n");
         return;
     }
-    PRINT_DEBUG("[MEMDUMP-USER] ELO MORDECZKO, NASZ PEDRZ MODE TAKI: %d\n", pm);
 
     try
     {

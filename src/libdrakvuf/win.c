@@ -390,22 +390,22 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, i
     {
         switch (narg)
         {
-        case 1:
-            return info->regs->rcx;
-        case 2:
-            return info->regs->rdx;
-        case 3:
-            return info->regs->r8;
-        case 4:
-            return info->regs->r9;
+            case 1:
+                return info->regs->rcx;
+            case 2:
+                return info->regs->rdx;
+            case 3:
+                return info->regs->r8;
+            case 4:
+                return info->regs->r9;
         }
     }
 
     access_context_t ctx =
     {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = info->regs->rsp + narg * (is32 ? 4 : 8),
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rsp + narg * (is32 ? 4 : 8),
     };
 
     if (is32)
