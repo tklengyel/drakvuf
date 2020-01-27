@@ -557,6 +557,7 @@ unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_con
 // Returns JSON-compliant copy of input string. User must free the result.
 gchar* drakvuf_escape_str(const char* input) NOEXCEPT;
 
+bool drakvuf_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info) NOEXCEPT;
 
 addr_t drakvuf_get_function_argument(drakvuf_t drakvuf,
                                      drakvuf_trap_info_t* info,

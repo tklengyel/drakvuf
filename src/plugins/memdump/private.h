@@ -169,7 +169,7 @@ struct return_hook_target_entry_t
 	vmi_pid_t pid;
 	drakvuf_trap_t* trap;
 	memdump* plugin;
-	std::list < uint64_t > arguments;
+	std::vector < uint64_t > arguments;
 };
 
 template<typename T>

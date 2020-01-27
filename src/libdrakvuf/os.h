@@ -193,6 +193,9 @@ typedef struct os_interface
     char* (*get_filename_from_handle)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
 
+    bool (*is_wow64)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
     addr_t (*get_function_argument)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg);
 

@@ -371,10 +371,22 @@ static bool find_kernbase(drakvuf_t drakvuf)
     return 1;
 }
 
+bool win_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    // check if we're in kernel mode
+    if ( (info->regs->cs_sel & 3) == 0)
+        return 0;
+
+    addr_t wow_ctx;
+    addr_t ethread = drakvuf_get_current_thread(drakvuf, info);
+    return drakvuf_get_wow_context(drakvuf, ethread, &wow_ctx);
+}
+
 addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg)
 {
     page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-    if (pm == VMI_PM_IA32E)
+    bool is32 = pm != VMI_PM_IA32E || win_is_wow64(drakvuf, info);
+    if (!is32)
     {
         switch (narg)
         {
@@ -393,13 +405,20 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, i
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = info->regs->rsp + narg * drakvuf_get_address_width(drakvuf),
+        .addr = info->regs->rsp + narg * (is32 ? 4 : 8),
     };
 
-    addr_t addr;
-    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &addr))
+    if (is32)
+    {
+        uint32_t ret;
+        if (VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &ret))
+            return 0;
+        return ret;
+    }
+    uint64_t ret;
+    if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
         return 0;
-    return addr;
+    return ret;
 }
 
 bool fill_wow_offsets( drakvuf_t drakvuf, size_t size, const char* names [][2] )
@@ -469,6 +488,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_process_data = win_get_process_data;
     drakvuf->osi.get_registry_keyhandle_path = win_reg_keyhandle_path;
     drakvuf->osi.get_filename_from_handle = win_get_filename_from_handle;
+    drakvuf->osi.is_wow64 = win_is_wow64;
     drakvuf->osi.get_function_argument = win_get_function_argument;
     drakvuf->osi.enumerate_processes = win_enumerate_processes;
     drakvuf->osi.enumerate_processes_with_module = win_enumerate_processes_with_module;

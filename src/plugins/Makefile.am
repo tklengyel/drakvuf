@@ -239,6 +239,7 @@ sources += memdump/memdump.cpp
 sources += memdump/memdump.h
 sources += memdump/private.h
 sources += memdump/userhook.cpp
+sources += memdump/crypto.cpp
 sources += memdump/stack_util.cpp
 endif
 
