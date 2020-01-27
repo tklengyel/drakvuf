@@ -357,6 +357,13 @@ char* drakvuf_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     return NULL;
 }
 
+bool drakvuf_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    if (drakvuf->osi.is_wow64)
+        return drakvuf->osi.is_wow64(drakvuf, info);
+    return 0;
+}
+
 addr_t drakvuf_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg)
 {
     if ( drakvuf->osi.get_function_argument )

@@ -116,6 +116,8 @@
 
 #include <fstream>
 #include <sstream>
+#include <map>
+#include <string>
 
 #include <config.h>
 #include <glib.h>
@@ -127,53 +129,9 @@
 
 #include "memdump.h"
 #include "private.h"
+#include "crypto.h"
 
-bool is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    addr_t wow_ctx;
-    addr_t ethread = drakvuf_get_current_thread(drakvuf, info);
-    return drakvuf_get_wow_context(drakvuf, ethread, &wow_ctx);
-}
-
-addr_t get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg)
-{
-    bool is32 = is_wow64(drakvuf, info);
-    if (!is32)
-    {
-        switch (narg)
-        {
-            case 1:
-                return info->regs->rcx;
-            case 2:
-                return info->regs->rdx;
-            case 3:
-                return info->regs->r8;
-            case 4:
-                return info->regs->r9;
-        }
-    }
-
-    access_context_t ctx =
-            {
-                    .translate_mechanism = VMI_TM_PROCESS_DTB,
-                    .dtb = info->regs->cr3,
-                    .addr = info->regs->rsp + narg * (is32 ? 4 : 8),
-            };
-
-    if (is32)
-    {
-        uint32_t ret;
-        if (VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &ret))
-            return 0;
-        return ret;
-    }
-    uint64_t ret;
-    if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
-        return 0;
-    return ret;
-}
-
-void print_arguments(std::list < uint64_t > arguments)
+void print_arguments(std::vector < uint64_t > arguments)
 {
     size_t i = 0;
     for (auto it = arguments.begin(); it != arguments.end(); it++, i++)
@@ -182,7 +140,17 @@ void print_arguments(std::list < uint64_t > arguments)
         if (i < arguments.size() - 1)
             printf(",");
     }
-    printf("]");
+}
+
+void print_extra_data(std::map < std::string, std::string > extra_data)
+{
+    size_t i = 0;
+    for (auto it = extra_data.begin(); it != extra_data.end(); it++, i++)
+    {
+        printf("\"%s\": \"%s\"", it->first.c_str(), it->second.c_str());
+        if (i < extra_data.size() - 1)
+            printf(", ");
+    }
 }
 
 static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
@@ -192,6 +160,11 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
         return VMI_EVENT_RESPONSE_NONE;
 
     auto plugin = ret_target->plugin;
+
+    std::map < std::string, std::string > extra_data;
+
+    if(!strcmp(info->trap->name, "CryptGenKey"))
+        extra_data = CryptGenKey_hook(drakvuf, info, ret_target->arguments);
 
     gchar* escaped_pname;
     switch (plugin->m_output_format)
@@ -231,7 +204,10 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
                     info->regs->rip);
 
             print_arguments(ret_target->arguments);
-            printf("}");
+            printf("], "
+                   "\"Extra\": {");
+            print_extra_data(extra_data);
+            printf("}}");
             g_free(escaped_pname);
             break;
         default:
@@ -262,7 +238,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
     vmi_v2pcache_flush(vmi, info->regs->cr3);
 
-    bool is_syswow = is_wow64(drakvuf, info);
+    bool is_syswow = drakvuf_is_wow64(drakvuf, info);
 
     access_context_t ctx =
             {
@@ -295,7 +271,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
 
     for (size_t i = 1; i <= target->args_num; i++)
     {
-        uint64_t argument = get_function_argument(drakvuf, info, i);
+        uint64_t argument = drakvuf_get_function_argument(drakvuf, info, i);
         ret_target->arguments.push_back(argument);
     }
     ret_target->plugin = target->plugin;
@@ -912,7 +888,7 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
     if (vmi_pagetable_lookup(vmi, info->regs->cr3, data->vaddr, &pa) != VMI_SUCCESS)
     {
-        PRINT_DEBUG("[MEMDUMP-USER] failed to get pa");
+        PRINT_DEBUG("[MEMDUMP-USER] failed to get pa\n");
         goto end;
     }
 

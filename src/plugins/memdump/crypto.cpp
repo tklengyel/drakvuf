@@ -102,80 +102,87 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_H
-#define WIN_H
-
+#include <config.h>
+#include <glib.h>
+#include <inttypes.h>
 #include <libvmi/libvmi.h>
-#include "libdrakvuf.h"
-#include "os.h"
-#include "win-exports.h"
+#include <libvmi/peparse.h>
+#include <libdrakvuf/private.h>
+#include <assert.h>
+#include <map>
+#include <string>
+#include <iomanip>
 
-addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+#include "crypto.h"
 
-addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+static std::string make_hex_string(uint8_t* data, size_t len)
+{
+    std::ostringstream ss;
+    ss << std::hex << std::setfill('0');
+    for (size_t i = 0; i < len; i++)
+    {
+        ss << std::setw(2) << static_cast<int>(data[i]);
+    }
+    return ss.str();
+}
 
-bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
+// TODO: only works for 32 bits, we should implement 64-bit version in future
+std::map < std::string, std::string > CryptGenKey_hook(drakvuf_t drakvuf, drakvuf_trap_info* info, std::vector <uint64_t> arguments)
+{
+	std::map < std::string, std::string > ret;
 
-char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
+    if (!drakvuf_is_wow64(drakvuf, info))
+    {
+        PRINT_DEBUG("CryptGenKey hook not supported for 64-bit process\n");
+        return ret;
+    }
+    addr_t hKey_addr = 0;
+    HCRYPTKEY_s *hKey = new HCRYPTKEY_s;
+    magic_s *magic = new magic_s;
+    key_data_s *key_data = new key_data_s;
+    uint8_t *key_bytes;
+    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
+    if (VMI_SUCCESS != vmi_read_32_va(vmi, arguments[3], info->proc_data.pid, (uint32_t*)&hKey_addr))
+    {
+        drakvuf_release_vmi(drakvuf);
+        goto end;
+    }
 
-bool win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
+    if (VMI_SUCCESS != vmi_read_va(vmi, hKey_addr, info->proc_data.pid, sizeof(HCRYPTKEY_s), hKey, NULL))
+    {
+        drakvuf_release_vmi(drakvuf);
+        goto end;
+    }
 
-char* win_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
+    hKey->magic ^= MAGIC_PTR_XOR_VALUE;
+    if (VMI_SUCCESS != vmi_read_va(vmi, hKey->magic, info->proc_data.pid, sizeof(magic_s), magic, NULL))
+    {
+        drakvuf_release_vmi(drakvuf);
+        goto end;
+    }
 
-int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base);
+    if (VMI_SUCCESS != vmi_read_va(vmi, magic->key_data, info->proc_data.pid, sizeof(key_data_s), key_data, NULL))
+    {
+        drakvuf_release_vmi(drakvuf);
+        goto end;
+    }
 
-int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    key_bytes = new uint8_t[key_data->key_size];
 
-bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
+    if (VMI_SUCCESS != vmi_read_va(vmi, key_data->key_bytes, info->proc_data.pid, key_data->key_size, key_bytes, NULL))
+    {
+        drakvuf_release_vmi(drakvuf);
+        goto end;
+    }
 
-bool win_get_thread_previous_mode(drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
+    drakvuf_release_vmi(drakvuf);
 
-bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info,
-        privilege_mode_t* previous_mode);
+    ret[EXTRA_GENERATED_KEY] = make_hex_string(key_bytes, key_data->key_size);
 
-bool win_is_ethread(drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
-
-bool win_is_eprocess(drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
-
-bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module_list);
-bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list );
-
-bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
-bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
-module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );
-module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );
-
-bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* eprocess_addr);
-
-bool win_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx);
-bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
-
-bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
-
-bool win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, int32_t* ppid );
-
-bool win_get_process_data( drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data );
-
-gchar* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle );
-
-char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
-
-bool win_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int argument_number);
-
-bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
-
-bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
-
-bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
-
-addr_t win_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
-bool win_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
-bool win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
-bool win_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
-
-#endif
+    end:
+    delete hKey;
+    delete magic;
+    delete key_data;
+    return ret;
+}
