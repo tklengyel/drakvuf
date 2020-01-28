@@ -942,8 +942,8 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         printf("Failed to trap return at 0x%lx\n", rsp);
         delete w;
     }
-
-    f->traps_to_free = g_slist_prepend(f->traps_to_free, trap);
+    else
+        f->traps_to_free = g_slist_prepend(f->traps_to_free, trap);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -1106,7 +1106,12 @@ filetracer::~filetracer()
         GSList *loop = traps_to_free;
         while (loop)
         {
+            drakvuf_trap_t *t = (drakvuf_trap_t*)loop->data;
+            struct wrapper *w = (struct wrapper*)t->data;
+
+            delete w;
             g_free(loop->data);
+
             loop = loop->next;
         }
         g_slist_free(traps_to_free);
