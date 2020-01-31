@@ -542,6 +542,7 @@ AC_CONFIG_FILES([Makefile src/Makefile
                  src/xen_helper/Makefile
                  src/plugins/Makefile
                  src/dirwatch/Makefile
+				 src/libusermode/Makefile
                ])
 
 AC_OUTPUT

@@ -102,77 +102,132 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef MEMDUMP_PRIVATE_H
-#define MEMDUMP_PRIVATE_H
+#ifndef WIN_USERHOOK_H
+#define WIN_USERHOOK_H
 
 #include <vector>
-#include <list>
+#include <memory>
 
-typedef enum
-  {
-   INVALID,
-   WriteVirtualMemoryExtras,
-   __MAX_EXTRAX__
-  } extras_type_t;
+#include <glib.h>
+#include "plugins/private.h"
+#include "plugins/plugins_ex.h"
 
-typedef struct
+typedef event_response_t(*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
+
+enum target_hook_state
 {
-  extras_type_t type;
-  union
-  {
-    struct
-    {
-      vmi_pid_t target_pid;
-      char* target_name;
-      addr_t base_address;
-    } write_virtual_memory_extras;
-  };
-} extras_t;
-
-class memdump;
-
-// type of a pointer residing on stack
-enum sptr_type_t
-{
-    ERROR,   // problem with stack inspection
-    MAIN,    // pointer to a main module
-    LINKED,  // pointer to some linked DLL module
-    UNLINKED // pointer to some non-legit memory
+	HOOK_FIRST_TRY,
+	HOOK_PAGEFAULT_RETRY,
+	HOOK_FAILED,
+	HOOK_OK
 };
 
-sptr_type_t check_module_linked_wow(drakvuf_t drakvuf,
-                                    vmi_instance_t vmi,
-                                    memdump* plugin,
-                                    drakvuf_trap_info_t* info,
-                                    addr_t dll_base);
+struct hook_target_entry_t
+{
+	vmi_pid_t pid;
+	std::string target_name;
+	callback_t callback;
+	size_t args_num;
+	target_hook_state state;
+	drakvuf_trap_t* trap;
+	void* plugin;
 
-sptr_type_t check_module_linked(drakvuf_t drakvuf,
-                                vmi_instance_t vmi,
-                                memdump* plugin,
-                                drakvuf_trap_info_t* info,
-                                addr_t dll_base);
+	hook_target_entry_t(std::string target_name, callback_t callback, size_t args_num, void* plugin)
+		: target_name(target_name), callback(callback), args_num(args_num), state(HOOK_FIRST_TRY), plugin(plugin) {}
+};
 
-bool dump_memory_region(
-    drakvuf_t drakvuf,
-    vmi_instance_t vmi,
-    drakvuf_trap_info_t* info,
-    memdump* plugin,
-    access_context_t* ctx,
-    size_t len_bytes,
-    const char* reason,
-    extras_t* extras,
-    void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, extras_t* extras));
+struct return_hook_target_entry_t
+{
+	vmi_pid_t pid;
+	drakvuf_trap_t* trap;
+	void* plugin;
+	std::vector < uint64_t > arguments;
+};
 
-bool inspect_stack_ptr(
-    drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    memdump* plugin,
-    bool is_32bit,
-    addr_t stack_ptr);
+template<typename T>
+struct map_view_of_section_result_t : public call_result_t<T>
+{
+	map_view_of_section_result_t(T* src) : call_result_t<T>(src), section_handle(), process_handle(), base_address_ptr() {}
 
-bool dump_from_stack(
-    drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    memdump* plugin);
+	uint64_t section_handle;
+	uint64_t process_handle;
+	addr_t base_address_ptr;
+};
+
+template<typename T>
+struct copy_on_write_result_t : public call_result_t<T>
+{
+	copy_on_write_result_t(T* src) : call_result_t<T>(src), vaddr(), pte(), old_cow_pa() {}
+
+	addr_t vaddr;
+	addr_t pte;
+	addr_t old_cow_pa;
+	std::vector<hook_target_entry_t*> hooks;
+};
+
+struct user_dll_t
+{
+	// relevant while loading
+	addr_t dtb;
+	uint32_t thread_id;
+	addr_t real_dll_base;
+	bool is_hooked;
+
+	// internal, for page faults
+	addr_t pf_current_addr;
+	addr_t pf_max_addr;
+
+	// one entry per hooked function
+	std::vector<hook_target_entry_t> targets;
+};
+
+struct target_config_entry_t
+{
+	std::string dll_name;
+	std::string function_name;
+	size_t args_num;
+
+	target_config_entry_t() : dll_name(), function_name(), args_num() {}
+	target_config_entry_t(std::string&& dll_name, std::string&& function_name, size_t args_num)
+		: dll_name(std::move(dll_name)), function_name(std::move(function_name)), args_num(args_num) {}
+};
+
+struct dll_t {
+    addr_t dtb;
+    vmi_pid_t pid;
+    uint32_t thread_id;
+    addr_t real_dll_base;
+    mmvad_info_t* mmvad;
+    std::vector<hook_target_entry_t> targets;
+};
+
+typedef void (*dll_discover_cb)(drakvuf_t, dll_t*, void*);
+
+struct usermode_cb_registration {
+    dll_discover_cb cb;
+    void* extra;
+};
+
+bool drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
+
+class userhook : public pluginex
+{
+public:
+    int initialized;
+
+	std::vector<usermode_cb_registration> plugins;
+
+	std::vector<target_config_entry_t> wanted_hooks;
+	// map dtb -> list of hooked dlls
+	std::map<addr_t, std::vector<user_dll_t>> loaded_dlls;
+
+	userhook(drakvuf_t drakvuf) : pluginex(drakvuf, OUTPUT_DEFAULT), initialized(0) {}
+    ~userhook();
+
+	bool init(drakvuf_t drakvuf);
+	bool register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
+};
+
+extern userhook* instance;
 
 #endif

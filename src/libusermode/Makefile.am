@@ -102,65 +102,44 @@
 #                                                                         #
 #*************************************************************************#
 
-bin_PROGRAMS = drakvuf xen_memclone injector proc_stat
+sources = userhook.cpp userhook.h
 
-SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libusermode
-
-drakvuf_SOURCES = main.cpp drakvuf.cpp drakvuf.h
-xen_memclone_SOURCES  = xen_memclone.c
-injector_SOURCES = injector.c
-proc_stat_SOURCES = proc_stat.cpp
-
-AM_CPPFLAGS = $(CPPFLAGS)
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
+AM_CPPFLAGS += $(CPPFLAGS)
 AM_CPPFLAGS += $(VMI_CFLAGS)
 AM_CPPFLAGS += $(GLIB_CFLAGS)
-AM_CPPFLAGS += $(JSON_CFLAGS)
-AM_CPPFLAGS += -I$(top_srcdir) -I$(srcdir)
+AM_CPPFLAGS += $(JSONC_CFLAGS)
 
 AM_LDFLAGS =  $(LDFLAGS)
-AM_LDFLAGS += $(VMI_LIBS)
 AM_LDFLAGS += $(GLIB_LIBS)
+AM_LDFLAGS += $(VMI_LIBS)
 AM_LDFLAGS += $(JSONC_LIBS)
 
-AM_CFLAGS = $(CFLAGS)
 AM_CXXFLAGS = $(CXXFLAGS)
-
 if HARDENING
-AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 AM_CXXFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 endif
 
 if SANITIZE
-AM_CFLAGS += $(SANITIZE_CFLAGS)
 AM_CXXFLAGS += $(SANITIZE_CFLAGS)
 AM_LDFLAGS += $(SANITIZE_LDFLAGS)
 endif
 
-# Note that -pg is incompatible with HARDENING
 if DEBUG
-AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
-AM_CFLAGS += -Wno-missing-field-initializers
 AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
-AM_CXXFLAGS += -Wno-missing-field-initializers -Wno-unknown-warning-option -Wno-c99-designator -ferror-limit=0
+AM_CXXFLAGS += -Wno-missing-field-initializers -Wno-unused-parameter
+AM_CXXFLAGS += -Wno-initializer-overrides -Wno-unknown-warning-option
+AM_CXXFLAGS += -Wno-c99-designator -ferror-limit=0 -Wno-reorder-init-list
+AM_CXXFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
+               -Wpointer-arith -Winit-self -Wshadow \
+               -Wredundant-decls -Wfloat-equal -Wundef \
+               -Wvla
+# Note that -pg is incompatible with HARDENING
 if !HARDENING
-AM_CFLAGS += -pg
 AM_CXXFLAGS += -pg
 endif
 endif
 
-drakvuf_LDADD = libdrakvuf/libdrakvuf.la
-drakvuf_LDADD += xen_helper/libxenhelper.la
-drakvuf_LDADD += plugins/libdrakvufplugins.la
-drakvuf_LDADD += libinjector/libinjector.la
-drakvuf_LDADD += libusermode/libusermode.la
-
-if HARDENING
-drakvuf_LDADD += $(HARDEN_LDFLAGS)
-endif
-
-injector_LDADD = libdrakvuf/libdrakvuf.la
-injector_LDADD += libinjector/libinjector.la
-
-proc_stat_LDADD = libdrakvuf/libdrakvuf.la
-
-xen_memclone_LDADD = xen_helper/libxenhelper.la
+noinst_LTLIBRARIES= libusermode.la
+libusermode_la_SOURCES= $(sources)
+libusermode_la_LIBADD = ../libdrakvuf/libdrakvuf.la
