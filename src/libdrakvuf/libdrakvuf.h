@@ -114,6 +114,9 @@ extern "C" {
 
 #pragma GCC visibility push(default)
 
+#define LIBVMI_EXTRA_GLIB
+#define LIBVMI_EXTRA_JSON
+
 #include <glib.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/libvmi_extra.h>

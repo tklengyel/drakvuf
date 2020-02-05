@@ -103,7 +103,6 @@
 ***************************************************************************/
 
 #include <libvmi/libvmi.h>
-#include <libvmi/libvmi_extra.h>
 #include <libvmi/x86.h>
 #include <stdlib.h>
 #include <string.h>
