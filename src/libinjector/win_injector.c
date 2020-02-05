@@ -102,6 +102,9 @@
  *                                                                         *
 ***************************************************************************/
 
+#define LIBVMI_EXTRA_GLIB
+#define LIBVMI_EXTRA_JSON
+
 #include <libvmi/libvmi.h>
 #include <libvmi/libvmi_extra.h>
 #include <libvmi/x86.h>
