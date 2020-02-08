@@ -317,26 +317,31 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
 
 void on_dll_discovered(drakvuf_t drakvuf, dll_t* dll, void* extra)
 {
-	memdump* plugin = (memdump*)extra;
+    memdump* plugin = (memdump*)extra;
 
-	vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-	unicode_string_t* dll_name = drakvuf_read_unicode_va(vmi, dll->mmvad->file_name_ptr, 0);
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    unicode_string_t* dll_name = drakvuf_read_unicode_va(vmi, dll->mmvad.file_name_ptr, 0);
 
-	if (dll_name && dll_name->contents)
-	{
-		for (auto const& wanted_hook : plugin->wanted_hooks)
-		{
-			if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
-			{
-				dll->targets.emplace_back(wanted_hook.function_name.c_str(), usermode_hook_cb, wanted_hook.args_num, plugin);
-			}
-		}
-	}
+    if (dll_name && dll_name->contents)
+    {
+        for (auto const& wanted_hook : plugin->wanted_hooks)
+        {
+            if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
+            {
+                dll->targets.emplace_back(wanted_hook.function_name.c_str(), usermode_hook_cb, wanted_hook.args_num, plugin);
+            }
+        }
+    }
 
-	if (dll_name)
-		vmi_free_unicode_str(dll_name);
+    if (dll_name)
+        vmi_free_unicode_str(dll_name);
 
-	drakvuf_release_vmi(drakvuf);
+    drakvuf_release_vmi(drakvuf);
+}
+
+void on_dll_hooked(drakvuf_t drakvuf, dll_t* dll, void* extra)
+{
+    PRINT_DEBUG("[MEMDUMP] DLL hooked - done\n");
 }
 
 void memdump::load_wanted_targets(const memdump_config* c)
@@ -397,10 +402,15 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
         return;
     }
 
-    usermode_cb_registration reg = { .cb = on_dll_discovered, .extra = (void *)this };
+    usermode_cb_registration reg = {
+        .pre_cb = on_dll_discovered,
+        .post_cb = on_dll_hooked,
+        .extra = (void *)this
+    };
+
     if (!drakvuf_register_usermode_callback(drakvuf, &reg)) {
-        printf("Failed to subscribe to libusermode\n");
-        throw - 1;
+        PRINT_DEBUG("[MEMDUMP] Failed to subscribe to libusermode\n");
+        throw -1;
     }
 }
 

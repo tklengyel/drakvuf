@@ -128,7 +128,7 @@ public:
     addr_t dll_base_rva;
     addr_t dll_base_wow_rva;
 
-	std::vector<target_config_entry_t> wanted_hooks;
+    std::vector<target_config_entry_t> wanted_hooks;
 
     memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
     ~memdump();
