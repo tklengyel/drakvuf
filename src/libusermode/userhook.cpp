@@ -761,6 +761,7 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
 bool userhook::init(drakvuf_t drakvuf)
 {
     page_mode_t pm = drakvuf_get_page_mode(drakvuf);
+    this->initialized = true;
 
     if (pm != VMI_PM_IA32E)
     {
@@ -781,16 +782,9 @@ bool userhook::init(drakvuf_t drakvuf)
     return 1;
 }
 
-bool userhook::register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg)
+void userhook::register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg)
 {
-    if (!this->initialized) {
-        if (!this->init(drakvuf)) {
-            return false;
-        }
-    }
-
     this->plugins.push_back(reg);
-    return true;
 }
 
 userhook::~userhook()
@@ -822,9 +816,6 @@ bool drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registrat
         }
     }
 
-    if (!instance->register_plugin(drakvuf, *reg)) {
-        return false;
-    }
-
+    instance->register_plugin(drakvuf, *reg);
     return true;
 }

@@ -219,7 +219,7 @@ public:
     ~userhook();
 
     bool init(drakvuf_t drakvuf);
-    bool register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
+    void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
 };
 
 extern userhook* instance;
