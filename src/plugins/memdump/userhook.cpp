@@ -171,16 +171,16 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     switch (plugin->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("memdump-userhok," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",0x%" PRIx64 ",\"",
+            printf("memdump-userhok," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",0x%" PRIx64 ",0x%" PRIx64 ",\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name, info->regs->rip);
+                   info->proc_data.userid, info->trap->name, info->regs->rax, info->regs->rip);
             print_arguments(ret_target->arguments);
             printf("\"");
             break;
         case OUTPUT_KV:
-            printf("memdump, Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",Arguments=\"",
+            printf("memdump, Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",ReturnValue=0x%" PRIx64 ",Arguments=\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name, info->regs->rip);
+                   info->proc_data.userid, info->trap->name, info->regs->rip, info->regs->rax);
             print_arguments(ret_target->arguments);
             printf("\"");
             break;
@@ -196,13 +196,15 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
                     "\"PPID\": %d, "
                     "\"Method\": \"%s\", "
                     "\"CalledFrom\": 0x%" PRIx64 ", "
+                    "\"ReturnValue\": 0x%" PRIx64 ", "
                     "\"Arguments\": [",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
                     info->proc_data.pid, info->proc_data.ppid,
                     info->trap->name,
-                    info->regs->rip);
+                    info->regs->rip,
+                    info->regs->rax);
 
             print_arguments(ret_target->arguments);
             printf("], "
@@ -213,9 +215,9 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[MEMDUMP-USERHOOK] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 " ProcessName:\"%s\" UserID:%" PRIi64 " Method:\"%s\" CalledFrom:0x%" PRIx64 " Arguments:\"",
+            printf("[MEMDUMP-USERHOOK] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 " ProcessName:\"%s\" UserID:%" PRIi64 " Method:\"%s\" CalledFrom:0x%" PRIx64 " ReturnValue:0x%" PRIx64 " Arguments:\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name, info->regs->rip);
+                   info->proc_data.userid, info->trap->name, info->regs->rax, info->regs->rip);
             print_arguments(ret_target->arguments);
             printf("\"");
             break;
