@@ -132,12 +132,11 @@
 #include "private.h"
 #include "crypto.h"
 
-void print_arguments(std::vector < uint64_t > arguments)
+void print_arguments(drakvuf_t drakvuf, drakvuf_trap_info* info, std::vector < uint64_t > arguments, std::vector < ArgumentPrinter* > argument_printers)
 {
-    size_t i = 0;
-    for (auto it = arguments.begin(); it != arguments.end(); it++, i++)
+    for (size_t i = 0; i < arguments.size(); i++)
     {
-        printf("0x%lX", *it);
+        printf("%s", argument_printers[i]->print(drakvuf, info, arguments[i]).c_str());
         if (i < arguments.size() - 1)
             printf(",");
     }
@@ -174,14 +173,14 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
             printf("memdump-userhok," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",0x%" PRIx64 ",0x%" PRIx64 ",\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    info->proc_data.userid, info->trap->name, info->regs->rax, info->regs->rip);
-            print_arguments(ret_target->arguments);
+            print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
             printf("\"");
             break;
         case OUTPUT_KV:
             printf("memdump, Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",ReturnValue=0x%" PRIx64 ",Arguments=\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    info->proc_data.userid, info->trap->name, info->regs->rip, info->regs->rax);
-            print_arguments(ret_target->arguments);
+            print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
             printf("\"");
             break;
         case OUTPUT_JSON:
@@ -206,7 +205,7 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
                     info->regs->rip,
                     info->regs->rax);
 
-            print_arguments(ret_target->arguments);
+            print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
             printf("], "
                    "\"Extra\": {");
             print_extra_data(extra_data);
@@ -218,7 +217,7 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
             printf("[MEMDUMP-USERHOOK] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 " ProcessName:\"%s\" UserID:%" PRIi64 " Method:\"%s\" CalledFrom:0x%" PRIx64 " ReturnValue:0x%" PRIx64 " Arguments:\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    info->proc_data.userid, info->trap->name, info->regs->rax, info->regs->rip);
-            print_arguments(ret_target->arguments);
+            print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
             printf("\"");
             break;
     }
@@ -272,11 +271,12 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     return_hook_target_entry_t* ret_target = new return_hook_target_entry_t();
     drakvuf_trap_t* trap = new drakvuf_trap_t;
 
-    for (size_t i = 1; i <= target->args_num; i++)
+    for (size_t i = 1; i <= target->argument_printers.size(); i++)
     {
         uint64_t argument = drakvuf_get_function_argument(drakvuf, info, i);
         ret_target->arguments.push_back(argument);
     }
+    ret_target->argument_printers = target->argument_printers;
     ret_target->plugin = target->plugin;
 
     addr_t paddr;
@@ -329,7 +329,9 @@ void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
         for (auto const& wanted_hook : plugin->wanted_hooks)
         {
             if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
-                drakvuf_request_usermode_hook(drakvuf, dll, wanted_hook.function_name.c_str(), usermode_hook_cb, wanted_hook.args_num, plugin);
+            {
+                drakvuf_request_usermode_hook(drakvuf, dll, wanted_hook.function_name.c_str(), usermode_hook_cb, wanted_hook.argument_pointers, plugin);
+            }
         }
     }
 
@@ -349,8 +351,8 @@ void memdump::load_wanted_targets(const memdump_config* c)
     if (!c->dll_hooks_list)
     {
         // if the DLL hook list was not provided, we provide some simple defaults
-        this->wanted_hooks.emplace_back("ws2_32.dll", "WSAStartup", 2);
-        this->wanted_hooks.emplace_back("ntdll.dll", "RtlExitUserProcess", 1);
+        this->wanted_hooks.emplace_back("ws2_32.dll", "WSAStartup", std::vector<ArgumentPrinter*> { new ArgumentPrinter(), new ArgumentPrinter() });
+        this->wanted_hooks.emplace_back("ntdll.dll", "RtlExitUserProcess", std::vector<ArgumentPrinter*> { new ArgumentPrinter(), new ArgumentPrinter() });
         return;
     }
 
@@ -370,15 +372,26 @@ void memdump::load_wanted_targets(const memdump_config* c)
         std::stringstream ss(line);
         target_config_entry_t e;
 
-        std::string args_num_s;
+        std::string arg_type;
         if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
             throw -1;
         if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
             throw -1;
-        if (!std::getline(ss, args_num_s, ',') || args_num_s.empty())
-            throw - 1;
-
-        e.args_num = std::stoi(args_num_s);
+        while (std::getline(ss, arg_type, ',') && !arg_type.empty())
+        {
+            if (arg_type == "lpcstr" || arg_type == "lpctstr")
+            {
+                e.argument_printers.push_back(new AsciiPrinter());
+            }
+            else if (arg_type == "lpcwstr")
+            {
+                e.argument_printers.push_back(new WideStringPrinter());
+            }
+            else
+            {
+            e.argument_printers.push_back(new ArgumentPrinter());
+            }
+        }
 
         this->wanted_hooks.push_back(e);
     }

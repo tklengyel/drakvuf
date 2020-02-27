@@ -99,79 +99,40 @@
  * license file for more details (it's in a COPYING file included with     *
  * DRAKVUF, and also available from                                        *
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
- *                                                                         *
- ***************************************************************************/
+ **
+     ***************************************************************************/
 
-#ifndef WIN_USERHOOK_H
-#define WIN_USERHOOK_H
+#ifndef PRINTERS_H
+#define PRINTERS_H
 
-#include <vector>
-#include <memory>
+#include <string>
+#include <map>
+#include <libdrakvuf/libdrakvuf.h>
 
-#include <glib.h>
-#include "plugins/private.h"
-#include "plugins/plugins_ex.h"
-#include "printers/printers.hpp"
-
-typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
-
-enum target_hook_state
+class ArgumentPrinter
 {
-    HOOK_FIRST_TRY,
-    HOOK_PAGEFAULT_RETRY,
-    HOOK_FAILED,
-    HOOK_OK
+public:
+    virtual std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument);
 };
 
-struct hook_target_entry_t
+class AsciiPrinter : public ArgumentPrinter
 {
-    vmi_pid_t pid;
-    std::string target_name;
-    callback_t callback;
-    std::vector < ArgumentPrinter* > argument_printers;
-    target_hook_state state;
-    drakvuf_trap_t* trap;
-    void* plugin;
-
-    hook_target_entry_t(std::string target_name, callback_t callback, std::vector < ArgumentPrinter* > argument_printers, void* plugin)
-        : target_name(target_name), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), plugin(plugin) {}
+public:
+    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument);
 };
 
-struct return_hook_target_entry_t
+class WideStringPrinter : public ArgumentPrinter
 {
-    vmi_pid_t pid;
-    drakvuf_trap_t* trap;
-    void* plugin;
-    std::vector < uint64_t > arguments;
-    std::vector < ArgumentPrinter* > argument_printers;
+public:
+    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument);
 };
 
-struct dll_view_t
+class BitMaskPrinter : public ArgumentPrinter
 {
-    // relevant while loading
-    addr_t dtb;
-    uint32_t thread_id;
-    addr_t real_dll_base;
-    mmvad_info_t mmvad;
-    bool is_hooked;
+    std::map < uint64_t, std::string > dict;
+public:
+    BitMaskPrinter(std::map < uint64_t, std::string > dict);
+    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument);
 };
-
-typedef void (*dll_pre_hook_cb)(drakvuf_t, const dll_view_t*, void*);
-typedef void (*dll_post_hook_cb)(drakvuf_t, const dll_view_t*, void*);
-
-struct usermode_cb_registration {
-    dll_pre_hook_cb pre_cb;
-    dll_post_hook_cb post_cb;
-    void* extra;
-};
-
-typedef enum usermode_reg_status {
-    USERMODE_REGISTER_ERROR,
-    USERMODE_REGISTER_SUCCESS,
-    USERMODE_ARCH_UNSUPPORTED,
-} usermode_reg_status_t;
-
-usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
-bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, size_t args_num, void* extra);
 
 #endif
