@@ -121,7 +121,8 @@ struct json_object* json_object_new_string_fmt(const char* format, ...)
 
     va_end(args);
 
-    if (string) {
+    if (string)
+    {
         ret = json_object_new_string(string);
         free(string);
     }
