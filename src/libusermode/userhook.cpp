@@ -294,7 +294,7 @@ fail:
     return false;
 }
 
-static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info * info, userhook * plugin, dll_t * dll_meta)
+static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info * info, userhook * plugin, dll_t * dll_meta)
 {
     vmi_lock_guard lg(drakvuf);
 
@@ -387,12 +387,21 @@ static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info * i
 
     PRINT_DEBUG("[USERHOOK] Done, flag DLL as hooked\n");
     dll_meta->is_hooked = true;
+    return VMI_EVENT_RESPONSE_NONE;
+}
 
-    for (auto& reg : plugin->plugins) {
-        reg.post_cb(drakvuf, dll_meta, reg.extra);
+static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info * info, userhook * plugin, dll_t * dll_meta)
+{
+    bool was_hooked = dll_meta->is_hooked;
+    event_response_t ret = internal_perform_hooking(drakvuf, info, plugin, dll_meta);
+
+    if (!was_hooked && dll_meta->is_hooked) {
+        for (auto& reg : plugin->plugins) {
+            reg.post_cb(drakvuf, dll_meta, reg.extra);
+        }
     }
 
-    return VMI_EVENT_RESPONSE_NONE;
+    return ret;
 }
 
 /**
