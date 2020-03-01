@@ -454,10 +454,10 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
 {
     auto data = get_trap_params<userhook, map_view_of_section_result_t<userhook>>(info);
     userhook* plugin = data->plugin();
+
     if (!data || !plugin)
     {
         PRINT_DEBUG("[USERHOOK] map_view_of_section_ret_cb invalid trap params!\n");
-        drakvuf_remove_trap(drakvuf, info->trap, nullptr);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -633,10 +633,10 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 {
     auto data = get_trap_params<userhook, copy_on_write_result_t<userhook>>(info);
     userhook* plugin = data->plugin();
+
     if (!data || !plugin)
     {
         PRINT_DEBUG("[USERHOOK] copy_on_write_ret_cb invalid trap params!\n");
-        drakvuf_remove_trap(drakvuf, info->trap, nullptr);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
