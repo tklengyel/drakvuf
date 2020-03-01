@@ -756,15 +756,19 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-bool userhook::init(drakvuf_t drakvuf)
+usermode_reg_status_t userhook::init(drakvuf_t drakvuf)
 {
     page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-    this->initialized = true;
 
     if (pm != VMI_PM_IA32E)
     {
         PRINT_DEBUG("[USERHOOK] Usermode hooking is not yet supported on this architecture/bitness.\n");
-        return 0;
+        return USERMODE_ARCH_UNSUPPORTED;
+    }
+
+    if (this->initialized) {
+        PRINT_DEBUG("[USERHOOK] Attempted double initialization.\n");
+        return USERMODE_REGISTER_ERROR;
     }
 
     breakpoint_in_system_process_searcher bp;
@@ -774,10 +778,11 @@ bool userhook::init(drakvuf_t drakvuf)
         !register_trap<userhook>(drakvuf, nullptr, this, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
         !register_trap<userhook>(drakvuf, nullptr, this, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite")))
     {
-        return 0;
+        return USERMODE_REGISTER_ERROR;
     }
 
-    return 1;
+    this->initialized = true;
+    return USERMODE_REGISTER_SUCCESS;
 }
 
 void userhook::register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg)
@@ -802,18 +807,21 @@ userhook::~userhook()
     }
 }
 
-bool drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg)
+usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg)
 {
+    usermode_reg_status_t ret = USERMODE_REGISTER_ERROR;
+
     if (!instance) {
         instance = new userhook(drakvuf);
     }
 
     if (!instance->initialized) {
-        if (!instance->init(drakvuf)) {
-            return false;
-        }
+        ret = instance->init(drakvuf);
+
+        if (ret != USERMODE_REGISTER_SUCCESS)
+            return ret;
     }
 
     instance->register_plugin(drakvuf, *reg);
-    return true;
+    return USERMODE_REGISTER_SUCCESS;
 }

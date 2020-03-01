@@ -202,7 +202,13 @@ struct usermode_cb_registration {
     void* extra;
 };
 
-bool drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
+typedef enum usermode_reg_status {
+    USERMODE_REGISTER_ERROR,
+    USERMODE_REGISTER_SUCCESS,
+    USERMODE_ARCH_UNSUPPORTED,
+} usermode_reg_status_t;
+
+usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
 
 class userhook : public pluginex
 {
