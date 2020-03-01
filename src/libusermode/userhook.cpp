@@ -457,7 +457,6 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
     if (!data || !plugin)
     {
         PRINT_DEBUG("[USERHOOK] map_view_of_section_ret_cb invalid trap params!\n");
-        drakvuf_remove_trap(drakvuf, info->trap, nullptr);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
