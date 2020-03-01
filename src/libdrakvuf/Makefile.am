@@ -112,7 +112,7 @@ c_sources = drakvuf.c json-profile.c os.c vmi.c \
             win-files.c \
             linux.c linux-processes.c linux-exports.c
 
-AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
+AM_CPPFLAGS = -I$(top_srcdir)
 AM_CPPFLAGS += $(CPPFLAGS)
 AM_CPPFLAGS += $(VMI_CFLAGS)
 AM_CPPFLAGS += $(GLIB_CFLAGS)

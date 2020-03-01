@@ -160,6 +160,7 @@ struct fd_info
 };
 typedef struct fd_info* fd_info_t;
 
+
 struct drakvuf
 {
     char* dom_name;
