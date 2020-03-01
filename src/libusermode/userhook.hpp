@@ -224,7 +224,7 @@ public:
     userhook(drakvuf_t drakvuf) : pluginex(drakvuf, OUTPUT_DEFAULT), initialized(0) {}
     ~userhook();
 
-    bool init(drakvuf_t drakvuf);
+    usermode_reg_status_t init(drakvuf_t drakvuf);
     void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
 };
 
