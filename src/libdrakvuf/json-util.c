@@ -110,20 +110,21 @@
 
 struct json_object* json_object_new_string_fmt(const char* format, ...)
 {
-    struct json_object* ret;
+    struct json_object* ret = NULL;
     char* string;
     va_list args;
 
     va_start(args, format);
 
     if (vasprintf(&string, format, args) < 0)
-    {
-        return NULL;
-    }
+        string = NULL;
 
     va_end(args);
 
-    ret = json_object_new_string(string);
-    free(string);
+    if (string) {
+        ret = json_object_new_string(string);
+        free(string);
+    }
+
     return ret;
 }
