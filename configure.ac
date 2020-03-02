@@ -428,8 +428,10 @@ AS_IF([test x"$hardening" != x"no"], [
         HARDEN_LDFLAGS="$HARDEN_LDFLAGS -Wl,-pie"])])])
 
   check_link_flag([-Wl,-z,relro],
-   [HARDEN_LDFLAGS="$HARDEN_LDFLAGS -Wl,-z,relro"
-    check_link_flag([-Wl,-z,now], [HARDEN_LDFLAGS="$HARDEN_LDFLAGS -Wl,-z,now"])])])
+   [HARDEN_LDFLAGS="$HARDEN_LDFLAGS -Wl,-z,relro"])
+  check_link_flag([-Wl,-z,now],
+   [HARDEN_LDFLAGS="$HARDEN_LDFLAGS -Wl,-z,now"])
+])
 
 AC_SUBST([HARDEN_CFLAGS])
 AC_SUBST([HARDEN_LDFLAGS])
@@ -494,7 +496,7 @@ LD="$saved_LD"
 #####################################################
 
 AC_HEADER_STDC
-AC_CHECK_HEADERS([fcntl.h malloc.h stdio.h stdlib.h string.h sys/time.h sys/mman.h sys/inotify.h syslog.h unistd.h errno.h pthread.h])
+AC_CHECK_HEADERS([fcntl.h malloc.h stdio.h stdlib.h string.h sys/time.h sys/mman.h sys/inotify.h unistd.h errno.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -512,8 +514,6 @@ AH_VERBATIM([__STDC_FORMAT_MACROS],
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS 1
 #endif])
-
-AC_CHECK_LIB(pthread, pthread_create, [], [AC_ERROR([Pthread library is not functional!])])
 
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.28], [], [AC_ERROR([glib-2.0 (version 2.28+) has to be installed!])])
 PKG_CHECK_MODULES([VMI], [libvmi >= 0.11], [], [AC_ERROR([LibVMI not found])])

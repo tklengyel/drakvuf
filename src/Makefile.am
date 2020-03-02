@@ -128,6 +128,7 @@ AM_CXXFLAGS = $(CXXFLAGS)
 if HARDENING
 AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 AM_CXXFLAGS += $(HARDEN_CFLAGS) -DHARDENING
+AM_LDFLAGS += $(HARDEN_LDFLAGS)
 endif
 
 if SANITIZE
@@ -151,10 +152,6 @@ drakvuf_LDADD = libdrakvuf/libdrakvuf.la
 drakvuf_LDADD += xen_helper/libxenhelper.la
 drakvuf_LDADD += plugins/libdrakvufplugins.la
 drakvuf_LDADD += libinjector/libinjector.la
-
-if HARDENING
-drakvuf_LDADD += $(HARDEN_LDFLAGS)
-endif
 
 injector_LDADD = libdrakvuf/libdrakvuf.la
 injector_LDADD += libinjector/libinjector.la

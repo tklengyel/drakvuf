@@ -116,6 +116,11 @@ AM_CFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
              -Wc++-compat
 AM_LDFLAGS = $(LDFLAGS) $(GLIB_LIBS)
 
+if HARDENING
+AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
+AM_LDFLAGS += $(HARDEN_LDFLAGS)
+endif
+
 if SANITIZE
 # For some reason this doesn't work.
 
