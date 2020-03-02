@@ -152,7 +152,10 @@ void print_extra_data(std::map < std::string, std::string > extra_data)
             printf(", ");
     }
 }
-
+char* get_argument_value(drakvuf_t drakvuf, drakvuf_trap_info* info, std::vector <uint64_t> arguments,int index)
+{
+    return vmi_read_str_va(drakvuf->vmi, arguments[index], info->proc_data.pid);
+}
 static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)info->trap->data;
@@ -162,26 +165,35 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     auto plugin = ret_target->plugin;
 
     std::map < std::string, std::string > extra_data;
-
+    char *lpApplicationName;
+    char *lpCommandLine;
+    bool functionCalled = false;
     if(!strcmp(info->trap->name, "CryptGenKey"))
         extra_data = CryptGenKey_hook(drakvuf, info, ret_target->arguments);
-
+    if(!strcmp(info->trap->name, "CreateProcessA"))
+        lpApplicationName = get_argument_value(drakvuf,info,ret_target->arguments,0);
+        lpCommandLine = get_argument_value(drakvuf,info,ret_target->arguments,1);
+        functionCalled = true;
     gchar* escaped_pname;
     switch (plugin->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("memdump-userhok," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",0x%" PRIx64 ",\"",
+            printf("memdump-userhook," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",0x%" PRIx64 ",\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    info->proc_data.userid, info->trap->name, info->regs->rip);
             print_arguments(ret_target->arguments);
             printf("\"");
             break;
         case OUTPUT_KV:
-            printf("memdump, Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",Arguments=\"",
+            printf("memdump-userhook Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",Arguments=\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
                    info->proc_data.userid, info->trap->name, info->regs->rip);
             print_arguments(ret_target->arguments);
             printf("\"");
+            if(functionCalled== true)
+            {
+                printf(",Values=\"%s,%s\"", lpApplicationName,lpCommandLine);
+            }
             break;
         case OUTPUT_JSON:
             escaped_pname = drakvuf_escape_str(info->proc_data.name);
