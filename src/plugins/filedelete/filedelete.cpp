@@ -278,7 +278,7 @@ static void save_file_metadata(filedelete* f,
     {
         json_object_object_add(jobj, "FullReadSuccess", json_object_new_boolean(FALSE));
         // if the file have been read partially, also note what was the NTSTATUS of failing operation
-        json_object_object_add(jobj, "ProcessName", json_object_new_int(ntstatus));
+        json_object_object_add(jobj, "ReadNTStatus", json_object_new_int(ntstatus));
     }
 
     fprintf(fp, "%s\n", json_object_get_string(jobj));
