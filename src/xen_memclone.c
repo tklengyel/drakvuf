@@ -118,8 +118,6 @@
 #include <math.h>
 #include <err.h>
 
-#include <xenctrl.h>
-
 #include "xen_helper/xen_helper.h"
 
 int main(int argc, char** argv)

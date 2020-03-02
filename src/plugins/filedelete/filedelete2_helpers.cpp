@@ -172,7 +172,7 @@ bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_inst
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = injector->saved_regs.rsp;
 
-    struct argument args[3] = { {0} };
+    struct argument args[3] = {};
     init_int_argument(&args[0], 0); // NonPagedPool
     init_int_argument(&args[1], BYTES_TO_READ);
     init_int_argument(&args[2], 0);
@@ -192,10 +192,10 @@ bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = injector->saved_regs.rsp;
 
-    struct argument args[9] = { {0} };
+    struct argument args[9] = {};
     struct _LARGE_INTEGER byte_offset = { .QuadPart = injector->ntreadfile_info.bytes_read };
-    struct IO_STATUS_BLOCK_32 io_status_block_32 = { 0 };
-    struct IO_STATUS_BLOCK_64 io_status_block_64 = { 0 };
+    struct IO_STATUS_BLOCK_32 io_status_block_32 = {};
+    struct IO_STATUS_BLOCK_64 io_status_block_64 = {};
 
     init_int_argument(&args[0], injector->handle);
     init_int_argument(&args[1], 0);
@@ -225,10 +225,10 @@ bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_
 
 bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
 {
-    struct argument args[5] = { {0} };
-    struct IO_STATUS_BLOCK_32 io_status_block_32 = { 0 };
-    struct IO_STATUS_BLOCK_64 io_status_block_64 = { 0 };
-    struct FILE_FS_DEVICE_INFORMATION dev_info = { 0 };
+    struct argument args[5] = {};
+    struct IO_STATUS_BLOCK_32 io_status_block_32 = {};
+    struct IO_STATUS_BLOCK_64 io_status_block_64 = {};
+    struct FILE_FS_DEVICE_INFORMATION dev_info = {};
 
     init_int_argument(&args[0], injector->handle);
     if (injector->is32bit)
