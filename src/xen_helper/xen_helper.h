@@ -106,6 +106,8 @@
 #define XEN_HELPER_H
 
 #define LIBXL_API_VERSION 0x040500
+#define XC_WANT_COMPAT_EVTCHN_API 1
+#define XC_WANT_COMPAT_MAP_FOREIGN_API 1
 
 #include <libxl_utils.h>
 #include <xenctrl.h>
@@ -116,7 +118,7 @@ typedef struct xen_interface
     xc_interface* xc;
     libxl_ctx* xl_ctx;
     xentoollog_logger* xl_logger;
-    void* evtchn;                  // the Xen event channel
+    xc_evtchn *evtchn;             // the Xen event channel
     int evtchn_fd;                 // its FD
 } xen_interface_t;
 

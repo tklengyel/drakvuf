@@ -102,12 +102,7 @@
  *                                                                         *
  ***************************************************************************/
 
-#define XC_WANT_COMPAT_EVTCHN_API 1
-#define XC_WANT_COMPAT_MAP_FOREIGN_API 1
-
 #include <stdlib.h>
-#include <xenctrl.h>
-#include <libxl_utils.h>
 #include <glib.h>
 #include <sys/mman.h>
 
@@ -120,7 +115,7 @@
 bool xen_init_interface(xen_interface_t** xen)
 {
 
-    *xen = g_try_malloc0(sizeof(xen_interface_t));
+    *xen = (xen_interface_t*)g_try_malloc0(sizeof(xen_interface_t));
 
     /* We create an xc interface to test connection to it */
     (*xen)->xc = xc_interface_open(0, 0, 0);
