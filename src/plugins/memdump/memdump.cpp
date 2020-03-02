@@ -396,7 +396,7 @@ bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* pl
         addr_t begin = mmvad.starting_vpn << 12;
         size_t len = (mmvad.ending_vpn - mmvad.starting_vpn + 1) << 12;
 
-        page_info_t p_info = {0};
+        page_info_t p_info = {};
 
         if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, stack_val, &p_info) != VMI_SUCCESS)
             continue;
@@ -560,7 +560,7 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
         }
     }
 
-    page_info_t p_info = {0};
+    page_info_t p_info = {};
 
     if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, mem_base_address, &p_info) == VMI_SUCCESS)
     {

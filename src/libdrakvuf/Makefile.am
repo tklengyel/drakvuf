@@ -135,9 +135,7 @@ endif
 
 # Note that -pg is incompatible with HARDENING
 if DEBUG
-AM_CFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -g -ggdb3
-AM_CFLAGS += -Wno-missing-field-initializers
-AM_CFLAGS += -Werror
+AM_CFLAGS += -DDRAKVUF_DEBUG -Wall -Wextra -Werror -g -ggdb3
 AM_CFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
              -Wpointer-arith -Winit-self -Wshadow \
              -Wswitch-enum -Wstrict-prototypes \

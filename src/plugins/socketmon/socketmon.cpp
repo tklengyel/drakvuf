@@ -856,7 +856,7 @@ static void register_module_trap( drakvuf_t drakvuf, drakvuf_trap_t* trap,
                                   const char* module_name, const char* function_name,
                                   event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
-    struct module_trap_context_t visitor_ctx = {0};
+    struct module_trap_context_t visitor_ctx = {};
     visitor_ctx.module_name = module_name;
     visitor_ctx.function_name = function_name;
     visitor_ctx.trap = trap;

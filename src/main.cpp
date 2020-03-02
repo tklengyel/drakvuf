@@ -258,7 +258,7 @@ int main(int argc, char** argv)
     bool verbose = false;
     bool leave_paused = false;
     bool libvmi_conf = false;
-    plugins_options options = { 0 };
+    plugins_options options = {};
     bool disabled_all = false; // Used to disable all plugin once
     const char* args[10] = {};
     int args_count = 0;

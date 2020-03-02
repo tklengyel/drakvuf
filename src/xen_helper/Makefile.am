@@ -105,9 +105,15 @@
 h_sources = xen_helper.h
 c_sources = xen_helper.c
 
-AM_CPPFLAGS = -I$(top_srcdir) $(GLIB_CFLAGS)
-AM_CFLAGS = -Werror -Wall -Wextra $(CFLAGS)
-AM_CFLAGS += -Wno-missing-field-initializers
+AM_CPPFLAGS = -I$(top_srcdir)
+AM_CFLAGS  = $(CFLAGS) $(GLIB_CFLAGS)
+AM_CFLAGS += -Wall -Wextra -Werror -g -ggdb3
+AM_CFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
+             -Wpointer-arith -Winit-self -Wshadow \
+             -Wswitch-enum -Wstrict-prototypes \
+             -Wmissing-prototypes -Wredundant-decls \
+             -Wfloat-equal -Wundef -Wvla \
+             -Wc++-compat
 AM_LDFLAGS = $(LDFLAGS) $(GLIB_LIBS)
 
 if SANITIZE
