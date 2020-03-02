@@ -113,6 +113,17 @@
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
+struct target_config_entry_t
+{
+    std::string dll_name;
+    std::string function_name;
+    size_t args_num;
+
+    target_config_entry_t() : dll_name(), function_name(), args_num() {}
+    target_config_entry_t(std::string&& dll_name, std::string&& function_name, size_t args_num)
+        : dll_name(std::move(dll_name)), function_name(std::move(function_name)), args_num(args_num) {}
+};
+
 struct memdump_config
 {
     const char* memdump_dir;

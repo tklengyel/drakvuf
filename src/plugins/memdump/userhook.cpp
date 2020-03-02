@@ -317,7 +317,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-void on_dll_discovered(drakvuf_t drakvuf, dll_t* dll, void* extra)
+void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
 {
     memdump* plugin = (memdump*)extra;
 
@@ -329,9 +329,7 @@ void on_dll_discovered(drakvuf_t drakvuf, dll_t* dll, void* extra)
         for (auto const& wanted_hook : plugin->wanted_hooks)
         {
             if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
-            {
-                dll->targets.emplace_back(wanted_hook.function_name.c_str(), usermode_hook_cb, wanted_hook.args_num, plugin);
-            }
+                drakvuf_request_usermode_hook(drakvuf, dll, wanted_hook.function_name.c_str(), usermode_hook_cb, wanted_hook.args_num, plugin);
         }
     }
 
@@ -341,7 +339,7 @@ void on_dll_discovered(drakvuf_t drakvuf, dll_t* dll, void* extra)
     drakvuf_release_vmi(drakvuf);
 }
 
-void on_dll_hooked(drakvuf_t drakvuf, dll_t* dll, void* extra)
+void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
 {
     PRINT_DEBUG("[MEMDUMP] DLL hooked - done\n");
 }

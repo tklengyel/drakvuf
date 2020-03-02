@@ -128,6 +128,7 @@
 #include <assert.h>
 
 #include "userhook.hpp"
+#include "uh-private.hpp"
 
 
 userhook* instance = nullptr;
@@ -150,7 +151,7 @@ static dll_t* get_pending_dll(drakvuf_t drakvuf, drakvuf_trap_info * info, userh
 
     for (auto& dll_meta : vec_it->second)
     {
-        if (!dll_meta.is_hooked && dll_meta.thread_id == thread_id)
+        if (!dll_meta.v.is_hooked && dll_meta.v.thread_id == thread_id)
             return &dll_meta;
     }
 
@@ -176,7 +177,7 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info * info, userh
     {
         for (auto const& dll_meta : vec_it->second)
         {
-            if (dll_meta.real_dll_base == mmvad.starting_vpn << 12)
+            if (dll_meta.v.real_dll_base == mmvad.starting_vpn << 12)
             {
                 PRINT_DEBUG("[USERHOOK] DLL %d!%llx is already hooked\n", info->proc_data.pid, (unsigned long long)mmvad.starting_vpn << 12);
                 return nullptr;
@@ -190,15 +191,15 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info * info, userh
 
     dll_t dll_meta =
     {
-        .dtb = info->regs->cr3,
-        .thread_id = thread_id,
-        .real_dll_base = (mmvad.starting_vpn << 12),
-        .mmvad = mmvad,
-        .is_hooked = false
+        .v.dtb = info->regs->cr3,
+        .v.thread_id = thread_id,
+        .v.real_dll_base = (mmvad.starting_vpn << 12),
+        .v.mmvad = mmvad,
+        .v.is_hooked = false
     };
 
     for (auto &reg : plugin->plugins) {
-        reg.pre_cb(drakvuf, &dll_meta, reg.extra);
+        reg.pre_cb(drakvuf, (const dll_view_t*)&dll_meta, reg.extra);
     }
 
     if (dll_meta.targets.empty()) {
@@ -338,7 +339,7 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
             {
                 .translate_mechanism = VMI_TM_PROCESS_DTB,
                 .dtb = info->regs->cr3,
-                .addr = dll_meta->real_dll_base
+                .addr = dll_meta->v.real_dll_base
             };
 
             status_t translate_ret = vmi_translate_sym2v(lg.vmi, &ctx, target.target_name.c_str(), &exec_func);
@@ -381,24 +382,24 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
             PRINT_DEBUG("[USERHOOK] Hook %s (vaddr = 0x%llx, dll_base = 0x%llx, result = %s)\n",
                 target.target_name.c_str(),
                 (unsigned long long)exec_func,
-                (unsigned long long)dll_meta->real_dll_base,
+                (unsigned long long)dll_meta->v.real_dll_base,
                 target.state == HOOK_OK ? "OK" : "FAIL");
         }
     }
 
     PRINT_DEBUG("[USERHOOK] Done, flag DLL as hooked\n");
-    dll_meta->is_hooked = true;
+    dll_meta->v.is_hooked = true;
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info * info, userhook * plugin, dll_t * dll_meta)
 {
-    bool was_hooked = dll_meta->is_hooked;
+    bool was_hooked = dll_meta->v.is_hooked;
     event_response_t ret = internal_perform_hooking(drakvuf, info, plugin, dll_meta);
 
-    if (!was_hooked && dll_meta->is_hooked) {
+    if (!was_hooked && dll_meta->v.is_hooked) {
         for (auto& reg : plugin->plugins) {
-            reg.post_cb(drakvuf, dll_meta, reg.extra);
+            reg.post_cb(drakvuf, (const dll_view_t*)dll_meta, reg.extra);
         }
     }
 
@@ -564,7 +565,7 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
     {
         for (auto const& dll_meta : vec_it->second)
         {
-            if (dll_meta.dtb == info->regs->cr3 && dll_meta.thread_id == thread_id)
+            if (dll_meta.v.dtb == info->regs->cr3 && dll_meta.v.thread_id == thread_id)
             {
                 our_fault = true;
                 break;
@@ -787,6 +788,12 @@ usermode_reg_status_t userhook::init(drakvuf_t drakvuf)
     return USERMODE_REGISTER_SUCCESS;
 }
 
+void userhook::request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, size_t args_num, void* extra)
+{
+    dll_t* p_dll = (dll_t*)const_cast<dll_view_t*>(dll);
+    p_dll->targets.emplace_back(func_name, callback, args_num, extra);
+}
+
 void userhook::register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg)
 {
     this->plugins.push_back(reg);
@@ -826,4 +833,14 @@ usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, user
 
     instance->register_plugin(drakvuf, *reg);
     return USERMODE_REGISTER_SUCCESS;
+}
+
+bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, size_t args_num, void* extra)
+{
+    if (!instance || !instance->initialized) {
+        return false;
+    }
+
+    instance->request_usermode_hook(drakvuf, dll, func_name, callback, args_num, extra);
+    return true;
 }

@@ -102,8 +102,8 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_USERHOOK_H
-#define WIN_USERHOOK_H
+#ifndef WIN_USERHOOK_PRIVATE_H
+#define WIN_USERHOOK_PRIVATE_H
 
 #include <vector>
 #include <memory>
@@ -112,64 +112,56 @@
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
-typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
-
-enum target_hook_state
+struct dll_t
 {
-    HOOK_FIRST_TRY,
-    HOOK_PAGEFAULT_RETRY,
-    HOOK_FAILED,
-    HOOK_OK
+    dll_view_t v;
+
+    // one entry per hooked function
+    std::vector<hook_target_entry_t> targets;
+
+    // internal, for page faults
+    addr_t pf_current_addr;
+    addr_t pf_max_addr;
 };
 
-struct hook_target_entry_t
+template<typename T>
+struct map_view_of_section_result_t : public call_result_t<T>
 {
-    vmi_pid_t pid;
-    std::string target_name;
-    callback_t callback;
-    size_t args_num;
-    target_hook_state state;
-    drakvuf_trap_t* trap;
-    void* plugin;
+    map_view_of_section_result_t(T* src) : call_result_t<T>(src), section_handle(), process_handle(), base_address_ptr() {}
 
-    hook_target_entry_t(std::string target_name, callback_t callback, size_t args_num, void* plugin)
-        : target_name(target_name), callback(callback), args_num(args_num), state(HOOK_FIRST_TRY), plugin(plugin) {}
+    uint64_t section_handle;
+    uint64_t process_handle;
+    addr_t base_address_ptr;
 };
 
-struct return_hook_target_entry_t
+template<typename T>
+struct copy_on_write_result_t : public call_result_t<T>
 {
-    vmi_pid_t pid;
-    drakvuf_trap_t* trap;
-    void* plugin;
-    std::vector < uint64_t > arguments;
+    copy_on_write_result_t(T* src) : call_result_t<T>(src), vaddr(), pte(), old_cow_pa() {}
+
+    addr_t vaddr;
+    addr_t pte;
+    addr_t old_cow_pa;
+    std::vector<hook_target_entry_t*> hooks;
 };
 
-struct dll_view_t
+class userhook : public pluginex
 {
-    // relevant while loading
-    addr_t dtb;
-    uint32_t thread_id;
-    addr_t real_dll_base;
-    mmvad_info_t mmvad;
-    bool is_hooked;
+public:
+    int initialized;
+
+    std::vector<usermode_cb_registration> plugins;
+    // map dtb -> list of hooked dlls
+    std::map<addr_t, std::vector<dll_t>> loaded_dlls;
+
+    userhook(drakvuf_t drakvuf) : pluginex(drakvuf, OUTPUT_DEFAULT), initialized(0) {}
+    ~userhook();
+
+    usermode_reg_status_t init(drakvuf_t drakvuf);
+    void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
+    void request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, size_t args_num, void* extra);
 };
 
-typedef void (*dll_pre_hook_cb)(drakvuf_t, const dll_view_t*, void*);
-typedef void (*dll_post_hook_cb)(drakvuf_t, const dll_view_t*, void*);
-
-struct usermode_cb_registration {
-    dll_pre_hook_cb pre_cb;
-    dll_post_hook_cb post_cb;
-    void* extra;
-};
-
-typedef enum usermode_reg_status {
-    USERMODE_REGISTER_ERROR,
-    USERMODE_REGISTER_SUCCESS,
-    USERMODE_ARCH_UNSUPPORTED,
-} usermode_reg_status_t;
-
-usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
-bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, size_t args_num, void* extra);
+extern userhook* instance;
 
 #endif
