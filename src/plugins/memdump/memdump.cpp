@@ -144,7 +144,7 @@ static void save_file_metadata(const drakvuf_trap_info_t* info,
 
     if (extras && extras->type == WriteVirtualMemoryExtras)
     {
-        json_object_object_add(jobj, "TargetPID", json_object_new_string_fmt("%" PRId32, extras->write_virtual_memory_extras.target_pid));
+        json_object_object_add(jobj, "TargetPID", json_object_new_int(extras->write_virtual_memory_extras.target_pid));
         json_object_object_add(jobj, "TargetProcessName", json_object_new_string(extras->write_virtual_memory_extras.target_name));
         json_object_object_add(jobj, "TargetBaseAddress", json_object_new_string_fmt("0x%" PRIx64, extras->write_virtual_memory_extras.base_address));
     }
