@@ -861,6 +861,10 @@ void remove_trap(drakvuf_t drakvuf,
                 loop=loop->next;
             }
 
+            // No need to update permissions if it hasn't changed
+            if ( update_access == container->memaccess.access )
+                break;
+
             ret = vmi_set_mem_event(vmi, container->memaccess.gfn, update_access, drakvuf->altp2m_idx);
             if (VMI_SUCCESS == ret)
             {
