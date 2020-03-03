@@ -218,8 +218,7 @@ jobs:
       addons:
         sonarcloud:
             organization: "drakvuf"
-            token:
-                secure: "$SONAR_TOKEN"
+            token: "$SONAR_TOKEN"
       script:
         - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
         - sudo apt-get update
