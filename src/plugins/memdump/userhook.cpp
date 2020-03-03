@@ -125,6 +125,7 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
 #include <libdrakvuf/private.h>
+#include <libusermode/userhook.hpp>
 #include <assert.h>
 
 #include "memdump.h"
@@ -159,7 +160,7 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     if (info->proc_data.pid != ret_target->pid)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto plugin = ret_target->plugin;
+    auto plugin = (memdump*)ret_target->plugin;
 
     std::map < std::string, std::string > extra_data;
 
@@ -170,16 +171,16 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     switch (plugin->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("memdump-userhok," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",0x%" PRIx64 ",\"",
+            printf("memdump-userhok," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",0x%" PRIx64 ",0x%" PRIx64 ",\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name, info->regs->rip);
+                   info->proc_data.userid, info->trap->name, info->regs->rax, info->regs->rip);
             print_arguments(ret_target->arguments);
             printf("\"");
             break;
         case OUTPUT_KV:
-            printf("memdump, Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",Arguments=\"",
+            printf("memdump, Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",ReturnValue=0x%" PRIx64 ",Arguments=\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name, info->regs->rip);
+                   info->proc_data.userid, info->trap->name, info->regs->rip, info->regs->rax);
             print_arguments(ret_target->arguments);
             printf("\"");
             break;
@@ -195,13 +196,15 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
                     "\"PPID\": %d, "
                     "\"Method\": \"%s\", "
                     "\"CalledFrom\": 0x%" PRIx64 ", "
+                    "\"ReturnValue\": 0x%" PRIx64 ", "
                     "\"Arguments\": [",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
                     info->proc_data.pid, info->proc_data.ppid,
                     info->trap->name,
-                    info->regs->rip);
+                    info->regs->rip,
+                    info->regs->rax);
 
             print_arguments(ret_target->arguments);
             printf("], "
@@ -212,9 +215,9 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[MEMDUMP-USERHOOK] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 " ProcessName:\"%s\" UserID:%" PRIi64 " Method:\"%s\" CalledFrom:0x%" PRIx64 " Arguments:\"",
+            printf("[MEMDUMP-USERHOOK] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 " ProcessName:\"%s\" UserID:%" PRIi64 " Method:\"%s\" CalledFrom:0x%" PRIx64 " ReturnValue:0x%" PRIx64 " Arguments:\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name, info->regs->rip);
+                   info->proc_data.userid, info->trap->name, info->regs->rax, info->regs->rip);
             print_arguments(ret_target->arguments);
             printf("\"");
             break;
@@ -233,7 +236,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     if (target->pid != info->proc_data.pid)
         return VMI_EVENT_RESPONSE_NONE;
 
-    dump_from_stack(drakvuf, info, target->plugin);
+    dump_from_stack(drakvuf, info, (memdump*)target->plugin);
 
     auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
     vmi_v2pcache_flush(vmi, info->regs->cr3);
@@ -314,43 +317,19 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-/**
- * Check if this thread is currently in process of loading a DLL.
- * If so, return a pointer to the associated metadata.
- */
-static user_dll_t* get_pending_dll(drakvuf_t drakvuf, drakvuf_trap_info* info, memdump* plugin)
+void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
 {
-    uint32_t thread_id;
-    if (!drakvuf_get_current_thread_id(drakvuf, info, &thread_id))
-        return nullptr;
+    memdump* plugin = (memdump*)extra;
 
-    auto vec_it = plugin->loaded_dlls.find(info->regs->cr3);
-
-    if (vec_it == plugin->loaded_dlls.end())
-        return nullptr;
-
-    for (auto& dll_meta : vec_it->second)
-    {
-        if (!dll_meta.is_hooked && dll_meta.thread_id == thread_id)
-            return &dll_meta;
-    }
-
-    return nullptr;
-}
-
-static bool populate_hook_targets(drakvuf_t drakvuf, memdump* plugin, const mmvad_info_t& mmvad, user_dll_t* dll_meta)
-{
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    unicode_string_t* dll_name = drakvuf_read_unicode_va(vmi, mmvad.file_name_ptr, 0);
+    unicode_string_t* dll_name = drakvuf_read_unicode_va(vmi, dll->mmvad.file_name_ptr, 0);
 
     if (dll_name && dll_name->contents)
     {
         for (auto const& wanted_hook : plugin->wanted_hooks)
         {
-            if (strstr((const char*) dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
-            {
-                dll_meta->targets.emplace_back(wanted_hook.function_name.c_str(), usermode_hook_cb, wanted_hook.args_num, plugin);
-            }
+            if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
+                drakvuf_request_usermode_hook(drakvuf, dll, wanted_hook.function_name.c_str(), usermode_hook_cb, wanted_hook.args_num, plugin);
         }
     }
 
@@ -358,470 +337,11 @@ static bool populate_hook_targets(drakvuf_t drakvuf, memdump* plugin, const mmva
         vmi_free_unicode_str(dll_name);
 
     drakvuf_release_vmi(drakvuf);
-    return !dll_meta->targets.empty();
 }
 
-/**
- * Check if DLL is interesting, if so, build a "hooking context" of a DLL. Such context is needed,
- * because user mode hooking is a stateful operation which requires a VM to be un-paused many times.
- */
-static user_dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, memdump* plugin, addr_t dll_base)
+void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
 {
-    mmvad_info_t mmvad;
-    if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, dll_base, &mmvad))
-        return nullptr;
-
-    if (mmvad.file_name_ptr == 0)
-        return nullptr;
-
-    auto vec_it = plugin->loaded_dlls.find(info->regs->cr3);
-
-    if (vec_it != plugin->loaded_dlls.end())
-    {
-        for (auto const& dll_meta : vec_it->second)
-        {
-            if (dll_meta.real_dll_base == mmvad.starting_vpn << 12)
-            {
-                PRINT_DEBUG("[MEMDUMP-USER] DLL %d!%llx is already hooked\n", info->proc_data.pid, (unsigned long long)mmvad.starting_vpn << 12);
-                return nullptr;
-            }
-        }
-    }
-
-    uint32_t thread_id;
-    if (!drakvuf_get_current_thread_id(drakvuf, info, &thread_id))
-        return nullptr;
-
-    user_dll_t dll_meta =
-    {
-        .dtb = info->regs->cr3,
-        .thread_id = thread_id,
-        .real_dll_base = (mmvad.starting_vpn << 12),
-        .is_hooked = false
-    };
-
-    if (!populate_hook_targets(drakvuf, plugin, mmvad, &dll_meta))
-        return nullptr;
-
-    PRINT_DEBUG("[MEMDUMP-USER] Found DLL which is worth processing %llx\n", (unsigned long long)mmvad.starting_vpn << 12);
-    addr_t vad_start = mmvad.starting_vpn << 12;
-    size_t vad_length = (mmvad.ending_vpn - mmvad.starting_vpn + 1) << 12;
-
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = vad_start
-    };
-
-    addr_t export_header_rva = 0;
-    size_t export_header_size = 0;
-
-    constexpr int MAX_HEADER_BYTES = 1024;   // keep under 1 page
-    uint8_t image[MAX_HEADER_BYTES];
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    bool status = (VMI_SUCCESS == peparse_get_image(vmi, &ctx, MAX_HEADER_BYTES, image));
-    drakvuf_release_vmi(drakvuf);
-
-    if (!status)
-        return nullptr;
-
-    void* optional_header = NULL;
-    uint16_t magic = 0;
-
-    peparse_assign_headers(image, NULL, NULL, &magic, &optional_header, NULL, NULL);
-    export_header_rva = peparse_get_idd_rva(IMAGE_DIRECTORY_ENTRY_EXPORT, &magic, optional_header, NULL, NULL);
-    export_header_size = peparse_get_idd_size(IMAGE_DIRECTORY_ENTRY_EXPORT, &magic, optional_header, NULL, NULL);
-
-    if (export_header_rva >= vad_length)
-    {
-        PRINT_DEBUG("[MEMDUMP-USER] Export header RVA is forwarded outside VAD\n");
-        return nullptr;
-    }
-    else if (export_header_size >= vad_length - export_header_rva)
-    {
-        PRINT_DEBUG("[MEMDUMP-USER] Export header size is forwarded outside VAD\n");
-        return nullptr;
-    }
-
-    dll_meta.pf_current_addr = vad_start + export_header_rva & ~(VMI_PS_4KB - 1);
-    dll_meta.pf_max_addr = vad_start + export_header_rva + export_header_size;
-
-    if (dll_meta.pf_max_addr & VMI_PS_4KB)
-    {
-        dll_meta.pf_max_addr += VMI_PS_4KB;
-        dll_meta.pf_max_addr = dll_meta.pf_max_addr & ~(VMI_PS_4KB - 1);
-    }
-
-    auto it = plugin->loaded_dlls.emplace(info->regs->cr3, std::vector<user_dll_t>()).first;
-    it->second.push_back(std::move(dll_meta));
-    return &it->second.back();
-}
-
-static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func)
-{
-    target->pid = info->proc_data.pid;
-
-    drakvuf_trap_t* trap = new drakvuf_trap_t;
-    trap->type = BREAKPOINT;
-    trap->name = target->target_name.c_str();
-    trap->cb = target->callback;
-    trap->data = target;
-
-    // during CoW we need to find all traps placed on the same physical page
-    // that's why we'll manually resolve vaddr and strore paddr under trap->breakpoint.addr
-    addr_t pa;
-
-    if (vmi_pagetable_lookup(vmi, info->regs->cr3, exec_func, &pa) != VMI_SUCCESS)
-    {
-        goto fail;
-    }
-
-    trap->breakpoint.lookup_type = LOOKUP_NONE;
-    trap->breakpoint.addr_type = ADDR_PA;
-    trap->breakpoint.addr = pa;
-
-    if (drakvuf_add_trap(drakvuf, trap))
-    {
-        target->trap = trap;
-        return true;
-    }
-
-fail:
-    PRINT_DEBUG("[MEMDUMP-USER] Failed to add trap :(\n");
-    delete trap;
-    return false;
-}
-
-static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, memdump* plugin, user_dll_t* dll_meta)
-{
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    // we have to make sure that addresses between [pf_current_addr, pf_max_addr]
-    // are available for reading otherwise vmi_translate_sym2v will fail unconditionally
-    // and we will be unable to add hooks
-
-    while (dll_meta->pf_current_addr <= dll_meta->pf_max_addr)
-    {
-        page_info_t pinfo;
-        addr_t pa;
-        if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, dll_meta->pf_current_addr, &pinfo) == VMI_SUCCESS)
-        {
-            PRINT_DEBUG("[MEMDUMP-USER] Export info accessible OK %llx\n", (unsigned long long)dll_meta->pf_current_addr);
-            dll_meta->pf_current_addr += VMI_PS_4KB;
-            continue;
-        }
-
-        pa = pinfo.paddr;
-
-        if (vmi_request_page_fault(vmi, info->vcpu, dll_meta->pf_current_addr, 0) == VMI_SUCCESS)
-        {
-            PRINT_DEBUG("[MEMDUMP-USER] Export info not accessible, page fault %llx\n", (unsigned long long)dll_meta->pf_current_addr);
-            dll_meta->pf_current_addr += VMI_PS_4KB;
-        }
-        else
-        {
-            PRINT_DEBUG("[MEMDUMP-USER] Failed to request page fault for DTB %llx, address %llx\n", (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
-        }
-
-        drakvuf_release_vmi(drakvuf);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    // export info should be available, try hooking DLLs
-    for (auto& target : dll_meta->targets)
-    {
-        if (target.state == HOOK_FIRST_TRY || target.state == HOOK_PAGEFAULT_RETRY)
-        {
-            addr_t exec_func;
-            access_context_t ctx =
-            {
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3,
-                .addr = dll_meta->real_dll_base
-            };
-
-            status_t translate_ret = vmi_translate_sym2v(vmi, &ctx, target.target_name.c_str(), &exec_func);
-
-            if (translate_ret == VMI_SUCCESS && target.state == HOOK_FIRST_TRY)
-            {
-                target.state = HOOK_FAILED;
-
-                page_info_t pinfo;
-                if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pinfo) != VMI_SUCCESS)
-                {
-                    if (vmi_request_page_fault(vmi, info->vcpu, exec_func, 0) == VMI_SUCCESS)
-                    {
-                        target.state = HOOK_PAGEFAULT_RETRY;
-                        drakvuf_release_vmi(drakvuf);
-                        return VMI_EVENT_RESPONSE_NONE;
-                    }
-                }
-                else
-                {
-                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
-                        target.state = HOOK_OK;
-                }
-            }
-            else if (translate_ret == VMI_SUCCESS && target.state == HOOK_PAGEFAULT_RETRY)
-            {
-                target.state = HOOK_FAILED;
-                page_info_t pinfo;
-
-                if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pinfo) == VMI_SUCCESS)
-                {
-                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
-                        target.state = HOOK_OK;
-                }
-            }
-            else
-            {
-                target.state = HOOK_FAILED;
-            }
-
-            PRINT_DEBUG("[MEMDUMP-USER] Hook %s (vaddr = 0x%llx, dll_base = 0x%llx, result = %s)\n",
-                        target.target_name.c_str(),
-                        (unsigned long long)exec_func,
-                        (unsigned long long)dll_meta->real_dll_base,
-                        target.state == HOOK_OK ? "OK" : "FAIL");
-        }
-    }
-
-    drakvuf_release_vmi(drakvuf);
-    PRINT_DEBUG("[MEMDUMP-USER] Done, flag DLL as hooked\n");
-    dll_meta->is_hooked = true;
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-/**
- * This is used in order to observe when SysWOW64 process is loading a new DLL.
- * If the DLL is interesting, we perform further investigation and try to equip user mode hooks.
- */
-static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    // IN HANDLE ProcessHandle
-    uint64_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    // IN OUT PVOID *BaseAddress
-    addr_t base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 2);
-
-    if (process_handle != ~0ULL)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    auto plugin = get_trap_plugin<memdump>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    user_dll_t* dll_meta = get_pending_dll(drakvuf, info, plugin);
-
-    if (!dll_meta)
-    {
-        addr_t base_address;
-
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = base_address_ptr
-        };
-
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        bool success = (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &base_address));
-        drakvuf_release_vmi(drakvuf);
-
-        if (!success)
-            return VMI_EVENT_RESPONSE_NONE;
-
-        dll_meta = create_dll_meta(drakvuf, info, plugin, base_address);
-    }
-
-    if (dll_meta)
-        return perform_hooking(drakvuf, info, plugin, dll_meta);
-
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-/**
- * This is used in order to observe when 64 bit process is loading a new DLL.
- * If the DLL is interesting, we perform further investigation and try to equip user mode hooks.
- */
-static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto data = get_trap_params<memdump, map_view_of_section_result_t<memdump>>(info);
-    memdump* plugin = data->plugin();
-    if (!data || !plugin)
-    {
-        PRINT_DEBUG("[MEMDUMP-USER] map_view_of_section_ret_cb invalid trap params!\n");
-        drakvuf_remove_trap(drakvuf, info->trap, nullptr);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
-        return VMI_EVENT_RESPONSE_NONE;
-
-    user_dll_t* dll_meta = get_pending_dll(drakvuf, info, plugin);
-
-    if (!dll_meta)
-    {
-        addr_t base_address;
-
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = data->base_address_ptr
-        };
-
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        bool success = (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &base_address));
-        drakvuf_release_vmi(drakvuf);
-
-        if (!success)
-            return VMI_EVENT_RESPONSE_NONE;
-
-        dll_meta = create_dll_meta(drakvuf, info, plugin, base_address);
-    }
-
-    if (dll_meta)
-        return perform_hooking(drakvuf, info, plugin, dll_meta);
-
-    plugin->destroy_trap(drakvuf, info->trap);
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto plugin = get_trap_plugin<memdump>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    auto trap = plugin->register_trap<memdump, map_view_of_section_result_t<memdump>>(
-                    drakvuf,
-                    info,
-                    plugin,
-                    map_view_of_section_ret_cb,
-                    breakpoint_by_pid_searcher());
-    if (!trap)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    auto data = get_trap_params<memdump, map_view_of_section_result_t<memdump>>(trap);
-    if (!data)
-    {
-        plugin->destroy_plugin_params(plugin->detach_plugin_params(trap));
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
-
-    // IN HANDLE SectionHandle
-    data->section_handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    // IN HANDLE ProcessHandle
-    data->process_handle = drakvuf_get_function_argument(drakvuf, info, 2);
-    // IN OUT PVOID *BaseAddress
-    data->base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 3);
-
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-/**
- * As we may accidentally trigger an exception in the kernel by using vmi_request_page_fault,
- * we hook KiSystemServiceHandler to account for that situation. Inside this hook,
- * we check if it was "our fault" and if so, we forcefully return EXCEPTION_CONTINUE_EXECUTION.
- * In any other case, we just pass the control to the original exception handler.
- */
-static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    PRINT_DEBUG("[MEMDUMP-USER] Entered system service handler\n");
-
-    auto plugin = get_trap_plugin<memdump>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    uint32_t thread_id;
-
-    if (!drakvuf_get_current_thread_id(drakvuf, info, &thread_id))
-    {
-        PRINT_DEBUG("[MEMDUMP-USER] Failed to get thread id in system service handler!\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    bool our_fault = false;
-
-    auto vec_it = plugin->loaded_dlls.find(info->regs->cr3);
-
-    if (vec_it != plugin->loaded_dlls.end())
-    {
-        for (auto const& dll_meta : vec_it->second)
-        {
-            if (dll_meta.dtb == info->regs->cr3 && dll_meta.thread_id == thread_id)
-            {
-                our_fault = true;
-                break;
-            }
-        }
-    }
-
-    if (!our_fault)
-    {
-        PRINT_DEBUG("[MEMDUMP-USER] Not suppressing service exception - not our fault\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    // emulate `ret` instruction
-    addr_t saved_rip = 0;
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp,
-    };
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    bool success = (VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(addr_t), &saved_rip, NULL));
-    drakvuf_release_vmi(drakvuf);
-
-    if ( !success )
-    {
-        PRINT_DEBUG("[MEMDUMP-USER] Error while reading the saved RIP in system service handler\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    constexpr int EXCEPTION_CONTINUE_EXECUTION = 0;
-    info->regs->rip = saved_rip;
-    info->regs->rsp += sizeof(addr_t);
-    info->regs->rax = EXCEPTION_CONTINUE_EXECUTION;
-    return VMI_EVENT_RESPONSE_SET_REGISTERS;
-}
-
-/**
- * Observe process exit and remove all user mode hooks
- */
-static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto plugin = get_trap_plugin<memdump>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    auto vec_it = plugin->loaded_dlls.find(info->regs->cr3);
-
-    if (vec_it == plugin->loaded_dlls.end())
-        return VMI_EVENT_RESPONSE_NONE;
-
-    for (auto& it : vec_it->second)
-    {
-        for (auto& target : it.targets)
-        {
-            if (target.state == HOOK_OK)
-            {
-                PRINT_DEBUG("[MEMDUMP-USER] Erased trap for pid %d %s\n", info->proc_data.pid,
-                            target.target_name.c_str());
-                drakvuf_remove_trap(drakvuf, target.trap, NULL);
-            }
-        }
-    }
-
-    plugin->loaded_dlls.erase(vec_it);
-    return VMI_EVENT_RESPONSE_NONE;
+    PRINT_DEBUG("[MEMDUMP] DLL hooked - done\n");
 }
 
 void memdump::load_wanted_targets(const memdump_config* c)
@@ -864,144 +384,8 @@ void memdump::load_wanted_targets(const memdump_config* c)
     }
 }
 
-static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto data = get_trap_params<memdump, copy_on_write_result_t<memdump>>(info);
-    memdump* plugin = data->plugin();
-    if (!data || !plugin)
-    {
-        PRINT_DEBUG("[MEMDUMP-USER] copy_on_write_ret_cb invalid trap params!\n");
-        drakvuf_remove_trap(drakvuf, info->trap, nullptr);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
-        return VMI_EVENT_RESPONSE_NONE;
-
-    plugin->destroy_trap(drakvuf, info->trap);
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    // sometimes the physical address was incorrectly cached in this moment, so we need to flush it
-    vmi_v2pcache_flush(vmi, info->regs->cr3);
-    addr_t pa;
-
-    if (vmi_pagetable_lookup(vmi, info->regs->cr3, data->vaddr, &pa) != VMI_SUCCESS)
-    {
-        PRINT_DEBUG("[MEMDUMP-USER] failed to get pa\n");
-        goto end;
-    }
-
-    if (data->old_cow_pa == pa)
-    {
-        PRINT_DEBUG("[MEMDUMP-USER] PA after CoW remained the same, wtf? Nothing to do here...\n");
-        goto end;
-    }
-
-    for (auto& hook : data->hooks)
-    {
-        addr_t hook_va = ((data->vaddr >> 12) << 12) + (hook->trap->breakpoint.addr & 0xFFF);
-        PRINT_DEBUG("adding hook at %lx\n", hook_va);
-
-        if (hook->trap)
-        {
-            drakvuf_remove_trap(drakvuf, hook->trap, nullptr);
-            delete hook->trap;
-            hook->state = HOOK_FAILED;
-            hook->trap = nullptr;
-        }
-
-        make_trap(vmi, drakvuf, info, hook, hook_va);
-    }
-
-end:
-    drakvuf_release_vmi(drakvuf);
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto plugin = get_trap_plugin<memdump>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    addr_t vaddr = drakvuf_get_function_argument(drakvuf, info, 1);
-    addr_t pte = drakvuf_get_function_argument(drakvuf, info, 2);
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    addr_t pa;
-
-    if (vmi_pagetable_lookup(vmi, info->regs->cr3, vaddr, &pa) != VMI_SUCCESS)
-    {
-        PRINT_DEBUG("[MEMDUMP-USER] failed to get pa");
-        drakvuf_release_vmi(drakvuf);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    drakvuf_release_vmi(drakvuf);
-
-
-    std::vector < hook_target_entry_t* > hooks;
-    for (auto& dll : plugin->loaded_dlls[info->regs->cr3])
-    {
-        for (auto& hook : dll.targets)
-        {
-            if (hook.state == HOOK_OK)
-            {
-                addr_t hook_addr = hook.trap->breakpoint.addr;
-                if (hook_addr >> 12 == pa >> 12)
-                {
-                    hooks.push_back(&hook);
-                }
-            }
-        }
-    }
-
-    PRINT_DEBUG("[MEMDUMP-USER] copy on write called: vaddr: %llx pte: %llx, pid: %d, cr3: %llx\n", (unsigned long long)vaddr, (unsigned long long)pte, info->proc_data.pid, (unsigned long long)info->regs->cr3);
-    PRINT_DEBUG("[MEMDUMP-USER] old CoW PA: %llx\n", (unsigned long long)pa);
-
-    if (!hooks.empty())
-    {
-        PRINT_DEBUG("MEMDUMP-USER] Found %zu hooks on CoW page, registering return trap\n", hooks.size());
-
-        auto trap = plugin->register_trap<memdump, copy_on_write_result_t<memdump>>(
-                        drakvuf,
-                        info,
-                        plugin,
-                        copy_on_write_ret_cb,
-                        breakpoint_by_pid_searcher());
-        if (!trap)
-            return VMI_EVENT_RESPONSE_NONE;
-
-        auto data = get_trap_params<memdump, copy_on_write_result_t<memdump>>(trap);
-        if (!data)
-        {
-            plugin->destroy_plugin_params(plugin->detach_plugin_params(trap));
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-
-        data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
-
-        data->vaddr = vaddr;
-        data->pte = pte;
-        data->old_cow_pa = pa;
-        data->hooks = hooks;
-    }
-
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
 void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
 {
-    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-
-    if (pm != VMI_PM_IA32E)
-    {
-        PRINT_DEBUG("[MEMDUMP-USER] Usermode hooking is not yet supported on this architecture/bitness.\n");
-        return;
-    }
-
     try
     {
         this->load_wanted_targets(c);
@@ -1018,30 +402,23 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
         return;
     }
 
-    breakpoint_in_system_process_searcher bp;
-    if (!register_trap<memdump>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
-        !register_trap<memdump>(drakvuf, nullptr, this, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection")) ||
-        !register_trap<memdump>(drakvuf, nullptr, this, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler")) ||
-        !register_trap<memdump>(drakvuf, nullptr, this, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
-        !register_trap<memdump>(drakvuf, nullptr, this, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite")))
-    {
+    usermode_cb_registration reg = {
+        .pre_cb = on_dll_discovered,
+        .post_cb = on_dll_hooked,
+        .extra = (void *)this
+    };
+
+    usermode_reg_status_t status = drakvuf_register_usermode_callback(drakvuf, &reg);
+
+    if (status == USERMODE_ARCH_UNSUPPORTED) {
+        PRINT_DEBUG("[MEMDUMP] Usermode hooking is not supported on this architecture/bitness, these features will be disabled\n");
+    } else if (status != USERMODE_REGISTER_SUCCESS) {
+        PRINT_DEBUG("[MEMDUMP] Failed to subscribe to libusermode\n");
         throw -1;
     }
 }
 
 void memdump::userhook_destroy(memdump* plugin)
 {
-    for (auto& it : plugin->loaded_dlls)
-    {
-        for (auto& loaded_dll : it.second)
-        {
-            for (auto& target : loaded_dll.targets)
-            {
-                if (target.state == HOOK_OK)
-                {
-                    delete target.trap;
-                }
-            }
-        }
-    }
+
 }
