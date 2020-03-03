@@ -102,51 +102,66 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef MEMDUMP_H
-#define MEMDUMP_H
+#ifndef WIN_USERHOOK_PRIVATE_H
+#define WIN_USERHOOK_PRIVATE_H
 
 #include <vector>
 #include <memory>
 
 #include <glib.h>
-#include <libusermode/userhook.hpp>
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
-struct target_config_entry_t
+struct dll_t
 {
-    std::string dll_name;
-    std::string function_name;
-    size_t args_num;
+    dll_view_t v;
 
-    target_config_entry_t() : dll_name(), function_name(), args_num() {}
-    target_config_entry_t(std::string&& dll_name, std::string&& function_name, size_t args_num)
-        : dll_name(std::move(dll_name)), function_name(std::move(function_name)), args_num(args_num) {}
+    // one entry per hooked function
+    std::vector<hook_target_entry_t> targets;
+
+    // internal, for page faults
+    addr_t pf_current_addr;
+    addr_t pf_max_addr;
 };
 
-struct memdump_config
+template<typename T>
+struct map_view_of_section_result_t : public call_result_t<T>
 {
-    const char* memdump_dir;
-    const char* dll_hooks_list;
+    map_view_of_section_result_t(T* src) : call_result_t<T>(src), section_handle(), process_handle(), base_address_ptr() {}
+
+    uint64_t section_handle;
+    uint64_t process_handle;
+    addr_t base_address_ptr;
 };
 
-class memdump: public pluginex
+template<typename T>
+struct copy_on_write_result_t : public call_result_t<T>
+{
+    copy_on_write_result_t(T* src) : call_result_t<T>(src), vaddr(), pte(), old_cow_pa() {}
+
+    addr_t vaddr;
+    addr_t pte;
+    addr_t old_cow_pa;
+    std::vector<hook_target_entry_t*> hooks;
+};
+
+class userhook : public pluginex
 {
 public:
-    int dumps_count;
-    // for memdump.cpp
-    const char* memdump_dir;
-    addr_t dll_base_rva;
-    addr_t dll_base_wow_rva;
+    int initialized;
 
-    std::vector<target_config_entry_t> wanted_hooks;
+    std::vector<usermode_cb_registration> plugins;
+    // map dtb -> list of hooked dlls
+    std::map<addr_t, std::vector<dll_t>> loaded_dlls;
 
-    memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
-    ~memdump();
+    userhook(drakvuf_t drakvuf) : pluginex(drakvuf, OUTPUT_DEFAULT), initialized(0) {}
+    ~userhook();
 
-    void userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output);
-    void userhook_destroy(memdump* plugin);
-    void load_wanted_targets(const memdump_config* c);
+    usermode_reg_status_t init(drakvuf_t drakvuf);
+    void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
+    void request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, size_t args_num, void* extra);
 };
+
+extern userhook* instance;
 
 #endif
