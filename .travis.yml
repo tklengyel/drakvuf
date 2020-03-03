@@ -1,6 +1,5 @@
 dist: bionic
 language: c
-sudo: true
 compiler: clang
 services:
     - docker
@@ -9,11 +8,9 @@ git:
 
 env:
     global:
-        # The next declaration is the encrypted COVERITY_SCAN_TOKEN, created
-        #   via the "travis encrypt" command using the project repo's public key
         - secure: "$COVERITY_SCAN_TOKEN"
 
-matrix:
+jobs:
     include:
 
 #
@@ -149,40 +146,6 @@ matrix:
         - make
 
 #
-# Coverity
-#
-    - env:
-        - TEST="Coverity"
-      addons:
-        coverity_scan:
-            project:
-                name: "$COVERITY_PROJECT_NAME"
-                description: "Build submitted via Travis CI"
-            notification_email: $COVERITY_NOTIFICATION_EMAIL
-            build_command_prepend: "./autogen.sh; ./configure --enable-debug; make clean"
-            build_command:   "make"
-            branch_pattern: $COVERITY_BRANCH_PATTERN
-      before_install:
-        - sudo apt-get update
-        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
-        - export INSTALLDIR=$PWD/usr/local/
-        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
-        - export C_INCLUDE_PATH=$PWD/usr/local/include
-        - export CPLUS_INCLUDE_PATH=$PWD/usr/local/include
-        - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
-        - export LDFLAGS="-L$PWD/usr/local/lib"
-        - export CFLAGS="-I$PWD/usr/local/include"
-        - git submodule update --init libvmi
-        - cd libvmi
-        - autoreconf -vif
-        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-        - make
-        - make install
-        - cd ..
-      script:
-        - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
-
-#
 # clang scan-build
 #
     - env:
@@ -211,18 +174,22 @@ matrix:
         - scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores make
 
 #
-# SonarCloud
+# Coverity
 #
-    - env:
-        - TEST="SonarCloud"
-      dist: xenial
-      edge: true
+    - if: branch = master
+      env:
+        - TEST="Coverity"
       addons:
-        sonarcloud:
-            organization: "drakvuf"
-            token:
-                secure: "$SONAR_TOKEN"
-      before_install:
+        coverity_scan:
+            project:
+                name: "$COVERITY_PROJECT_NAME"
+                description: "Build submitted via Travis CI"
+            notification_email: $COVERITY_NOTIFICATION_EMAIL
+            build_command_prepend: "./autogen.sh; ./configure --enable-debug; make clean"
+            build_command:   "make"
+            branch_pattern: $COVERITY_BRANCH_PATTERN
+      script:
+        - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
         - sudo apt-get update
         - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
         - export INSTALLDIR=$PWD/usr/local/
@@ -239,10 +206,39 @@ matrix:
         - make
         - make install
         - cd ..
-      install:
-        - ./autogen.sh
+        - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
+
+#
+# SonarCloud
+#
+    - if: branch = master
+      env:
+        - TEST="SonarCloud"
+      dist: xenial
+      addons:
+        sonarcloud:
+            organization: "drakvuf"
+            token:
+                secure: "$SONAR_TOKEN"
       script:
         - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
+        - export INSTALLDIR=$PWD/usr/local/
+        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
+        - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export CPLUS_INCLUDE_PATH=$PWD/usr/local/include
+        - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
+        - export LDFLAGS="-L$PWD/usr/local/lib"
+        - export CFLAGS="-I$PWD/usr/local/include"
+        - git submodule update --init libvmi
+        - cd libvmi
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
+        - make
+        - make install
+        - cd ..
+        - ./autogen.sh
         - ./configure --enable-debug
         - build-wrapper-linux-x86-64 --out-dir bw-output make -j2
         - sonar-scanner
@@ -250,7 +246,8 @@ matrix:
 #
 # Build binary packages and push them as releases on drakvuf-builds
 #
-    - env:
+    - if: branch = master
+      env:
         - TEST="package build"
       script:
         - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
@@ -266,11 +263,7 @@ matrix:
         - git tag $TRAVIS_TAG
       deploy:
         provider: releases
-        api_key:
-          secure: "$GITHUB_TOKEN"
+        edge: true
         repo: tklengyel/drakvuf-builds
         file:
           - package/out/**/*
-        skip_cleanup: true
-        file_glob: true
-        tags: true
