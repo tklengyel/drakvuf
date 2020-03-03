@@ -177,8 +177,8 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
             printf("\"");
             break;
         case OUTPUT_KV:
-            printf("memdump-userhook Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",Arguments=\"",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+            printf("memdump-userhook Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",PID=%d,PPID=%d,ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",Arguments=\"",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
                    info->proc_data.userid, info->trap->name, info->regs->rip);
             print_arguments(ret_target->arguments);
             printf("\"");
