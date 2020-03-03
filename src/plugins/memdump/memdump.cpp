@@ -108,6 +108,7 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
 #include <assert.h>
+#include <libdrakvuf/json-util.h>
 
 #include "memdump.h"
 #include "private.h"
@@ -132,22 +133,28 @@ static void save_file_metadata(const drakvuf_trap_info_t* info,
     if (!fp)
         return;
 
-    fprintf(fp, "Method: \"%s\"\n", method);
-    fprintf(fp, "DumpReason: \"%s\"\n", dump_reason);
-    fprintf(fp, "DumpAddress: 0x%" PRIx64 "\n", dump_address);
-    fprintf(fp, "DumpSize: 0x%" PRIx64 "\n", dump_size);
-    fprintf(fp, "PID: %" PRId32 "\n", info->proc_data.pid);
-    fprintf(fp, "PPID: %" PRId32 "\n", info->proc_data.ppid);
-    fprintf(fp, "ProcessName: \"%s\"\n", info->proc_data.name);
+    json_object *jobj = json_object_new_object();
+    json_object_object_add(jobj, "Method", json_object_new_string(method));
+    json_object_object_add(jobj, "DumpReason", json_object_new_string(dump_reason));
+    json_object_object_add(jobj, "DumpAddress", json_object_new_string_fmt("0x%" PRIx64, dump_address));
+    json_object_object_add(jobj, "DumpSize", json_object_new_string_fmt("0x%" PRIx64, dump_size));
+    json_object_object_add(jobj, "PID", json_object_new_int(info->proc_data.pid));
+    json_object_object_add(jobj, "PPID", json_object_new_int(info->proc_data.ppid));
+    json_object_object_add(jobj, "ProcessName", json_object_new_string(info->proc_data.name));
+
     if (extras && extras->type == WriteVirtualMemoryExtras)
     {
-        fprintf(fp, "TargetPID: %" PRId32 "\n", extras->write_virtual_memory_extras.target_pid);
-        fprintf(fp, "TargetProcessName: \"%s\"\n", extras->write_virtual_memory_extras.target_name);
-        fprintf(fp, "TargetBaseAddress: %" PRIx64 "\n", extras->write_virtual_memory_extras.base_address);
+        json_object_object_add(jobj, "TargetPID", json_object_new_int(extras->write_virtual_memory_extras.target_pid));
+        json_object_object_add(jobj, "TargetProcessName", json_object_new_string(extras->write_virtual_memory_extras.target_name));
+        json_object_object_add(jobj, "TargetBaseAddress", json_object_new_string_fmt("0x%" PRIx64, extras->write_virtual_memory_extras.base_address));
     }
-    fprintf(fp, "DataFileName: \"%s\"\n", data_file_name);
 
+    json_object_object_add(jobj, "DataFileName", json_object_new_string(data_file_name));
+
+    fprintf(fp, "%s\n", json_object_get_string(jobj));
     fclose(fp);
+
+    json_object_put(jobj);
 }
 
 /**
