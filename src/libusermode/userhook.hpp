@@ -102,51 +102,74 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef MEMDUMP_H
-#define MEMDUMP_H
+#ifndef WIN_USERHOOK_H
+#define WIN_USERHOOK_H
 
 #include <vector>
 #include <memory>
 
 #include <glib.h>
-#include <libusermode/userhook.hpp>
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
-struct target_config_entry_t
+typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
+
+enum target_hook_state
 {
-    std::string dll_name;
-    std::string function_name;
+    HOOK_FIRST_TRY,
+    HOOK_PAGEFAULT_RETRY,
+    HOOK_FAILED,
+    HOOK_OK
+};
+
+struct hook_target_entry_t
+{
+    vmi_pid_t pid;
+    std::string target_name;
+    callback_t callback;
     size_t args_num;
+    target_hook_state state;
+    drakvuf_trap_t* trap;
+    void* plugin;
 
-    target_config_entry_t() : dll_name(), function_name(), args_num() {}
-    target_config_entry_t(std::string&& dll_name, std::string&& function_name, size_t args_num)
-        : dll_name(std::move(dll_name)), function_name(std::move(function_name)), args_num(args_num) {}
+    hook_target_entry_t(std::string target_name, callback_t callback, size_t args_num, void* plugin)
+        : target_name(target_name), callback(callback), args_num(args_num), state(HOOK_FIRST_TRY), plugin(plugin) {}
 };
 
-struct memdump_config
+struct return_hook_target_entry_t
 {
-    const char* memdump_dir;
-    const char* dll_hooks_list;
+    vmi_pid_t pid;
+    drakvuf_trap_t* trap;
+    void* plugin;
+    std::vector < uint64_t > arguments;
 };
 
-class memdump: public pluginex
+struct dll_view_t
 {
-public:
-    int dumps_count;
-    // for memdump.cpp
-    const char* memdump_dir;
-    addr_t dll_base_rva;
-    addr_t dll_base_wow_rva;
-
-    std::vector<target_config_entry_t> wanted_hooks;
-
-    memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
-    ~memdump();
-
-    void userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output);
-    void userhook_destroy(memdump* plugin);
-    void load_wanted_targets(const memdump_config* c);
+    // relevant while loading
+    addr_t dtb;
+    uint32_t thread_id;
+    addr_t real_dll_base;
+    mmvad_info_t mmvad;
+    bool is_hooked;
 };
+
+typedef void (*dll_pre_hook_cb)(drakvuf_t, const dll_view_t*, void*);
+typedef void (*dll_post_hook_cb)(drakvuf_t, const dll_view_t*, void*);
+
+struct usermode_cb_registration {
+    dll_pre_hook_cb pre_cb;
+    dll_post_hook_cb post_cb;
+    void* extra;
+};
+
+typedef enum usermode_reg_status {
+    USERMODE_REGISTER_ERROR,
+    USERMODE_REGISTER_SUCCESS,
+    USERMODE_ARCH_UNSUPPORTED,
+} usermode_reg_status_t;
+
+usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
+bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, size_t args_num, void* extra);
 
 #endif
