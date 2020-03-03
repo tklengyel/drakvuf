@@ -788,10 +788,10 @@ usermode_reg_status_t userhook::init(drakvuf_t drakvuf)
     return USERMODE_REGISTER_SUCCESS;
 }
 
-void userhook::request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, size_t args_num, void* extra)
+void userhook::request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, std::vector<ArgumentPrinter*> argument_printers, void* extra)
 {
     dll_t* p_dll = (dll_t*)const_cast<dll_view_t*>(dll);
-    p_dll->targets.emplace_back(func_name, callback, args_num, extra);
+    p_dll->targets.emplace_back(func_name, callback, argument_printers, extra);
 }
 
 void userhook::register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg)
@@ -835,12 +835,12 @@ usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, user
     return USERMODE_REGISTER_SUCCESS;
 }
 
-bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, size_t args_num, void* extra)
+bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, std::vector<ArgumentPrinter*> argument_printers, void* extra)
 {
     if (!instance || !instance->initialized) {
         return false;
     }
 
-    instance->request_usermode_hook(drakvuf, dll, func_name, callback, args_num, extra);
+    instance->request_usermode_hook(drakvuf, dll, func_name, callback, argument_printers, extra);
     return true;
 }

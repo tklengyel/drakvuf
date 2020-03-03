@@ -117,11 +117,10 @@ struct target_config_entry_t
 {
     std::string dll_name;
     std::string function_name;
-    std::vector < ArgumentPrinter* > argument_printers;
 
     target_config_entry_t() : dll_name(), function_name() {}
-    target_config_entry_t(std::string&& dll_name, std::string&& function_name, std::vector < ArgumentPrinter* > argument_printers)
-            : dll_name(std::move(dll_name)), function_name(std::move(function_name)), argument_printers(std::move(argument_printers)) {}
+    target_config_entry_t(std::string&& dll_name, std::string&& function_name)
+        : dll_name(std::move(dll_name)), function_name(std::move(function_name)) {}
 };
 
 struct memdump_config

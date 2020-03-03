@@ -99,55 +99,45 @@
  * license file for more details (it's in a COPYING file included with     *
  * DRAKVUF, and also available from                                        *
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
- **
-     ***************************************************************************/
+ *                                                                         *
+ ***************************************************************************/
 
-#ifndef PRINTERS_H
-#define PRINTERS_H
+#ifndef APIMON_H
+#define APIMON_H
 
-#include <string>
-#include <map>
-#include <libvmi/libvmi.h>
-#include <libdrakvuf/libdrakvuf.h>
+#include <vector>
+#include <memory>
 
-class ArgumentPrinter
+#include <glib.h>
+#include <libusermode/userhook.hpp>
+#include "plugins/private.h"
+#include "plugins/plugins_ex.h"
+
+struct api_target_config_entry_t
+{
+    std::string dll_name;
+    std::string function_name;
+    std::vector < ArgumentPrinter* > argument_printers;
+
+    api_target_config_entry_t() : dll_name(), function_name() {}
+    api_target_config_entry_t(std::string&& dll_name, std::string&& function_name, std::vector < ArgumentPrinter* > argument_printers)
+        : dll_name(std::move(dll_name)), function_name(std::move(function_name)), argument_printers(std::move(argument_printers)) {}
+};
+
+struct apimon_config
+{
+    const char* dll_hooks_list;
+};
+
+class apimon: public pluginex
 {
 public:
-    virtual std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument);
-};
+    std::vector<api_target_config_entry_t> wanted_hooks;
 
-class StringPrinterInterface : public ArgumentPrinter
-{
-protected:
-    virtual std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) = 0;
-public:
-    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument);
-};
+    apimon(drakvuf_t drakvuf, const apimon_config* config, output_format_t output);
+    ~apimon();
 
-class AsciiPrinter : public StringPrinterInterface
-{
-private:
-    std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx);
-};
-
-class WideStringPrinter : public StringPrinterInterface
-{
-private:
-    std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx);
-};
-
-class UnicodePrinter : public StringPrinterInterface
-{
-private:
-    std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx);
-};
-
-class BitMaskPrinter : public ArgumentPrinter
-{
-    std::map < uint64_t, std::string > dict;
-public:
-    BitMaskPrinter(std::map < uint64_t, std::string > dict);
-    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument);
+    void load_wanted_targets(const apimon_config* c);
 };
 
 #endif
