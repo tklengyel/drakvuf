@@ -427,6 +427,8 @@ AS_IF([test x"$hardening" != x"no"], [
        [HARDEN_CFLAGS="$HARDEN_CFLAGS -fPIE"
         HARDEN_LDFLAGS="$HARDEN_LDFLAGS -Wl,-pie"])])])
 
+  check_link_flag([-Wl,-z,noexecstack],
+   [HARDEN_LDFLAGS="$HARDEN_LDFLAGS -Wl,-z,noexecstack"])
   check_link_flag([-Wl,-z,relro],
    [HARDEN_LDFLAGS="$HARDEN_LDFLAGS -Wl,-z,relro"])
   check_link_flag([-Wl,-z,now],
