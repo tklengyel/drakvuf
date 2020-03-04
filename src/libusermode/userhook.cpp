@@ -134,6 +134,11 @@
 userhook* instance = nullptr;
 
 
+static void wrap_delete(drakvuf_trap_t* trap)
+{
+    g_slice_free(drakvuf_trap_t, trap);
+}
+
 /**
  * Check if this thread is currently in process of loading a DLL.
  * If so, return a pointer to the associated metadata.
@@ -266,7 +271,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info *
 {
     target->pid = info->proc_data.pid;
 
-    drakvuf_trap_t* trap = new drakvuf_trap_t;
+    drakvuf_trap_t* trap = g_slice_new(drakvuf_trap_t);
     trap->type = BREAKPOINT;
     trap->name = target->target_name.c_str();
     trap->cb = target->callback;
@@ -677,8 +682,7 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
         if (hook->trap)
         {
-            drakvuf_remove_trap(drakvuf, hook->trap, nullptr);
-            delete hook->trap;
+            drakvuf_remove_trap(drakvuf, hook->trap, wrap_delete);
             hook->state = HOOK_FAILED;
             hook->trap = nullptr;
         }
@@ -788,7 +792,7 @@ usermode_reg_status_t userhook::init(drakvuf_t drakvuf)
     return USERMODE_REGISTER_SUCCESS;
 }
 
-void userhook::request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, std::vector<ArgumentPrinter*> argument_printers, void* extra)
+void userhook::request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, const std::vector< std::unique_ptr < ArgumentPrinter > > &argument_printers, void* extra)
 {
     dll_t* p_dll = (dll_t*)const_cast<dll_view_t*>(dll);
     p_dll->targets.emplace_back(func_name, callback, argument_printers, extra);
@@ -835,7 +839,7 @@ usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, user
     return USERMODE_REGISTER_SUCCESS;
 }
 
-bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, std::vector<ArgumentPrinter*> argument_printers, void* extra)
+bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers, void* extra)
 {
     if (!instance || !instance->initialized) {
         return false;
@@ -843,4 +847,72 @@ bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, con
 
     instance->request_usermode_hook(drakvuf, dll, func_name, callback, argument_printers, extra);
     return true;
+}
+
+void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, std::vector<plugin_target_config_entry_t>* wanted_hooks)
+{
+    if (!dll_hooks_list_path)
+    {
+        // if the DLL hook list was not provided, we provide some simple defaults
+        std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec1;
+        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter()));
+        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter()));
+        wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", "log+stack", std::move(arg_vec1));
+
+        std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec2;
+        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter()));
+        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter()));
+        wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", "log+stack", std::move(arg_vec2));
+        return;
+    }
+
+    std::ifstream ifs(dll_hooks_list_path, std::ifstream::in);
+
+    if (!ifs)
+    {
+        throw -1;
+    }
+
+    std::string line;
+    while (std::getline(ifs, line))
+    {
+        if (line.empty() || line[0] == '#')
+            continue;
+
+        std::stringstream ss(line);
+
+        wanted_hooks->push_back(plugin_target_config_entry_t());
+        plugin_target_config_entry_t &e = wanted_hooks->back();
+
+        std::string arg_type;
+        if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
+            throw -1;
+        if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
+            throw -1;
+        if (!std::getline(ss, e.strategy, ',') || e.strategy.empty())
+            throw -1;
+
+        if (e.strategy != "log" && e.strategy != "log+stack" && e.strategy != "stack")
+            throw -1;
+
+        while (std::getline(ss, arg_type, ',') && !arg_type.empty())
+        {
+            if (arg_type == "lpcstr" || arg_type == "lpctstr")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new AsciiPrinter()));
+            }
+            else if (arg_type == "lpcwstr" || arg_type == "lpwstr")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new WideStringPrinter()));
+            }
+            else if (arg_type == "punicode_string")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UnicodePrinter()));
+            }
+            else
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new ArgumentPrinter()));
+            }
+        }
+    }
 }

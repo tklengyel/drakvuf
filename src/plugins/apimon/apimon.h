@@ -113,17 +113,6 @@
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
-struct api_target_config_entry_t
-{
-    std::string dll_name;
-    std::string function_name;
-    std::vector < ArgumentPrinter* > argument_printers;
-
-    api_target_config_entry_t() : dll_name(), function_name() {}
-    api_target_config_entry_t(std::string&& dll_name, std::string&& function_name, std::vector < ArgumentPrinter* > argument_printers)
-        : dll_name(std::move(dll_name)), function_name(std::move(function_name)), argument_printers(std::move(argument_printers)) {}
-};
-
 struct apimon_config
 {
     const char* dll_hooks_list;
@@ -132,12 +121,10 @@ struct apimon_config
 class apimon: public pluginex
 {
 public:
-    std::vector<api_target_config_entry_t> wanted_hooks;
+    std::vector<plugin_target_config_entry_t> wanted_hooks;
 
     apimon(drakvuf_t drakvuf, const apimon_config* config, output_format_t output);
     ~apimon();
-
-    void load_wanted_targets(const apimon_config* c);
 };
 
 #endif

@@ -113,16 +113,6 @@
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
-struct target_config_entry_t
-{
-    std::string dll_name;
-    std::string function_name;
-
-    target_config_entry_t() : dll_name(), function_name() {}
-    target_config_entry_t(std::string&& dll_name, std::string&& function_name)
-        : dll_name(std::move(dll_name)), function_name(std::move(function_name)) {}
-};
-
 struct memdump_config
 {
     const char* memdump_dir;
@@ -138,14 +128,13 @@ public:
     addr_t dll_base_rva;
     addr_t dll_base_wow_rva;
 
-    std::vector<target_config_entry_t> wanted_hooks;
+    std::vector<plugin_target_config_entry_t> wanted_hooks;
 
     memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
     ~memdump();
 
     void userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output);
-    void userhook_destroy(memdump* plugin);
-    void load_wanted_targets(const memdump_config* c);
+    void userhook_destroy();
 };
 
 #endif

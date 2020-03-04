@@ -99,8 +99,8 @@
  * license file for more details (it's in a COPYING file included with     *
  * DRAKVUF, and also available from                                        *
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
- **
-     ***************************************************************************/
+ *                                                                         *
+ ***************************************************************************/
 
 #ifndef PRINTERS_H
 #define PRINTERS_H
@@ -114,6 +114,7 @@ class ArgumentPrinter
 {
 public:
     virtual std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument);
+    virtual ~ArgumentPrinter();
 };
 
 class StringPrinterInterface : public ArgumentPrinter

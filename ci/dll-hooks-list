@@ -1,0 +1,3 @@
+# DLL hooks list for tests on DRAKVUF CI
+user32.dll,CharLowerA,log+stack,lpstr
+user32.dll,SetRect,log+stack,lprect,int,int,int,int

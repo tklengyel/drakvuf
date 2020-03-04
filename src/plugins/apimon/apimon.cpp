@@ -115,7 +115,7 @@
 #include "crypto.h"
 
 
-void print_arguments(drakvuf_t drakvuf, drakvuf_trap_info* info, std::vector < uint64_t > arguments, std::vector < ArgumentPrinter* > argument_printers)
+void print_arguments(drakvuf_t drakvuf, drakvuf_trap_info* info, std::vector < uint64_t > arguments, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers)
 {
     json_object *jobj = json_object_new_array();
 
@@ -159,18 +159,16 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     switch (plugin->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("apimon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",0x%" PRIx64 ",0x%" PRIx64 ",\"",
+            printf("apimon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",0x%" PRIx64 ",0x%" PRIx64 ",",
             UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
             info->proc_data.userid, info->trap->name, info->regs->rax, info->regs->rip);
             print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
-            printf("\"");
             break;
         case OUTPUT_KV:
-            printf("apimon, Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",ReturnValue=0x%" PRIx64 ",Arguments=\"",
+            printf("apimon, Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",ReturnValue=0x%" PRIx64 ",Arguments=",
             UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
             info->proc_data.userid, info->trap->name, info->regs->rip, info->regs->rax);
             print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
-            printf("\"");
             break;
         case OUTPUT_JSON:
             escaped_pname = drakvuf_escape_str(info->proc_data.name);
@@ -203,11 +201,10 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
             break;
         default:
         case OUTPUT_DEFAULT:
-            printf("[APIMON-USERHOOK] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 " ProcessName:\"%s\" UserID:%" PRIi64 " Method:\"%s\" CalledFrom:0x%" PRIx64 " ReturnValue:0x%" PRIx64 " Arguments:\"",
+            printf("[APIMON-USERHOOK] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 " ProcessName:\"%s\" UserID:%" PRIi64 " Method:\"%s\" CalledFrom:0x%" PRIx64 " ReturnValue:0x%" PRIx64 " Arguments:",
             UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
             info->proc_data.userid, info->trap->name, info->regs->rax, info->regs->rip);
             print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
-            printf("\"");
             break;
     }
     printf("\n");
@@ -224,8 +221,8 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     if (target->pid != info->proc_data.pid)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    vmi_v2pcache_flush(vmi, info->regs->cr3);
+    vmi_lock_guard lg(drakvuf);
+    vmi_v2pcache_flush(lg.vmi, info->regs->cr3);
 
     bool is_syswow = drakvuf_is_wow64(drakvuf, info);
 
@@ -243,7 +240,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     {
         uint32_t ret_addr_tmp;
 
-        if (vmi_read_32(vmi, &ctx, &ret_addr_tmp) == VMI_SUCCESS)
+        if (vmi_read_32(lg.vmi, &ctx, &ret_addr_tmp) == VMI_SUCCESS)
         {
             success = true;
             ret_addr = ret_addr_tmp;
@@ -251,35 +248,41 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     }
     else
     {
-        success = vmi_read_64(vmi, &ctx, &ret_addr) == VMI_SUCCESS;
+        success = vmi_read_64(lg.vmi, &ctx, &ret_addr) == VMI_SUCCESS;
     }
-    drakvuf_release_vmi(drakvuf);
 
-    return_hook_target_entry_t* ret_target = new return_hook_target_entry_t();
-    drakvuf_trap_t* trap = new drakvuf_trap_t;
+    return_hook_target_entry_t* ret_target = new(std::nothrow) return_hook_target_entry_t(target->pid, target->plugin, target->argument_printers);
+
+    if (!ret_target)
+    {
+        PRINT_DEBUG("[APIMON-USER] Failed to allocate memory for return_hook_target_entry_t\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    drakvuf_trap_t* trap = new(std::nothrow) drakvuf_trap_t;
+
+    if (!trap)
+    {
+        PRINT_DEBUG("[APIMON-USER] Failed to allocate memory for drakvuf_trap_t\n");
+        delete ret_target;
+        return VMI_EVENT_RESPONSE_NONE;
+    }
 
     for (size_t i = 1; i <= target->argument_printers.size(); i++)
     {
         uint64_t argument = drakvuf_get_function_argument(drakvuf, info, i);
         ret_target->arguments.push_back(argument);
     }
-    ret_target->argument_printers = target->argument_printers;
-    ret_target->plugin = target->plugin;
 
     addr_t paddr;
-    vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    if ( VMI_SUCCESS != vmi_pagetable_lookup(vmi, info->regs->cr3, ret_addr, &paddr) )
+    if ( VMI_SUCCESS != vmi_pagetable_lookup(lg.vmi, info->regs->cr3, ret_addr, &paddr) )
     {
-        delete ret_target;
         delete trap;
-        drakvuf_release_vmi(drakvuf);
+        delete ret_target;
         return VMI_EVENT_RESPONSE_NONE;
 
     }
-    drakvuf_release_vmi(drakvuf);
-
-    ret_target->pid = target->pid;
 
     trap->type = BREAKPOINT;
     trap->name = target->target_name.c_str();
@@ -308,8 +311,8 @@ static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* ex
 {
     apimon* plugin = (apimon*)extra;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    unicode_string_t* dll_name = drakvuf_read_unicode_va(vmi, dll->mmvad.file_name_ptr, 0);
+    vmi_lock_guard lg(drakvuf);
+    unicode_string_t* dll_name = drakvuf_read_unicode_va(lg.vmi, dll->mmvad.file_name_ptr, 0);
 
     if (dll_name && dll_name->contents)
     {
@@ -324,8 +327,6 @@ static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* ex
 
     if (dll_name)
         vmi_free_unicode_str(dll_name);
-
-    drakvuf_release_vmi(drakvuf);
 }
 
 static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
@@ -333,73 +334,27 @@ static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
     PRINT_DEBUG("[APIMON] DLL hooked - done\n");
 }
 
-// TODO repeated code
-void apimon::load_wanted_targets(const apimon_config* c)
-{
-    if (!c->dll_hooks_list)
-    {
-        // if the DLL hook list was not provided, we provide some simple defaults
-        this->wanted_hooks.emplace_back("ws2_32.dll", "WSAStartup", std::vector<ArgumentPrinter*> { new ArgumentPrinter(), new ArgumentPrinter() });
-        this->wanted_hooks.emplace_back("ntdll.dll", "RtlExitUserProcess", std::vector<ArgumentPrinter*> { new ArgumentPrinter(), new ArgumentPrinter() });
-        return;
-    }
-
-    std::ifstream ifs(c->dll_hooks_list, std::ifstream::in);
-
-    if (!ifs)
-    {
-        throw -1;
-    }
-
-    std::string line;
-    while (std::getline(ifs, line))
-    {
-        if (line.empty() || line[0] == '#')
-            continue;
-
-        std::stringstream ss(line);
-        api_target_config_entry_t e;
-
-        std::string arg_type;
-        if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
-            throw -1;
-        if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
-            throw -1;
-        while (std::getline(ss, arg_type, ',') && !arg_type.empty())
-        {
-            if (arg_type == "lpcstr" || arg_type == "lpctstr")
-            {
-                e.argument_printers.push_back(new AsciiPrinter());
-            }
-            else if (arg_type == "lpcwstr" || arg_type == "lpwstr")
-            {
-                e.argument_printers.push_back(new WideStringPrinter());
-            }
-            else if (arg_type == "punicode_string")
-            {
-                e.argument_printers.push_back(new UnicodePrinter());
-            }
-            else
-            {
-                e.argument_printers.push_back(new ArgumentPrinter());
-            }
-        }
-
-        this->wanted_hooks.push_back(e);
-    }
-}
-
 apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output)
     : pluginex(drakvuf, output)
 {
     try
     {
-        this->load_wanted_targets(c);
+        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, &this->wanted_hooks);
     }
     catch (int e)
     {
         fprintf(stderr, "Malformed DLL hook configuration for APIMON plugin\n");
         throw -1;
+    }
+
+    auto it = std::begin(this->wanted_hooks);
+
+    while (it != std::end(this->wanted_hooks))
+    {
+        if ((*it).strategy != "log" && (*it).strategy != "log+stack")
+            it = this->wanted_hooks.erase(it);
+	else
+            ++it;
     }
 
     if (this->wanted_hooks.empty())
@@ -416,11 +371,16 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
 
     usermode_reg_status_t status = drakvuf_register_usermode_callback(drakvuf, &reg);
 
-    if (status == USERMODE_ARCH_UNSUPPORTED) {
-        PRINT_DEBUG("[APIMON] Usermode hooking is not supported on this architecture/bitness, these features will be disabled\n");
-    } else if (status != USERMODE_REGISTER_SUCCESS) {
-        PRINT_DEBUG("[APIMON] Failed to subscribe to libusermode\n");
-        throw -1;
+    switch (status) {
+        case USERMODE_REGISTER_SUCCESS:
+            // success, nothing to do
+            break;
+        case USERMODE_ARCH_UNSUPPORTED:
+            PRINT_DEBUG("[APIMON] Usermode hooking is not supported on this architecture/bitness, these features will be disabled\n");
+            break;
+        default:
+            PRINT_DEBUG("[APIMON] Failed to subscribe to libusermode\n");
+            throw -1;
     }
 }
 
