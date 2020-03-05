@@ -43,6 +43,17 @@ jobs:
           fi
 
 #
+# cppcheck
+#
+    - env:
+        - TEST="cppcheck"
+      addons:
+        snaps:
+          - cppcheck
+      script:
+        - cppcheck --error-exitcode=1 --force ./src
+
+#
 # compile tests
 #
     - env:
