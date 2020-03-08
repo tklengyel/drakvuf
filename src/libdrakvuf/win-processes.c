@@ -633,7 +633,7 @@ bool win_search_modules( drakvuf_t drakvuf,
 
             vmi_free_unicode_str( module_info->full_name );
             vmi_free_unicode_str( module_info->base_name );
-            g_free( module_info );
+            g_slice_free(module_info_t, module_info);
         }
     }
 
@@ -668,7 +668,7 @@ bool win_search_modules_wow( drakvuf_t drakvuf,
 
             vmi_free_unicode_str( module_info->full_name );
             vmi_free_unicode_str( module_info->base_name );
-            g_free( module_info );
+            g_slice_free(module_info_t, module_info);
         }
     }
 
