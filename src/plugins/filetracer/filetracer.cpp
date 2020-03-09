@@ -188,7 +188,7 @@ static void print_file_obj_info(drakvuf_t drakvuf,
                     "\"PPID\": %d,"
                     "\"Method\": \"%s\","
                     "\"FileName\": %s,"
-                    "\"Handle: 0x%" PRIx32 "",
+                    "\"Handle\": \"0x%" PRIx32 "\"",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
