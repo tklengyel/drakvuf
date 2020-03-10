@@ -325,6 +325,7 @@ printout:
             break;
         case OUTPUT_JSON:
             escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_fname = drakvuf_escape_str(display_file);
             printf( "{"
                     "\"Plugin\": \"memdump\", "
                     "\"TimeStamp\":" "\"" FORMAT_TIMEVAL "\", "

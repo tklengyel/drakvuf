@@ -257,7 +257,7 @@ module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_he
             break;
         }
 
-        module_info_t* ret_module_info = (module_info_t*)g_try_malloc0( sizeof( module_info_t ) );
+        module_info_t* ret_module_info = (module_info_t*)g_slice_alloc0( sizeof( module_info_t ) );
 
         if ( ret_module_info )
         {
@@ -282,7 +282,7 @@ module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_he
                     vmi_free_unicode_str( ret_module_info->base_name );
                 }
             }
-            g_free( ret_module_info );
+            g_slice_free(module_info_t, ret_module_info);
         }
 
         next_module = tmp_next;
@@ -313,7 +313,7 @@ module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_lis
             break;
         }
 
-        module_info_t* ret_module_info = (module_info_t*)g_try_malloc0( sizeof( module_info_t ) );
+        module_info_t* ret_module_info = (module_info_t*)g_slice_alloc0( sizeof( module_info_t ) );
 
         if ( ret_module_info )
         {
@@ -338,7 +338,7 @@ module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_lis
                     vmi_free_unicode_str( ret_module_info->base_name );
                 }
             }
-            g_free( ret_module_info );
+            g_slice_free(module_info_t, ret_module_info);
         }
 
         next_module = tmp_next;

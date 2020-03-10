@@ -171,7 +171,7 @@ void process_free_requests(drakvuf_t drakvuf)
         remove_trap(drakvuf, free_wrapper->trap);
         if (free_wrapper->free_routine)
             free_wrapper->free_routine(free_wrapper->trap);
-        g_free(free_wrapper);
+        g_slice_free(struct free_trap_wrapper, free_wrapper);
     }
 
     g_hash_table_destroy(drakvuf->remove_traps);
@@ -319,7 +319,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
 
 done:
     g_free(pass->proc_data.name);
-    g_free(pass);
+    g_slice_free(struct memcb_pass, pass);
     /* We switch back to the altp2m view no matter what */
     event->slat_id = drakvuf->altp2m_idx;
     drakvuf->step_event[event->vcpu_id]->callback = vmi_reset_trap;
@@ -435,7 +435,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
          * There seems to be another trap still active
          * but it may already have another event queued that will clear it.
          */
-        struct memcb_pass* pass = (struct memcb_pass*)g_try_malloc0(sizeof(struct memcb_pass));
+        struct memcb_pass* pass = (struct memcb_pass*)g_slice_alloc0(sizeof(struct memcb_pass));
         pass->drakvuf = drakvuf;
         pass->gfn = event->mem_event.gfn;
         pass->pa = pa;
@@ -465,7 +465,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             event->slat_id = drakvuf->altp2m_idr;
             if (event->mem_event.out_access & VMI_MEMACCESS_W)
             {
-                g_free(pass);
+                g_slice_free(struct memcb_pass, pass);
                 g_free( (gpointer)proc_data.name );
                 PRINT_DEBUG("Somebody try to write to the shadow page, let's emulate it instead\n");
                 return rsp | VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
@@ -953,7 +953,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
         status_t ret;
         xen_unshare_gfn(drakvuf->xen, drakvuf->domID, trap->memaccess.gfn);
 
-        s = (struct wrapper*)g_try_malloc0(sizeof(struct wrapper));
+        s = (struct wrapper*)g_slice_alloc0(sizeof(struct wrapper));
         s->drakvuf = drakvuf;
         s->traps = g_slist_prepend(s->traps, trap);
         s->memaccess.gfn = trap->memaccess.gfn;
@@ -971,7 +971,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
             PRINT_DEBUG("*** FAILED TO SET MEMORY TRAP @ PAGE %lu ***\n",
                         trap->memaccess.gfn);
             g_slist_free(s->traps);
-            g_free(s);
+            g_slice_free(struct wrapper, s);
             return 0;
         }
 
@@ -1017,7 +1017,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     if (s)
         old_access = s->memaccess.access;
 
-    container = (struct wrapper*)g_try_malloc0(sizeof(struct wrapper));
+    container = (struct wrapper*)g_slice_alloc0(sizeof(struct wrapper));
     if ( !container )
         return 0;
 
@@ -1030,7 +1030,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 
     if ( !remapped_gfn )
     {
-        remapped_gfn = (struct remapped_gfn*)g_try_malloc0(sizeof(struct remapped_gfn));
+        remapped_gfn = (struct remapped_gfn*)g_slice_alloc0(sizeof(struct remapped_gfn));
         if ( !remapped_gfn )
             goto err_exit;
 
@@ -1041,7 +1041,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         PRINT_DEBUG("Physmap populated? %i\n", rc);
         if (rc < 0)
         {
-            g_free(remapped_gfn);
+            g_slice_free(struct remapped_gfn, remapped_gfn);
             goto err_exit;
         }
 
@@ -1160,7 +1160,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 err_exit:
     if ( container->traps )
         g_slist_free(container->traps);
-    g_free(container);
+    g_slice_free(struct wrapper, container);
     g_hash_table_remove(drakvuf->remapped_gfns, &remapped_gfn->o);
     return 0;
 }
@@ -1400,12 +1400,12 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     PRINT_DEBUG("Max GPFN: 0x%lx\n", drakvuf->max_gpfn);
 
     // Crete tables to lookup breakpoints
-    drakvuf->breakpoint_lookup_pa = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free);
+    drakvuf->breakpoint_lookup_pa = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free_wrapper);
     drakvuf->breakpoint_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
     drakvuf->breakpoint_lookup_trap = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
-    drakvuf->memaccess_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free);
+    drakvuf->memaccess_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free_wrapper);
     drakvuf->memaccess_lookup_trap = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
-    drakvuf->remapped_gfns = g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, g_free);
+    drakvuf->remapped_gfns = g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free_remapped_gfn);
     drakvuf->remove_traps = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
 
     unsigned int i;
@@ -1620,8 +1620,8 @@ void close_vmi(drakvuf_t drakvuf)
         if ( drakvuf->step_event[i]->data != drakvuf )
         {
             struct memcb_pass* pass = (struct memcb_pass*)drakvuf->step_event[i]->data;
-            g_free((gpointer)pass->proc_data.name);
-            g_free((gpointer)pass);
+            g_free(pass->proc_data.name);
+            g_slice_free(struct memcb_pass, pass);
         }
 
         g_free(drakvuf->step_event[i]);
