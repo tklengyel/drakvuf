@@ -6,10 +6,6 @@ services:
 git:
     submodules: false
 
-env:
-    global:
-        - secure: "$COVERITY_SCAN_TOKEN"
-
 jobs:
     include:
 
@@ -199,8 +195,7 @@ jobs:
             build_command_prepend: "./autogen.sh; ./configure --enable-debug; make clean"
             build_command:   "make"
             branch_pattern: $COVERITY_BRANCH_PATTERN
-      script:
-        - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
+      before_install:
         - sudo apt-get update
         - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
         - export INSTALLDIR=$PWD/usr/local/
@@ -217,6 +212,7 @@ jobs:
         - make
         - make install
         - cd ..
+      script:
         - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
 
 #
