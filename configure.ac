@@ -116,6 +116,18 @@ AX_CXX_COMPILE_STDCXX_11
 
 ######################################################
 
+AC_ARG_ENABLE([repl],
+  [AS_HELP_STRING([--enable-repl],
+    [Enable the repl library @<:@no@:>@])],
+  [repl="$enableval"],
+  [repl="no"])
+AM_CONDITIONAL([REPL], [test x$repl = xyes])
+if test x$repl = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_REPL, 1, "")
+fi
+
+######################################################
+
 AC_ARG_ENABLE([plugin_syscalls],
   [AS_HELP_STRING([--disable-plugin-syscalls],
     [Enable the syscall tracing plugin @<:@yes@:>@])],
@@ -557,6 +569,8 @@ matches your expectations.
 Host system type: $host
 Build system type: $build
 Installation prefix: $prefix
+-------------------------------------------------------------------------------
+REPL:         $repl
 -------------------------------------------------------------------------------
 DRAKVUF Plugins
 Syscalls:     $plugin_syscalls
