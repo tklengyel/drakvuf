@@ -134,18 +134,18 @@ static inline void print_help(void)
 
 static event_response_t trap_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-	auto ret = repl_start(drakvuf, info);
-	drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
-	return ret;
+    auto ret = repl_start(drakvuf, info);
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+    return ret;
 }
 
 int main(int argc, char** argv)
 {
-	int return_code = 0;
+    int return_code = 0;
     char c;
     char* json_kernel_path = NULL;
     char* domain = NULL;
-	bool libvmi_conf = false;
+    bool libvmi_conf = false;
     bool verbose = 0;
 
     if (argc < 4)
@@ -168,7 +168,7 @@ int main(int argc, char** argv)
                 verbose = 1;
                 break;
 #endif
-			case 'l':
+            case 'l':
                 libvmi_conf = true;
                 break;
             default:
@@ -198,19 +198,19 @@ int main(int argc, char** argv)
         return 1;
     }
 
-	drakvuf_trap_t inject_trap = {
+    drakvuf_trap_t inject_trap = {
         .type = REGISTER,
         .reg = CR3,
-		.cb = &trap_handler,
-		.name = "repl_trap"
+        .cb = &trap_handler,
+        .name = "repl_trap"
     };
 
-	if (!drakvuf_add_trap(drakvuf, &inject_trap))
+    if (!drakvuf_add_trap(drakvuf, &inject_trap))
         throw -1;
 
-	repl_init();
+    repl_init();
 
-	if (!drakvuf_is_interrupted(drakvuf))
+    if (!drakvuf_is_interrupted(drakvuf))
         drakvuf_loop(drakvuf);
 
     return return_code;

@@ -130,56 +130,56 @@ extern bool verbose;
 
 static void repl_init(drakvuf_t drakvuf)
 {
-	// init python
-	Py_Initialize();
+    // init python
+    Py_Initialize();
 
-	// load libdrakvuf
-	PyObject* sysPath = PySys_GetObject("path");
-	PyList_Append(sysPath, PyUnicode_FromString("/opt/drakvuf/src/librepl"));
-	auto module = PyImport_ImportModule("libdrakvuf");
+    // load libdrakvuf
+    PyObject* sysPath = PySys_GetObject("path");
+    PyList_Append(sysPath, PyUnicode_FromString("/opt/drakvuf/src/librepl"));
+    auto module = PyImport_ImportModule("libdrakvuf");
 
-	// include modules
-	PyRun_SimpleString(
-		"from ctypes import *\n"
-		"import libdrakvuf\n"
-	);
+    // include modules
+    PyRun_SimpleString(
+        "from ctypes import *\n"
+        "import libdrakvuf\n"
+    );
 
-	PyObject_SetAttrString(module, "drakvuf", PyLong_FromVoidPtr(static_cast<void*>(drakvuf)));
+    PyObject_SetAttrString(module, "drakvuf", PyLong_FromVoidPtr(static_cast<void*>(drakvuf)));
 }
 
 event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-	// init only once
-	repl_init(drakvuf);
+    // init only once
+    repl_init(drakvuf);
 
-	std::cout << "=================================================================\n"
-			  << "REPL STARTING...\n"
-			  << "=================================================================\n";
+    std::cout << "=================================================================\n"
+              << "REPL STARTING...\n"
+              << "=================================================================\n";
 
-	{
-		std::stringstream ss;
+    {
+        std::stringstream ss;
 
-		// convenient variable assignment
-		ss << "trap_info = cast(" << static_cast<void*>(info) << ", POINTER(libdrakvuf.drakvuf_trap_info_t))\n";
+        // convenient variable assignment
+        ss << "trap_info = cast(" << static_cast<void*>(info) << ", POINTER(libdrakvuf.drakvuf_trap_info_t))\n";
 
-		// pass repl_start to python
-		ss << "trap_cb = CFUNCTYPE(libdrakvuf.event_response_t, libdrakvuf.drakvuf_t, POINTER(libdrakvuf.drakvuf_trap_info_t))\n";
-		ss << "repl_start = cast(" << reinterpret_cast<void*>(repl_start) << ", trap_cb)\n";
+        // pass repl_start to python
+        ss << "trap_cb = CFUNCTYPE(libdrakvuf.event_response_t, libdrakvuf.drakvuf_t, POINTER(libdrakvuf.drakvuf_trap_info_t))\n";
+        ss << "repl_start = cast(" << reinterpret_cast<void*>(repl_start) << ", trap_cb)\n";
 
-		PRINT_DEBUG("setting up variables:\n%s", ss.str().c_str());
+        PRINT_DEBUG("setting up variables:\n%s", ss.str().c_str());
 
-		PyRun_SimpleString(ss.str().c_str());
-	}
+        PyRun_SimpleString(ss.str().c_str());
+    }
 
-	// try to load IPython
-	PyRun_SimpleString(
-		"import IPython\n"
-		"IPython.embed(colors='neutral', banner2=\"\"\""
-		"REPL ready to go, enjoy hacking!\n"
-		"trap_info contains current trap info structure\n"
-		"libdrakvuf.drakvuf contains drakvuf_t pointer\n"
-		"to go back to drakvuf loop use exit(), to break loop use CTRL+C\"\"\")\n"
-	);
+    // try to load IPython
+    PyRun_SimpleString(
+        "import IPython\n"
+        "IPython.embed(colors='neutral', banner2=\"\"\""
+        "REPL ready to go, enjoy hacking!\n"
+        "trap_info contains current trap info structure\n"
+        "libdrakvuf.drakvuf contains drakvuf_t pointer\n"
+        "to go back to drakvuf loop use exit(), to break loop use CTRL+C\"\"\")\n"
+    );
 
-	return VMI_EVENT_RESPONSE_NONE;
+    return VMI_EVENT_RESPONSE_NONE;
 }
