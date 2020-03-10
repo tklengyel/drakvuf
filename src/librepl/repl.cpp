@@ -182,4 +182,4 @@ event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 	);
 
 	return VMI_EVENT_RESPONSE_NONE;
-} 
+}

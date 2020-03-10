@@ -102,7 +102,7 @@
  *                                                                         *
  ***************************************************************************/
 
-sources = 
+sources =
 sources += librepl.h
 sources += repl.cpp
 
@@ -143,6 +143,6 @@ AM_CXXFLAGS += -pg
 endif
 endif
 
-noinst_LTLIBRARIES= librepl.la
-librepl_la_SOURCES= $(sources)
-librepl_la_LIBADD+= ../libdrakvuf/libdrakvuf.la
+noinst_LTLIBRARIES = librepl.la
+librepl_la_SOURCES = $(sources)
+librepl_la_LIBADD = ../libdrakvuf/libdrakvuf.la
