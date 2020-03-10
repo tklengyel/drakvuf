@@ -733,7 +733,7 @@ gchar* drakvuf_escape_str(const char* input)
     }
 
     const char* escaped = json_object_to_json_string(obj);
-    if (NULL == obj)
+    if (NULL == escaped)
     {
         fprintf(stderr, "json_object_to_json_string() failed!\n");
         goto exit;

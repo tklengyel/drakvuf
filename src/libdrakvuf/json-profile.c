@@ -154,7 +154,7 @@ bool json_lookup_array(
                 PRINT_DEBUG("Failed to find address for symbol %s\n", symbol_subsymbol_array[i][0]);
             }
         }
-        else if ( VMI_FAILURE == vmi_get_struct_member_offset_from_json(drakvuf->vmi, json, symbol_subsymbol_array[i][0], symbol_subsymbol_array[i][1], &rva[i]) )
+        else if ( rva && VMI_FAILURE == vmi_get_struct_member_offset_from_json(drakvuf->vmi, json, symbol_subsymbol_array[i][0], symbol_subsymbol_array[i][1], &rva[i]) )
         {
             errors++;
             PRINT_DEBUG("Failed to find offset for %s:%s\n", symbol_subsymbol_array[i][0], symbol_subsymbol_array[i][1]);
