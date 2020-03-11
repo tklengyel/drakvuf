@@ -138,7 +138,9 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
     switch (table_levels)
     {
         case 0:
-            vmi_read_addr_va(vmi, table_base + handle * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj);
+            if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + handle * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj) )
+                return 0;
+
             break;
         case 1:
         {
