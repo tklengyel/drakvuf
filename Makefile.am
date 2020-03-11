@@ -104,5 +104,6 @@
 
 ACLOCAL_AMFLAGS = --install -I m4
 SUBDIRS = src
-EXTRA_DIST  = scripts/wrap-compiler-for-flag-check
+EXTRA_DIST  = autogen.sh
+EXTRA_DIST += scripts/wrap-compiler-for-flag-check
 EXTRA_DIST += tools/*
