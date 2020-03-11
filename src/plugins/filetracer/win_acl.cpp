@@ -458,7 +458,7 @@ std::string parse_sid(const uint8_t buffer[])
     {
         uint64_t idx = sizeof(SID_IDENTIFIER_AUTHORITY) - 1 - i;
         uint64_t offset = i * sizeof(uint8_t);
-        id_auth += sid->IdentifierAuthority[idx] << offset;
+        id_auth += ((uint64_t)sid->IdentifierAuthority[idx]) << offset;
     }
 
     std::stringstream fmt;

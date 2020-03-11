@@ -429,8 +429,7 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
 static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto data = get_trap_params<procmon, open_process_result_t<procmon>>(info);
-    procmon* plugin = data->plugin();
-    if (!data || !plugin)
+    if (!data || !data->plugin())
     {
         PRINT_DEBUG("procmon open_process_return_hook_cb invalid trap params!\n");
         drakvuf_remove_trap(drakvuf, info->trap, nullptr);
@@ -439,6 +438,8 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
+
+    procmon* plugin = data->plugin();
 
     plugin->destroy_trap(drakvuf, info->trap);
 
