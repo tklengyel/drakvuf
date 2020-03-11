@@ -114,6 +114,7 @@
 #include <sys/inotify.h>
 #include <signal.h>
 #include <time.h>
+#include <config.h>
 
 #include "../xen_helper/xen_helper.h"
 
@@ -366,6 +367,9 @@ int main(int argc, char** argv)
     int ret = 0;
     struct sigaction act;
     shutting_down = 0;
+
+    fprintf(stderr, "%s %s v%s Copyright (C) 2014-2020 Tamas K Lengyel\n",
+            PACKAGE_NAME, argv[0], PACKAGE_VERSION);
 
     if (argc!=15)
     {
