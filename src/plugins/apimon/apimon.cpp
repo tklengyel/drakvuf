@@ -237,21 +237,17 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     addr_t ret_addr = 0;
 
     if (is_syswow)
-    {
-        uint32_t ret_addr_tmp;
-
-        if (vmi_read_32(lg.vmi, &ctx, &ret_addr_tmp) == VMI_SUCCESS)
-        {
-            success = true;
-            ret_addr = ret_addr_tmp;
-        }
-    }
+        success = (vmi_read_32(lg.vmi, &ctx, (uint32_t*)&ret_addr) == VMI_SUCCESS);
     else
+        success = (vmi_read_64(lg.vmi, &ctx, &ret_addr) == VMI_SUCCESS);
+
+    if (!success)
     {
-        success = vmi_read_64(lg.vmi, &ctx, &ret_addr) == VMI_SUCCESS;
+        PRINT_DEBUG("[APIMON-USER] Failed to read return address from the stack.\n");
+	return VMI_EVENT_RESPONSE_NONE;
     }
 
-    return_hook_target_entry_t* ret_target = new(std::nothrow) return_hook_target_entry_t(target->pid, target->plugin, target->argument_printers);
+    return_hook_target_entry_t* ret_target = new (std::nothrow) return_hook_target_entry_t(target->pid, target->plugin, target->argument_printers);
 
     if (!ret_target)
     {
@@ -259,7 +255,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    drakvuf_trap_t* trap = new(std::nothrow) drakvuf_trap_t;
+    drakvuf_trap_t* trap = new (std::nothrow) drakvuf_trap_t;
 
     if (!trap)
     {
@@ -281,7 +277,6 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
         delete trap;
         delete ret_target;
         return VMI_EVENT_RESPONSE_NONE;
-
     }
 
     trap->type = BREAKPOINT;
