@@ -126,7 +126,6 @@ if test x$repl = xyes; then
 
   AC_PATH_PROG(PYTHON3, python3, nopython)
   AS_IF([test "$ac_cv_path_PYTHON3" = "nopython"],
-  [
     AC_MSG_ERROR([could not find python or python3]),
     [
       PYTHON_CFLAGS=`${PYTHON3}-config --includes`
