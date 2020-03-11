@@ -668,7 +668,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
 
 static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 {
-    size_t payload_size = 0;
+    long payload_size = 0;
     unsigned char* data = NULL;
     FILE* fp = fopen(file, "rb");
 
@@ -677,7 +677,11 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 
     // obtain file size:
     fseek (fp, 0, SEEK_END);
-    payload_size = ftell (fp);
+    if ( (payload_size = ftell (fp)) < 0 )
+    {
+        fclose(fp);
+        return false;
+    }
     rewind (fp);
 
     data = g_try_malloc0(payload_size);
@@ -687,7 +691,7 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
         return false;
     }
 
-    if ( payload_size != fread(data, 1, payload_size, fp))
+    if ( (size_t)payload_size != fread(data, 1, payload_size, fp))
     {
         g_free(data);
         fclose(fp);
