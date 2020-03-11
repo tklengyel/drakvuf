@@ -128,10 +128,12 @@ std::string FieldToString(const std::map<uint64_t, std::string>& maps, const std
     std::size_t indexes = value.size();
     for (std::size_t i = 0; i < indexes; i++)
     {
-        if (!value[i])
+        uint64_t v = value[i];
+
+        if (!v)
             continue;
 
-        auto it = maps.find(value[i] << i);
+        auto it = maps.find(v << i);
         if (it == maps.end())
             continue;
 

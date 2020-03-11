@@ -115,7 +115,6 @@ public:
     drakvuf_trap_t ssdtwrite;
     drakvuf_trap_t ssdtwrite2;
 
-    size_t ulongs;
     addr_t kiservicetable;
     uint32_t kiservicelimit;
 
