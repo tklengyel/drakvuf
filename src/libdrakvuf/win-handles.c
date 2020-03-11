@@ -151,10 +151,10 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
             handle -= i;
             j = handle / ((low_count * HANDLE_MULTIPLIER) / psize);
 
-            if ( VMI_SUCCESS == vmi_read_addr_va(vmi, table_base + j, 0, &table) )
-            {
-                vmi_read_addr_va(vmi, table + i * (drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER), 0, &obj);
-            }
+            if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + j, 0, &table) ||
+                 VMI_FAILURE == vmi_read_addr_va(vmi, table + i * (drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER), 0, &obj) )
+                return 0;
+
             break;
         }
         case 2:
@@ -173,9 +173,11 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
             k = j % (mid_count * psize);
             j = (j-k)/mid_count;
 
-            if ( VMI_SUCCESS == vmi_read_addr_va(vmi, table_base + j, 0, &table) &&
-                 VMI_SUCCESS == vmi_read_addr_va(vmi, table + k, 0, &table2) )
-                vmi_read_addr_va(vmi, table2 + i * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj);
+            if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + j, 0, &table) ||
+                 VMI_FAILURE == vmi_read_addr_va(vmi, table + k, 0, &table2) ||
+                 VMI_FAILURE == vmi_read_addr_va(vmi, table2 + i * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj) )
+                return 0;
+
             break;
         }
     }
