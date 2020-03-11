@@ -138,6 +138,12 @@ static void repl_init(drakvuf_t drakvuf)
     PyList_Append(sysPath, PyUnicode_FromString("/opt/drakvuf/src/librepl"));
     auto module = PyImport_ImportModule("libdrakvuf");
 
+    if (module == NULL)
+    {
+        std::cout << "No libdrakvuf.py found, please generate it before running REPL\n";
+        throw -1;
+    }
+
     // include modules
     PyRun_SimpleString(
         "from ctypes import *\n"
