@@ -132,13 +132,6 @@ static inline void print_help(void)
            );
 }
 
-static event_response_t trap_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto ret = repl_start(drakvuf, info);
-    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
-    return ret;
-}
-
 int main(int argc, char** argv)
 {
     int return_code = 0;
@@ -201,14 +194,12 @@ int main(int argc, char** argv)
     drakvuf_trap_t inject_trap = {
         .type = REGISTER,
         .reg = CR3,
-        .cb = &trap_handler,
+        .cb = &repl_start,
         .name = "repl_trap"
     };
 
     if (!drakvuf_add_trap(drakvuf, &inject_trap))
         throw -1;
-
-    repl_init();
 
     if (!drakvuf_is_interrupted(drakvuf))
         drakvuf_loop(drakvuf);
