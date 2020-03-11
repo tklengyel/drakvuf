@@ -102,92 +102,29 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_USERHOOK_H
-#define WIN_USERHOOK_H
+#ifndef APIMON_H
+#define APIMON_H
 
 #include <vector>
 #include <memory>
 
 #include <glib.h>
+#include <libusermode/userhook.hpp>
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
-#include "printers/printers.hpp"
 
-typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
-
-struct plugin_target_config_entry_t
+struct apimon_config
 {
-    std::string dll_name;
-    std::string function_name;
-    std::string strategy;
-    std::vector< std::unique_ptr< ArgumentPrinter > > argument_printers;
-
-    plugin_target_config_entry_t() : dll_name(), function_name(), strategy(), argument_printers() {}
-    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, std::string&& strategy, std::vector< std::unique_ptr< ArgumentPrinter > > &&argument_printers)
-        : dll_name(std::move(dll_name)), function_name(std::move(function_name)), strategy(std::move(strategy)), argument_printers(std::move(argument_printers)) {}
+    const char* dll_hooks_list;
 };
 
-enum target_hook_state
+class apimon: public pluginex
 {
-    HOOK_FIRST_TRY,
-    HOOK_PAGEFAULT_RETRY,
-    HOOK_FAILED,
-    HOOK_OK
+public:
+    std::vector<plugin_target_config_entry_t> wanted_hooks;
+
+    apimon(drakvuf_t drakvuf, const apimon_config* config, output_format_t output);
+    ~apimon();
 };
-
-struct hook_target_entry_t
-{
-    vmi_pid_t pid;
-    std::string target_name;
-    callback_t callback;
-    const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers;
-    target_hook_state state;
-    drakvuf_trap_t* trap;
-    void* plugin;
-
-    hook_target_entry_t(std::string target_name, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers, void* plugin)
-        : target_name(target_name), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), plugin(plugin) {}
-};
-
-struct return_hook_target_entry_t
-{
-    vmi_pid_t pid;
-    drakvuf_trap_t* trap;
-    void* plugin;
-    std::vector < uint64_t > arguments;
-    const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers;
-
-    return_hook_target_entry_t(vmi_pid_t pid, void* plugin, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers) :
-        pid(pid), plugin(plugin), argument_printers(argument_printers) {}
-};
-
-struct dll_view_t
-{
-    // relevant while loading
-    addr_t dtb;
-    uint32_t thread_id;
-    addr_t real_dll_base;
-    mmvad_info_t mmvad;
-    bool is_hooked;
-};
-
-typedef void (*dll_pre_hook_cb)(drakvuf_t, const dll_view_t*, void*);
-typedef void (*dll_post_hook_cb)(drakvuf_t, const dll_view_t*, void*);
-
-struct usermode_cb_registration {
-    dll_pre_hook_cb pre_cb;
-    dll_post_hook_cb post_cb;
-    void* extra;
-};
-
-typedef enum usermode_reg_status {
-    USERMODE_REGISTER_ERROR,
-    USERMODE_REGISTER_SUCCESS,
-    USERMODE_ARCH_UNSUPPORTED,
-} usermode_reg_status_t;
-
-usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
-bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, const std::vector< std::unique_ptr< ArgumentPrinter > > &argument_printers, void* extra);
-void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, std::vector<plugin_target_config_entry_t>* wanted_hooks);
 
 #endif

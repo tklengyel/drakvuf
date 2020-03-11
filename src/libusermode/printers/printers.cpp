@@ -102,92 +102,86 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_USERHOOK_H
-#define WIN_USERHOOK_H
+#include "printers.hpp"
+#include <string>
+#include <iomanip>
+#include <libvmi/libvmi.h>
+#include <libdrakvuf/libdrakvuf.h>
 
-#include <vector>
-#include <memory>
-
-#include <glib.h>
-#include "plugins/private.h"
-#include "plugins/plugins_ex.h"
-#include "printers/printers.hpp"
-
-typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
-
-struct plugin_target_config_entry_t
+std::string ArgumentPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument)
 {
-    std::string dll_name;
-    std::string function_name;
-    std::string strategy;
-    std::vector< std::unique_ptr< ArgumentPrinter > > argument_printers;
+    std::stringstream stream;
+    stream << "0x" << std::hex << argument;
+    return stream.str();
+}
 
-    plugin_target_config_entry_t() : dll_name(), function_name(), strategy(), argument_printers() {}
-    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, std::string&& strategy, std::vector< std::unique_ptr< ArgumentPrinter > > &&argument_printers)
-        : dll_name(std::move(dll_name)), function_name(std::move(function_name)), strategy(std::move(strategy)), argument_printers(std::move(argument_printers)) {}
-};
+ArgumentPrinter::~ArgumentPrinter() {}
 
-enum target_hook_state
+std::string StringPrinterInterface::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument)
 {
-    HOOK_FIRST_TRY,
-    HOOK_PAGEFAULT_RETRY,
-    HOOK_FAILED,
-    HOOK_OK
-};
+    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = argument
+    };
+    std::string str = getBuffer(vmi, &ctx);
+    drakvuf_release_vmi(drakvuf);
+    std::stringstream stream;
+    stream << "0x" << std::hex << argument << ":\"" << str << "\"";
+    return stream.str();
+}
 
-struct hook_target_entry_t
+std::string AsciiPrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx)
 {
-    vmi_pid_t pid;
-    std::string target_name;
-    callback_t callback;
-    const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers;
-    target_hook_state state;
-    drakvuf_trap_t* trap;
-    void* plugin;
+    char *str = vmi_read_str(vmi, ctx);
+    return str ? str : "";
+}
 
-    hook_target_entry_t(std::string target_name, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers, void* plugin)
-        : target_name(target_name), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), plugin(plugin) {}
-};
-
-struct return_hook_target_entry_t
+std::string WideStringPrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx)
 {
-    vmi_pid_t pid;
-    drakvuf_trap_t* trap;
-    void* plugin;
-    std::vector < uint64_t > arguments;
-    const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers;
+    auto str_obj = drakvuf_read_wchar_string(vmi, ctx);
+    return str_obj == NULL ? "" : (char*)str_obj->contents;
+}
 
-    return_hook_target_entry_t(vmi_pid_t pid, void* plugin, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers) :
-        pid(pid), plugin(plugin), argument_printers(argument_printers) {}
-};
-
-struct dll_view_t
+std::string UnicodePrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx)
 {
-    // relevant while loading
-    addr_t dtb;
-    uint32_t thread_id;
-    addr_t real_dll_base;
-    mmvad_info_t mmvad;
-    bool is_hooked;
-};
+    auto str_obj = drakvuf_read_unicode_common(vmi, ctx);
+    return str_obj == NULL ? "" : (char*)str_obj->contents;
+}
 
-typedef void (*dll_pre_hook_cb)(drakvuf_t, const dll_view_t*, void*);
-typedef void (*dll_post_hook_cb)(drakvuf_t, const dll_view_t*, void*);
+BitMaskPrinter::BitMaskPrinter(std::map < uint64_t, std::string > dict) : dict(dict)
+{
+    // intentionally empty
+}
 
-struct usermode_cb_registration {
-    dll_pre_hook_cb pre_cb;
-    dll_post_hook_cb post_cb;
-    void* extra;
-};
-
-typedef enum usermode_reg_status {
-    USERMODE_REGISTER_ERROR,
-    USERMODE_REGISTER_SUCCESS,
-    USERMODE_ARCH_UNSUPPORTED,
-} usermode_reg_status_t;
-
-usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
-bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, const std::vector< std::unique_ptr< ArgumentPrinter > > &argument_printers, void* extra);
-void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, std::vector<plugin_target_config_entry_t>* wanted_hooks);
-
-#endif
+std::string BitMaskPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument)
+{
+    std::stringstream stream;
+    stream << "0x" << std::hex << argument << ": ";
+    if (argument == 0 && this->dict.find(0) != this->dict.end())
+    {
+        stream << this->dict[0];
+    }
+    else
+    {
+        bool first = true;
+        for (std::pair<uint64_t, std::string> element : this->dict)
+        {
+            if (argument & element.first)
+            {
+                if (first)
+                {
+                    first = false;
+                }
+                else
+                {
+                    stream << " | ";
+                }
+                stream << element.second;
+            }
+        }
+    }
+    return stream.str();
+}
