@@ -132,7 +132,7 @@ struct plugins_options
     const char* wow_ole32_profile;      // PLUGIN_WMIMON
     const char* combase_profile;        // PLUGIN_WMIMON
     const char* memdump_dir;            // PLUGIN_MEMDUMP
-    const char* dll_hooks_list;         // PLUGIN_MEMDUMP
+    const char* dll_hooks_list;         // PLUGIN_MEMDUMP, PLUGIN_APIMON
 };
 
 typedef enum drakvuf_plugin
@@ -159,6 +159,7 @@ typedef enum drakvuf_plugin
     PLUGIN_DKOMMON,
     PLUGIN_WMIMON,
     PLUGIN_MEMDUMP,
+    PLUGIN_APIMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -186,6 +187,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_DKOMMON] = "dkommon",
     [PLUGIN_WMIMON] = "wmimon",
     [PLUGIN_MEMDUMP] = "memdump",
+    [PLUGIN_APIMON] = "apimon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -212,6 +214,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_DKOMMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_WMIMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_MEMDUMP]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_APIMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
 class plugin
