@@ -74,8 +74,9 @@ jobs:
       install:
         - ./autogen.sh
       script:
-        - ./configure || cat config.log
+        - ./configure --prefix=${INSTALLDIR} || cat config.log
         - make
+        - make install
 
     - env:
         - TEST="compile with plugin disabled"
@@ -99,8 +100,9 @@ jobs:
       install:
         - ./autogen.sh
       script:
-        - ./configure --disable-plugin-syscalls || cat config.log
+        - ./configure --prefix=${INSTALLDIR} --disable-plugin-syscalls || cat config.log
         - make
+        - make install
 
     - env:
         - TEST="compile debug"
@@ -124,8 +126,9 @@ jobs:
       install:
         - ./autogen.sh
       script:
-        - ./configure --enable-debug --enable-sanitize || cat config.log
+        - ./configure --prefix=${INSTALLDIR} --enable-debug --enable-sanitize || cat config.log
         - make
+        - make install
 
     - env:
         - TEST="compile debug with plugin disabled"
@@ -149,8 +152,40 @@ jobs:
       install:
         - ./autogen.sh
       script:
-        - ./configure --enable-debug --disable-plugin-syscalls || cat config.log
+        - ./configure --prefix=${INSTALLDIR} --enable-debug --disable-plugin-syscalls || cat config.log
         - make
+        - make install
+
+    - env:
+        - TEST="compile from make dist tarball"
+      before_install:
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
+        - export INSTALLDIR=$PWD/usr/local/
+        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
+        - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export CPLUS_INCLUDE_PATH=$PWD/usr/local/include
+        - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
+        - export LDFLAGS="-L$PWD/usr/local/lib"
+        - export CFLAGS="-I$PWD/usr/local/include"
+        - git submodule update --init libvmi
+        - cd libvmi
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
+        - make
+        - make install
+        - cd ..
+      script:
+        - ./autogen.sh
+        - ./configure --prefix=${INSTALLDIR} || cat config.log
+        - make dist
+        - mkdir build && cd build
+        - tar xvf ../drakvuf-*.tar.gz
+        - cd *drakvuf*
+        - ./autogen.sh
+        - ./configure --prefix=${INSTALLDIR} || cat config.log
+        - make
+        - make install
 
 #
 # clang scan-build
