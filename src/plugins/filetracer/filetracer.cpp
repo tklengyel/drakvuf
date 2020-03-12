@@ -430,7 +430,7 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
                     "\"Method\" : \"%s\","
                     "\"Operation\" : \"%s\","
                     "\"FileName\" : %s,"
-                    "\"Handle\" : 0x%" PRIx32 ","
+                    "\"Handle\" : \"0x%" PRIx32 "\""
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
@@ -541,7 +541,7 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
                     "\"Operation\" : \"%s\","
                     "\"SrcFileName\" : %s,"
                     "\"DstFileName\" : %s,"
-                    "\"Handle\": 0x%" PRIx32
+                    "\"Handle\": \"0x%" PRIx32 "\""
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
@@ -641,7 +641,7 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
                     "\"PPID\": %d,"
                     "\"Method\": \"%s\","
                     "\"FileName\": %s,"
-                    "\"Handle\": 0x%x,"
+                    "\"Handle\": \"0x%x\","
                     "\"DesiredAccess\": \"%s\","
                     "\"FileAttributes\": \"%s\","
                     "\"ShareAccess\": \"%s\","
