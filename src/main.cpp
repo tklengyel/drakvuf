@@ -261,9 +261,10 @@ int main(int argc, char** argv)
     const char* args[10] = {};
     int args_count = 0;
 
-
     eprint_current_time();
-    fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
+
+    fprintf(stderr, "%s v%s Copyright (C) 2014-2020 Tamas K Lengyel\n",
+            PACKAGE_NAME, PACKAGE_VERSION);
 
     if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 )
     {

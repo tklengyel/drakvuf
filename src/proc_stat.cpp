@@ -103,6 +103,7 @@
  ***************************************************************************/
 
 #include <map>
+#include <config.h>
 #include <libdrakvuf/libdrakvuf.h>
 
 /*
@@ -131,6 +132,9 @@ static void close_handler(int sig)
 
 int main(int argc, char** argv)
 {
+    fprintf(stderr, "%s %s v%s Copyright (C) 2014-2020 Tamas K Lengyel\n",
+            PACKAGE_NAME, argv[0], PACKAGE_VERSION);
+
     /* this is the VM that we are looking at */
     if (argc != 5)
     {
