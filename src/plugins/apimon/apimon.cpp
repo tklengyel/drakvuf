@@ -115,6 +115,13 @@
 #include "crypto.h"
 
 
+static void free_trap(drakvuf_trap_t* trap)
+{
+    return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)trap->data;
+    delete ret_target;
+    delete trap;
+}
+
 void print_arguments(drakvuf_t drakvuf, drakvuf_trap_info* info, std::vector < uint64_t > arguments, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers)
 {
     json_object *jobj = json_object_new_array();
@@ -209,8 +216,7 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     }
     printf("\n");
 
-    drakvuf_remove_trap(drakvuf, info->trap, nullptr);
-    delete ret_target;
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
