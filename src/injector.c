@@ -108,6 +108,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
+#include <config.h>
 #include <libvmi/libvmi.h>
 
 #include <libdrakvuf/libdrakvuf.h>
@@ -160,6 +161,9 @@ int main(int argc, char** argv)
     bool libvmi_conf = false;
     const char* args[10] = {};
     int args_count = 0;
+
+    fprintf(stderr, "%s %s v%s Copyright (C) 2014-2020 Tamas K Lengyel\n",
+            PACKAGE_NAME, argv[0], PACKAGE_VERSION);
 
     if (argc < 4)
     {

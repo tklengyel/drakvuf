@@ -122,6 +122,8 @@
 
 int main(int argc, char** argv)
 {
+    fprintf(stderr, "%s %s v%s Copyright (C) 2014-2020 Tamas K Lengyel\n",
+            PACKAGE_NAME, argv[0], PACKAGE_VERSION);
 
     if (argc < 3)
     {
