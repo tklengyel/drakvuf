@@ -224,6 +224,7 @@ static void print_process_creation_result(
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
+                    "\"TID\": %d,"
                     "\"Method\" : \"%s\","
                     "\"Status\" : %" PRIu64 ","
                     "\"NewPid\" : %d,"
@@ -235,7 +236,7 @@ static void print_process_creation_result(
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
                     info->trap->name, status, new_pid,
                     escaped_cmdline,
                     escaped_ipath,

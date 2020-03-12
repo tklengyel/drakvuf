@@ -173,13 +173,14 @@ static void print_header(output_format_t format, drakvuf_t drakvuf, const drakvu
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
+                    "\"TID\": %d,"
                     "\"Module\": \"%s\","
                     "\"Method\": \"%s\","
                     "\"Args\": [",
                     UNPACK_TIMEVAL(info->timestamp),
                     info->vcpu, info->regs->cr3, escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
                     info->trap->breakpoint.module, info->trap->name);
             g_free(escaped_pname);
             break;
