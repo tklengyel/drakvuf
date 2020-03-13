@@ -318,6 +318,7 @@ static void print_file_info(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
+                    "\"TID\": %d,"
                     "\"Method\" : \"%s\","
                     "\"FileName\" : %s"
                     "%s"
@@ -325,7 +326,7 @@ static void print_file_info(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_
                     prefix, UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
                     info->trap->name, escaped_fname, data);
             g_free(escaped_fname);
             g_free(escaped_pname);
