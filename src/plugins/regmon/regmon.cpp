@@ -175,12 +175,13 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
+                    "\"TID\": %d,"
                     "\"Method\" : \"%s\","
                     "\"Key\" : %s",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
                     info->trap->name,
                     escaped_key);
             if (value_name)

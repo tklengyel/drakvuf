@@ -187,14 +187,15 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
                     "\"UserId\": %" PRIu64 ", "
                     "\"PID\": %d, "
                     "\"PPID\": %d, "
+                    "\"TID\": %d, "
                     "\"Method\": \"%s\", "
-                    "\"CalledFrom\": 0x%" PRIx64 ", "
-                    "\"ReturnValue\": 0x%" PRIx64 ", "
+                    "\"CalledFrom\": \"0x%" PRIx64 "\", "
+                    "\"ReturnValue\": \"0x%" PRIx64 "\", "
                     "\"Arguments\": ",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
                     info->trap->name,
                     info->regs->rip,
                     info->regs->rax);
