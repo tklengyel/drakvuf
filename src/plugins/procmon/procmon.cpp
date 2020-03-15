@@ -169,7 +169,11 @@ static char* read_cmd_line(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t
             if(VMI_SUCCESS == vmi_read(vmi,&ctx2,cmd_len,buf_ret,NULL))
             {
                 cmd = (char*)g_try_malloc0(cmd_len+1);
-                if (!cmd) return NULL;
+                if (!cmd){
+                    g_free(buf_ret);
+                    g_free(cmd);
+                    return NULL;
+                }
                 int i;
                 for(i = 0;i<cmd_len;i++)
                 {
