@@ -178,7 +178,6 @@ static char* readcmdline(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t a
     }
     return cmd;
 }
-
 static void print_process_creation_result(
     procmon* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     reg_t status, vmi_pid_t new_pid, addr_t user_process_parameters_addr)
@@ -200,8 +199,7 @@ static void print_process_creation_result(
     gchar* escaped_curdir = NULL;
 
     vmi_lock_guard vmi_lg(drakvuf);
-    char *cmd = readcmdline(vmi_lg.vmi,info,cmdline_addr);
-    
+    char *cmd = readcmdline(vmi_lg.vmi,info,cmdline_addr);    
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
