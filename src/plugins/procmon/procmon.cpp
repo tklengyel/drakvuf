@@ -297,6 +297,7 @@ static void print_process_creation_result(
 
     g_free(cmdline);
     g_free(curdir);
+    free(cmd);
     if (cmdline_us)
         vmi_free_unicode_str(cmdline_us);
 
