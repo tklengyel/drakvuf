@@ -163,7 +163,6 @@ static char* readcmdline(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t a
         if(VMI_SUCCESS == vmi_read_addr(vmi,&ctx2,&buffer_adr))
         {
             ctx2.addr = buffer_adr;
-            size_t bytes_read;
             char *buf_ret;
             buf_ret = (char*)malloc(cmd_len+1);
             if(VMI_SUCCESS == vmi_read(vmi,&ctx2,cmd_len,buf_ret,NULL))
