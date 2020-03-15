@@ -174,8 +174,9 @@ static char* read_cmd_line(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t
                 for(i = 0;i<cmd_len;i++)
                 {
                     strncat(cmd,&buf_ret[i],1);
-                }
+                }                
             }
+            g_free(buf_ret);
         }
     }
     return cmd;
