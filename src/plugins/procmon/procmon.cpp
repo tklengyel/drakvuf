@@ -199,7 +199,7 @@ static void print_process_creation_result(
     gchar* escaped_curdir = NULL;
 
     vmi_lock_guard vmi_lg(drakvuf);
-    char *cmd = readcmdline(vmi_lg.vmi,info,cmdline_addr);    
+    char *cmd = readcmdline(vmi_lg.vmi,info,cmdline_addr);
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
