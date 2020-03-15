@@ -145,7 +145,7 @@ struct process_visitor_ctx
 
 } // namespace
 
-static char* readcmdline(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr)
+static char* read_cmd_line(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr)
 {
     char *cmd = NULL;
     access_context_t ctx2 =
@@ -158,16 +158,16 @@ static char* readcmdline(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t a
     uint16_t cmd_len = 0;
     if(VMI_SUCCESS == vmi_read_16(vmi,&ctx2,&cmd_len))
     {
-        ctx2.addr = cmdline_addr+8;
+        ctx2.addr = cmdline_addr+8; // _UNICODE_STRING->Buffer
         addr_t buffer_adr = 0;
         if(VMI_SUCCESS == vmi_read_addr(vmi,&ctx2,&buffer_adr))
         {
             ctx2.addr = buffer_adr;
             char *buf_ret;
-            buf_ret = (char*)malloc(cmd_len+1);
+            buf_ret = (char*)g_malloc0(cmd_len+1);
             if(VMI_SUCCESS == vmi_read(vmi,&ctx2,cmd_len,buf_ret,NULL))
             {
-                cmd = (char*)malloc(cmd_len+1);
+                cmd = (char*)g_malloc0(cmd_len+1);
                 int i;
                 for(i = 0;i<cmd_len;i++)
                 {
@@ -199,7 +199,7 @@ static void print_process_creation_result(
     gchar* escaped_curdir = NULL;
 
     vmi_lock_guard vmi_lg(drakvuf);
-    char *cmd = readcmdline(vmi_lg.vmi,info,cmdline_addr);
+    char *cmd = read_cmd_line(vmi_lg.vmi,info,cmdline_addr);
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -297,7 +297,7 @@ static void print_process_creation_result(
 
     g_free(cmdline);
     g_free(curdir);
-    free(cmd);
+    g_free(cmd);
     if (cmdline_us)
         vmi_free_unicode_str(cmdline_us);
 
