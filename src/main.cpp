@@ -429,7 +429,7 @@ int main(int argc, char** argv)
                 libvmi_conf = true;
                 break;
             case 'k':
-                kpgd = strtol(optarg, NULL, 0);
+                kpgd = strtoull(optarg, NULL, 0);
                 break;
             case 'w':
                 json_wow_path = optarg;
