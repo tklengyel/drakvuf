@@ -155,7 +155,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     g_free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool _verbose, bool libvmi_conf)
+bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool _verbose, bool libvmi_conf, addr_t kpgd)
 {
 
     if ( !domain || !json_kernel_path )
@@ -176,6 +176,8 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
     }
     else
         PRINT_DEBUG("drakvuf_init: Rekall WoW64 profile not used\n");
+
+    (*drakvuf)->kpgd = kpgd;
 
     g_mutex_init(&(*drakvuf)->vmi_lock);
 

@@ -167,10 +167,11 @@ drakvuf_c::drakvuf_c(const char* domain,
                      output_format_t output,
                      bool verbose,
                      bool leave_paused,
-                     bool libvmi_conf)
+                     bool libvmi_conf,
+                     addr_t kpgd)
     : leave_paused{ leave_paused }
 {
-    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, verbose, libvmi_conf))
+    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, verbose, libvmi_conf, kpgd))
     {
         drakvuf_close(drakvuf, leave_paused);
         throw std::runtime_error("drakvuf_init() failed");
