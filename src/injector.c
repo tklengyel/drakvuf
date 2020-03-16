@@ -235,7 +235,7 @@ int main(int argc, char** argv)
                 libvmi_conf = true;
                 break;
             case 'k':
-                kpgd = strtol(optarg, NULL, 0);
+                kpgd = strtoull(optarg, NULL, 0);
                 break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
