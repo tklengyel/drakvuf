@@ -208,6 +208,7 @@ struct drakvuf
     xen_pfn_t max_gpfn;
     addr_t kernbase;
     addr_t kdtb;
+    addr_t kpgd;
 
     int address_width;
 
