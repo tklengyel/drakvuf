@@ -145,6 +145,45 @@ struct process_visitor_ctx
 
 } // namespace
 
+static char* read_cmd_line(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr)
+{
+    char *cmd = NULL;
+    access_context_t ctx2 =
+            {
+                    .translate_mechanism = VMI_TM_PROCESS_DTB,
+                    .dtb = info->regs->cr3,
+                    .addr = addr,
+            };
+    addr_t cmdline_addr = ctx2.addr;
+    uint16_t cmd_len = 0;
+    if(VMI_SUCCESS == vmi_read_16(vmi,&ctx2,&cmd_len))
+    {
+        ctx2.addr = cmdline_addr+8; // _UNICODE_STRING->Buffer
+        addr_t buffer_adr = 0;
+        if(VMI_SUCCESS == vmi_read_addr(vmi,&ctx2,&buffer_adr))
+        {
+            ctx2.addr = buffer_adr;
+            char *buf_ret;
+            buf_ret = (char*)g_try_malloc0(cmd_len+1);
+            if (!buf_ret) return NULL;
+            if(VMI_SUCCESS == vmi_read(vmi,&ctx2,cmd_len,buf_ret,NULL))
+            {
+                cmd = (char*)g_try_malloc0(cmd_len+1);
+                if (!cmd){
+                    g_free(buf_ret);
+                    return NULL;
+                }
+                int i;
+                for(i = 0;i<cmd_len;i++)
+                {
+                    strncat(cmd,&buf_ret[i],1);
+                }
+            }
+            g_free(buf_ret);
+        }
+    }
+    return cmd;
+}
 static void print_process_creation_result(
     procmon* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     reg_t status, vmi_pid_t new_pid, addr_t user_process_parameters_addr)
@@ -166,6 +205,7 @@ static void print_process_creation_result(
     gchar* escaped_curdir = NULL;
 
     vmi_lock_guard vmi_lg(drakvuf);
+    char *cmd = read_cmd_line(vmi_lg.vmi,info,cmdline_addr);
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -191,7 +231,7 @@ static void print_process_creation_result(
             curdir = g_strdup("");
     }
 
-    gchar* cmdline = g_strescape(cmdline_us ? reinterpret_cast<char const*>(cmdline_us->contents) : "", NULL);
+    gchar* cmdline = g_strescape(cmdline_us ? reinterpret_cast<char const*>(cmdline_us->contents) : cmd, NULL);
     char const* imagepath = imagepath_us ? reinterpret_cast<char const*>(imagepath_us->contents) : "";
     char const* dllpath = dllpath_us ? reinterpret_cast<char const*>(dllpath_us->contents) : "";
 
@@ -263,6 +303,7 @@ static void print_process_creation_result(
 
     g_free(cmdline);
     g_free(curdir);
+    g_free(cmd);
     if (cmdline_us)
         vmi_free_unicode_str(cmdline_us);
 
