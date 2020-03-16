@@ -151,7 +151,8 @@ public:
               output_format_t output,
               bool verbose,
               bool leave_paused,
-              bool libvmi_conf);
+              bool libvmi_conf,
+              addr_t kpgd);
     ~drakvuf_c();
 
     int is_initialized();
