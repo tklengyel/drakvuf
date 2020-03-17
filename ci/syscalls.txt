@@ -1,0 +1,14 @@
+NtReadVirtualMemory
+NtCallbackReturn
+NtYieldExecution
+NtAdjustGroupsToken
+NtSetTimer2
+NtWaitForWorkViaWorkerFactory
+NtQuerySystemInformation
+NtOpenFile
+NtSetTimer
+NtClose
+NtOpenProcess
+NtOpenKey
+NtOpenKeyEx
+NtSetEvent
