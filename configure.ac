@@ -122,21 +122,6 @@ AC_ARG_ENABLE([repl],
   [repl="$enableval"],
   [repl="no"])
 AM_CONDITIONAL([REPL], [test x$repl = xyes])
-if test x$repl = xyes; then
-
-  AC_PATH_PROG(PYTHON3, python3, nopython)
-  AS_IF([test "$ac_cv_path_PYTHON3" = "nopython"],
-    AC_MSG_ERROR([could not find python or python3]),
-    [
-      PYTHON_CFLAGS=`${PYTHON3}-config --includes`
-	  AC_SUBST([PYTHON_CFLAGS])
-      PYTHON_LIBS=`${PYTHON3}-config --libs`
-	  AC_SUBST([PYTHON_LIBS])
-	]
-  )
-
-  AC_DEFINE_UNQUOTED(ENABLE_REPL, 1, "")
-fi
 
 ######################################################
 
@@ -559,6 +544,26 @@ AC_CHECK_HEADERS([libxl_utils.h], [], [AC_ERROR([Xenlight (libxl) headers are no
 AC_CHECK_LIB(xenlight, libxl_name_to_domid, [], [AC_ERROR([Xenlight does not have required features!])])
 
 AC_CHECK_LIB([xentoollog], [xtl_logger_destroy])
+
+if test x$repl = xyes; then
+  AC_PATH_PROG(PYTHON3, python3, nopython)
+  AS_IF([test "$ac_cv_path_PYTHON3" = "nopython"],
+    AC_MSG_ERROR([could not find python or python3]),
+    [
+      PYTHON_CFLAGS=`${PYTHON3}-config --includes`
+	  AC_SUBST([PYTHON_CFLAGS])
+      PYTHON_LIBS=`${PYTHON3}-config --libs`
+	  AC_SUBST([PYTHON_LIBS])
+	]
+  )
+
+  AC_PATH_PROG([CTYPESGEN], [ctypesgen], [])
+  AS_IF([test x"$CTYPESGEN" = x],
+    AC_MSG_ERROR([could not find ctypesgen])
+  )
+
+  AC_DEFINE_UNQUOTED(ENABLE_REPL, 1, "")
+fi
 
 #####################################################
 

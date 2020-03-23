@@ -146,3 +146,6 @@ endif
 noinst_LTLIBRARIES = librepl.la
 librepl_la_SOURCES = $(sources)
 librepl_la_LIBADD = ../libdrakvuf/libdrakvuf.la
+
+all-local:
+	$(CTYPESGEN) $(top_srcdir)/src/libdrakvuf/libdrakvuf.h -I $(AM_CPPFLAGS) -o libdrakvuf.py
