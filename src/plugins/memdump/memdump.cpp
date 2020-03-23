@@ -370,6 +370,7 @@ done:
     free(file);
     free(file_path);
     free(tmp_file_path);
+    free(metafile);
     g_free(access_ptrs);
 
     return ret;
