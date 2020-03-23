@@ -117,6 +117,13 @@ using handle_t = uint64_t;
 using handled_t = bool;
 using file_name_t = std::string;
 
+enum file_extraction_reason
+{
+    FILEEXTR_WRITE,
+    FILEEXTR_DELETE,
+};
+using file_extraction_reason_t = file_extraction_reason;
+
 struct filedelete_config
 {
     const char* dump_folder;
@@ -127,9 +134,9 @@ struct filedelete_config
 class filedelete: public plugin
 {
 public:
-    drakvuf_trap_t traps[4] =
+    drakvuf_trap_t traps[6] =
     {
-        [0 ... 3] = {
+        [0 ... 5] = {
             .breakpoint.lookup_type = LOOKUP_PID,
             .breakpoint.pid = 4,
             .breakpoint.addr_type = ADDR_RVA,
@@ -148,7 +155,7 @@ public:
     output_format_t format;
     bool use_injector;
 
-    std::map<std::pair<vmi_pid_t, handle_t>, file_name_t> files;
+    std::map<std::pair<vmi_pid_t, handle_t>, std::pair<file_name_t, file_extraction_reason_t>> files;
     int sequence_number;
 
     filedelete(drakvuf_t drakvuf, const filedelete_config* config, output_format_t output);
