@@ -279,7 +279,7 @@ bool drakvuf_get_bitfield_offset_and_size(drakvuf_t drakvuf,
         size_t* start_bit,
         size_t* end_bit)
 {
-    return VMI_SUCCESS == vmi_get_bitfield_offset_and_size(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), struct_name, struct_member, offset, start_bit, end_bit);
+    return VMI_SUCCESS == vmi_get_bitfield_offset_and_size_from_json(drakvuf->vmi, vmi_get_kernel_json(drakvuf->vmi), struct_name, struct_member, offset, start_bit, end_bit);
 }
 
 bool json_get_symbol_rva(drakvuf_t drakvuf,
