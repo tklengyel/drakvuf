@@ -608,11 +608,13 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
                     "PrototypePte 0x%lx, bytes read %zu\n",
                     ctx->pid, ctx->tid, ptes, mmvad->prototype_pte, bytes_read);
                 delete[] buf;
+                buf = nullptr;
                 ptes = 0;
             }
             for (uint32_t i = 0; i < ptes; ++i)
                 prototype_pte.push_back(buf[i]);
-            delete[] buf;
+            if (buf)
+                delete[] buf;
         }
     }
 
