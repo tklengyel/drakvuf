@@ -251,6 +251,12 @@ sources += apimon/crypto.cpp
 sources += apimon/crypto.h
 endif
 
+if PLUGIN_PROCDUMP
+sources += procdump/procdump.cpp
+sources += procdump/procdump.h
+sources += procdump/private.h
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h
 

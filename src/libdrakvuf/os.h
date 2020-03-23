@@ -115,6 +115,9 @@ typedef struct os_interface
     addr_t (*get_current_process)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
+    addr_t (*get_current_attached_process)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
     bool (*get_last_error)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
 
@@ -123,6 +126,9 @@ typedef struct os_interface
 
     char* (*get_process_name)
     (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
+
+    bool (*get_process_dtb)
+    (drakvuf_t drakvuf, addr_t eprocess_base, addr_t* pdbase);
 
     char* (*get_process_commandline)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
@@ -214,6 +220,18 @@ typedef struct os_interface
     bool (*find_mmvad)
     (drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
 
+    bool (*traverse_mmvad)
+    (drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callback, void* callback_data);
+
+    bool (*is_mmvad_commited)
+    (drakvuf_t drakvuf, mmvad_info_t* mmvad);
+
+    uint32_t (*mmvad_type)
+    (drakvuf_t drakvuf, mmvad_info_t* mmvad);
+
+    uint64_t (*mmvad_commit_charge)
+    (drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width);
+
     bool (*get_pid_from_handle)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 
@@ -235,5 +253,6 @@ bool set_os_windows(drakvuf_t drakvuf);
 bool set_os_linux(drakvuf_t drakvuf);
 
 bool fill_kernel_offsets(drakvuf_t drakvuf, size_t size, const char* names[][2]);
+bool fill_kernel_bitfields(drakvuf_t drakvuf, size_t size, const char* names [][2]);
 
 #endif

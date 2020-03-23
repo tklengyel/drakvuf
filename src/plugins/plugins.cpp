@@ -127,6 +127,7 @@
 #include "wmimon/wmimon.h"
 #include "memdump/memdump.h"
 #include "apimon/apimon.h"
+#include "procdump/procdump.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -337,6 +338,18 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .dll_hooks_list = options->dll_hooks_list
                     };
                     this->plugins[plugin_id] = new apimon(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_PROCDUMP
+                case PLUGIN_PROCDUMP :
+                {
+                    procdump_config config =
+                        {
+                            .procdump_dir = options->procdump_dir,
+                        };
+                    this->plugins[plugin_id] =
+                        new procdump(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif

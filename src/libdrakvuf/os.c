@@ -128,6 +128,21 @@ bool fill_kernel_offsets(drakvuf_t drakvuf, size_t size, const char* names [][2]
     return 1;
 }
 
+bool fill_kernel_bitfields(drakvuf_t drakvuf, size_t size, const char* names [][2])
+{
+    drakvuf->bitfields = (bitfield_t)g_try_malloc0(sizeof(struct bitfield) * size );
+    if ( !drakvuf->bitfields )
+        return 0;
+
+    for (size_t i = 0; i < size; i++)
+        if (!drakvuf_get_bitfield_offset_and_size(drakvuf, names[i][0], names[i][1], &(drakvuf->bitfields[i].offset), &(drakvuf->bitfields[i].start_bit), &(drakvuf->bitfields[i].end_bit)))
+        {
+            PRINT_DEBUG("Failed to find offsets for array of bitfields.\n");
+        }
+
+    return 1;
+}
+
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     if ( drakvuf->osi.get_current_thread )
@@ -160,10 +175,28 @@ addr_t drakvuf_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
+addr_t drakvuf_get_current_attached_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    if ( drakvuf->osi.get_current_attached_process )
+        return drakvuf->osi.get_current_attached_process(drakvuf, info);
+
+    return 0;
+}
+
 char* drakvuf_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpath)
 {
     if ( drakvuf->osi.get_process_name )
         return drakvuf->osi.get_process_name(drakvuf, process_base, fullpath);
+
+    return NULL;
+}
+
+bool drakvuf_get_process_dtb(drakvuf_t drakvuf,
+                             addr_t process_base,
+                             addr_t* dtb)
+{
+    if ( drakvuf->osi.get_process_dtb )
+        return drakvuf->osi.get_process_dtb(drakvuf, process_base, dtb);
 
     return NULL;
 }
@@ -410,6 +443,38 @@ bool drakvuf_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_
 {
     if ( drakvuf->osi.find_mmvad )
         return drakvuf->osi.find_mmvad(drakvuf, eprocess, vaddr, out_mmvad);
+
+    return false;
+}
+
+bool drakvuf_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callback, void* callback_data)
+{
+    if ( drakvuf->osi.traverse_mmvad )
+        return drakvuf->osi.traverse_mmvad(drakvuf, eprocess, callback, callback_data);
+
+    return false;
+}
+
+bool drakvuf_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    if ( drakvuf->osi.is_mmvad_commited )
+        return drakvuf->osi.is_mmvad_commited(drakvuf, mmvad);
+
+    return false;
+}
+
+uint32_t drakvuf_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    if ( drakvuf->osi.mmvad_type )
+        return drakvuf->osi.mmvad_type(drakvuf, mmvad);
+
+    return false;
+}
+
+uint64_t drakvuf_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width)
+{
+    if ( drakvuf->osi.mmvad_commit_charge )
+        return drakvuf->osi.mmvad_commit_charge(drakvuf, mmvad, width);
 
     return false;
 }

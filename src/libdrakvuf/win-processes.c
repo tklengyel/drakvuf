@@ -208,6 +208,30 @@ addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return process;
 }
 
+addr_t win_get_current_attached_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t thread;
+    uint8_t apcstateindex;
+
+    thread=win_get_current_thread(drakvuf, info);
+    if (thread == 0 || VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_APCSTATEINDEX], 0, &apcstateindex))
+    {
+        return 0;
+    }
+
+    if (apcstateindex)
+    {
+        addr_t process;
+        if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_APCSTATE] + drakvuf->offsets[KAPC_STATE_PROCESS], 0, &process))
+            return 0;
+        return process;
+    }
+    else
+    {
+        return win_get_current_process(drakvuf, info);
+    }
+}
+
 bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str)
 {
     if (!err || !err_str)
@@ -283,6 +307,19 @@ char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpat
     }
 
     return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
+}
+
+bool win_get_process_pdbase(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* pdbase)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    if (!eprocess_base)
+        return false;
+
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, pdbase))
+        return false;
+
+    return true;
 }
 
 char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base)
@@ -988,6 +1025,7 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
 {
     int depth = 0;
     bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
 
     access_context_t ctx;
     memset(&ctx, 0, sizeof(access_context_t));
@@ -1016,8 +1054,8 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
         addr_t left_child;
         addr_t right_child;
 
-        uint64_t starting_vpn;
-        uint64_t ending_vpn;
+        uint64_t starting_vpn = 0;
+        uint64_t ending_vpn = 0;
 
         uint32_t starting_vpn_low;
         uint32_t ending_vpn_low;
@@ -1025,7 +1063,8 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
         uint8_t ending_vpn_high;
 
         uint64_t mmvad_core = 0;
-        uint64_t flags1;
+        uint64_t flags = 0;
+        uint64_t flags1 = 0;
 
         if (depth > MMVAD_MAX_DEPTH)
         {
@@ -1068,16 +1107,33 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
         {
             ctx.addr = node_addr + drakvuf->offsets[MMVAD_STARTING_VPN];
 
-            if (vmi_read_64(drakvuf->vmi, &ctx, &starting_vpn) != VMI_SUCCESS)
+            if (!is32bit)
             {
-                return false;
+                if (vmi_read_64(drakvuf->vmi, &ctx, &starting_vpn) != VMI_SUCCESS)
+                {
+                    return false;
+                }
+
+                ctx.addr = node_addr + drakvuf->offsets[MMVAD_ENDING_VPN];
+
+                if (vmi_read_64(drakvuf->vmi, &ctx, &ending_vpn) != VMI_SUCCESS)
+                {
+                    return false;
+                }
             }
-
-            ctx.addr = node_addr + drakvuf->offsets[MMVAD_ENDING_VPN];
-
-            if (vmi_read_64(drakvuf->vmi, &ctx, &ending_vpn) != VMI_SUCCESS)
+            else
             {
-                return false;
+                if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&starting_vpn) != VMI_SUCCESS)
+                {
+                    return false;
+                }
+
+                ctx.addr = node_addr + drakvuf->offsets[MMVAD_ENDING_VPN];
+
+                if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&ending_vpn) != VMI_SUCCESS)
+                {
+                    return false;
+                }
             }
         }
         else
@@ -1127,29 +1183,41 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
         }
         else if (starting_vpn * VMI_PS_4KB <= vaddr && (ending_vpn + 1) * VMI_PS_4KB > vaddr)
         {
+            addr_t pool_tag_delta = is32bit ? 4 : 0xC;
             uint32_t pool_tag;
             addr_t subsection;
             addr_t control_area;
             addr_t file_object;
+            addr_t segment;
+            uint32_t ptes;
+            addr_t prototype_pte;
 
             out_mmvad->file_name_ptr = 0;
 
             if (is_win7)
             {
-                ctx.addr = node_addr + drakvuf->offsets[MMVAD_FLAGS1];
+                ctx.addr = node_addr + drakvuf->offsets[MMVAD_FLAGS];
+                if (vmi_read_64(drakvuf->vmi, &ctx, &flags) != VMI_SUCCESS)
+                {
+                    return false;
+                }
             }
             else
             {
+                ctx.addr = node_addr + drakvuf->offsets[MMVAD_SHORT_FLAGS];
+                if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&flags) != VMI_SUCCESS)
+                {
+                    return false;
+                }
                 ctx.addr = mmvad_core + drakvuf->offsets[MMVAD_SHORT_FLAGS1];
-            }
-
-            if (vmi_read_64(drakvuf->vmi, &ctx, &flags1) != VMI_SUCCESS)
-            {
-                return false;
+                if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&flags1) != VMI_SUCCESS)
+                {
+                    return false;
+                }
             }
 
             // read Windows' PoolTag which is 12 bytes before the actual object
-            ctx.addr = node_addr - 0xC;
+            ctx.addr = node_addr - pool_tag_delta;
             if (vmi_read_32(drakvuf->vmi, &ctx, &pool_tag) != VMI_SUCCESS)
             {
                 return false;
@@ -1179,12 +1247,32 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
                                 out_mmvad->file_name_ptr = (file_object + drakvuf->offsets[FILEOBJECT_NAME]);
                             }
                         }
+
+                        ctx.addr = control_area + drakvuf->offsets[CONTROL_AREA_SEGMENT];
+
+                        if (vmi_read_addr(drakvuf->vmi, &ctx, &segment) == VMI_SUCCESS)
+                        {
+                            ctx.addr = control_area + drakvuf->offsets[SEGMENT_TOTALNUMBEROFPTES];
+
+                            if (vmi_read_32(drakvuf->vmi, &ctx, &ptes) == VMI_SUCCESS)
+                            {
+                                out_mmvad->total_number_of_ptes = ptes;
+                            }
+
+                            ctx.addr = control_area + drakvuf->offsets[SEGMENT_PROTOTYPEPTE];
+
+                            if (vmi_read_addr(drakvuf->vmi, &ctx, &prototype_pte) == VMI_SUCCESS)
+                            {
+                                out_mmvad->prototype_pte = prototype_pte;
+                            }
+                        }
                     }
                 }
             }
 
             out_mmvad->starting_vpn = starting_vpn;
             out_mmvad->ending_vpn = ending_vpn;
+            out_mmvad->flags = flags;
             out_mmvad->flags1 = flags1;
 
             return true;
@@ -1200,6 +1288,317 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
     }
 
     return false;
+}
+
+static bool win_traverse_mmvad_node(drakvuf_t drakvuf, addr_t node_addr, mmvad_callback callback, void* callback_data)
+{
+    int depth = 0;
+    bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+
+    access_context_t ctx;
+    memset(&ctx, 0, sizeof(access_context_t));
+    ctx.translate_mechanism = VMI_TM_PROCESS_PID;
+    ctx.pid = 4;
+
+
+    addr_t left_child;
+    addr_t right_child;
+
+    uint64_t starting_vpn = 0;
+    uint64_t ending_vpn = 0;
+
+    uint32_t starting_vpn_low;
+    uint32_t ending_vpn_low;
+    uint8_t starting_vpn_high;
+    uint8_t ending_vpn_high;
+
+    uint64_t mmvad_core = 0;
+    uint64_t flags = 0;
+    uint64_t flags1 = 0;
+
+    if (depth > MMVAD_MAX_DEPTH)
+    {
+        PRINT_DEBUG("Error. Max depth exceeded when walking MMVAD tree.\n");
+        return false;
+    }
+
+    ++depth;
+
+
+    if (is_win7)
+    {
+        ctx.addr = node_addr + drakvuf->offsets[MMVAD_LEFT_CHILD];
+    }
+    else
+    {
+        ctx.addr = node_addr + drakvuf->offsets[RTL_BALANCED_NODE_LEFT];
+    }
+
+    if (vmi_read_addr(drakvuf->vmi, &ctx, &left_child) != VMI_SUCCESS)
+    {
+        return false;
+    }
+
+    if (is_win7)
+    {
+        ctx.addr = node_addr + drakvuf->offsets[MMVAD_RIGHT_CHILD];
+    }
+    else
+    {
+        ctx.addr = node_addr + drakvuf->offsets[RTL_BALANCED_NODE_RIGHT];
+    }
+
+    if (vmi_read_addr(drakvuf->vmi, &ctx, &right_child) != VMI_SUCCESS)
+    {
+        return false;
+    }
+
+    if (is_win7)
+    {
+        ctx.addr = node_addr + drakvuf->offsets[MMVAD_STARTING_VPN];
+
+        if (!is32bit)
+        {
+            if (vmi_read_64(drakvuf->vmi, &ctx, &starting_vpn) != VMI_SUCCESS)
+            {
+                return false;
+            }
+
+            ctx.addr = node_addr + drakvuf->offsets[MMVAD_ENDING_VPN];
+
+            if (vmi_read_64(drakvuf->vmi, &ctx, &ending_vpn) != VMI_SUCCESS)
+            {
+                return false;
+            }
+        }
+        else
+        {
+            if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&starting_vpn) != VMI_SUCCESS)
+            {
+                return false;
+            }
+
+            ctx.addr = node_addr + drakvuf->offsets[MMVAD_ENDING_VPN];
+
+            if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&ending_vpn) != VMI_SUCCESS)
+            {
+                return false;
+            }
+        }
+    }
+    else
+    {
+        mmvad_core = node_addr + drakvuf->offsets[MMVAD_CORE];
+        ctx.addr = mmvad_core + drakvuf->offsets[MMVAD_SHORT_STARTING_VPN];
+
+        if (vmi_read_32(drakvuf->vmi, &ctx, &starting_vpn_low) != VMI_SUCCESS)
+        {
+            return false;
+        }
+
+        ctx.addr = mmvad_core + drakvuf->offsets[MMVAD_SHORT_ENDING_VPN];
+
+        if (vmi_read_32(drakvuf->vmi, &ctx, &ending_vpn_low) != VMI_SUCCESS)
+        {
+            return false;
+        }
+
+        ctx.addr = mmvad_core + drakvuf->offsets[MMVAD_SHORT_STARTING_VPN_HIGH];
+
+        if (vmi_read_8(drakvuf->vmi, &ctx, &starting_vpn_high) != VMI_SUCCESS)
+        {
+            return false;
+        }
+
+        ctx.addr = mmvad_core + drakvuf->offsets[MMVAD_SHORT_ENDING_VPN_HIGH];
+
+        if (vmi_read_8(drakvuf->vmi, &ctx, &ending_vpn_high) != VMI_SUCCESS)
+        {
+            return false;
+        }
+
+        starting_vpn = starting_vpn_high;
+        starting_vpn <<= 32;
+        starting_vpn |= starting_vpn_low;
+
+        ending_vpn = ending_vpn_high;
+        ending_vpn <<= 32;
+        ending_vpn |= ending_vpn_low;
+    }
+
+    if (starting_vpn == 0 && ending_vpn == 0)
+    {
+        // the root node seems to be empty with only right child pointer filled in
+        return win_traverse_mmvad_node(drakvuf, right_child, callback, callback_data);
+    }
+
+    addr_t pool_tag_delta = is32bit ? 4 : 0xC;
+    uint32_t pool_tag;
+    addr_t subsection;
+    addr_t control_area;
+    addr_t file_object;
+    addr_t segment;
+    uint32_t ptes;
+    addr_t prototype_pte;
+
+    mmvad_info_t mmvad;
+    mmvad.file_name_ptr = 0;
+    mmvad.total_number_of_ptes = 0;
+    mmvad.prototype_pte = 0;
+
+    if (is_win7)
+    {
+        ctx.addr = node_addr + drakvuf->offsets[MMVAD_FLAGS];
+        if (vmi_read_64(drakvuf->vmi, &ctx, &flags) != VMI_SUCCESS)
+        {
+            return false;
+        }
+    }
+    else
+    {
+        ctx.addr = node_addr + drakvuf->offsets[MMVAD_SHORT_FLAGS];
+        if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&flags) != VMI_SUCCESS)
+        {
+            return false;
+        }
+        ctx.addr = mmvad_core + drakvuf->offsets[MMVAD_SHORT_FLAGS1];
+        if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&flags1) != VMI_SUCCESS)
+        {
+            return false;
+        }
+    }
+
+    // read Windows' PoolTag which is 12 bytes before the actual object
+    ctx.addr = node_addr - pool_tag_delta;
+    if (vmi_read_32(drakvuf->vmi, &ctx, &pool_tag) != VMI_SUCCESS)
+    {
+        return false;
+    }
+
+    // Windows MMVAD can have multiple types, can be differentiated with pool tags
+    // some types are shorter and don't even contain "Subsection" field
+    if (pool_tag == POOL_TAG_VADL || pool_tag == POOL_TAG_VAD || pool_tag == POOL_TAG_VADM)
+    {
+        ctx.addr = node_addr + drakvuf->offsets[MMVAD_SUBSECTION];
+
+        if (vmi_read_addr(drakvuf->vmi, &ctx, &subsection) == VMI_SUCCESS)
+        {
+            ctx.addr = subsection + drakvuf->offsets[SUBSECTION_CONTROL_AREA];
+
+            if (vmi_read_addr(drakvuf->vmi, &ctx, &control_area) == VMI_SUCCESS)
+            {
+                ctx.addr = control_area + drakvuf->offsets[CONTROL_AREA_FILEPOINTER];
+
+                if (vmi_read_addr(drakvuf->vmi, &ctx, &file_object) == VMI_SUCCESS)
+                {
+                    // file_object is a special _EX_FAST_REF pointer, we need to explicitly clear low bits
+                    file_object &= (~0xFULL);
+
+                    if ((void*)file_object != NULL)
+                    {
+                        mmvad.file_name_ptr = (file_object + drakvuf->offsets[FILEOBJECT_NAME]);
+                    }
+                }
+
+                // FIXME We could get this fields form MMVAD.FirstPrototypePte and MMVAD.LastPrototypePte
+                ctx.addr = control_area + drakvuf->offsets[CONTROL_AREA_SEGMENT];
+
+                if (vmi_read_addr(drakvuf->vmi, &ctx, &segment) == VMI_SUCCESS)
+                {
+                    ctx.addr = segment + drakvuf->offsets[SEGMENT_TOTALNUMBEROFPTES];
+
+                    if (vmi_read_32(drakvuf->vmi, &ctx, &ptes) == VMI_SUCCESS)
+                    {
+                        mmvad.total_number_of_ptes = ptes;
+                    }
+
+                    ctx.addr = segment + drakvuf->offsets[SEGMENT_PROTOTYPEPTE];
+
+                    if (vmi_read_addr(drakvuf->vmi, &ctx, &prototype_pte) == VMI_SUCCESS)
+                    {
+                        mmvad.prototype_pte = prototype_pte;
+                    }
+                }
+            }
+        }
+    }
+
+    mmvad.starting_vpn = starting_vpn;
+    mmvad.ending_vpn = ending_vpn;
+    mmvad.flags = flags;
+    mmvad.flags1 = flags1;
+
+    if (win_traverse_mmvad_node(drakvuf, left_child, callback, callback_data))
+        return true;
+
+    if (callback(drakvuf, &mmvad, callback_data))
+        return true;
+
+    return win_traverse_mmvad_node(drakvuf, right_child, callback, callback_data);
+}
+
+bool win_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callback, void* callback_data)
+{
+    bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
+
+    access_context_t ctx;
+    memset(&ctx, 0, sizeof(access_context_t));
+    ctx.translate_mechanism = VMI_TM_PROCESS_PID;
+    ctx.pid = 4;
+
+    addr_t node_addr = 0;
+
+    if (is_win7)
+    {
+        node_addr = eprocess + drakvuf->offsets[EPROCESS_VADROOT] + drakvuf->offsets[VADROOT_BALANCED_ROOT];
+    }
+    else
+    {
+        ctx.addr = eprocess + drakvuf->offsets[EPROCESS_VADROOT] + drakvuf->offsets[RTL_AVL_TREE_ROOT];
+
+        if (vmi_read_addr(drakvuf->vmi, &ctx, &node_addr) != VMI_SUCCESS)
+        {
+            PRINT_DEBUG("MMVAD failed for node addr\n");
+            return false;
+        }
+    }
+
+    if (node_addr)
+        return win_traverse_mmvad_node(drakvuf, node_addr, callback, callback_data);
+
+    return false;
+}
+
+static uint64_t win_mmvad_flag(drakvuf_t drakvuf, uint64_t flags, int idx)
+{
+    bitfield_t bf = &drakvuf->bitfields[idx];
+    uint64_t mask = (1ULL << (bf->end_bit - bf->start_bit)) - 1;
+    return (flags >> bf->start_bit) & mask;
+}
+
+bool win_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
+    int idx = is_win7 ? MMVAD_FLAGS_MEMCOMMIT : MMVAD_FLAGS1_MEMCOMMIT;
+    uint64_t flags = is_win7 ? mmvad->flags : mmvad->flags1;
+    return win_mmvad_flag(drakvuf, flags, idx);
+}
+
+uint64_t win_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width)
+{
+    bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
+    int idx = is_win7 ? MMVAD_FLAGS_COMMITCHARGE : MMVAD_FLAGS1_COMMITCHARGE;
+    uint64_t flags = is_win7 ? mmvad->flags : mmvad->flags1;
+    if (width)
+        *width = drakvuf->bitfields[idx].end_bit - drakvuf->bitfields[idx].start_bit;
+    return win_mmvad_flag(drakvuf, flags, idx);
+}
+
+uint32_t win_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad)
+{
+    int idx = MMVAD_FLAGS_VADTYPE;
+    return win_mmvad_flag(drakvuf, mmvad->flags, idx);
 }
 
 bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid)

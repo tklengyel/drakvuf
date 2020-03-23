@@ -114,9 +114,13 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
+addr_t win_get_current_attached_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
 bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
 
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
+
+bool win_get_process_pdbase(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* pdbase);
 
 char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
 
@@ -172,6 +176,11 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, i
 bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
 
 bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
+
+bool win_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callback, void* callback_data);
+bool win_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad);
+uint64_t win_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width);
+uint32_t win_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad);
 
 bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
 

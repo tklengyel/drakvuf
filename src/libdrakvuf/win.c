@@ -444,6 +444,7 @@ bool set_os_windows(drakvuf_t drakvuf)
 
     // Get the offsets from the JSON profile
     fill_kernel_offsets(drakvuf, __WIN_OFFSETS_MAX, win_offset_names);
+    fill_kernel_bitfields(drakvuf, __WIN_BITFIELDS_MAX, win_bitfields_names);
 
     drakvuf->sizes = (size_t*)g_try_malloc0(sizeof(size_t) * __WIN_SIZES_MAX);
     if ( !drakvuf->sizes )
@@ -464,8 +465,10 @@ bool set_os_windows(drakvuf_t drakvuf)
 
     drakvuf->osi.get_current_thread = win_get_current_thread;
     drakvuf->osi.get_current_process = win_get_current_process;
+    drakvuf->osi.get_current_attached_process = win_get_current_attached_process;
     drakvuf->osi.get_last_error = win_get_last_error;
     drakvuf->osi.get_process_name = win_get_process_name;
+    drakvuf->osi.get_process_dtb = win_get_process_pdbase;
     drakvuf->osi.get_process_commandline = win_get_process_commandline;
     drakvuf->osi.get_current_process_name = win_get_current_process_name;
     drakvuf->osi.get_process_userid = win_get_process_userid;
@@ -495,6 +498,10 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.enumerate_processes_with_module = win_enumerate_processes_with_module;
     drakvuf->osi.is_crashreporter = win_is_crashreporter;
     drakvuf->osi.find_mmvad = win_find_mmvad;
+    drakvuf->osi.traverse_mmvad = win_traverse_mmvad;
+    drakvuf->osi.is_mmvad_commited = win_is_mmvad_commited;
+    drakvuf->osi.mmvad_commit_charge = win_mmvad_commit_charge;
+    drakvuf->osi.mmvad_type = win_mmvad_type;
     drakvuf->osi.get_pid_from_handle = win_get_pid_from_handle;
     drakvuf->osi.get_wow_context = win_get_wow_context;
     drakvuf->osi.get_user_stack32 = win_get_user_stack32;
