@@ -151,6 +151,32 @@ void dump_va(vmi_instance_t vmi, access_context_t* ctx, const size_t count, cons
         dump_buffer(buffer.get(), count, columns, ctx->addr, header, footer);
 }
 
+void dump_registers(const x86_registers_t* regs, string header, string footer)
+{
+    printf("%s\n"
+           "rax 0x%016lx rbx 0x%016lx rcx 0x%016lx rdx 0x%016lx\n"
+           "rsi 0x%016lx rdi 0x%016lx rbp 0x%016lx rsp 0x%016lx\n"
+           "r8  0x%016lx r9  0x%016lx r10 0x%016lx r11 0x%016lx\n"
+           "r12 0x%016lx r13 0x%016lx r14 0x%016lx r15 0x%016lx\n"
+           "rip 0x%016lx rflags 0x%016lx\n"
+           "CS 0x%04lx DS 0x%04lx ES 0x%04lx SS 0x%04lx FS 0x%04lx GS 0x%04lx\n"
+           "FS_BASE 0x%016lx GS_BASE 0x%016lx SHADOW_GS 0x%016lx\n"
+           "CR0 0x%016lx CR2 0x%016lx CR3 0x%016lx CR4 0x%016lx\n"
+           "%s\n",
+           header.data(),
+           regs->rax, regs->rbx, regs->rcx, regs->rdx,
+           regs->rsi, regs->rdi, regs->rbp, regs->rsp,
+           regs->r8, regs->r9, regs->r10, regs->r11,
+           regs->r12, regs->r13, regs->r14, regs->r15,
+           regs->rip, regs->rflags,
+           regs->cs_sel, regs->ds_sel, regs->es_sel, regs->ss_sel,
+           regs->fs_sel, regs->gs_sel,
+           regs->fs_base, regs->gs_base, regs->shadow_gs,
+           regs->cr0, regs->cr2, regs->cr3, regs->cr4,
+           footer.data()
+        );
+}
+
 static std::string format_flag(string flag, output_format_t format)
 {
     if ( format == OUTPUT_KV )
