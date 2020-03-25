@@ -107,6 +107,51 @@
 
 using std::string;
 
+struct attached_proc_data
+{
+    addr_t base_addr;
+    const char* name;
+    vmi_pid_t pid;
+    vmi_pid_t ppid;
+    uint32_t tid;
+
+    attached_proc_data(drakvuf_t drakvuf,
+                       drakvuf_trap_info_t* info)
+        : base_addr(0)
+        , name(nullptr)
+        , pid(0)
+        , ppid(0)
+        , tid(0)
+    {
+        proc_data_t data;
+        data.name = nullptr;
+        addr_t attached_proc = drakvuf_get_current_attached_process(drakvuf, info);
+        if (!attached_proc ||
+            !drakvuf_get_process_data(drakvuf, attached_proc,
+                                      &data) ||
+            !drakvuf_get_current_thread_id(drakvuf, info,
+                                           &data.tid) ||
+            !data.pid || !data.tid)
+        {
+            if (data.name)
+                g_free( (gpointer)data.name );
+            return;
+        }
+
+        base_addr = data.base_addr;
+        name = data.name;
+        pid = data.pid;
+        ppid = data.ppid;
+        tid = data.tid;
+    }
+
+    ~attached_proc_data()
+    {
+        g_free( (gpointer)name);
+    }
+};
+using attached_proc_data_t = struct attached_proc_data;
+
 struct vad_info
 {
     uint32_t type; // TODO Use backed file name instead of type?

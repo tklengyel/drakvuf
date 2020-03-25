@@ -629,6 +629,7 @@ LibraryMon:   $plugin_librarymon
 DKOMmon:      $plugin_dkommon
 WMIMon:       $plugin_wmimon
 MEMDump:      $plugin_memdump
+ProcDump:     $plugin_procdump
 APIMon:       $plugin_apimon
 -------------------------------------------------------------------------------
 REPL:         $repl

@@ -452,14 +452,8 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
                                          drakvuf_trap_info_t* info)
 {
-    addr_t attached_proc = drakvuf_get_current_attached_process(drakvuf, info);
-    proc_data_t attached_proc_data;
-    if (!attached_proc ||
-        !drakvuf_get_process_data(drakvuf, attached_proc,
-                                  &attached_proc_data) ||
-        !drakvuf_get_current_thread_id(drakvuf, info,
-                                       &attached_proc_data.tid) ||
-        !attached_proc_data.pid || !attached_proc_data.tid)
+    attached_proc_data_t proc(drakvuf, info);
+    if (!proc.pid)
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
@@ -469,8 +463,8 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
 
     auto ctx = static_cast<struct procdump_ctx*>(info->trap->data);
 
-    if (attached_proc_data.pid != ctx->pid ||
-        attached_proc_data.tid != ctx->tid)
+    if (proc.pid != ctx->pid ||
+        proc.tid != ctx->tid)
     {
         return VMI_EVENT_RESPONSE_NONE;
     }
@@ -500,14 +494,8 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
 static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
                                           drakvuf_trap_info_t* info)
 {
-    addr_t attached_proc = drakvuf_get_current_attached_process(drakvuf, info);
-    proc_data_t attached_proc_data;
-    if (!attached_proc ||
-        !drakvuf_get_process_data(drakvuf, attached_proc,
-                                  &attached_proc_data) ||
-        !drakvuf_get_current_thread_id(drakvuf, info,
-                                       &attached_proc_data.tid) ||
-        !attached_proc_data.pid || !attached_proc_data.tid)
+    attached_proc_data_t proc(drakvuf, info);
+    if (!proc.pid)
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
@@ -517,8 +505,8 @@ static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
 
     auto ctx = static_cast<struct procdump_ctx*>(info->trap->data);
 
-    if (attached_proc_data.pid != ctx->pid ||
-        attached_proc_data.tid != ctx->tid)
+    if (proc.pid != ctx->pid ||
+        proc.tid != ctx->tid)
     {
         return VMI_EVENT_RESPONSE_NONE;
     }
@@ -537,7 +525,7 @@ static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
     }
     else
         PRINT_DEBUG("[PROCDUMP] [PID:%d] Failed to allocate pool\n",
-                    attached_proc_data.pid);
+                    proc.pid);
 
     return detach(drakvuf, info, ctx);
 }
@@ -633,14 +621,8 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
 static event_response_t terminate_process_cb(drakvuf_t drakvuf,
                                              drakvuf_trap_info_t* info)
 {
-    addr_t attached_proc = drakvuf_get_current_attached_process(drakvuf, info);
-    proc_data_t attached_proc_data;
-    if (!attached_proc ||
-        !drakvuf_get_process_data(drakvuf, attached_proc,
-                                  &attached_proc_data) ||
-        !drakvuf_get_current_thread_id(drakvuf, info,
-                                       &attached_proc_data.tid) ||
-        !attached_proc_data.pid || !attached_proc_data.tid)
+    attached_proc_data_t proc(drakvuf, info);
+    if (!proc.pid)
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
@@ -650,34 +632,36 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
 
     auto plugin = get_trap_plugin<procdump>(info);
     if (!plugin)
+    {
         return VMI_EVENT_RESPONSE_NONE;
+    }
 
     // The callback could be called if other thread invokes NtTerminateProcess
     // or as a return path from injected function.
     // In both cases we should not starting process dump again.
-    auto it = plugin->terminating.find(attached_proc_data.pid);
+    auto it = plugin->terminating.find(proc.pid);
     if (it != plugin->terminating.end())
     {
         if (!it->second)
-            plugin->terminating.erase(attached_proc_data.pid);
+            plugin->terminating.erase(proc.pid);
 
         return VMI_EVENT_RESPONSE_NONE;
     }
     else
-        plugin->terminating[attached_proc_data.pid] = attached_proc_data.tid;
+        plugin->terminating[proc.pid] = proc.tid;
 
     // TODO Move into constructor
     auto ctx = new procdump_ctx;
-    ctx->pid = attached_proc_data.pid;
-    ctx->ppid = attached_proc_data.ppid;
-    ctx->tid = attached_proc_data.tid;
-    ctx->name = std::string(attached_proc_data.name);
+    ctx->pid = proc.pid;
+    ctx->ppid = proc.ppid;
+    ctx->tid = proc.tid;
+    ctx->name = std::string(proc.name);
     ctx->plugin = plugin;
     ctx->idx = plugin->procdumps_count++;
     ctx->size = 0;
     ctx->offset = 0;
     // Get virtual address space map of the process
-    drakvuf_traverse_mmvad(drakvuf, attached_proc_data.base_addr, dump_mmvad,
+    drakvuf_traverse_mmvad(drakvuf, proc.base_addr, dump_mmvad,
                            ctx);
     if (ctx->vads.empty())
     {
@@ -688,8 +672,8 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     {
         PRINT_DEBUG("[PROCDUMP] [\"%s\":%4d] [PID:%4d] [TID:%4d] [\"%s\"] "
                     "Dump 0x%lx (%ld MiB, %lu VADs) SN=%lu\n",
-                    __FUNCTION__, __LINE__, attached_proc_data.pid,
-                    attached_proc_data.tid, attached_proc_data.name, ctx->size,
+                    __FUNCTION__, __LINE__, proc.pid,
+                    proc.tid, proc.name, ctx->size,
                     ctx->size / 1024 / 1024, ctx->vads.size(), ctx->idx);
     }
     ctx->file_path =
