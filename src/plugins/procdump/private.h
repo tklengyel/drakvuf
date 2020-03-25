@@ -175,9 +175,8 @@ struct procdump_ctx
     uint64_t idx;
     addr_t pool;
     const uint64_t POOL_SIZE_IN_PAGES = 0x100;
-    uint8_t* file;
+    FILE* file;
     size_t size;
-    size_t offset;
     string file_path;
     size_t current_dump_size;
 };

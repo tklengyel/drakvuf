@@ -230,9 +230,9 @@ static bool max_contigious_range(const std::vector<uint64_t>& prototype_ptes,
 }
 
 static bool read_vm(vmi_instance_t vmi, addr_t dtb, addr_t start, size_t size,
-                    uint8_t* out, size_t& offset, const size_t out_size)
+                    FILE* file)
 {
-    if (!out || !size || out_size < offset + size)
+    if (!file || !size)
     {
         return false;
     }
@@ -251,17 +251,19 @@ static bool read_vm(vmi_instance_t vmi, addr_t dtb, addr_t start, size_t size,
         {
             if (access_ptrs[i])
             {
-                memcpy(out + offset, access_ptrs[i], VMI_PS_4KB);
+                fwrite(access_ptrs[i], VMI_PS_4KB, 1, file);
                 munmap(access_ptrs[i], VMI_PS_4KB);
             }
-
-            offset += VMI_PS_4KB;
         }
 
         res = true;
     }
     else
-        offset += VMI_PS_4KB * num_pages;
+    {
+        // unaccessible page, pad with zeros to ensure proper alignment of the data
+        uint8_t zeros[VMI_PS_4KB] = {};
+        fwrite(zeros, VMI_PS_4KB, 1, file);
+    }
 
     delete[] access_ptrs;
     return res;
@@ -276,14 +278,13 @@ static void dump_with_mmap(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     auto size = (vad->second.total_number_of_ptes - vad->second.idx) * VMI_PS_4KB;
 
     vmi_lock_guard vmi_lg(drakvuf);
-    if( !read_vm(vmi_lg.vmi, info->regs->cr3, start, size, ctx->file, ctx->offset,
-                 ctx->size) )
+    if( !read_vm(vmi_lg.vmi, info->regs->cr3, start, size, ctx->file) )
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to copy VAD "
                     "(start 0x%lx, size 0x%lx) into file "
-                    "(start %p, size 0x%lx, offset 0x%lx) with mmap\n",
+                    "(start %p, size 0x%lx) with mmap\n",
                     ctx->pid, ctx->tid, ctx->vads.begin()->first,
-                    size, ctx->file, ctx->size, ctx->offset);
+                    size, ctx->file, ctx->size);
     }
 
     ctx->vads.erase(start);
@@ -318,7 +319,9 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     if (skip)
     {
         // Mapped region or VAD end should follow not-mapped region
-        ctx->offset += ptes_to_dump * VMI_PS_4KB;
+        uint8_t zeros[VMI_PS_4KB] = {};
+        for (uint32_t i = 0; i < ptes_to_dump; ++i)
+            fwrite(zeros, VMI_PS_4KB, 1, ctx->file);
         vad->second.idx += ptes_to_dump;
         skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
                                     vad->second.idx, ptes_to_dump);
@@ -443,7 +446,7 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     free_pool(ctx->plugin->pools, ctx->pool);
     drakvuf_remove_trap(drakvuf, ctx->bp, (drakvuf_trap_free_t)g_free);
     ctx->plugin->terminating.at(ctx->pid) = 0;
-    munmap(ctx->file, ctx->size);
+    fclose(ctx->file);
     delete ctx;
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -475,13 +478,13 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
 
     vmi_lock_guard vmi_lg(drakvuf);
     if (!read_vm(vmi_lg.vmi, info->regs->cr3, ctx->pool, ctx->current_dump_size,
-                 ctx->file, ctx->offset, ctx->size))
+                 ctx->file))
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to copy VAD "
                     "(start 0x%lx, size 0x%lx) into file "
-                    "(start %p, size 0x%lx, offset 0x%lx) with injection\n",
+                    "(start %p, size 0x%lx) with injection\n",
                     ctx->pid, ctx->tid, ctx->vads.begin()->first,
-                    ctx->current_dump_size, ctx->file, ctx->size, ctx->offset);
+                    ctx->current_dump_size, ctx->file, ctx->size);
     }
     vmi_lg.unlock();
 
@@ -659,7 +662,6 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     ctx->plugin = plugin;
     ctx->idx = plugin->procdumps_count++;
     ctx->size = 0;
-    ctx->offset = 0;
     // Get virtual address space map of the process
     drakvuf_traverse_mmvad(drakvuf, proc.base_addr, dump_mmvad,
                            ctx);
@@ -678,32 +680,15 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     }
     ctx->file_path =
         plugin->procdump_dir + "/procdump." + std::to_string(ctx->idx);
-    auto fd =
-        open((ctx->file_path + ".mm").data(), O_RDWR | O_CREAT | O_TRUNC, 0600);
-    if (-1 == fd)
+    ctx->file =
+        fopen((ctx->file_path + ".mm").data(), "w");
+    if (!ctx->file)
     {
         PRINT_DEBUG("[PROCDUMP] Failed to create file\n");
         delete ctx;
         return VMI_EVENT_RESPONSE_NONE;
     }
-    else if (-1 == ftruncate(fd, ctx->size))
-    {
-        PRINT_DEBUG("[PROCDUMP] Failed to truncate file up to %zu\n",
-                    ctx->size);
-        delete ctx;
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-    else
-    {
-        ctx->file = static_cast<uint8_t*>(mmap(
-            nullptr, ctx->size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
-        if (MAP_FAILED == ctx->file)
-        {
-            PRINT_DEBUG("[PROCDUMP] Failed to mmap file\n");
-            delete ctx;
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-    }
+
     // Save registers to restore process/thread state
     memcpy(&ctx->saved_regs, info->regs, sizeof(x86_registers_t));
     ctx->bp = (drakvuf_trap_t*)g_try_malloc0(sizeof(drakvuf_trap_t));
