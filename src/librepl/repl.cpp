@@ -152,7 +152,7 @@ static void repl_init(drakvuf_t drakvuf)
     // get executable path
     auto exe_path = get_selfpath();
     auto py_drakvuf_path = exe_path.substr(0, exe_path.find_last_of('/')) + "/librepl";
-    PRINT_DEBUG("PyDrakvuf path: %s\n", py_drakvuf.c_str());
+    PRINT_DEBUG("PyDrakvuf path: %s\n", py_drakvuf_path.c_str());
 
     // load libdrakvuf
     auto sysPath = PySys_GetObject("path");
