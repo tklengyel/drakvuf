@@ -129,6 +129,7 @@ static inline void print_help(void)
             "\t -v                        Turn on verbose (debug) output\n"
 #endif
             "\t -l                        Use libvmi.conf\n"
+	        "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
            );
 }
 
@@ -140,6 +141,7 @@ int main(int argc, char** argv)
     char* domain = NULL;
     bool libvmi_conf = false;
     bool verbose = 0;
+    addr_t kpgd = 0;
 
     if (argc < 4)
     {
@@ -147,7 +149,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:f:vlg")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:f:k:vlg")) != -1)
         switch (c)
         {
             case 'r':
@@ -163,6 +165,9 @@ int main(int argc, char** argv)
 #endif
             case 'l':
                 libvmi_conf = true;
+                break;
+            case 'k':
+                kpgd = strtoull(optarg, NULL, 0);
                 break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
@@ -185,7 +190,7 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, verbose, libvmi_conf))
+    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, verbose, libvmi_conf, kpgd))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
         return 1;
