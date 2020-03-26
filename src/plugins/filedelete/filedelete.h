@@ -107,6 +107,7 @@
 
 #include "plugins/private.h"
 #include "plugins/plugins.h"
+#include "plugins/plugins_ex.h"
 
 #include <map>
 #include <utility>
