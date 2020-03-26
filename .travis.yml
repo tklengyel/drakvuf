@@ -156,7 +156,7 @@ jobs:
         - TEST="compile debug with REPL enabled"
       before_install:
         - sudo apt-get update
-        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev python3-dev python3-pip
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev python3-dev python3-pip python3-setuptools
         - sudo pip3 install ctypesgen ipython
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
