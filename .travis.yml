@@ -157,6 +157,7 @@ jobs:
       before_install:
         - sudo apt-get update
         - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
+        - sudo pip3 install ctypesgen ipython
         - export INSTALLDIR=$PWD/usr/local/
         - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
         - export C_INCLUDE_PATH=$PWD/usr/local/include
