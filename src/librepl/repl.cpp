@@ -102,6 +102,9 @@
  *                                                                         *
  ***************************************************************************/
 
+#include <unistd.h>
+#include <limits.h>
+
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -128,34 +131,53 @@ extern bool verbose;
     PRINT_DEBUG("total refcount = %i\n", PyInt_AsSsize_t(refCount)); \
     Py_DECREF(refCount);
 
+static std::string get_selfpath()
+{
+    char buf[PATH_MAX];
+    ssize_t len = ::readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+    if (len != -1) {
+        buf[len] = '\0';
+        return std::string(buf);
+    } else {
+        PRINT_DEBUG("failed to get executable path!");
+        exit(1);
+    }
+}
+
 static void repl_init(drakvuf_t drakvuf)
 {
     // init python
     Py_Initialize();
 
+    // get executable path
+    auto exe_path = get_selfpath();
+    auto py_drakvuf_path = exe_path.substr(0, exe_path.find_last_of('/')) + "/librepl";
+    PRINT_DEBUG("PyDrakvuf path: %s\n", py_drakvuf.c_str());
+
     // load libdrakvuf
-    PyObject* sysPath = PySys_GetObject("path");
-    PyList_Append(sysPath, PyUnicode_FromString("/opt/drakvuf/src/librepl"));
+    auto sysPath = PySys_GetObject("path");
+    PyList_Append(sysPath, PyUnicode_FromString(py_drakvuf.c_str()));
     auto module = PyImport_ImportModule("libdrakvuf");
 
     if (module == NULL)
     {
         std::cout << "No libdrakvuf.py found, please generate it before running REPL\n";
-        throw -1;
+        exit(1);
     }
 
-    // include modules
-    PyRun_SimpleString(
-        "from ctypes import *\n"
-        "import libdrakvuf\n"
-    );
+    // import modules
+    if(PyRun_SimpleString("from ctypes import *\nimport IPython\nimport libdrakvuf\n") == -1)
+    {
+        std::cout << "Failed to load one of dependencies\n";
+        PyErr_Print();
+        exit(1);
+    }
 
     PyObject_SetAttrString(module, "drakvuf", PyLong_FromVoidPtr(static_cast<void*>(drakvuf)));
 }
 
 event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    // init only once
     repl_init(drakvuf);
 
     std::cout << "=================================================================\n"
@@ -177,9 +199,7 @@ event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         PyRun_SimpleString(ss.str().c_str());
     }
 
-    // try to load IPython
     PyRun_SimpleString(
-        "import IPython\n"
         "IPython.embed(colors='neutral', banner2=\"\"\""
         "REPL ready to go, enjoy hacking!\n"
         "trap_info contains current trap info structure\n"
