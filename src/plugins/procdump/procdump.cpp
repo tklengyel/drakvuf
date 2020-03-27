@@ -108,6 +108,7 @@
 #include <unistd.h>
 #include <vector>
 
+#include <libdrakvuf/json-util.h>
 #include <libinjector/libinjector.h>
 
 #include "procdump.h"
@@ -119,13 +120,18 @@ static void save_file_metadata(struct procdump_ctx* ctx, proc_data_t* proc_data)
     if (!fp)
         return;
 
-    fprintf(fp, "DumpSize: 0x%" PRIx64 "\n", ctx->size);
-    fprintf(fp, "PID: %" PRId32 "\n", proc_data->pid);
-    fprintf(fp, "PPID: %" PRId32 "\n", proc_data->ppid);
-    fprintf(fp, "ProcessName: \"%s\"\n", proc_data->name);
-    fprintf(fp, "DataFileName: \"%s\"\n", (ctx->file_path + ".mm").data());
+    json_object *jobj = json_object_new_object();
+    json_object_object_add(jobj, "DumpSize", json_object_new_string_fmt("0x%" PRIx64, ctx->size));
+    json_object_object_add(jobj, "PID", json_object_new_int(proc_data->pid));
+    json_object_object_add(jobj, "PPID", json_object_new_int(proc_data->ppid));
+    json_object_object_add(jobj, "ProcessName", json_object_new_string(proc_data->name));
 
+    json_object_object_add(jobj, "DataFileName", json_object_new_string((ctx->file_path + ".mm").data()));
+
+    fprintf(fp, "%s\n", json_object_get_string(jobj));
     fclose(fp);
+
+    json_object_put(jobj);
 }
 
 static void free_pool(pool_map_t& pools, addr_t va)
