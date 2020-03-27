@@ -357,7 +357,6 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
         for (size_t i = 0 ; i < data_bytes.size() ; i += 2)
         {
             uint16_t value_word = *(reinterpret_cast<uint16_t*>(&data_bytes[i]));
-            uint32_t value_dword = *(reinterpret_cast<uint32_t*>(&data_bytes[i]));
 
             if (value_word == 0)
             {
@@ -371,8 +370,12 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
                 ctx.addr = data_addr + i + 2;
             }
 
-            if ((value_dword == 0) && ((i + 4) >= data_bytes.size()))
-                break;
+            if (data_bytes.size() - i >= 4)
+            {
+                uint32_t value_dword = *(reinterpret_cast<uint32_t*>(&data_bytes[i]));
+                if ((value_dword == 0) && ((i + 4) >= data_bytes.size()))
+                    break;
+            }
         }
     }
     else
