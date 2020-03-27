@@ -325,10 +325,10 @@ static void print_filedelete_information(filedelete* f, const char* userid_str,
     switch (f->format)
     {
         case OUTPUT_CSV:
-            data << "," << bytes_read << "0x" << std::hex << fo_flags << "(" << flags << ")" << "," << seq_number << "," << r;
+            data << "," << bytes_read << "0x" << std::hex << fo_flags << std::dec << "(" << flags << ")" << "," << seq_number << "," << r;
             break;
         case OUTPUT_KV:
-            data << ",Size=" << bytes_read << ",Flags=0x" << std::hex << fo_flags;
+            data << ",Size=" << bytes_read << ",Flags=0x" << std::hex << fo_flags << std::dec;
             if (!flags.empty()) data << "," << flags;
             data << ",SN=" << seq_number;
             data << ",Reason=\"" << r << "\"";
@@ -341,7 +341,7 @@ static void print_filedelete_information(filedelete* f, const char* userid_str,
         default:
         case OUTPUT_DEFAULT:
             for (auto& c: prefix) c = toupper(c);
-            data << " SIZE:" << bytes_read << " FO_FLAGS:0x" << std::hex << fo_flags << "(" << flags << ")";
+            data << " SIZE:" << bytes_read << " FO_FLAGS:0x" << std::hex << fo_flags << std::dec << "(" << flags << ")";
             data << " SN:" << seq_number;
             data << " REASON:\"" << r << "\"";
             break;
