@@ -406,6 +406,10 @@ bool drakvuf_get_process_thread_id( drakvuf_t drakvuf,
                                     addr_t process_base,
                                     uint32_t* pid) NOEXCEPT;
 
+bool drakvuf_get_process_dtb(drakvuf_t drakvuf,
+                             addr_t process_base,
+                             addr_t* dtb) NOEXCEPT;
+
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
                                    addr_t process_base) NOEXCEPT;

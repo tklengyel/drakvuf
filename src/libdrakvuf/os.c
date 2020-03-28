@@ -216,6 +216,14 @@ int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_
     return ~0l;
 }
 
+bool drakvuf_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb)
+{
+    if ( drakvuf->osi.get_process_dtb )
+        return drakvuf->osi.get_process_dtb(drakvuf, process_base, dtb);
+
+    return 0;
+}
+
 bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id )
 {
     if ( drakvuf->osi.get_current_thread_id )

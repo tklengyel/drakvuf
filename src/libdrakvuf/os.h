@@ -133,6 +133,9 @@ typedef struct os_interface
     int64_t (*get_process_userid)
     (drakvuf_t drakvuf, addr_t process_base);
 
+    bool (*get_process_dtb)
+    (drakvuf_t drakvuf, addr_t process_base, addr_t* dtb);
+
     bool (*get_process_pid)
     (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid);
 

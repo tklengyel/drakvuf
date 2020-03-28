@@ -469,6 +469,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_process_commandline = win_get_process_commandline;
     drakvuf->osi.get_current_process_name = win_get_current_process_name;
     drakvuf->osi.get_process_userid = win_get_process_userid;
+    drakvuf->osi.get_process_dtb = win_get_process_dtb;
     drakvuf->osi.get_current_process_userid = win_get_current_process_userid;
     drakvuf->osi.get_current_thread_id = win_get_current_thread_id;
     drakvuf->osi.get_thread_previous_mode = win_get_thread_previous_mode;
