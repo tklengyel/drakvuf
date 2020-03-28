@@ -109,9 +109,11 @@ sources =
 if PLUGIN_SYSCALLS
 sources += syscalls/syscalls.cpp
 sources += syscalls/syscalls.h
-sources += syscalls/commonscproto.h
-sources += syscalls/winscproto.h
-sources += syscalls/linuxscproto.h
+sources += syscalls/linux.cpp
+sources += syscalls/linux.h
+sources += syscalls/win.cpp
+sources += syscalls/win.h
+sources += syscalls/private.h
 endif
 
 if PLUGIN_POOLMON

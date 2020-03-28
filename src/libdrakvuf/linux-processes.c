@@ -165,7 +165,8 @@ addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         // Mask PCID bits
         ctx.dtb = info->regs->cr3 & ~0xfffull;
-        ctx.addr = info->regs->gs_base;
+        // We might trap before swapgs
+        ctx.addr = VMI_GET_BIT(info->regs->gs_base, 47) ? info->regs->gs_base : info->regs->shadow_gs;
     }
 
     ctx.addr += drakvuf->offsets[CURRENT_TASK];

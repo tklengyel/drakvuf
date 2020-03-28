@@ -118,7 +118,7 @@ struct plugins_options
     bool filedelete_use_injector;       // PLUGIN_FILEDELETE
     bool cpuid_stealth;                 // PLUGIN_CPUIDMON
     const char* tcpip_profile;          // PLUGIN_SOCKETMON
-    const char* win32k_profile;         // PLUGIN_CLIPBOARDMON, PLUGIN_WINDOWMON
+    const char* win32k_profile;         // PLUGIN_CLIPBOARDMON, PLUGIN_WINDOWMON, PLUGIN_SYSCALLS
     const char* sspicli_profile;        // PLUGIN_ENVMON
     const char* kernel32_profile;       // PLUGIN_ENVMON
     const char* kernelbase_profile;     // PLUGIN_ENVMON
