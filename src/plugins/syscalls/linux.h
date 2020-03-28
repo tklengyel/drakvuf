@@ -177,373 +177,668 @@ static const char* linux_pt_regs_names[__PT_REGS_MAX] =
     [PT_REGS_SS] = "ss",
 };
 
-// The actual max depends on the arch and actual kernel version
-#define NUM_SYSCALLS_LINUX 313
+namespace linuxsc {
 
-static const syscall_definition_t linux_syscalls[] =
-{
-    [0] =
-    {
-        .name = "read", .ret = LONG,   .num_args = 3, .args =
-        {
-            {.name = "fd",      .dir = DIR_IN, .type = LONG },
-            {.name = "buf",     .dir = DIR_IN, .type = PVOID },
-            {.name = "count",   .dir = DIR_IN, .type = ULONG },
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wmissing-braces"
 
-        }
-    },
+SYSCALL(read, LONG, 3,
+            "fd",    "", DIR_IN,    LONG,
+            "buf",   "", DIR_IN,    PVOID,
+            "count", "", DIR_OUT,   ULONG
+         );
+SYSCALL(write, LONG, 3,
+            "fd",    "", DIR_IN,    LONG,
+            "buf",   "", DIR_OUT,   PVOID,
+            "count", "", DIR_OUT,   ULONG
+         );
+SYSCALL(open, LONG, 3,
+            "pathname", "", DIR_IN, PCHAR,
+            "flags",    "", DIR_IN, ULONG,
+            "mode",     "", DIR_IN, ULONG
+         );
+SYSCALL(close, LONG, 1,
+            "fd", "", DIR_IN, LONG,
+         );
+SYSCALL(openat, LONG, 4,
+            "dirfd",    "", DIR_IN, LONG,
+            "pathname", "", DIR_IN, PCHAR,
+            "flags",    "", DIR_IN, ULONG,
+            "mode",     "", DIR_IN, ULONG,
+         );
 
-    [1] =
-    {
-        .name = "write", .ret = LONG,    .num_args = 3, .args =
-        {
-            {.name = "fd",       .dir = DIR_IN,  .type = LONG },
-            {.name = "buf",      .dir = DIR_OUT, .type = PVOID },
-            {.name = "count",    .dir = DIR_OUT, .type = ULONG },
-        },
-    },
+// TODO: fill in missing ret & argument info
+SYSCALL(stat, VOID,0);
+SYSCALL(fstat,VOID,0);
+SYSCALL(lstat,VOID,0);
+SYSCALL(poll,VOID,0);
+SYSCALL(lseek,VOID,0);
+SYSCALL(mmap,VOID,0);
+SYSCALL(mprotect,VOID,0);
+SYSCALL(munmap,VOID,0);
+SYSCALL(brk,VOID,0);
+SYSCALL(rt_sigaction,VOID,0);
+SYSCALL(rt_sigprocmask,VOID,0);
+SYSCALL(rt_sigreturn,VOID,0);
+SYSCALL(ioctl,VOID,0);
+SYSCALL(pread64,VOID,0);
+SYSCALL(pwrite64,VOID,0);
+SYSCALL(readv,VOID,0);
+SYSCALL(writev,VOID,0);
+SYSCALL(access,VOID,0);
+SYSCALL(pipe,VOID,0);
+SYSCALL(select,VOID,0);
+SYSCALL(sched_yield,VOID,0);
+SYSCALL(mremap,VOID,0);
+SYSCALL(msync,VOID,0);
+SYSCALL(mincore,VOID,0);
+SYSCALL(madvise,VOID,0);
+SYSCALL(shmget,VOID,0);
+SYSCALL(shmat,VOID,0);
+SYSCALL(shmctl,VOID,0);
+SYSCALL(dup,VOID,0);
+SYSCALL(dup2,VOID,0);
+SYSCALL(pause,VOID,0);
+SYSCALL(nanosleep,VOID,0);
+SYSCALL(getitimer,VOID,0);
+SYSCALL(alarm,VOID,0);
+SYSCALL(setitimer,VOID,0);
+SYSCALL(getpid,VOID,0);
+SYSCALL(sendfile64,VOID,0);
+SYSCALL(socket,VOID,0);
+SYSCALL(connect,VOID,0);
+SYSCALL(accept,VOID,0);
+SYSCALL(sendto,VOID,0);
+SYSCALL(recvfrom,VOID,0);
+SYSCALL(sendmsg,VOID,0);
+SYSCALL(recvmsg,VOID,0);
+SYSCALL(shutdown,VOID,0);
+SYSCALL(bind,VOID,0);
+SYSCALL(listen,VOID,0);
+SYSCALL(getsockname,VOID,0);
+SYSCALL(getpeername,VOID,0);
+SYSCALL(socketpair,VOID,0);
+SYSCALL(setsockopt,VOID,0);
+SYSCALL(getsockopt,VOID,0);
+SYSCALL(clone,VOID,0);
+SYSCALL(fork,VOID,0);
+SYSCALL(vfork,VOID,0);
+SYSCALL(execve,VOID,0);
+SYSCALL(exit,VOID,0);
+SYSCALL(wait4,VOID,0);
+SYSCALL(kill,VOID,0);
+SYSCALL(uname,VOID,0);
+SYSCALL(semget,VOID,0);
+SYSCALL(semop,VOID,0);
+SYSCALL(semctl,VOID,0);
+SYSCALL(shmdt,VOID,0);
+SYSCALL(msgget,VOID,0);
+SYSCALL(msgsnd,VOID,0);
+SYSCALL(msgrcv,VOID,0);
+SYSCALL(msgctl,VOID,0);
+SYSCALL(fcntl,VOID,0);
+SYSCALL(flock,VOID,0);
+SYSCALL(fsync,VOID,0);
+SYSCALL(fdatasync,VOID,0);
+SYSCALL(truncate,VOID,0);
+SYSCALL(ftruncate,VOID,0);
+SYSCALL(getdents,VOID,0);
+SYSCALL(getcwd,VOID,0);
+SYSCALL(chdir,VOID,0);
+SYSCALL(fchdir,VOID,0);
+SYSCALL(rename,VOID,0);
+SYSCALL(mkdir,VOID,0);
+SYSCALL(rmdir,VOID,0);
+SYSCALL(creat,VOID,0);
+SYSCALL(link,VOID,0);
+SYSCALL(unlink,VOID,0);
+SYSCALL(symlink,VOID,0);
+SYSCALL(readlink,VOID,0);
+SYSCALL(chmod,VOID,0);
+SYSCALL(fchmod,VOID,0);
+SYSCALL(chown,VOID,0);
+SYSCALL(fchown,VOID,0);
+SYSCALL(lchown,VOID,0);
+SYSCALL(umask,VOID,0);
+SYSCALL(gettimeofday,VOID,0);
+SYSCALL(getrlimit,VOID,0);
+SYSCALL(getrusage,VOID,0);
+SYSCALL(sysinfo,VOID,0);
+SYSCALL(times,VOID,0);
+SYSCALL(ptrace,VOID,0);
+SYSCALL(getuid,VOID,0);
+SYSCALL(syslog,VOID,0);
+SYSCALL(getgid,VOID,0);
+SYSCALL(setuid,VOID,0);
+SYSCALL(setgid,VOID,0);
+SYSCALL(geteuid,VOID,0);
+SYSCALL(getegid,VOID,0);
+SYSCALL(setpgid,VOID,0);
+SYSCALL(getppid,VOID,0);
+SYSCALL(getpgrp,VOID,0);
+SYSCALL(setsid,VOID,0);
+SYSCALL(setreuid,VOID,0);
+SYSCALL(setregid,VOID,0);
+SYSCALL(getgroups,VOID,0);
+SYSCALL(setgroups,VOID,0);
+SYSCALL(setresuid,VOID,0);
+SYSCALL(getresuid,VOID,0);
+SYSCALL(setresgid,VOID,0);
+SYSCALL(getresgid,VOID,0);
+SYSCALL(getpgid,VOID,0);
+SYSCALL(setfsuid,VOID,0);
+SYSCALL(setfsgid,VOID,0);
+SYSCALL(getsid,VOID,0);
+SYSCALL(capget,VOID,0);
+SYSCALL(capset,VOID,0);
+SYSCALL(rt_sigpending,VOID,0);
+SYSCALL(rt_sigtimedwait,VOID,0);
+SYSCALL(rt_sigqueueinfo,VOID,0);
+SYSCALL(rt_sigsuspend,VOID,0);
+SYSCALL(sigaltstack,VOID,0);
+SYSCALL(utime,VOID,0);
+SYSCALL(mknod,VOID,0);
+SYSCALL(uselib,VOID,0);
+SYSCALL(personality,VOID,0);
+SYSCALL(ustat,VOID,0);
+SYSCALL(statfs,VOID,0);
+SYSCALL(fstatfs,VOID,0);
+SYSCALL(sysfs,VOID,0);
+SYSCALL(getpriority,VOID,0);
+SYSCALL(setpriority,VOID,0);
+SYSCALL(sched_setparam,VOID,0);
+SYSCALL(sched_getparam,VOID,0);
+SYSCALL(sched_setscheduler,VOID,0);
+SYSCALL(sched_getscheduler,VOID,0);
+SYSCALL(sched_get_priority_max,VOID,0);
+SYSCALL(sched_get_priority_min,VOID,0);
+SYSCALL(sched_rr_get_interval,VOID,0);
+SYSCALL(mlock,VOID,0);
+SYSCALL(munlock,VOID,0);
+SYSCALL(mlockall,VOID,0);
+SYSCALL(munlockall,VOID,0);
+SYSCALL(vhangup,VOID,0);
+SYSCALL(modify_ldt,VOID,0);
+SYSCALL(pivot_root,VOID,0);
+SYSCALL(_sysctl,VOID,0);
+SYSCALL(prctl,VOID,0);
+SYSCALL(arch_prctl,VOID,0);
+SYSCALL(adjtimex,VOID,0);
+SYSCALL(setrlimit,VOID,0);
+SYSCALL(chroot,VOID,0);
+SYSCALL(sync,VOID,0);
+SYSCALL(acct,VOID,0);
+SYSCALL(settimeofday,VOID,0);
+SYSCALL(mount,VOID,0);
+SYSCALL(umount2,VOID,0);
+SYSCALL(swapon,VOID,0);
+SYSCALL(swapoff,VOID,0);
+SYSCALL(reboot,VOID,0);
+SYSCALL(sethostname,VOID,0);
+SYSCALL(setdomainname,VOID,0);
+SYSCALL(iopl,VOID,0);
+SYSCALL(ioperm,VOID,0);
+SYSCALL(create_module,VOID,0);
+SYSCALL(init_module,VOID,0);
+SYSCALL(delete_module,VOID,0);
+SYSCALL(get_kernel_syms,VOID,0);
+SYSCALL(query_module,VOID,0);
+SYSCALL(quotactl,VOID,0);
+SYSCALL(nfsservctl,VOID,0);
+SYSCALL(getpmsg,VOID,0);
+SYSCALL(putpmsg,VOID,0);
+SYSCALL(afs_syscall,VOID,0);
+SYSCALL(tuxcall,VOID,0);
+SYSCALL(security,VOID,0);
+SYSCALL(gettid,VOID,0);
+SYSCALL(readahead,VOID,0);
+SYSCALL(setxattr,VOID,0);
+SYSCALL(lsetxattr,VOID,0);
+SYSCALL(fsetxattr,VOID,0);
+SYSCALL(getxattr,VOID,0);
+SYSCALL(lgetxattr,VOID,0);
+SYSCALL(fgetxattr,VOID,0);
+SYSCALL(listxattr,VOID,0);
+SYSCALL(llistxattr,VOID,0);
+SYSCALL(flistxattr,VOID,0);
+SYSCALL(removexattr,VOID,0);
+SYSCALL(lremovexattr,VOID,0);
+SYSCALL(fremovexattr,VOID,0);
+SYSCALL(tkill,VOID,0);
+SYSCALL(time,VOID,0);
+SYSCALL(futex,VOID,0);
+SYSCALL(sched_setaffinity,VOID,0);
+SYSCALL(sched_getaffinity,VOID,0);
+SYSCALL(set_thread_area,VOID,0);
+SYSCALL(io_setup,VOID,0);
+SYSCALL(io_destroy,VOID,0);
+SYSCALL(io_getevents,VOID,0);
+SYSCALL(io_submit,VOID,0);
+SYSCALL(io_cancel,VOID,0);
+SYSCALL(get_thread_area,VOID,0);
+SYSCALL(lookup_dcookie,VOID,0);
+SYSCALL(epoll_create,VOID,0);
+SYSCALL(epoll_ctl_old,VOID,0);
+SYSCALL(epoll_wait_old,VOID,0);
+SYSCALL(remap_file_pages,VOID,0);
+SYSCALL(getdents64,VOID,0);
+SYSCALL(set_tid_address,VOID,0);
+SYSCALL(restart_syscall,VOID,0);
+SYSCALL(semtimedop,VOID,0);
+SYSCALL(fadvise64,VOID,0);
+SYSCALL(timer_create,VOID,0);
+SYSCALL(timer_settime,VOID,0);
+SYSCALL(timer_gettime,VOID,0);
+SYSCALL(timer_getoverrun,VOID,0);
+SYSCALL(timer_delete,VOID,0);
+SYSCALL(clock_settime,VOID,0);
+SYSCALL(clock_gettime,VOID,0);
+SYSCALL(clock_getres,VOID,0);
+SYSCALL(clock_nanosleep,VOID,0);
+SYSCALL(exit_group,VOID,0);
+SYSCALL(epoll_wait,VOID,0);
+SYSCALL(epoll_ctl,VOID,0);
+SYSCALL(tgkill,VOID,0);
+SYSCALL(utimes,VOID,0);
+SYSCALL(vserver,VOID,0);
+SYSCALL(mbind,VOID,0);
+SYSCALL(set_mempolicy,VOID,0);
+SYSCALL(get_mempolicy,VOID,0);
+SYSCALL(mq_open,VOID,0);
+SYSCALL(mq_unlink,VOID,0);
+SYSCALL(mq_timedsend,VOID,0);
+SYSCALL(mq_timedreceive,VOID,0);
+SYSCALL(mq_notify,VOID,0);
+SYSCALL(mq_getsetattr,VOID,0);
+SYSCALL(kexec_load,VOID,0);
+SYSCALL(waitid,VOID,0);
+SYSCALL(add_key,VOID,0);
+SYSCALL(request_key,VOID,0);
+SYSCALL(keyctl,VOID,0);
+SYSCALL(ioprio_set,VOID,0);
+SYSCALL(ioprio_get,VOID,0);
+SYSCALL(inotify_init,VOID,0);
+SYSCALL(inotify_add_watch,VOID,0);
+SYSCALL(inotify_rm_watch,VOID,0);
+SYSCALL(migrate_pages,VOID,0);
+SYSCALL(mkdirat,VOID,0);
+SYSCALL(mknodat,VOID,0);
+SYSCALL(fchownat,VOID,0);
+SYSCALL(futimesat,VOID,0);
+SYSCALL(newfstatat,VOID,0);
+SYSCALL(unlinkat,VOID,0);
+SYSCALL(renameat,VOID,0);
+SYSCALL(linkat,VOID,0);
+SYSCALL(symlinkat,VOID,0);
+SYSCALL(readlinkat,VOID,0);
+SYSCALL(fchmodat,VOID,0);
+SYSCALL(faccessat,VOID,0);
+SYSCALL(pselect6,VOID,0);
+SYSCALL(ppoll,VOID,0);
+SYSCALL(unshare,VOID,0);
+SYSCALL(set_robust_list,VOID,0);
+SYSCALL(get_robust_list,VOID,0);
+SYSCALL(splice,VOID,0);
+SYSCALL(tee,VOID,0);
+SYSCALL(sync_file_range,VOID,0);
+SYSCALL(vmsplice,VOID,0);
+SYSCALL(move_pages,VOID,0);
+SYSCALL(utimensat,VOID,0);
+SYSCALL(epoll_pwait,VOID,0);
+SYSCALL(signalfd,VOID,0);
+SYSCALL(timerfd_create,VOID,0);
+SYSCALL(eventfd,VOID,0);
+SYSCALL(fallocate,VOID,0);
+SYSCALL(timerfd_settime,VOID,0);
+SYSCALL(timerfd_gettime,VOID,0);
+SYSCALL(accept4,VOID,0);
+SYSCALL(signalfd4,VOID,0);
+SYSCALL(eventfd2,VOID,0);
+SYSCALL(epoll_create1,VOID,0);
+SYSCALL(dup3,VOID,0);
+SYSCALL(pipe2,VOID,0);
+SYSCALL(inotify_init1,VOID,0);
+SYSCALL(preadv,VOID,0);
+SYSCALL(pwritev,VOID,0);
+SYSCALL(rt_tgsigqueueinfo,VOID,0);
+SYSCALL(perf_event_open,VOID,0);
+SYSCALL(recvmmsg,VOID,0);
+SYSCALL(fanotify_init,VOID,0);
+SYSCALL(fanotify_mark,VOID,0);
+SYSCALL(prlimit64,VOID,0);
+SYSCALL(name_to_handle_at,VOID,0);
+SYSCALL(open_by_handle_at,VOID,0);
+SYSCALL(clock_adjtime,VOID,0);
+SYSCALL(syncfs,VOID,0);
+SYSCALL(sendmmsg,VOID,0);
+SYSCALL(setns,VOID,0);
+SYSCALL(getcpu,VOID,0);
+SYSCALL(process_vm_readv,VOID,0);
+SYSCALL(process_vm_writev,VOID,0);
+SYSCALL(kcmp,VOID,0);
+SYSCALL(finit_module,VOID,0);
 
-    [2] =
-    {
-        .name = "open",  .ret = LONG,   .num_args = 3, .args =
-        {
-            {.name = "pathname", .dir = DIR_IN, .type = PCHAR },
-            {.name = "flags",    .dir = DIR_IN, .type = ULONG },
-            {.name = "mode",     .dir = DIR_IN, .type = ULONG },
+#pragma clang diagnostic pop
 
-        },
-    },
-
-    [3] =
-    {
-        .name = "close", .ret = LONG,   .num_args = 1, .args =
-        {
-            {.name = "fd",       .dir = DIR_IN, .type = LONG },
-        },
-    },
-
-    [257] =
-    {
-        .name = "openat",  .ret = LONG,   .num_args = 4, .args =
-        {
-            {.name = "dirfd",    .dir = DIR_IN, .type = LONG },
-            {.name = "pathname", .dir = DIR_IN, .type = PCHAR },
-            {.name = "flags",    .dir = DIR_IN, .type = ULONG },
-            {.name = "mode",     .dir = DIR_IN, .type = ULONG },
-
-        },
-    },
-
-    // TODO: define the full function prototype for the rest
-    [4] = { .name = "stat" },
-    [5] = { .name = "fstat" },
-    [6] = { .name = "lstat" },
-    [7] = { .name = "poll" },
-    [8] = { .name = "lseek" },
-    [9] = { .name = "mmap" },
-    [10] = { .name = "mprotect" },
-    [11] = { .name = "munmap" },
-    [12] = { .name = "brk" },
-    [13] = { .name = "rt_sigaction" },
-    [14] = { .name = "rt_sigprocmask" },
-    [15] = { .name = "rt_sigreturn" },
-    [16] = { .name = "ioctl" },
-    [17] = { .name = "pread64" },
-    [18] = { .name = "pwrite64" },
-    [19] = { .name = "readv" },
-    [20] = { .name = "writev" },
-    [21] = { .name = "access" },
-    [22] = { .name = "pipe" },
-    [23] = { .name = "select" },
-    [24] = { .name = "sched_yield" },
-    [25] = { .name = "mremap" },
-    [26] = { .name = "msync" },
-    [27] = { .name = "mincore" },
-    [28] = { .name = "madvise" },
-    [29] = { .name = "shmget" },
-    [30] = { .name = "shmat" },
-    [31] = { .name = "shmctl" },
-    [32] = { .name = "dup" },
-    [33] = { .name = "dup2" },
-    [34] = { .name = "pause" },
-    [35] = { .name = "nanosleep" },
-    [36] = { .name = "getitimer" },
-    [37] = { .name = "alarm" },
-    [38] = { .name = "setitimer" },
-    [39] = { .name = "getpid" },
-    [40] = { .name = "sendfile64" },
-    [41] = { .name = "socket" },
-    [42] = { .name = "connect" },
-    [43] = { .name = "accept" },
-    [44] = { .name = "sendto" },
-    [45] = { .name = "recvfrom" },
-    [46] = { .name = "sendmsg" },
-    [47] = { .name = "recvmsg" },
-    [48] = { .name = "shutdown" },
-    [49] = { .name = "bind" },
-    [50] = { .name = "listen" },
-    [51] = { .name = "getsockname" },
-    [52] = { .name = "getpeername" },
-    [53] = { .name = "socketpair" },
-    [54] = { .name = "setsockopt" },
-    [55] = { .name = "getsockopt" },
-    [56] = { .name = "clone" },
-    [57] = { .name = "fork" },
-    [58] = { .name = "vfork" },
-    [59] = { .name = "execve" },
-    [60] = { .name = "exit" },
-    [61] = { .name = "wait4" },
-    [62] = { .name = "kill" },
-    [63] = { .name = "uname" },
-    [64] = { .name = "semget" },
-    [65] = { .name = "semop" },
-    [66] = { .name = "semctl" },
-    [67] = { .name = "shmdt" },
-    [68] = { .name = "msgget" },
-    [69] = { .name = "msgsnd" },
-    [70] = { .name = "msgrcv" },
-    [71] = { .name = "msgctl" },
-    [72] = { .name = "fcntl" },
-    [73] = { .name = "flock" },
-    [74] = { .name = "fsync" },
-    [75] = { .name = "fdatasync" },
-    [76] = { .name = "truncate" },
-    [77] = { .name = "ftruncate" },
-    [78] = { .name = "getdents" },
-    [79] = { .name = "getcwd" },
-    [80] = { .name = "chdir" },
-    [81] = { .name = "fchdir" },
-    [82] = { .name = "rename" },
-    [83] = { .name = "mkdir" },
-    [84] = { .name = "rmdir" },
-    [85] = { .name = "creat" },
-    [86] = { .name = "link" },
-    [87] = { .name = "unlink" },
-    [88] = { .name = "symlink" },
-    [89] = { .name = "readlink" },
-    [90] = { .name = "chmod" },
-    [91] = { .name = "fchmod" },
-    [92] = { .name = "chown" },
-    [93] = { .name = "fchown" },
-    [94] = { .name = "lchown" },
-    [95] = { .name = "umask" },
-    [96] = { .name = "gettimeofday" },
-    [97] = { .name = "getrlimit" },
-    [98] = { .name = "getrusage" },
-    [99] = { .name = "sysinfo" },
-    [100] = { .name = "times" },
-    [101] = { .name = "ptrace" },
-    [102] = { .name = "getuid" },
-    [103] = { .name = "syslog" },
-    [104] = { .name = "getgid" },
-    [105] = { .name = "setuid" },
-    [106] = { .name = "setgid" },
-    [107] = { .name = "geteuid" },
-    [108] = { .name = "getegid" },
-    [109] = { .name = "setpgid" },
-    [110] = { .name = "getppid" },
-    [111] = { .name = "getpgrp" },
-    [112] = { .name = "setsid" },
-    [113] = { .name = "setreuid" },
-    [114] = { .name = "setregid" },
-    [115] = { .name = "getgroups" },
-    [116] = { .name = "setgroups" },
-    [117] = { .name = "setresuid" },
-    [118] = { .name = "getresuid" },
-    [119] = { .name = "setresgid" },
-    [120] = { .name = "getresgid" },
-    [121] = { .name = "getpgid" },
-    [122] = { .name = "setfsuid" },
-    [123] = { .name = "setfsgid" },
-    [124] = { .name = "getsid" },
-    [125] = { .name = "capget" },
-    [126] = { .name = "capset" },
-    [127] = { .name = "rt_sigpending" },
-    [128] = { .name = "rt_sigtimedwait" },
-    [129] = { .name = "rt_sigqueueinfo" },
-    [130] = { .name = "rt_sigsuspend" },
-    [131] = { .name = "sigaltstack" },
-    [132] = { .name = "utime" },
-    [133] = { .name = "mknod" },
-    [134] = { .name = "uselib" },
-    [135] = { .name = "personality" },
-    [136] = { .name = "ustat" },
-    [137] = { .name = "statfs" },
-    [138] = { .name = "fstatfs" },
-    [139] = { .name = "sysfs" },
-    [140] = { .name = "getpriority" },
-    [141] = { .name = "setpriority" },
-    [142] = { .name = "sched_setparam" },
-    [143] = { .name = "sched_getparam" },
-    [144] = { .name = "sched_setscheduler" },
-    [145] = { .name = "sched_getscheduler" },
-    [146] = { .name = "sched_get_priority_max" },
-    [147] = { .name = "sched_get_priority_min" },
-    [148] = { .name = "sched_rr_get_interval" },
-    [149] = { .name = "mlock" },
-    [150] = { .name = "munlock" },
-    [151] = { .name = "mlockall" },
-    [152] = { .name = "munlockall" },
-    [153] = { .name = "vhangup" },
-    [154] = { .name = "modify_ldt" },
-    [155] = { .name = "pivot_root" },
-    [156] = { .name = "_sysctl" },
-    [157] = { .name = "prctl" },
-    [158] = { .name = "arch_prctl" },
-    [159] = { .name = "adjtimex" },
-    [160] = { .name = "setrlimit" },
-    [161] = { .name = "chroot" },
-    [162] = { .name = "sync" },
-    [163] = { .name = "acct" },
-    [164] = { .name = "settimeofday" },
-    [165] = { .name = "mount" },
-    [166] = { .name = "umount2" },
-    [167] = { .name = "swapon" },
-    [168] = { .name = "swapoff" },
-    [169] = { .name = "reboot" },
-    [170] = { .name = "sethostname" },
-    [171] = { .name = "setdomainname" },
-    [172] = { .name = "iopl" },
-    [173] = { .name = "ioperm" },
-    [174] = { .name = "create_module" },
-    [175] = { .name = "init_module" },
-    [176] = { .name = "delete_module" },
-    [177] = { .name = "get_kernel_syms" },
-    [178] = { .name = "query_module" },
-    [179] = { .name = "quotactl" },
-    [180] = { .name = "nfsservctl" },
-    [181] = { .name = "getpmsg" },
-    [182] = { .name = "putpmsg" },
-    [183] = { .name = "afs_syscall" },
-    [184] = { .name = "tuxcall" },
-    [185] = { .name = "security" },
-    [186] = { .name = "gettid" },
-    [187] = { .name = "readahead" },
-    [188] = { .name = "setxattr" },
-    [189] = { .name = "lsetxattr" },
-    [190] = { .name = "fsetxattr" },
-    [191] = { .name = "getxattr" },
-    [192] = { .name = "lgetxattr" },
-    [193] = { .name = "fgetxattr" },
-    [194] = { .name = "listxattr" },
-    [195] = { .name = "llistxattr" },
-    [196] = { .name = "flistxattr" },
-    [197] = { .name = "removexattr" },
-    [198] = { .name = "lremovexattr" },
-    [199] = { .name = "fremovexattr" },
-    [200] = { .name = "tkill" },
-    [201] = { .name = "time" },
-    [202] = { .name = "futex" },
-    [203] = { .name = "sched_setaffinity" },
-    [204] = { .name = "sched_getaffinity" },
-    [205] = { .name = "set_thread_area" },
-    [206] = { .name = "io_setup" },
-    [207] = { .name = "io_destroy" },
-    [208] = { .name = "io_getevents" },
-    [209] = { .name = "io_submit" },
-    [210] = { .name = "io_cancel" },
-    [211] = { .name = "get_thread_area" },
-    [212] = { .name = "lookup_dcookie" },
-    [213] = { .name = "epoll_create" },
-    [214] = { .name = "epoll_ctl_old" },
-    [215] = { .name = "epoll_wait_old" },
-    [216] = { .name = "remap_file_pages" },
-    [217] = { .name = "getdents64" },
-    [218] = { .name = "set_tid_address" },
-    [219] = { .name = "restart_syscall" },
-    [220] = { .name = "semtimedop" },
-    [221] = { .name = "fadvise64" },
-    [222] = { .name = "timer_create" },
-    [223] = { .name = "timer_settime" },
-    [224] = { .name = "timer_gettime" },
-    [225] = { .name = "timer_getoverrun" },
-    [226] = { .name = "timer_delete" },
-    [227] = { .name = "clock_settime" },
-    [228] = { .name = "clock_gettime" },
-    [229] = { .name = "clock_getres" },
-    [230] = { .name = "clock_nanosleep" },
-    [231] = { .name = "exit_group" },
-    [232] = { .name = "epoll_wait" },
-    [233] = { .name = "epoll_ctl" },
-    [234] = { .name = "tgkill" },
-    [235] = { .name = "utimes" },
-    [236] = { .name = "vserver" },
-    [237] = { .name = "mbind" },
-    [238] = { .name = "set_mempolicy" },
-    [239] = { .name = "get_mempolicy" },
-    [240] = { .name = "mq_open" },
-    [241] = { .name = "mq_unlink" },
-    [242] = { .name = "mq_timedsend" },
-    [243] = { .name = "mq_timedreceive" },
-    [244] = { .name = "mq_notify" },
-    [245] = { .name = "mq_getsetattr" },
-    [246] = { .name = "kexec_load" },
-    [247] = { .name = "waitid" },
-    [248] = { .name = "add_key" },
-    [249] = { .name = "request_key" },
-    [250] = { .name = "keyctl" },
-    [251] = { .name = "ioprio_set" },
-    [252] = { .name = "ioprio_get" },
-    [253] = { .name = "inotify_init" },
-    [254] = { .name = "inotify_add_watch" },
-    [255] = { .name = "inotify_rm_watch" },
-    [256] = { .name = "migrate_pages" },
-    [258] = { .name = "mkdirat" },
-    [259] = { .name = "mknodat" },
-    [260] = { .name = "fchownat" },
-    [261] = { .name = "futimesat" },
-    [262] = { .name = "newfstatat" },
-    [263] = { .name = "unlinkat" },
-    [264] = { .name = "renameat" },
-    [265] = { .name = "linkat" },
-    [266] = { .name = "symlinkat" },
-    [267] = { .name = "readlinkat" },
-    [268] = { .name = "fchmodat" },
-    [269] = { .name = "faccessat" },
-    [270] = { .name = "pselect6" },
-    [271] = { .name = "ppoll" },
-    [272] = { .name = "unshare" },
-    [273] = { .name = "set_robust_list" },
-    [274] = { .name = "get_robust_list" },
-    [275] = { .name = "splice" },
-    [276] = { .name = "tee" },
-    [277] = { .name = "sync_file_range" },
-    [278] = { .name = "vmsplice" },
-    [279] = { .name = "move_pages" },
-    [280] = { .name = "utimensat" },
-    [281] = { .name = "epoll_pwait" },
-    [282] = { .name = "signalfd" },
-    [283] = { .name = "timerfd_create" },
-    [284] = { .name = "eventfd" },
-    [285] = { .name = "fallocate" },
-    [286] = { .name = "timerfd_settime" },
-    [287] = { .name = "timerfd_gettime" },
-    [288] = { .name = "accept4" },
-    [289] = { .name = "signalfd4" },
-    [290] = { .name = "eventfd2" },
-    [291] = { .name = "epoll_create1" },
-    [292] = { .name = "dup3" },
-    [293] = { .name = "pipe2" },
-    [294] = { .name = "inotify_init1" },
-    [295] = { .name = "preadv" },
-    [296] = { .name = "pwritev" },
-    [297] = { .name = "rt_tgsigqueueinfo" },
-    [298] = { .name = "perf_event_open" },
-    [299] = { .name = "recvmmsg" },
-    [300] = { .name = "fanotify_init" },
-    [301] = { .name = "fanotify_mark" },
-    [302] = { .name = "prlimit64" },
-    [303] = { .name = "name_to_handle_at" },
-    [304] = { .name = "open_by_handle_at" },
-    [305] = { .name = "clock_adjtime" },
-    [306] = { .name = "syncfs" },
-    [307] = { .name = "sendmmsg" },
-    [308] = { .name = "setns" },
-    [309] = { .name = "getcpu" },
-    [310] = { .name = "process_vm_readv" },
-    [311] = { .name = "process_vm_writev" },
-    [312] = { .name = "kcmp" },
-    [313] = { .name = "finit_module" },
+static const syscall_t* linux_syscalls[] = {
+    [0] = &read,
+    [1] = &write,
+    [2] = &open,
+    [3] = &close,
+    [4] = &stat,
+    [5] = &fstat,
+    [6] = &lstat,
+    [7] = &poll,
+    [8] = &lseek,
+    [9] = &mmap,
+    [10] = &mprotect,
+    [11] = &munmap,
+    [12] = &brk,
+    [13] = &rt_sigaction,
+    [14] = &rt_sigprocmask,
+    [15] = &rt_sigreturn,
+    [16] = &ioctl,
+    [17] = &pread64,
+    [18] = &pwrite64,
+    [19] = &readv,
+    [20] = &writev,
+    [21] = &access,
+    [22] = &pipe,
+    [23] = &select,
+    [24] = &sched_yield,
+    [25] = &mremap,
+    [26] = &msync,
+    [27] = &mincore,
+    [28] = &madvise,
+    [29] = &shmget,
+    [30] = &shmat,
+    [31] = &shmctl,
+    [32] = &dup,
+    [33] = &dup2,
+    [34] = &pause,
+    [35] = &nanosleep,
+    [36] = &getitimer,
+    [37] = &alarm,
+    [38] = &setitimer,
+    [39] = &getpid,
+    [40] = &sendfile64,
+    [41] = &socket,
+    [42] = &connect,
+    [43] = &accept,
+    [44] = &sendto,
+    [45] = &recvfrom,
+    [46] = &sendmsg,
+    [47] = &recvmsg,
+    [48] = &shutdown,
+    [49] = &bind,
+    [50] = &listen,
+    [51] = &getsockname,
+    [52] = &getpeername,
+    [53] = &socketpair,
+    [54] = &setsockopt,
+    [55] = &getsockopt,
+    [56] = &clone,
+    [57] = &fork,
+    [58] = &vfork,
+    [59] = &execve,
+    [60] = &exit,
+    [61] = &wait4,
+    [62] = &kill,
+    [63] = &uname,
+    [64] = &semget,
+    [65] = &semop,
+    [66] = &semctl,
+    [67] = &shmdt,
+    [68] = &msgget,
+    [69] = &msgsnd,
+    [70] = &msgrcv,
+    [71] = &msgctl,
+    [72] = &fcntl,
+    [73] = &flock,
+    [74] = &fsync,
+    [75] = &fdatasync,
+    [76] = &truncate,
+    [77] = &ftruncate,
+    [78] = &getdents,
+    [79] = &getcwd,
+    [80] = &chdir,
+    [81] = &fchdir,
+    [82] = &rename,
+    [83] = &mkdir,
+    [84] = &rmdir,
+    [85] = &creat,
+    [86] = &link,
+    [87] = &unlink,
+    [88] = &symlink,
+    [89] = &readlink,
+    [90] = &chmod,
+    [91] = &fchmod,
+    [92] = &chown,
+    [93] = &fchown,
+    [94] = &lchown,
+    [95] = &umask,
+    [96] = &gettimeofday,
+    [97] = &getrlimit,
+    [98] = &getrusage,
+    [99] = &sysinfo,
+    [100] = &times,
+    [101] = &ptrace,
+    [102] = &getuid,
+    [103] = &syslog,
+    [104] = &getgid,
+    [105] = &setuid,
+    [106] = &setgid,
+    [107] = &geteuid,
+    [108] = &getegid,
+    [109] = &setpgid,
+    [110] = &getppid,
+    [111] = &getpgrp,
+    [112] = &setsid,
+    [113] = &setreuid,
+    [114] = &setregid,
+    [115] = &getgroups,
+    [116] = &setgroups,
+    [117] = &setresuid,
+    [118] = &getresuid,
+    [119] = &setresgid,
+    [120] = &getresgid,
+    [121] = &getpgid,
+    [122] = &setfsuid,
+    [123] = &setfsgid,
+    [124] = &getsid,
+    [125] = &capget,
+    [126] = &capset,
+    [127] = &rt_sigpending,
+    [128] = &rt_sigtimedwait,
+    [129] = &rt_sigqueueinfo,
+    [130] = &rt_sigsuspend,
+    [131] = &sigaltstack,
+    [132] = &utime,
+    [133] = &mknod,
+    [134] = &uselib,
+    [135] = &personality,
+    [136] = &ustat,
+    [137] = &statfs,
+    [138] = &fstatfs,
+    [139] = &sysfs,
+    [140] = &getpriority,
+    [141] = &setpriority,
+    [142] = &sched_setparam,
+    [143] = &sched_getparam,
+    [144] = &sched_setscheduler,
+    [145] = &sched_getscheduler,
+    [146] = &sched_get_priority_max,
+    [147] = &sched_get_priority_min,
+    [148] = &sched_rr_get_interval,
+    [149] = &mlock,
+    [150] = &munlock,
+    [151] = &mlockall,
+    [152] = &munlockall,
+    [153] = &vhangup,
+    [154] = &modify_ldt,
+    [155] = &pivot_root,
+    [156] = &_sysctl,
+    [157] = &prctl,
+    [158] = &arch_prctl,
+    [159] = &adjtimex,
+    [160] = &setrlimit,
+    [161] = &chroot,
+    [162] = &sync,
+    [163] = &acct,
+    [164] = &settimeofday,
+    [165] = &mount,
+    [166] = &umount2,
+    [167] = &swapon,
+    [168] = &swapoff,
+    [169] = &reboot,
+    [170] = &sethostname,
+    [171] = &setdomainname,
+    [172] = &iopl,
+    [173] = &ioperm,
+    [174] = &create_module,
+    [175] = &init_module,
+    [176] = &delete_module,
+    [177] = &get_kernel_syms,
+    [178] = &query_module,
+    [179] = &quotactl,
+    [180] = &nfsservctl,
+    [181] = &getpmsg,
+    [182] = &putpmsg,
+    [183] = &afs_syscall,
+    [184] = &tuxcall,
+    [185] = &security,
+    [186] = &gettid,
+    [187] = &readahead,
+    [188] = &setxattr,
+    [189] = &lsetxattr,
+    [190] = &fsetxattr,
+    [191] = &getxattr,
+    [192] = &lgetxattr,
+    [193] = &fgetxattr,
+    [194] = &listxattr,
+    [195] = &llistxattr,
+    [196] = &flistxattr,
+    [197] = &removexattr,
+    [198] = &lremovexattr,
+    [199] = &fremovexattr,
+    [200] = &tkill,
+    [201] = &time,
+    [202] = &futex,
+    [203] = &sched_setaffinity,
+    [204] = &sched_getaffinity,
+    [205] = &set_thread_area,
+    [206] = &io_setup,
+    [207] = &io_destroy,
+    [208] = &io_getevents,
+    [209] = &io_submit,
+    [210] = &io_cancel,
+    [211] = &get_thread_area,
+    [212] = &lookup_dcookie,
+    [213] = &epoll_create,
+    [214] = &epoll_ctl_old,
+    [215] = &epoll_wait_old,
+    [216] = &remap_file_pages,
+    [217] = &getdents64,
+    [218] = &set_tid_address,
+    [219] = &restart_syscall,
+    [220] = &semtimedop,
+    [221] = &fadvise64,
+    [222] = &timer_create,
+    [223] = &timer_settime,
+    [224] = &timer_gettime,
+    [225] = &timer_getoverrun,
+    [226] = &timer_delete,
+    [227] = &clock_settime,
+    [228] = &clock_gettime,
+    [229] = &clock_getres,
+    [230] = &clock_nanosleep,
+    [231] = &exit_group,
+    [232] = &epoll_wait,
+    [233] = &epoll_ctl,
+    [234] = &tgkill,
+    [235] = &utimes,
+    [236] = &vserver,
+    [237] = &mbind,
+    [238] = &set_mempolicy,
+    [239] = &get_mempolicy,
+    [240] = &mq_open,
+    [241] = &mq_unlink,
+    [242] = &mq_timedsend,
+    [243] = &mq_timedreceive,
+    [244] = &mq_notify,
+    [245] = &mq_getsetattr,
+    [246] = &kexec_load,
+    [247] = &waitid,
+    [248] = &add_key,
+    [249] = &request_key,
+    [250] = &keyctl,
+    [251] = &ioprio_set,
+    [252] = &ioprio_get,
+    [253] = &inotify_init,
+    [254] = &inotify_add_watch,
+    [255] = &inotify_rm_watch,
+    [256] = &migrate_pages,
+    [257] = &openat,
+    [258] = &mkdirat,
+    [259] = &mknodat,
+    [260] = &fchownat,
+    [261] = &futimesat,
+    [262] = &newfstatat,
+    [263] = &unlinkat,
+    [264] = &renameat,
+    [265] = &linkat,
+    [266] = &symlinkat,
+    [267] = &readlinkat,
+    [268] = &fchmodat,
+    [269] = &faccessat,
+    [270] = &pselect6,
+    [271] = &ppoll,
+    [272] = &unshare,
+    [273] = &set_robust_list,
+    [274] = &get_robust_list,
+    [275] = &splice,
+    [276] = &tee,
+    [277] = &sync_file_range,
+    [278] = &vmsplice,
+    [279] = &move_pages,
+    [280] = &utimensat,
+    [281] = &epoll_pwait,
+    [282] = &signalfd,
+    [283] = &timerfd_create,
+    [284] = &eventfd,
+    [285] = &fallocate,
+    [286] = &timerfd_settime,
+    [287] = &timerfd_gettime,
+    [288] = &accept4,
+    [289] = &signalfd4,
+    [290] = &eventfd2,
+    [291] = &epoll_create1,
+    [292] = &dup3,
+    [293] = &pipe2,
+    [294] = &inotify_init1,
+    [295] = &preadv,
+    [296] = &pwritev,
+    [297] = &rt_tgsigqueueinfo,
+    [298] = &perf_event_open,
+    [299] = &recvmmsg,
+    [300] = &fanotify_init,
+    [301] = &fanotify_mark,
+    [302] = &prlimit64,
+    [303] = &name_to_handle_at,
+    [304] = &open_by_handle_at,
+    [305] = &clock_adjtime,
+    [306] = &syncfs,
+    [307] = &sendmmsg,
+    [308] = &setns,
+    [309] = &getcpu,
+    [310] = &process_vm_readv,
+    [311] = &process_vm_writev,
+    [312] = &kcmp,
+    [313] = &finit_module,
 };
 
+// The actual max depends on the arch and actual kernel version
+#define NUM_SYSCALLS_LINUX sizeof(linuxsc::linux_syscalls)/sizeof(syscall_t*)
+
+}
 #endif // SYSCALLS_LINUX_H

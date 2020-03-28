@@ -424,63 +424,38 @@ typedef struct
 } arg_t;
 
 typedef struct {
-    const char*  name;
-    type_t       ret;
+    const char *name;
+    type_t ret;
     unsigned int num_args;
-    arg_t        args[17];
-} syscall_definition_t;
+    const arg_t *args;
+} syscall_t;
 
 struct wrapper;
 struct wrapper
 {
     syscalls *s;
-    const syscall_definition_t *sc;
+    const syscall_t *sc;
     const char *type;
     struct wrapper *w;
     uint16_t num;
     addr_t tid;
 };
 
-/*
- * TODO: Use the following macro to declare syscalls instead of
- *  doing this giant array approach we currently have.
- *
- *
- * typedef struct {
- *   const char *name;
- *   int ret;
- *   int num_args;
- *   const arg_t *args;
- * } syscall_t;
- *
- * #define SYSCALL(_name, _ret, _num_args, ...)                    \
- *   static const arg_t _name ## _arg[] = { __VA_ARGS__ };         \
- *   static const syscall_t _name = {                              \
- *     .name = #_name,                                             \
- *     .ret = _ret,                                                \
- *     .num_args = _num_args,                                      \
- *     .args = (const struct arg*)&_name ## _arg                   \
- *   }
- *
- *
- * Example:
- * #pragma clang diagnostic push
- * #pragma clang diagnostic ignored "-Wmissing-braces"
- * SYSCALL(syscall_name, HANDLE, 3,
- *               "arg_name1", DIR_IN, "", PVOID,
- *               "arg_name2", DIR_IN, "opt", PVOID,
- *               "arg_name3", DIR_OUT, "", PULONG
- *        );
- * #pragma clang diagnostic pop
- *
- */
+#define SYSCALL(_name, _ret, _num_args, ...)                     \
+   static const arg_t _name ## _arg[] = { __VA_ARGS__ };         \
+   static const syscall_t _name = {                              \
+     .name = #_name,                                             \
+     .ret = _ret,                                                \
+     .num_args = _num_args,                                      \
+     .args = (const arg_t*)&_name ## _arg                        \
+   }
 
 void print_header(output_format_t format, drakvuf_t drakvuf,
                   bool syscall, const drakvuf_trap_info_t* info,
-                  int nr, const char *module, const syscall_definition_t *sc,
+                  int nr, const char *module, const syscall_t *sc,
                   uint64_t ret, const char *extra_info);
 void print_nargs(output_format_t format, uint32_t nargs);
-void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_definition_t* sc, void* args_data);
+void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data);
 void print_footer(output_format_t format, uint32_t nargs);
 void free_trap(gpointer p);
 
