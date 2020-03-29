@@ -115,7 +115,7 @@
 // Builds the argument buffer from the current context, returns status
 static status_t linux_build_argbuf(void* buf, vmi_instance_t vmi,
                                    drakvuf_trap_info_t* info, syscalls *s,
-                                   const syscall_definition_t* sc,
+                                   const syscall_t* sc,
                                    addr_t pt_regs_addr)
 {
     int nargs = 0;
@@ -220,7 +220,7 @@ static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     syscalls *s = w->s;
 
-    const syscall_definition_t *sc = w->num <= NUM_SYSCALLS_LINUX ? &linux_syscalls[w->num] : NULL;
+    const syscall_t *sc = w->num < NUM_SYSCALLS_LINUX ? linuxsc::linux_syscalls[w->num] : NULL;
 
     print_header(s->format, drakvuf, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, NULL);
     print_footer(s->format, 0);
@@ -239,7 +239,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     unsigned int nargs = 0;
     uint8_t buf[sizeof(uint64_t) * 8] = {0};
-    const syscall_definition_t* sc = NULL;
+    const syscall_t* sc = NULL;
     addr_t pt_regs = 0;
 
     addr_t ret = 0, nr = ~0;
@@ -263,7 +263,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if ( nr<NUM_SYSCALLS_LINUX )
     {
-        sc = &linux_syscalls[nr];
+        sc = linuxsc::linux_syscalls[nr];
         nargs = sc->num_args;
 
        if ( s->filter && !g_hash_table_lookup(s->filter, sc->name) )

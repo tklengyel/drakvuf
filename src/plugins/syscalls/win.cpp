@@ -126,7 +126,7 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return 0;
 
     struct wrapper *w = (struct wrapper *)wr->w;
-    const syscall_definition_t *sc = w->sc;
+    const syscall_t *sc = w->sc;
     syscalls *s = w->s;
 
     char exit_status_buf[NTSTATUS_MAX_FORMAT_STR_SIZE] = {0};
@@ -147,7 +147,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     vmi_lock_guard lg(drakvuf);
     struct wrapper *w = (struct wrapper*)info->trap->data;
-    const syscall_definition_t *sc = w->sc;
+    const syscall_t *sc = w->sc;
     syscalls *s = w->s;
 
     unsigned int nargs = 0;
@@ -248,7 +248,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
 {
     bool ret = false;
     unsigned int syscall_count = ntos ? NUM_SYSCALLS_NT : NUM_SYSCALLS_WIN32K;
-    const syscall_definition_t *definitions = ntos ? nt : win32k;
+    const syscall_t **definitions = ntos ? nt : win32k;
     int error = -1;
 
     json_object *json = ntos ? vmi_get_kernel_json(vmi) : s->win32k_json;
@@ -313,9 +313,9 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
 
                     for (unsigned int d=0; d < syscall_count; d++)
                     {
-                        if ( !strcmp(definitions[d].name, symbol->name) )
+                        if ( !strcmp(definitions[d]->name, symbol->name) )
                         {
-                            w->sc = &definitions[d];
+                            w->sc = definitions[d];
                             break;
                         }
                     }

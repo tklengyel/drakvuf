@@ -147,7 +147,7 @@ static char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const 
 
 void print_header(output_format_t format, drakvuf_t drakvuf,
                   bool syscall, const drakvuf_trap_info_t* info,
-                  int nr, const char *module, const syscall_definition_t *sc,
+                  int nr, const char *module, const syscall_t *sc,
                   uint64_t ret, const char *extra_info)
 {
     gchar* escaped_pname = NULL;
@@ -282,7 +282,7 @@ static void print_kv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* in
 }
 
 
-static void print_json_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_definition_t* sc, size_t i, addr_t val, const char* str)
+static void print_json_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, size_t i, addr_t val, const char* str)
 {
     const arg_t& arg = sc->args[i];
 
@@ -321,7 +321,7 @@ static void print_default_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_
     printf("\n");
 }
 
-void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_definition_t* sc, void* args_data)
+void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data)
 {
     if ( !args_data )
         return;
@@ -395,21 +395,21 @@ static GHashTable* read_syscalls_filter(const char* filter_file)
         g_hash_table_destroy(table);
         return NULL;
     }
-    ssize_t read;
+    ssize_t bytes_read;
     do
     {
         char* line = NULL;
         size_t len = 0;
-        read = getline(&line, &len, f);
-        while (read > 0 && (line[read - 1] == '\n' || line[read - 1] == '\r')) read--;
-        if (read > 0)
+        bytes_read = getline(&line, &len, f);
+        while (bytes_read > 0 && (line[bytes_read - 1] == '\n' || line[bytes_read - 1] == '\r')) bytes_read--;
+        if (bytes_read > 0)
         {
-            line[read] = '\0';
+            line[bytes_read] = '\0';
             g_hash_table_insert(table, line, NULL);
         }
         else
             free(line);
-    } while (read != -1);
+    } while (bytes_read != -1);
 
     fclose(f);
     return table;
