@@ -129,7 +129,7 @@ static inline void print_help(void)
             "\t -v                        Turn on verbose (debug) output\n"
 #endif
             "\t -l                        Use libvmi.conf\n"
-	        "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
+            "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
            );
 }
 
