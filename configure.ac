@@ -587,8 +587,6 @@ Host system type: $host
 Build system type: $build
 Installation prefix: $prefix
 -------------------------------------------------------------------------------
-REPL:         $repl
--------------------------------------------------------------------------------
 DRAKVUF Plugins
 Syscalls:     $plugin_syscalls
 Poolmon:      $plugin_poolmon
@@ -611,4 +609,6 @@ LibraryMon:   $plugin_librarymon
 DKOMmon:      $plugin_dkommon
 WMIMon:       $plugin_wmimon
 MEMDump:      $plugin_memdump
+-------------------------------------------------------------------------------
+REPL:         $repl
 -------------------------------------------------------------------------------])
