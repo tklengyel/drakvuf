@@ -353,7 +353,8 @@ bool drakvuf_init (drakvuf_t* drakvuf,
                    const char* json_profile,
                    const char* json_wow_profile,
                    const bool verbose,
-                   const bool libvmi_conf) NOEXCEPT;
+                   const bool libvmi_conf,
+                   const addr_t kpgd) NOEXCEPT;
 void drakvuf_close (drakvuf_t drakvuf, const bool pause) NOEXCEPT;
 bool drakvuf_add_trap(drakvuf_t drakvuf,
                       drakvuf_trap_t* trap) NOEXCEPT;
@@ -404,6 +405,10 @@ bool drakvuf_get_process_pid(drakvuf_t drakvuf,
 bool drakvuf_get_process_thread_id( drakvuf_t drakvuf,
                                     addr_t process_base,
                                     uint32_t* pid) NOEXCEPT;
+
+bool drakvuf_get_process_dtb(drakvuf_t drakvuf,
+                             addr_t process_base,
+                             addr_t* dtb) NOEXCEPT;
 
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,

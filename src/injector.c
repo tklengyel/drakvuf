@@ -108,6 +108,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <unistd.h>
+#include <config.h>
 #include <libvmi/libvmi.h>
 
 #include <libdrakvuf/libdrakvuf.h>
@@ -129,6 +130,7 @@ static inline void print_help(void)
             "\t -e <inject_file>          The executable to start with injection\n"
             "Optional inputs:\n"
             "\t -l                        Use libvmi.conf\n"
+            "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
             "\t -m <inject_method>        The injection method [WIN] (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
             "\t -f <args for exec>        [LINUX] - Arguments specified for exec to include (requires -m execproc)\n"
             "\t                           [LINUX] (execproc -> int execlp(const char *file, const char *arg0, ..., const char *argn, (char *)0); for Linux kernel 4.18+, 64bit only) (Maximum 10 args)\n"
@@ -160,6 +162,10 @@ int main(int argc, char** argv)
     bool libvmi_conf = false;
     const char* args[10] = {};
     int args_count = 0;
+    addr_t kpgd = 0;
+
+    fprintf(stderr, "%s %s v%s Copyright (C) 2014-2020 Tamas K Lengyel\n",
+            PACKAGE_NAME, argv[0], PACKAGE_VERSION);
 
     if (argc < 4)
     {
@@ -167,7 +173,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:f:vlg")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:f:k:vlg")) != -1)
         switch (c)
         {
             case 'r':
@@ -228,6 +234,9 @@ int main(int argc, char** argv)
             case 'l':
                 libvmi_conf = true;
                 break;
+            case 'k':
+                kpgd = strtoull(optarg, NULL, 0);
+                break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
                 return rc;
@@ -266,7 +275,7 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, verbose, libvmi_conf))
+    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, verbose, libvmi_conf, kpgd))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
         return 1;

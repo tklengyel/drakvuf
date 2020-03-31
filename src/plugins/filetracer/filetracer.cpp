@@ -186,13 +186,14 @@ static void print_file_obj_info(drakvuf_t drakvuf,
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
+                    "\"TID\": %d,"
                     "\"Method\": \"%s\","
                     "\"FileName\": %s,"
                     "\"Handle\": \"0x%" PRIx32 "\"",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
                     info->trap->name, escaped_fname, handle);
 
             if (!file_attr.empty())
@@ -427,15 +428,16 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
+                    "\"TID\": %d,"
                     "\"Method\" : \"%s\","
                     "\"Operation\" : \"%s\","
                     "\"FileName\" : %s,"
-                    "\"Handle\" : 0x%" PRIx32 ","
+                    "\"Handle\" : \"0x%" PRIx32 "\""
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
                     syscall_name, operation_name, escaped_fname, handle);
 
             g_free(escaped_fname);
@@ -537,16 +539,17 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
+                    "\"TID\": %d,"
                     "\"Method\" : \"%s\","
                     "\"Operation\" : \"%s\","
                     "\"SrcFileName\" : %s,"
                     "\"DstFileName\" : %s,"
-                    "\"Handle\": 0x%" PRIx32
+                    "\"Handle\": \"0x%" PRIx32 "\""
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
                     syscall_name, operation_name, escaped_fname_src, escaped_fname_dst, src_file_handle );
 
             g_free(escaped_fname_dst);
@@ -639,9 +642,10 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
+                    "\"TID\": %d,"
                     "\"Method\": \"%s\","
                     "\"FileName\": %s,"
-                    "\"Handle\": 0x%x,"
+                    "\"Handle\": \"0x%x\","
                     "\"DesiredAccess\": \"%s\","
                     "\"FileAttributes\": \"%s\","
                     "\"ShareAccess\": \"%s\","
@@ -650,7 +654,7 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
                     info->trap->name, escaped_fname, handle,
                     w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str());
 

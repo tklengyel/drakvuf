@@ -1059,7 +1059,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         uint8_t backup[VMI_PS_4KB];
         if ( VMI_FAILURE == vmi_read_pa(drakvuf->vmi, current_gfn<<12, VMI_PS_4KB, &backup, NULL) )
         {
-            fprintf(stderr, "Copying trapped page to new location FAILED\n");
+            fprintf(stderr, "Reading original page contents before remapping failed\n");
             goto err_exit;
         }
 
@@ -1379,6 +1379,10 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
     {
         GHashTable* config = g_hash_table_new(g_str_hash, g_str_equal);
         g_hash_table_insert(config, "volatility_ist", drakvuf->json_kernel_path);
+        if (drakvuf->kpgd)
+        {
+            g_hash_table_insert(config, "kpgd", &drakvuf->kpgd);
+        }
         drakvuf->os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GHASHTABLE, config, NULL);
         g_hash_table_destroy(config);
     }

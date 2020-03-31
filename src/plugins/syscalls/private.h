@@ -102,12 +102,8 @@
  *                                                                         *
  ***************************************************************************/
 
-/*
- * From http://laredo-13.mit.edu/~brendan/scproto.txt
- *
- */
-#ifndef commoncsproto_h
-#define commoncsproto_h
+#ifndef SYSCALLS_PRIVATE_H
+#define SYSCALLS_PRIVATE_H
 
 typedef enum
 {
@@ -118,7 +114,7 @@ typedef enum
     DIR_MISSING
 } arg_direction_t;
 
-const char* arg_direction_names[]
+static const char* arg_direction_names[]
 {
     [DIR_IN] = "IN",
     [DIR_OUT] = "OUT",
@@ -419,33 +415,48 @@ static const char* type_names[]
     [WORKERFACTORYINFOCLASS] = "WORKERFACTORYINFOCLASS"
 };
 
-
-/* For now, put all syscall flags here */
-#define SYSCALL_FLAG_LINUX_PT_REGS (1 << 0) /* Args passed via struct pt_regs rather than direct registers */
-
 typedef struct
 {
     const char*     name;
-    arg_direction_t dir;
     const char*     dir_opt;
+    arg_direction_t dir;
     type_t          type;
 } arg_t;
 
-typedef struct
-{
-    const char*  name;
-    addr_t       addr;
-    type_t       ret;
+typedef struct {
+    const char *name;
+    type_t ret;
     unsigned int num_args;
-    arg_t        args[17];
+    const arg_t *args;
 } syscall_t;
 
-typedef struct
+struct wrapper;
+struct wrapper
 {
-    syscalls* sc;
-    int       syscall_index;
-    uint32_t  flags;
-} syscall_wrapper_t;
+    syscalls *s;
+    const syscall_t *sc;
+    const char *type;
+    struct wrapper *w;
+    uint16_t num;
+    addr_t tid;
+};
 
+#define SYSCALL(_name, _ret, _num_args, ...)                     \
+   static const arg_t _name ## _arg[] = { __VA_ARGS__ };         \
+   static const syscall_t _name = {                              \
+     .name = #_name,                                             \
+     .ret = _ret,                                                \
+     .num_args = _num_args,                                      \
+     .args = (const arg_t*)&_name ## _arg                        \
+   }
+
+void print_header(output_format_t format, drakvuf_t drakvuf,
+                  bool syscall, const drakvuf_trap_info_t* info,
+                  int nr, const char *module, const syscall_t *sc,
+                  uint64_t ret, const char *extra_info);
+void print_nargs(output_format_t format, uint32_t nargs);
+void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data);
+void print_footer(output_format_t format, uint32_t nargs);
+void free_trap(gpointer p);
 
 #endif // commoncsproto_h

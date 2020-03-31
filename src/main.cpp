@@ -155,6 +155,7 @@ static void print_usage()
             "\t -d <domain ID or name>    The domain's ID or name\n"
             "Optional inputs:\n"
             "\t -l                        Use libvmi.conf\n"
+            "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
             "\t -i <injection pid>        The PID of the process to hijack for injection\n"
             "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
             "\t -e <inject_file>          The executable to start with injection\n"
@@ -227,9 +228,7 @@ static void print_usage()
             "\t --memdump-dir <directory>\n"
             "\t                           Where to store memory dumps\n"
             "\t --dll-hooks-list <file>\n"
-            "\t                           List of DLL functions to be hooked\n"
-            "\t                           each entry in a separate line of file\n"
-            "\t                           line format: dll_name,function_name,num_of_arguments\n"
+            "\t                           List of DLL functions to be hooked (see wiki)\n"
 #endif
             "\t -h, --help                Show this help\n"
             );
@@ -258,14 +257,16 @@ int main(int argc, char** argv)
     bool verbose = false;
     bool leave_paused = false;
     bool libvmi_conf = false;
+    addr_t kpgd = 0;
     plugins_options options = {};
     bool disabled_all = false; // Used to disable all plugin once
     const char* args[10] = {};
     int args_count = 0;
 
-
     eprint_current_time();
-    fprintf(stderr, "%s v%s\n", PACKAGE_NAME, PACKAGE_VERSION);
+
+    fprintf(stderr, "%s v%s Copyright (C) 2014-2020 Tamas K Lengyel\n",
+            PACKAGE_NAME, PACKAGE_VERSION);
 
     if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 )
     {
@@ -313,7 +314,7 @@ int main(int argc, char** argv)
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:w:W:h";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:h";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
@@ -427,6 +428,9 @@ int main(int argc, char** argv)
             case 'l':
                 libvmi_conf = true;
                 break;
+            case 'k':
+                kpgd = strtoull(optarg, NULL, 0);
+                break;
             case 'w':
                 json_wow_path = optarg;
                 break;
@@ -503,7 +507,7 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = new drakvuf_c(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf);
+        drakvuf = new drakvuf_c(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd);
     }
     catch (const std::exception& e)
     {

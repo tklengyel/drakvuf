@@ -154,7 +154,7 @@ static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_inf
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
-                    "\"Message\": \"Hidden Process\","
+                    "\"Message\": \"Hidden Process\""
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
@@ -242,7 +242,7 @@ static event_response_t notify_zero_page_write(drakvuf_t drakvuf, drakvuf_trap_i
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
-                    "\"Message\": \"Zero Page Write\","
+                    "\"Message\": \"Zero Page Write\""
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
@@ -288,7 +288,7 @@ static void print_driver(drakvuf_t drakvuf, drakvuf_trap_info_t* info, output_fo
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
                     "\"Message\": \"%s\","
-                    "\"DriverName\": \"%s\","
+                    "\"DriverName\": \"%s\""
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,

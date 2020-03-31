@@ -109,9 +109,11 @@ sources =
 if PLUGIN_SYSCALLS
 sources += syscalls/syscalls.cpp
 sources += syscalls/syscalls.h
-sources += syscalls/commonscproto.h
-sources += syscalls/winscproto.h
-sources += syscalls/linuxscproto.h
+sources += syscalls/linux.cpp
+sources += syscalls/linux.h
+sources += syscalls/win.cpp
+sources += syscalls/win.h
+sources += syscalls/private.h
 endif
 
 if PLUGIN_POOLMON
@@ -238,9 +240,15 @@ if PLUGIN_MEMDUMP
 sources += memdump/memdump.cpp
 sources += memdump/memdump.h
 sources += memdump/private.h
-sources += memdump/userhook.cpp
-sources += memdump/crypto.cpp
 sources += memdump/stack_util.cpp
+sources += memdump/userhook.cpp
+endif
+
+if PLUGIN_APIMON
+sources += apimon/apimon.cpp
+sources += apimon/apimon.h
+sources += apimon/crypto.cpp
+sources += apimon/crypto.h
 endif
 
 ###############################################################################

@@ -102,7 +102,8 @@
 #                                                                         #
 #*************************************************************************#
 
-sources = userhook.cpp
+sources =  userhook.cpp userhook.hpp uh-private.hpp
+sources += printers/printers.hpp printers/printers.cpp
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(CPPFLAGS)

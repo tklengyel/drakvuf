@@ -102,92 +102,254 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_USERHOOK_H
-#define WIN_USERHOOK_H
-
-#include <vector>
-#include <memory>
-
+#include <config.h>
 #include <glib.h>
-#include "plugins/private.h"
-#include "plugins/plugins_ex.h"
-#include "printers/printers.hpp"
+#include <inttypes.h>
+#include <libvmi/libvmi.h>
+#include <assert.h>
 
-typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
+#include "syscalls.h"
+#include "private.h"
+#include "linux.h"
 
-struct plugin_target_config_entry_t
+// Builds the argument buffer from the current context, returns status
+static status_t linux_build_argbuf(void* buf, vmi_instance_t vmi,
+                                   drakvuf_trap_info_t* info, syscalls *s,
+                                   const syscall_t* sc,
+                                   addr_t pt_regs_addr)
 {
-    std::string dll_name;
-    std::string function_name;
-    std::string strategy;
-    std::vector< std::unique_ptr< ArgumentPrinter > > argument_printers;
+    int nargs = 0;
+    status_t rc = VMI_SUCCESS;
 
-    plugin_target_config_entry_t() : dll_name(), function_name(), strategy(), argument_printers() {}
-    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, std::string&& strategy, std::vector< std::unique_ptr< ArgumentPrinter > > &&argument_printers)
-        : dll_name(std::move(dll_name)), function_name(std::move(function_name)), strategy(std::move(strategy)), argument_printers(std::move(argument_printers)) {}
-};
+    if (NULL == sc)
+    {
+        rc = VMI_FAILURE;
+        goto exit;
+    }
 
-enum target_hook_state
+    nargs = sc->num_args;
+
+    // get arguments only if we know how many to get
+    if (0 == nargs)
+    {
+        goto exit;
+    }
+
+    // Now now, only support legacy syscall arg passing on 32 bit
+    if ( 4 == s->reg_size )
+    {
+        uint32_t* buf32 = (uint32_t*)buf;
+        if ( nargs > 0 )
+            buf32[0] = (uint32_t) info->regs->rbx;
+        if ( nargs > 1 )
+            buf32[1] = (uint32_t) info->regs->rcx;
+        if ( nargs > 2 )
+            buf32[2] = (uint32_t) info->regs->rdx;
+        if ( nargs > 3 )
+            buf32[3] = (uint32_t) info->regs->rsi;
+        if ( nargs > 4 )
+            buf32[4] = (uint32_t) info->regs->rdi;
+    }
+    else if ( 8 == s->reg_size )
+    {
+        uint64_t* buf64 = (uint64_t*)buf;
+
+        // Support both calling conventions for 64 bit Linux syscalls
+        if (pt_regs_addr)
+        {
+            // The syscall args are passed via a struct pt_regs *, which is in %rdi upon entry
+            size_t pt_regs[__PT_REGS_MAX] = {0};
+            access_context_t ctx =
+            {
+                .translate_mechanism = VMI_TM_PROCESS_DTB,
+                .dtb = info->regs->cr3
+            };
+
+            for ( int i=0; i<__PT_REGS_MAX; i++)
+            {
+                ctx.addr = pt_regs_addr + s->offsets[i];
+                if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &pt_regs[i]) )
+                {
+                    fprintf(stderr, "vmi_read_va(%p) failed\n", (void*)ctx.addr);
+                    goto exit;
+                }
+            }
+
+            if ( nargs > 0 )
+                buf64[0] = pt_regs[PT_REGS_RDI];
+            if ( nargs > 1 )
+                buf64[1] = pt_regs[PT_REGS_RSI];
+            if ( nargs > 2 )
+                buf64[2] = pt_regs[PT_REGS_RDX];
+            if ( nargs > 3 )
+                buf64[3] = pt_regs[PT_REGS_RCX];
+            if ( nargs > 4 )
+                buf64[4] = pt_regs[PT_REGS_R8];
+            if ( nargs > 5 )
+                buf64[5] = pt_regs[PT_REGS_R9];
+        }
+        else
+        {
+            // The args are passed directly via registers in sycall context
+            if ( nargs > 0 )
+                buf64[0] = info->regs->rdi;
+            if ( nargs > 1 )
+                buf64[1] = info->regs->rsi;
+            if ( nargs > 2 )
+                buf64[2] = info->regs->rdx;
+            if ( nargs > 3 )
+                buf64[3] = info->regs->rcx;
+            if ( nargs > 4 )
+                buf64[4] = info->regs->r8;
+            if ( nargs > 5 )
+                buf64[5] = info->regs->r9;
+        }
+    }
+
+exit:
+    return rc;
+}
+
+static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    HOOK_FIRST_TRY,
-    HOOK_PAGEFAULT_RETRY,
-    HOOK_FAILED,
-    HOOK_OK
-};
+    vmi_lock_guard lg(drakvuf);
+    struct wrapper *w = (struct wrapper *)info->trap->data;
 
-struct hook_target_entry_t
+    if ( w->tid != info->proc_data.tid )
+        return 0;
+
+    syscalls *s = w->s;
+
+    const syscall_t *sc = w->num < NUM_SYSCALLS_LINUX ? linuxsc::linux_syscalls[w->num] : NULL;
+
+    print_header(s->format, drakvuf, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, NULL);
+    print_footer(s->format, 0);
+
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
+    s->traps = g_slist_remove(s->traps, info->trap);
+
+    return 0;
+}
+
+static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    vmi_pid_t pid;
-    std::string target_name;
-    callback_t callback;
-    const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers;
-    target_hook_state state;
-    drakvuf_trap_t* trap;
-    void* plugin;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    struct wrapper *w = (struct wrapper *)info->trap->data;
+    syscalls* s = w->s;
 
-    hook_target_entry_t(std::string target_name, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers, void* plugin)
-        : target_name(target_name), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), plugin(plugin) {}
-};
+    unsigned int nargs = 0;
+    uint8_t buf[sizeof(uint64_t) * 8] = {0};
+    const syscall_t* sc = NULL;
+    addr_t pt_regs = 0;
 
-struct return_hook_target_entry_t
+    addr_t ret = 0, nr = ~0;
+    if ( VMI_GET_BIT(info->regs->rdi, 47) )
+    {
+        /*
+         * On older kernels: __visible void do_syscall_64(struct pt_regs *regs)
+         */
+        pt_regs = info->regs->rdi;
+        vmi_read_addr_va(vmi, pt_regs + s->offsets[PT_REGS_ORIG_RAX], 0, &nr);
+    } else {
+        /*
+         * On newer kernels: __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
+         */
+        nr = info->regs->rdi;
+        pt_regs = info->regs->rsi;
+    }
+
+    vmi_read_addr_va(vmi, info->regs->rsp, 0, &ret);
+    drakvuf_release_vmi(drakvuf);
+
+    if ( nr<NUM_SYSCALLS_LINUX )
+    {
+        sc = linuxsc::linux_syscalls[nr];
+        nargs = sc->num_args;
+
+       if ( s->filter && !g_hash_table_lookup(s->filter, sc->name) )
+            return 0;
+    }
+
+    int rc = linux_build_argbuf(buf, vmi, info, s, sc, pt_regs);
+    if ( VMI_SUCCESS != rc )
+    {
+        // Don't extract any args
+        nargs = 0;
+    }
+
+    print_header(s->format, drakvuf, true, info, nr, info->trap->breakpoint.module, sc, 0, NULL);
+    if ( nargs )
+    {
+        print_nargs(s->format, nargs);
+        print_args(s, drakvuf, info, sc, buf);
+    }
+    print_footer(s->format, nargs);
+
+    struct wrapper *wr = g_slice_new0(struct wrapper);
+    wr->s = s;
+    wr->num = nr;
+    wr->tid = info->proc_data.tid;
+
+    drakvuf_trap_t *ret_trap = g_slice_new0(drakvuf_trap_t);
+    ret_trap->breakpoint.lookup_type = LOOKUP_DTB;
+    ret_trap->breakpoint.dtb = info->regs->cr3;
+    ret_trap->breakpoint.addr_type = ADDR_VA;
+    ret_trap->breakpoint.addr = ret;
+    ret_trap->breakpoint.module = "linux";
+    ret_trap->type = BREAKPOINT;
+    ret_trap->cb = linux_ret_cb;
+    ret_trap->data = wr;
+
+    if ( drakvuf_add_trap(drakvuf, ret_trap) )
+       s->traps = g_slist_prepend(s->traps, ret_trap);
+    else
+    {
+        g_slice_free(drakvuf_trap_t, ret_trap);
+        g_slice_free(struct wrapper, w);
+    }
+
+    return 0;
+}
+
+void setup_linux(drakvuf_t drakvuf, syscalls *s)
 {
-    vmi_pid_t pid;
-    drakvuf_trap_t* trap;
-    void* plugin;
-    std::vector < uint64_t > arguments;
-    const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers;
+    s->offsets = (size_t*)g_try_malloc0(__PT_REGS_MAX*sizeof(size_t));
+    if ( !s->offsets )
+        throw -1;
 
-    return_hook_target_entry_t(vmi_pid_t pid, void* plugin, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers) :
-        pid(pid), plugin(plugin), argument_printers(argument_printers) {}
-};
+    for ( int i=0; i<__PT_REGS_MAX; i++ )
+         if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "pt_regs", linux_pt_regs_names[i], &s->offsets[i]) )
+             throw -1;
 
-struct dll_view_t
-{
-    // relevant while loading
-    addr_t dtb;
-    uint32_t thread_id;
-    addr_t real_dll_base;
-    mmvad_info_t mmvad;
-    bool is_hooked;
-};
+    addr_t _text;
+    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "_text", &_text) )
+        throw -1;
 
-typedef void (*dll_pre_hook_cb)(drakvuf_t, const dll_view_t*, void*);
-typedef void (*dll_post_hook_cb)(drakvuf_t, const dll_view_t*, void*);
+    addr_t syscall64;
+    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "do_syscall_64", &syscall64) )
+        throw -1;
 
-struct usermode_cb_registration {
-    dll_pre_hook_cb pre_cb;
-    dll_post_hook_cb post_cb;
-    void* extra;
-};
+    addr_t kaslr = s->kernel_base - _text;
 
-typedef enum usermode_reg_status {
-    USERMODE_REGISTER_ERROR,
-    USERMODE_REGISTER_SUCCESS,
-    USERMODE_ARCH_UNSUPPORTED,
-} usermode_reg_status_t;
+    drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
+    struct wrapper *w = g_slice_new0(struct wrapper);
 
-usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
-bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, const std::vector< std::unique_ptr< ArgumentPrinter > > &argument_printers, void* extra);
-void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, std::vector<plugin_target_config_entry_t>* wanted_hooks);
+    w->s = s;
 
-#endif
+    trap->breakpoint.lookup_type = LOOKUP_PID;
+    trap->breakpoint.pid = 0;
+    trap->breakpoint.addr_type = ADDR_VA;
+    trap->breakpoint.addr = syscall64 + kaslr;
+    trap->breakpoint.module = "linux";
+    trap->type = BREAKPOINT;
+    trap->cb = linux_cb;
+    trap->data = w;
+
+    if ( drakvuf_add_trap(drakvuf, trap) )
+        s->traps = g_slist_prepend(s->traps, trap);
+    else
+    {
+        free_trap(trap);
+        throw -1;
+    }
+}

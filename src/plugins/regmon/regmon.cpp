@@ -175,12 +175,13 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
                     "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
+                    "\"TID\": %d,"
                     "\"Method\" : \"%s\","
                     "\"Key\" : %s",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
                     info->trap->name,
                     escaped_key);
             if (value_name)
@@ -342,9 +343,7 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
     std::vector<uint8_t> data_bytes(data_size, 0);
 
     size_t bytes_read = 0;
-    vmi_read(vmi_lg.vmi, &ctx, data_size, data_bytes.data(), &bytes_read);
-
-    if (bytes_read != data_size)
+    if ( VMI_FAILURE == vmi_read(vmi_lg.vmi, &ctx, data_size, data_bytes.data(), &bytes_read) )
     {
         PRINT_DEBUG("[REGMON] Error reading data, expected %zu bytes, but actually read %zu\n", data_size, bytes_read);
         return nullptr;

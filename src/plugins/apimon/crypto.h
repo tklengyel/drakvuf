@@ -102,104 +102,60 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef linuxscproto_h
-#define linuxscproto_h
+#ifndef DRAKMON_CRYPTO_H
+#define DRAKMON_CRYPTO_H
 
-#define NUM_SYSCALLS_LINUX 300
+#include <fstream>
+#include <sstream>
 
-#include "commonscproto.h"
+#include <config.h>
+#include <glib.h>
+#include <inttypes.h>
+#include <libvmi/libvmi.h>
+#include <libvmi/peparse.h>
+#include <libdrakvuf/private.h>
+#include <assert.h>
+#include <vector>
+#include <map>
+#include <string>
 
-/**
- * Older Linux kernels pass the arguments to the syscall functions via
- * registers, per the ABI. Newer kernels pass the arguments via a
- * struct pt_regs. This change was made Apr 2018 in/near commit
- * fa697140f9a20119a9ec8fd7460cc4314fbdaff3.
- *
- * See kernel: arch/x86/include/asm/syscall_wrapper.h
- *             arch/x86/entry/entry_64.S
- *             arch/x86/include/uapi/asm/ptrace.h
- *
- * Functions named __x64_sys_* expect the new convention and are
- * marked in DRAKVUF with SYSCALL_FLAG_LINUX_PT_REGS (commonscproto.h)
- * in their wrappers' flags field.
- */
+// Magic value found in rsaenh.dll
+// some internal pointers are xored with this mask
+#define MAGIC_PTR_XOR_VALUE 0xE35A172C
 
-struct linux_pt_regs
+std::map < std::string, std::string > CryptGenKey_hook(drakvuf_t drakvuf, drakvuf_trap_info* info, std::vector <uint64_t> arguments);
+
+struct HCRYPTKEY_s
 {
-    unsigned long r15;
-    unsigned long r14;
-    unsigned long r13;
-    unsigned long r12;
-    unsigned long rbp;
-    unsigned long rbx;
-
-    unsigned long r11;
-    unsigned long r10;
-    unsigned long r9;
-    unsigned long r8;
-    unsigned long rax;
-    unsigned long rcx;
-    unsigned long rdx;
-    unsigned long rsi;
-    unsigned long rdi;
-
-    unsigned long orig_rax;
-
-    unsigned long rip;
-    unsigned long cs;
-    unsigned long eflags;
-    unsigned long rsp;
-    unsigned long ss;
+    uint32_t CPGenKey;
+    uint32_t CPDeriveKey;
+    uint32_t CPDestroyKey;
+    uint32_t CPSetKeyParam;
+    uint32_t CPGetKeyParam;
+    uint32_t CPExportKey;
+    uint32_t CPImportKey;
+    uint32_t CPEncrypt;
+    uint32_t CPDecrypt;
+    uint32_t CPDuplicateKey;
+    uint32_t hCryptProv;
+    uint32_t magic;
 };
 
-static const syscall_t linux_syscalls[] =
+struct magic_s
 {
-    {
-        .name = "sys_open",  .ret = LONG,   .num_args = 3, .args =
-        {
-            {.name = "pathname", .dir = DIR_IN, .type = PCHAR },
-            {.name = "flags",    .dir = DIR_IN, .type = ULONG },
-            {.name = "mode",     .dir = DIR_IN, .type = ULONG },
-
-        },
-    },
-
-    {
-        .name = "sys_openat",  .ret = LONG,   .num_args = 4, .args =
-        {
-            {.name = "dirfd",    .dir = DIR_IN, .type = LONG },
-            {.name = "pathname", .dir = DIR_IN, .type = PCHAR },
-            {.name = "flags",    .dir = DIR_IN, .type = ULONG },
-            {.name = "mode",     .dir = DIR_IN, .type = ULONG },
-
-        },
-    },
-
-    {
-        .name = "sys_close", .ret = LONG,   .num_args = 1, .args =
-        {
-            {.name = "fd",       .dir = DIR_IN, .type = LONG },
-        },
-    },
-
-    {
-        .name = "sys_read", .ret = LONG,   .num_args = 3, .args =
-        {
-            {.name = "fd",      .dir = DIR_IN, .type = LONG },
-            {.name = "buf",     .dir = DIR_IN, .type = PVOID },
-            {.name = "count",   .dir = DIR_IN, .type = ULONG },
-
-        }
-    },
-
-    {
-        .name = "sys_write", .ret = LONG,    .num_args = 3, .args =
-        {
-            {.name = "fd",       .dir = DIR_IN,  .type = LONG },
-            {.name = "buf",      .dir = DIR_OUT, .type = PVOID },
-            {.name = "count",    .dir = DIR_OUT, .type = ULONG },
-        },
-    },
+    uint32_t key_data;
 };
 
-#endif // linuxscproto_h
+struct key_data_s
+{
+    uint32_t unknown;
+    uint32_t alg;
+    uint32_t flags;
+    uint32_t key_size;
+    uint32_t key_bytes;
+};
+
+// CryptGenKey
+#define EXTRA_GENERATED_KEY "generated_key"
+
+#endif

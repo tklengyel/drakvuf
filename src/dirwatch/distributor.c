@@ -121,6 +121,7 @@
 #include <sys/inotify.h>
 #include <time.h>
 #include <poll.h>
+#include <config.h>
 
 static const char* in_folder;
 static const char* queue_folder;
@@ -136,6 +137,9 @@ int main(int argc, char** argv)
     uint64_t jobs = 0;
     int ret = 0;
     uint64_t limit = 0;
+
+    fprintf(stderr, "%s %s v%s Copyright (C) 2014-2020 Tamas K Lengyel\n",
+            PACKAGE_NAME, argv[0], PACKAGE_VERSION);
 
     if (argc < 3)
     {

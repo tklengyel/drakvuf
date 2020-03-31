@@ -102,53 +102,219 @@
  *                                                                         *
  ***************************************************************************/
 
-/**
- * User mode hooking module of MEMDUMP plugin.
- *
- * (1) Observes when a process is loading a new DLL through the side effects
- * of NtMapViewOfSection or NtProtectVirtualMemory being called.
- * (2) Finds the DLL export information and checks if it's fully readable,
- * if not, triggers a page fault to force system to load it into memory.
- * (3) Translates given export symbols to virtual addresses, checks if
- * the underlying memory is available (if not, again triggers page fault)
- * and finally adds a standard DRAKVUF trap.
- */
-
-#include <fstream>
-#include <sstream>
-#include <map>
-#include <string>
-
 #include <config.h>
 #include <glib.h>
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
-#include <libdrakvuf/private.h>
-#include <libusermode/userhook.hpp>
 #include <assert.h>
+#include <libdrakvuf/json-util.h>
 
-#include "memdump.h"
+#include "apimon.h"
 #include "private.h"
+#include "crypto.h"
+
+
+static void free_trap(drakvuf_trap_t* trap)
+{
+    return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)trap->data;
+    delete ret_target;
+    delete trap;
+}
+
+void print_arguments(drakvuf_t drakvuf, drakvuf_trap_info* info, std::vector < uint64_t > arguments, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers)
+{
+    json_object *jobj = json_object_new_array();
+
+    for (size_t i = 0; i < arguments.size(); i++)
+    {
+        json_object_array_add(jobj, json_object_new_string(argument_printers[i]->print(drakvuf, info, arguments[i]).c_str()));
+    }
+
+    printf("%s", json_object_get_string(jobj));
+
+    json_object_put(jobj);
+}
+
+void print_extra_data(std::map < std::string, std::string > extra_data)
+{
+    size_t i = 0;
+    for (auto it = extra_data.begin(); it != extra_data.end(); it++, i++)
+    {
+        printf("\"%s\": \"%s\"", it->first.c_str(), it->second.c_str());
+        if (i < extra_data.size() - 1)
+            printf(", ");
+    }
+}
+
+static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
+{
+    return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)info->trap->data;
+
+    // TODO check thread_id and cr3?
+    if (info->proc_data.pid != ret_target->pid)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    auto plugin = (apimon*)ret_target->plugin;
+
+    std::map < std::string, std::string > extra_data;
+
+    if(!strcmp(info->trap->name, "CryptGenKey"))
+        extra_data = CryptGenKey_hook(drakvuf, info, ret_target->arguments);
+
+    gchar* escaped_pname;
+    switch (plugin->m_output_format)
+    {
+        case OUTPUT_CSV:
+            printf("apimon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",0x%" PRIx64 ",0x%" PRIx64 ",",
+            UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+            info->proc_data.userid, info->trap->name, info->regs->rax, info->regs->rip);
+            print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
+            break;
+        case OUTPUT_KV:
+            printf("apimon Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",PID=%d,PPID=%d,ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",ReturnValue=0x%" PRIx64 ",Arguments=",
+            UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+            info->proc_data.userid, info->trap->name, info->regs->rip, info->regs->rax);
+            print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
+            break;
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            printf( "{"
+                    "\"Plugin\": \"apimon\", "
+                    "\"TimeStamp\":" "\"" FORMAT_TIMEVAL "\", "
+                    "\"ProcessName\": %s, "
+                    "\"UserName\": \"%s\", "
+                    "\"UserId\": %" PRIu64 ", "
+                    "\"PID\": %d, "
+                    "\"PPID\": %d, "
+                    "\"TID\": %d, "
+                    "\"Method\": \"%s\", "
+                    "\"CalledFrom\": \"0x%" PRIx64 "\", "
+                    "\"ReturnValue\": \"0x%" PRIx64 "\", "
+                    "\"Arguments\": ",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->proc_data.userid,
+                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
+                    info->trap->name,
+                    info->regs->rip,
+                    info->regs->rax);
+
+            print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
+            printf(", "
+                   "\"Extra\": {");
+            print_extra_data(extra_data);
+            printf("}}");
+            g_free(escaped_pname);
+            break;
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[APIMON-USERHOOK] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 " ProcessName:\"%s\" UserID:%" PRIi64 " Method:\"%s\" CalledFrom:0x%" PRIx64 " ReturnValue:0x%" PRIx64 " Arguments:",
+            UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+            info->proc_data.userid, info->trap->name, info->regs->rax, info->regs->rip);
+            print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
+            break;
+    }
+    printf("\n");
+
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
+    return VMI_EVENT_RESPONSE_NONE;
+}
 
 static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     hook_target_entry_t* target = (hook_target_entry_t*)info->trap->data;
 
-    // TODO check thread_id and cr3?
     if (target->pid != info->proc_data.pid)
         return VMI_EVENT_RESPONSE_NONE;
 
-    dump_from_stack(drakvuf, info, (memdump*)target->plugin);
+    vmi_lock_guard lg(drakvuf);
+    vmi_v2pcache_flush(lg.vmi, info->regs->cr3);
+
+    bool is_syswow = drakvuf_is_wow64(drakvuf, info);
+
+    access_context_t ctx =
+            {
+                    .translate_mechanism = VMI_TM_PROCESS_DTB,
+                    .dtb = info->regs->cr3,
+                    .addr = info->regs->rsp
+            };
+
+    bool success = false;
+    addr_t ret_addr = 0;
+
+    if (is_syswow)
+        success = (vmi_read_32(lg.vmi, &ctx, (uint32_t*)&ret_addr) == VMI_SUCCESS);
+    else
+        success = (vmi_read_64(lg.vmi, &ctx, &ret_addr) == VMI_SUCCESS);
+
+    if (!success)
+    {
+        PRINT_DEBUG("[APIMON-USER] Failed to read return address from the stack.\n");
+	return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    return_hook_target_entry_t* ret_target = new (std::nothrow) return_hook_target_entry_t(target->pid, target->plugin, target->argument_printers);
+
+    if (!ret_target)
+    {
+        PRINT_DEBUG("[APIMON-USER] Failed to allocate memory for return_hook_target_entry_t\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    drakvuf_trap_t* trap = new (std::nothrow) drakvuf_trap_t;
+
+    if (!trap)
+    {
+        PRINT_DEBUG("[APIMON-USER] Failed to allocate memory for drakvuf_trap_t\n");
+        delete ret_target;
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    for (size_t i = 1; i <= target->argument_printers.size(); i++)
+    {
+        uint64_t argument = drakvuf_get_function_argument(drakvuf, info, i);
+        ret_target->arguments.push_back(argument);
+    }
+
+    addr_t paddr;
+
+    if ( VMI_SUCCESS != vmi_pagetable_lookup(lg.vmi, info->regs->cr3, ret_addr, &paddr) )
+    {
+        delete trap;
+        delete ret_target;
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    trap->type = BREAKPOINT;
+    trap->name = target->target_name.c_str();
+    trap->cb = usermode_return_hook_cb;
+    trap->data = ret_target;
+    trap->breakpoint.lookup_type = LOOKUP_DTB;
+    trap->breakpoint.dtb = info->regs->cr3;
+    trap->breakpoint.addr_type = ADDR_VA;
+    trap->breakpoint.addr = ret_addr;
+
+    if (drakvuf_add_trap(drakvuf, trap))
+    {
+        ret_target->trap = trap;
+    }
+    else
+    {
+        PRINT_DEBUG("[APIMON-USER] Failed to add trap :(\n");
+        delete trap;
+        delete ret_target;
+    }
+
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
 {
-    memdump* plugin = (memdump*)extra;
+    apimon* plugin = (apimon*)extra;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    unicode_string_t* dll_name = drakvuf_read_unicode_va(vmi, dll->mmvad.file_name_ptr, 0);
+    vmi_lock_guard lg(drakvuf);
+    unicode_string_t* dll_name = drakvuf_read_unicode_va(lg.vmi, dll->mmvad.file_name_ptr, 0);
 
     if (dll_name && dll_name->contents)
     {
@@ -156,23 +322,22 @@ static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* ex
         {
             if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
             {
-                drakvuf_request_usermode_hook(drakvuf, dll, wanted_hook.function_name.c_str(), usermode_hook_cb, std::vector < std::unique_ptr< ArgumentPrinter > >(), plugin);
+                drakvuf_request_usermode_hook(drakvuf, dll, wanted_hook.function_name.c_str(), usermode_hook_cb, wanted_hook.argument_printers, plugin);
             }
         }
     }
 
     if (dll_name)
         vmi_free_unicode_str(dll_name);
-
-    drakvuf_release_vmi(drakvuf);
 }
 
 static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
 {
-    PRINT_DEBUG("[MEMDUMP] DLL hooked - done\n");
+    PRINT_DEBUG("[APIMON] DLL hooked - done\n");
 }
 
-void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
+apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output)
+    : pluginex(drakvuf, output)
 {
     try
     {
@@ -180,7 +345,7 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
     }
     catch (int e)
     {
-        fprintf(stderr, "Malformed DLL hook configuration for MEMDUMP plugin\n");
+        fprintf(stderr, "Malformed DLL hook configuration for APIMON plugin\n");
         throw -1;
     }
 
@@ -188,35 +353,40 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
 
     while (it != std::end(this->wanted_hooks))
     {
-        if ((*it).strategy != "stack" && (*it).strategy != "log+stack")
+        if ((*it).strategy != "log" && (*it).strategy != "log+stack")
             it = this->wanted_hooks.erase(it);
-        else
+	else
             ++it;
     }
 
     if (this->wanted_hooks.empty())
     {
-        // don't load this part of plugin if there is nothing to do
+        // don't load this plugin if there is nothing to do
         return;
     }
 
     usermode_cb_registration reg = {
-        .pre_cb = on_dll_discovered,
-        .post_cb = on_dll_hooked,
-        .extra = (void *)this
+            .pre_cb = on_dll_discovered,
+            .post_cb = on_dll_hooked,
+            .extra = (void *)this
     };
 
     usermode_reg_status_t status = drakvuf_register_usermode_callback(drakvuf, &reg);
 
-    if (status == USERMODE_ARCH_UNSUPPORTED) {
-        PRINT_DEBUG("[MEMDUMP] Usermode hooking is not supported on this architecture/bitness, these features will be disabled\n");
-    } else if (status != USERMODE_REGISTER_SUCCESS) {
-        PRINT_DEBUG("[MEMDUMP] Failed to subscribe to libusermode\n");
-        throw -1;
+    switch (status) {
+        case USERMODE_REGISTER_SUCCESS:
+            // success, nothing to do
+            break;
+        case USERMODE_ARCH_UNSUPPORTED:
+            PRINT_DEBUG("[APIMON] Usermode hooking is not supported on this architecture/bitness, these features will be disabled\n");
+            break;
+        default:
+            PRINT_DEBUG("[APIMON] Failed to subscribe to libusermode\n");
+            throw -1;
     }
 }
 
-void memdump::userhook_destroy()
+apimon::~apimon()
 {
 
 }

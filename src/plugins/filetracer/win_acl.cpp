@@ -454,11 +454,11 @@ std::string parse_sid(const uint8_t buffer[])
     auto sid = reinterpret_cast<const struct SID*>(buffer);
     auto rev = static_cast<int>(sid->Revision);
     uint64_t id_auth = 0;
-    for (auto i = 0; i != sizeof(SID_IDENTIFIER_AUTHORITY); ++i)
+    for (uint64_t i = 0; i != sizeof(SID_IDENTIFIER_AUTHORITY); ++i)
     {
-        auto idx = sizeof(SID_IDENTIFIER_AUTHORITY) - 1 - i;
-        auto offset = i * sizeof(uint8_t);
-        id_auth += sid->IdentifierAuthority[idx] << offset;
+        uint64_t idx = sizeof(SID_IDENTIFIER_AUTHORITY) - 1 - i;
+        uint64_t offset = i * sizeof(uint8_t);
+        id_auth += ((uint64_t)sid->IdentifierAuthority[idx]) << offset;
     }
 
     std::stringstream fmt;

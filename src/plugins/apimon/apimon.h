@@ -102,60 +102,29 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAKMON_CRYPTO_H
-#define DRAKMON_CRYPTO_H
+#ifndef APIMON_H
+#define APIMON_H
 
-#include <fstream>
-#include <sstream>
-
-#include <config.h>
-#include <glib.h>
-#include <inttypes.h>
-#include <libvmi/libvmi.h>
-#include <libvmi/peparse.h>
-#include <libdrakvuf/private.h>
-#include <assert.h>
 #include <vector>
-#include <map>
-#include <string>
+#include <memory>
 
-// Magic value found in rsaenh.dll
-// some internal pointers are xored with this mask
-#define MAGIC_PTR_XOR_VALUE 0xE35A172C
+#include <glib.h>
+#include <libusermode/userhook.hpp>
+#include "plugins/private.h"
+#include "plugins/plugins_ex.h"
 
-std::map < std::string, std::string > CryptGenKey_hook(drakvuf_t drakvuf, drakvuf_trap_info* info, std::vector <uint64_t> arguments);
-
-struct HCRYPTKEY_s
+struct apimon_config
 {
-    uint32_t CPGenKey;
-    uint32_t CPDeriveKey;
-    uint32_t CPDestroyKey;
-    uint32_t CPSetKeyParam;
-    uint32_t CPGetKeyParam;
-    uint32_t CPExportKey;
-    uint32_t CPImportKey;
-    uint32_t CPEncrypt;
-    uint32_t CPDecrypt;
-    uint32_t CPDuplicateKey;
-    uint32_t hCryptProv;
-    uint32_t magic;
+    const char* dll_hooks_list;
 };
 
-struct magic_s
+class apimon: public pluginex
 {
-    uint32_t key_data;
-};
+public:
+    std::vector<plugin_target_config_entry_t> wanted_hooks;
 
-struct key_data_s
-{
-    uint32_t unknown;
-    uint32_t alg;
-    uint32_t flags;
-    uint32_t key_size;
-    uint32_t key_bytes;
+    apimon(drakvuf_t drakvuf, const apimon_config* config, output_format_t output);
+    ~apimon();
 };
-
-// CryptGenKey
-#define EXTRA_GENERATED_KEY "generated_key"
 
 #endif

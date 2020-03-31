@@ -151,7 +151,9 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (VMI_PM_IA32E == drakvuf->pm)
     {
         prcb = drakvuf->offsets[KPCR_PRCB];
-        kpcr = cpl ? info->regs->shadow_gs : info->regs->gs_base;
+        kpcr = cpl ? info->regs->shadow_gs :
+               /* if we are in kernel mode we might trap before swapgs */
+               VMI_GET_BIT(info->regs->gs_base, 47) ? info->regs->gs_base : info->regs->shadow_gs;
     }
     else
     {
@@ -316,7 +318,6 @@ char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
 
 bool win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, vmi_pid_t* pid)
 {
-
     if ( VMI_SUCCESS == vmi_read_32_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PID], 0, (uint32_t*)pid) )
         return true;
 
@@ -330,7 +331,6 @@ char* win_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 
 int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
 {
-
     addr_t peb;
     addr_t userid;
     vmi_instance_t vmi = drakvuf->vmi;
@@ -361,6 +361,13 @@ int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
 int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     return win_get_process_userid(drakvuf, win_get_current_process(drakvuf, info));
+}
+
+bool win_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb)
+{
+    if (VMI_FAILURE == vmi_read_addr_va(drakvuf->vmi, process_base + drakvuf->offsets[EPROCESS_PDBASE], 0, dtb))
+        return false;
+    return true;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
