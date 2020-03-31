@@ -37,6 +37,7 @@ drakvuf
 injector
 xen_memclone
 proc_stat
+repl
 
 libtool
 ltmain.sh
