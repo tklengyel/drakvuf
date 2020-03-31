@@ -210,26 +210,18 @@ addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 addr_t win_get_current_attached_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    addr_t thread;
     uint8_t apcstateindex;
-
-    thread=win_get_current_thread(drakvuf, info);
-    if (thread == 0 || VMI_SUCCESS != vmi_read_8_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_APCSTATEINDEX], 0, &apcstateindex))
+    addr_t process;
+    addr_t thread = win_get_current_thread(drakvuf, info);
+    if (thread &&
+        VMI_SUCCESS == vmi_read_8_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_APCSTATEINDEX], 0, &apcstateindex) &&
+        apcstateindex &&
+        VMI_SUCCESS == vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_APCSTATE] + drakvuf->offsets[KAPC_STATE_PROCESS], 0, &process))
     {
-        return 0;
-    }
-
-    if (apcstateindex)
-    {
-        addr_t process;
-        if (VMI_SUCCESS != vmi_read_addr_va(drakvuf->vmi, thread + drakvuf->offsets[KTHREAD_APCSTATE] + drakvuf->offsets[KAPC_STATE_PROCESS], 0, &process))
-            return 0;
         return process;
     }
-    else
-    {
-        return win_get_current_process(drakvuf, info);
-    }
+
+    return win_get_current_process(drakvuf, info);
 }
 
 bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str)
