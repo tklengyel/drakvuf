@@ -187,6 +187,32 @@ jobs:
         - make
         - make install
 
+    - env:
+        - TEST="compile debug with REPL enabled"
+      before_install:
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev python3-dev python3-pip python3-setuptools
+        - sudo pip3 install ctypesgen ipython
+        - export INSTALLDIR=$PWD/usr/local/
+        - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
+        - export C_INCLUDE_PATH=$PWD/usr/local/include
+        - export CPLUS_INCLUDE_PATH=$PWD/usr/local/include
+        - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
+        - export LDFLAGS="-L$PWD/usr/local/lib"
+        - export CFLAGS="-I$PWD/usr/local/include"
+        - git submodule update --init libvmi
+        - cd libvmi
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
+        - make
+        - make install
+        - cd ..
+      install:
+        - ./autogen.sh
+      script:
+        - ./configure --enable-debug --enable-sanitize --enable-repl || cat config.log
+        - make
+
 #
 # clang scan-build
 #

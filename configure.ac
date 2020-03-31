@@ -116,6 +116,15 @@ AX_CXX_COMPILE_STDCXX_11
 
 ######################################################
 
+AC_ARG_ENABLE([repl],
+  [AS_HELP_STRING([--enable-repl],
+    [Enable the repl library @<:@no@:>@])],
+  [repl="$enableval"],
+  [repl="no"])
+AM_CONDITIONAL([REPL], [test x$repl = xyes])
+
+######################################################
+
 AC_ARG_ENABLE([plugin_syscalls],
   [AS_HELP_STRING([--disable-plugin-syscalls],
     [Enable the syscall tracing plugin @<:@yes@:>@])],
@@ -546,6 +555,26 @@ AC_CHECK_LIB(xenlight, libxl_name_to_domid, [], [AC_ERROR([Xenlight does not hav
 
 AC_CHECK_LIB([xentoollog], [xtl_logger_destroy])
 
+if test x$repl = xyes; then
+  AC_PATH_PROG(PYTHON3, python3, nopython)
+  AS_IF([test "$ac_cv_path_PYTHON3" = "nopython"],
+    AC_MSG_ERROR([could not find python or python3]),
+    [
+      PYTHON_CFLAGS=`${PYTHON3}-config --includes`
+	  AC_SUBST([PYTHON_CFLAGS])
+      PYTHON_LIBS=`${PYTHON3}-config --libs`
+	  AC_SUBST([PYTHON_LIBS])
+	]
+  )
+
+  AC_PATH_PROG([CTYPESGEN], [ctypesgen], [])
+  AS_IF([test x"$CTYPESGEN" = x],
+    AC_MSG_ERROR([could not find ctypesgen])
+  )
+
+  AC_DEFINE_UNQUOTED(ENABLE_REPL, 1, "")
+fi
+
 #####################################################
 
 AC_CONFIG_FILES([Makefile src/Makefile
@@ -555,6 +584,7 @@ AC_CONFIG_FILES([Makefile src/Makefile
                  src/plugins/Makefile
                  src/dirwatch/Makefile
                  src/libusermode/Makefile
+                 src/librepl/Makefile
                ])
 
 AC_OUTPUT
@@ -590,4 +620,6 @@ DKOMmon:      $plugin_dkommon
 WMIMon:       $plugin_wmimon
 MEMDump:      $plugin_memdump
 APIMon:       $plugin_apimon
+-------------------------------------------------------------------------------
+REPL:         $repl
 -------------------------------------------------------------------------------])
