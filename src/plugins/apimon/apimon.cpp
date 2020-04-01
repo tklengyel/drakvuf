@@ -251,7 +251,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     if (!success)
     {
         PRINT_DEBUG("[APIMON-USER] Failed to read return address from the stack.\n");
-	return VMI_EVENT_RESPONSE_NONE;
+        return VMI_EVENT_RESPONSE_NONE;
     }
 
     return_hook_target_entry_t* ret_target = new (std::nothrow) return_hook_target_entry_t(target->pid, target->plugin, target->argument_printers);
@@ -355,7 +355,7 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
     {
         if ((*it).strategy != "log" && (*it).strategy != "log+stack")
             it = this->wanted_hooks.erase(it);
-	else
+        else
             ++it;
     }
 
