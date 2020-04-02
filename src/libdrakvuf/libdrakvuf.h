@@ -403,10 +403,6 @@ char* drakvuf_get_process_name(drakvuf_t drakvuf,
                                addr_t process_base,
                                bool fullpath) NOEXCEPT;
 
-bool drakvuf_get_process_dtb(drakvuf_t drakvuf,
-                             addr_t process_base,
-                             addr_t* dtb) NOEXCEPT;
-
 /* Caller must free the returned string */
 char* drakvuf_get_process_commandline(drakvuf_t drakvuf,
                                       drakvuf_trap_info_t* info,

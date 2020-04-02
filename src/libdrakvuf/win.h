@@ -120,8 +120,6 @@ bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* 
 
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
 
-bool win_get_process_pdbase(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* pdbase);
-
 char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
 
 bool win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);

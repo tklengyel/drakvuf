@@ -191,16 +191,6 @@ char* drakvuf_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool full
     return NULL;
 }
 
-bool drakvuf_get_process_dtb(drakvuf_t drakvuf,
-                             addr_t process_base,
-                             addr_t* dtb)
-{
-    if ( drakvuf->osi.get_process_dtb )
-        return drakvuf->osi.get_process_dtb(drakvuf, process_base, dtb);
-
-    return NULL;
-}
-
 char* drakvuf_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base)
 {
     if ( drakvuf->osi.get_process_commandline )

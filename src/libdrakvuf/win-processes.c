@@ -301,19 +301,6 @@ char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpat
     return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
 }
 
-bool win_get_process_pdbase(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* pdbase)
-{
-    vmi_instance_t vmi = drakvuf->vmi;
-
-    if (!eprocess_base)
-        return false;
-
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, pdbase))
-        return false;
-
-    return true;
-}
-
 char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base)
 {
     vmi_instance_t vmi = drakvuf->vmi;
