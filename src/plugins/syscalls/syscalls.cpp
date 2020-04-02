@@ -185,7 +185,7 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
         case OUTPUT_JSON:
             // print_footer() puts single EOL at end of JSON doc to simplify parsing on other end
             type = syscall ? "syscall" : "sysret";
-            escaped_pname = drakvuf_escape_str(name);
+            escaped_pname = drakvuf_escape_str(info->proc_data.name);
             printf( "{"
                     "\"Type\" : \"%s\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
@@ -204,13 +204,13 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
                     info->vcpu, info->regs->cr3, escaped_pname,
                     USERIDSTR(drakvuf), info->proc_data.userid,
                     info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
-                    info->trap->breakpoint.module, info->trap->name);
+                    module, name);
 
             if ( syscall )
                 printf("\"Args\": [");
             else
                 printf("\"Ret\": %" PRIu64 ","
-                       "\"Info\": \"%s\",",
+                       "\"Info\": \"%s\"",
                         ret, extra_info ?: "");
 
             g_free(escaped_pname);
