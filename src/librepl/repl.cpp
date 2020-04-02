@@ -144,6 +144,15 @@ static std::string get_selfpath()
     }
 }
 
+static event_response_t get_ret_val()
+{
+    // Using PyEval_GetGlobals would probably be nicer, but it returned nullptr
+    auto module = PyImport_AddModule("__main__");
+    auto retval = PyLong_AsSize_t(PyObject_GetAttrString(module, "retval"));
+    PRINT_DEBUG("retval: %lu\n", retval);
+    return static_cast<event_response_t>(retval);
+}
+
 static void repl_init(drakvuf_t drakvuf)
 {
     // init python
@@ -193,6 +202,8 @@ event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         // pass repl_start to python
         ss << "trap_cb = CFUNCTYPE(libdrakvuf.event_response_t, libdrakvuf.drakvuf_t, POINTER(libdrakvuf.drakvuf_trap_info_t))\n";
         ss << "repl_start = cast(" << reinterpret_cast<void*>(repl_start) << ", trap_cb)\n";
+        ss << "drakvuf = cast(" << reinterpret_cast<void*>(drakvuf) << ", libdrakvuf.drakvuf_t)\n";
+        ss << "retval = " << reinterpret_cast<int>(VMI_EVENT_RESPONSE_NONE) << "\n";
 
         PRINT_DEBUG("setting up variables:\n%s", ss.str().c_str());
 
@@ -203,9 +214,10 @@ event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         "IPython.embed(colors='neutral', banner2=\"\"\""
         "REPL ready to go, enjoy hacking!\n"
         "trap_info contains current trap info structure\n"
-        "libdrakvuf.drakvuf contains drakvuf_t pointer\n"
+        "drakvuf contains drakvuf_t pointer\n"
+        "retval contains event return code, which you can overwrite\n"
         "to go back to drakvuf loop use exit(), to break loop use CTRL+C\"\"\")\n"
     );
 
-    return VMI_EVENT_RESPONSE_NONE;
+    return get_ret_val();
 }
