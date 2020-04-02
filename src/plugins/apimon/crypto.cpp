@@ -111,11 +111,13 @@
 #include <assert.h>
 #include <map>
 #include <string>
+#include <vector>
 #include <iomanip>
 
 #include "crypto.h"
+#include "plugins/plugins.h"
 
-static std::string make_hex_string(uint8_t* data, size_t len)
+static std::string make_hex_string(uint8_t const* data, size_t len)
 {
     std::ostringstream ss;
     ss << std::hex << std::setfill('0');
@@ -129,7 +131,7 @@ static std::string make_hex_string(uint8_t* data, size_t len)
 // TODO: only works for 32 bits, we should implement 64-bit version in future
 std::map < std::string, std::string > CryptGenKey_hook(drakvuf_t drakvuf, drakvuf_trap_info* info, std::vector <uint64_t> arguments)
 {
-	std::map < std::string, std::string > ret;
+    std::map < std::string, std::string > ret;
 
     if (!drakvuf_is_wow64(drakvuf, info))
     {
@@ -137,52 +139,29 @@ std::map < std::string, std::string > CryptGenKey_hook(drakvuf_t drakvuf, drakvu
         return ret;
     }
     addr_t hKey_addr = 0;
-    HCRYPTKEY_s *hKey = new HCRYPTKEY_s;
-    magic_s *magic = new magic_s;
-    key_data_s *key_data = new key_data_s;
-    uint8_t *key_bytes;
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    HCRYPTKEY_s hKey;
+    magic_s magic;
+    key_data_s key_data;
+
+    auto vmi = vmi_lock_guard(drakvuf);
 
     if (VMI_SUCCESS != vmi_read_32_va(vmi, arguments[3], info->proc_data.pid, (uint32_t*)&hKey_addr))
-    {
-        drakvuf_release_vmi(drakvuf);
-        goto end;
-    }
+        return ret;
 
-    if (VMI_SUCCESS != vmi_read_va(vmi, hKey_addr, info->proc_data.pid, sizeof(HCRYPTKEY_s), hKey, NULL))
-    {
-        drakvuf_release_vmi(drakvuf);
-        goto end;
-    }
+    if (VMI_SUCCESS != vmi_read_va(vmi, hKey_addr, info->proc_data.pid, sizeof(hKey), &hKey, NULL))
+        return ret;
 
-    hKey->magic ^= MAGIC_PTR_XOR_VALUE;
-    if (VMI_SUCCESS != vmi_read_va(vmi, hKey->magic, info->proc_data.pid, sizeof(magic_s), magic, NULL))
-    {
-        drakvuf_release_vmi(drakvuf);
-        goto end;
-    }
+    hKey.magic ^= MAGIC_PTR_XOR_VALUE;
+    if (VMI_SUCCESS != vmi_read_va(vmi, hKey.magic, info->proc_data.pid, sizeof(magic), &magic, NULL))
+        return ret;
 
-    if (VMI_SUCCESS != vmi_read_va(vmi, magic->key_data, info->proc_data.pid, sizeof(key_data_s), key_data, NULL))
-    {
-        drakvuf_release_vmi(drakvuf);
-        goto end;
-    }
+    if (VMI_SUCCESS != vmi_read_va(vmi, magic.key_data, info->proc_data.pid, sizeof(key_data), &key_data, NULL))
+        return ret;
 
-    key_bytes = new uint8_t[key_data->key_size];
+    std::vector<uint8_t> key_bytes(key_data.key_size);
+    if (VMI_SUCCESS != vmi_read_va(vmi, key_data.key_bytes, info->proc_data.pid, key_bytes.size(), key_bytes.data(), NULL))
+        return ret;
 
-    if (VMI_SUCCESS != vmi_read_va(vmi, key_data->key_bytes, info->proc_data.pid, key_data->key_size, key_bytes, NULL))
-    {
-        drakvuf_release_vmi(drakvuf);
-        goto end;
-    }
-
-    drakvuf_release_vmi(drakvuf);
-
-    ret[EXTRA_GENERATED_KEY] = make_hex_string(key_bytes, key_data->key_size);
-
-    end:
-    delete hKey;
-    delete magic;
-    delete key_data;
+    ret[EXTRA_GENERATED_KEY] = make_hex_string(key_bytes.data(), key_bytes.size());
     return ret;
 }
