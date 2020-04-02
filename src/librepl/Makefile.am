@@ -148,4 +148,4 @@ librepl_la_SOURCES = $(sources)
 librepl_la_LIBADD = ../libdrakvuf/libdrakvuf.la
 
 all-local:
-	$(CTYPESGEN) $(top_srcdir)/src/libdrakvuf/libdrakvuf.h -I $(AM_CPPFLAGS) -o libdrakvuf.py
+	$(CTYPESGEN) $(top_srcdir)/src/libdrakvuf/libdrakvuf.h -I $(AM_CPPFLAGS) -o libdrakvuf.py -l repl -L $(abs_top_srcdir)/src 2> /dev/null

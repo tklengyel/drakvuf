@@ -170,6 +170,9 @@ drakvuf_LDADD += librepl/librepl.la
 
 repl_LDADD = librepl/librepl.la
 repl_LDADD += libdrakvuf/libdrakvuf.la
+
+repl_CXXFLAGS = $(AM_CXXFLAGS) -fpie
+repl_LDFLAGS = $(AM_LDFLAGS) -Wl,-E
 endif
 
 xen_memclone_LDADD = xen_helper/libxenhelper.la
