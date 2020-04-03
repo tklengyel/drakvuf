@@ -108,9 +108,11 @@
 #include <map>
 
 #include "plugins/private.h"
+#include <plugins/output_format.h>
 
 #include "envmon.h"
 #include "private.h"
+
 
 namespace
 {
@@ -197,47 +199,35 @@ static event_response_t trap_SspipGetUserName_cb(drakvuf_t drakvuf, drakvuf_trap
     if (ex_name_fmt < sizeof(extended_name_formats)/sizeof(extended_name_formats[0]) && extended_name_formats[ex_name_fmt])
         ex_name_fmt_str = extended_name_formats[ex_name_fmt];
 
+
     switch (p->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->trap->name);
-            printf(",%lu,\"%s\"\n", ex_name_fmt, ex_name_fmt_str);
+            csvfmt::print("envmon", drakvuf, info,
+                          keyval("ExtendedNameFormat", ex_name_fmt),
+                          keyval("ExtendedNameFormatStr", std::quoted(ex_name_fmt_str))
+                         );
             break;
         case OUTPUT_KV:
-            printf("envmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->trap->name);
-            printf(",ExtendedNameFormat=%lu,ExtendedNameFormatStr=\"%s\"\n", ex_name_fmt, ex_name_fmt_str);
+            kvfmt::print("envmon", drakvuf, info,
+                         keyval("ExtendedNameFormat", ex_name_fmt),
+                         keyval("ExtendedNameFormatStr", std::quoted(ex_name_fmt_str))
+                        );
             break;
         case OUTPUT_JSON:
         {
-            gchar_ptr proc_name(drakvuf_escape_str(info->proc_data.name));
-            printf("{"
-                   "\"Plugin\" : \"envmon\","
-                   "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                   "\"ProcessName\": \"%s\","
-                   "\"PID\" : %d,"
-                   "\"PPID\": %d,"
-                   "\"Method\" : \"%s\","
-                   "\"ExtendedNameFormat\" : %lu,"
-                   "\"ExtendedNameFormatStr\" : \"%s\""
-                   "}\n",
-                   UNPACK_TIMEVAL(info->timestamp),
-                   proc_name.get(),
-                   info->proc_data.pid,
-                   info->proc_data.ppid,
-                   info->trap->name,
-                   ex_name_fmt, ex_name_fmt_str);
+            jsonfmt::print("envmon", drakvuf, info,
+                           keyval("ExtendedNameFormat", ex_name_fmt),
+                           keyval("ExtendedNameFormatStr", ex_name_fmt_str)
+                          );
             break;
         }
         default:
         case OUTPUT_DEFAULT:
-            printf("[ENVMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->trap->name);
-            printf(" EXTENDEDNAMEFORMAT:%lu EXTENDEDNAMEFORMATSTR:\"%s\"\n", ex_name_fmt, ex_name_fmt_str);
+            fmt::print("envmon", drakvuf, info,
+                       keyval("ExtendedNameFormat", ex_name_fmt),
+                       keyval("ExtendedNameFormatStr", std::quoted(ex_name_fmt_str))
+                      );
             break;
     }
     return VMI_EVENT_RESPONSE_NONE;
@@ -278,42 +268,34 @@ static event_response_t trap_DefineDosDeviceW_cb(drakvuf_t drakvuf, drakvuf_trap
     switch (p->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s,\"%s\",\"%s\",\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->trap->name, flags.c_str(), device_name, target_path);
+            csvfmt::print("envmon", drakvuf, info,
+                          keyval("Flags", flags),
+                          keyval("DeviceName", std::quoted(device_name)),
+                          keyval("TargetPath", std::quoted(target_path))
+                         );
             break;
         case OUTPUT_KV:
-            printf("envmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Flags=\"%s\",DeviceName=\"%s\",TargetPath=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->trap->name, flags.c_str(), device_name, target_path);
+            kvfmt::print("envmon", drakvuf, info,
+                         keyval("Flags", flags.c_str()),
+                         keyval("DeviceName", std::quoted(device_name)),
+                         keyval("TargetPath", std::quoted(target_path))
+                        );
             break;
         case OUTPUT_JSON:
         {
-            gchar_ptr proc_name(drakvuf_escape_str(info->proc_data.name));
-            printf("{"
-                   "\"Plugin\" : \"envmon\","
-                   "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                   "\"ProcessName\": \"%s\","
-                   "\"PID\" : %d,"
-                   "\"PPID\": %d,"
-                   "\"Method\" : \"%s\","
-                   "\"Flags\" : \"%s\","
-                   "\"DeviceName\" : \"%s\","
-                   "\"TargetPath\" : \"%s\""
-                   "}\n",
-                   UNPACK_TIMEVAL(info->timestamp),
-                   proc_name.get(),
-                   info->proc_data.pid,
-                   info->proc_data.ppid,
-                   info->trap->name,
-                   flags.c_str(), device_name, target_path);
+            jsonfmt::print("envmon", drakvuf, info,
+                           keyval("Flags", flags.c_str()),
+                           keyval("DeviceName", device_name),
+                           keyval("TargetPath", target_path)
+                          );
             break;
         }
         default:
-        case OUTPUT_DEFAULT:
-            printf("[ENVMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s FLAGS:\"%s\" DEVNAME:\"%s\" TARGETPATH:\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->trap->name, flags.c_str(), device_name, target_path);
+            fmt::print("envmon", drakvuf, info,
+                       keyval("Flags", flags.c_str()),
+                       keyval("DeviceName", std::quoted(device_name)),
+                       keyval("TargetPath", std::quoted(target_path))
+                      );
             break;
     }
 
@@ -332,38 +314,19 @@ static event_response_t trap_GetComputerNameW_cb(drakvuf_t drakvuf, drakvuf_trap
     switch (p->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->trap->name);
+            csvfmt::print("envmon", drakvuf, info);
             break;
         case OUTPUT_KV:
-            printf("envmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->trap->name);
+            kvfmt::print("envmon", drakvuf, info);
             break;
         case OUTPUT_JSON:
         {
-            gchar_ptr proc_name(drakvuf_escape_str(info->proc_data.name));
-            printf("{"
-                   "\"Plugin\" : \"envmon\","
-                   "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                   "\"ProcessName\": \"%s\","
-                   "\"PID\" : %d,"
-                   "\"PPID\": %d,"
-                   "\"Method\" : \"%s\""
-                   "}\n",
-                   UNPACK_TIMEVAL(info->timestamp),
-                   proc_name.get(),
-                   info->proc_data.pid,
-                   info->proc_data.ppid,
-                   info->trap->name);
+            jsonfmt::print("envmon", drakvuf, info);
             break;
         }
         default:
         case OUTPUT_DEFAULT:
-            printf("[ENVMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->trap->name);
+            fmt::print("envmon", drakvuf, info);
             break;
     }
     return VMI_EVENT_RESPONSE_NONE;
@@ -378,38 +341,19 @@ static event_response_t trap_IsNativeVhdBoot_cb(drakvuf_t drakvuf, drakvuf_trap_
     switch (p->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->trap->name);
+            csvfmt::print("envmon", drakvuf, info);
             break;
         case OUTPUT_KV:
-            printf("envmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->trap->name);
+            kvfmt::print("envmon", drakvuf, info);
             break;
         case OUTPUT_JSON:
         {
-            gchar_ptr proc_name(drakvuf_escape_str(info->proc_data.name));
-            printf("{"
-                   "\"Plugin\" : \"envmon\","
-                   "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                   "\"ProcessName\": \"%s\","
-                   "\"PID\" : %d,"
-                   "\"PPID\": %d,"
-                   "\"Method\" : \"%s\""
-                   "}\n",
-                   UNPACK_TIMEVAL(info->timestamp),
-                   proc_name.get(),
-                   info->proc_data.pid,
-                   info->proc_data.ppid,
-                   info->trap->name);
+            jsonfmt::print("envmon", drakvuf, info);
             break;
         }
         default:
         case OUTPUT_DEFAULT:
-            printf("[ENVMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->trap->name);
+            fmt::print("envmon", drakvuf, info);
             break;
     }
     return VMI_EVENT_RESPONSE_NONE;
@@ -431,44 +375,31 @@ static event_response_t trap_GetComputerNameExW_cb(drakvuf_t drakvuf, drakvuf_tr
     switch (p->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->trap->name);
-            printf(",%lu,\"%s\"\n", name_type, name_type_str);
+            csvfmt::print("envmon", drakvuf, info,
+                          keyval("NameType", name_type),
+                          keyval("NameTypeStr", std::quoted(name_type_str))
+                         );
             break;
         case OUTPUT_KV:
-            printf("envmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->trap->name);
-            printf(",NameType=%lu,NameTypeStr=\"%s\"\n", name_type, name_type_str);
+            kvfmt::print("envmon", drakvuf, info,
+                         keyval("NameType", name_type),
+                         keyval("NameTypeStr", std::quoted(name_type_str))
+                        );
             break;
         case OUTPUT_JSON:
         {
-            gchar_ptr proc_name(drakvuf_escape_str(info->proc_data.name));
-            printf("{"
-                   "\"Plugin\" : \"envmon\","
-                   "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                   "\"ProcessName\": \"%s\","
-                   "\"PID\" : %d,"
-                   "\"PPID\": %d,"
-                   "\"Method\" : \"%s\","
-                   "\"NameType\" : %lu,"
-                   "\"NameTypeStr\" : \"%s\""
-                   "}\n",
-                   UNPACK_TIMEVAL(info->timestamp),
-                   proc_name.get(),
-                   info->proc_data.pid,
-                   info->proc_data.ppid,
-                   info->trap->name,
-                   name_type, name_type_str);
+            jsonfmt::print("envmon", drakvuf, info,
+                           keyval("NameType", name_type),
+                           keyval("NameTypeStr", name_type_str)
+                          );
             break;
         }
         default:
         case OUTPUT_DEFAULT:
-            printf("[ENVMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->trap->name);
-            printf(" NAMETYPE:%lu NAMETYPESTR:\"%s\"\n", name_type, name_type_str);
+            fmt::print("envmon", drakvuf, info,
+                       keyval("NameType", name_type),
+                       keyval("NameTypeStr", std::quoted(name_type_str))
+                      );
             break;
     }
     return VMI_EVENT_RESPONSE_NONE;
@@ -486,44 +417,31 @@ static event_response_t trap_GetAdaptersAddresses_cb(drakvuf_t drakvuf, drakvuf_
     switch (p->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->trap->name);
-            printf(",%s,%s\n", family.c_str(), flags.c_str());
+            csvfmt::print("envmon", drakvuf, info,
+                          keyval("Family", family.c_str()),
+                          keyval("Flags", flags.c_str())
+                         );
             break;
         case OUTPUT_KV:
-            printf("envmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->trap->name);
-            printf(",Family=%s,%s\n", family.c_str(), flags.c_str());
+            kvfmt::print("envmon", drakvuf, info,
+                         keyval("Family", family.c_str()),
+                         keyval("Flags", flags.c_str())
+                        );
             break;
         case OUTPUT_JSON:
         {
-            gchar_ptr proc_name(drakvuf_escape_str(info->proc_data.name));
-            printf("{"
-                   "\"Plugin\" : \"envmon\","
-                   "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                   "\"ProcessName\": \"%s\","
-                   "\"PID\" : %d,"
-                   "\"PPID\": %d,"
-                   "\"Method\" : \"%s\","
-                   "\"Family\" : \"%s\","
-                   "\"Flags\" : \"%s\""
-                   "}\n",
-                   UNPACK_TIMEVAL(info->timestamp),
-                   proc_name.get(),
-                   info->proc_data.pid,
-                   info->proc_data.ppid,
-                   info->trap->name,
-                   family.c_str(), flags.c_str());
+            jsonfmt::print("envmon", drakvuf, info,
+                           keyval("Family", family.c_str()),
+                           keyval("Flags", flags.c_str())
+                          );
             break;
         }
         default:
         case OUTPUT_DEFAULT:
-            printf("[ENVMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->trap->name);
-            printf(" FAMILY:%s FLAGS:%s\n", family.c_str(), flags.c_str());
+            fmt::print("envmon", drakvuf, info,
+                       keyval("Family", family.c_str()),
+                       keyval("Flags", flags.c_str())
+                      );
             break;
     }
     return VMI_EVENT_RESPONSE_NONE;
@@ -539,43 +457,27 @@ static event_response_t trap_WNetGetProviderNameW_cb(drakvuf_t drakvuf, drakvuf_
     switch (p->m_output_format)
     {
         case OUTPUT_CSV:
-            printf("envmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->trap->name);
-            printf(",%lu\n", net_type);
+            csvfmt::print("envmon", drakvuf, info,
+                          keyval("NetType", net_type)
+                         );
             break;
         case OUTPUT_KV:
-            printf("envmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->trap->name);
-            printf(",NetType=%lu\n", net_type);
+            kvfmt::print("envmon", drakvuf, info,
+                         keyval("NetType", net_type)
+                        );
             break;
         case OUTPUT_JSON:
         {
-            gchar_ptr proc_name(drakvuf_escape_str(info->proc_data.name));
-            printf("{"
-                   "\"Plugin\" : \"envmon\","
-                   "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                   "\"ProcessName\": \"%s\","
-                   "\"PID\" : %d,"
-                   "\"PPID\": %d,"
-                   "\"Method\" : \"%s\","
-                   "\"NetType\" : %lu"
-                   "}\n",
-                   UNPACK_TIMEVAL(info->timestamp),
-                   proc_name.get(),
-                   info->proc_data.pid,
-                   info->proc_data.ppid,
-                   info->trap->name,
-                   net_type);
+            jsonfmt::print("envmon", drakvuf, info,
+                           keyval("NetType", net_type)
+                          );
             break;
         }
         default:
         case OUTPUT_DEFAULT:
-            printf("[ENVMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->trap->name);
-            printf(" NETTYPE:%lu\n", net_type);
+            fmt::print("envmon", drakvuf, info,
+                       keyval("NetType", net_type)
+                      );
             break;
     }
     return VMI_EVENT_RESPONSE_NONE;
