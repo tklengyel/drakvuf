@@ -115,10 +115,8 @@
 #include <tuple>
 #include <utility> // pair
 
-using str_t = const char*;
-
 template<class Value>
-auto keyval(str_t key, const Value& value)
+auto keyval(const char* key, const Value& value)
 {
     return std::make_pair(key, value);
 }
@@ -140,7 +138,7 @@ std::string x64(uint64_t value)
 }
 
 template<class Arg>
-void print_data(const std::pair<str_t, Arg>& arg)
+void print_data(const std::pair<const char*, Arg>& arg)
 {
     std::string up_key(arg.first);
     std::transform(up_key.begin(), up_key.end(), up_key.begin(),
@@ -153,7 +151,7 @@ void print_data(const std::pair<str_t, Arg>& arg)
 }
 
 template<class Arg, class... Args>
-void print_data(const std::pair<str_t, Arg>& arg, const std::pair<str_t, Args>& ... args)
+void print_data(const std::pair<const char*, Arg>& arg, const std::pair<const char*, Args>& ... args)
 {
     print_data(arg);
     if constexpr (sizeof...(args) > 0)
@@ -164,7 +162,7 @@ void print_data(const std::pair<str_t, Arg>& arg, const std::pair<str_t, Args>& 
 }
 
 template<class... Args>
-void print(str_t plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::pair<str_t, Args>& ... args)
+void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::pair<const char*, Args>& ... args)
 {
     std::string up_name(plugin_name);
     std::transform(up_name.begin(), up_name.end(), up_name.begin(),
@@ -210,7 +208,7 @@ namespace csvfmt
 {
 
 template<class Arg, class... Args>
-void print_data(const std::pair<str_t, Arg>& arg, const std::pair<str_t, Args>& ... args)
+void print_data(const std::pair<const char*, Arg>& arg, const std::pair<const char*, Args>& ... args)
 {
     std::cout << arg.second;
     if constexpr (sizeof...(args) > 0)
@@ -221,7 +219,7 @@ void print_data(const std::pair<str_t, Arg>& arg, const std::pair<str_t, Args>& 
 }
 
 template<class... Args>
-void print(str_t plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::pair<str_t, Args>& ... args)
+void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::pair<const char*, Args>& ... args)
 {
     std::cout << plugin_name;
 
@@ -255,13 +253,13 @@ namespace kvfmt
 {
 
 template<class Arg>
-void print_data(const std::pair<str_t, Arg>& arg)
+void print_data(const std::pair<const char*, Arg>& arg)
 {
     std::cout << arg.first << '=' << arg.second;
 }
 
 template<class Arg, class... Args>
-void print_data(const std::pair<str_t, Arg>& arg, const std::pair<str_t, Args>& ... args)
+void print_data(const std::pair<const char*, Arg>& arg, const std::pair<const char*, Args>& ... args)
 {
     print_data(arg);
     if constexpr (sizeof...(args) > 0)
@@ -272,7 +270,7 @@ void print_data(const std::pair<str_t, Arg>& arg, const std::pair<str_t, Args>& 
 }
 
 template<class... Args>
-void print(str_t plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::pair<str_t, Args>& ... args)
+void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::pair<const char*, Args>& ... args)
 {
     std::cout << plugin_name;
 
@@ -311,23 +309,23 @@ namespace jsonfmt
 {
 
 template<class Arg>
-void print_data(const std::pair<str_t, Arg>& arg)
+void print_data(const std::pair<const char*, Arg>& arg)
 {
     std::cout << std::quoted(arg.first) << ':' << arg.second;
 }
 
-inline void print_data(const std::pair<str_t, str_t>& arg)
+inline void print_data(const std::pair<const char*, const char*>& arg)
 {
     std::cout << std::quoted(arg.first) << ':' << std::quoted(arg.second);
 }
 
-inline void print_data(const std::pair<str_t, std::string>& arg)
+inline void print_data(const std::pair<const char*, std::string>& arg)
 {
     print_data(keyval(arg.first, arg.second.c_str()));
 }
 
 template<class Arg, class... Args>
-void print_data(const std::pair<str_t, Arg>& arg, const std::pair<str_t, Args>& ... args)
+void print_data(const std::pair<const char*, Arg>& arg, const std::pair<const char*, Args>& ... args)
 {
     print_data(arg);
     if constexpr (sizeof...(args) > 0)
@@ -338,7 +336,7 @@ void print_data(const std::pair<str_t, Arg>& arg, const std::pair<str_t, Args>& 
 }
 
 template<class... Args>
-void print(str_t plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::pair<str_t, Args>& ... args)
+void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::pair<const char*, Args>& ... args)
 {
     std::cout << '{';
     print_data(keyval("Plugin", plugin_name));
