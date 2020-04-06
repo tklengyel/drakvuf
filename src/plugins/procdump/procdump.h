@@ -133,6 +133,7 @@ using terminating_map_t = std::map<vmi_pid_t, uint32_t>;
 class procdump : public pluginex
 {
 public:
+    GSList* traps;
     uint64_t procdumps_count;
     std::string procdump_dir;
     pool_map_t pools;

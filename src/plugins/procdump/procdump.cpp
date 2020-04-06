@@ -120,7 +120,7 @@ static void save_file_metadata(struct procdump_ctx* ctx, proc_data_t* proc_data)
     if (!fp)
         return;
 
-    json_object *jobj = json_object_new_object();
+    json_object* jobj = json_object_new_object();
     json_object_object_add(jobj, "DumpSize", json_object_new_string_fmt("0x%" PRIx64, ctx->size));
     json_object_object_add(jobj, "PID", json_object_new_int(proc_data->pid));
     json_object_object_add(jobj, "PPID", json_object_new_int(proc_data->ppid));
@@ -157,10 +157,10 @@ static bool dump_next_vads(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
                            procdump_ctx* ctx);
 
 static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
-                                         drakvuf_trap_info_t* info);
+        drakvuf_trap_info_t* info);
 
 static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
-                                          drakvuf_trap_info_t* info);
+        drakvuf_trap_info_t* info);
 
 static bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
                                  procdump_ctx* ctx)
@@ -179,39 +179,6 @@ static bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     ctx->bp->cb = exallocatepool_cb;
 
     return true;
-}
-
-enum
-{
-    MMPTE_UNUSED,
-    MMPTE_VALID,
-    MMPTE_TRANSITION,
-    MMPTE_PROTOTYPE,
-};
-
-static bool IS_MMPTE_VALID(uint64_t mmpte) { return mmpte & 1; }
-
-static bool IS_MMPTE_TRANSITION(uint64_t mmpte)
-{
-    return !IS_MMPTE_VALID(mmpte) && (mmpte & 0x800);
-}
-
-static bool IS_MMPTE_PROTOTYPE(uint64_t mmpte)
-{
-    return !IS_MMPTE_VALID(mmpte) && !IS_MMPTE_TRANSITION(mmpte) &&
-           (mmpte & 0x400);
-}
-
-// TODO Move into win-processes.c
-// TODO Use bitfields
-// FIXME Distinguish MMPTE_PROTOTYPE and MMPTE_SUBSECTION
-static bool IS_MMPTE_ACCESSIBLE(uint64_t mmpte)
-{
-    return IS_MMPTE_VALID(mmpte) ||
-           (IS_MMPTE_TRANSITION(mmpte) &&
-            !(mmpte & 0x200)) || // _MMPTE_SOFTWARE
-           (IS_MMPTE_PROTOTYPE(mmpte) &&
-            !(mmpte & 0x200)); //  TODO _MMPTE_SOFTWARE - why?
 }
 
 // Returns true if next count pages is mapped and false otherwise.
@@ -284,7 +251,7 @@ static void dump_with_mmap(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     auto size = (vad->second.total_number_of_ptes - vad->second.idx) * VMI_PS_4KB;
 
     vmi_lock_guard vmi_lg(drakvuf);
-    if( !read_vm(vmi_lg.vmi, info->regs->cr3, start, size, ctx->file) )
+    if ( !read_vm(vmi_lg.vmi, info->regs->cr3, start, size, ctx->file) )
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to copy VAD "
                     "(start 0x%lx, size 0x%lx) into file "
@@ -304,8 +271,8 @@ enum rtlcopy_status
 };
 
 static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
-                                                   drakvuf_trap_info_t* info,
-                                                   procdump_ctx* ctx)
+        drakvuf_trap_info_t* info,
+        procdump_ctx* ctx)
 {
     auto vad = ctx->vads.begin();
 
@@ -387,15 +354,15 @@ static bool dump_next_vads(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     {
         if (2 == ctx->vads.begin()->second.type)
         {
-            switch(dump_with_rtlcopymemory(drakvuf, info, ctx))
+            switch (dump_with_rtlcopymemory(drakvuf, info, ctx))
             {
-            case RTLCOPY_INJECT:
-                return true;
-            case RTLCOPY_GO_NEXT_VAD:
-                continue;
-            case RTLCOPY_RETRY_WITH_MMAP:
-            default:
-                break;
+                case RTLCOPY_INJECT:
+                    return true;
+                case RTLCOPY_GO_NEXT_VAD:
+                    continue;
+                case RTLCOPY_RETRY_WITH_MMAP:
+                default:
+                    break;
             }
         }
 
@@ -403,6 +370,18 @@ static bool dump_next_vads(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     }
 
     return false;
+}
+
+static void free_trap(gpointer p)
+{
+    if (!p)
+        return;
+
+    drakvuf_trap_t* t = (drakvuf_trap_t*)p;
+    if (t->data)
+        g_slice_free(procdump_ctx, t->data);
+
+    g_slice_free(drakvuf_trap_t, t);
 }
 
 static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
@@ -450,7 +429,8 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     info->regs->r15 = ctx->saved_regs.r15;
 
     free_pool(ctx->plugin->pools, ctx->pool);
-    drakvuf_remove_trap(drakvuf, ctx->bp, (drakvuf_trap_free_t)g_free);
+    drakvuf_remove_trap(drakvuf, ctx->bp, (drakvuf_trap_free_t)free_trap);
+    ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
     ctx->plugin->terminating.at(ctx->pid) = 0;
     fclose(ctx->file);
     delete ctx;
@@ -459,7 +439,7 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 }
 
 static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
-                                         drakvuf_trap_info_t* info)
+        drakvuf_trap_info_t* info)
 {
     attached_proc_data_t proc(drakvuf, info);
     if (!proc.pid)
@@ -501,7 +481,7 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
 }
 
 static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
-                                          drakvuf_trap_info_t* info)
+        drakvuf_trap_info_t* info)
 {
     attached_proc_data_t proc(drakvuf, info);
     if (!proc.pid)
@@ -628,7 +608,7 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
 }
 
 static event_response_t terminate_process_cb(drakvuf_t drakvuf,
-                                             drakvuf_trap_info_t* info)
+        drakvuf_trap_info_t* info)
 {
     attached_proc_data_t proc(drakvuf, info);
     if (!proc.pid)
@@ -697,7 +677,7 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
 
     // Save registers to restore process/thread state
     memcpy(&ctx->saved_regs, info->regs, sizeof(x86_registers_t));
-    ctx->bp = (drakvuf_trap_t*)g_try_malloc0(sizeof(drakvuf_trap_t));
+    ctx->bp = (drakvuf_trap_t*)g_slice_new0(drakvuf_trap_t);
     ctx->pool = find_pool(plugin->pools);
     ctx->bp->type = BREAKPOINT;
     ctx->bp->cb = terminate_process_cb;
@@ -708,6 +688,8 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     ctx->bp->breakpoint.addr = info->regs->rip;
     if (drakvuf_add_trap(drakvuf, ctx->bp))
     {
+        plugin->traps = g_slist_prepend(plugin->traps, ctx->bp);
+
         bool is_continue = false;
 
         if (ctx->pool)
@@ -751,6 +733,7 @@ static addr_t get_function_va(drakvuf_t drakvuf, const char* lib,
 procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
                    output_format_t output)
     : pluginex(drakvuf, output)
+    , traps(nullptr)
     , procdumps_count(0)
     , pools()
     , terminating()
@@ -774,4 +757,14 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
     }
 }
 
-procdump::~procdump() {}
+procdump::~procdump()
+{
+    GSList* loop = this->traps;
+    while (loop)
+    {
+        free_trap(loop->data);
+        loop = loop->next;
+    }
+
+    g_slist_free(this->traps);
+}

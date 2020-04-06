@@ -181,4 +181,40 @@ struct procdump_ctx
     size_t current_dump_size;
 };
 
+enum
+{
+    MMPTE_UNUSED,
+    MMPTE_VALID,
+    MMPTE_TRANSITION,
+    MMPTE_PROTOTYPE,
+};
+
+static bool IS_MMPTE_VALID(uint64_t mmpte)
+{
+    return VMI_GET_BIT(mmpte, 1);
+}
+
+static bool IS_MMPTE_TRANSITION(uint64_t mmpte)
+{
+    return !IS_MMPTE_VALID(mmpte) && VMI_GET_BIT(mmpte, 12);
+}
+
+static bool IS_MMPTE_PROTOTYPE(uint64_t mmpte)
+{
+    return !IS_MMPTE_VALID(mmpte) && !IS_MMPTE_TRANSITION(mmpte) &&
+           VMI_GET_BIT(mmpte, 11);
+}
+
+// TODO Move into win-processes.c
+// TODO Use bitfields
+// FIXME Distinguish MMPTE_PROTOTYPE and MMPTE_SUBSECTION
+static bool IS_MMPTE_ACCESSIBLE(uint64_t mmpte)
+{
+    return IS_MMPTE_VALID(mmpte) ||
+           (IS_MMPTE_TRANSITION(mmpte) &&
+            !VMI_GET_BIT(mmpte, 10)) || // _MMPTE_SOFTWARE
+           (IS_MMPTE_PROTOTYPE(mmpte) &&
+            !VMI_GET_BIT(mmpte, 10)); //  TODO _MMPTE_SOFTWARE - why?
+}
+
 #endif
