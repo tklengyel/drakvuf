@@ -379,7 +379,7 @@ static void free_trap(gpointer p)
 
     drakvuf_trap_t* t = (drakvuf_trap_t*)p;
     if (t->data)
-        g_slice_free(procdump_ctx, t->data);
+        delete (procdump_ctx*) t->data;
 
     g_slice_free(drakvuf_trap_t, t);
 }
@@ -429,11 +429,10 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     info->regs->r15 = ctx->saved_regs.r15;
 
     free_pool(ctx->plugin->pools, ctx->pool);
-    drakvuf_remove_trap(drakvuf, ctx->bp, (drakvuf_trap_free_t)free_trap);
-    ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
     ctx->plugin->terminating.at(ctx->pid) = 0;
     fclose(ctx->file);
-    delete ctx;
+    ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
+    drakvuf_remove_trap(drakvuf, ctx->bp, (drakvuf_trap_free_t)free_trap);
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }

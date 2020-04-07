@@ -191,18 +191,18 @@ enum
 
 static bool IS_MMPTE_VALID(uint64_t mmpte)
 {
-    return VMI_GET_BIT(mmpte, 1);
+    return VMI_GET_BIT(mmpte, 0);
 }
 
 static bool IS_MMPTE_TRANSITION(uint64_t mmpte)
 {
-    return !IS_MMPTE_VALID(mmpte) && VMI_GET_BIT(mmpte, 12);
+    return !IS_MMPTE_VALID(mmpte) && VMI_GET_BIT(mmpte, 11);
 }
 
 static bool IS_MMPTE_PROTOTYPE(uint64_t mmpte)
 {
     return !IS_MMPTE_VALID(mmpte) && !IS_MMPTE_TRANSITION(mmpte) &&
-           VMI_GET_BIT(mmpte, 11);
+           VMI_GET_BIT(mmpte, 10);
 }
 
 // TODO Move into win-processes.c
@@ -211,10 +211,8 @@ static bool IS_MMPTE_PROTOTYPE(uint64_t mmpte)
 static bool IS_MMPTE_ACCESSIBLE(uint64_t mmpte)
 {
     return IS_MMPTE_VALID(mmpte) ||
-           (IS_MMPTE_TRANSITION(mmpte) &&
-            !VMI_GET_BIT(mmpte, 10)) || // _MMPTE_SOFTWARE
-           (IS_MMPTE_PROTOTYPE(mmpte) &&
-            !VMI_GET_BIT(mmpte, 10)); //  TODO _MMPTE_SOFTWARE - why?
+           (IS_MMPTE_TRANSITION(mmpte) && !VMI_GET_BIT(mmpte, 9)) ||
+           (IS_MMPTE_PROTOTYPE(mmpte) && !VMI_GET_BIT(mmpte, 9));
 }
 
 #endif
