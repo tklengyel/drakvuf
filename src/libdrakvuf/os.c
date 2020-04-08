@@ -137,7 +137,7 @@ bool fill_kernel_bitfields(drakvuf_t drakvuf, size_t size, const char* names [][
     for (size_t i = 0; i < size; i++)
         if (!drakvuf_get_bitfield_offset_and_size(drakvuf, names[i][0], names[i][1], &(drakvuf->bitfields[i].offset), &(drakvuf->bitfields[i].start_bit), &(drakvuf->bitfields[i].end_bit)))
         {
-            PRINT_DEBUG("Failed to find offsets for array of bitfields.\n");
+            PRINT_DEBUG("Failed to find offsets for of bitfield: %s:%s.\n", names[i][0], names[i][1]);
         }
 
     return 1;
