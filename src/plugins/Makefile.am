@@ -290,6 +290,7 @@ AM_CXXFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
                -Wpointer-arith -Winit-self -Wshadow \
                -Wredundant-decls -Wfloat-equal -Wundef \
                -Wvla
+AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wno-unknown-warning-option
 # Note that -pg is incompatible with HARDENING
 if !HARDENING
 AM_CXXFLAGS += -pg

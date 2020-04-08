@@ -140,6 +140,7 @@ endif
 # Note that -pg is incompatible with HARDENING
 if DEBUG
 AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
+AM_CXXFLAGS += -Wno-c99-designator -Wno-unknown-warning-option
 AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
 AM_CXXFLAGS += -ferror-limit=0
 if !HARDENING
