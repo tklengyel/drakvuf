@@ -309,6 +309,12 @@ bool drakvuf_get_kernel_struct_member_rva(drakvuf_t drakvuf,
                                           const char* struct_name,
                                           const char* symbol,
                                           addr_t* rva) NOEXCEPT;
+bool drakvuf_get_bitfield_offset_and_size(drakvuf_t drakvuf,
+                                          const char *struct_name,
+                                          const char *struct_member,
+                                          addr_t *offset,
+                                          size_t *start_bit,
+                                          size_t *end_bit) NOEXCEPT;
 bool json_get_symbol_rva(drakvuf_t drakvuf,
                          json_object *json,
                          const char* function,
@@ -381,6 +387,9 @@ addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf) NOEXCEPT;
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
                                    drakvuf_trap_info_t* info) NOEXCEPT;
 
+addr_t drakvuf_get_current_attached_process(drakvuf_t drakvuf,
+                                            drakvuf_trap_info_t* info) NOEXCEPT;
+
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
                                   drakvuf_trap_info_t* info) NOEXCEPT;
 bool drakvuf_get_last_error(drakvuf_t drakvuf,
@@ -422,14 +431,23 @@ typedef struct _mmvad_info
 {
     uint64_t starting_vpn;
     uint64_t ending_vpn;
+    uint64_t flags;
     uint64_t flags1;
 
     /* Pointer to the file name, if this MMVAD is backed by some file on disk.
      * If not null, read with: drakvuf_read_unicode_va(drakvuf->vmi, mmvad->file_name_ptr, 0) */
     addr_t file_name_ptr;
+    uint32_t total_number_of_ptes;
+    addr_t prototype_pte;
 } mmvad_info_t;
 
+typedef bool (*mmvad_callback)(drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callback_data);
+
 bool drakvuf_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad) NOEXCEPT;
+bool drakvuf_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callback, void* callback_data) NOEXCEPT;
+bool drakvuf_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad) NOEXCEPT;
+uint32_t drakvuf_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad);
+uint64_t drakvuf_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width) NOEXCEPT;
 
 addr_t drakvuf_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess) NOEXCEPT;
 bool drakvuf_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx) NOEXCEPT;
