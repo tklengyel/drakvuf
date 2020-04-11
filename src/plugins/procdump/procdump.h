@@ -102,154 +102,48 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef OS_H
-#define OS_H
+#ifndef PROCDUMP_H
+#define PROCDUMP_H
 
-typedef struct process_data_priv proc_data_priv_t;
+#include <map>
+#include <string>
 
-typedef struct os_interface
+#include <libvmi/libvmi.h>
+
+#include "plugins/plugins_ex.h"
+#include "plugins/private.h"
+
+struct procdump_config
 {
-    addr_t (*get_current_thread)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    const char* procdump_dir;
+};
 
-    addr_t (*get_current_process)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+enum pool_status
+{
+    POOL_INVALID,
+    POOL_FREE,
+    POOL_USED,
+};
+using pool_status_t = pool_status;
+using pool_map_t = std::map<addr_t, pool_status_t>;
 
-    addr_t (*get_current_attached_process)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+// Use second field to store thread ID. Zero TID marks finished process.
+using terminating_map_t = std::map<vmi_pid_t, uint32_t>;
 
-    bool (*get_last_error)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
+class procdump : public pluginex
+{
+public:
+    GSList* traps;
+    uint64_t procdumps_count;
+    std::string procdump_dir;
+    pool_map_t pools;
+    terminating_map_t terminating;
 
-    addr_t (*export_lib_address)
-    (drakvuf_t drakvuf, addr_t process_addr, const char* lib);
+    addr_t malloc_va;
+    addr_t memcpy_va;
 
-    char* (*get_process_name)
-    (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
-
-    char* (*get_process_commandline)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
-
-    char* (*get_current_process_name)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
-
-    int64_t (*get_process_userid)
-    (drakvuf_t drakvuf, addr_t process_base);
-
-    bool (*get_process_dtb)
-    (drakvuf_t drakvuf, addr_t process_base, addr_t* dtb);
-
-    bool (*get_process_pid)
-    (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid);
-
-    bool (*get_process_tid)
-    (drakvuf_t drakvuf, addr_t process_base, uint32_t* tid);
-
-    int64_t (*get_current_process_userid)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-    bool (*get_current_thread_id)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
-
-    bool (*get_thread_previous_mode)
-    (drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
-
-    bool (*get_current_thread_previous_mode)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t* previous_mode);
-
-    bool (*is_process)
-    (drakvuf_t drakvuf, addr_t dtb, addr_t process_addr);
-
-    bool (*is_thread)
-    (drakvuf_t drakvuf, addr_t dtb, addr_t thread_addr);
-
-    bool (*get_module_list)
-    (drakvuf_t drakvuf, addr_t process_base, addr_t* module_list);
-
-    bool (*get_module_list_wow)
-    (drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list);
-
-    bool (*find_process)
-    (drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* process_addr);
-
-    bool (*inject_traps_modules)
-    (drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
-
-    bool (*get_module_base_addr)
-    (drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
-
-    bool (*get_module_base_addr_ctx)
-    (drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
-
-    addr_t (*exportksym_to_va)
-    (drakvuf_t drakvuf, const vmi_pid_t pid, const char* proc_name, const char* mod_name, addr_t rva);
-
-    addr_t (*exportsym_to_va)
-    (drakvuf_t drakvuf, addr_t process_addr, const char* module, const char* sym);
-
-    bool (*get_process_ppid)
-    (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid);
-
-    bool (*get_process_data)
-    (drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data);
-
-    gchar* (*get_registry_keyhandle_path)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle);
-
-    char* (*get_filename_from_handle)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
-
-    bool (*is_wow64)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-    addr_t (*get_function_argument)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg);
-
-    bool (*enumerate_processes)
-    (drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t process, void* visitor_ctx), void* visitor_ctx);
-
-    bool (*enumerate_processes_with_module)
-    (drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
-
-    bool (*is_crashreporter)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
-
-    bool (*find_mmvad)
-    (drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
-
-    bool (*traverse_mmvad)
-    (drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callback, void* callback_data);
-
-    bool (*is_mmvad_commited)
-    (drakvuf_t drakvuf, mmvad_info_t* mmvad);
-
-    uint32_t (*mmvad_type)
-    (drakvuf_t drakvuf, mmvad_info_t* mmvad);
-
-    uint64_t (*mmvad_commit_charge)
-    (drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width);
-
-    bool (*get_pid_from_handle)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
-
-    bool (*get_wow_context)
-    (drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
-
-    bool (*get_user_stack32)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
-
-    bool (*get_user_stack64)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
-
-    addr_t (*get_wow_peb)
-    (drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
-
-} os_interface_t;
-
-bool set_os_windows(drakvuf_t drakvuf);
-bool set_os_linux(drakvuf_t drakvuf);
-
-bool fill_kernel_offsets(drakvuf_t drakvuf, size_t size, const char* names[][2]);
-bool fill_kernel_bitfields(drakvuf_t drakvuf, size_t size, const char* names [][2]);
+    procdump(drakvuf_t drakvuf, const procdump_config* config, output_format_t output);
+    ~procdump();
+};
 
 #endif

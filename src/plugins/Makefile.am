@@ -251,6 +251,12 @@ sources += apimon/crypto.cpp
 sources += apimon/crypto.h
 endif
 
+if PLUGIN_PROCDUMP
+sources += procdump/procdump.cpp
+sources += procdump/procdump.h
+sources += procdump/private.h
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h
 
@@ -284,6 +290,7 @@ AM_CXXFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
                -Wpointer-arith -Winit-self -Wshadow \
                -Wredundant-decls -Wfloat-equal -Wundef \
                -Wvla
+AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wno-unknown-warning-option
 # Note that -pg is incompatible with HARDENING
 if !HARDENING
 AM_CXXFLAGS += -pg

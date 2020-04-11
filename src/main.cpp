@@ -230,6 +230,10 @@ static void print_usage()
             "\t --dll-hooks-list <file>\n"
             "\t                           List of DLL functions to be hooked (see wiki)\n"
 #endif
+#ifdef ENABLE_PLUGIN_PROCDUMP
+            "\t --procdump-dir <directory>\n"
+            "\t                           Where to store processes dumps\n"
+#endif
             "\t -h, --help                Show this help\n"
             );
 }
@@ -290,6 +294,7 @@ int main(int argc, char** argv)
         opt_json_combase,
         opt_memdump_dir,
         opt_dll_hooks_list,
+        opt_procdump_dir,
     };
     const option long_opts[] =
     {
@@ -312,6 +317,7 @@ int main(int argc, char** argv)
         {"json-combase", required_argument, NULL, opt_json_combase},
         {"memdump-dir", required_argument, NULL, opt_memdump_dir},
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
+        {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:h";
@@ -472,6 +478,11 @@ int main(int argc, char** argv)
                 break;
             case opt_dll_hooks_list:
                 options.dll_hooks_list = optarg;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_PROCDUMP
+            case opt_procdump_dir:
+                options.procdump_dir = optarg;
                 break;
 #endif
             case 'h':

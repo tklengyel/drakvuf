@@ -102,154 +102,117 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef OS_H
-#define OS_H
+#ifndef PROCDUMP_PRIVATE_H
+#define PROCDUMP_PRIVATE_H
 
-typedef struct process_data_priv proc_data_priv_t;
+using std::string;
 
-typedef struct os_interface
+struct attached_proc_data
 {
-    addr_t (*get_current_thread)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    addr_t base_addr;
+    const char* name;
+    vmi_pid_t pid;
+    vmi_pid_t ppid;
+    uint32_t tid;
 
-    addr_t (*get_current_process)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    attached_proc_data(drakvuf_t drakvuf,
+                       drakvuf_trap_info_t* info)
+        : base_addr(0)
+        , name(nullptr)
+        , pid(0)
+        , ppid(0)
+        , tid(0)
+    {
+        proc_data_t data;
+        data.name = nullptr;
+        addr_t attached_proc = drakvuf_get_current_attached_process(drakvuf, info);
+        if (!attached_proc ||
+            !drakvuf_get_process_data(drakvuf, attached_proc,
+                                      &data) ||
+            !drakvuf_get_current_thread_id(drakvuf, info,
+                                           &data.tid) ||
+            !data.pid || !data.tid)
+        {
+            if (data.name)
+                g_free( (gpointer)data.name );
+            return;
+        }
 
-    addr_t (*get_current_attached_process)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+        base_addr = data.base_addr;
+        name = data.name;
+        pid = data.pid;
+        ppid = data.ppid;
+        tid = data.tid;
+    }
 
-    bool (*get_last_error)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
+    ~attached_proc_data()
+    {
+        g_free( (gpointer)name);
+    }
+};
+using attached_proc_data_t = struct attached_proc_data;
 
-    addr_t (*export_lib_address)
-    (drakvuf_t drakvuf, addr_t process_addr, const char* lib);
+struct vad_info
+{
+    uint32_t type; // TODO Use backed file name instead of type?
+    uint64_t total_number_of_ptes;
+    std::vector<uint64_t> prototype_ptes;
+    uint32_t idx;                       // index in prototype_ptes
+};
+using vad_info_t = struct vad_info;
+using vads_t = std::map<addr_t, vad_info_t>;
 
-    char* (*get_process_name)
-    (drakvuf_t drakvuf, addr_t process_base, bool fullpath);
+struct procdump_ctx
+{
+    vmi_pid_t pid;
+    vmi_pid_t ppid;
+    uint32_t tid;
+    string name;
+    procdump* plugin;
+    drakvuf_trap_t* bp;
+    vads_t vads;
+    x86_registers_t saved_regs;
+    uint64_t idx;
+    addr_t pool;
+    const uint64_t POOL_SIZE_IN_PAGES = 0x100;
+    FILE* file;
+    size_t size;
+    string file_path;
+    size_t current_dump_size;
+};
 
-    char* (*get_process_commandline)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
+enum
+{
+    MMPTE_UNUSED,
+    MMPTE_VALID,
+    MMPTE_TRANSITION,
+    MMPTE_PROTOTYPE,
+};
 
-    char* (*get_current_process_name)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
+static bool IS_MMPTE_VALID(uint64_t mmpte)
+{
+    return VMI_GET_BIT(mmpte, 0);
+}
 
-    int64_t (*get_process_userid)
-    (drakvuf_t drakvuf, addr_t process_base);
+static bool IS_MMPTE_TRANSITION(uint64_t mmpte)
+{
+    return !IS_MMPTE_VALID(mmpte) && VMI_GET_BIT(mmpte, 11);
+}
 
-    bool (*get_process_dtb)
-    (drakvuf_t drakvuf, addr_t process_base, addr_t* dtb);
+static bool IS_MMPTE_PROTOTYPE(uint64_t mmpte)
+{
+    return !IS_MMPTE_VALID(mmpte) && !IS_MMPTE_TRANSITION(mmpte) &&
+           VMI_GET_BIT(mmpte, 10);
+}
 
-    bool (*get_process_pid)
-    (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid);
-
-    bool (*get_process_tid)
-    (drakvuf_t drakvuf, addr_t process_base, uint32_t* tid);
-
-    int64_t (*get_current_process_userid)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-    bool (*get_current_thread_id)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
-
-    bool (*get_thread_previous_mode)
-    (drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
-
-    bool (*get_current_thread_previous_mode)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, privilege_mode_t* previous_mode);
-
-    bool (*is_process)
-    (drakvuf_t drakvuf, addr_t dtb, addr_t process_addr);
-
-    bool (*is_thread)
-    (drakvuf_t drakvuf, addr_t dtb, addr_t thread_addr);
-
-    bool (*get_module_list)
-    (drakvuf_t drakvuf, addr_t process_base, addr_t* module_list);
-
-    bool (*get_module_list_wow)
-    (drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list);
-
-    bool (*find_process)
-    (drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* process_addr);
-
-    bool (*inject_traps_modules)
-    (drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
-
-    bool (*get_module_base_addr)
-    (drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
-
-    bool (*get_module_base_addr_ctx)
-    (drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
-
-    addr_t (*exportksym_to_va)
-    (drakvuf_t drakvuf, const vmi_pid_t pid, const char* proc_name, const char* mod_name, addr_t rva);
-
-    addr_t (*exportsym_to_va)
-    (drakvuf_t drakvuf, addr_t process_addr, const char* module, const char* sym);
-
-    bool (*get_process_ppid)
-    (drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid);
-
-    bool (*get_process_data)
-    (drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data);
-
-    gchar* (*get_registry_keyhandle_path)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle);
-
-    char* (*get_filename_from_handle)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
-
-    bool (*is_wow64)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-    addr_t (*get_function_argument)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg);
-
-    bool (*enumerate_processes)
-    (drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t process, void* visitor_ctx), void* visitor_ctx);
-
-    bool (*enumerate_processes_with_module)
-    (drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
-
-    bool (*is_crashreporter)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
-
-    bool (*find_mmvad)
-    (drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
-
-    bool (*traverse_mmvad)
-    (drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callback, void* callback_data);
-
-    bool (*is_mmvad_commited)
-    (drakvuf_t drakvuf, mmvad_info_t* mmvad);
-
-    uint32_t (*mmvad_type)
-    (drakvuf_t drakvuf, mmvad_info_t* mmvad);
-
-    uint64_t (*mmvad_commit_charge)
-    (drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width);
-
-    bool (*get_pid_from_handle)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
-
-    bool (*get_wow_context)
-    (drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
-
-    bool (*get_user_stack32)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
-
-    bool (*get_user_stack64)
-    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
-
-    addr_t (*get_wow_peb)
-    (drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
-
-} os_interface_t;
-
-bool set_os_windows(drakvuf_t drakvuf);
-bool set_os_linux(drakvuf_t drakvuf);
-
-bool fill_kernel_offsets(drakvuf_t drakvuf, size_t size, const char* names[][2]);
-bool fill_kernel_bitfields(drakvuf_t drakvuf, size_t size, const char* names [][2]);
+// TODO Move into win-processes.c
+// TODO Use bitfields
+// FIXME Distinguish MMPTE_PROTOTYPE and MMPTE_SUBSECTION
+static bool IS_MMPTE_ACCESSIBLE(uint64_t mmpte)
+{
+    return IS_MMPTE_VALID(mmpte) ||
+           (IS_MMPTE_TRANSITION(mmpte) && !VMI_GET_BIT(mmpte, 9)) ||
+           (IS_MMPTE_PROTOTYPE(mmpte) && !VMI_GET_BIT(mmpte, 9));
+}
 
 #endif

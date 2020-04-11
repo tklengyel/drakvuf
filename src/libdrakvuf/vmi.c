@@ -224,6 +224,9 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                 .vcpu = event->vcpu_id,
             };
 
+            if (!trap_info.proc_data.tid)
+                drakvuf_get_current_thread_id(drakvuf, &trap_info, &trap_info.proc_data.tid);
+
             g_get_current_time(&trap_info.timestamp);
 
             rsp |= trap->cb(drakvuf, &trap_info);

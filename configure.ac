@@ -355,6 +355,16 @@ if test x$plugin_apimon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_APIMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_procdump],
+  [AS_HELP_STRING([--disable-plugin-procdump],
+    [Enable the windows process dumping plugin @<:@yes@:>@])],
+  [plugin_procdump="$enableval"],
+  [plugin_procdump="yes"])
+AM_CONDITIONAL([PLUGIN_PROCDUMP], [test x$plugin_procdump = xyes])
+if test x$plugin_procdump = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PROCDUMP, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([hardening],
@@ -619,6 +629,7 @@ LibraryMon:   $plugin_librarymon
 DKOMmon:      $plugin_dkommon
 WMIMon:       $plugin_wmimon
 MEMDump:      $plugin_memdump
+ProcDump:     $plugin_procdump
 APIMon:       $plugin_apimon
 -------------------------------------------------------------------------------
 REPL:         $repl
