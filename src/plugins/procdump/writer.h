@@ -102,74 +102,19 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef PROCDUMP_PRIVATE_H
-#define PROCDUMP_PRIVATE_H
+#pragma once
 
-#include "writer.h"
+#include <memory>
 
-using std::string;
+class ProcdumpWriter {
+public:
+    virtual ~ProcdumpWriter() = default;
 
-struct vad_info
-{
-    uint32_t type; // TODO Use backed file name instead of type?
-    uint64_t total_number_of_ptes;
-    std::vector<uint64_t> prototype_ptes;
-    uint32_t idx;                       // index in prototype_ptes
-};
-using vad_info_t = struct vad_info;
-using vads_t = std::map<addr_t, vad_info_t>;
-
-struct procdump_ctx
-{
-    vmi_pid_t pid;
-    vmi_pid_t ppid;
-    uint32_t tid;
-    string name;
-    procdump* plugin;
-    drakvuf_trap_t* bp;
-    vads_t vads;
-    x86_registers_t saved_regs;
-    uint64_t idx;
-    addr_t pool;
-    const uint64_t POOL_SIZE_IN_PAGES = 0x100;
-    size_t size;
-    size_t current_dump_size;
-    string data_file_name;
-    std::unique_ptr<ProcdumpWriter> writer;
+    virtual bool append(uint8_t const *data, size_t size) = 0;
+    virtual bool finish() = 0;
 };
 
-enum
-{
-    MMPTE_UNUSED,
-    MMPTE_VALID,
-    MMPTE_TRANSITION,
-    MMPTE_PROTOTYPE,
+class ProcdumpWriterFactory {
+public:
+    static std::unique_ptr<ProcdumpWriter> build(std::string const& path, bool use_compression);
 };
-
-static bool IS_MMPTE_VALID(uint64_t mmpte)
-{
-    return VMI_GET_BIT(mmpte, 0);
-}
-
-static bool IS_MMPTE_TRANSITION(uint64_t mmpte)
-{
-    return !IS_MMPTE_VALID(mmpte) && VMI_GET_BIT(mmpte, 11);
-}
-
-static bool IS_MMPTE_PROTOTYPE(uint64_t mmpte)
-{
-    return !IS_MMPTE_VALID(mmpte) && !IS_MMPTE_TRANSITION(mmpte) &&
-           VMI_GET_BIT(mmpte, 10);
-}
-
-// TODO Move into win-processes.c
-// TODO Use bitfields
-// FIXME Distinguish MMPTE_PROTOTYPE and MMPTE_SUBSECTION
-static bool IS_MMPTE_ACCESSIBLE(uint64_t mmpte)
-{
-    return IS_MMPTE_VALID(mmpte) ||
-           (IS_MMPTE_TRANSITION(mmpte) && !VMI_GET_BIT(mmpte, 9)) ||
-           (IS_MMPTE_PROTOTYPE(mmpte) && !VMI_GET_BIT(mmpte, 9));
-}
-
-#endif
