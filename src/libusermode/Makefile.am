@@ -117,6 +117,7 @@ AM_LDFLAGS += $(VMI_LIBS)
 AM_LDFLAGS += $(JSONC_LIBS)
 
 AM_CXXFLAGS = $(CXXFLAGS)
+
 if HARDENING
 AM_CXXFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 endif
@@ -126,10 +127,12 @@ AM_CXXFLAGS += $(SANITIZE_CFLAGS)
 AM_LDFLAGS += $(SANITIZE_LDFLAGS)
 endif
 
-if DEBUG
+if !DEBUG
+AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
+else
 AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
-AM_CXXFLAGS += -Wno-unused-parameter
-AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list -Wno-unknown-warning-option
+AM_CXXFLAGS += -Wno-unused-parameter -Wno-unknown-warning-option
+AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
 AM_CXXFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
                -Wpointer-arith -Winit-self -Wshadow \
                -Wredundant-decls -Wfloat-equal -Wundef \

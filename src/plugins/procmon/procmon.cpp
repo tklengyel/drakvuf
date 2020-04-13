@@ -784,8 +784,7 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx
         return;
     }
 
-    GTimeVal t;
-    g_get_current_time(&t);
+    gint64 t = g_get_real_time();
 
     switch (ctx->format)
     {

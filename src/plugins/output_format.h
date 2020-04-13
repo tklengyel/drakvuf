@@ -121,12 +121,6 @@ auto keyval(const char* key, const Value& value)
     return std::make_pair(key, value);
 }
 
-std::ostream& operator<<(std::ostream& os, const GTimeVal& t)
-{
-    os << t.tv_sec << "." << std::to_string(t.tv_usec).substr(0, 6);
-    return os;
-}
-
 namespace fmt
 {
 
