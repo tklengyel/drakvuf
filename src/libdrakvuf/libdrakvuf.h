@@ -184,7 +184,7 @@ typedef struct drakvuf_trap drakvuf_trap_t;
 
 typedef struct drakvuf_trap_info
 {
-    GTimeVal timestamp;
+    gint64 timestamp;
     unsigned int vcpu;
     uint16_t altp2m_idx;
     proc_data_t proc_data ; /* Current executing process data */
@@ -617,12 +617,11 @@ typedef enum
 
 // Printf helpers for timestamp.
 #define FORMAT_TIMEVAL "%" PRId64 ".%06" PRId64
-#define UNPACK_TIMEVAL(t) (t).tv_sec, (t).tv_usec
+#define UNPACK_TIMEVAL(t) (t/G_USEC_PER_SEC), (t - t/G_USEC_PER_SEC)
 
 #define eprint_current_time(...) \
     do { \
-        GTimeVal current_time; \
-        g_get_current_time (&current_time); \
+        gint64 current_time = g_get_real_time(); \
         fprintf(stderr, FORMAT_TIMEVAL " ", UNPACK_TIMEVAL(current_time)); \
     } while (0)
 

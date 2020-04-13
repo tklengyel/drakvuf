@@ -710,8 +710,7 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 
 static void print_injection_info(output_format_t format, const char* file, injector_t injector)
 {
-    GTimeVal t;
-    g_get_current_time(&t);
+    gint64 t = g_get_real_time();
     char* arguments = "";
 
     for (int i=0; i<injector->args_count; i++)
