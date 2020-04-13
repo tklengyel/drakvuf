@@ -112,16 +112,8 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_PROG_CC_STDC
 AC_PROG_CXX(clang++)
 AX_REQUIRE_DEFINED([AX_CXX_COMPILE_STDCXX])
-AX_CXX_COMPILE_STDCXX([17])
-
-######################################################
-
-AC_ARG_ENABLE([repl],
-  [AS_HELP_STRING([--enable-repl],
-    [Enable the repl library @<:@no@:>@])],
-  [repl="$enableval"],
-  [repl="no"])
-AM_CONDITIONAL([REPL], [test x$repl = xyes])
+AX_CXX_COMPILE_STDCXX([17], [ext], [mandatory])
+CXXFLAGS="-std=gnu++17"
 
 ######################################################
 
@@ -366,6 +358,13 @@ if test x$plugin_procdump = xyes; then
 fi
 
 #####################################################
+
+AC_ARG_ENABLE([repl],
+  [AS_HELP_STRING([--enable-repl],
+    [Enable the repl library @<:@no@:>@])],
+  [repl="$enableval"],
+  [repl="no"])
+AM_CONDITIONAL([REPL], [test x$repl = xyes])
 
 AC_ARG_ENABLE([hardening],
   [AS_HELP_STRING([--enable-hardening],
