@@ -218,6 +218,15 @@ jobs:
 #
     - env:
         - TEST="scan-build"
+      addons:
+        apt:
+          sources:
+          - sourceline: 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main'
+            key_url: https://apt.llvm.org/llvm-snapshot.gpg.key
+          - ubuntu-toolchain-r-test
+          packages:
+          - clang-10
+          - clang-tools-10
       before_install:
         - sudo apt-get update
         - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev
@@ -228,6 +237,7 @@ jobs:
         - export PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
         - export LDFLAGS="-L$PWD/usr/local/lib"
         - export CFLAGS="-I$PWD/usr/local/include"
+        - export PATH=$PATH:/usr/lib/llvm-10/bin
       install:
         - git submodule update --init libvmi
         - cd libvmi
@@ -238,8 +248,8 @@ jobs:
         - cd ..
         - ./autogen.sh
       script:
-        - scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
-        - scan-build --status-bugs --use-cc=clang --use-c++=clang++ -analyze-headers -disable-checker deadcode.DeadStores make
+        - scan-build-10 --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
+        - scan-build-10 --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores make
 
 #
 # Coverity
