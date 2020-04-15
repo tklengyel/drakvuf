@@ -114,9 +114,12 @@
 #include "procdump.h"
 #include "private.h"
 
+using namespace std::string_literals;
+
 static void save_file_metadata(struct procdump_ctx* ctx, proc_data_t* proc_data)
 {
-    FILE* fp = fopen((ctx->file_path + ".metadata").data(), "w");
+    auto plugin = ctx->plugin;
+    FILE* fp = fopen((plugin->procdump_dir + "/"s + ctx->data_file_name + ".metadata"s).c_str(), "w");
     if (!fp)
         return;
 
@@ -125,8 +128,9 @@ static void save_file_metadata(struct procdump_ctx* ctx, proc_data_t* proc_data)
     json_object_object_add(jobj, "PID", json_object_new_int(proc_data->pid));
     json_object_object_add(jobj, "PPID", json_object_new_int(proc_data->ppid));
     json_object_object_add(jobj, "ProcessName", json_object_new_string(proc_data->name));
+    json_object_object_add(jobj, "Compression", json_object_new_string(plugin->use_compression ? "gzip" : "none"));
 
-    json_object_object_add(jobj, "DataFileName", json_object_new_string((ctx->file_path + ".mm").data()));
+    json_object_object_add(jobj, "DataFileName", json_object_new_string(ctx->data_file_name.c_str()));
 
     fprintf(fp, "%s\n", json_object_get_string(jobj));
     fclose(fp);
@@ -143,7 +147,7 @@ static void free_pool(pool_map_t& pools, addr_t va)
 
 static addr_t find_pool(pool_map_t& pools)
 {
-    for (auto pool : pools)
+    for (auto& pool : pools)
         if (POOL_FREE == pool.second)
         {
             pool.second = POOL_USED;
@@ -202,13 +206,17 @@ static bool max_contigious_range(const std::vector<uint64_t>& prototype_ptes,
     return skip;
 }
 
-static bool read_vm(vmi_instance_t vmi, addr_t dtb, addr_t start, size_t size,
-                    FILE* file)
+static bool read_vm(drakvuf_t drakvuf, addr_t dtb, addr_t start, size_t size,
+                    struct procdump_ctx* procdump_ctx)
 {
-    if (!file || !size)
+    if (!procdump_ctx || !procdump_ctx->writer)
     {
         return false;
     }
+
+    if (!size) return true;
+
+    vmi_lock_guard vmi(drakvuf);
 
     access_context_t vmi_ctx;
     vmi_ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -217,25 +225,26 @@ static bool read_vm(vmi_instance_t vmi, addr_t dtb, addr_t start, size_t size,
     auto num_pages = size / VMI_PS_4KB;
     auto access_ptrs = new void* [num_pages] { 0 };
 
-    bool res = false;
+    bool res = true;
     if (VMI_SUCCESS == vmi_mmap_guest(vmi, &vmi_ctx, num_pages, access_ptrs))
     {
         for (size_t i = 0; i < num_pages; ++i)
         {
             if (access_ptrs[i])
             {
-                fwrite(access_ptrs[i], VMI_PS_4KB, 1, file);
+                if (res)
+                {
+                    res = procdump_ctx->writer->append(static_cast<uint8_t *>(access_ptrs[i]), VMI_PS_4KB);
+                }
                 munmap(access_ptrs[i], VMI_PS_4KB);
             }
         }
-
-        res = true;
     }
     else
     {
         // unaccessible page, pad with zeros to ensure proper alignment of the data
         uint8_t zeros[VMI_PS_4KB] = {};
-        fwrite(zeros, VMI_PS_4KB, 1, file);
+        res = procdump_ctx->writer->append(zeros, VMI_PS_4KB);
     }
 
     delete[] access_ptrs;
@@ -250,14 +259,13 @@ static void dump_with_mmap(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     auto start = vad->first + vad->second.idx * VMI_PS_4KB;
     auto size = (vad->second.total_number_of_ptes - vad->second.idx) * VMI_PS_4KB;
 
-    vmi_lock_guard vmi_lg(drakvuf);
-    if ( !read_vm(vmi_lg.vmi, info->regs->cr3, start, size, ctx->file) )
+    if ( !read_vm(drakvuf, info->regs->cr3, start, size, ctx) )
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to copy VAD "
                     "(start 0x%lx, size 0x%lx) into file "
-                    "(start %p, size 0x%lx) with mmap\n",
+                    "(size 0x%lx) with mmap\n",
                     ctx->pid, ctx->tid, ctx->vads.begin()->first,
-                    size, ctx->file, ctx->size);
+                    size, ctx->size);
     }
 
     ctx->vads.erase(start);
@@ -294,7 +302,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
         // Mapped region or VAD end should follow not-mapped region
         uint8_t zeros[VMI_PS_4KB] = {};
         for (uint32_t i = 0; i < ptes_to_dump; ++i)
-            fwrite(zeros, VMI_PS_4KB, 1, ctx->file);
+            ctx->writer->append(zeros, VMI_PS_4KB);
         vad->second.idx += ptes_to_dump;
         skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
                                     vad->second.idx, ptes_to_dump);
@@ -387,6 +395,8 @@ static void free_trap(gpointer p)
 static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
                                procdump_ctx* ctx)
 {
+    ctx->writer->finish();
+
     if (ctx->vads.empty())
     {
         // If there is no VADs left than the file have been processed
@@ -430,7 +440,6 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 
     free_pool(ctx->plugin->pools, ctx->pool);
     ctx->plugin->terminating.at(ctx->pid) = 0;
-    fclose(ctx->file);
     ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
     drakvuf_remove_trap(drakvuf, ctx->bp, (drakvuf_trap_free_t)free_trap);
 
@@ -461,17 +470,15 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
     // This is crucial because lots of injections could exhaust the kernel stack
     info->regs->rsp = ctx->saved_regs.rsp;
 
-    vmi_lock_guard vmi_lg(drakvuf);
-    if (!read_vm(vmi_lg.vmi, info->regs->cr3, ctx->pool, ctx->current_dump_size,
-                 ctx->file))
+    if (!read_vm(drakvuf, info->regs->cr3, ctx->pool, ctx->current_dump_size,
+                 ctx))
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to copy VAD "
                     "(start 0x%lx, size 0x%lx) into file "
-                    "(start %p, size 0x%lx) with injection\n",
+                    "(size 0x%lx) with injection\n",
                     ctx->pid, ctx->tid, ctx->vads.begin()->first,
-                    ctx->current_dump_size, ctx->file, ctx->size);
+                    ctx->current_dump_size, ctx->size);
     }
-    vmi_lg.unlock();
 
     if (dump_next_vads(drakvuf, info, ctx))
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -663,11 +670,14 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
                     proc.tid, proc.name, ctx->size,
                     ctx->size / 1024 / 1024, ctx->vads.size(), ctx->idx);
     }
-    ctx->file_path =
-        plugin->procdump_dir + "/procdump." + std::to_string(ctx->idx);
-    ctx->file =
-        fopen((ctx->file_path + ".mm").data(), "w");
-    if (!ctx->file)
+
+    try
+    {
+        std::string data_file_name = "procdump."s + std::to_string(ctx->idx);
+        ctx->data_file_name = data_file_name;
+        ctx->writer = ProcdumpWriterFactory::build(plugin->procdump_dir + "/"s + data_file_name, plugin->use_compression);
+    }
+    catch (int)
     {
         PRINT_DEBUG("[PROCDUMP] Failed to create file\n");
         delete ctx;
@@ -732,9 +742,10 @@ static addr_t get_function_va(drakvuf_t drakvuf, const char* lib,
 procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
                    output_format_t output)
     : pluginex(drakvuf, output)
+    , procdump_dir{config->procdump_dir ?: ""}
+    , use_compression{config->compress_procdumps}
     , traps(nullptr)
     , procdumps_count(0)
-    , procdump_dir()
     , pools()
     , terminating()
     , malloc_va()
@@ -742,8 +753,6 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
 {
     if (!config->procdump_dir)
         return;
-    else
-        procdump_dir = std::string(config->procdump_dir);
 
     this->malloc_va =
         get_function_va(drakvuf, "ntoskrnl.exe", "ExAllocatePoolWithTag");

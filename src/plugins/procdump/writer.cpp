@@ -101,75 +101,112 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-
-#ifndef PROCDUMP_PRIVATE_H
-#define PROCDUMP_PRIVATE_H
-
 #include "writer.h"
 
-using std::string;
+#include "drakvuf.h"
 
-struct vad_info
-{
-    uint32_t type; // TODO Use backed file name instead of type?
-    uint64_t total_number_of_ptes;
-    std::vector<uint64_t> prototype_ptes;
-    uint32_t idx;                       // index in prototype_ptes
-};
-using vad_info_t = struct vad_info;
-using vads_t = std::map<addr_t, vad_info_t>;
+#include <zlib.h>
 
-struct procdump_ctx
-{
-    vmi_pid_t pid;
-    vmi_pid_t ppid;
-    uint32_t tid;
-    string name;
-    procdump* plugin;
-    drakvuf_trap_t* bp;
-    vads_t vads;
-    x86_registers_t saved_regs;
-    uint64_t idx;
-    addr_t pool;
-    const uint64_t POOL_SIZE_IN_PAGES = 0x100;
-    size_t size;
-    size_t current_dump_size;
-    string data_file_name;
-    std::unique_ptr<ProcdumpWriter> writer;
-};
+#include <string>
+#include <cstdio>
+#include <cstdint>
 
-enum
-{
-    MMPTE_UNUSED,
-    MMPTE_VALID,
-    MMPTE_TRANSITION,
-    MMPTE_PROTOTYPE,
+namespace {
+
+class BaseProcdumpWriter : public ProcdumpWriter {
+public:
+    explicit BaseProcdumpWriter(std::string const& path)
+        : file{fopen(path.c_str(), "w")}
+    {
+        if (!file) throw -1;
+    }
+
+    ~BaseProcdumpWriter()
+    {
+        fclose(file);
+    }
+
+    bool append(uint8_t const *data, size_t size) override
+    {
+        return (size == 0 || fwrite(data, size, 1, file) == 1);
+    }
+
+    bool finish() override
+    {
+        return (fflush(file) == 0);
+    }
+
+private:
+    FILE *file;
 };
 
-static bool IS_MMPTE_VALID(uint64_t mmpte)
+class GzippedProcdumpWriter : public BaseProcdumpWriter {
+public:
+    explicit GzippedProcdumpWriter(std::string const& path)
+        : BaseProcdumpWriter{path}
+        , z_file{}
+    {
+        z_file.zalloc = Z_NULL;
+        z_file.zfree = Z_NULL;
+        z_file.opaque = Z_NULL;
+        z_file.avail_in = 0;
+        z_file.next_in = Z_NULL;
+        int window_bits = 15 + 16; // Use gzip header format with windowbits of 15
+        int mem_level = 8;
+        auto ret = deflateInit2(&z_file, Z_BEST_SPEED, Z_DEFLATED, window_bits, mem_level, Z_DEFAULT_STRATEGY);
+        if (ret != Z_OK) throw -1;
+    }
+
+    ~GzippedProcdumpWriter()
+    {
+        deflateEnd(&z_file);
+    }
+
+    bool append(uint8_t const* data, size_t size) override
+    {
+        z_file.avail_in = size;
+        z_file.next_in = const_cast<uint8_t*>(data);
+        return write_impl(Z_NO_FLUSH);
+    }
+
+    bool finish() override
+    {
+        return write_impl(Z_FINISH) && BaseProcdumpWriter::finish();
+    }
+
+private:
+    bool write_impl(int flush);
+
+private:
+    z_stream z_file;
+};
+
+bool GzippedProcdumpWriter::write_impl(int flush)
 {
-    return VMI_GET_BIT(mmpte, 0);
+    do
+    {
+        uint8_t out[16 * 1024];
+        z_file.avail_out = sizeof(out);
+        z_file.next_out = out;
+
+        auto ret = deflate(&z_file, flush);
+        if (ret == Z_STREAM_ERROR)
+        {
+            PRINT_DEBUG("[PROCDUMP] GZIP fail: deflate return Z_STREAM_ERROR");
+            return false;
+        }
+
+        if (!BaseProcdumpWriter::append(out, sizeof(out) - z_file.avail_out)) return false;
+    }
+    while (z_file.avail_out == 0);
+    g_assert(z_file.avail_in == 0);
+    return true;
 }
 
-static bool IS_MMPTE_TRANSITION(uint64_t mmpte)
-{
-    return !IS_MMPTE_VALID(mmpte) && VMI_GET_BIT(mmpte, 11);
 }
 
-static bool IS_MMPTE_PROTOTYPE(uint64_t mmpte)
+std::unique_ptr<ProcdumpWriter> ProcdumpWriterFactory::build(std::string const& path, bool use_compression)
 {
-    return !IS_MMPTE_VALID(mmpte) && !IS_MMPTE_TRANSITION(mmpte) &&
-           VMI_GET_BIT(mmpte, 10);
+    if (use_compression) return std::make_unique<GzippedProcdumpWriter>(path);
+    return std::make_unique<BaseProcdumpWriter>(path);
 }
-
-// TODO Move into win-processes.c
-// TODO Use bitfields
-// FIXME Distinguish MMPTE_PROTOTYPE and MMPTE_SUBSECTION
-static bool IS_MMPTE_ACCESSIBLE(uint64_t mmpte)
-{
-    return IS_MMPTE_VALID(mmpte) ||
-           (IS_MMPTE_TRANSITION(mmpte) && !VMI_GET_BIT(mmpte, 9)) ||
-           (IS_MMPTE_PROTOTYPE(mmpte) && !VMI_GET_BIT(mmpte, 9));
-}
-
-#endif
