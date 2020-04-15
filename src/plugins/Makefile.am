@@ -255,6 +255,8 @@ if PLUGIN_PROCDUMP
 sources += procdump/procdump.cpp
 sources += procdump/procdump.h
 sources += procdump/private.h
+sources += procdump/writer.cpp
+sources += procdump/writer.h
 endif
 
 ###############################################################################

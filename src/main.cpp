@@ -233,6 +233,8 @@ static void print_usage()
 #ifdef ENABLE_PLUGIN_PROCDUMP
             "\t --procdump-dir <directory>\n"
             "\t                           Where to store processes dumps\n"
+            "\t --compress-procdumps\n"
+            "\t                           Controls compression of processes dumps on disk\n"
 #endif
             "\t -h, --help                Show this help\n"
             );
@@ -295,6 +297,7 @@ int main(int argc, char** argv)
         opt_memdump_dir,
         opt_dll_hooks_list,
         opt_procdump_dir,
+        opt_compress_procdumps,
     };
     const option long_opts[] =
     {
@@ -318,6 +321,7 @@ int main(int argc, char** argv)
         {"memdump-dir", required_argument, NULL, opt_memdump_dir},
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
+        {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:h";
@@ -483,6 +487,9 @@ int main(int argc, char** argv)
 #ifdef ENABLE_PLUGIN_PROCDUMP
             case opt_procdump_dir:
                 options.procdump_dir = optarg;
+                break;
+            case opt_compress_procdumps:
+                options.compress_procdumps = true;
                 break;
 #endif
             case 'h':
