@@ -734,8 +734,11 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
     : pluginex(drakvuf, output)
     , traps(nullptr)
     , procdumps_count(0)
+    , procdump_dir()
     , pools()
     , terminating()
+    , malloc_va()
+    , memcpy_va()
 {
     if (!config->procdump_dir)
         return;

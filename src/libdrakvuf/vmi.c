@@ -224,8 +224,9 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                 .vcpu = event->vcpu_id,
             };
 
-            if (!trap_info.proc_data.tid)
-                drakvuf_get_current_thread_id(drakvuf, &trap_info, &trap_info.proc_data.tid);
+            if (!trap_info.proc_data.tid &&
+                !drakvuf_get_current_thread_id(drakvuf, &trap_info, &trap_info.proc_data.tid))
+                PRINT_DEBUG("Post mem cb failed to get TID for PID %d\n", pass->proc_data.pid);
 
             trap_info.timestamp = g_get_real_time();
 

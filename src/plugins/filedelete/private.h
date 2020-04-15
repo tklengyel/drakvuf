@@ -106,6 +106,7 @@
 #define FILEDELETE_PRIVATE_H
 
 #define FILE_DISPOSITION_INFORMATION 13
+#define FILE_DELETE_ON_CLOSE 0x1000
 
 enum offset
 {
@@ -130,6 +131,17 @@ enum offset
 };
 
 extern const char* offset_names[__OFFSET_MAX][2];
+
+struct createfile_ret_info
+{
+    vmi_pid_t pid;
+    uint32_t tid;
+    uint64_t rsp;
+
+    addr_t handle;
+
+    filedelete* f;
+};
 
 /************************
  * # For filedelete 2
