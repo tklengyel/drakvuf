@@ -997,7 +997,7 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     attached_proc_data_t proc(drakvuf, info);
-    if (!proc.pid)
+    if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
@@ -1007,7 +1007,7 @@ static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     auto w = (struct createfile_ret_info*)info->trap->data;
 
-    if (proc.pid != w->pid || proc.tid != w->tid)
+    if (info->attached_proc_data.pid != w->pid || info->attached_proc_data.tid != w->tid)
         return VMI_EVENT_RESPONSE_NONE;
 
     if (w->rsp && info->regs->rsp <= w->rsp)
@@ -1033,7 +1033,7 @@ static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         auto filename = get_file_name(w->f, drakvuf, vmi_lg.vmi, info, handle, nullptr, nullptr);
         if (filename.empty()) filename = "<UNKNOWN>";
 
-        w->f->files[{proc.pid, handle}] = {filename, FILEEXTR_DELETE};
+        w->f->files[{info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_DELETE};
     }
 
     delete w;
@@ -1045,7 +1045,7 @@ static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 static void createfile_cb_impl(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)
 {
     attached_proc_data_t proc(drakvuf, info);
-    if (!proc.pid)
+    if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
@@ -1058,8 +1058,8 @@ static void createfile_cb_impl(drakvuf_t drakvuf, drakvuf_trap_info_t* info, add
     vmi_read_addr_va(vmi_lg.vmi, info->regs->rsp, 0, &ret_addr);
 
     auto w = new createfile_ret_info;
-    w->pid = proc.pid;
-    w->tid = proc.tid;
+    w->pid = info->attached_proc_data.pid;
+    w->tid = info->attached_proc_data.tid;
     w->rsp = info->regs->rsp;
     w->handle = handle;
     w->f = (filedelete*)info->trap->data;
@@ -1121,7 +1121,7 @@ static event_response_t createfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* in
 static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     attached_proc_data_t proc(drakvuf, info);
-    if (!proc.pid)
+    if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
@@ -1154,7 +1154,7 @@ static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
             auto filename = get_file_name(f, drakvuf, vmi, info, handle, nullptr, nullptr);
             if (filename.empty()) filename = "<UNKNOWN>";
 
-            f->files[{proc.pid, handle}] = {filename, FILEEXTR_DELETE};
+            f->files[{info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_DELETE};
         }
     }
 
@@ -1166,7 +1166,7 @@ done:
 static event_response_t writefile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     attached_proc_data_t proc(drakvuf, info);
-    if (!proc.pid)
+    if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
@@ -1182,7 +1182,7 @@ static event_response_t writefile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     auto filename = get_file_name(f, drakvuf, vmi, info, handle, nullptr, nullptr);
     if (filename.empty()) filename = "<UNKNOWN>";
 
-    f->files[{proc.pid, handle}] = {filename, FILEEXTR_WRITE};
+    f->files[{info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_WRITE};
 
     drakvuf_release_vmi(drakvuf);
     return 0;
@@ -1198,7 +1198,7 @@ static event_response_t writefile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     attached_proc_data_t proc(drakvuf, info);
-    if (!proc.pid)
+    if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
@@ -1209,7 +1209,7 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     filedelete* f = (filedelete*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    auto reason = f->files[{proc.pid, handle}].second;
+    auto reason = f->files[{info->attached_proc_data.pid, handle}].second;
 
     event_response_t response = 0;
     if (f->use_injector)
@@ -1220,7 +1220,7 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         auto filename1 = get_file_name(f, drakvuf, vmi, info, handle, nullptr, nullptr);
         if (filename1.empty()) filename1 = "<UNKNOWN>";
 
-        auto filename = f->files[{proc.pid, handle}].first;
+        auto filename = f->files[{info->attached_proc_data.pid, handle}].first;
         if (filename.empty())
             goto done;
 
@@ -1228,7 +1228,7 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             goto done;
     }
 
-    if (f->files.erase({proc.pid, handle}) > 0)
+    if (f->files.erase({info->attached_proc_data.pid, handle}) > 0)
     {
         // We detect the fact of closing of the previously modified file.
         grab_file_by_handle(f, drakvuf, vmi, info, handle, reason);
@@ -1242,7 +1242,7 @@ done:
 static event_response_t createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     attached_proc_data_t proc(drakvuf, info);
-    if (!proc.pid)
+    if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
@@ -1268,7 +1268,7 @@ static event_response_t createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     filename = get_file_name(f, drakvuf, vmi, info, handle, nullptr, nullptr);
     if (filename.empty()) filename = "<UNKNOWN>";
 
-    f->files[{proc.pid, handle}] = {filename, FILEEXTR_WRITE};
+    f->files[{info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_WRITE};
 
 done:
     drakvuf_release_vmi(drakvuf);

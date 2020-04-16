@@ -175,8 +175,8 @@ void librarymon::print_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, c
     {
         case OUTPUT_CSV:
             printf("librarymon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,\"%s\",\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name,
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
+                   info->attached_proc_data.userid, info->trap->name,
                    name.contents ? (char*)name.contents : "",
                    path.contents ? (char*)path.contents : "");
             break;
@@ -184,7 +184,7 @@ void librarymon::print_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, c
         case OUTPUT_KV:
             printf("librarymon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
                    "Method=%s,ModuleName=\"%s\",ModulePath=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
                    info->trap->name,
                    name.contents ? (char*)name.contents : "",
                    path.contents ? (char*)path.contents : "");
@@ -192,7 +192,7 @@ void librarymon::print_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, c
 
         case OUTPUT_JSON:
         {
-            char* escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            char* escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
             printf( "{"
                     "\"Plugin\" : \"librarymon\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
@@ -204,7 +204,7 @@ void librarymon::print_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, c
                     "\"ModulePath\" : \"%s\""
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
-                    info->proc_data.pid, info->proc_data.ppid, escaped_pname, info->trap->name,
+                    info->attached_proc_data.pid, info->attached_proc_data.ppid, escaped_pname, info->trap->name,
                     name.contents ? (char*)name.contents : "",
                     path.contents ? (char*)path.contents : "");
             g_free(escaped_pname);
@@ -214,9 +214,9 @@ void librarymon::print_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, c
         case OUTPUT_DEFAULT:
             printf("[LIBRARYMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64
                    ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s, MODULE_NAME:\"%s\", MODULE_PATH:\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr,
-                   info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name,
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.base_addr,
+                   info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
+                   USERIDSTR(drakvuf), info->attached_proc_data.userid, info->trap->name,
                    name.contents ? (char*)name.contents : "",
                    path.contents ? (char*)path.contents : "");
             break;

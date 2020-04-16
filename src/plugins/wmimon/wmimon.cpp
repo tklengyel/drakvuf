@@ -224,7 +224,7 @@ struct search_breakpoint_by_addr
 
             if (stt == VMI_SUCCESS)
             {
-                PRINT_DEBUG("Register trap in self process. PID: %u\n", info->proc_data.pid);
+                PRINT_DEBUG("Register trap in self process. PID: %u\n", info->attached_proc_data.pid);
                 trap->breakpoint.lookup_type = LOOKUP_DTB;
                 trap->breakpoint.dtb = info->regs->cr3;
                 trap->breakpoint.module = info->trap->breakpoint.module;
@@ -233,7 +233,7 @@ struct search_breakpoint_by_addr
             }
             else
             {
-                auto module_name = search_module_name_by_addr(drakvuf, m_plugin->Offsets(), info->proc_data.pid, m_addr);
+                auto module_name = search_module_name_by_addr(drakvuf, m_plugin->Offsets(), info->attached_proc_data.pid, m_addr);
                 if (!module_name)
                 {
                     PRINT_DEBUG("Failed to search a module by image base %lx\n", m_addr);
@@ -241,7 +241,7 @@ struct search_breakpoint_by_addr
                 }
                 else
                 {
-                    context _ctx(info->proc_data.pid, trap, false);
+                    context _ctx(info->attached_proc_data.pid, trap, false);
                     if (!drakvuf_enumerate_processes_with_module(drakvuf, module_name, module_visitor, &_ctx))
                     {
                         PRINT_DEBUG("Failed to search a other process with loaded module %s\n", module_name);
@@ -410,12 +410,12 @@ event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_
         case OUTPUT_CSV:
             printf("wmimon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s,%s,%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->trap->name, reinterpret_cast<char*>(object->contents), reinterpret_cast<char*>(method->contents));
+                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(object->contents), reinterpret_cast<char*>(method->contents));
             break;
         case OUTPUT_KV:
             printf("wmimon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Object=\"%s\",Function=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->trap->name, reinterpret_cast<char*>(object->contents),
+                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
+                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(object->contents),
                    reinterpret_cast<char*>(method->contents));
             break;
         case OUTPUT_JSON:
@@ -434,8 +434,8 @@ event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_
                    "}\n",
                    UNPACK_TIMEVAL(info->timestamp),
                    proc_name,
-                   info->proc_data.pid,
-                   info->proc_data.ppid,
+                   info->attached_proc_data.pid,
+                   info->attached_proc_data.ppid,
                    info->trap->name,
                    reinterpret_cast<char*>(object->contents),
                    reinterpret_cast<char*>(method->contents));
@@ -444,7 +444,7 @@ event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_
         default:
         case OUTPUT_DEFAULT:
             printf("[WMIMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s,Object:\"%s\",Function:\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
                    info->trap->name, reinterpret_cast<char*>(object->contents), reinterpret_cast<char*>(method->contents));
             break;
     }
@@ -528,12 +528,12 @@ event_response_t GetObject_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         case OUTPUT_CSV:
             printf("wmimon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s,%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->trap->name, reinterpret_cast<char*>(object->contents));
+                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(object->contents));
             break;
         case OUTPUT_KV:
             printf("wmimon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Object=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->trap->name, reinterpret_cast<char*>(object->contents));
+                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
+                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(object->contents));
             break;
         case OUTPUT_JSON:
         {
@@ -550,8 +550,8 @@ event_response_t GetObject_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
                    "}\n",
                    UNPACK_TIMEVAL(info->timestamp),
                    proc_name,
-                   info->proc_data.pid,
-                   info->proc_data.ppid,
+                   info->attached_proc_data.pid,
+                   info->attached_proc_data.ppid,
                    info->trap->name,
                    reinterpret_cast<char*>(object->contents));
             break;
@@ -559,7 +559,7 @@ event_response_t GetObject_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         default:
         case OUTPUT_DEFAULT:
             printf("[WMIMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s,Object:\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
                    info->trap->name, reinterpret_cast<char*>(object->contents));
             break;
     }
@@ -641,12 +641,12 @@ event_response_t ExecQuery_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         case OUTPUT_CSV:
             printf("wmimon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s,%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->trap->name, reinterpret_cast<char*>(command->contents));
+                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(command->contents));
             break;
         case OUTPUT_KV:
             printf("wmimon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Command=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->trap->name, reinterpret_cast<char*>(command->contents));
+                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
+                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(command->contents));
             break;
         case OUTPUT_JSON:
         {
@@ -663,8 +663,8 @@ event_response_t ExecQuery_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
                    "}\n",
                    UNPACK_TIMEVAL(info->timestamp),
                    proc_name,
-                   info->proc_data.pid,
-                   info->proc_data.ppid,
+                   info->attached_proc_data.pid,
+                   info->attached_proc_data.ppid,
                    info->trap->name,
                    reinterpret_cast<char*>(command->contents));
             break;
@@ -672,7 +672,7 @@ event_response_t ExecQuery_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         default:
         case OUTPUT_DEFAULT:
             printf("[WMIMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s,Command:\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
                    info->trap->name, reinterpret_cast<char*>(command->contents));
             break;
     }
@@ -754,12 +754,12 @@ event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_in
         case OUTPUT_CSV:
             printf("wmimon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s,%s\n",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->proc_data.name, info->trap->name, reinterpret_cast<char*>(resource->contents));
+                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(resource->contents));
             break;
         case OUTPUT_KV:
             printf("wmimon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Resource=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, info->trap->name, reinterpret_cast<char*>(resource->contents));
+                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
+                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(resource->contents));
             break;
         case OUTPUT_JSON:
         {
@@ -776,8 +776,8 @@ event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_in
                    "}\n",
                    UNPACK_TIMEVAL(info->timestamp),
                    proc_name,
-                   info->proc_data.pid,
-                   info->proc_data.ppid,
+                   info->attached_proc_data.pid,
+                   info->attached_proc_data.ppid,
                    info->trap->name,
                    reinterpret_cast<char*>(resource->contents));
             break;
@@ -785,7 +785,7 @@ event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_in
         default:
         case OUTPUT_DEFAULT:
             printf("[WMIMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s,Resource:%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
                    info->trap->name, reinterpret_cast<char*>(resource->contents));
             break;
     }

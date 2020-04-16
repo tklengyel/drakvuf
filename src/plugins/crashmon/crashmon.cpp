@@ -115,14 +115,14 @@ static void print_crashed_process_information(drakvuf_t drakvuf, drakvuf_trap_in
     {
         case OUTPUT_CSV:
             printf("crashmon," FORMAT_TIMEVAL ",%" PRIu32 ",%" PRIu32 ",\"%s\",%" PRIi64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name, info->proc_data.userid);
+                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name, info->attached_proc_data.userid);
             break;
         case OUTPUT_KV:
             printf("crashmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\"\n",
                    UNPACK_TIMEVAL(info->timestamp), pid, ppid, name);
             break;
         case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
             printf( "{"
                     "\"Plugin\" : \"crashmon\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
@@ -133,7 +133,7 @@ static void print_crashed_process_information(drakvuf_t drakvuf, drakvuf_trap_in
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
-                    info->proc_data.userid,
+                    info->attached_proc_data.userid,
                     pid,
                     ppid);
             g_free(escaped_pname);
@@ -141,7 +141,7 @@ static void print_crashed_process_information(drakvuf_t drakvuf, drakvuf_trap_in
         case OUTPUT_DEFAULT:
         default:
             printf("[CRASHMON] TIME:" FORMAT_TIMEVAL " PID:%" PRIu32 " PPID:0x%" PRIu32 ",\"%s\" %s:%" PRIi64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name, USERIDSTR(drakvuf), info->proc_data.userid);
+                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name, USERIDSTR(drakvuf), info->attached_proc_data.userid);
             break;
     }
 }
