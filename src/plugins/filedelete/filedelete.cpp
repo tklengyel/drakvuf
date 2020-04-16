@@ -396,7 +396,14 @@ static void save_file_metadata(filedelete* f,
         return;
 
     json_object *jobj = json_object_new_object();
-    json_object_object_add(jobj, "FileName", json_object_new_string(filename ?: "<UNKNOWN>"));
+    if (!jobj)
+    {
+        fclose(fp);
+        return;
+    }
+
+    filename = filename ?: "<UNKNOWN>";
+    json_object_object_add(jobj, "FileName", json_object_new_string(filename));
     json_object_object_add(jobj, "FileSize", json_object_new_int64(file_size));
     json_object_object_add(jobj, "FileFlags", json_object_new_string_fmt("0x%lx (%s)", fo_flags, parse_flags(fo_flags, fo_flags_map, OUTPUT_DEFAULT, "0").c_str()));
     json_object_object_add(jobj, "SequenceNumber", json_object_new_int(sequence_number));

@@ -120,6 +120,13 @@ typedef struct injector* injector_t;
 
 typedef enum
 {
+    INJECTOR_FAILED,
+    INJECTOR_FAILED_WITH_ERROR_CODE,
+    INJECTOR_SUCCEEDED,
+} injector_status_t;
+
+typedef enum
+{
     // win
     INJECT_METHOD_CREATEPROC,
     INJECT_METHOD_SHELLEXEC,
@@ -188,7 +195,7 @@ bool setup_stack_locked(drakvuf_t drakvuf,
                         struct argument args[],
                         int nb_args) NOEXCEPT;
 
-int injector_start_app(drakvuf_t drakvuf,
+injector_status_t injector_start_app(drakvuf_t drakvuf,
                        vmi_pid_t pid,
                        uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
                        const char* app,
