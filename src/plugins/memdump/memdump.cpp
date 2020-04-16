@@ -370,6 +370,7 @@ done:
     free(file);
     free(file_path);
     free(tmp_file_path);
+    free(metafile);
     g_free(access_ptrs);
 
     return ret;
@@ -392,10 +393,11 @@ bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* pl
 
     vmi_read(vmi, &ctx, 512, buf, &bytes_read);
 
-    for (size_t i = 0; i < bytes_read; i++)
+    size_t stack_width = is_32bit ? 4 : 8;
+    for (size_t i = 0; i < bytes_read; i += stack_width)
     {
         uint64_t stack_val = 0;
-        memcpy(&stack_val, buf+i, is_32bit ? 4 : 8);
+        memcpy(&stack_val, buf+i, stack_width);
 
         mmvad_info_t mmvad;
         if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, stack_val, &mmvad))

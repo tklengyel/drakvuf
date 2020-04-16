@@ -105,7 +105,7 @@
 #include <libinjector/libinjector.h>
 #include "private.h"
 
-int injector_start_app(
+injector_status_t injector_start_app(
     drakvuf_t drakvuf,
     vmi_pid_t pid,
     uint32_t tid,

@@ -547,9 +547,17 @@ int main(int argc, char** argv)
     if (injection_pid > 0 && inject_file)
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout, injection_global_search, args_count, args);
-        if (!ret)
+        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout, injection_global_search, args_count, args);
+        switch (ret)
+        {
+        case INJECTOR_FAILED_WITH_ERROR_CODE:
+            rc = 0;
+        case INJECTOR_FAILED:
             goto exit;
+        case INJECTOR_SUCCEEDED:
+        default:
+            break;
+        }
     }
 
     PRINT_DEBUG("Starting plugins\n");

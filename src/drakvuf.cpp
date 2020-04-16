@@ -216,7 +216,7 @@ void drakvuf_c::resume()
     drakvuf_resume(drakvuf);
 }
 
-int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
+injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                           uint32_t injection_tid,
                           const char* inject_cmd,
                           const char* cwd,
@@ -231,7 +231,7 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
 {
     GThread* timeout_thread = startup_timer(this, timeout);
 
-    int rc = injector_start_app(drakvuf,
+    auto rc = injector_start_app(drakvuf,
                                 injection_pid,
                                 injection_tid,
                                 inject_cmd,
@@ -247,7 +247,7 @@ int drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                                 args);
 
 
-    if (!rc)
+    if (INJECTOR_SUCCEEDED != rc)
         fprintf(stderr, "Process startup failed\n");
 
     cleanup_timer(this, timeout_thread);
