@@ -295,7 +295,12 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     auto skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
                                      vad->second.idx, ptes_to_dump);
 
-    g_assert(ptes_to_dump);
+    if (!ptes_to_dump)
+    {
+        PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Dump %u PTEs from %u / %lu\n",
+                    ctx->pid, ptes_to_dump, vad->second.idx, total_number_of_ptes);
+        return RTLCOPY_RETRY_WITH_MMAP;
+    }
 
     if (skip)
     {
@@ -317,6 +322,21 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
         ptes_to_dump = ctx->POOL_SIZE_IN_PAGES;
 
     const auto idx = vad->second.idx; // cache it because we will change it
+    if (idx + ptes_to_dump == total_number_of_ptes)
+    {
+        ctx->vads.erase(vad_start);
+    }
+    else if (idx + ptes_to_dump < total_number_of_ptes)
+    {
+        ctx->vads.begin()->second.idx += ptes_to_dump;
+    }
+    else
+    {
+        PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Dump %u PTEs from %u / %lu\n",
+                    ctx->pid, ptes_to_dump, idx, total_number_of_ptes);
+        return RTLCOPY_RETRY_WITH_MMAP;
+    }
+
 
     ctx->current_dump_size = ptes_to_dump * VMI_PS_4KB;
     struct argument args[3] = {};
@@ -336,21 +356,6 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     info->regs->rip = ctx->plugin->memcpy_va;
 
     ctx->bp->cb = rtlcopymemory_cb;
-
-    if (idx + ptes_to_dump == total_number_of_ptes)
-    {
-        ctx->vads.erase(vad_start);
-    }
-    else if (idx + ptes_to_dump < total_number_of_ptes)
-    {
-        ctx->vads.begin()->second.idx += ptes_to_dump;
-    }
-    else
-    {
-        PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Dump %u PTEs from %u / %lu\n",
-                    ctx->pid, ptes_to_dump, idx, total_number_of_ptes);
-        g_assert(false);
-    }
 
     return RTLCOPY_INJECT;
 }
