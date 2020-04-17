@@ -520,13 +520,13 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
     if ( VMI_SUCCESS != vmi_read_8(vmi, ctx, reinterpret_cast<uint8_t*>(&ace_count)) || 0 == ace_count)
         return std::string();
 
+    const size_t ACL_SIZE = 8;
     uint8_t acl_size = 0;
     ctx->addr = pacl + offsets[_ACL_AclSize];
-    if ( VMI_SUCCESS != vmi_read_8(vmi, ctx, &acl_size) || 0 == acl_size)
+    if ( VMI_SUCCESS != vmi_read_8(vmi, ctx, &acl_size) || ACL_SIZE >= acl_size )
         return std::string();
 
-    const size_t ACL_SIZE = 8;
-    const size_t aces_size = acl_size - ACL_SIZE;
+    const uint8_t aces_size = acl_size - ACL_SIZE;
     std::unique_ptr<uint8_t[]> aces(new uint8_t[aces_size] {0});
     auto ace_ptr = aces.get();
     ctx->addr = pacl + ACL_SIZE;
