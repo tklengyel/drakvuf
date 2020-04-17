@@ -394,7 +394,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                                  &trap_info.attached_proc_data);
         if (!trap_info.attached_proc_data.tid &&
             !drakvuf_get_current_thread_id(drakvuf, &trap_info, &trap_info.attached_proc_data.tid))
-            PRINT_DEBUG("Pre mem cb failed to get TID for PID %d\n", trap_info.attached_proc_data.tid);
+            PRINT_DEBUG("Pre mem cb failed to get TID for PID %u\n", trap_info.attached_proc_data.tid);
     }
 
     GSList* loop = s->traps;
@@ -461,10 +461,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
         pass->proc_data.userid    = proc_data.userid;
         pass->proc_data.tid       = proc_data.tid;
         pass->attached_proc_data.base_addr = trap_info.attached_proc_data.base_addr;
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-qual"
         pass->attached_proc_data.name      = (char*) trap_info.attached_proc_data.name;
-#pragma GCC diagnostic pop
         pass->attached_proc_data.pid       = trap_info.attached_proc_data.pid;
         pass->attached_proc_data.ppid      = trap_info.attached_proc_data.ppid;
         pass->attached_proc_data.userid    = trap_info.attached_proc_data.userid;
@@ -491,10 +488,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             {
                 g_slice_free(struct memcb_pass, pass);
                 g_free( (gpointer)proc_data.name );
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-qual"
                 g_free( (gpointer)trap_info.attached_proc_data.name );
-#pragma GCC diagnostic pop
                 PRINT_DEBUG("Somebody try to write to the shadow page, let's emulate it instead\n");
                 return rsp | VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
             }
@@ -510,10 +504,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     }
 
     g_free( (gpointer)proc_data.name );
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-qual"
     g_free( (gpointer)trap_info.attached_proc_data.name );
-#pragma GCC diagnostic pop
     return rsp;
 }
 
@@ -612,10 +603,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf->in_callback = 0;
 
     g_free( (gpointer)proc_data.name );
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-qual"
     g_free( (gpointer)trap_info.attached_proc_data.name );
-#pragma GCC diagnostic pop
 
     process_free_requests(drakvuf);
 
@@ -690,10 +678,7 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf->in_callback = 0;
 
     g_free(proc_data.name);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-qual"
     g_free( (gpointer)trap_info.attached_proc_data.name );
-#pragma GCC diagnostic pop
 
     process_free_requests(drakvuf);
 
@@ -755,10 +740,7 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf->in_callback = 0;
 
     g_free(proc_data.name);
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-qual"
     g_free( (gpointer)trap_info.attached_proc_data.name );
-#pragma GCC diagnostic pop
 
     process_free_requests(drakvuf);
 
@@ -821,10 +803,7 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf->in_callback = 0;
 
     g_free( (gpointer)proc_data.name );
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wcast-qual"
     g_free( (gpointer)trap_info.attached_proc_data.name );
-#pragma GCC diagnostic pop
 
     process_free_requests(drakvuf);
 
