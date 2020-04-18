@@ -810,20 +810,18 @@ static event_response_t set_information_file_cb(drakvuf_t drakvuf, drakvuf_trap_
 {
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t fileinfo = drakvuf_get_function_argument(drakvuf, info, 3);
-    uint64_t fileinfoclass = drakvuf_get_function_argument(drakvuf, info, 5);
+    uint32_t fileinfoclass = drakvuf_get_function_argument(drakvuf, info, 5);
 
     if (fileinfoclass == FILE_RENAME_INFORMATION)
     {
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+        auto vmi = vmi_lock_guard(drakvuf);
         print_rename_file_info(vmi, drakvuf, info, handle, fileinfo);
-        drakvuf_release_vmi(drakvuf);
     }
 
     if (fileinfoclass == FILE_DISPOSITION_INFORMATION)
     {
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+        auto vmi = vmi_lock_guard(drakvuf);
         print_delete_file_info(vmi, drakvuf, info, handle, fileinfo);
-        drakvuf_release_vmi(drakvuf);
     }
 
     return 0;
