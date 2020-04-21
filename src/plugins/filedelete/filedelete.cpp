@@ -996,7 +996,6 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
 static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    attached_proc_data_t proc(drakvuf, info);
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
@@ -1044,7 +1043,6 @@ static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
 static void createfile_cb_impl(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle)
 {
-    attached_proc_data_t proc(drakvuf, info);
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
@@ -1120,7 +1118,6 @@ static event_response_t createfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* in
  */
 static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    attached_proc_data_t proc(drakvuf, info);
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
@@ -1165,7 +1162,6 @@ done:
 
 static event_response_t writefile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    attached_proc_data_t proc(drakvuf, info);
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
@@ -1197,7 +1193,6 @@ static event_response_t writefile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
  */
 static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    attached_proc_data_t proc(drakvuf, info);
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
@@ -1241,7 +1236,6 @@ done:
 
 static event_response_t createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    attached_proc_data_t proc(drakvuf, info);
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
