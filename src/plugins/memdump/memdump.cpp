@@ -138,9 +138,9 @@ static void save_file_metadata(const drakvuf_trap_info_t* info,
     json_object_object_add(jobj, "DumpReason", json_object_new_string(dump_reason));
     json_object_object_add(jobj, "DumpAddress", json_object_new_string_fmt("0x%" PRIx64, dump_address));
     json_object_object_add(jobj, "DumpSize", json_object_new_string_fmt("0x%" PRIx64, dump_size));
-    json_object_object_add(jobj, "PID", json_object_new_int(info->proc_data.pid));
-    json_object_object_add(jobj, "PPID", json_object_new_int(info->proc_data.ppid));
-    json_object_object_add(jobj, "ProcessName", json_object_new_string(info->proc_data.name));
+    json_object_object_add(jobj, "PID", json_object_new_int(info->attached_proc_data.pid));
+    json_object_object_add(jobj, "PPID", json_object_new_int(info->attached_proc_data.ppid));
+    json_object_object_add(jobj, "ProcessName", json_object_new_string(info->attached_proc_data.name));
 
     if (extras && extras->type == WriteVirtualMemoryExtras)
     {
@@ -309,22 +309,22 @@ printout:
     {
         case OUTPUT_CSV:
             printf("memdump," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",\"%s\",%d,%" PRIx64 ",%" PRIu64 ",\"%s\"",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, info->trap->name, reason, info->proc_data.pid, ctx->addr, len_bytes, display_file);
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
+                   info->attached_proc_data.userid, info->trap->name, reason, info->attached_proc_data.pid, ctx->addr, len_bytes, display_file);
 
             if (printout_extras)
                 printout_extras(drakvuf, plugin->m_output_format, extras);
             break;
         case OUTPUT_KV:
             printf("memdump Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,DumpReason=\"%s\",DumpPID=%d,DumpAddr=%" PRIx64 ",DumpSize=%" PRIu64 ",SN=%d",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, reason, info->proc_data.pid, ctx->addr, len_bytes, plugin->dumps_count);
+                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
+                   info->trap->name, reason, info->attached_proc_data.pid, ctx->addr, len_bytes, plugin->dumps_count);
 
             if (printout_extras)
                 printout_extras(drakvuf, plugin->m_output_format, extras);
             break;
         case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
             escaped_fname = drakvuf_escape_str(display_file);
             printf( "{"
                     "\"Plugin\": \"memdump\", "
@@ -342,9 +342,9 @@ printout:
                     "\"DumpFilename\": %s",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    info->trap->name, reason, info->proc_data.pid, ctx->addr,
+                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
+                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
+                    info->trap->name, reason, info->attached_proc_data.pid, ctx->addr,
                     len_bytes, escaped_fname);
             if (printout_extras)
                 printout_extras(drakvuf, plugin->m_output_format, extras);
@@ -355,8 +355,8 @@ printout:
         default:
         case OUTPUT_DEFAULT:
             printf("[MEMDUMP] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" Reason:\"%s\" Process:%d Base:0x%" PRIx64 " Size:%" PRIu64 " File:\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, reason, info->proc_data.pid, ctx->addr,
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
+                   USERIDSTR(drakvuf), info->attached_proc_data.userid, info->trap->name, reason, info->attached_proc_data.pid, ctx->addr,
                    len_bytes, display_file);
 
             if (printout_extras)
@@ -400,7 +400,7 @@ bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* pl
         memcpy(&stack_val, buf+i, stack_width);
 
         mmvad_info_t mmvad;
-        if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, stack_val, &mmvad))
+        if (!drakvuf_find_mmvad(drakvuf, info->attached_proc_data.base_addr, stack_val, &mmvad))
             continue;
 
         addr_t begin = mmvad.starting_vpn << 12;
@@ -541,7 +541,7 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     mmvad_info_t mmvad;
 
-    if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, mem_base_address, &mmvad))
+    if (!drakvuf_find_mmvad(drakvuf, info->attached_proc_data.base_addr, mem_base_address, &mmvad))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to find MMVAD for memory passed to NtFreeVirtualMemory\n");
         drakvuf_release_vmi(drakvuf);
@@ -630,7 +630,7 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
 
     mmvad_info_t mmvad;
 
-    if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, mem_base_address, &mmvad))
+    if (!drakvuf_find_mmvad(drakvuf, info->attached_proc_data.base_addr, mem_base_address, &mmvad))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to find MMVAD for memory passed to NtProtectVirtualMemory\n");
         drakvuf_release_vmi(drakvuf);

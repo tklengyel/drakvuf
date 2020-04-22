@@ -187,7 +187,8 @@ typedef struct drakvuf_trap_info
     gint64 timestamp;
     unsigned int vcpu;
     uint16_t altp2m_idx;
-    proc_data_t proc_data ; /* Current executing process data */
+    proc_data_t proc_data ; /* Current owning process data */
+    proc_data_t attached_proc_data ; /* Current attached process data */
     addr_t trap_pa;
     x86_registers_t* regs;
     drakvuf_trap_t* trap;

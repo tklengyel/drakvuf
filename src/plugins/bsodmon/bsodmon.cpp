@@ -168,18 +168,18 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         case OUTPUT_CSV:
             printf("bsodmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%" PRIx64
                    ",\"%s\",%" PRIx64 ",%" PRIx64 ",%" PRIx64 ",%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, code, bugcheck_name, params[0], params[1], params[2], params[3]);
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
+                   info->attached_proc_data.userid, code, bugcheck_name, params[0], params[1], params[2], params[3]);
             break;
         case OUTPUT_KV:
             printf("bsodmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",BugCheckCode=%" PRIx64
                    ",BugCheckName=\"%s\",BugCheckParameter1=%" PRIx64 ",BugCheckParameter2=%" PRIx64 ",BugCheckParameter2=%" PRIx64
                    ",BugCheckParameter4=%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid,
-                   info->proc_data.name, code, bugcheck_name, params[0], params[1], params[2], params[3]);
+                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
+                   info->attached_proc_data.name, code, bugcheck_name, params[0], params[1], params[2], params[3]);
             break;
         case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
             printf( "{"
                     "\"Plugin\" : \"bsodmon\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
@@ -198,8 +198,8 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     info->vcpu, info->regs->cr3, escaped_pname,
-                    info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
+                    info->attached_proc_data.userid,
+                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
                     code, bugcheck_name, params[0], params[1], params[2], params[3]);
             g_free(escaped_pname);
             break;
@@ -208,8 +208,8 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             printf("[BSODMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64
                    " BugCheckCode:%" PRIx64 " BugCheckName:%s BugCheckParameter1:%" PRIx64 " BugCheckParameter2:%" PRIx64
                    " BugCheckParameter3:%" PRIx64 " BugCheckParameter4:%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, code, bugcheck_name, params[0], params[1], params[2], params[3]);
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
+                   USERIDSTR(drakvuf), info->attached_proc_data.userid, code, bugcheck_name, params[0], params[1], params[2], params[3]);
             break;
     }
 
