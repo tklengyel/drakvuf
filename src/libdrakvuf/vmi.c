@@ -219,14 +219,16 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                 .proc_data.ppid      = pass->proc_data.ppid,
                 .proc_data.userid    = pass->proc_data.userid,
                 .proc_data.tid       = pass->proc_data.tid,
+                .attached_proc_data.base_addr = pass->attached_proc_data.base_addr,
+                .attached_proc_data.name      = pass->attached_proc_data.name,
+                .attached_proc_data.pid       = pass->attached_proc_data.pid,
+                .attached_proc_data.ppid      = pass->attached_proc_data.ppid,
+                .attached_proc_data.userid    = pass->attached_proc_data.userid,
+                .attached_proc_data.tid       = pass->attached_proc_data.tid,
                 .trap_pa = pass->pa,
                 .regs = event->x86_regs,
                 .vcpu = event->vcpu_id,
             };
-
-            if (!trap_info.proc_data.tid &&
-                !drakvuf_get_current_thread_id(drakvuf, &trap_info, &trap_info.proc_data.tid))
-                PRINT_DEBUG("Post mem cb failed to get TID for PID %d\n", pass->proc_data.pid);
 
             trap_info.timestamp = g_get_real_time();
 
@@ -323,6 +325,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
 
 done:
     g_free(pass->proc_data.name);
+    g_free(pass->attached_proc_data.name);
     g_slice_free(struct memcb_pass, pass);
     /* We switch back to the altp2m view no matter what */
     event->slat_id = drakvuf->altp2m_idx;
@@ -367,6 +370,8 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     proc_data_priv_t proc_data;
     memset(&proc_data, 0, sizeof(proc_data_priv_t));
+    proc_data_priv_t attached_proc_data;
+    memset(&attached_proc_data, 0, sizeof(proc_data_priv_t));
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
@@ -376,6 +381,15 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.trap_pa = pa;
 
     drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data );
+    addr_t attached_proc = drakvuf_get_current_attached_process(drakvuf, &trap_info);
+    if (attached_proc)
+    {
+        drakvuf_get_process_data_priv(drakvuf, attached_proc,
+                                      &attached_proc_data);
+        if (!attached_proc_data.tid &&
+            !drakvuf_get_current_thread_id(drakvuf, &trap_info, &attached_proc_data.tid))
+            PRINT_DEBUG("Pre mem cb failed to get TID for PID %u\n", attached_proc_data.tid);
+    }
 
     trap_info.proc_data.base_addr = proc_data.base_addr;
     trap_info.proc_data.name      = proc_data.name;
@@ -383,6 +397,12 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.proc_data.ppid      = proc_data.ppid;
     trap_info.proc_data.userid    = proc_data.userid;
     trap_info.proc_data.tid       = proc_data.tid;
+    trap_info.attached_proc_data.base_addr = attached_proc_data.base_addr;
+    trap_info.attached_proc_data.name      = attached_proc_data.name;
+    trap_info.attached_proc_data.pid       = attached_proc_data.pid;
+    trap_info.attached_proc_data.ppid      = attached_proc_data.ppid;
+    trap_info.attached_proc_data.userid    = attached_proc_data.userid;
+    trap_info.attached_proc_data.tid       = attached_proc_data.tid;
 
     GSList* loop = s->traps;
     drakvuf->in_callback = 1;
@@ -446,6 +466,13 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
         pass->proc_data.pid       = proc_data.pid;
         pass->proc_data.ppid      = proc_data.ppid;
         pass->proc_data.userid    = proc_data.userid;
+        pass->proc_data.tid       = proc_data.tid;
+        pass->attached_proc_data.base_addr = attached_proc_data.base_addr;
+        pass->attached_proc_data.name      = attached_proc_data.name;
+        pass->attached_proc_data.pid       = attached_proc_data.pid;
+        pass->attached_proc_data.ppid      = attached_proc_data.ppid;
+        pass->attached_proc_data.userid    = attached_proc_data.userid;
+        pass->attached_proc_data.tid       = attached_proc_data.tid;
 
         if (!s->memaccess.guard2)
         {
@@ -468,6 +495,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             {
                 g_slice_free(struct memcb_pass, pass);
                 g_free( (gpointer)proc_data.name );
+                g_free( (gpointer)attached_proc_data.name );
                 PRINT_DEBUG("Somebody try to write to the shadow page, let's emulate it instead\n");
                 return rsp | VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
             }
@@ -483,6 +511,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     }
 
     g_free( (gpointer)proc_data.name );
+    g_free( (gpointer)attached_proc_data.name );
     return rsp;
 }
 
@@ -543,6 +572,8 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     proc_data_priv_t proc_data;
     memset(&proc_data, 0, sizeof(proc_data_priv_t));
+    proc_data_priv_t attached_proc_data;
+    memset(&attached_proc_data, 0, sizeof(proc_data_priv_t));
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
@@ -552,6 +583,15 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.trap_pa = pa;
 
     drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data );
+    addr_t attached_proc = drakvuf_get_current_attached_process(drakvuf, &trap_info);
+    if (attached_proc)
+    {
+        drakvuf_get_process_data_priv(drakvuf, attached_proc,
+                                      &attached_proc_data);
+        if (!attached_proc_data.tid &&
+            !drakvuf_get_current_thread_id(drakvuf, &trap_info, &attached_proc_data.tid))
+            PRINT_DEBUG("Pre mem cb failed to get TID for PID %u\n", attached_proc_data.tid);
+    }
 
     trap_info.proc_data.base_addr = proc_data.base_addr;
     trap_info.proc_data.name      = proc_data.name;
@@ -559,6 +599,12 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.proc_data.ppid      = proc_data.ppid;
     trap_info.proc_data.userid    = proc_data.userid;
     trap_info.proc_data.tid       = proc_data.tid;
+    trap_info.attached_proc_data.base_addr = attached_proc_data.base_addr;
+    trap_info.attached_proc_data.name      = attached_proc_data.name;
+    trap_info.attached_proc_data.pid       = attached_proc_data.pid;
+    trap_info.attached_proc_data.ppid      = attached_proc_data.ppid;
+    trap_info.attached_proc_data.userid    = attached_proc_data.userid;
+    trap_info.attached_proc_data.tid       = attached_proc_data.tid;
 
     drakvuf->in_callback = 1;
     GSList* loop = s->traps;
@@ -571,6 +617,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf->in_callback = 0;
 
     g_free( (gpointer)proc_data.name );
+    g_free( (gpointer)attached_proc_data.name );
 
     process_free_requests(drakvuf);
 
@@ -608,6 +655,8 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     proc_data_priv_t proc_data;
     memset(&proc_data, 0, sizeof(proc_data_priv_t));
+    proc_data_priv_t attached_proc_data;
+    memset(&attached_proc_data, 0, sizeof(proc_data_priv_t));
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
@@ -616,6 +665,15 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.vcpu = event->vcpu_id;
 
     drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data );
+    addr_t attached_proc = drakvuf_get_current_attached_process(drakvuf, &trap_info);
+    if (attached_proc)
+    {
+        drakvuf_get_process_data_priv(drakvuf, attached_proc,
+                                      &attached_proc_data);
+        if (!attached_proc_data.tid &&
+            !drakvuf_get_current_thread_id(drakvuf, &trap_info, &attached_proc_data.tid))
+            PRINT_DEBUG("Pre mem cb failed to get TID for PID %u\n", attached_proc_data.tid);
+    }
 
     trap_info.proc_data.base_addr = proc_data.base_addr;
     trap_info.proc_data.name      = proc_data.name;
@@ -623,6 +681,12 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.proc_data.ppid      = proc_data.ppid;
     trap_info.proc_data.userid    = proc_data.userid;
     trap_info.proc_data.tid       = proc_data.tid;
+    trap_info.attached_proc_data.base_addr = attached_proc_data.base_addr;
+    trap_info.attached_proc_data.name      = attached_proc_data.name;
+    trap_info.attached_proc_data.pid       = attached_proc_data.pid;
+    trap_info.attached_proc_data.ppid      = attached_proc_data.ppid;
+    trap_info.attached_proc_data.userid    = attached_proc_data.userid;
+    trap_info.attached_proc_data.tid       = attached_proc_data.tid;
 
     drakvuf->in_callback = 1;
     GSList* loop = drakvuf->cr3;
@@ -635,6 +699,7 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf->in_callback = 0;
 
     g_free(proc_data.name);
+    g_free( (gpointer)attached_proc_data.name );
 
     process_free_requests(drakvuf);
 
@@ -658,6 +723,8 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     proc_data_priv_t proc_data;
     memset(&proc_data, 0, sizeof(proc_data_priv_t));
+    proc_data_priv_t attached_proc_data;
+    memset(&attached_proc_data, 0, sizeof(proc_data_priv_t));
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
@@ -667,6 +734,15 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.debug = &event->debug_event;
 
     drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data );
+    addr_t attached_proc = drakvuf_get_current_attached_process(drakvuf, &trap_info);
+    if (attached_proc)
+    {
+        drakvuf_get_process_data_priv(drakvuf, attached_proc,
+                                      &attached_proc_data);
+        if (!attached_proc_data.tid &&
+            !drakvuf_get_current_thread_id(drakvuf, &trap_info, &attached_proc_data.tid))
+            PRINT_DEBUG("Pre mem cb failed to get TID for PID %u\n", attached_proc_data.tid);
+    }
 
     trap_info.proc_data.base_addr = proc_data.base_addr;
     trap_info.proc_data.name      = proc_data.name;
@@ -674,6 +750,12 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.proc_data.ppid      = proc_data.ppid;
     trap_info.proc_data.userid    = proc_data.userid;
     trap_info.proc_data.tid       = proc_data.tid;
+    trap_info.attached_proc_data.base_addr = attached_proc_data.base_addr;
+    trap_info.attached_proc_data.name      = attached_proc_data.name;
+    trap_info.attached_proc_data.pid       = attached_proc_data.pid;
+    trap_info.attached_proc_data.ppid      = attached_proc_data.ppid;
+    trap_info.attached_proc_data.userid    = attached_proc_data.userid;
+    trap_info.attached_proc_data.tid       = attached_proc_data.tid;
 
     drakvuf->in_callback = 1;
     GSList* loop = drakvuf->debug;
@@ -686,6 +768,7 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf->in_callback = 0;
 
     g_free(proc_data.name);
+    g_free( (gpointer)attached_proc_data.name );
 
     process_free_requests(drakvuf);
 
@@ -710,6 +793,8 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     proc_data_priv_t proc_data;
     memset(&proc_data, 0, sizeof(proc_data_priv_t));
+    proc_data_priv_t attached_proc_data;
+    memset(&attached_proc_data, 0, sizeof(proc_data_priv_t));
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
@@ -719,6 +804,15 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.cpuid = &event->cpuid_event;
 
     drakvuf_get_current_process_data( drakvuf, &trap_info, &proc_data );
+    addr_t attached_proc = drakvuf_get_current_attached_process(drakvuf, &trap_info);
+    if (attached_proc)
+    {
+        drakvuf_get_process_data_priv(drakvuf, attached_proc,
+                                      &attached_proc_data);
+        if (!attached_proc_data.tid &&
+            !drakvuf_get_current_thread_id(drakvuf, &trap_info, &attached_proc_data.tid))
+            PRINT_DEBUG("Pre mem cb failed to get TID for PID %u\n", attached_proc_data.tid);
+    }
 
     trap_info.proc_data.base_addr = proc_data.base_addr;
     trap_info.proc_data.name      = proc_data.name;
@@ -726,6 +820,12 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.proc_data.ppid      = proc_data.ppid;
     trap_info.proc_data.userid    = proc_data.userid;
     trap_info.proc_data.tid       = proc_data.tid;
+    trap_info.attached_proc_data.base_addr = attached_proc_data.base_addr;
+    trap_info.attached_proc_data.name      = attached_proc_data.name;
+    trap_info.attached_proc_data.pid       = attached_proc_data.pid;
+    trap_info.attached_proc_data.ppid      = attached_proc_data.ppid;
+    trap_info.attached_proc_data.userid    = attached_proc_data.userid;
+    trap_info.attached_proc_data.tid       = attached_proc_data.tid;
 
     drakvuf->in_callback = 1;
     GSList* loop = drakvuf->cpuid;
@@ -738,6 +838,7 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf->in_callback = 0;
 
     g_free( (gpointer)proc_data.name );
+    g_free( (gpointer)attached_proc_data.name );
 
     process_free_requests(drakvuf);
 
@@ -1614,6 +1715,7 @@ void close_vmi(drakvuf_t drakvuf)
         {
             struct memcb_pass* pass = (struct memcb_pass*)drakvuf->step_event[i]->data;
             g_free(pass->proc_data.name);
+            g_free(pass->attached_proc_data.name);
             g_slice_free(struct memcb_pass, pass);
         }
 

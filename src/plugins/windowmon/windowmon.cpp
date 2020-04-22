@@ -149,16 +149,16 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         case OUTPUT_CSV:
             printf("windowmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, window_class, window_name);
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
+                   info->attached_proc_data.userid, window_class, window_name);
             break;
         case OUTPUT_KV:
             printf("windowmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Class=%s,Name=%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
                    info->trap->name, window_class, window_name);
             break;
         case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
             printf( "{"
                     "\"Plugin\" : \"windowmon\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
@@ -173,8 +173,8 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     "}\n",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
+                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
+                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
                     info->trap->name,
                     window_class, window_name);
             g_free(escaped_pname);
@@ -182,8 +182,8 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         default:
         case OUTPUT_DEFAULT:
             printf("[WINDOWMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" CLASS:%s NAME:%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, window_class, window_name);
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
+                   USERIDSTR(drakvuf), info->attached_proc_data.userid, window_class, window_name);
             break;
     }
 
