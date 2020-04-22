@@ -170,7 +170,7 @@ typedef enum memaccess_type
 
 typedef struct process_data
 {
-    char* name;         /* Process name */
+    const char* name;   /* Process name */
     vmi_pid_t pid ;     /* Process pid */
     vmi_pid_t ppid ;    /* Process parent pid */
     addr_t base_addr ;  /* Process base address */
