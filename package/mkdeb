@@ -13,7 +13,7 @@ fi
 
 if [ "$2" = "" ]
 then
-    version=0.0+git$(git log -1 --date=format:'%Y%m%d.%H%M%S' --pretty=format:%cd)+$(git rev-parse --short HEAD)-1
+    version=$(grep 'PACKAGE_VERSION' 'src/Makefile' | head -n 1 | cut -f2 "-d=" | xargs echo -n)
     echo "Auto-detected version: $version"
 
     if [ "$version" = "0.0+git+-1" ]
