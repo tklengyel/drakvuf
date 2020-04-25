@@ -16,7 +16,7 @@ then
     version=0.0+git$(git log -1 --date=format:'%Y%m%d.%H%M%S' --pretty=format:%cd)+$(git rev-parse --short HEAD)-1
     echo "Auto-detected version: $version"
 
-    if [ "$version" = "" ]
+    if [ "$version" = "0.0+git+-1" ]
     then
         echo "Unable to recognize package version automatically, please provide it explicitly by the command line:"
        echo "package/mkdeb <distro> <version>"
