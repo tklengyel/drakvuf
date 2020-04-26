@@ -187,6 +187,7 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
             type = syscall ? "syscall" : "sysret";
             escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
             printf( "{"
+                    "\"Plugin\": \"syscalls\","
                     "\"Type\" : \"%s\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
                     "\"VCPU\": %" PRIu32 ","
