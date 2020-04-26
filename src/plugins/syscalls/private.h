@@ -456,7 +456,7 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
                   uint64_t ret, const char *extra_info);
 void print_nargs(output_format_t format, uint32_t nargs);
 void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data);
-void print_footer(output_format_t format, uint32_t nargs);
+void print_footer(output_format_t format, uint32_t nargs, bool syscall);
 void free_trap(gpointer p);
 
 #endif // commoncsproto_h

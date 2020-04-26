@@ -135,7 +135,7 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         exit_status_str = ntstatus_format_string(ntstatus_t(info->regs->rax), exit_status_buf, sizeof(exit_status_buf));
 
     print_header(s->format, drakvuf, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, exit_status_str);
-    print_footer(s->format, 0);
+    print_footer(s->format, 0, false);
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
     s->traps = g_slist_remove(s->traps, info->trap);
@@ -210,7 +210,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         print_nargs(s->format, nargs);
         print_args(s, drakvuf, info, sc, buf);
     }
-    print_footer(s->format, nargs);
+    print_footer(s->format, nargs, true);
     g_free(buf);
 
     addr_t ret = 0;
