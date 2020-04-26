@@ -192,14 +192,14 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
                     "\"VCPU\": %" PRIu32 ","
                     "\"CR3\": %" PRIu64 ","
                     "\"ProcessName\": %s,"
-                    "\"UserName\": %s,"
-                    "\"UserId\": %" PRIu64 \
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
                     "\"TID\": %d,"
                     "\"Module\": \"%s\","
                     "\"Method\": \"%s\","
-                    "\"Args\": [",
+                    "\"Args\": {",
                     type, UNPACK_TIMEVAL(info->timestamp),
                     info->vcpu, info->regs->cr3, escaped_pname,
                     USERIDSTR(drakvuf), info->attached_proc_data.userid,
@@ -207,7 +207,7 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
                     module, name);
 
             if ( syscall )
-                printf("\"Args\": [");
+                printf("\"Args\": {");
             else
                 printf("\"Ret\": %" PRIu64 ","
                        "\"Info\": \"%s\"",
@@ -373,8 +373,8 @@ void print_footer(output_format_t format, uint32_t nargs)
             printf("\n");
             break;
         case OUTPUT_JSON:
-            // close JSON args array and document
-            printf("] }\n");
+            // close JSON args object and document
+            printf("} }\n");
             break;
         default:
         case OUTPUT_DEFAULT:
