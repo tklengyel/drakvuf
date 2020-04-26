@@ -375,9 +375,9 @@ void print_footer(output_format_t format, uint32_t nargs, bool syscall)
         case OUTPUT_JSON:
             // close JSON args object and document
             if ( syscall )
-                printf("] }\n");
+                printf("] } }\n");
             else
-                printf("}\n");
+                printf("} }\n");
             break;
         default:
         case OUTPUT_DEFAULT:
