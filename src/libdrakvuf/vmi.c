@@ -152,7 +152,7 @@ event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t* event)
     PRINT_DEBUG("reset trap on vCPU %u, switching altp2m %u->%u\n", event->vcpu_id, event->slat_id, drakvuf->altp2m_idx);
     event->slat_id = drakvuf->altp2m_idx;
     return VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Turn off singlestep
-           VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+           VMI_EVENT_RESPONSE_SLAT_ID;
 }
 
 /*
@@ -333,7 +333,7 @@ done:
     drakvuf->step_event[event->vcpu_id]->data = drakvuf;
     return rsp |
            VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Turn off singlestep
-           VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+           VMI_EVENT_RESPONSE_SLAT_ID;
 }
 
 /* This hits on the first access on a page, so not in singlestep yet */
@@ -507,7 +507,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
         drakvuf->step_event[event->vcpu_id]->data = pass;
         return rsp |
                VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Turn on singlestep
-               VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+               VMI_EVENT_RESPONSE_SLAT_ID;
     }
 
     g_free( (gpointer)proc_data.name );
@@ -626,11 +626,13 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     {
         PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u\n", event->vcpu_id);
         event->slat_id = 0;
+        event->next_slat_id = drakvuf->altp2m_idx;
+
+        // TODO: once support for Xen versions before 4.14 is dropped remove these lines
         drakvuf->step_event[event->vcpu_id]->callback = vmi_reset_trap;
         drakvuf->step_event[event->vcpu_id]->data = drakvuf;
-        return rsp |
-               VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Enable singlestep
-               VMI_EVENT_RESPONSE_VMM_PAGETABLE_ID;
+
+        return rsp | drakvuf->int3_response_flags;
     }
 
     return rsp;
@@ -1606,6 +1608,13 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         PRINT_DEBUG("Failed to switch Altp2m view to X\n");
         return 0;
     }
+
+    if ( xen_version() >= 14 )
+        drakvuf->int3_response_flags = VMI_EVENT_RESPONSE_SLAT_ID |     // Switch to this ID immediately
+                                       VMI_EVENT_RESPONSE_NEXT_SLAT_ID; // Switch to next ID after singlestepping a single instruction
+    else
+        drakvuf->int3_response_flags = VMI_EVENT_RESPONSE_SLAT_ID |     // Switch to this ID immediately
+                                       VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP; // Turn on singlestep
 
     PRINT_DEBUG("init_vmi finished\n");
     return 1;
