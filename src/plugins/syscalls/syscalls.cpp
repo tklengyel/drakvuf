@@ -207,7 +207,7 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
                     module, name);
 
             if ( syscall )
-                printf("\"Args\": {");
+                printf("\"Args\": [");
             else
                 printf("\"Ret\": %" PRIu64 ","
                        "\"Info\": \"%s\"",
@@ -362,7 +362,7 @@ void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const
     }
 }
 
-void print_footer(output_format_t format, uint32_t nargs)
+void print_footer(output_format_t format, uint32_t nargs, bool syscall)
 {
     switch (format)
     {
@@ -374,7 +374,10 @@ void print_footer(output_format_t format, uint32_t nargs)
             break;
         case OUTPUT_JSON:
             // close JSON args object and document
-            printf("} }\n");
+            if ( syscall )
+                printf("] }\n");
+            else
+                printf("}\n");
             break;
         default:
         case OUTPUT_DEFAULT:
