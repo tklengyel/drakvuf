@@ -36,4 +36,3 @@ then
 
     DRAK_DOM0_RAM=$(expr "$DRAK_TOTAL_RAM" / 2)
 fi
-
