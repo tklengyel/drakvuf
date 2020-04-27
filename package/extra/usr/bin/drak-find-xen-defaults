@@ -2,6 +2,7 @@
 
 set -e
 
+IS_XEN=0
 xen-detect -N || IS_XEN=$?
 
 if [ $IS_XEN = 1 ]
