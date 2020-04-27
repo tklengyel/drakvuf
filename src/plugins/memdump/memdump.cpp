@@ -751,6 +751,43 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plugin)
+{
+    vmi_lock_guard lg(drakvuf);
+    vmi_v2pcache_flush(lg.vmi, info->regs->cr3);
+
+    bool is_syswow = drakvuf_is_wow64(drakvuf, info);
+
+    addr_t data_size = 0;
+
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rcx
+    };
+
+	const auto ptr_size = is_syswow ? sizeof(uint32_t) : sizeof(addr_t);
+	ctx.addr += ptr_size;
+
+    if (vmi_read(lg.vmi, &ctx, ptr_size, &data_size, nullptr) != VMI_SUCCESS)
+    {
+        PRINT_DEBUG("[MEMDUMP.NET] failed to read size of dump from memory.");
+        return false;
+    }
+
+    PRINT_DEBUG("[MEMDUMP.NET] dumping assembly from memory (size = %lu)\n", data_size);
+
+	ctx.addr += ptr_size;
+
+    if (!dump_memory_region(drakvuf, lg.vmi, info, plugin, &ctx, data_size, ".NET AssemblyNative::LoadImage", nullptr, nullptr))
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
+        return false;
+    }
+
+    return true;
+}
+
 memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
     : pluginex(drakvuf, output)
     , dumps_count()
@@ -775,6 +812,16 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
     {
         PRINT_DEBUG("Memdump works better when there is a JSON profile for WoW64 NTDLL (-w)\n");
     }
+
+    if (c->clr_profile)
+        this->setup_dotnet_hooks(drakvuf, "clr.dll", c->clr_profile);
+    else
+        PRINT_DEBUG("clr.dll profile not found, memdump will procede without .NET hooks\n");
+
+    if (c->mscorwks_profile)
+        this->setup_dotnet_hooks(drakvuf, "mscorwks.dll", c->mscorwks_profile);
+    else
+        PRINT_DEBUG("mscorwks.dll profile not found, memdump will procede without .NET hooks\n");
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap<memdump>(drakvuf, nullptr, this, free_virtual_memory_hook_cb,    bp.for_syscall_name("NtFreeVirtualMemory")) ||

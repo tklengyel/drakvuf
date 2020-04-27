@@ -139,6 +139,9 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     if (target->pid != info->proc_data.pid)
         return VMI_EVENT_RESPONSE_NONE;
 
+    if (target->target_name == "AssemblyNative::LoadImage")
+        dotnet_assembly_native_load_image_cb(drakvuf, info, (memdump*)target->plugin);
+
     dump_from_stack(drakvuf, info, (memdump*)target->plugin);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -156,7 +159,7 @@ static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* ex
         {
             if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
             {
-                drakvuf_request_usermode_hook(drakvuf, dll, wanted_hook.function_name.c_str(), usermode_hook_cb, std::vector < std::unique_ptr< ArgumentPrinter > >(), plugin);
+                drakvuf_request_usermode_hook(drakvuf, dll, wanted_hook.type, wanted_hook.function_name.c_str(), wanted_hook.offset, usermode_hook_cb, std::vector < std::unique_ptr< ArgumentPrinter > >(), plugin);
             }
         }
     }
@@ -188,7 +191,7 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
 
     while (it != std::end(this->wanted_hooks))
     {
-        if ((*it).strategy != "stack" && (*it).strategy != "log+stack")
+        if ((*it).log_strategy != "stack" && (*it).log_strategy != "log+stack")
             it = this->wanted_hooks.erase(it);
         else
             ++it;
@@ -214,6 +217,34 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
         PRINT_DEBUG("[MEMDUMP] Failed to subscribe to libusermode\n");
         throw -1;
     }
+}
+
+void memdump::setup_dotnet_hooks(drakvuf_t drakvuf, const char* dll_name, const char* profile)
+{
+    PRINT_DEBUG("%s profile found, will setup usermode hooks for .NET\n", dll_name);
+    
+    auto profile_json = json_object_from_file(profile);
+    if (!profile_json)
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed to load JSON debug info for %s\n", dll_name);
+        return;
+    }
+
+    addr_t func_rva = 0;
+    // LoadImage_1 => AssemblyNative::LoadImage
+    if (!json_get_symbol_rva(drakvuf, profile_json, "LoadImage_1", &func_rva))
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed to find LoadImage_1 (AssemblyNative::LoadImage) RVA in json for %s", dll_name);
+        return;
+    }
+    
+    plugin_target_config_entry_t entry;
+    entry.function_name = "AssemblyNative::LoadImage";
+    entry.dll_name = dll_name;
+    entry.type = HOOK_BY_OFFSET;
+    entry.offset = func_rva;
+    entry.log_strategy = "log+stack";
+    this->wanted_hooks.push_back(std::move(entry));
 }
 
 void memdump::userhook_destroy()

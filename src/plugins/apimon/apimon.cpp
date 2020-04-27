@@ -322,7 +322,7 @@ static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* ex
         {
             if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
             {
-                drakvuf_request_usermode_hook(drakvuf, dll, wanted_hook.function_name.c_str(), usermode_hook_cb, wanted_hook.argument_printers, plugin);
+                drakvuf_request_usermode_hook(drakvuf, dll, wanted_hook.type, wanted_hook.function_name.c_str(), wanted_hook.offset, usermode_hook_cb, wanted_hook.argument_printers, plugin);
             }
         }
     }
@@ -353,7 +353,7 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
 
     while (it != std::end(this->wanted_hooks))
     {
-        if ((*it).strategy != "log" && (*it).strategy != "log+stack")
+        if ((*it).log_strategy != "log" && (*it).log_strategy != "log+stack")
             it = this->wanted_hooks.erase(it);
         else
             ++it;

@@ -117,6 +117,8 @@ struct memdump_config
 {
     const char* memdump_dir;
     const char* dll_hooks_list;
+    const char* clr_profile;
+    const char* mscorwks_profile;
 };
 
 class memdump: public pluginex
@@ -135,6 +137,9 @@ public:
 
     void userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output);
     void userhook_destroy();
+
+private:
+    void setup_dotnet_hooks(drakvuf_t drakvuf, const char* dll_name, const char* profile);
 };
 
 #endif

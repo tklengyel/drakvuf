@@ -339,17 +339,29 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
     {
         if (target.state == HOOK_FIRST_TRY || target.state == HOOK_PAGEFAULT_RETRY)
         {
-            addr_t exec_func;
-            access_context_t ctx =
+            addr_t exec_func = 0;
+
+            if (target.type == HOOK_BY_NAME)
             {
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3,
-                .addr = dll_meta->v.real_dll_base
-            };
+                access_context_t ctx =
+                {
+                    .translate_mechanism = VMI_TM_PROCESS_DTB,
+                    .dtb = info->regs->cr3,
+                    .addr = dll_meta->v.real_dll_base
+                };
 
-            status_t translate_ret = vmi_translate_sym2v(lg.vmi, &ctx, target.target_name.c_str(), &exec_func);
-
-            if (translate_ret == VMI_SUCCESS && target.state == HOOK_FIRST_TRY)
+                if (vmi_translate_sym2v(lg.vmi, &ctx, target.target_name.c_str(), &exec_func) != VMI_SUCCESS)
+                {
+                    target.state = HOOK_FAILED;
+                    return VMI_EVENT_RESPONSE_NONE;
+                }
+            }
+            else // HOOK_BY_OFFSET
+            {
+                exec_func = dll_meta->v.real_dll_base + target.offset;
+            }
+            
+            if (target.state == HOOK_FIRST_TRY)
             {
                 target.state = HOOK_FAILED;
 
@@ -368,7 +380,7 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
                         target.state = HOOK_OK;
                 }
             }
-            else if (translate_ret == VMI_SUCCESS && target.state == HOOK_PAGEFAULT_RETRY)
+            else if (target.state == HOOK_PAGEFAULT_RETRY)
             {
                 target.state = HOOK_FAILED;
                 page_info_t pinfo;
@@ -792,10 +804,14 @@ usermode_reg_status_t userhook::init(drakvuf_t drakvuf)
     return USERMODE_REGISTER_SUCCESS;
 }
 
-void userhook::request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, const std::vector< std::unique_ptr < ArgumentPrinter > > &argument_printers, void* extra)
+void userhook::request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, target_hook_type type, const char* func_name, addr_t offset, callback_t callback, const std::vector< std::unique_ptr < ArgumentPrinter > > &argument_printers, void* extra)
 {
     dll_t* p_dll = (dll_t*)const_cast<dll_view_t*>(dll);
-    p_dll->targets.emplace_back(func_name, callback, argument_printers, extra);
+
+    if (type == HOOK_BY_NAME)
+        p_dll->targets.emplace_back(func_name, callback, argument_printers, extra);
+    else // HOOK_BY_OFFSET
+        p_dll->targets.emplace_back(func_name, offset, callback, argument_printers, extra);
 }
 
 void userhook::register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg)
@@ -839,13 +855,13 @@ usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, user
     return USERMODE_REGISTER_SUCCESS;
 }
 
-bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers, void* extra)
+bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, target_hook_type type, const char* func_name, addr_t offset, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers, void* extra)
 {
     if (!instance || !instance->initialized) {
         return false;
     }
 
-    instance->request_usermode_hook(drakvuf, dll, func_name, callback, argument_printers, extra);
+    instance->request_usermode_hook(drakvuf, dll, type, func_name, offset, callback, argument_printers, extra);
     return true;
 }
 
@@ -860,8 +876,8 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
         wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", "log+stack", std::move(arg_vec1));
 
         std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec2;
-        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter()));
-        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter()));
+        arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter()));
+        arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter()));
         wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", "log+stack", std::move(arg_vec2));
         return;
     }
@@ -887,13 +903,31 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
         std::string arg_type;
         if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
             throw -1;
+        
         if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
             throw -1;
-        if (!std::getline(ss, e.strategy, ',') || e.strategy.empty())
+        
+        e.type = HOOK_BY_NAME;
+        
+        std::string log_strategy_or_offset;
+        if (!std::getline(ss, log_strategy_or_offset, ','))
             throw -1;
 
-        if (e.strategy != "log" && e.strategy != "log+stack" && e.strategy != "stack")
-            throw -1;
+        if (log_strategy_or_offset == "log" || log_strategy_or_offset == "log+stack" || log_strategy_or_offset == "stack")
+        {
+            e.log_strategy = log_strategy_or_offset;
+        }
+        else
+        {
+            e.offset = std::stoull(log_strategy_or_offset, 0, 16);
+            e.type = HOOK_BY_OFFSET;
+
+            if (!std::getline(ss, e.log_strategy, ',') || e.log_strategy.empty())
+                throw -1;
+
+            if (e.log_strategy != "log" && e.log_strategy != "log+stack" && e.log_strategy != "stack")
+                throw -1;
+        }
 
         while (std::getline(ss, arg_type, ',') && !arg_type.empty())
         {
