@@ -115,16 +115,32 @@
 
 typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
 
+enum target_hook_type
+{
+    HOOK_BY_NAME,
+    HOOK_BY_OFFSET
+};
+
 struct plugin_target_config_entry_t
 {
     std::string dll_name;
+    target_hook_type type;
     std::string function_name;
-    std::string strategy;
+    addr_t offset;
+    std::string log_strategy;
     std::vector< std::unique_ptr< ArgumentPrinter > > argument_printers;
 
-    plugin_target_config_entry_t() : dll_name(), function_name(), strategy(), argument_printers() {}
-    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, std::string&& strategy, std::vector< std::unique_ptr< ArgumentPrinter > > &&argument_printers)
-        : dll_name(std::move(dll_name)), function_name(std::move(function_name)), strategy(std::move(strategy)), argument_printers(std::move(argument_printers)) {}
+    plugin_target_config_entry_t()
+        : dll_name(), function_name(), offset(), log_strategy(), argument_printers()
+    {}
+
+    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, addr_t offset, std::string&& log_strategy, std::vector< std::unique_ptr< ArgumentPrinter > > &&argument_printers)
+        : dll_name(std::move(dll_name)), type(HOOK_BY_OFFSET), function_name(std::move(function_name)), offset(offset), log_strategy(std::move(log_strategy)), argument_printers(std::move(argument_printers))
+    {}
+
+    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, std::string&& log_strategy, std::vector< std::unique_ptr< ArgumentPrinter > > &&argument_printers)
+        : dll_name(std::move(dll_name)), type(HOOK_BY_NAME), function_name(std::move(function_name)), log_strategy(std::move(log_strategy)), argument_printers(std::move(argument_printers))
+    {}
 };
 
 enum target_hook_state
@@ -138,7 +154,9 @@ enum target_hook_state
 struct hook_target_entry_t
 {
     vmi_pid_t pid;
+    target_hook_type type;
     std::string target_name;
+    addr_t offset;
     callback_t callback;
     const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers;
     target_hook_state state;
@@ -146,7 +164,12 @@ struct hook_target_entry_t
     void* plugin;
 
     hook_target_entry_t(std::string target_name, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers, void* plugin)
-        : target_name(target_name), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), plugin(plugin) {}
+        : type(HOOK_BY_NAME), target_name(target_name), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), plugin(plugin)
+    {}
+
+    hook_target_entry_t(std::string target_name, addr_t offset, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers, void* plugin)
+        : type(HOOK_BY_OFFSET), target_name(target_name), offset(offset), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), plugin(plugin)
+    {}
 };
 
 struct return_hook_target_entry_t
@@ -187,7 +210,7 @@ typedef enum usermode_reg_status {
 } usermode_reg_status_t;
 
 usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
-bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const char* func_name, callback_t callback, const std::vector< std::unique_ptr< ArgumentPrinter > > &argument_printers, void* extra);
+bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, target_hook_type type, const char* func_name, addr_t offset, callback_t callback, const std::vector< std::unique_ptr< ArgumentPrinter > > &argument_printers, void* extra);
 void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, std::vector<plugin_target_config_entry_t>* wanted_hooks);
 
 #endif

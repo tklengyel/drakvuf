@@ -135,6 +135,8 @@ struct plugins_options
     const char* dll_hooks_list;         // PLUGIN_MEMDUMP, PLUGIN_APIMON
     const char* procdump_dir;           // PLUGIN_PROCDUMP
     bool compress_procdumps = false;    // PLUGIN_PROCDUMP
+    const char* clr_profile;            // PLUGIN_MEMDUMP
+    const char* mscorwks_profile;       // PLUGIN_MEMDUMP
 };
 
 typedef enum drakvuf_plugin
