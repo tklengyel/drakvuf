@@ -222,7 +222,7 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
 void memdump::setup_dotnet_hooks(drakvuf_t drakvuf, const char* dll_name, const char* profile)
 {
     PRINT_DEBUG("%s profile found, will setup usermode hooks for .NET\n", dll_name);
-    
+
     auto profile_json = json_object_from_file(profile);
     if (!profile_json)
     {
@@ -237,7 +237,7 @@ void memdump::setup_dotnet_hooks(drakvuf_t drakvuf, const char* dll_name, const 
         PRINT_DEBUG("[MEMDUMP] Failed to find LoadImage_1 (AssemblyNative::LoadImage) RVA in json for %s", dll_name);
         return;
     }
-    
+
     plugin_target_config_entry_t entry;
     entry.function_name = "AssemblyNative::LoadImage";
     entry.dll_name = dll_name;

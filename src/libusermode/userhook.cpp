@@ -360,7 +360,7 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
             {
                 exec_func = dll_meta->v.real_dll_base + target.offset;
             }
-            
+
             if (target.state == HOOK_FIRST_TRY)
             {
                 target.state = HOOK_FAILED;
@@ -903,12 +903,12 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
         std::string arg_type;
         if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
             throw -1;
-        
+
         if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
             throw -1;
-        
+
         e.type = HOOK_BY_NAME;
-        
+
         std::string log_strategy_or_offset;
         if (!std::getline(ss, log_strategy_or_offset, ','))
             throw -1;
