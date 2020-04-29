@@ -161,6 +161,14 @@ struct fd_info
 typedef struct fd_info* fd_info_t;
 
 
+struct bitfield
+{
+    size_t offset;
+    size_t start_bit;
+    size_t end_bit;
+};
+typedef struct bitfield* bitfield_t;
+
 struct drakvuf
 {
     char* dom_name;
@@ -191,6 +199,7 @@ struct drakvuf
 
     size_t* offsets;
     size_t* sizes;
+    bitfield_t bitfields;
 
     size_t* wow_offsets;
 
@@ -295,6 +304,7 @@ struct memcb_pass
     uint64_t gfn;
     addr_t pa;
     proc_data_priv_t proc_data ;
+    proc_data_priv_t attached_proc_data ;
     struct remapped_gfn* remapped_gfn;
     vmi_mem_access_t access;
     GSList* traps;

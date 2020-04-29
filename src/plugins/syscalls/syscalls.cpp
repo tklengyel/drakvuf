@@ -163,8 +163,8 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
                    ",%s,%" PRIi64 \
                    ",%" PRIi32 ",%s,%s",
                    type, UNPACK_TIMEVAL(info->timestamp), info->vcpu,
-                   info->regs->cr3, info->proc_data.name, info->proc_data.pid, info->proc_data.ppid,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
+                   info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.pid, info->attached_proc_data.ppid,
+                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
                    nr, module, name);
             if ( !syscall )
                 printf(",%lu,%s", ret, extra_info);
@@ -176,8 +176,8 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
                    ",UserName=\"%s\",UserId=%" PRIu64 \
                    ",Syscall=%" PRIi32 ",Module=\"%s\",Method=\"%s\"",
                    type, UNPACK_TIMEVAL(info->timestamp), info->vcpu,
-                   info->regs->cr3, info->proc_data.name, info->proc_data.pid, info->proc_data.ppid,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
+                   info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.pid, info->attached_proc_data.ppid,
+                   USERIDSTR(drakvuf), info->attached_proc_data.userid,
                    nr, module, name);
             if ( !syscall )
                 printf(",Ret=%lu,Info=\"%s\"", ret, extra_info?:"");
@@ -185,25 +185,26 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
         case OUTPUT_JSON:
             // print_footer() puts single EOL at end of JSON doc to simplify parsing on other end
             type = syscall ? "syscall" : "sysret";
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
             printf( "{"
+                    "\"Plugin\": \"syscalls\","
                     "\"Type\" : \"%s\","
                     "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
                     "\"VCPU\": %" PRIu32 ","
                     "\"CR3\": %" PRIu64 ","
                     "\"ProcessName\": %s,"
-                    "\"UserName\": %s,"
-                    "\"UserId\": %" PRIu64 \
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
                     "\"PID\" : %d,"
                     "\"PPID\": %d,"
                     "\"TID\": %d,"
                     "\"Module\": \"%s\","
                     "\"Method\": \"%s\","
-                    "\"Args\": [",
+                    "\"Args\": {",
                     type, UNPACK_TIMEVAL(info->timestamp),
                     info->vcpu, info->regs->cr3, escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
+                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
+                    info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
                     module, name);
 
             if ( syscall )
@@ -224,8 +225,8 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
                    " %s:%" PRIi64 \
                    " %" PRIi32 ":%s!%s",
                    type, UNPACK_TIMEVAL(info->timestamp), info->vcpu,
-                   info->regs->cr3, info->proc_data.name, info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
+                   info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
+                   USERIDSTR(drakvuf), info->attached_proc_data.userid,
                    nr, module, name);
             if ( !syscall )
                 printf(" Ret:%lu Info:%s", ret, extra_info ?: "");
@@ -362,7 +363,7 @@ void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const
     }
 }
 
-void print_footer(output_format_t format, uint32_t nargs)
+void print_footer(output_format_t format, uint32_t nargs, bool syscall)
 {
     switch (format)
     {
@@ -373,8 +374,11 @@ void print_footer(output_format_t format, uint32_t nargs)
             printf("\n");
             break;
         case OUTPUT_JSON:
-            // close JSON args array and document
-            printf("] }\n");
+            // close JSON args object and document
+            if ( syscall )
+                printf("] } }\n");
+            else
+                printf("} }\n");
             break;
         default:
         case OUTPUT_DEFAULT:

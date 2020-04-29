@@ -101,174 +101,112 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#include "writer.h"
 
-#ifndef FILEDELETE_PRIVATE_H
-#define FILEDELETE_PRIVATE_H
+#include "drakvuf.h"
 
-#define FILE_DISPOSITION_INFORMATION 13
-#define FILE_DELETE_ON_CLOSE 0x1000
+#include <zlib.h>
 
-enum offset
-{
-    FILE_OBJECT_TYPE,
-    FILE_OBJECT_FLAGS,
-    FILE_OBJECT_FILENAME,
-    FILE_OBJECT_SECTIONOBJECTPOINTER,
-    SECTIONOBJECTPOINTER_DATASECTIONOBJECT,
-    SECTIONOBJECTPOINTER_SHAREDCACHEMAP,
-    SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT,
-    CONTROL_AREA_SEGMENT,
-    SEGMENT_CONTROLAREA,
-    SEGMENT_SIZEOFSEGMENT,
-    SEGMENT_TOTALNUMBEROFPTES,
-    SUBSECTION_NEXTSUBSECTION,
-    SUBSECTION_SUBSECTIONBASE,
-    SUBSECTION_PTESINSUBSECTION,
-    SUBSECTION_CONTROLAREA,
-    SUBSECTION_STARTINGSECTOR,
-    OBJECT_HEADER_BODY,
-    __OFFSET_MAX
-};
+#include <string>
+#include <cstdio>
+#include <cstdint>
 
-extern const char* offset_names[__OFFSET_MAX][2];
+namespace {
 
-struct createfile_ret_info
-{
-    vmi_pid_t pid;
-    uint32_t tid;
-    uint64_t rsp;
-
-    addr_t handle;
-
-    filedelete* f;
-};
-
-/************************
- * # For filedelete 2
- ************************/
-
-enum file_object_flags
-{
-    FO_FILE_OPEN                    = 0x00000001,
-    FO_SYNCHRONOUS_IO               = 0x00000002,
-    FO_ALERTABLE_IO                 = 0x00000004,
-    FO_NO_INTERMEDIATE_BUFFERING    = 0x00000008,
-    FO_WRITE_THROUGH                = 0x00000010,
-    FO_SEQUENTIAL_ONLY              = 0x00000020,
-    FO_CACHE_SUPPORTED              = 0x00000040,
-    FO_NAMED_PIPE                   = 0x00000080,
-    FO_STREAM_FILE                  = 0x00000100,
-    FO_MAILSLOT                     = 0x00000200,
-    FO_GENERATE_AUDIT_ON_CLOSE      = 0x00000400,
-    FO_DIRECT_DEVICE_OPEN           = 0x00000800,
-    FO_FILE_MODIFIED                = 0x00001000,
-    FO_FILE_SIZE_CHANGED            = 0x00002000,
-    FO_CLEANUP_COMPLETE             = 0x00004000,
-    FO_TEMPORARY_FILE               = 0x00008000,
-    FO_DELETE_ON_CLOSE              = 0x00010000,
-    FO_OPENED_CASE_SENSITIVE        = 0x00020000,
-    FO_HANDLE_CREATED               = 0x00040000,
-    FO_FILE_FAST_IO_READ            = 0x00080000,
-    FO_RANDOM_ACCESS                = 0x00100000,
-    FO_FILE_OPEN_CANCELLED          = 0x00200000,
-    FO_VOLUME_OPEN                  = 0x00400000,
-    FO_REMOTE_ORIGIN                = 0x01000000,
-    FO_DISALLOW_EXCLUSIVE           = 0x02000000,
-    FO_SKIP_SET_EVENT               = 0x04000000,
-    FO_SKIP_SET_FAST_IO             = 0x08000000,
-    FO_INDIRECT_WAIT_OBJECT         = 0x10000000,
-    FO_SECTION_MINSTORE_TREATMENT   = 0x20000000,
-};
-
-struct wrapper_t
-{
-    filedelete* f;
-    bool is32bit;
-
-    handle_t handle;
-    uint64_t fo_flags;
-
-    reg_t target_cr3;
-    uint32_t target_thread_id;
-    addr_t eprocess_base;
-
-    x86_registers_t saved_regs;
-
-    int curr_sequence_number;
-
-    union
+class BaseProcdumpWriter : public ProcdumpWriter {
+public:
+    explicit BaseProcdumpWriter(std::string const& path)
+        : file{fopen(path.c_str(), "w")}
     {
-        struct
-        {
-            addr_t out;
-            size_t size;
-        } ntqueryobject_info;
+        if (!file) throw -1;
+    }
 
-        struct
-        {
-            size_t bytes_read;
-            addr_t out;
-            addr_t io_status_block;
-        } ntreadfile_info;
-    };
+    ~BaseProcdumpWriter()
+    {
+        fclose(file);
+    }
 
-    drakvuf_trap_t* bp;
+    bool append(uint8_t const *data, size_t size) override
+    {
+        return (size == 0 || fwrite(data, size, 1, file) == 1);
+    }
 
-    addr_t pool;
+    bool finish() override
+    {
+        return (fflush(file) == 0);
+    }
+
+private:
+    FILE *file;
 };
 
-struct IO_STATUS_BLOCK_32
+class GzippedProcdumpWriter : public BaseProcdumpWriter {
+public:
+    explicit GzippedProcdumpWriter(std::string const& path)
+        : BaseProcdumpWriter{path}
+        , z_file{}
+    {
+        z_file.zalloc = Z_NULL;
+        z_file.zfree = Z_NULL;
+        z_file.opaque = Z_NULL;
+        z_file.avail_in = 0;
+        z_file.next_in = Z_NULL;
+        int window_bits = 15 + 16; // Use gzip header format with windowbits of 15
+        int mem_level = 8;
+        auto ret = deflateInit2(&z_file, Z_BEST_SPEED, Z_DEFLATED, window_bits, mem_level, Z_DEFAULT_STRATEGY);
+        if (ret != Z_OK) throw -1;
+    }
+
+    ~GzippedProcdumpWriter()
+    {
+        deflateEnd(&z_file);
+    }
+
+    bool append(uint8_t const* data, size_t size) override
+    {
+        z_file.avail_in = size;
+        z_file.next_in = const_cast<uint8_t*>(data);
+        return write_impl(Z_NO_FLUSH);
+    }
+
+    bool finish() override
+    {
+        return write_impl(Z_FINISH) && BaseProcdumpWriter::finish();
+    }
+
+private:
+    bool write_impl(int flush);
+
+private:
+    z_stream z_file;
+};
+
+bool GzippedProcdumpWriter::write_impl(int flush)
 {
-    uint32_t status;
-    uint32_t info;
-} __attribute__((packed));
+    do
+    {
+        uint8_t out[16 * 1024];
+        z_file.avail_out = sizeof(out);
+        z_file.next_out = out;
 
-struct IO_STATUS_BLOCK_64
+        auto ret = deflate(&z_file, flush);
+        if (ret == Z_STREAM_ERROR)
+        {
+            PRINT_DEBUG("[PROCDUMP] GZIP fail: deflate return Z_STREAM_ERROR");
+            return false;
+        }
+
+        if (!BaseProcdumpWriter::append(out, sizeof(out) - z_file.avail_out)) return false;
+    }
+    while (z_file.avail_out == 0);
+    g_assert(z_file.avail_in == 0);
+    return true;
+}
+
+}
+
+std::unique_ptr<ProcdumpWriter> ProcdumpWriterFactory::build(std::string const& path, bool use_compression)
 {
-    uint64_t status;
-    uint64_t info;
-} __attribute__((packed));
-
-constexpr static uint32_t STATUS_SUCCESS = 0;
-constexpr static uint32_t STATUS_PENDING = 0x103;
-constexpr static uint32_t STATUS_END_OF_FILE = 0xC0000011;
-
-struct _LARGE_INTEGER
-{
-    uint64_t QuadPart;
-} __attribute__((packed));
-
-struct FILE_FS_DEVICE_INFORMATION
-{
-    uint32_t device_type;
-    uint32_t characteristics;
-} __attribute__((packed));
-
-static const uint64_t BYTES_TO_READ = 0x10000;
-
-/**************************************
- * ## Callbacks for injected functions
- *************************************/
-event_response_t exfreepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t waitobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-/***************************
- * ## Helpers for injection
- ***************************/
-bool inject_free_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_waitobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-
-/********************
- *  ## Other helpers
- ********************/
-void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-void free_pool(std::map<addr_t, bool>& pools, addr_t va);
-addr_t find_pool(std::map<addr_t, bool>& pools);
-
-#endif // FILEDELETE_PRIVATE_H
+    if (use_compression) return std::make_unique<GzippedProcdumpWriter>(path);
+    return std::make_unique<BaseProcdumpWriter>(path);
+}

@@ -1,0 +1,39 @@
+#!/bin/sh
+
+set -e
+
+IS_XEN=0
+xen-detect -N || IS_XEN=$?
+
+if [ $IS_XEN = 1 ]
+then
+    DRAK_TOTAL_CPU=$(xl info | grep nr_cpus | cut -f2 '-d:' | xargs)
+    DRAK_TOTAL_RAM=$(xl info | grep total_memory | cut -f2 '-d:' | xargs)
+else
+    DRAK_TOTAL_CPU=$(nproc --all)
+    DRAK_TOTAL_RAM=$(($(getconf _PHYS_PAGES) * $(getconf PAGE_SIZE) / (1024 * 1024)))
+fi
+
+if [ -z "$DRAK_DOM0_CPU" ]
+then
+    if [ $IS_XEN = 1 ]
+    then
+        DRAK_TOTAL_CPU=$(xl info | grep nr_cpus | cut -f2 '-d:' | xargs)
+    else
+        DRAK_TOTAL_CPU=$(nproc --all)
+    fi
+
+    DRAK_DOM0_CPU=$(expr "$DRAK_TOTAL_CPU" / 2)
+fi
+
+if [ -z "$DRAK_DOM0_RAM" ]
+then
+    if [ $IS_XEN = 1 ]
+    then
+        DRAK_TOTAL_RAM=$(xl info | grep total_memory | cut -f2 '-d:' | xargs)
+    else
+        DRAK_TOTAL_RAM=$(($(getconf _PHYS_PAGES) * $(getconf PAGE_SIZE) / (1024 * 1024)))
+    fi
+
+    DRAK_DOM0_RAM=$(expr "$DRAK_TOTAL_RAM" / 2)
+fi

@@ -173,7 +173,7 @@ struct injector
     size_t offsets[OFFSET_MAX];
 
     // Results:
-    int rc;
+    injector_status_t rc;
     inject_result_t result;
     struct
     {
@@ -527,8 +527,8 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     if ( info->proc_data.pid != injector->target_pid || ( injector->target_tid && (uint32_t)info->proc_data.tid != injector->target_tid ))
     {
-        PRINT_DEBUG("MemX received but PID (%u) doesn't match target process (%u)\n",
-                    info->proc_data.pid, injector->target_pid);
+        PRINT_DEBUG("MemX received but PID:TID (%u:%u) doesn't match target process (%u:%u)\n",
+                    info->proc_data.pid, info->proc_data.tid, injector->target_pid, injector->target_tid);
         return 0;
     }
 
@@ -583,7 +583,7 @@ static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drak
     vmi_pid_t crashed_pid = 0;
     if (drakvuf_is_crashreporter(drakvuf, info, &crashed_pid) && crashed_pid == injector->target_pid)
     {
-        injector->rc = 0;
+        injector->rc = INJECTOR_FAILED;
         injector->detected = false;
 
         drakvuf_interrupt(drakvuf, SIGDRAKVUFCRASH);
@@ -713,7 +713,7 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
     PRINT_DEBUG("Process start detected %i -> 0x%lx\n", injector->pid, info->regs->cr3);
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
 
-    injector->rc = 1;
+    injector->rc = INJECTOR_SUCCEEDED;
     injector->detected = true;
 
     if ( injector->break_loop_on_detection )
@@ -889,7 +889,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             {
                 // TODO Retrieve PID and TID
                 PRINT_DEBUG("Injected\n");
-                injector->rc = 1;
+                injector->rc = INJECTOR_SUCCEEDED;
             }
 
             memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
@@ -901,14 +901,17 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             // We are now in the return path from CreateProcessW called from mem_callback
 
             if (info->regs->rax)
+            {
+                injector->rc = INJECTOR_SUCCEEDED;
                 fill_created_process_info(injector, info);
+            }
             else
             {
+                injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
                 injector->error_code.valid = true;
                 drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
             }
 
-            injector->rc = info->regs->rax;
             memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
 
             if (injector->pid && injector->tid)
@@ -934,7 +937,6 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             else
             {
                 PRINT_DEBUG("Failed to inject\n");
-                injector->rc = 0;
 
                 drakvuf_remove_trap(drakvuf, info->trap, NULL);
                 drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
@@ -954,17 +956,21 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
 
-        injector->rc = info->regs->rax;
+        if (info->regs->rax == 1)
+            injector->rc = INJECTOR_SUCCEEDED;
+        else
+            injector->rc = INJECTOR_FAILED;
+
         memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
 
-        if (injector->rc == 1)
+        if (injector->rc == INJECTOR_SUCCEEDED)
         {
             PRINT_DEBUG("Resumed\n");
         }
         else
         {
             PRINT_DEBUG("Failed to resume\n");
-            injector->rc = 0;
+            injector->rc = INJECTOR_FAILED;
 
             drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
         }
@@ -1108,14 +1114,17 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         // We are now in the return path from CreateProcessW
 
         if (info->regs->rax)
+        {
+            injector->rc = INJECTOR_SUCCEEDED;
             fill_created_process_info(injector, info);
+        }
         else
         {
             injector->error_code.valid = true;
+            injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
             drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
         }
 
-        injector->rc = info->regs->rax;
         memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
 
         if (injector->pid && injector->tid)
@@ -1141,7 +1150,6 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         else
         {
             PRINT_DEBUG("Failed to inject\n");
-            injector->rc = 0;
         }
     }
     // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND while
@@ -1150,12 +1158,12 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     {
         // TODO Retrieve PID and TID
         PRINT_DEBUG("Injected\n");
-        injector->rc = 1;
+        injector->rc = INJECTOR_SUCCEEDED;
     }
     else if ( (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method) && STATUS_EXEC_OK == injector->status)
     {
         PRINT_DEBUG("Shellcode executed\n");
-        injector->rc = 1;
+        injector->rc = INJECTOR_SUCCEEDED;
     }
 
     drakvuf_remove_trap(drakvuf, info->trap, NULL);
@@ -1248,8 +1256,7 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 
 static void print_injection_info(output_format_t format, const char* file, injector_t injector)
 {
-    GTimeVal t;
-    g_get_current_time(&t);
+    gint64 t = g_get_real_time();
 
     char* process_name = NULL;
     char* arguments = NULL;
@@ -1545,7 +1552,7 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
     return injector->exec_func != 0;
 }
 
-int injector_start_app_on_win(
+injector_status_t injector_start_app_on_win(
     drakvuf_t drakvuf,
     vmi_pid_t pid,
     uint32_t tid,
@@ -1559,7 +1566,7 @@ int injector_start_app_on_win(
     injector_t* to_be_freed_later,
     bool global_search)
 {
-    int rc = 0;
+    injector_status_t rc = 0;
     PRINT_DEBUG("Target PID %u to start '%s'\n", pid, file);
 
     unicode_string_t* target_file_us = convert_utf8_to_utf16(file);

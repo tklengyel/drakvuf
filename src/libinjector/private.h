@@ -127,7 +127,7 @@ extern bool verbose;
 
 #endif
 
-int injector_start_app_on_linux(drakvuf_t drakvuf,
+injector_status_t injector_start_app_on_linux(drakvuf_t drakvuf,
                                 vmi_pid_t pid,
                                 uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used i.e, tid = pid
                                 const char* app,
@@ -137,7 +137,7 @@ int injector_start_app_on_linux(drakvuf_t drakvuf,
                                 const char* args[]);
 
 
-int injector_start_app_on_win(drakvuf_t drakvuf,
+injector_status_t injector_start_app_on_win(drakvuf_t drakvuf,
                               vmi_pid_t pid,
                               uint32_t tid,
                               const char* app,

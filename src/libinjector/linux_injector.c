@@ -160,7 +160,7 @@ struct injector
     GSList* memtraps;
 
     // Results:
-    int rc;
+    injector_status_t rc;
     inject_result_t result;
     struct
     {
@@ -372,7 +372,7 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
         if (info->regs->rax == ~0u)
         {
             printf("Process start failed!! Exec returned -1 \n");
-            injector->rc = 0;
+            injector->rc = INJECTOR_FAILED;
             injector->detected = false;
             drakvuf_remove_trap(drakvuf, injector->int3_trap, NULL);
             drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
@@ -394,7 +394,7 @@ static event_response_t wait_for_injected_process_cb_linux(drakvuf_t drakvuf, dr
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
     drakvuf_interrupt(drakvuf, SIGINT);
 
-    injector->rc = 1;
+    injector->rc = INJECTOR_SUCCEEDED;
     injector->detected = true;
 
     return 0;
@@ -560,7 +560,7 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
         if (info->regs->rax == ~0u)
         {
             PRINT_DEBUG("Process start failed!!, As exec returned -1 \n");
-            injector->rc = 0;
+            injector->rc = INJECTOR_FAILED;
             injector->detected = false;
             drakvuf_remove_trap(drakvuf, injector->cr3_trap, NULL);
             drakvuf_remove_trap(drakvuf, info->trap,  (drakvuf_trap_free_t)free);
@@ -575,7 +575,7 @@ static event_response_t wait_for_process_in_userspace(drakvuf_t drakvuf, drakvuf
     if (injector->method == INJECT_METHOD_SHELLCODE_LINUX && injector->status == STATUS_EXEC_OK)
     {
         printf("Shellcode executed successfully\n");
-        injector->rc = 1;
+        injector->rc = INJECTOR_SUCCEEDED;
     }
 
     // Unexpected state
@@ -710,8 +710,7 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 
 static void print_injection_info(output_format_t format, const char* file, injector_t injector)
 {
-    GTimeVal t;
-    g_get_current_time(&t);
+    gint64 t = g_get_real_time();
     char* arguments = "";
 
     for (int i=0; i<injector->args_count; i++)
@@ -889,7 +888,7 @@ static bool initialize_linux_injector_functions(injector_t injector)
     return true;
 }
 
-int injector_start_app_on_linux(
+injector_status_t injector_start_app_on_linux(
     drakvuf_t drakvuf,
     vmi_pid_t pid,
     uint32_t tid,

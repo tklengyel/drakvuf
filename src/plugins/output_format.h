@@ -102,88 +102,262 @@
 *                                                                         *
 ***************************************************************************/
 
-#include <libvmi/libvmi.h>
+#ifndef PLUGINS_OUTPUT_FORMAT_H
+#define PLUGINS_OUTPUT_FORMAT_H
 
-#include "crashmon.h"
+#include <libdrakvuf/libdrakvuf.h>
 
-static void print_crashed_process_information(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, vmi_pid_t ppid, const char* name)
+#include <algorithm>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <string>
+#include <tuple>
+#include <utility> // pair
+
+template<class Value>
+auto keyval(const char* key, const Value& value)
 {
-    crashmon* d = static_cast<crashmon*>(info->trap->data);
-    gchar* escaped_pname = NULL;
+    return std::make_pair(key, value);
+}
 
-    switch (d->format)
+namespace fmt
+{
+
+std::string x64(uint64_t value)
+{
+    std::ostringstream os;
+    os << "0x" << std::uppercase << std::hex << value;
+    return os.str();
+}
+
+template<class Arg>
+void print_data(const std::pair<const char*, Arg>& arg)
+{
+    std::string up_key(arg.first);
+    std::transform(up_key.begin(), up_key.end(), up_key.begin(),
+                   [](uint8_t c)
     {
-        case OUTPUT_CSV:
-            printf("crashmon," FORMAT_TIMEVAL ",%" PRIu32 ",%" PRIu32 ",\"%s\",%" PRIi64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name, info->attached_proc_data.userid);
-            break;
-        case OUTPUT_KV:
-            printf("crashmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name);
-            break;
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"crashmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d"
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    info->attached_proc_data.userid,
-                    pid,
-                    ppid);
-            g_free(escaped_pname);
-            break;
-        case OUTPUT_DEFAULT:
-        default:
-            printf("[CRASHMON] TIME:" FORMAT_TIMEVAL " PID:%" PRIu32 " PPID:0x%" PRIu32 ",\"%s\" %s:%" PRIi64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name, USERIDSTR(drakvuf), info->attached_proc_data.userid);
-            break;
+        return std::toupper(c);
+    });
+
+    std::cout << up_key << ':' << arg.second;
+}
+
+template<class Arg, class... Args>
+void print_data(const std::pair<const char*, Arg>& arg, const std::pair<const char*, Args>& ... args)
+{
+    print_data(arg);
+    if constexpr (sizeof...(args) > 0)
+    {
+        std::cout << ',';
+        print_data(args...);
     }
 }
 
-static event_response_t check_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+template<class... Args>
+void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::pair<const char*, Args>& ... args)
 {
-    vmi_pid_t pid = 0;
-    if (drakvuf_is_crashreporter(drakvuf, info, &pid))
+    std::string up_name(plugin_name);
+    std::transform(up_name.begin(), up_name.end(), up_name.begin(),
+                   [](uint8_t c)
     {
-        addr_t eprocess = 0;
-        vmi_pid_t ppid = 0;
-        const char* name_unknown = "<UNKNOWN>";
-        const char* name = name_unknown;
-        char* tmp = NULL;
+        return std::toupper(c);
+    });
 
-        if (drakvuf_find_process(drakvuf, pid, nullptr, &eprocess))
+    std::cout << '[' << up_name << ']';
+
+    if (info)
+    {
+        std::cout << ' ';
+
+        uint64_t tid = drakvuf_get_current_thread(drakvuf, info);
+        print_data(
+            keyval("TimeStamp", info->timestamp),
+            keyval("PID", info->proc_data.pid),
+            keyval("PPID", info->proc_data.ppid),
+            keyval("TID", tid),
+            keyval("ProcessName", info->proc_data.name),
+            keyval("Method", info->trap->name)
+        );
+
+        if constexpr (sizeof...(args) > 0)
         {
-            tmp = drakvuf_get_process_name(drakvuf, eprocess, true);
-            if (tmp)
-                name = tmp;
-
-            if (!drakvuf_get_process_ppid(drakvuf, eprocess, &ppid))
-                PRINT_DEBUG("[CRASHMON] Failed to get PPID for crashed process with PID %d\n", pid);
+            std::cout << ',';
+            print_data(args...);
         }
-        else
-        {
-            PRINT_DEBUG("[CRASHMON] Failed to get EPROCESS for crashed process with PID %d\n", pid);
-        }
-
-        print_crashed_process_information(drakvuf, info, pid, ppid, name);
-        free(tmp);
+    }
+    else if constexpr (sizeof...(args) > 0)
+    {
+        std::cout << ' ';
+        print_data(args...);
     }
 
-    return 0;
+    std::cout << "\n";
 }
 
-crashmon::crashmon(drakvuf_t drakvuf, output_format_t output)
-    : format(output)
+} // namespace fmt
+
+namespace csvfmt
 {
-    /* Setup trap for thread switch */
-    trap.cb = check_crashreporter;
 
-    if (!drakvuf_add_trap(drakvuf, &trap))
-        throw -1;
+template<class Arg, class... Args>
+void print_data(const std::pair<const char*, Arg>& arg, const std::pair<const char*, Args>& ... args)
+{
+    std::cout << arg.second;
+    if constexpr (sizeof...(args) > 0)
+    {
+        std::cout << ',';
+        print_data(args...);
+    }
 }
+
+template<class... Args>
+void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::pair<const char*, Args>& ... args)
+{
+    std::cout << plugin_name;
+
+    if (info)
+    {
+        std::cout << ',';
+
+        uint64_t tid = drakvuf_get_current_thread(drakvuf, info);
+        print_data(
+            keyval("TimeStamp", info->timestamp),
+            keyval("PID", info->proc_data.pid),
+            keyval("PPID", info->proc_data.ppid),
+            keyval("TID", tid),
+            keyval("ProcessName", std::quoted(info->proc_data.name)),
+            keyval("Method", info->trap->name)
+        );
+    }
+
+    if constexpr (sizeof...(args) > 0)
+    {
+        std::cout << ',';
+        print_data(args...);
+    }
+
+    std::cout << "\n";
+}
+
+} // namespace csvfmt
+
+namespace kvfmt
+{
+
+template<class Arg>
+void print_data(const std::pair<const char*, Arg>& arg)
+{
+    std::cout << arg.first << '=' << arg.second;
+}
+
+template<class Arg, class... Args>
+void print_data(const std::pair<const char*, Arg>& arg, const std::pair<const char*, Args>& ... args)
+{
+    print_data(arg);
+    if constexpr (sizeof...(args) > 0)
+    {
+        std::cout << ',';
+        print_data(args...);
+    }
+}
+
+template<class... Args>
+void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::pair<const char*, Args>& ... args)
+{
+    std::cout << plugin_name;
+
+    if (info)
+    {
+        std::cout << ' ';
+
+        uint64_t tid = drakvuf_get_current_thread(drakvuf, info);
+        print_data(
+            keyval("TimeStamp", info->timestamp),
+            keyval("PID", info->proc_data.pid),
+            keyval("PPID", info->proc_data.ppid),
+            keyval("TID", tid),
+            keyval("ProcessName", std::quoted(info->proc_data.name)),
+            keyval("Method", info->trap->name)
+        );
+
+        if constexpr (sizeof...(args) > 0)
+        {
+            std::cout << ',';
+            print_data(args...);
+        }
+    }
+    else if constexpr (sizeof...(args) > 0)
+    {
+        std::cout << ' ';
+        print_data(args...);
+    }
+
+    std::cout << "\n";
+}
+
+} // namespace kvfmt
+
+namespace jsonfmt
+{
+
+template<class Arg>
+void print_data(const std::pair<const char*, Arg>& arg)
+{
+    std::cout << std::quoted(arg.first) << ':' << arg.second;
+}
+
+inline void print_data(const std::pair<const char*, const char*>& arg)
+{
+    std::cout << std::quoted(arg.first) << ':' << std::quoted(arg.second);
+}
+
+inline void print_data(const std::pair<const char*, std::string>& arg)
+{
+    print_data(keyval(arg.first, arg.second.c_str()));
+}
+
+template<class Arg, class... Args>
+void print_data(const std::pair<const char*, Arg>& arg, const std::pair<const char*, Args>& ... args)
+{
+    print_data(arg);
+    if constexpr (sizeof...(args) > 0)
+    {
+        std::cout << ',';
+        print_data(args...);
+    }
+}
+
+template<class... Args>
+void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const std::pair<const char*, Args>& ... args)
+{
+    std::cout << '{';
+    print_data(keyval("Plugin", plugin_name));
+
+    if (info)
+    {
+        std::cout << ',';
+        uint64_t tid = drakvuf_get_current_thread(drakvuf, info);
+        print_data(
+            keyval("TimeStamp", info->timestamp),
+            keyval("PID", info->proc_data.pid),
+            keyval("PPID", info->proc_data.ppid),
+            keyval("TID", tid),
+            keyval("ProcessName", info->proc_data.name),
+            keyval("Method", info->trap->name)
+        );
+    }
+
+    if constexpr (sizeof...(args) > 0)
+    {
+        std::cout << ',';
+        print_data(args...);
+    }
+
+    std::cout << "}\n";
+}
+
+} // namespace jsonfmt
+
+#endif

@@ -152,7 +152,8 @@ enum
                 auto ace = reinterpret_cast<const struct ACE*>(header); \
                 type = #ACE "_TYPE"; \
                 mask = parse_flags(ace->Mask, generic_ar, format); \
-                sid = parse_sid(ace_ptr + offsetof(struct ACE, SidStart)); \
+                auto bytes_left = aces.get() + aces_size - ace_ptr - offsetof(struct ACE, SidStart); \
+                sid = parse_sid(ace_ptr + offsetof(struct ACE, SidStart), bytes_left); \
                 break; }\
 
 static const flags_str_t ace_types =
@@ -449,8 +450,14 @@ std::map<std::string, std::string> known_sids
 
 } // namespace
 
-std::string parse_sid(const uint8_t buffer[])
+std::string parse_sid(const uint8_t buffer[], uint64_t buffer_size)
 {
+    if (buffer_size < 8)
+    {
+        PRINT_DEBUG("[FILETRACER] Invalid SID size\n");
+        return std::string();
+    }
+
     auto sid = reinterpret_cast<const struct SID*>(buffer);
     auto rev = static_cast<int>(sid->Revision);
     uint64_t id_auth = 0;
@@ -465,7 +472,16 @@ std::string parse_sid(const uint8_t buffer[])
     fmt << "S-" << rev << "-" << id_auth;
 
     for (size_t i = 0; i != sid->SubAuthorityCount; ++i)
+    {
+        uint64_t delta = (const char*)&sid->SubAuthority[i] + sizeof(sid->SubAuthority[i]) - (const char*)buffer;
+        if (delta > buffer_size)
+        {
+            PRINT_DEBUG("[FILETRACER] Invalid SID size\n");
+            break;
+        }
+
         fmt << "-" << sid->SubAuthority[i];
+    }
 
     auto known_sid = known_sids.find(fmt.str());
     if (known_sids.cend() != known_sid)
@@ -490,7 +506,7 @@ std::string read_sid(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets)
          sid_size != bytes_read)
         return string();
 
-    return parse_sid(buffer.get());
+    return parse_sid(buffer.get(), sid_size);
 }
 
 string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, string base_name, output_format_t format)
@@ -504,13 +520,13 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
     if ( VMI_SUCCESS != vmi_read_8(vmi, ctx, reinterpret_cast<uint8_t*>(&ace_count)) || 0 == ace_count)
         return std::string();
 
+    const size_t ACL_SIZE = 8;
     uint8_t acl_size = 0;
     ctx->addr = pacl + offsets[_ACL_AclSize];
-    if ( VMI_SUCCESS != vmi_read_8(vmi, ctx, &acl_size) || 0 == acl_size)
+    if ( VMI_SUCCESS != vmi_read_8(vmi, ctx, &acl_size) || ACL_SIZE >= acl_size )
         return std::string();
 
-    const size_t ACL_SIZE = 8;
-    const size_t aces_size = acl_size - ACL_SIZE;
+    const uint8_t aces_size = acl_size - ACL_SIZE;
     std::unique_ptr<uint8_t[]> aces(new uint8_t[aces_size] {0});
     auto ace_ptr = aces.get();
     ctx->addr = pacl + ACL_SIZE;

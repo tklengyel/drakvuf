@@ -184,10 +184,11 @@ typedef struct drakvuf_trap drakvuf_trap_t;
 
 typedef struct drakvuf_trap_info
 {
-    GTimeVal timestamp;
+    gint64 timestamp;
     unsigned int vcpu;
     uint16_t altp2m_idx;
-    proc_data_t proc_data ; /* Current executing process data */
+    proc_data_t proc_data ; /* Current owning process data */
+    proc_data_t attached_proc_data ; /* Current attached process data */
     addr_t trap_pa;
     x86_registers_t* regs;
     drakvuf_trap_t* trap;
@@ -309,6 +310,12 @@ bool drakvuf_get_kernel_struct_member_rva(drakvuf_t drakvuf,
                                           const char* struct_name,
                                           const char* symbol,
                                           addr_t* rva) NOEXCEPT;
+bool drakvuf_get_bitfield_offset_and_size(drakvuf_t drakvuf,
+                                          const char *struct_name,
+                                          const char *struct_member,
+                                          addr_t *offset,
+                                          size_t *start_bit,
+                                          size_t *end_bit) NOEXCEPT;
 bool json_get_symbol_rva(drakvuf_t drakvuf,
                          json_object *json,
                          const char* function,
@@ -381,6 +388,9 @@ addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf) NOEXCEPT;
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
                                    drakvuf_trap_info_t* info) NOEXCEPT;
 
+addr_t drakvuf_get_current_attached_process(drakvuf_t drakvuf,
+                                            drakvuf_trap_info_t* info) NOEXCEPT;
+
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
                                   drakvuf_trap_info_t* info) NOEXCEPT;
 bool drakvuf_get_last_error(drakvuf_t drakvuf,
@@ -422,14 +432,23 @@ typedef struct _mmvad_info
 {
     uint64_t starting_vpn;
     uint64_t ending_vpn;
+    uint64_t flags;
     uint64_t flags1;
 
     /* Pointer to the file name, if this MMVAD is backed by some file on disk.
      * If not null, read with: drakvuf_read_unicode_va(drakvuf->vmi, mmvad->file_name_ptr, 0) */
     addr_t file_name_ptr;
+    uint32_t total_number_of_ptes;
+    addr_t prototype_pte;
 } mmvad_info_t;
 
+typedef bool (*mmvad_callback)(drakvuf_t drakvuf, mmvad_info_t* mmvad, void* callback_data);
+
 bool drakvuf_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad) NOEXCEPT;
+bool drakvuf_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callback, void* callback_data) NOEXCEPT;
+bool drakvuf_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad) NOEXCEPT;
+uint32_t drakvuf_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad);
+uint64_t drakvuf_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width) NOEXCEPT;
 
 addr_t drakvuf_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess) NOEXCEPT;
 bool drakvuf_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx) NOEXCEPT;
@@ -599,12 +618,11 @@ typedef enum
 
 // Printf helpers for timestamp.
 #define FORMAT_TIMEVAL "%" PRId64 ".%06" PRId64
-#define UNPACK_TIMEVAL(t) (t).tv_sec, (t).tv_usec
+#define UNPACK_TIMEVAL(t) (t/G_USEC_PER_SEC), (t - t/G_USEC_PER_SEC)
 
 #define eprint_current_time(...) \
     do { \
-        GTimeVal current_time; \
-        g_get_current_time (&current_time); \
+        gint64 current_time = g_get_real_time(); \
         fprintf(stderr, FORMAT_TIMEVAL " ", UNPACK_TIMEVAL(current_time)); \
     } while (0)
 

@@ -103,7 +103,7 @@
 #*************************************************************************#
 
 AC_PREREQ([2.60])
-AC_INIT([DRAKVUF], [0.7-m4_esyscmd_s([git describe --always])], [tamas@tklengyel.com], [], [https://drakvuf.com])
+AC_INIT([DRAKVUF], m4_join([], [0.7-git], m4_esyscmd_s([git log -1 --date=format:%Y%m%d%H%M%S --pretty=format:%cd]), [+], m4_esyscmd_s([git describe --always]), [-1]), [tamas@tklengyel.com], [], [https://drakvuf.com])
 AM_INIT_AUTOMAKE([1.10 no-define foreign subdir-objects])
 LT_INIT
 AC_CONFIG_HEADERS([config.h])
@@ -111,17 +111,9 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AC_PROG_CC_STDC
 AC_PROG_CXX(clang++)
-AX_REQUIRE_DEFINED([AX_CXX_COMPILE_STDCXX_11])
-AX_CXX_COMPILE_STDCXX_11
-
-######################################################
-
-AC_ARG_ENABLE([repl],
-  [AS_HELP_STRING([--enable-repl],
-    [Enable the repl library @<:@no@:>@])],
-  [repl="$enableval"],
-  [repl="no"])
-AM_CONDITIONAL([REPL], [test x$repl = xyes])
+AX_REQUIRE_DEFINED([AX_CXX_COMPILE_STDCXX])
+AX_CXX_COMPILE_STDCXX([17], [ext], [mandatory])
+CXXFLAGS="-std=gnu++17"
 
 ######################################################
 
@@ -355,7 +347,24 @@ if test x$plugin_apimon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_APIMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_procdump],
+  [AS_HELP_STRING([--disable-plugin-procdump],
+    [Enable the windows process dumping plugin @<:@yes@:>@])],
+  [plugin_procdump="$enableval"],
+  [plugin_procdump="yes"])
+AM_CONDITIONAL([PLUGIN_PROCDUMP], [test x$plugin_procdump = xyes])
+if test x$plugin_procdump = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PROCDUMP, 1, "")
+fi
+
 #####################################################
+
+AC_ARG_ENABLE([repl],
+  [AS_HELP_STRING([--enable-repl],
+    [Enable the repl library @<:@no@:>@])],
+  [repl="$enableval"],
+  [repl="no"])
+AM_CONDITIONAL([REPL], [test x$repl = xyes])
 
 AC_ARG_ENABLE([hardening],
   [AS_HELP_STRING([--enable-hardening],
@@ -539,6 +548,8 @@ AH_VERBATIM([__STDC_FORMAT_MACROS],
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.28], [], [AC_ERROR([glib-2.0 (version 2.28+) has to be installed!])])
 PKG_CHECK_MODULES([VMI], [libvmi >= 0.11], [], [AC_ERROR([LibVMI not found])])
 PKG_CHECK_MODULES([JSONC], [json-c], [], [AC_ERROR([libjson-c not found])])
+AS_IF([test x$plugin_procdump == xyes],
+    [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
 
 AC_CHECK_LIB([xencall], [xencall_buffers_never_fault])
 AC_CHECK_LIB([xenforeignmemory], [xenforeignmemory_map_resource])
@@ -619,6 +630,7 @@ LibraryMon:   $plugin_librarymon
 DKOMmon:      $plugin_dkommon
 WMIMon:       $plugin_wmimon
 MEMDump:      $plugin_memdump
+ProcDump:     $plugin_procdump
 APIMon:       $plugin_apimon
 -------------------------------------------------------------------------------
 REPL:         $repl

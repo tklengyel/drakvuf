@@ -102,173 +102,50 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef FILEDELETE_PRIVATE_H
-#define FILEDELETE_PRIVATE_H
+#ifndef PROCDUMP_H
+#define PROCDUMP_H
 
-#define FILE_DISPOSITION_INFORMATION 13
-#define FILE_DELETE_ON_CLOSE 0x1000
+#include <map>
+#include <string>
 
-enum offset
+#include <libvmi/libvmi.h>
+
+#include "plugins/plugins_ex.h"
+#include "plugins/private.h"
+
+struct procdump_config
 {
-    FILE_OBJECT_TYPE,
-    FILE_OBJECT_FLAGS,
-    FILE_OBJECT_FILENAME,
-    FILE_OBJECT_SECTIONOBJECTPOINTER,
-    SECTIONOBJECTPOINTER_DATASECTIONOBJECT,
-    SECTIONOBJECTPOINTER_SHAREDCACHEMAP,
-    SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT,
-    CONTROL_AREA_SEGMENT,
-    SEGMENT_CONTROLAREA,
-    SEGMENT_SIZEOFSEGMENT,
-    SEGMENT_TOTALNUMBEROFPTES,
-    SUBSECTION_NEXTSUBSECTION,
-    SUBSECTION_SUBSECTIONBASE,
-    SUBSECTION_PTESINSUBSECTION,
-    SUBSECTION_CONTROLAREA,
-    SUBSECTION_STARTINGSECTOR,
-    OBJECT_HEADER_BODY,
-    __OFFSET_MAX
+    const char* procdump_dir;
+    bool compress_procdumps;
 };
 
-extern const char* offset_names[__OFFSET_MAX][2];
-
-struct createfile_ret_info
+enum pool_status
 {
-    vmi_pid_t pid;
-    uint32_t tid;
-    uint64_t rsp;
+    POOL_INVALID,
+    POOL_FREE,
+    POOL_USED,
+};
+using pool_status_t = pool_status;
+using pool_map_t = std::map<addr_t, pool_status_t>;
 
-    addr_t handle;
+// Use second field to store thread ID. Zero TID marks finished process.
+using terminating_map_t = std::map<vmi_pid_t, uint32_t>;
 
-    filedelete* f;
+class procdump : public pluginex
+{
+public:
+    std::string const procdump_dir;
+    bool const use_compression;
+    GSList* traps;
+    uint64_t procdumps_count;
+    pool_map_t pools;
+    terminating_map_t terminating;
+
+    addr_t malloc_va;
+    addr_t memcpy_va;
+
+    procdump(drakvuf_t drakvuf, const procdump_config* config, output_format_t output);
+    ~procdump();
 };
 
-/************************
- * # For filedelete 2
- ************************/
-
-enum file_object_flags
-{
-    FO_FILE_OPEN                    = 0x00000001,
-    FO_SYNCHRONOUS_IO               = 0x00000002,
-    FO_ALERTABLE_IO                 = 0x00000004,
-    FO_NO_INTERMEDIATE_BUFFERING    = 0x00000008,
-    FO_WRITE_THROUGH                = 0x00000010,
-    FO_SEQUENTIAL_ONLY              = 0x00000020,
-    FO_CACHE_SUPPORTED              = 0x00000040,
-    FO_NAMED_PIPE                   = 0x00000080,
-    FO_STREAM_FILE                  = 0x00000100,
-    FO_MAILSLOT                     = 0x00000200,
-    FO_GENERATE_AUDIT_ON_CLOSE      = 0x00000400,
-    FO_DIRECT_DEVICE_OPEN           = 0x00000800,
-    FO_FILE_MODIFIED                = 0x00001000,
-    FO_FILE_SIZE_CHANGED            = 0x00002000,
-    FO_CLEANUP_COMPLETE             = 0x00004000,
-    FO_TEMPORARY_FILE               = 0x00008000,
-    FO_DELETE_ON_CLOSE              = 0x00010000,
-    FO_OPENED_CASE_SENSITIVE        = 0x00020000,
-    FO_HANDLE_CREATED               = 0x00040000,
-    FO_FILE_FAST_IO_READ            = 0x00080000,
-    FO_RANDOM_ACCESS                = 0x00100000,
-    FO_FILE_OPEN_CANCELLED          = 0x00200000,
-    FO_VOLUME_OPEN                  = 0x00400000,
-    FO_REMOTE_ORIGIN                = 0x01000000,
-    FO_DISALLOW_EXCLUSIVE           = 0x02000000,
-    FO_SKIP_SET_EVENT               = 0x04000000,
-    FO_SKIP_SET_FAST_IO             = 0x08000000,
-    FO_INDIRECT_WAIT_OBJECT         = 0x10000000,
-    FO_SECTION_MINSTORE_TREATMENT   = 0x20000000,
-};
-
-struct wrapper_t
-{
-    filedelete* f;
-    bool is32bit;
-
-    handle_t handle;
-    uint64_t fo_flags;
-
-    reg_t target_cr3;
-    uint32_t target_thread_id;
-    addr_t eprocess_base;
-
-    x86_registers_t saved_regs;
-
-    int curr_sequence_number;
-
-    union
-    {
-        struct
-        {
-            addr_t out;
-            size_t size;
-        } ntqueryobject_info;
-
-        struct
-        {
-            size_t bytes_read;
-            addr_t out;
-            addr_t io_status_block;
-        } ntreadfile_info;
-    };
-
-    drakvuf_trap_t* bp;
-
-    addr_t pool;
-};
-
-struct IO_STATUS_BLOCK_32
-{
-    uint32_t status;
-    uint32_t info;
-} __attribute__((packed));
-
-struct IO_STATUS_BLOCK_64
-{
-    uint64_t status;
-    uint64_t info;
-} __attribute__((packed));
-
-constexpr static uint32_t STATUS_SUCCESS = 0;
-constexpr static uint32_t STATUS_PENDING = 0x103;
-constexpr static uint32_t STATUS_END_OF_FILE = 0xC0000011;
-
-struct _LARGE_INTEGER
-{
-    uint64_t QuadPart;
-} __attribute__((packed));
-
-struct FILE_FS_DEVICE_INFORMATION
-{
-    uint32_t device_type;
-    uint32_t characteristics;
-} __attribute__((packed));
-
-static const uint64_t BYTES_TO_READ = 0x10000;
-
-/**************************************
- * ## Callbacks for injected functions
- *************************************/
-event_response_t exfreepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t waitobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-/***************************
- * ## Helpers for injection
- ***************************/
-bool inject_free_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_waitobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-
-/********************
- *  ## Other helpers
- ********************/
-void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-void free_pool(std::map<addr_t, bool>& pools, addr_t va);
-addr_t find_pool(std::map<addr_t, bool>& pools);
-
-#endif // FILEDELETE_PRIVATE_H
+#endif

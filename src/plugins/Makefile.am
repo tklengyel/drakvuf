@@ -251,8 +251,16 @@ sources += apimon/crypto.cpp
 sources += apimon/crypto.h
 endif
 
+if PLUGIN_PROCDUMP
+sources += procdump/procdump.cpp
+sources += procdump/procdump.h
+sources += procdump/private.h
+sources += procdump/writer.cpp
+sources += procdump/writer.h
+endif
+
 ###############################################################################
-sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h
+sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h output_format.h
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(CPPFLAGS)
@@ -266,6 +274,7 @@ AM_LDFLAGS += $(VMI_LIBS)
 AM_LDFLAGS += $(JSONC_LIBS)
 
 AM_CXXFLAGS = $(CXXFLAGS)
+
 if HARDENING
 AM_CXXFLAGS += $(HARDEN_CFLAGS) -DHARDENING
 AM_LDFLAGS += $(HARDEN_LDFLAGS)
@@ -276,10 +285,13 @@ AM_CXXFLAGS += $(SANITIZE_CFLAGS)
 AM_LDFLAGS += $(SANITIZE_LDFLAGS)
 endif
 
-if DEBUG
+if !DEBUG
+AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
+else
 AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
 AM_CXXFLAGS += -ferror-limit=0
 AM_CXXFLAGS += -Wno-unused-parameter -Wno-unknown-warning-option
+AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
 AM_CXXFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
                -Wpointer-arith -Winit-self -Wshadow \
                -Wredundant-decls -Wfloat-equal -Wundef \

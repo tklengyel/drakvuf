@@ -123,6 +123,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [EPROCESS_WOW64PROCESS] = { "_EPROCESS", "Wow64Process" },
     [EPROCESS_WOW64PROCESS_WIN10] = { "_EPROCESS", "WoW64Process" },
     [EPROCESS_VADROOT] = { "_EPROCESS", "VadRoot" },
+    [EPROCESS_LISTTHREADHEAD] = { "_EPROCESS", "ThreadListHead" },
 
     // Windows >=8 specific
     [RTL_AVL_TREE_ROOT] = { "_RTL_AVL_TREE", "Root"},
@@ -134,6 +135,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [MMVAD_SHORT_STARTING_VPN_HIGH] = {"_MMVAD_SHORT", "StartingVpnHigh"},
     [MMVAD_SHORT_ENDING_VPN] = {"_MMVAD_SHORT", "EndingVpn"},
     [MMVAD_SHORT_ENDING_VPN_HIGH] = {"_MMVAD_SHORT", "EndingVpnHigh"},
+    [MMVAD_SHORT_FLAGS] = { "_MMVAD_SHORT", "u" },
     [MMVAD_SHORT_FLAGS1] = { "_MMVAD_SHORT", "u1" },
 
     [VADROOT_BALANCED_ROOT] = { "VadRoot", "BalancedRoot" },
@@ -141,10 +143,13 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [MMVAD_RIGHT_CHILD] = { "_MMVAD", "RightChild" },
     [MMVAD_STARTING_VPN] = { "_MMVAD", "StartingVpn" },
     [MMVAD_ENDING_VPN] = { "_MMVAD", "EndingVpn" },
-    [MMVAD_FLAGS1] = { "_MMVAD", "u" },
+    [MMVAD_FLAGS] = { "_MMVAD", "u" },
     [MMVAD_SUBSECTION] = { "_MMVAD", "Subsection" },
     [SUBSECTION_CONTROL_AREA] = { "_SUBSECTION", "ControlArea" },
     [CONTROL_AREA_FILEPOINTER] = { "_CONTROL_AREA", "FilePointer" },
+    [CONTROL_AREA_SEGMENT] = { "_CONTROL_AREA", "Segment" },
+    [SEGMENT_TOTALNUMBEROFPTES] = { "_SEGMENT", "TotalNumberOfPtes"},
+    [SEGMENT_PROTOTYPEPTE] = { "_SEGMENT", "PrototypePte"},
 
     [KPROCESS_HEADER] = { "_KPROCESS", "Header" },
     [PEB_IMAGEBASADDRESS] = { "_PEB", "ImageBaseAddress" },
@@ -160,17 +165,21 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [KPCR_PRCB] = {"_KPCR", "Prcb" },
     [KPCR_PRCBDATA] = {"_KPCR", "PrcbData" },
     [KPRCB_CURRENTTHREAD] = { "_KPRCB", "CurrentThread" },
+    [KTHREAD_APCSTATE] = {"_KTHREAD", "ApcState" },
+    [KTHREAD_APCSTATEINDEX] = {"_KTHREAD", "ApcStateIndex" },
     [KTHREAD_PROCESS] = {"_KTHREAD", "Process" },
     [KTHREAD_PREVIOUSMODE] = { "_KTHREAD", "PreviousMode" },
     [KTHREAD_HEADER] = { "_KTHREAD", "Header" },
     [KTHREAD_TEB] = { "_KTHREAD", "Teb" },
     [KTHREAD_TRAPFRAME] = { "_KTHREAD", "TrapFrame" },
+    [KAPC_STATE_PROCESS] = { "_KAPC_STATE", "Process" },
     [KTRAP_FRAME_RBP] = { "_KTRAP_FRAME", "Rbp" },
     [KTRAP_FRAME_RSP] = { "_KTRAP_FRAME", "Rsp" },
     [TEB_TLS_SLOTS] = { "_TEB", "TlsSlots" },
     [TEB_LASTERRORVALUE] = { "_TEB", "LastErrorValue" },
     [ETHREAD_CID] = {"_ETHREAD", "Cid" },
     [ETHREAD_TCB] = { "_ETHREAD", "Tcb" },
+    [ETHREAD_THREADLISTENTRY] = { "_ETHREAD", "ThreadListEntry" },
     [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
     [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
@@ -193,6 +202,18 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [RTL_USER_PROCESS_PARAMETERS_COMMANDLINE] = { "_RTL_USER_PROCESS_PARAMETERS", "CommandLine" },
 
     [EWOW64PROCESS_PEB] = { "_EWOW64PROCESS", "Peb" },
+
+    [LIST_ENTRY_FLINK] = { "_LIST_ENTRY", "Flink" },
+};
+
+static const char* win_bitfields_names[__WIN_OFFSETS_MAX][2] =
+{
+    [MMVAD_FLAGS_PROTECTION] = { "_MMVAD_FLAGS", "Protection" },
+    [MMVAD_FLAGS_MEMCOMMIT] = { "_MMVAD_FLAGS", "MemCommit" },
+    [MMVAD_FLAGS1_MEMCOMMIT] = { "_MMVAD_FLAGS1", "MemCommit" },
+    [MMVAD_FLAGS_VADTYPE] = { "_MMVAD_FLAGS", "VadType" },
+    [MMVAD_FLAGS_COMMITCHARGE] = { "_MMVAD_FLAGS", "CommitCharge" },
+    [MMVAD_FLAGS1_COMMITCHARGE] = { "_MMVAD_FLAGS1", "CommitCharge" },
 };
 
 #endif

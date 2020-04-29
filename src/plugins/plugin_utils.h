@@ -167,4 +167,14 @@ void dump_buffer(const uint8_t buffer[],
                  std::string header = std::string(),
                  std::string footer = std::string());
 
+/* Dump register to stdout
+ *
+ * regs Registers
+ * header Opening message.
+ * footer Closing message
+ */
+void dump_registers(const x86_registers_t* regs,
+                    std::string header = std::string(),
+                    std::string footer = std::string());
+
 #endif

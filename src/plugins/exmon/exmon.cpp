@@ -166,14 +166,14 @@ static void print_program_info(uint8_t previous_mode, char const* user_format, d
     exmon* e = (exmon*)info->trap->data;
     if (previous_mode == 1)
     {
-        if (info->proc_data.base_addr)
+        if (info->attached_proc_data.base_addr)
         {
-            const char* escaped_pname = info->proc_data.name;
+            const char* escaped_pname = info->attached_proc_data.name;
             if (e->format == OUTPUT_JSON)
             {
-                escaped_pname = (const char*)drakvuf_escape_str (info->proc_data.name);
+                escaped_pname = (const char*)drakvuf_escape_str (info->attached_proc_data.name);
             }
-            printf(user_format, info->proc_data.pid, info->proc_data.ppid, escaped_pname);
+            printf(user_format, info->attached_proc_data.pid, info->attached_proc_data.ppid, escaped_pname);
             if (e->format == OUTPUT_JSON)
             {
                 g_free ((void*) escaped_pname);

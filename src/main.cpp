@@ -234,6 +234,12 @@ static void print_usage()
             "\t --json-mscorwks <path to json>\n"
             "\t                           The JSON profile for mscorewks.dll\n"
 #endif
+#ifdef ENABLE_PLUGIN_PROCDUMP
+            "\t --procdump-dir <directory>\n"
+            "\t                           Where to store processes dumps\n"
+            "\t --compress-procdumps\n"
+            "\t                           Controls compression of processes dumps on disk\n"
+#endif
             "\t -h, --help                Show this help\n"
             );
 }
@@ -294,6 +300,8 @@ int main(int argc, char** argv)
         opt_json_combase,
         opt_memdump_dir,
         opt_dll_hooks_list,
+        opt_procdump_dir,
+        opt_compress_procdumps,
         opt_json_clr,
         opt_json_mscorwks
     };
@@ -318,6 +326,8 @@ int main(int argc, char** argv)
         {"json-combase", required_argument, NULL, opt_json_combase},
         {"memdump-dir", required_argument, NULL, opt_memdump_dir},
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
+        {"procdump-dir", required_argument, NULL, opt_procdump_dir},
+        {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
         {"json-clr", required_argument, NULL, opt_json_clr},
         {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
         {NULL, 0, NULL, 0}
@@ -488,6 +498,14 @@ int main(int argc, char** argv)
                 options.mscorwks_profile = optarg;
                 break;
 #endif
+#ifdef ENABLE_PLUGIN_PROCDUMP
+            case opt_procdump_dir:
+                options.procdump_dir = optarg;
+                break;
+            case opt_compress_procdumps:
+                options.compress_procdumps = true;
+                break;
+#endif
             case 'h':
                 print_usage();
                 return 0;
@@ -543,9 +561,17 @@ int main(int argc, char** argv)
     if (injection_pid > 0 && inject_file)
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        int ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout, injection_global_search, args_count, args);
-        if (!ret)
+        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout, injection_global_search, args_count, args);
+        switch (ret)
+        {
+        case INJECTOR_FAILED_WITH_ERROR_CODE:
+            rc = 0;
+        case INJECTOR_FAILED:
             goto exit;
+        case INJECTOR_SUCCEEDED:
+        default:
+            break;
+        }
     }
 
     PRINT_DEBUG("Starting plugins\n");

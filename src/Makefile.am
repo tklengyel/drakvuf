@@ -115,12 +115,14 @@ AM_CPPFLAGS = $(CPPFLAGS)
 AM_CPPFLAGS += $(VMI_CFLAGS)
 AM_CPPFLAGS += $(GLIB_CFLAGS)
 AM_CPPFLAGS += $(JSONC_CFLAGS)
+AM_CPPFLAGS += $(ZLIB_CFLAGS)
 AM_CPPFLAGS += -I$(top_srcdir) -I$(srcdir)
 
 AM_LDFLAGS =  $(LDFLAGS)
 AM_LDFLAGS += $(VMI_LIBS)
 AM_LDFLAGS += $(GLIB_LIBS)
 AM_LDFLAGS += $(JSONC_LIBS)
+AM_LDFLAGS += $(ZLIB_LIBS)
 
 AM_CFLAGS = $(CFLAGS)
 AM_CXXFLAGS = $(CXXFLAGS)
@@ -138,10 +140,13 @@ AM_LDFLAGS += $(SANITIZE_LDFLAGS)
 endif
 
 # Note that -pg is incompatible with HARDENING
-if DEBUG
+if !DEBUG
+AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
+else
 AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
 AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
-AM_CXXFLAGS += -ferror-limit=0
+AM_CXXFLAGS += -ferror-limit=0 -Wno-unknown-warning-option
+AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
 if !HARDENING
 AM_CFLAGS += -pg
 AM_CXXFLAGS += -pg

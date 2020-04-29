@@ -144,7 +144,7 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     {
         case OUTPUT_CSV:
             printf("regmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->name, key_name );
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid, info->trap->name, key_name );
             if (value_name)
                 printf(",%s", value_name);
             if (value)
@@ -154,7 +154,7 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
         case OUTPUT_KV:
             printf("regmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Key=\"%s\"",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
                    info->trap->name, key_name);
             if (value_name)
                 printf(",ValueName=\"%s\"", value_name);
@@ -164,7 +164,7 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             break;
 
         case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
+            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
             escaped_key   = drakvuf_escape_str(key_name);
 
             printf( "{"
@@ -180,8 +180,8 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
                     "\"Key\" : %s",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
+                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
+                    info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
                     info->trap->name,
                     escaped_key);
             if (value_name)
@@ -206,8 +206,8 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         default:
         case OUTPUT_DEFAULT:
             printf("[REGMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64 ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s:%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.base_addr, info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, key_name );
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.base_addr, info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
+                   USERIDSTR(drakvuf), info->attached_proc_data.userid, info->trap->name, key_name );
             if (value_name)
                 printf(",%s", value_name);
             if (value)
@@ -357,7 +357,6 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
         for (size_t i = 0 ; i < data_bytes.size() ; i += 2)
         {
             uint16_t value_word = *(reinterpret_cast<uint16_t*>(&data_bytes[i]));
-            uint32_t value_dword = *(reinterpret_cast<uint32_t*>(&data_bytes[i]));
 
             if (value_word == 0)
             {
@@ -371,8 +370,12 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
                 ctx.addr = data_addr + i + 2;
             }
 
-            if ((value_dword == 0) && ((i + 4) >= data_bytes.size()))
-                break;
+            if (data_bytes.size() - i >= 4)
+            {
+                uint32_t value_dword = *(reinterpret_cast<uint32_t*>(&data_bytes[i]));
+                if ((value_dword == 0) && ((i + 4) >= data_bytes.size()))
+                    break;
+            }
         }
     }
     else

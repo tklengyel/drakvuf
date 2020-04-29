@@ -160,7 +160,7 @@ public:
     void loop(int duration);
     void pause();
     void resume();
-    int inject_cmd(vmi_pid_t injection_pid,
+    injector_status_t inject_cmd(vmi_pid_t injection_pid,
                    uint32_t injection_tid,
                    const char* inject_cmd,
                    const char* cwd,
