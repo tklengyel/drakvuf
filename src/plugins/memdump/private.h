@@ -175,4 +175,9 @@ bool dump_from_stack(
     drakvuf_trap_info_t* info,
     memdump* plugin);
 
+bool dotnet_assembly_native_load_image_cb(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    memdump* plugin);
+
 #endif

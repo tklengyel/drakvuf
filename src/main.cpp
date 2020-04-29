@@ -229,6 +229,10 @@ static void print_usage()
             "\t                           Where to store memory dumps\n"
             "\t --dll-hooks-list <file>\n"
             "\t                           List of DLL functions to be hooked (see wiki)\n"
+            "\t --json-clr <path to json>\n"
+            "\t                           The JSON profile for clr.dll\n"
+            "\t --json-mscorwks <path to json>\n"
+            "\t                           The JSON profile for mscorewks.dll\n"
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP
             "\t --procdump-dir <directory>\n"
@@ -298,6 +302,8 @@ int main(int argc, char** argv)
         opt_dll_hooks_list,
         opt_procdump_dir,
         opt_compress_procdumps,
+        opt_json_clr,
+        opt_json_mscorwks
     };
     const option long_opts[] =
     {
@@ -322,6 +328,8 @@ int main(int argc, char** argv)
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
+        {"json-clr", required_argument, NULL, opt_json_clr},
+        {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:h";
@@ -482,6 +490,12 @@ int main(int argc, char** argv)
                 break;
             case opt_dll_hooks_list:
                 options.dll_hooks_list = optarg;
+                break;
+            case opt_json_clr:
+                options.clr_profile = optarg;
+                break;
+            case opt_json_mscorwks:
+                options.mscorwks_profile = optarg;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP
