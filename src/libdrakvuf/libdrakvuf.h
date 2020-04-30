@@ -618,7 +618,7 @@ typedef enum
 
 // Printf helpers for timestamp.
 #define FORMAT_TIMEVAL "%" PRId64 ".%06" PRId64
-#define UNPACK_TIMEVAL(t) (t/G_USEC_PER_SEC), (t - t/G_USEC_PER_SEC)
+#define UNPACK_TIMEVAL(t) (t/G_USEC_PER_SEC), (t - (t/G_USEC_PER_SEC)*G_USEC_PER_SEC)
 
 #define eprint_current_time(...) \
     do { \
