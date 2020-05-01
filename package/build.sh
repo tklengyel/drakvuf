@@ -19,7 +19,7 @@ mkdir -p package/log
 if [ ! -f "package/cache/xen-intermediate-$IMAGE-$XEN_HASH.tar.gz" ]
 then
     echo Building Xen intermediate $XEN_HASH...
-    docker build --build-arg "IMAGE=$IMAGE" -f package/Dockerfile-xen -t xen-intermediate . # 2>&1 >package/log/xen-build.log
+    docker build --build-arg "IMAGE=$IMAGE" -f package/Dockerfile-xen -t xen-intermediate . 2>&1 >package/log/xen-build.log
     if [ $? -ne 0 ]; then echo Xen intermediate image build failed, build log tail below ; tail -n 200 package/log/xen-build.log ; exit 1 ; fi
     echo Removing old Xen intermediate image...
     rm -f package/cache/xen-intermediate-*.tar.gz
