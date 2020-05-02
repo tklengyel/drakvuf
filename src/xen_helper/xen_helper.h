@@ -141,5 +141,6 @@ bool xen_pause(xen_interface_t* xen, domid_t domID);
 void xen_resume(xen_interface_t* xen, domid_t domID);
 void xen_force_resume(xen_interface_t* xen, domid_t domID);
 bool xen_enable_altp2m(xen_interface_t* xen, domid_t domID);
+int xen_version(void);
 
 #endif
