@@ -365,3 +365,22 @@ bool xen_enable_altp2m(xen_interface_t* xen, domid_t domID)
 
     return 1;
 }
+
+int xen_version(void)
+{
+    FILE* fp = fopen("/sys/hypervisor/version/minor", "r");
+    char* line = NULL;
+    size_t len = 0;
+    int version = 0;
+
+    if (fp)
+    {
+        if ( getline(&line, &len, fp) != -1 && line && len)
+            version = atoi(line);
+        fclose(fp);
+    }
+
+    free(line);
+
+    return version;
+}

@@ -185,6 +185,8 @@ struct drakvuf
 
     xen_pfn_t sink_page_gfn;
 
+    event_response_t int3_response_flags;
+
     // VMI
     unsigned long flush_counter;
     GMutex vmi_lock;
