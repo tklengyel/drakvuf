@@ -226,6 +226,7 @@ static bool read_vm(drakvuf_t drakvuf, addr_t dtb, addr_t start, size_t size,
     auto access_ptrs = new void* [num_pages] { 0 };
 
     bool res = true;
+    uint8_t zeros[VMI_PS_4KB] = {};
     if (VMI_SUCCESS == vmi_mmap_guest(vmi, &vmi_ctx, num_pages, access_ptrs))
     {
         for (size_t i = 0; i < num_pages; ++i)
@@ -233,18 +234,19 @@ static bool read_vm(drakvuf_t drakvuf, addr_t dtb, addr_t start, size_t size,
             if (access_ptrs[i])
             {
                 if (res)
-                {
                     res = procdump_ctx->writer->append(static_cast<uint8_t *>(access_ptrs[i]), VMI_PS_4KB);
-                }
                 munmap(access_ptrs[i], VMI_PS_4KB);
             }
+            else if (res)
+                res = procdump_ctx->writer->append(zeros, VMI_PS_4KB);
         }
     }
     else
     {
         // unaccessible page, pad with zeros to ensure proper alignment of the data
-        uint8_t zeros[VMI_PS_4KB] = {};
-        res = procdump_ctx->writer->append(zeros, VMI_PS_4KB);
+        for (size_t i = 0; i < num_pages; ++i)
+            if (res)
+                res = procdump_ctx->writer->append(zeros, VMI_PS_4KB);
     }
 
     delete[] access_ptrs;
