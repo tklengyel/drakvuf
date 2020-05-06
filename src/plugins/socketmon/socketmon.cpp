@@ -876,27 +876,18 @@ static void register_dnsapi_trap( drakvuf_t drakvuf, drakvuf_trap_t* trap,
     register_module_trap(drakvuf, trap, "dnsapi.dll", function_name, hook_cb);
 }
 
-static win_ver_t get_win_ver(drakvuf_t drakvuf)
-{
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    win_ver_t winver = vmi_get_winver(vmi);
-    drakvuf_release_vmi(drakvuf);
-    return winver;
-}
-
-static uint16_t get_win_build_number(drakvuf_t drakvuf)
-{
-  vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-  uint16_t build = vmi_get_win_buildnumber(vmi);
-  drakvuf_release_vmi(drakvuf);
-  return build;
-}
-
 socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format_t output)
     : format{output}
 {
     this->pm = drakvuf_get_page_mode(drakvuf);
-    this->winver = get_win_ver(drakvuf);
+
+    vmi_lock_guard vmi(drakvuf);
+    win_build_info_t build_info;
+    if (!vmi_get_windows_build_info(vmi.vmi, &build_info))
+        throw -1;
+
+    this->winver = build_info.version;
+    auto build = build_info.buildnumber;
 
     if ( !c->tcpip_profile )
     {
@@ -943,7 +934,7 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
                 tcpe_cb = tcpe_win81_x64_cb;
                 break;
             case VMI_OS_WINDOWS_10:
-                if (get_win_build_number(drakvuf) < 1734)
+                if (build < 1734)
                     // Tested on Windows 10 x64 before 1803
                     tcpe_cb = tcpe_win10_x64_cb;
                 else

@@ -151,6 +151,22 @@ addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
+addr_t drakvuf_get_current_thread_teb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    if ( drakvuf->osi.get_current_thread_teb )
+        return drakvuf->osi.get_current_thread_teb(drakvuf, info);
+
+    return 0;
+}
+
+addr_t drakvuf_get_current_thread_stackbase(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    if ( drakvuf->osi.get_current_thread_stackbase )
+        return drakvuf->osi.get_current_thread_stackbase(drakvuf, info);
+
+    return 0;
+}
+
 bool drakvuf_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str)
 {
     if ( drakvuf->osi.get_last_error )
@@ -229,6 +245,14 @@ int64_t drakvuf_get_process_userid(drakvuf_t drakvuf, addr_t process_base)
         return drakvuf->osi.get_process_userid(drakvuf, process_base);
 
     return ~0l;
+}
+
+unicode_string_t* drakvuf_get_process_csdversion(drakvuf_t drakvuf, addr_t process_base)
+{
+    if ( drakvuf->osi.get_process_csdversion )
+        return drakvuf->osi.get_process_csdversion(drakvuf, process_base);
+
+    return NULL;
 }
 
 int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info)

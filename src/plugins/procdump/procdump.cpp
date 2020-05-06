@@ -107,12 +107,14 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <vector>
+#include <cpuid.h>
 
 #include <libdrakvuf/json-util.h>
 #include <libinjector/libinjector.h>
 
 #include "procdump.h"
 #include "private.h"
+#include "minidump.h"
 
 using namespace std::string_literals;
 
@@ -618,6 +620,60 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
     return false;
 }
 
+static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, procdump_ctx* ctx)
+{
+    auto plugin = get_trap_plugin<procdump>(info);
+    if (!plugin)
+        return false;
+
+    uint32_t time_stamp = g_get_real_time() / G_USEC_PER_SEC;
+
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+
+    unicode_string_t* csdversion_us = drakvuf_get_process_csdversion(drakvuf, info->attached_proc_data.base_addr);
+    std::wstring csdversion;
+    if (csdversion_us)
+        csdversion = std::wstring(csdversion_us->contents[0], csdversion_us->contents[csdversion_us->length]);
+
+    vector<struct mdmp_memory_descriptor64> memory_ranges;
+    for (auto vad: ctx->vads)
+    {
+        struct mdmp_memory_descriptor64 range(vad.first,
+                vad.second.total_number_of_ptes * VMI_PS_4KB);
+        memory_ranges.push_back(range);
+    }
+
+    struct mdmp_thread thread;
+    thread.thread_id = info->attached_proc_data.tid;
+    thread.teb = drakvuf_get_current_thread_teb(drakvuf, info);
+    thread.stack.start_of_memory_range = drakvuf_get_current_thread_stackbase(drakvuf, info);
+    union thread_context thread_ctx;
+    thread_ctx.set(is32bit, info->regs);
+
+    auto mdmp = minidump(time_stamp,
+                        is32bit,
+                        plugin->num_cpus,
+                        plugin->win_major,
+                        plugin->win_minor,
+                        plugin->win_build_number,
+                        plugin->vendor,
+                        plugin->version_information,
+                        plugin->feature_information,
+                        plugin->amd_extended_cpu_features,
+                        csdversion,
+                        memory_ranges,
+                        {thread},
+                        {thread_ctx});
+
+    if (!ctx->writer->append((const uint8_t*)&mdmp, sizeof(mdmp)))
+    {
+        PRINT_DEBUG("[PROCDUMP] Failed to prepare MiniDump file\n");
+        return false;
+    }
+
+    return true;
+}
+
 static event_response_t terminate_process_cb(drakvuf_t drakvuf,
         drakvuf_trap_info_t* info)
 {
@@ -688,6 +744,12 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
         return VMI_EVENT_RESPONSE_NONE;
     }
 
+    if (!prepare_mdmp_header(drakvuf, info, ctx))
+    {
+        delete ctx;
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
     // Save registers to restore process/thread state
     memcpy(&ctx->saved_regs, info->regs, sizeof(x86_registers_t));
     ctx->bp = (drakvuf_trap_t*)g_slice_new0(drakvuf_trap_t);
@@ -754,6 +816,14 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
     , terminating()
     , malloc_va()
     , memcpy_va()
+    , win_build_number(0)
+    , win_major(0)
+    , win_minor(0)
+    , num_cpus(0)
+    , vendor()
+    , version_information()
+    , feature_information()
+    , amd_extended_cpu_features()
 {
     if (!config->procdump_dir)
         return;
@@ -762,6 +832,21 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
         get_function_va(drakvuf, "ntoskrnl.exe", "ExAllocatePoolWithTag");
     this->memcpy_va =
         get_function_va(drakvuf, "ntoskrnl.exe", "RtlCopyMemoryNonTemporal");
+
+    vmi_lock_guard vmi(drakvuf);
+    num_cpus = vmi_get_num_vcpus(vmi);
+    win_build_info_t build_info;
+    if (!vmi_get_windows_build_info(vmi.vmi, &build_info))
+        throw -1;
+
+    win_build_number = build_info.buildnumber;
+    win_major = build_info.major;
+    win_minor = build_info.minor;
+
+    uint32_t r0, r1, r2;
+    __cpuid(0, r0, vendor[0], vendor[2], vendor[1]);
+    __cpuid(1, version_information, r0, r1, feature_information);
+    __cpuid(0x80000001, r0, amd_extended_cpu_features, r1, r2);
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap<procdump>(

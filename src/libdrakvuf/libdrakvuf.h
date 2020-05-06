@@ -393,6 +393,13 @@ addr_t drakvuf_get_current_attached_process(drakvuf_t drakvuf,
 
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
                                   drakvuf_trap_info_t* info) NOEXCEPT;
+
+addr_t drakvuf_get_current_thread_teb(drakvuf_t drakvuf,
+                                      drakvuf_trap_info_t* info) NOEXCEPT;
+
+addr_t drakvuf_get_current_thread_stackbase(drakvuf_t drakvuf,
+                                            drakvuf_trap_info_t* info) NOEXCEPT;
+
 bool drakvuf_get_last_error(drakvuf_t drakvuf,
                             drakvuf_trap_info_t* info,
                             uint32_t* err,
@@ -423,6 +430,9 @@ bool drakvuf_get_process_dtb(drakvuf_t drakvuf,
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
                                    addr_t process_base) NOEXCEPT;
+
+unicode_string_t* drakvuf_get_process_csdversion(drakvuf_t drakvuf,
+                                                 addr_t process_base) NOEXCEPT;
 
 bool drakvuf_get_process_data(drakvuf_t drakvuf,
                               addr_t process_base,
