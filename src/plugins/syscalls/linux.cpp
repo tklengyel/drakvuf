@@ -266,7 +266,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         sc = linuxsc::linux_syscalls[nr];
         nargs = sc->num_args;
 
-       if ( s->filter && !g_hash_table_lookup(s->filter, sc->name) )
+       if ( s->filter && !g_hash_table_contains(s->filter, sc->name) )
             return 0;
     }
 
