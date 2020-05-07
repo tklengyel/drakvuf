@@ -257,6 +257,7 @@ sources += procdump/procdump.h
 sources += procdump/private.h
 sources += procdump/writer.cpp
 sources += procdump/writer.h
+sources += procdump/minidump.h
 endif
 
 ###############################################################################

@@ -112,6 +112,12 @@ typedef struct os_interface
     addr_t (*get_current_thread)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
+    addr_t (*get_current_thread_teb)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    addr_t (*get_current_thread_stackbase)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
     addr_t (*get_current_process)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
@@ -135,6 +141,9 @@ typedef struct os_interface
 
     int64_t (*get_process_userid)
     (drakvuf_t drakvuf, addr_t process_base);
+
+    unicode_string_t* (*get_process_csdversion)
+    (drakvuf_t drakvuf, addr_t eprocess_base);
 
     bool (*get_process_dtb)
     (drakvuf_t drakvuf, addr_t process_base, addr_t* dtb);

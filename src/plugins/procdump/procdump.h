@@ -144,6 +144,15 @@ public:
     addr_t malloc_va;
     addr_t memcpy_va;
 
+    uint16_t win_build_number;
+    uint16_t win_major;
+    uint16_t win_minor;
+    uint32_t num_cpus;
+    std::array<uint32_t, 3> vendor;
+    uint32_t version_information;
+    uint32_t feature_information;
+    uint32_t amd_extended_cpu_features;
+
     procdump(drakvuf_t drakvuf, const procdump_config* config, output_format_t output);
     ~procdump();
 };

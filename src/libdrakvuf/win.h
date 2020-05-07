@@ -112,6 +112,10 @@
 
 addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
+addr_t win_get_current_thread_teb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+addr_t win_get_current_thread_stackbase(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
 addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 addr_t win_get_current_attached_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
@@ -127,6 +131,8 @@ bool win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
 char* win_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
 
 int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base);
+
+unicode_string_t* win_get_process_csdversion(drakvuf_t drakvuf, addr_t eprocess_base);
 
 int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
