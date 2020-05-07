@@ -440,11 +440,8 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
 {
     this->os = drakvuf_get_os_type(drakvuf);
     this->kernel_base = drakvuf_get_kernel_base(drakvuf);
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    this->reg_size = vmi_get_address_width(vmi); // 4 or 8 (bytes)
-    this->pm = vmi_get_page_mode(vmi, 0);
-    drakvuf_release_vmi(drakvuf);
+    this->reg_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
+    this->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
 
     if ( c->syscalls_filter_file )
         this->filter = read_syscalls_filter(c->syscalls_filter_file);
