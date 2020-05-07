@@ -464,6 +464,8 @@ bool set_os_windows(drakvuf_t drakvuf)
     }
 
     drakvuf->osi.get_current_thread = win_get_current_thread;
+    drakvuf->osi.get_current_thread_teb = win_get_current_thread_teb;
+    drakvuf->osi.get_current_thread_stackbase = win_get_current_thread_stackbase;
     drakvuf->osi.get_current_process = win_get_current_process;
     drakvuf->osi.get_current_attached_process = win_get_current_attached_process;
     drakvuf->osi.get_last_error = win_get_last_error;
@@ -471,6 +473,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_process_commandline = win_get_process_commandline;
     drakvuf->osi.get_current_process_name = win_get_current_process_name;
     drakvuf->osi.get_process_userid = win_get_process_userid;
+    drakvuf->osi.get_process_csdversion = win_get_process_csdversion;
     drakvuf->osi.get_process_dtb = win_get_process_dtb;
     drakvuf->osi.get_current_process_userid = win_get_current_process_userid;
     drakvuf->osi.get_current_thread_id = win_get_current_thread_id;

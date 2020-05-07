@@ -196,6 +196,36 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return thread;
 }
 
+addr_t win_get_current_thread_teb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    addr_t kthread = win_get_current_thread(drakvuf, info);
+    if (!kthread)
+        return 0;
+
+    addr_t teb = 0;
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, kthread + drakvuf->offsets[KTHREAD_TEB], 0, &teb))
+        return 0;
+
+    return teb;
+}
+
+addr_t win_get_current_thread_stackbase(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    addr_t kthread = win_get_current_thread(drakvuf, info);
+    if (!kthread)
+        return 0;
+
+    addr_t stackbase = 0;
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, kthread + drakvuf->offsets[KTHREAD_STACKBASE], 0, &stackbase))
+        return 0;
+
+    return stackbase;
+}
+
 addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t thread;
@@ -375,6 +405,31 @@ int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
         PRINT_DEBUG("The process at 0x%" PRIx64 " has a userid larger then INT_MAX!\n", eprocess_base);
 
     return (int64_t)userid;
+};
+
+unicode_string_t* win_get_process_csdversion(drakvuf_t drakvuf, addr_t eprocess_base)
+{
+    addr_t peb;
+    vmi_instance_t vmi = drakvuf->vmi;
+    access_context_t ctx;
+    memset(&ctx, 0, sizeof(access_context_t));
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+
+    if (!eprocess_base)
+        return NULL;
+
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PEB], 0, &peb))
+        return NULL;
+
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))
+        return NULL;
+
+    addr_t csdversion_va = 0;
+    ctx.addr = peb + drakvuf->offsets[PEB_CSDVERSION];
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &csdversion_va) )
+        return NULL;
+
+    return drakvuf_read_unicode_va(drakvuf->vmi, csdversion_va, 0);
 };
 
 int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
