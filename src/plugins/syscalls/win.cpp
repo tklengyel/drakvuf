@@ -273,20 +273,6 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
         long offset = 0;
         addr_t syscall_va;
 
-        struct wrapper *w = g_slice_new0(struct wrapper);
-        drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
-
-        w->num = syscall_num;
-        w->s = s;
-        w->type = ntos ? "nt" : "win32k";
-
-        trap->breakpoint.lookup_type = LOOKUP_DTB;
-        trap->breakpoint.dtb = cr3;
-        trap->breakpoint.addr_type = ADDR_VA;
-        trap->type = BREAKPOINT;
-        trap->cb = syscall_cb;
-        trap->data = w;
-
         if ( !s->is32bit )
         {
             /*
@@ -299,13 +285,12 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
         } else
             syscall_va = table[syscall_num];
 
-        trap->breakpoint.addr = syscall_va;
-
         addr_t rva = syscall_va - base;
         if ( s->is32bit )
             rva = static_cast<uint32_t>(rva);
 
-        const struct symbol* symbol = NULL;
+        const struct symbol* symbol = nullptr;
+        const syscall_t* definition = nullptr;
         if ( symbols )
         {
             for (unsigned int z=0; z < symbols->count; z++)
@@ -318,7 +303,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
                     {
                         if ( !strcmp(definitions[d]->name, symbol->name) )
                         {
-                            w->sc = definitions[d];
+                            definition = definitions[d];
                             break;
                         }
                     }
@@ -329,8 +314,30 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
 
         if ( !symbol )
             PRINT_DEBUG("\t Syscall %u @ 0x%lx has no debug information matching it with RVA 0x%lx. Table: 0x%lx Offset: 0x%lx\n", syscall_num, syscall_va, rva, sst[0], offset);
-        else if ( !w->sc )
+        else if ( !definition )
             PRINT_DEBUG("\t Syscall %s has no internal definition. New syscall?\n", symbol->name);
+
+        if ( s->filter && ( !symbol || !g_hash_table_contains(s->filter, symbol->name) ) )
+        {
+            PRINT_DEBUG("Syscall %s filtered out by syscalls filter file\n", symbol ? symbol->name : "<unknowm>");
+            continue;
+        }
+
+        struct wrapper *w = g_slice_new0(struct wrapper);
+        drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
+
+        w->num = syscall_num;
+        w->s = s;
+        w->type = ntos ? "nt" : "win32k";
+        w->sc = definition;
+
+        trap->breakpoint.lookup_type = LOOKUP_DTB;
+        trap->breakpoint.dtb = cr3;
+        trap->breakpoint.addr_type = ADDR_VA;
+        trap->breakpoint.addr = syscall_va;
+        trap->type = BREAKPOINT;
+        trap->cb = syscall_cb;
+        trap->data = w;
 
         if ( drakvuf_add_trap(drakvuf, trap) )
             s->traps = g_slist_prepend(s->traps, trap);
