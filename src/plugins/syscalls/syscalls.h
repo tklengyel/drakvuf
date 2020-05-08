@@ -123,7 +123,7 @@ public:
     json_object* win32k_json;
 
     uint8_t reg_size;
-    page_mode_t pm;
+    bool is32bit;
     output_format_t format;
     os_t os;
 
