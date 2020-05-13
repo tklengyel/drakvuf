@@ -1619,7 +1619,7 @@ injector_status_t injector_start_app_on_win(
         return 0;
     }
 
-    if (inject(drakvuf, injector) && injector->rc)
+    if (inject(drakvuf, injector) && injector->rc == INJECTOR_SUCCEEDED)
     {
         injector->result = INJECT_RESULT_SUCCESS;
         print_injection_info(format, file, injector);
