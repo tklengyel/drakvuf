@@ -211,8 +211,9 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
 
     usermode_reg_status_t status = drakvuf_register_usermode_callback(drakvuf, &reg);
 
-    if (status == USERMODE_ARCH_UNSUPPORTED) {
-        PRINT_DEBUG("[MEMDUMP] Usermode hooking is not supported on this architecture/bitness, these features will be disabled\n");
+    if (status == USERMODE_ARCH_UNSUPPORTED ||
+        status == USERMODE_OS_UNSUPPORTED) {
+        PRINT_DEBUG("[MEMDUMP] Usermode hooking is not supported on this architecture/bitness/os version, these features will be disabled\n");
     } else if (status != USERMODE_REGISTER_SUCCESS) {
         PRINT_DEBUG("[MEMDUMP] Failed to subscribe to libusermode\n");
         throw -1;
