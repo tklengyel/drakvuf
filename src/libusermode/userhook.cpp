@@ -775,8 +775,19 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+static uint16_t get_win_build_number(drakvuf_t drakvuf)
+{
+  vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+  uint16_t build = vmi_get_win_buildnumber(vmi);
+  drakvuf_release_vmi(drakvuf);
+  return build;
+}
+
 usermode_reg_status_t userhook::init(drakvuf_t drakvuf)
 {
+    if (get_win_build_number(drakvuf) == 15063)
+        return USERMODE_OS_UNSUPPORTED;
+
     page_mode_t pm = drakvuf_get_page_mode(drakvuf);
 
     if (pm != VMI_PM_IA32E)
