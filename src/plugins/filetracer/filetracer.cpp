@@ -455,6 +455,100 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     g_free(file);
 }
 
+static void print_basic_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo)
+{
+    gchar* escaped_pname = NULL;
+    gchar* escaped_fname = NULL;
+    filetracer* f = (filetracer*)info->trap->data;
+    const char* operation_name = "FileBasicInformation";
+
+    access_context_t ctx;
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+
+    uint64_t creation = 0;
+    ctx.addr = fileinfo + f->basic_creation_offset;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &creation) )
+        return;
+
+    uint64_t access = 0;
+    ctx.addr = fileinfo + f->basic_last_access_offset;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &access) )
+        return;
+
+    uint64_t write = 0;
+    ctx.addr = fileinfo + f->basic_last_write_offset;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &write) )
+        return;
+
+    uint64_t change = 0;
+    ctx.addr = fileinfo + f->basic_change_time_offset;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &change) )
+        return;
+
+    uint64_t attributes = 0;
+    ctx.addr = fileinfo + f->basic_attributes_offset;
+    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &attributes) )
+        return;
+
+    char* filename_ = drakvuf_get_filename_from_handle(drakvuf, info, src_file_handle);
+    const char* filename = filename_ ? : "<UNKNOWN>";
+
+    switch (f->format)
+    {
+        case OUTPUT_CSV:
+            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%" PRIx32 ",\"%s\",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid,
+                   operation_name, src_file_handle, filename, creation, access, write, change, parse_flags(attributes, file_flags_and_attrs, f->format).c_str());
+            break;
+
+        case OUTPUT_KV:
+            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Operation=%s,FileHandle=%" PRIx32 ",FileName=\"%s\",CreationTime=%" PRIu64 ",LastAccessTime=%" PRIu64 ",LastWriteTime=%" PRIu64 ",ChangeTime=%" PRIu64 ",FileAttributes=\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
+                   operation_name, src_file_handle, filename, creation, access, write, change, parse_flags(attributes, file_flags_and_attrs, f->format).c_str());
+            break;
+        case OUTPUT_JSON:
+            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
+            escaped_fname = drakvuf_escape_str(filename);
+
+            printf( "{"
+                    "\"Plugin\" : \"filetracer\","
+                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
+                    "\"ProcessName\": %s,"
+                    "\"UserName\": \"%s\","
+                    "\"UserId\": %" PRIu64 ","
+                    "\"PID\" : %d,"
+                    "\"PPID\": %d,"
+                    "\"TID\": %d,"
+                    "\"Operation\" : \"%s\","
+                    "\"FileHandle\" : \"0x%" PRIx32 "\""
+                    "\"FileName\" : %s,"
+                    "\"CreationTime\": %" PRIu64 ","
+                    "\"LastAccessTime\": %" PRIu64 ","
+                    "\"LastWriteTime\": %" PRIu64 ","
+                    "\"ChangeTime\": %" PRIu64 ","
+                    "\"FileAttributes\": \"%s\""
+                    "}\n",
+                    UNPACK_TIMEVAL(info->timestamp),
+                    escaped_pname,
+                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
+                    info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
+                    operation_name, src_file_handle, escaped_fname, creation, access, write, change,
+                    parse_flags(attributes, file_flags_and_attrs, f->format).c_str());
+
+            g_free(escaped_pname);
+            g_free(escaped_fname);
+            break;
+
+        default:
+        case OUTPUT_DEFAULT:
+            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 "%s,%" PRIx32 ",\"%s\",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",\"%s\"\n",
+                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, USERIDSTR(drakvuf), info->attached_proc_data.userid,
+                   operation_name, src_file_handle, filename, creation, access, write, change, parse_flags(attributes, file_flags_and_attrs, f->format).c_str());
+            break;
+    }
+}
+
 static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo)
 {
     gchar* escaped_pname = NULL;
@@ -803,6 +897,8 @@ static event_response_t query_attributes_file_cb(drakvuf_t drakvuf, drakvuf_trap
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+// TODO Remove hard-code. Retrieve from Volatility3 profile: profile["enums"]["_FILE_INFORMATION_CLASS"]
+#define FILE_BASIC_INFORMATION 4
 #define FILE_RENAME_INFORMATION 10
 #define FILE_DISPOSITION_INFORMATION 13
 
@@ -811,6 +907,12 @@ static event_response_t set_information_file_cb(drakvuf_t drakvuf, drakvuf_trap_
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t fileinfo = drakvuf_get_function_argument(drakvuf, info, 3);
     uint32_t fileinfoclass = drakvuf_get_function_argument(drakvuf, info, 5);
+
+    if (fileinfoclass == FILE_BASIC_INFORMATION)
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+        print_basic_file_info(vmi, drakvuf, info, handle, fileinfo);
+    }
 
     if (fileinfoclass == FILE_RENAME_INFORMATION)
     {
@@ -888,12 +990,25 @@ filetracer::filetracer(drakvuf_t drakvuf, output_format_t output)
 
     if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets) )
         throw -1;
+
+    // TODO Remove hard-code. Retrieve from Volatility3 profile
     // Offset of the RootDirectory field in _FILE_RENAME_INFORMATION structure
     this->newfile_root_offset = addr_size;
     // Offset of the FileName field in _FILE_RENAME_INFORMATION structure
     this->newfile_name_offset = addr_size * 2 + 4;
     // Offset of the FileNameLength field in _FILE_RENAME_INFORMATION structure
     this->newfile_name_length_offset = addr_size * 2;
+
+    // Offset of the CreationTime field in _FILE_BASIC_INFORMATION structure
+    this->basic_creation_offset = 0;
+    // Offset of the LastAccessTime field in _FILE_BASIC_INFORMATION structure
+    this->basic_last_access_offset = addr_size;
+    // Offset of the LastWriteTime field in _FILE_BASIC_INFORMATION structure
+    this->basic_last_write_offset = addr_size * 2;
+    // Offset of the ChangeTime field in _FILE_BASIC_INFORMATION structure
+    this->basic_change_time_offset = addr_size * 3;
+    // Offset of the FileAttributes field in _FILE_BASIC_INFORMATION structure
+    this->basic_attributes_offset = addr_size * 4;
 
     assert(sizeof(trap)/sizeof(trap[0]) > 6);
     register_trap(drakvuf, "NtCreateFile",          &trap[0], create_file_cb);
