@@ -117,6 +117,11 @@ public:
     addr_t newfile_name_offset;
     addr_t newfile_name_length_offset;
     addr_t newfile_root_offset;
+    addr_t basic_creation_offset;
+    addr_t basic_last_access_offset;
+    addr_t basic_last_write_offset;
+    addr_t basic_change_time_offset;
+    addr_t basic_attributes_offset;
 
     drakvuf_trap_t trap[7] =
     {
