@@ -102,12 +102,211 @@
 *                                                                         *
 ***************************************************************************/
 
-#ifndef PLUGINS_OUTPUT_FORMAT_H
-#define PLUGINS_OUTPUT_FORMAT_H
+#ifndef PLUGINS_OUTPUT_FORMAT_JSONFMT_H
+#define PLUGINS_OUTPUT_FORMAT_JSONFMT_H
 
-#include "output_format/csvfmt.h"
-#include "output_format/deffmt.h"
-#include "output_format/jsonfmt.h"
-#include "output_format/kvfmt.h"
+#include "common.h"
 
-#endif
+#include <type_traits_helpers.h>
+
+namespace jsonfmt
+{
+
+template <class T>
+constexpr bool print_data(fmt::ostream& os, const T& data, char sep = 0);
+
+
+template <class T, class = void, class...>
+struct data_printer
+{
+
+    static bool print(fmt::ostream& os, const TimeVal& t, char)
+    {
+        os << '"';
+        os << t.tv_sec << ".";
+
+        auto c = os.fill('0');
+        auto w = os.width(6);
+        os << t.tv_usec << std::setfill(c) << std::setw(w);
+        os << '"';
+        return true;
+    }
+
+    template <class Tv = T>
+    static bool print(fmt::ostream& os, const fmt::Nval<Tv>& data, char)
+    {
+        os << data.value;
+        return true;
+    }
+
+    template <class Tv = T>
+    static bool print(fmt::ostream& os, const fmt::Xval<Tv>& data, char)
+    {
+        auto ff = os.flags();
+        os << (data.withbase ? "0x" : "") << std::uppercase << std::hex << data.value;
+        os.flags(ff);
+        return true;
+    }
+
+    template <class Tv = T>
+    static bool print(fmt::ostream& os, const fmt::Fval<Tv>& data, char)
+    {
+        auto ff = os.flags();
+        os << std::fixed << data.value;
+        os.flags(ff);
+        return true;
+    }
+
+    template <class Tv = T>
+    static bool print(fmt::ostream& os, const fmt::Rstr<Tv>& data, char)
+    {
+        os << data.value;
+        return true;
+    }
+
+    template <class Tv = T>
+    static bool print(fmt::ostream& os, const fmt::Qstr<Tv>& data, char)
+    {
+        os << std::quoted(data.value);
+        return true;
+    }
+
+    template <class Tv = T>
+    static bool print(fmt::ostream& os, const std::function<bool(std::ostream&)>& printer, char)
+    {
+        std::ostringstream ss;
+        bool printed = printer(ss);
+        if (printed)
+            os << ss.str();
+        return printed;
+    }
+
+    template <class Tv = T>
+    static bool print(fmt::ostream& os, const std::optional<Tv>& data, char sep)
+    {
+        if (!data.has_value())
+        {
+            os << "null";
+            return true;
+        }
+        return print_data(os, data.value(), sep);
+    }
+
+    template <class Tk, class Tv>
+    static bool print(fmt::ostream& os, const std::pair<Tk, Tv>& data, char)
+    {
+        static_assert(
+            std::is_same_v<Tk, const char*> ||
+            std::is_same_v<std::decay_t<Tk>, std::string> ||
+            std::is_same_v<std::decay_t<Tk>, std::string_view>,
+            "Unsupported JSON printer key type");
+
+        auto pos = os.tellp();
+        if (print_data(os, fmt::qstr(data.first), 0))
+        {
+            os << ':';
+            if (print_data(os, data.second, ','))
+            {
+                return true;
+            }
+        }
+        os.seekp(pos);
+        return false;
+    }
+};
+
+template <class T>
+struct data_printer<T, std::enable_if_t<is_iterable<T>::value, void>>
+{
+    static bool print(fmt::ostream& os, const T& data, char sep)
+    {
+        uint32_t i = 0;
+        bool printed = false;
+        for (const auto& v : data) {
+            if (printed)
+                os << sep;
+            printed = print_data(os, v, sep);
+            ++i;
+        }
+        if (i > 0 && !printed)
+            os.unputc(sep);
+        return true;
+    }
+};
+
+template <class T>
+constexpr bool print_data(fmt::ostream& os, const T& data, char sep) {
+    return data_printer<T>::print(os, data, sep);
+}
+
+/**/
+
+template <class T, class... Ts>
+constexpr bool print_data(fmt::ostream& os, const T& data, const Ts&... rest) {
+    constexpr char sep = ',';
+    bool printed = print_data(os, data, sep);
+    bool printed_rest = false;
+
+    if constexpr (sizeof...(rest) > 0)
+    {
+        if (printed)
+            os << sep;
+        printed_rest = print_data(os, rest...);
+        if (!printed_rest && printed)
+            os.unputc(sep);
+    }
+    return printed || printed_rest;
+}
+
+/**/
+
+inline void print_common_data(fmt::ostream& os, const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    if (info)
+    {
+        std::optional<decltype(fmt::qstr(info->trap->name))> method;
+        if (info->trap->name)
+            method = fmt::qstr(info->trap->name);
+
+        print_data(os,
+            keyval("Plugin", fmt::qstr(plugin_name)),
+            keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
+            keyval("PID", fmt::nval(info->attached_proc_data.pid)),
+            keyval("PPID", fmt::nval(info->attached_proc_data.ppid)),
+            keyval("TID", fmt::nval(info->attached_proc_data.tid)),
+            keyval("UserName", fmt::qstr(USERIDSTR(drakvuf))),
+            keyval("UserId", fmt::nval(info->proc_data.userid)),
+            keyval("ProcessName", fmt::qstr(info->attached_proc_data.name)),
+            keyval("Method", method)
+        );
+    }
+}
+
+template<class... Args>
+void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const Args& ... args)
+{
+    fmt::out << '{';
+
+    bool printed = false;
+    if (info)
+    {
+        print_common_data(fmt::out, plugin_name, drakvuf, info);
+        printed = true;
+    }
+
+    if constexpr (sizeof...(args) > 0)
+    {
+        constexpr char sep = ',';
+        if (printed)
+            fmt::out << sep;
+        if (!print_data(fmt::out, args...))
+            fmt::out.unputc(sep);
+    }
+
+    fmt::out << "}\n";
+    fmt::out.flush();
+}
+
+} // namespace jsonfmt
+
+#endif // PLUGINS_OUTPUT_FORMAT_JSONFMT_H

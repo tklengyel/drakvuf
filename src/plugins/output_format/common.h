@@ -102,12 +102,138 @@
 *                                                                         *
 ***************************************************************************/
 
-#ifndef PLUGINS_OUTPUT_FORMAT_H
-#define PLUGINS_OUTPUT_FORMAT_H
+#ifndef PLUGINS_OUTPUT_FORMAT_COMMON_H
+#define PLUGINS_OUTPUT_FORMAT_COMMON_H
 
-#include "output_format/csvfmt.h"
-#include "output_format/deffmt.h"
-#include "output_format/jsonfmt.h"
-#include "output_format/kvfmt.h"
+#include "ostream.h"
 
-#endif
+#include <libdrakvuf/libdrakvuf.h>
+#include <plugins/private.h>
+
+#include <algorithm>
+#include <functional>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+struct TimeVal {
+  glong tv_sec;
+  glong tv_usec;
+};
+
+template<class Value>
+auto keyval(const char* key, const Value& value)
+{
+    return std::make_pair(key, value);
+}
+
+namespace fmt {
+
+template<class T>
+struct __val_holder
+{
+    T value;
+
+    __val_holder(T&& v): value(std::forward<T>(v)) {}
+};
+
+/* numeric value */
+template<class T>
+struct Nval: __val_holder<T>
+{
+    Nval(T&& v): __val_holder<T>(std::forward<T>(v)) {}
+};
+
+template<class T, std::enable_if_t<std::is_integral_v<std::remove_reference_t<T>>, int> = 0>
+auto nval(T&& value)
+{
+    return Nval<T>(std::forward<T>(value));
+}
+
+/* format specific numeric value */
+template<class T>
+struct Xval: __val_holder<T>
+{
+    bool withbase;
+    Xval(T&& v, bool use_base = true): __val_holder<T>(std::forward<T>(v)), withbase(use_base) {}
+};
+
+template<class T, std::enable_if_t<std::is_integral_v<std::remove_reference_t<T>>, int> = 0>
+auto xval(T&& value, bool use_base = true)
+{
+    return Xval<T>(std::forward<T>(value));
+}
+
+/* floating value in fixed format */
+template<class T>
+struct Fval: __val_holder<T>
+{
+    Fval(T&& v): __val_holder<T>(std::forward<T>(v)) {}
+};
+
+template<class T, std::enable_if_t<std::is_floating_point_v<T>, int> = 0>
+auto fval(T&& value)
+{
+    return Fval<T>(std::forward<T>(value));
+}
+
+/* raw string value */
+template<class T>
+struct Rstr: __val_holder<T>
+{
+    Rstr(T&& v): __val_holder<T>(std::forward<T>(v)) {}
+};
+
+template<class T, std::enable_if_t<std::is_same_v<const T*, const char*>, int> = 0>
+auto rstr(const T* value)
+{
+    if (value == nullptr)
+        value = "(null)";
+    return Rstr<const T*>(std::forward<const T*>(value));
+}
+template<class T, std::enable_if_t<std::is_same_v<std::decay_t<T>, std::string>, int> = 0>
+auto rstr(T&& value)
+{
+    return Rstr<T>(std::forward<T>(value));
+}
+template<class T, std::enable_if_t<std::is_same_v<std::decay_t<T>, std::string_view>, int> = 0>
+auto rstr(T&& value)
+{
+    return Rstr<T>(std::forward<T>(value));
+}
+
+/* format specific quoted string value */
+template<class T>
+struct Qstr: __val_holder<T>
+{
+    Qstr(T&& v): __val_holder<T>(std::forward<T>(v)) {}
+};
+
+template<class T, std::enable_if_t<std::is_same_v<const T*, const char*>, int> = 0>
+auto qstr(const T* value)
+{
+    if (value == nullptr)
+        value = "(null)";
+    return Qstr<const T*>(std::forward<const T*>(value));
+}
+template<class T, std::enable_if_t<std::is_same_v<std::decay_t<T>, std::string>, int> = 0>
+auto qstr(T&& value)
+{
+    return Qstr<T>(std::forward<T>(value));
+}
+template<class T, std::enable_if_t<std::is_same_v<std::decay_t<T>, std::string_view>, int> = 0>
+auto qstr(T&& value)
+{
+    return Qstr<T>(std::forward<T>(value));
+}
+
+} // namespace fmt
+
+#endif // PLUGINS_OUTPUT_FORMAT_COMMON_H
