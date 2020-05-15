@@ -123,9 +123,10 @@
 #include <utility>
 #include <vector>
 
-struct TimeVal {
-  glong tv_sec;
-  glong tv_usec;
+struct TimeVal
+{
+    glong tv_sec;
+    glong tv_usec;
 };
 
 template<class Value>
@@ -134,7 +135,8 @@ auto keyval(const char* key, const Value& value)
     return std::make_pair(key, value);
 }
 
-namespace fmt {
+namespace fmt
+{
 
 template<class T>
 struct __val_holder

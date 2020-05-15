@@ -206,7 +206,8 @@ struct data_printer<T, std::enable_if_t<is_iterable<T>::value, void>>
     {
         uint32_t i = 0;
         bool printed = false;
-        for (const auto& v : data) {
+        for (const auto& v : data)
+        {
             if (printed)
                 os << sep;
             printed = print_data(os, v, sep);
@@ -219,14 +220,16 @@ struct data_printer<T, std::enable_if_t<is_iterable<T>::value, void>>
 };
 
 template <class T>
-constexpr bool print_data(fmt::ostream& os, const T& data, char sep) {
+constexpr bool print_data(fmt::ostream& os, const T& data, char sep)
+{
     return data_printer<T>::print(os, data, sep);
 }
 
 /**/
 
 template <class T, class... Ts>
-constexpr bool print_data(fmt::ostream& os, const T& data, const Ts&... rest) {
+constexpr bool print_data(fmt::ostream& os, const T& data, const Ts& ... rest)
+{
     constexpr char sep = ',';
     bool printed = print_data(os, data, sep);
     bool printed_rest = false;
@@ -253,16 +256,16 @@ inline void print_common_data(fmt::ostream& os, drakvuf_trap_info_t* info)
             method = fmt::rstr(info->trap->name);
 
         print_data(os,
-            keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-            keyval("VCPU", fmt::nval(info->vcpu)),
-            keyval("CR3", fmt::xval(info->regs->cr3)),
-            keyval("UserId", fmt::nval(info->proc_data.userid)),
-            keyval("PID", fmt::nval(info->attached_proc_data.pid)),
-            keyval("PPID", fmt::nval(info->attached_proc_data.ppid)),
-            keyval("TID", fmt::nval(info->attached_proc_data.tid)),
-            keyval("ProcessName", fmt::qstr(info->attached_proc_data.name)),
-            keyval("Method", method)
-        );
+                   keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
+                   keyval("VCPU", fmt::nval(info->vcpu)),
+                   keyval("CR3", fmt::xval(info->regs->cr3)),
+                   keyval("UserId", fmt::nval(info->proc_data.userid)),
+                   keyval("PID", fmt::nval(info->attached_proc_data.pid)),
+                   keyval("PPID", fmt::nval(info->attached_proc_data.ppid)),
+                   keyval("TID", fmt::nval(info->attached_proc_data.tid)),
+                   keyval("ProcessName", fmt::qstr(info->attached_proc_data.name)),
+                   keyval("Method", method)
+                  );
     }
 }
 

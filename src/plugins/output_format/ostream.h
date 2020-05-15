@@ -113,8 +113,9 @@
 
 #include <stdio.h>
 #include <unistd.h>
- 
-namespace fmt {
+
+namespace fmt
+{
 
 template<std::size_t SIZE, class CharT = char>
 class ArrayedStreamBuffer : public std::basic_streambuf<CharT>
@@ -123,7 +124,7 @@ public:
     using Base = std::basic_streambuf<CharT>;
     using int_type = typename Base::int_type;
     using char_type = typename Base::char_type;
- 
+
 public:
     ArrayedStreamBuffer() : buffer_{}
     {
@@ -132,7 +133,7 @@ public:
 
     void unputc(char_type ch)
     {
-        if(Base::pptr() > Base::pbase() && Base::pptr()[-1] == ch)
+        if (Base::pptr() > Base::pbase() && Base::pptr()[-1] == ch)
         {
             int sz = sizeof(ch);
             Base::pbump(-sz);
