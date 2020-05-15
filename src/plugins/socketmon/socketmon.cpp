@@ -881,13 +881,16 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
 {
     this->pm = drakvuf_get_page_mode(drakvuf);
 
-    vmi_lock_guard vmi(drakvuf);
-    win_build_info_t build_info;
-    if (!vmi_get_windows_build_info(vmi.vmi, &build_info))
-        throw -1;
+    uint16_t build = 0;
+    {
+        vmi_lock_guard vmi(drakvuf);
+        win_build_info_t build_info;
+        if (!vmi_get_windows_build_info(vmi.vmi, &build_info))
+            throw -1;
 
-    this->winver = build_info.version;
-    auto build = build_info.buildnumber;
+        this->winver = build_info.version;
+        build = build_info.buildnumber;
+    }
 
     if ( !c->tcpip_profile )
     {
