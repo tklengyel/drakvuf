@@ -199,7 +199,11 @@ bool GzippedProcdumpWriter::write_impl(int flush)
         if (!BaseProcdumpWriter::append(out, sizeof(out) - z_file.avail_out)) return false;
     }
     while (z_file.avail_out == 0);
-    g_assert(z_file.avail_in == 0);
+    if (z_file.avail_in != 0)
+    {
+        PRINT_DEBUG("[PROCDUMP] GZIP fail: z_file.avail_in != 0");
+        return false;
+    }
     return true;
 }
 
