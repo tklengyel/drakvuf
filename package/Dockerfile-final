@@ -4,7 +4,7 @@ COPY . /build
 RUN export INSTALL_PATH="/build/usr" && \
     cd /build/libvmi && \
     autoreconf -vif && \
-    ./configure --prefix=$INSTALL_PATH --disable-kvm --disable-file --disable-bareflank --disable-safety-checks && \
+    ./configure --prefix=$INSTALL_PATH --disable-kvm --disable-file --disable-bareflank --disable-safety-checks --enable-vmi-debug && \
     make -j$(nproc) && \
     make install && \
     ldconfig
@@ -17,7 +17,7 @@ RUN export INSTALL_PATH="/build/usr" && \
     export LDFLAGS="-L$INSTALL_PATH/lib" && \
     export CFLAGS="-I$INSTALL_PATH/include" && \
     autoreconf -vif && \
-    ./configure --prefix=$INSTALL_PATH && \
+    ./configure --prefix=$INSTALL_PATH --enable-debug && \
     make -j$(nproc) && \
     make install
 
