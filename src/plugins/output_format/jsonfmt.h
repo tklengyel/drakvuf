@@ -107,7 +107,7 @@
 
 #include "common.h"
 
-#include <type_traits_helpers.h>
+#include "plugins/type_traits_helpers.h"
 
 namespace jsonfmt
 {
