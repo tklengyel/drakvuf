@@ -35,4 +35,3 @@ rm -rf /var/lib/apt/lists* /tmp/* /var/tmp/*
 rm /usr/bin/gcc /usr/bin/g++
 ln -s /usr/bin/gcc-7 /usr/bin/gcc
 ln -s /usr/bin/g++-7 /usr/bin/g++
-
