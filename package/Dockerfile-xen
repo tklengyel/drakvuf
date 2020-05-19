@@ -5,6 +5,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV USER root
 
 COPY package/depends.sh /tmp/depends.sh
+COPY package/swab.patch /tmp/swab.patch
 
 # build depends
 RUN mkdir -p /log && \
