@@ -59,6 +59,7 @@ cp -avr /build/usr/bin/* deb/usr/bin/
 
 mkdir -p deb/usr/lib/
 cp -avr /build/usr/lib/* deb/usr/lib/
+mv deb/usr/lib/python2.7/site-packages deb/usr/lib/python2.7/dist-packages
 
 mkdir -p deb/usr/include/
 cp -avr /build/usr/include/* deb/usr/include/
@@ -85,7 +86,10 @@ make dist
 mv drakvuf*.tar.gz /out
 
 # For Travis CI
-git config --local user.name "drakvuf-builds"
-git config --local user.email "drakvuf-builds@tklsoftware.com"
-export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
-git tag $TRAVIS_TAG
+if [ -d ".git/" ]
+then
+    git config --local user.name "drakvuf-builds"
+    git config --local user.email "drakvuf-builds@tklsoftware.com"
+    export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
+    git tag $TRAVIS_TAG
+fi
