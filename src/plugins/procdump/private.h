@@ -127,7 +127,9 @@ struct procdump_ctx
     string name;
     procdump* plugin;
     drakvuf_trap_t* bp;
+    drakvuf_trap_t* bp2;
     vads_t vads;
+    vads_t dlls;
     x86_registers_t saved_regs;
     uint64_t idx;
     addr_t pool;

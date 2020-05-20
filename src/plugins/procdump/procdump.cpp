@@ -169,6 +169,12 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
 static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
         drakvuf_trap_info_t* info);
 
+static event_response_t complete_stage1(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                                        procdump_ctx* ctx);
+
+static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
+        drakvuf_trap_info_t* info);
+
 static bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
                                  procdump_ctx* ctx)
 {
@@ -360,33 +366,73 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
 
     info->regs->rip = ctx->plugin->memcpy_va;
 
-    ctx->bp->cb = rtlcopymemory_cb;
+    ctx->bp2->cb = rtlcopymemory_cb;
 
     return RTLCOPY_INJECT;
 }
+
+static bool dump_next_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                           procdump_ctx* ctx)
+{
+    while (!ctx->vads.empty())
+    {
+        switch (dump_with_rtlcopymemory(drakvuf, info, ctx))
+        {
+            case RTLCOPY_INJECT:
+                return true;
+            case RTLCOPY_GO_NEXT_VAD:
+                break;
+            case RTLCOPY_RETRY_WITH_MMAP:
+            default:
+                dump_with_mmap(drakvuf, info, ctx);
+                break;
+        }
+    }
+
+    return false;
+}
+
+#define VAD_TYPE_DLL 2
 
 static bool dump_next_vads(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
                            procdump_ctx* ctx)
 {
     while (!ctx->vads.empty())
     {
-        if (2 == ctx->vads.begin()->second.type)
+        if (VAD_TYPE_DLL == ctx->vads.begin()->second.type)
         {
-            switch (dump_with_rtlcopymemory(drakvuf, info, ctx))
-            {
-                case RTLCOPY_INJECT:
-                    return true;
-                case RTLCOPY_GO_NEXT_VAD:
-                    continue;
-                case RTLCOPY_RETRY_WITH_MMAP:
-                default:
-                    break;
-            }
+            // To avoid raises (aka BSODs) dump DLLs at stage 2
+            auto vad = ctx->vads.begin();
+            auto vad_start = vad->first;
+            ctx->dlls[vad_start] = vad->second;
+            ctx->vads.erase(vad_start);
         }
-
-        dump_with_mmap(drakvuf, info, ctx);
+        else
+            dump_with_mmap(drakvuf, info, ctx);
     }
 
+    // Go to stage 2
+    complete_stage1(drakvuf, info, ctx);
+    ctx->bp2 = (drakvuf_trap_t*)g_slice_new0(drakvuf_trap_t);
+    ctx->bp2->type = BREAKPOINT;
+    ctx->bp2->cb = terminate_process_cb2;
+    ctx->bp2->data = ctx;
+    ctx->bp2->name = nullptr;
+    ctx->bp2->breakpoint.lookup_type = LOOKUP_DTB;
+    ctx->bp2->breakpoint.dtb = info->regs->cr3;
+    ctx->bp2->breakpoint.addr_type = ADDR_VA;
+    ctx->bp2->breakpoint.addr = ctx->plugin->clean_process_va;
+    if (drakvuf_add_trap(drakvuf, ctx->bp2))
+    {
+        ctx->plugin->traps = g_slist_prepend(ctx->plugin->traps, ctx->bp2);
+        return true;
+    }
+    else
+    {
+        PRINT_DEBUG("[PROCDUMP] Failed to trap return location of injected "
+                    "function call @ 0x%lx!\n",
+                    ctx->bp2->breakpoint.addr);
+    }
     return false;
 }
 
@@ -402,21 +448,9 @@ static void free_trap(gpointer p)
     g_slice_free(drakvuf_trap_t, t);
 }
 
-static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                               procdump_ctx* ctx)
+static void restore_registers(drakvuf_trap_info_t* info,
+                              procdump_ctx* ctx)
 {
-    ctx->writer->finish();
-
-    if (ctx->vads.empty())
-    {
-        // If there is no VADs left than the file have been processed
-        save_file_metadata(ctx, &info->proc_data);
-        fmt::print(ctx->plugin->m_output_format, "procdump", drakvuf, info,
-                   keyval("DumpReason", fmt::Qstr("TerminateProcess")),
-                   keyval("DumpSize", fmt::Nval(ctx->size)),
-                   keyval("SN", fmt::Nval(ctx->idx))
-                  );
-    }
     // One could not restore all registers at once like this:
     //     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t)),
     // because thus kernel structures could be affected.
@@ -440,11 +474,49 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     info->regs->r13 = ctx->saved_regs.r13;
     info->regs->r14 = ctx->saved_regs.r14;
     info->regs->r15 = ctx->saved_regs.r15;
+}
 
+static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                               procdump_ctx* ctx)
+{
+    ctx->writer->finish();
+
+    if (ctx->vads.empty())
+    {
+        // If there is no VADs left than the file have been processed
+        save_file_metadata(ctx, &info->proc_data);
+        fmt::print(ctx->plugin->m_output_format, "procdump", drakvuf, info,
+                   keyval("DumpReason", fmt::Qstr("TerminateProcess")),
+                   keyval("DumpSize", fmt::Nval(ctx->size)),
+                   keyval("SN", fmt::Nval(ctx->idx))
+                  );
+    }
+
+    restore_registers(info, ctx);
     free_pool(ctx->plugin->pools, ctx->pool);
     ctx->plugin->terminating.at(ctx->pid) = 0;
+    if (ctx->bp)
+    {
+        ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
+        drakvuf_remove_trap(drakvuf, ctx->bp, (drakvuf_trap_free_t)free_trap);
+    }
+    if (ctx->bp2)
+    {
+        ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp2);
+        drakvuf_remove_trap(drakvuf, ctx->bp2, (drakvuf_trap_free_t)free_trap);
+    }
+
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+}
+
+static event_response_t complete_stage1(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                                        procdump_ctx* ctx)
+{
+    restore_registers(info, ctx);
     ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
+    ctx->bp->data = nullptr;
     drakvuf_remove_trap(drakvuf, ctx->bp, (drakvuf_trap_free_t)free_trap);
+    ctx->bp = nullptr;
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
@@ -482,7 +554,7 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
                     ctx->current_dump_size, ctx->size);
     }
 
-    if (dump_next_vads(drakvuf, info, ctx))
+    if (dump_next_dlls(drakvuf, info, ctx))
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     else
         return detach(drakvuf, info, ctx);
@@ -546,7 +618,7 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
     // * Sections mapped with NtMapViewOfSection: VadType is 0
     if (!vad_commit_charge)
         return false;
-    if (!(vad_type == 2 || vad_type == 0))
+    if (!(vad_type == VAD_TYPE_DLL || vad_type == 0))
         return false;
 
     // MiAllocateVad sets CommitCharge to MM_MAX_COMMIT
@@ -569,7 +641,7 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
     }
 
     std::vector<addr_t> prototype_pte;
-    if (vad_type == 2)
+    if (vad_type == VAD_TYPE_DLL)
     {
         auto ptes = mmvad->total_number_of_ptes;
         if (len_pages == ptes)
@@ -632,16 +704,31 @@ static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pr
     vector<struct mdmp_memory_descriptor64> memory_ranges;
     for (auto vad: ctx->vads)
     {
-        struct mdmp_memory_descriptor64 range(vad.first,
-                                              vad.second.total_number_of_ptes * VMI_PS_4KB);
-        memory_ranges.push_back(range);
+        if (VAD_TYPE_DLL != vad.second.type)
+        {
+            struct mdmp_memory_descriptor64 range(vad.first,
+                    vad.second.total_number_of_ptes * VMI_PS_4KB);
+            memory_ranges.push_back(range);
+        }
+    }
+    for (auto vad: ctx->vads)
+    {
+        if (VAD_TYPE_DLL == vad.second.type)
+        {
+            struct mdmp_memory_descriptor64 range(vad.first,
+                    vad.second.total_number_of_ptes * VMI_PS_4KB);
+            memory_ranges.push_back(range);
+        }
     }
 
+    // TODO Store all threads of the process
     struct mdmp_thread thread;
     thread.thread_id = info->attached_proc_data.tid;
+    // TODO Get Teb and StackBase from attached thread
     thread.teb = drakvuf_get_current_thread_teb(drakvuf, info);
     thread.stack.start_of_memory_range = drakvuf_get_current_thread_stackbase(drakvuf, info);
     union thread_context thread_ctx;
+    // TODO Get registers from attached thread _KTHREAD.TrapFrame
     thread_ctx.set(is32bit, info->regs);
 
     auto mdmp = minidump(time_stamp,
@@ -666,6 +753,66 @@ static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pr
     }
 
     return true;
+}
+
+static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
+        drakvuf_trap_info_t* info)
+{
+    if (!info->attached_proc_data.pid)
+    {
+        PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to get "
+                    "attached process\n",
+                    info->proc_data.pid, info->proc_data.tid);
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    auto ctx = static_cast<struct procdump_ctx*>(info->trap->data);
+    if (!ctx)
+    {
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    if (info->attached_proc_data.pid != ctx->pid)
+    {
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    // The thread could change
+    ctx->tid = info->attached_proc_data.tid;
+    ctx->plugin->terminating[ctx->pid] = ctx->tid;
+
+    // Get virtual address space map of the process
+    drakvuf_traverse_mmvad(drakvuf, info->attached_proc_data.base_addr, dump_mmvad,
+                           ctx);
+    if (ctx->vads.empty())
+        return detach(drakvuf, info, ctx);
+    else
+    {
+        for (auto dll = ctx->dlls.cbegin(); dll != ctx->dlls.end();)
+        {
+            auto vad = ctx->vads.find(dll->first);
+            if (vad == ctx->vads.end() ||
+                vad->second.total_number_of_ptes != dll->second.total_number_of_ptes ||
+                vad->second.prototype_ptes.size() != dll->second.prototype_ptes.size())
+            {
+                PRINT_DEBUG("[PROCDUMP] DLL at %#lx of %ld PTEs disappered\n",
+                            dll->first, dll->second.total_number_of_ptes);
+                ctx->dlls.erase(dll++);
+            }
+            else
+                ++dll;
+        }
+
+        ctx->vads.clear();
+        ctx->vads.swap(ctx->dlls);
+    }
+
+    // Save registers to restore process/thread state
+    memcpy(&ctx->saved_regs, info->regs, sizeof(x86_registers_t));
+    if (dump_next_dlls(drakvuf, info, ctx))
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    else
+        return detach(drakvuf, info, ctx);
 }
 
 static event_response_t terminate_process_cb(drakvuf_t drakvuf,
@@ -810,6 +957,7 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
     , terminating()
     , malloc_va()
     , memcpy_va()
+    , clean_process_va()
     , win_build_number(0)
     , win_major(0)
     , win_minor(0)
@@ -826,6 +974,8 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
         get_function_va(drakvuf, "ntoskrnl.exe", "ExAllocatePoolWithTag");
     this->memcpy_va =
         get_function_va(drakvuf, "ntoskrnl.exe", "RtlCopyMemoryNonTemporal");
+    this->clean_process_va =
+        get_function_va(drakvuf, "ntoskrnl.exe", "MmCleanProcessAddressSpace");
 
     vmi_lock_guard vmi(drakvuf);
     num_cpus = vmi_get_num_vcpus(vmi);
@@ -845,7 +995,7 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
     breakpoint_in_system_process_searcher bp;
     if (!register_trap<procdump>(
             drakvuf, nullptr, this, terminate_process_cb,
-            bp.for_syscall_name("MmCleanProcessAddressSpace")))
+            bp.for_syscall_name("NtTerminateProcess")))
     {
         throw -1;
     }
