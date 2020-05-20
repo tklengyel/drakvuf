@@ -202,7 +202,7 @@ struct data_printer
             "Unsupported JSON printer key type");
 
         auto pos = os.tellp();
-        if (print_data(os, fmt::qstr(data.first), 0))
+        if (print_data(os, fmt::Qstr(data.first), 0))
         {
             os << ':';
             if (print_data(os, data.second, ','))
@@ -267,19 +267,19 @@ inline void print_common_data(fmt::ostream& os, const char* plugin_name, drakvuf
 {
     if (info)
     {
-        std::optional<decltype(fmt::qstr(info->trap->name))> method;
+        std::optional<fmt::Qstr<decltype(info->trap->name)>> method;
         if (info->trap->name)
-            method = fmt::qstr(info->trap->name);
+            method = fmt::Qstr(info->trap->name);
 
         print_data(os,
-                   keyval("Plugin", fmt::qstr(plugin_name)),
+                   keyval("Plugin", fmt::Qstr(plugin_name)),
                    keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-                   keyval("PID", fmt::nval(info->attached_proc_data.pid)),
-                   keyval("PPID", fmt::nval(info->attached_proc_data.ppid)),
-                   keyval("TID", fmt::nval(info->attached_proc_data.tid)),
-                   keyval("UserName", fmt::qstr(USERIDSTR(drakvuf))),
-                   keyval("UserId", fmt::nval(info->proc_data.userid)),
-                   keyval("ProcessName", fmt::qstr(info->attached_proc_data.name)),
+                   keyval("PID", fmt::Nval(info->attached_proc_data.pid)),
+                   keyval("PPID", fmt::Nval(info->attached_proc_data.ppid)),
+                   keyval("TID", fmt::Nval(info->attached_proc_data.tid)),
+                   keyval("UserName", fmt::Qstr(USERIDSTR(drakvuf))),
+                   keyval("UserId", fmt::Nval(info->proc_data.userid)),
+                   keyval("ProcessName", fmt::Qstr(info->attached_proc_data.name)),
                    keyval("Method", method)
                   );
     }

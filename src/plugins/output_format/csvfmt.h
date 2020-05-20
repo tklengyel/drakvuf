@@ -251,19 +251,19 @@ inline void print_common_data(fmt::ostream& os, drakvuf_trap_info_t* info)
 {
     if (info)
     {
-        std::optional<decltype(fmt::rstr(info->trap->name))> method;
+        std::optional<fmt::Rstr<decltype(info->trap->name)>> method;
         if (info->trap->name)
-            method = fmt::rstr(info->trap->name);
+            method = fmt::Rstr(info->trap->name);
 
         print_data(os,
                    keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-                   keyval("VCPU", fmt::nval(info->vcpu)),
-                   keyval("CR3", fmt::xval(info->regs->cr3)),
-                   keyval("UserId", fmt::nval(info->proc_data.userid)),
-                   keyval("PID", fmt::nval(info->attached_proc_data.pid)),
-                   keyval("PPID", fmt::nval(info->attached_proc_data.ppid)),
-                   keyval("TID", fmt::nval(info->attached_proc_data.tid)),
-                   keyval("ProcessName", fmt::qstr(info->attached_proc_data.name)),
+                   keyval("VCPU", fmt::Nval(info->vcpu)),
+                   keyval("CR3", fmt::Xval(info->regs->cr3)),
+                   keyval("UserId", fmt::Nval(info->proc_data.userid)),
+                   keyval("PID", fmt::Nval(info->attached_proc_data.pid)),
+                   keyval("PPID", fmt::Nval(info->attached_proc_data.ppid)),
+                   keyval("TID", fmt::Nval(info->attached_proc_data.tid)),
+                   keyval("ProcessName", fmt::Qstr(info->attached_proc_data.name)),
                    keyval("Method", method)
                   );
     }

@@ -198,7 +198,7 @@ struct data_printer
             "Unsupported DEFAULT printer key type");
 
         auto pos = os.tellp();
-        if (print_data(os, fmt::rstr(data.first), 0))
+        if (print_data(os, fmt::Rstr(data.first), 0))
         {
             os << ':';
             if (print_data(os, data.second, ';'))
@@ -270,12 +270,12 @@ inline void print_common_data(fmt::ostream& os, drakvuf_t drakvuf, drakvuf_trap_
 
         print_data(os,
                    keyval("TIME", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-                   keyval("VCPU", fmt::nval(info->vcpu)),
-                   keyval("CR3", fmt::xval(info->regs->cr3)),
-                   keyval(procname.c_str(), fmt::rstr(method)),
-                   keyval(USERIDSTR(drakvuf), fmt::nval(info->proc_data.userid)),
-                   keyval("PID", fmt::nval(info->attached_proc_data.pid)),
-                   keyval("PPID", fmt::nval(info->attached_proc_data.ppid))
+                   keyval("VCPU", fmt::Nval(info->vcpu)),
+                   keyval("CR3", fmt::Xval(info->regs->cr3)),
+                   keyval(procname.c_str(), fmt::Rstr(method)),
+                   keyval(USERIDSTR(drakvuf), fmt::Nval(info->proc_data.userid)),
+                   keyval("PID", fmt::Nval(info->attached_proc_data.pid)),
+                   keyval("PPID", fmt::Nval(info->attached_proc_data.ppid))
                   );
     }
 }

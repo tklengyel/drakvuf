@@ -109,6 +109,7 @@
 
 #include <libdrakvuf/libdrakvuf.h>
 #include <plugins/private.h>
+#include <plugins/type_traits_helpers.h>
 
 #include <algorithm>
 #include <functional>
@@ -139,102 +140,103 @@ namespace fmt
 {
 
 template<class T>
-struct __val_holder
+struct ValHolder
 {
     T value;
-
-    __val_holder(T&& v): value(std::forward<T>(v)) {}
+    ValHolder(T v): value(std::move(v)) {}
 };
 
 /* numeric value */
-template<class T>
-struct Nval: __val_holder<T>
+template<class T, class = void>
+struct Nval
 {
-    Nval(T&& v): __val_holder<T>(std::forward<T>(v)) {}
+    Nval(T v)
+    {
+        static_assert(always_false<T>::value, "should be integral type");
+    }
 };
 
-template<class T, std::enable_if_t<std::is_integral_v<std::remove_reference_t<T>>, int> = 0>
-auto nval(T&& value)
+template<class T>
+struct Nval<T, std::enable_if_t<std::is_integral_v<std::remove_reference_t<T>>, void>>: ValHolder<T>
 {
-    return Nval<T>(std::forward<T>(value));
-}
+    Nval(T v): ValHolder<T>(std::move(v)) {}
+};
 
 /* format specific numeric value */
 template<class T>
-struct Xval: __val_holder<T>
+struct Xval: Nval<T>
 {
     bool withbase;
-    Xval(T&& v, bool use_base = true): __val_holder<T>(std::forward<T>(v)), withbase(use_base) {}
+    Xval(T v, bool use_base = true): Nval<T>(std::move(v)), withbase(use_base) {}
 };
-
-template<class T, std::enable_if_t<std::is_integral_v<std::remove_reference_t<T>>, int> = 0>
-auto xval(T&& value, bool use_base = true)
-{
-    return Xval<T>(std::forward<T>(value));
-}
 
 /* floating value in fixed format */
-template<class T>
-struct Fval: __val_holder<T>
+template<class T, class = void>
+struct Fval
 {
-    Fval(T&& v): __val_holder<T>(std::forward<T>(v)) {}
+    Fval(T v)
+    {
+        static_assert(always_false<T>::value, "should be float type");
+    }
 };
 
-template<class T, std::enable_if_t<std::is_floating_point_v<T>, int> = 0>
-auto fval(T&& value)
+template<class T>
+struct Fval<T, std::enable_if_t<std::is_floating_point_v<T>, void>>: ValHolder<T>
 {
-    return Fval<T>(std::forward<T>(value));
-}
+    Fval(T v): ValHolder<T>(std::move(v)) {}
+};
 
 /* raw string value */
-template<class T>
-struct Rstr: __val_holder<T>
+template<class T, class = void>
+struct Rstr
 {
-    Rstr(T&& v): __val_holder<T>(std::forward<T>(v)) {}
+    Rstr(T v)
+    {
+        static_assert(always_false<T>::value, "should be the one of: char*, const char*, std::string, std::string_view");
+    }
 };
 
-template<class T, std::enable_if_t<std::is_same_v<const T*, const char*>, int> = 0>
-auto rstr(const T* value)
+template<class T>
+struct Rstr<T,
+    std::enable_if_t<
+        std::is_same_v<T, char*>,
+        void>
+    >: ValHolder<const std::remove_pointer_t<T>*>
 {
-    if (value == nullptr)
-        value = "(null)";
-    return Rstr<const T*>(std::forward<const T*>(value));
-}
-template<class T, std::enable_if_t<std::is_same_v<std::decay_t<T>, std::string>, int> = 0>
-auto rstr(T&& value)
+    using const_ptr_t = const std::remove_pointer_t<T>*;
+
+    Rstr(T v): ValHolder<const_ptr_t>(std::move(v))
+    {
+        if (ValHolder<const_ptr_t>::value == nullptr)
+            ValHolder<const_ptr_t>::value = "(null)";
+    }
+};
+
+template<class T>
+struct Rstr<T,
+    std::enable_if_t<
+        std::is_same_v<T, const char*>
+        || std::is_same_v<std::decay_t<T>, std::string>
+        || std::is_same_v<std::decay_t<T>, std::string_view>,
+        void>
+    >: ValHolder<T>
 {
-    return Rstr<T>(std::forward<T>(value));
-}
-template<class T, std::enable_if_t<std::is_same_v<std::decay_t<T>, std::string_view>, int> = 0>
-auto rstr(T&& value)
-{
-    return Rstr<T>(std::forward<T>(value));
-}
+    Rstr(T v): ValHolder<T>(std::move(v))
+    {
+        if constexpr (std::is_same_v<T, const char*>)
+        {
+            if (ValHolder<T>::value == nullptr)
+                ValHolder<T>::value = "(null)";
+        }
+    }
+};
 
 /* format specific quoted string value */
 template<class T>
-struct Qstr: __val_holder<T>
+struct Qstr: Rstr<T>
 {
-    Qstr(T&& v): __val_holder<T>(std::forward<T>(v)) {}
+    Qstr(T v): Rstr<T>(std::move(v)) {}
 };
-
-template<class T, std::enable_if_t<std::is_same_v<const T*, const char*>, int> = 0>
-auto qstr(const T* value)
-{
-    if (value == nullptr)
-        value = "(null)";
-    return Qstr<const T*>(std::forward<const T*>(value));
-}
-template<class T, std::enable_if_t<std::is_same_v<std::decay_t<T>, std::string>, int> = 0>
-auto qstr(T&& value)
-{
-    return Qstr<T>(std::forward<T>(value));
-}
-template<class T, std::enable_if_t<std::is_same_v<std::decay_t<T>, std::string_view>, int> = 0>
-auto qstr(T&& value)
-{
-    return Qstr<T>(std::forward<T>(value));
-}
 
 } // namespace fmt
 

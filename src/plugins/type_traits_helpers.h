@@ -108,6 +108,11 @@
 
 #include <type_traits>
 
+template<class T>
+struct always_false: std::false_type {};
+
+/**/
+
 template <class T, class = void>
 struct has_begin_helper : std::false_type {};
 
