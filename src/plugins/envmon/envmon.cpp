@@ -412,8 +412,7 @@ static event_response_t trap_GetAdaptersAddresses_cb(drakvuf_t drakvuf, drakvuf_
         return VMI_EVENT_RESPONSE_NONE;
 
     const auto family = print::FieldToString(family_name_formats, drakvuf_get_function_argument(drakvuf, info, 1));
-    //const 
-    auto flags  = print::FieldToString(flags_name_formats, std::bitset<64>(drakvuf_get_function_argument(drakvuf, info, 2)));
+    const auto flags  = print::FieldToString(flags_name_formats, std::bitset<64>(drakvuf_get_function_argument(drakvuf, info, 2)));
 
     switch (p->m_output_format)
     {
