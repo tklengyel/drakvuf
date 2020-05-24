@@ -244,7 +244,7 @@ std::string get_filepath(drakvuf_t drakvuf, drakvuf_trap_info_t *info, vmi_insta
     filetracer *f = (filetracer *)info->trap->data;
 
     ctx.addr = dentry_addr + f->offsets[_DENTRY_D_NAME] + f->offsets[_QSTR_NAME] + 16;
-    std::string path_name = vmi_read_str(vmi, &ctx);
+    std::string path_name = g_strdup_printf("%s",vmi_read_str(vmi, &ctx));
 
     if (path_name[0] != '[' && path_name != "")
     {
@@ -254,7 +254,7 @@ std::string get_filepath(drakvuf_t drakvuf, drakvuf_trap_info_t *info, vmi_insta
         while (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &d_parent) && d_parent)
         {
             ctx.addr = d_parent + f->offsets[_DENTRY_D_NAME] + f->offsets[_QSTR_NAME] + 16;
-            dirname = vmi_read_str(vmi, &ctx);
+            dirname = g_strdup_printf("%s",vmi_read_str(vmi, &ctx));
 
             if (dirname == "/" || dirname == "" || dirname == prev_dirname)
                 break;
@@ -306,8 +306,8 @@ int get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t *info, linux_wrapper *l
         return 0;
 
     // get filename with absolute path
-    lw->filename = get_filepath(drakvuf, info, vmi_lg.vmi, dentry_addr);
-    if (!lw->filename.c_str())
+    lw->filename = g_strdup_printf("%s", get_filepath(drakvuf, info, vmi_lg.vmi, dentry_addr).data());
+    if (lw->filename.empty())
         return 0;
 
     addr_t inode;
@@ -340,9 +340,9 @@ int get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t *info, linux_wrapper *l
     return 1;
 }
 
-std::string read_filename(drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t fileaddr)
+char *read_filename(drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t fileaddr)
 {
-    vmi_lock_guard vmi_lg(drakvuf);
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     access_context_t ctx =
         {
@@ -351,8 +351,8 @@ std::string read_filename(drakvuf_t drakvuf, drakvuf_trap_info_t *info, addr_t f
             .addr = fileaddr,
         };
 
-    std::string filename = "";
-    filename = vmi_read_str(vmi_lg.vmi, &ctx);
+    char *filename = vmi_read_str(vmi, &ctx);
+    drakvuf_release_vmi(drakvuf);
     return filename;
 }
 
@@ -395,10 +395,11 @@ static event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     filetracer *f = (filetracer *)info->trap->data;
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
 
     lw->f = f;
     lw->pid = info->proc_data.pid;
@@ -443,10 +444,11 @@ static event_response_t read_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
         loff_t *pos
     )
     */
-
+    
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t file_struct = drakvuf_get_function_argument(drakvuf, info, 1);
     lw->args["count"] = std::to_string(drakvuf_get_function_argument(drakvuf, info, 3));
     int64_t pos = drakvuf_get_function_argument(drakvuf, info, 4);
@@ -468,9 +470,10 @@ static event_response_t write_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *in
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t file_struct = drakvuf_get_function_argument(drakvuf, info, 1);
     if (get_file_info(drakvuf, info, lw, file_struct, "file"))
         print_info(drakvuf, info, lw);
@@ -487,9 +490,10 @@ static event_response_t close_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *in
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t file_struct = drakvuf_get_function_argument(drakvuf, info, 1);
     if (get_file_info(drakvuf, info, lw, file_struct, "file"))
         print_info(drakvuf, info, lw);
@@ -507,9 +511,10 @@ static event_response_t llseek_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *i
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t file_struct = drakvuf_get_function_argument(drakvuf, info, 1);
     int64_t offset_ = drakvuf_get_function_argument(drakvuf, info, 2);
     int whence = drakvuf_get_function_argument(drakvuf, info, 3);
@@ -531,12 +536,13 @@ static event_response_t memfd_create_file_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t file_name_addr = drakvuf_get_function_argument(drakvuf, info, 1);
-    lw->filename = read_filename(drakvuf, info, file_name_addr);
-    if (lw->filename.c_str())
+    lw->filename = g_strdup_printf("%s", read_filename(drakvuf, info, file_name_addr));
+    if (!lw->filename.empty())
         print_info(drakvuf, info, lw);
     delete lw;
     return VMI_EVENT_RESPONSE_NONE;
@@ -553,9 +559,10 @@ static event_response_t mknod_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *in
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
     if (get_file_info(drakvuf, info, lw, dentry_addr, "dentry"))
         print_info(drakvuf, info, lw);
@@ -576,17 +583,17 @@ static event_response_t rename_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *i
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
-
+        return VMI_EVENT_RESPONSE_NONE;
+    
     addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    std::string file_name = get_filepath(drakvuf, info, vmi, dentry_addr);
+    std::string file_name = g_strdup_printf("%s", get_filepath(drakvuf, info, vmi, dentry_addr).data());
     drakvuf_release_vmi(drakvuf);
-    if (!file_name.c_str())
+    if (file_name.empty())
         return VMI_EVENT_RESPONSE_NONE;
-
     lw->args["old_name"] = file_name;
 
     dentry_addr = drakvuf_get_function_argument(drakvuf, info, 4);
@@ -605,12 +612,13 @@ static event_response_t truncate_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t 
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t path_struct = drakvuf_get_function_argument(drakvuf, info, 1);
-    int64_t length = drakvuf_get_function_argument(drakvuf, info, 2);
-    lw->args["length"] = std::to_string(length);
+    uint64_t length = drakvuf_get_function_argument(drakvuf, info, 2);
+    lw->args["length"] = g_strdup_printf("%ld", length);
     if (get_file_info(drakvuf, info, lw, path_struct, "path"))
         print_info(drakvuf, info, lw);
     delete lw;
@@ -628,14 +636,15 @@ static event_response_t allocate_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t 
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t file_struct = drakvuf_get_function_argument(drakvuf, info, 1);
     int64_t offset = drakvuf_get_function_argument(drakvuf, info, 3);
-    lw->args["offset"] = std::to_string(offset);
+    lw->args["offset"] = g_strdup_printf("%ld", offset);
     int64_t length = drakvuf_get_function_argument(drakvuf, info, 4);
-    lw->args["length"] = std::to_string(length);
+    lw->args["length"] = g_strdup_printf("%ld", length);
     if (get_file_info(drakvuf, info, lw, file_struct, "file"))
         print_info(drakvuf, info, lw);
     delete lw;
@@ -643,15 +652,6 @@ static event_response_t allocate_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t 
 }
 
 /* ---------------FILE ATTRIBUTES CHANGE CALLBACK------- */
-
-std::string convet_to_octal_string(int val)
-{
-    std::string oct = "";
-    while (val)
-        oct.push_back('0' + val % 8), val /= 8;
-    reverse(oct.begin(), oct.end());
-    return oct;
-}
 
 static event_response_t chmod_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 {
@@ -662,14 +662,15 @@ static event_response_t chmod_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *in
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     filetracer *f = (filetracer *)info->trap->data;
     addr_t path_struct = drakvuf_get_function_argument(drakvuf, info, 1);
     int64_t new_mode = drakvuf_get_function_argument(drakvuf, info, 2);
     lw->args["new_mode"] = parse_flags(new_mode, linux_file_modes, f->format);
-    lw->args["new_permissions"] = convet_to_octal_string(new_mode & 0xfff);
+    lw->args["new_permissions"] = g_strdup_printf("%lo", new_mode & 0xfff);
     if (get_file_info(drakvuf, info, lw, path_struct, "path"))
         print_info(drakvuf, info, lw);
     delete lw;
@@ -686,14 +687,15 @@ static event_response_t chown_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *in
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t path_struct = drakvuf_get_function_argument(drakvuf, info, 1);
     uint64_t new_uid = drakvuf_get_function_argument(drakvuf, info, 2);
-    lw->args["new_uid"] = std::to_string(new_uid);
+    lw->args["new_uid"] = g_strdup_printf("%ld", new_uid);
     uint64_t new_gid = drakvuf_get_function_argument(drakvuf, info, 3);
-    lw->args["new_gid"] = std::to_string(new_gid);
+    lw->args["new_gid"] = g_strdup_printf("%ld", new_gid);
     if (get_file_info(drakvuf, info, lw, path_struct, "path"))
         print_info(drakvuf, info, lw);
     delete lw;
@@ -709,9 +711,10 @@ static event_response_t utimes_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *i
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     filetracer *f = (filetracer *)info->trap->data;
     uint64_t time_sec = 0;
     addr_t path_struct = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -727,7 +730,7 @@ static event_response_t utimes_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *i
     vmi_read_64(vmi, &ctx, &time_sec);
     drakvuf_release_vmi(drakvuf);
     if (time_sec)
-        lw->args["time_sec"] = std::to_string(time_sec);
+        lw->args["time_sec"] = g_strdup_printf("%ld", time_sec);
 
     if (get_file_info(drakvuf, info, lw, path_struct, "path"))
         print_info(drakvuf, info, lw);
@@ -745,17 +748,15 @@ static event_response_t access_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *i
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
 
     addr_t file_name_addr = drakvuf_get_function_argument(drakvuf, info, 2);
-    if (file_name_addr) // check for valid addr
-    {
-        lw->filename = read_filename(drakvuf, info, file_name_addr);
-        if (lw->filename.c_str())
-            print_info(drakvuf, info, lw);
-    }
+    lw->filename = g_strdup_printf("%s", read_filename(drakvuf, info, file_name_addr));
+    if (lw->filename.c_str())
+        print_info(drakvuf, info, lw);
     delete lw;
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -772,14 +773,16 @@ static event_response_t mkdir_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
+
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     filetracer *f = (filetracer *)info->trap->data;
     addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
     int64_t new_mode = drakvuf_get_function_argument(drakvuf, info, 3);
     lw->args["new_mode"] = parse_flags(new_mode, linux_file_modes, f->format);
-    lw->args["new_permissions"] = convet_to_octal_string(new_mode & 0xfff);
+    lw->args["new_permissions"] = g_strdup_printf("%lo", new_mode & 0xfff);
     if (get_file_info(drakvuf, info, lw, dentry_addr, "dentry"))
         print_info(drakvuf, info, lw);
     delete lw;
@@ -795,9 +798,10 @@ static event_response_t rmdir_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
     if (get_file_info(drakvuf, info, lw, dentry_addr, "dentry"))
         print_info(drakvuf, info, lw);
@@ -812,12 +816,12 @@ static event_response_t chdir_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
         struct fs_struct *fs,
         const struct path *path
     )
-    )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t path_struct = drakvuf_get_function_argument(drakvuf, info, 2);
     if (get_file_info(drakvuf, info, lw, path_struct, "path"))
         print_info(drakvuf, info, lw);
@@ -834,9 +838,10 @@ static event_response_t chroot_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t path_struct = drakvuf_get_function_argument(drakvuf, info, 2);
     if (get_file_info(drakvuf, info, lw, path_struct, "path"))
         print_info(drakvuf, info, lw);
@@ -857,15 +862,16 @@ static event_response_t link_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
 
     addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 3);
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    std::string file_name = get_filepath(drakvuf, info, vmi, dentry_addr);
+    std::string file_name = g_strdup_printf("%s", get_filepath(drakvuf, info, vmi, dentry_addr).data());
     drakvuf_release_vmi(drakvuf);
-    if (!file_name.c_str())
+    if (file_name.empty())
         return VMI_EVENT_RESPONSE_NONE;
 
     lw->args["link_name"] = file_name;
@@ -887,9 +893,10 @@ static event_response_t unlink_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *i
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
     if (get_file_info(drakvuf, info, lw, dentry_addr, "dentry"))
         print_info(drakvuf, info, lw);
@@ -907,13 +914,14 @@ static event_response_t symbolic_link_file_cb(drakvuf_t drakvuf, drakvuf_trap_in
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 2);
     addr_t oldname_addr = drakvuf_get_function_argument(drakvuf, info, 3);
     if (oldname_addr)
-        lw->args["oldname"] = read_filename(drakvuf, info, oldname_addr);
+        lw->args["oldname"] = g_strdup_printf("%s", read_filename(drakvuf, info, oldname_addr));
     if (get_file_info(drakvuf, info, lw, dentry_addr, "dentry"))
         print_info(drakvuf, info, lw);
     delete lw;
@@ -930,12 +938,13 @@ static event_response_t read_link_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *inf
     )
     */
 
+    PRINT_DEBUG("Filetrace Callback: %s \n", info->trap->name);
     struct linux_wrapper *lw = new linux_wrapper;
     if (!lw)
-        return 0;
+        return VMI_EVENT_RESPONSE_NONE;
     addr_t dentry_addr = drakvuf_get_function_argument(drakvuf, info, 1);
     uint64_t buflen = drakvuf_get_function_argument(drakvuf, info, 3);
-    lw->args["buflen"] = std::to_string(buflen);
+    lw->args["buflen"] = g_strdup_printf("%ld", buflen);
     if (get_file_info(drakvuf, info, lw, dentry_addr, "dentry"))
         print_info(drakvuf, info, lw);
     delete lw;
@@ -986,7 +995,7 @@ static void register_trap(drakvuf_t drakvuf, const char *syscall_name,
 
 void setup_linux(drakvuf_t drakvuf, filetracer *f, output_format_t output)
 {
-    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, linux_offset_names,__LINUX_OFFSET_MAX, f->offsets))
+    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, linux_offset_names, __LINUX_OFFSET_MAX, f->offsets))
         throw - 1;
 
     drakvuf_trap_t *trap[22];
