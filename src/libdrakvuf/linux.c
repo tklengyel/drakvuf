@@ -120,6 +120,39 @@
 #include "linux-offsets.h"
 #include "linux-offsets-map.h"
 
+addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg)
+{
+    switch (narg)
+    {
+        case 1:
+            return info->regs->rdi;
+        case 2:
+            return info->regs->rsi;
+        case 3:
+            return info->regs->rdx;
+        case 4:
+            return info->regs->rcx;
+        case 5:
+            return info->regs->r8;
+        case 6:
+            return info->regs->r9;
+    }
+
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rsp + narg * 8,
+    };
+
+    
+    uint64_t ret;
+    if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
+        return 0;
+    return ret;
+}
+
 static bool find_kernbase(drakvuf_t drakvuf)
 {
     if ( VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "_text", &drakvuf->kernbase) )
@@ -150,6 +183,7 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.get_process_data = linux_get_process_data;
     drakvuf->osi.exportsym_to_va = linux_eprocess_sym2va;
     drakvuf->osi.export_lib_address = get_lib_address;
+    drakvuf->osi.get_function_argument = linux_get_function_argument;
 
     return 1;
 }

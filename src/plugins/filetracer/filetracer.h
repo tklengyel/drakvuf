@@ -111,24 +111,15 @@
 class filetracer: public plugin
 {
 public:
+    GSList *traps;
     output_format_t format;
 
     size_t* offsets;
     addr_t newfile_name_offset;
     addr_t newfile_name_length_offset;
     addr_t newfile_root_offset;
-
-    drakvuf_trap_t trap[7] =
-    {
-        [0 ... 6] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.pid = 4,
-            .breakpoint.addr_type = ADDR_RVA,
-            .breakpoint.module = "ntoskrnl.exe",
-            .type = BREAKPOINT,
-            .data = (void*)this
-        }
-    };
+    os_t os;
+    addr_t kaslr;
 
     GSList *traps_to_free;
     filetracer(drakvuf_t drakvuf, output_format_t output);
