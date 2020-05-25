@@ -130,7 +130,7 @@ template <class T, class = void>
 struct is_iterable_helper : std::false_type {};
 
 template <class T>
-struct is_iterable_helper<T, std::enable_if_t<has_begin_helper<T>::value && has_end_helper<T>::value, void>> : std::true_type {};
+struct is_iterable_helper<T, std::enable_if_t<has_begin_helper<T>::value&& has_end_helper<T>::value, void>> : std::true_type {};
 
 template <class T>
 struct is_iterable : is_iterable_helper<T> {};

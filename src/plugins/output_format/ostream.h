@@ -106,77 +106,23 @@
 #define PLUGINS_OUTPUT_FORMAT_OSTREAM_H
 #pragma once
 
-#include <array>
-#include <ios>
 #include <iostream>
-#include <streambuf>
-
-#include <stdio.h>
-#include <unistd.h>
 
 namespace fmt
 {
 
-template<std::size_t SIZE, class CharT = char>
-class ArrayedStreamBuffer : public std::basic_streambuf<CharT>
+inline void unputc(std::ostream& os)
 {
-public:
-    using Base = std::basic_streambuf<CharT>;
-    using int_type = typename Base::int_type;
-    using char_type = typename Base::char_type;
+    constexpr int char_size = sizeof(std::ostream::char_type);
 
-public:
-    ArrayedStreamBuffer() : buffer_{}
+    size_t pos = os.tellp();
+    if (pos > char_size)
     {
-        Base::setp(buffer_.begin(), buffer_.end());
+        os.seekp(pos - char_size);
     }
+}
 
-    void unputc(char_type ch)
-    {
-        if (Base::pptr() > Base::pbase() && Base::pptr()[-1] == ch)
-        {
-            int sz = sizeof(ch);
-            Base::pbump(-sz);
-        }
-    }
-
-protected:
-    int sync() final
-    {
-        // this is required because of printf() logging
-        fflush(stdout);
-
-        int size = Base::pptr() - Base::pbase();
-        if (write(STDOUT_FILENO, Base::pbase(), size) == size)
-        {
-            Base::pbump(-size);
-            return 0;
-        }
-        return -1;
-    }
-
-private:
-    std::array<char_type, SIZE> buffer_;
-};
-
-class ostream: public std::ostream
-{
-public:
-    ostream(): std::ostream(&streambuf)
-    {
-        exceptions(std::ostream::failbit);
-    }
-
-    void unputc(char_type ch)
-    {
-        streambuf.unputc(ch);
-    }
-
-private:
-    ArrayedStreamBuffer<4096> streambuf;
-};
-
-extern ostream out;
+extern std::ostream cout;
 
 } // namespace fmt
 

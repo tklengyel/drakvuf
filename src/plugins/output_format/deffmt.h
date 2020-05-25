@@ -107,20 +107,39 @@
 
 #include "common.h"
 
-#include "plugins/type_traits_helpers.h"
+#include "type_traits_helpers.h"
 
 namespace deffmt
 {
 
 template <class T>
-constexpr bool print_data(fmt::ostream& os, const T& data, char sep = 0);
+constexpr bool print_data(std::ostream& os, const T& data, char sep);
 
+
+template<class T, std::size_t N>
+struct TuplePrinter
+{
+    static bool print(std::ostream& os, const T& data, char sep)
+    {
+        if constexpr (N > 0)
+        {
+            bool printed_prev = TuplePrinter<T, N-1>::print(os, data, sep);
+            if (printed_prev)
+                os << sep;
+            bool printed = print_data(os, std::get<N-1>(data), sep);
+            if (!printed && printed_prev)
+                fmt::unputc(os);
+            return printed;
+        }
+        return false;
+    }
+};
 
 template <class T, class = void, class...>
-struct data_printer
+struct DataPrinter
 {
 
-    static bool print(fmt::ostream& os, const TimeVal& t, char)
+    static bool print(std::ostream& os, const TimeVal& t, char)
     {
         os << t.tv_sec << ".";
 
@@ -131,14 +150,14 @@ struct data_printer
     }
 
     template <class Tv = T>
-    static bool print(fmt::ostream& os, const fmt::Nval<Tv>& data, char)
+    static bool print(std::ostream& os, const fmt::Nval<Tv>& data, char)
     {
         os << data.value;
         return true;
     }
 
     template <class Tv = T>
-    static bool print(fmt::ostream& os, const fmt::Xval<Tv>& data, char)
+    static bool print(std::ostream& os, const fmt::Xval<Tv>& data, char)
     {
         auto ff = os.flags();
         os << (data.withbase ? "0x" : "") << std::uppercase << std::hex << data.value;
@@ -147,7 +166,7 @@ struct data_printer
     }
 
     template <class Tv = T>
-    static bool print(fmt::ostream& os, const fmt::Fval<Tv>& data, char)
+    static bool print(std::ostream& os, const fmt::Fval<Tv>& data, char)
     {
         auto ff = os.flags();
         os << std::fixed << data.value;
@@ -156,21 +175,21 @@ struct data_printer
     }
 
     template <class Tv = T>
-    static bool print(fmt::ostream& os, const fmt::Rstr<Tv>& data, char)
+    static bool print(std::ostream& os, const fmt::Rstr<Tv>& data, char)
     {
         os << data.value;
         return true;
     }
 
     template <class Tv = T>
-    static bool print(fmt::ostream& os, const fmt::Qstr<Tv>& data, char)
+    static bool print(std::ostream& os, const fmt::Qstr<Tv>& data, char)
     {
         os << '"' << data.value << '"';
         return true;
     }
 
     template <class Tv = T>
-    static bool print(fmt::ostream& os, const std::function<bool(std::ostream&)>& printer, char)
+    static bool print(std::ostream& os, const std::function<bool(std::ostream&)>& printer, char)
     {
         std::ostringstream ss;
         bool printed = printer(ss);
@@ -180,7 +199,7 @@ struct data_printer
     }
 
     template <class Tv = T>
-    static bool print(fmt::ostream& os, const std::optional<Tv>& data, char sep)
+    static bool print(std::ostream& os, const std::optional<Tv>& data, char sep)
     {
         if (!data.has_value())
             return false;
@@ -189,7 +208,7 @@ struct data_printer
     }
 
     template <class Tk, class Tv>
-    static bool print(fmt::ostream& os, const std::pair<Tk, Tv>& data, char)
+    static bool print(std::ostream& os, const std::pair<Tk, Tv>& data, char)
     {
         static_assert(
             std::is_same_v<Tk, const char*> ||
@@ -209,38 +228,43 @@ struct data_printer
         os.seekp(pos);
         return false;
     }
+
+    template <class... Ts>
+    static bool print(std::ostream& os, const std::tuple<Ts...>& data, char sep)
+    {
+        return TuplePrinter<decltype(data), sizeof...(Ts)>::print(os, data, sep);
+    }
 };
 
 template <class T>
-struct data_printer<T, std::enable_if_t<is_iterable<T>::value, void>>
+struct DataPrinter<T, std::enable_if_t<is_iterable<T>::value, void>>
 {
-    static bool print(fmt::ostream& os, const T& data, char sep)
+    static bool print(std::ostream& os, const T& data, char sep)
     {
-        uint32_t i = 0;
         bool printed = false;
         for (const auto& v : data)
         {
+            bool printed_prev = printed;
             if (printed)
                 os << sep;
             printed = print_data(os, v, sep);
-            ++i;
+            if (!printed && printed_prev)
+                fmt::unputc(os);
         }
-        if (i > 0 && !printed)
-            os.unputc(sep);
         return true;
     }
 };
 
 template <class T>
-constexpr bool print_data(fmt::ostream& os, const T& data, char sep)
+constexpr bool print_data(std::ostream& os, const T& data, char sep)
 {
-    return data_printer<T>::print(os, data, sep);
+    return DataPrinter<T>::print(os, data, sep);
 }
 
 /**/
 
 template <class T, class... Ts>
-constexpr bool print_data(fmt::ostream& os, const T& data, const Ts& ... rest)
+constexpr bool print_data(std::ostream& os, const T& data, const Ts& ... rest)
 {
     constexpr char sep = ' ';
     bool printed = print_data(os, data, sep);
@@ -252,14 +276,14 @@ constexpr bool print_data(fmt::ostream& os, const T& data, const Ts& ... rest)
             os << sep;
         printed_rest = print_data(os, rest...);
         if (!printed_rest && printed)
-            os.unputc(sep);
+            fmt::unputc(os);
     }
     return printed || printed_rest;
 }
 
 /**/
 
-inline void print_common_data(fmt::ostream& os, drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     if (info)
     {
@@ -290,12 +314,12 @@ void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info
         return std::toupper(c);
     });
 
-    fmt::out << '[' << up_name << ']' << ' ';
+    fmt::cout << '[' << up_name << ']' << ' ';
 
     bool printed = false;
     if (info)
     {
-        print_common_data(fmt::out, drakvuf, info);
+        print_common_data(fmt::cout, drakvuf, info);
         printed = true;
     }
 
@@ -303,13 +327,13 @@ void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info
     {
         constexpr char sep = ' ';
         if (printed)
-            fmt::out << sep;
-        if (!print_data(fmt::out, args...))
-            fmt::out.unputc(sep);
+            fmt::cout << sep;
+        if (!print_data(fmt::cout, args...))
+            fmt::unputc(fmt::cout);
     }
 
-    fmt::out << "\n";
-    fmt::out.flush();
+    fmt::cout << "\n";
+    fmt::cout.flush();
 }
 
 } // namespace deffmt

@@ -104,9 +104,33 @@
 
 #include "ostream.h"
 
+#include <sstream>
+
+#include <stdio.h>
+#include <unistd.h>
+
 namespace fmt
 {
 
-ostream out;
+class StrBuf : public std::stringbuf
+{
+protected:
+    int sync() final
+    {
+        // this is required because of printf() logging
+        fflush(stdout);
+
+        int size = pptr() - pbase();
+        if (write(STDOUT_FILENO, pbase(), size) == size)
+        {
+            seekpos(0);
+            return 0;
+        }
+        return -1;
+    }
+};
+
+static StrBuf outbuf;
+std::ostream cout(&outbuf);
 
 } // namespace fmt
