@@ -113,10 +113,4 @@
 
 #include "output_format/xfmt.h"
 
-#include "output_format/common_obs.h"
-#include "output_format/csvfmt_obs.h"
-#include "output_format/deffmt_obs.h"
-#include "output_format/jsonfmt_obs.h"
-#include "output_format/kvfmt_obs.h"
-
 #endif
