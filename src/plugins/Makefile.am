@@ -249,8 +249,6 @@ sources += apimon/apimon.cpp
 sources += apimon/apimon.h
 sources += apimon/crypto.cpp
 sources += apimon/crypto.h
-sources += apimon/printers.cpp
-sources += apimon/printers.h
 endif
 
 if PLUGIN_PROCDUMP
