@@ -102,15 +102,32 @@
 *                                                                         *
 ***************************************************************************/
 
-#ifndef PLUGINS_OUTPUT_FORMAT_H
-#define PLUGINS_OUTPUT_FORMAT_H
+#ifndef PLUGINS_OUTPUT_FORMAT_XFMT_H
+#define PLUGINS_OUTPUT_FORMAT_XFMT_H
 
-#include "output_format/common.h"
-#include "output_format/csvfmt.h"
-#include "output_format/deffmt.h"
-#include "output_format/jsonfmt.h"
-#include "output_format/kvfmt.h"
+namespace fmt
+{
 
-#include "output_format/xfmt.h"
+template<class... Args>
+void print(output_format_t format, const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const Args& ... args)
+{
+    switch (format)
+    {
+        case OUTPUT_CSV:
+            csvfmt::print(plugin_name, drakvuf, info, args...);
+            break;
+        case OUTPUT_KV:
+            kvfmt::print(plugin_name, drakvuf, info, args...);
+            break;
+        case OUTPUT_JSON:
+            jsonfmt::print(plugin_name, drakvuf, info, args...);
+            break;
+        case OUTPUT_DEFAULT:
+            deffmt::print(plugin_name, drakvuf, info, args...);
+            break;
+    }
+}
 
-#endif
+} // namespace fmt
+
+#endif // PLUGINS_OUTPUT_FORMAT_XFMT_H

@@ -102,15 +102,147 @@
 *                                                                         *
 ***************************************************************************/
 
-#ifndef PLUGINS_OUTPUT_FORMAT_H
-#define PLUGINS_OUTPUT_FORMAT_H
+#ifndef PLUGINS_OUTPUT_FORMAT_COMMON_H
+#define PLUGINS_OUTPUT_FORMAT_COMMON_H
 
-#include "output_format/common.h"
-#include "output_format/csvfmt.h"
-#include "output_format/deffmt.h"
-#include "output_format/jsonfmt.h"
-#include "output_format/kvfmt.h"
+#include "ostream.h"
 
-#include "output_format/xfmt.h"
+#include <libdrakvuf/libdrakvuf.h>
+#include <plugins/private.h>
+#include <plugins/type_traits_helpers.h>
 
-#endif
+#include <algorithm>
+#include <functional>
+#include <iomanip>
+#include <ios>
+#include <iostream>
+#include <map>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+struct TimeVal
+{
+    glong tv_sec;
+    glong tv_usec;
+};
+
+template<class Value>
+auto keyval(const char* key, Value&& value)
+{
+    return std::make_pair(key, std::forward<Value>(value));
+}
+
+namespace fmt
+{
+
+template<class T>
+struct ValHolder
+{
+    T value;
+    ValHolder(T v): value(std::move(v)) {}
+};
+
+/* numeric value */
+template<class T, class = void>
+struct Nval
+{
+    Nval(T v)
+    {
+        static_assert(always_false<T>::value, "should be integral type");
+    }
+};
+
+template<class T>
+struct Nval<T, std::enable_if_t<std::is_integral_v<std::remove_reference_t<T>>, void>>: ValHolder<T>
+{
+    Nval(T v): ValHolder<T>(std::move(v)) {}
+};
+
+/* format specific numeric value */
+template<class T>
+struct Xval: Nval<T>
+{
+    bool withbase;
+    Xval(T v, bool use_base = true): Nval<T>(std::move(v)), withbase(use_base) {}
+};
+
+/* floating value in fixed format */
+template<class T, class = void>
+struct Fval
+{
+    Fval(T v)
+    {
+        static_assert(always_false<T>::value, "should be float type");
+    }
+};
+
+template<class T>
+struct Fval<T, std::enable_if_t<std::is_floating_point_v<T>, void>>: ValHolder<T>
+{
+    Fval(T v): ValHolder<T>(std::move(v)) {}
+};
+
+/* raw string value */
+template<class T, class = void>
+struct Rstr
+{
+    Rstr(T v)
+    {
+        static_assert(always_false<T>::value, "should be the one of: const char*, std::string, std::string_view");
+    }
+};
+
+template<class T>
+struct Rstr<T,
+           std::enable_if_t<
+           std::is_same_v<T, char*>,
+           void>
+           >: ValHolder<const std::remove_pointer_t<T>*>
+{
+    using const_ptr_t = const std::remove_pointer_t<T>* ;
+
+    Rstr(T v): ValHolder<const_ptr_t>(std::move(v))
+    {
+        if constexpr (std::is_same_v<T, const char*>)
+        {
+            if (ValHolder<const_ptr_t>::value == nullptr)
+                ValHolder<const_ptr_t>::value = "(null)";
+        }
+    }
+};
+
+template<class T>
+struct Rstr<T,
+           std::enable_if_t<
+           std::is_same_v<T, const char*>
+           || std::is_same_v<std::decay_t<T>, std::string>
+           || std::is_same_v<std::decay_t<T>, std::string_view>,
+           void>
+           >: ValHolder<T>
+{
+    Rstr(char* v): Rstr<const T>(v) {}
+
+    Rstr(T v): ValHolder<T>(std::move(v))
+    {
+        if constexpr (std::is_same_v<T, const char*>)
+        {
+            if (ValHolder<T>::value == nullptr)
+                ValHolder<T>::value = "(null)";
+        }
+    }
+};
+
+/* format specific quoted string value */
+template<class T>
+struct Qstr: Rstr<T>
+{
+    Qstr(T v): Rstr<T>(std::move(v)) {}
+};
+
+} // namespace fmt
+
+#endif // PLUGINS_OUTPUT_FORMAT_COMMON_H

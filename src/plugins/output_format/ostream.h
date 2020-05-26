@@ -102,15 +102,28 @@
 *                                                                         *
 ***************************************************************************/
 
-#ifndef PLUGINS_OUTPUT_FORMAT_H
-#define PLUGINS_OUTPUT_FORMAT_H
+#ifndef PLUGINS_OUTPUT_FORMAT_OSTREAM_H
+#define PLUGINS_OUTPUT_FORMAT_OSTREAM_H
+#pragma once
 
-#include "output_format/common.h"
-#include "output_format/csvfmt.h"
-#include "output_format/deffmt.h"
-#include "output_format/jsonfmt.h"
-#include "output_format/kvfmt.h"
+#include <iostream>
 
-#include "output_format/xfmt.h"
+namespace fmt
+{
 
-#endif
+inline void unputc(std::ostream& os)
+{
+    constexpr int char_size = sizeof(std::ostream::char_type);
+
+    size_t pos = os.tellp();
+    if (pos > char_size)
+    {
+        os.seekp(pos - char_size);
+    }
+}
+
+extern std::ostream cout;
+
+} // namespace fmt
+
+#endif // PLUGINS_OUTPUT_FORMAT_OSTREAM_H
