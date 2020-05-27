@@ -197,17 +197,17 @@ static bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 // Returns true if next count pages is mapped and false otherwise.
 static bool max_contigious_range(const std::vector<uint64_t>& prototype_ptes,
                                  uint32_t total_number_of_ptes, uint32_t idx,
-                                 uint32_t& count)
+                                 uint32_t& count, uint64_t max_pages)
 {
     // No check for null pointer for purpose
     count = 0;
     if (idx >= total_number_of_ptes)
         return true;
 
-    bool skip = !IS_MMPTE_ACCESSIBLE(prototype_ptes[idx]);
-    for (auto i = idx; i < total_number_of_ptes; ++i)
+    bool skip = !IS_MMPTE_DUMPABLE(prototype_ptes[idx]);
+    for (auto i = idx; i < total_number_of_ptes && i < idx + max_pages; ++i)
     {
-        if (skip == !IS_MMPTE_ACCESSIBLE(prototype_ptes[i]))
+        if (skip == !IS_MMPTE_DUMPABLE(prototype_ptes[i]))
             ++count;
         else
             break;
@@ -304,7 +304,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     auto total_number_of_ptes = vad->second.total_number_of_ptes;
     uint32_t ptes_to_dump = 0;
     auto skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
-                                     vad->second.idx, ptes_to_dump);
+                                     vad->second.idx, ptes_to_dump, ctx->POOL_SIZE_IN_PAGES);
 
     if (!ptes_to_dump)
     {
@@ -321,7 +321,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
             ctx->writer->append(zeros, VMI_PS_4KB);
         vad->second.idx += ptes_to_dump;
         skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
-                                    vad->second.idx, ptes_to_dump);
+                                    vad->second.idx, ptes_to_dump, ctx->POOL_SIZE_IN_PAGES);
         if (0 == ptes_to_dump)
         {
             ctx->vads.erase(vad_start);
@@ -376,13 +376,13 @@ static bool dump_next_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 {
     while (!ctx->vads.empty())
     {
-        auto dll = ctx->vads.begin();
-        if (dll->second.zero_fill)
+        auto vad = ctx->vads.begin();
+        if (vad->second.zero_fill)
         {
             uint8_t zeros[VMI_PS_4KB] = {};
-            for (uint32_t i = 0; i < dll->second.total_number_of_ptes; ++i)
+            for (uint32_t i = 0; i < vad->second.total_number_of_ptes; ++i)
                 ctx->writer->append(zeros, VMI_PS_4KB);
-            ctx->vads.erase(dll->first);
+            ctx->vads.erase(vad->first);
         }
         else
         {

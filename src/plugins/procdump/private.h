@@ -150,30 +150,65 @@ enum
     MMPTE_PROTOTYPE,
 };
 
+#define MM_GUARD_PAGE         0x10
+
+// Assume that valid page is accessible
 static bool IS_MMPTE_VALID(uint64_t mmpte)
 {
     return VMI_GET_BIT(mmpte, 0);
 }
 
-static bool IS_MMPTE_TRANSITION(uint64_t mmpte)
+// Assume that MM_GUARD_PAGE shoulbe reset to page been accessible
+static bool IS_MMPTE_ACCESSIBLE(uint64_t protection)
 {
-    return !IS_MMPTE_VALID(mmpte) && VMI_GET_BIT(mmpte, 11);
+    return (protection & 0x7) && !(protection & MM_GUARD_PAGE);
 }
+
+/*
+ * Assume that either the MMPTE is valid or prototype or transition or software
+ */
 
 static bool IS_MMPTE_PROTOTYPE(uint64_t mmpte)
 {
-    return !IS_MMPTE_VALID(mmpte) && !IS_MMPTE_TRANSITION(mmpte) &&
-           VMI_GET_BIT(mmpte, 10);
+    return VMI_GET_BIT(mmpte, 10);
+}
+
+static bool IS_MMPTE_TRANSITION(uint64_t mmpte)
+{
+    return VMI_GET_BIT(mmpte, 11);
+}
+
+static bool IS_MMPTE_PROTOTYPE_ACCESSIBLE(uint64_t mmpte)
+{
+    auto is_accessible = IS_MMPTE_ACCESSIBLE((mmpte >> 11));
+    return VMI_GET_BIT(mmpte, 10) &&
+           is_accessible;
+}
+
+static bool IS_MMPTE_TRANSITION_ACCESSIBLE(uint64_t mmpte)
+{
+    auto is_accessible = IS_MMPTE_ACCESSIBLE((mmpte >> 5));
+    return VMI_GET_BIT(mmpte, 11) &&
+           is_accessible;
+}
+
+static bool IS_MMPTE_SOFTWARE_ACCESSIBLE(uint64_t mmpte)
+{
+    auto is_accessible = IS_MMPTE_ACCESSIBLE((mmpte >> 5));
+    return !IS_MMPTE_VALID(mmpte) &&
+           !IS_MMPTE_PROTOTYPE(mmpte) &&
+           !IS_MMPTE_TRANSITION(mmpte) &&
+           is_accessible;
 }
 
 // TODO Move into win-processes.c
 // TODO Use bitfields
-// FIXME Distinguish MMPTE_PROTOTYPE and MMPTE_SUBSECTION
-static bool IS_MMPTE_ACCESSIBLE(uint64_t mmpte)
+static bool IS_MMPTE_DUMPABLE(uint64_t mmpte)
 {
     return IS_MMPTE_VALID(mmpte) ||
-           (IS_MMPTE_TRANSITION(mmpte) && !VMI_GET_BIT(mmpte, 9)) ||
-           (IS_MMPTE_PROTOTYPE(mmpte) && !VMI_GET_BIT(mmpte, 9));
+           IS_MMPTE_SOFTWARE_ACCESSIBLE(mmpte) ||
+           IS_MMPTE_TRANSITION_ACCESSIBLE(mmpte) ||
+           IS_MMPTE_PROTOTYPE_ACCESSIBLE(mmpte);
 }
 
 #endif
