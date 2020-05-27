@@ -376,16 +376,27 @@ static bool dump_next_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 {
     while (!ctx->vads.empty())
     {
-        switch (dump_with_rtlcopymemory(drakvuf, info, ctx))
+        auto dll = ctx->vads.begin();
+        if (dll->second.zero_fill)
         {
-            case RTLCOPY_INJECT:
-                return true;
-            case RTLCOPY_GO_NEXT_VAD:
-                break;
-            case RTLCOPY_RETRY_WITH_MMAP:
-            default:
-                dump_with_mmap(drakvuf, info, ctx);
-                break;
+            uint8_t zeros[VMI_PS_4KB] = {};
+            for (uint32_t i = 0; i < dll->second.total_number_of_ptes; ++i)
+                ctx->writer->append(zeros, VMI_PS_4KB);
+            ctx->vads.erase(dll->first);
+        }
+        else
+        {
+            switch (dump_with_rtlcopymemory(drakvuf, info, ctx))
+            {
+                case RTLCOPY_INJECT:
+                    return true;
+                case RTLCOPY_GO_NEXT_VAD:
+                    break;
+                case RTLCOPY_RETRY_WITH_MMAP:
+                default:
+                    dump_with_mmap(drakvuf, info, ctx);
+                    break;
+            }
         }
     }
 
@@ -680,7 +691,7 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
                 mmvad->ending_vpn, len_pages, len_bytes, vad_commit, vad_type,
                 vad_commit_charge);
 
-    ctx->vads[vad_start] = {vad_type, len_pages, prototype_pte, 0};
+    ctx->vads[vad_start] = {vad_type, len_pages, prototype_pte, 0, false};
     ctx->size += len_bytes;
 
     return false;
@@ -788,7 +799,7 @@ static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
         return detach(drakvuf, info, ctx);
     else
     {
-        for (auto dll = ctx->dlls.cbegin(); dll != ctx->dlls.end();)
+        for (auto dll = ctx->dlls.begin(); dll != ctx->dlls.end();)
         {
             auto vad = ctx->vads.find(dll->first);
             if (vad == ctx->vads.end() ||
@@ -797,7 +808,7 @@ static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
             {
                 PRINT_DEBUG("[PROCDUMP] DLL at %#lx of %ld PTEs disappered\n",
                             dll->first, dll->second.total_number_of_ptes);
-                ctx->dlls.erase(dll++);
+                dll->second.zero_fill = true;
             }
             else
                 ++dll;

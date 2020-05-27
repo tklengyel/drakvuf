@@ -115,6 +115,8 @@ struct vad_info
     uint64_t total_number_of_ptes;
     std::vector<uint64_t> prototype_ptes;
     uint32_t idx;                       // index in prototype_ptes
+    // Zero-fill missing DLLs in minidump to match the header.
+    bool zero_fill;
 };
 using vad_info_t = struct vad_info;
 using vads_t = std::map<addr_t, vad_info_t>;
