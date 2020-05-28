@@ -20,7 +20,6 @@ if [ ! -f "package/cache/xen-intermediate-$IMAGE-$XEN_HASH.tar.gz" ]
 then
     echo Building Xen intermediate $XEN_HASH...
     DOCKER_CMD="docker build --build-arg 'IMAGE=$IMAGE' -f package/Dockerfile-xen -t xen-intermediate ."
-    echo $DOCKER_CMD
 
     if [ ! -z "$TRAVIS_JOB_ID" ]; then
         # suppress Xen build logs when we are in CI
