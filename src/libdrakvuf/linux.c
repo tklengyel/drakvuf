@@ -146,7 +146,7 @@ addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
         .addr = info->regs->rsp + narg * 8,
     };
 
-    
+
     uint64_t ret;
     if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
         return 0;
