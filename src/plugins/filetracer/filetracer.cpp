@@ -114,66 +114,18 @@
 #include "win.h"
 
 filetracer::filetracer(drakvuf_t drakvuf, output_format_t output)
-    : format{output}, traps_to_free(NULL)
 {
     this->os = drakvuf_get_os_type(drakvuf);
-
     if (this->os == VMI_OS_WINDOWS)
     {
-        int addr_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
-        // Offset of the RootDirectory field in _FILE_RENAME_INFORMATION structure
-        this->newfile_root_offset = addr_size;
-        // Offset of the FileName field in _FILE_RENAME_INFORMATION structure
-        this->newfile_name_offset = addr_size * 2 + 4;
-        // Offset of the FileNameLength field in _FILE_RENAME_INFORMATION structure
-        this->newfile_name_length_offset = addr_size * 2;
-        setup_windows(drakvuf, this, output);
+        new win_filetracer(drakvuf, output);
     }
     else
     {
-        this->offsets = new size_t[__LINUX_OFFSET_MAX];
-        addr_t _text;
-        if (!drakvuf_get_kernel_symbol_rva(drakvuf, "_text", &_text))
-            throw - 1;
-
-        addr_t kernel_base = drakvuf_get_kernel_base(drakvuf);
-        this->kaslr = kernel_base - _text;
-
-        setup_linux(drakvuf, this, output);
-    }
-
-    if (!this->traps)
-    {
-        PRINT_DEBUG("No traps were added by setup\n");
-        throw - 1;
+        new linux_filetracer(drakvuf, output);
     }
 }
 
 filetracer::~filetracer()
 {
-    if (traps_to_free)
-    {
-        GSList *loop = traps_to_free;
-        while (loop)
-        {
-            drakvuf_trap_t *t = (drakvuf_trap_t *)loop->data;
-            if (this->os == VMI_OS_WINDOWS)
-            {
-                struct wrapper *w = (struct wrapper *)t->data;
-                delete w;
-            }
-            else
-            {
-                struct linux_wrapper *lw = (struct linux_wrapper *)t->data;
-                delete lw;
-            }
-
-            g_free(loop->data);
-
-            loop = loop->next;
-        }
-        g_slist_free(traps_to_free);
-    }
-
-    delete[] offsets;
 }

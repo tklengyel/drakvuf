@@ -141,6 +141,7 @@ const char* offset_names[__OFFSET_MAX][2] =
     [SUBSECTION_CONTROLAREA] = {"_SUBSECTION", "ControlArea"},
     [SUBSECTION_STARTINGSECTOR] = {"_SUBSECTION", "StartingSector"},
     [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
+    [OBJECT_HEADER_HANDLE_COUNT] = { "_OBJECT_HEADER", "HandleCount" },
 };
 
 static const flags_str_t fo_flags_map =
@@ -175,6 +176,36 @@ static const flags_str_t fo_flags_map =
     REGISTER_FLAG(FO_INDIRECT_WAIT_OBJECT),
     REGISTER_FLAG(FO_SECTION_MINSTORE_TREATMENT),
 };
+
+static bool get_file_object_handle_count(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, filedelete* f, handle_t handle, uint64_t* handle_count)
+{
+    if (!handle_count)
+        return false;
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    if (!obj)
+        return false; // Break operatioin to not crash VM
+
+    addr_t handles = obj + f->offsets[OBJECT_HEADER_HANDLE_COUNT];
+
+    access_context_t ctx;
+    memset(&ctx, 0, sizeof(access_context_t));
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.addr = handles;
+    ctx.dtb = info->regs->cr3;
+
+    bool is32bit = (f->pm != VMI_PM_IA32E);
+    uint64_t handles_value = 0;
+    bool success = false;
+    if (is32bit)
+        success = (VMI_SUCCESS == vmi_read_32(vmi, &ctx, (uint32_t*)&handles_value));
+    else
+        success = (VMI_SUCCESS == vmi_read_64(vmi, &ctx, &handles_value));
+    if (success)
+        *handle_count = handles_value;
+
+    return success;
+}
 
 static bool get_file_object_flags(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, filedelete* f, handle_t handle, uint64_t* flags)
 {
@@ -1202,9 +1233,19 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     filedelete* f = (filedelete*)info->trap->data;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    vmi_lock_guard vmi(drakvuf);
+
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    auto reason = f->files[{info->attached_proc_data.pid, handle}].second;
+
+    auto file_info = f->files.find({info->attached_proc_data.pid, handle});
+    if ( f->files.end() == file_info )
+        return VMI_EVENT_RESPONSE_NONE;
+
+    uint64_t handle_count = 1;
+    if (get_file_object_handle_count(drakvuf, info, vmi.vmi, f, handle, &handle_count))
+    {
+        if (handle_count > 1) return VMI_EVENT_RESPONSE_NONE;
+    }
 
     event_response_t response = 0;
     if (f->use_injector)
@@ -1212,25 +1253,22 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         /*
          * Check if closing handle have been changed with NtWriteFile
          */
-        auto filename1 = get_file_name(f, drakvuf, vmi, info, handle, nullptr, nullptr);
-        if (filename1.empty()) filename1 = "<UNKNOWN>";
-
-        auto filename = f->files[{info->attached_proc_data.pid, handle}].first;
+        auto filename = file_info->second.first;
         if (filename.empty())
             goto done;
 
-        if ( START_READFILE_SUCCEED == start_readfile(drakvuf, info, vmi, handle, filename.c_str(), &response) )
+        if ( START_READFILE_SUCCEED == start_readfile(drakvuf, info, vmi.vmi, handle, filename.c_str(), &response) )
             goto done;
     }
 
     if (f->files.erase({info->attached_proc_data.pid, handle}) > 0)
     {
         // We detect the fact of closing of the previously modified file.
-        grab_file_by_handle(f, drakvuf, vmi, info, handle, reason);
+        auto reason = file_info->second.second;
+        grab_file_by_handle(f, drakvuf, vmi.vmi, info, handle, reason);
     }
 
 done:
-    drakvuf_release_vmi(drakvuf);
     return response;
 }
 

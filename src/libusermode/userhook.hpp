@@ -207,6 +207,7 @@ typedef enum usermode_reg_status {
     USERMODE_REGISTER_ERROR,
     USERMODE_REGISTER_SUCCESS,
     USERMODE_ARCH_UNSUPPORTED,
+    USERMODE_OS_UNSUPPORTED,
 } usermode_reg_status_t;
 
 usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);

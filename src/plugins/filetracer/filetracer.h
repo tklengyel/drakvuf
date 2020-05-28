@@ -107,21 +107,13 @@
 
 #include "plugins/private.h"
 #include "plugins/plugins.h"
+#include "win.h"
+#include "linux.h"
 
 class filetracer: public plugin
 {
 public:
-    GSList *traps;
-    output_format_t format;
-
-    size_t* offsets;
-    addr_t newfile_name_offset;
-    addr_t newfile_name_length_offset;
-    addr_t newfile_root_offset;
     os_t os;
-    addr_t kaslr;
-
-    GSList *traps_to_free;
     filetracer(drakvuf_t drakvuf, output_format_t output);
     ~filetracer();
 };

@@ -105,9 +105,33 @@
 #ifndef FILETRACER_LINUX_H
 #define FILETRACER_LINUX_H
 
-#include "private.h"
+#include "plugins/private.h"
+#include "plugins/plugins.h"
 
-void setup_linux(drakvuf_t drakvuf, filetracer *f, output_format_t output);
+class linux_filetracer
+{
+public:
+    GSList *traps;
+    addr_t kaslr;
+    size_t* offsets;
+    output_format_t format;
+    GSList *traps_to_free;
+
+    drakvuf_trap_t trap[22] =
+    {
+        [0 ... 21] = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 0,
+            .breakpoint.addr_type = ADDR_VA,
+            .breakpoint.module = "linux",
+            .type = BREAKPOINT,
+            .data = (void*)this
+        }
+    };
+
+    linux_filetracer(drakvuf_t drakvuf, output_format_t output);
+    ~linux_filetracer();
+};
 
 enum linux_pt_regs
 {

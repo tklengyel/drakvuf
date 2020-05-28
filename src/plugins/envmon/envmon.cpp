@@ -200,36 +200,10 @@ static event_response_t trap_SspipGetUserName_cb(drakvuf_t drakvuf, drakvuf_trap
         ex_name_fmt_str = extended_name_formats[ex_name_fmt];
 
 
-    switch (p->m_output_format)
-    {
-        case OUTPUT_CSV:
-            csvfmt::print("envmon", drakvuf, info,
-                          keyval("ExtendedNameFormat", ex_name_fmt),
-                          keyval("ExtendedNameFormatStr", std::quoted(ex_name_fmt_str))
-                         );
-            break;
-        case OUTPUT_KV:
-            kvfmt::print("envmon", drakvuf, info,
-                         keyval("ExtendedNameFormat", ex_name_fmt),
-                         keyval("ExtendedNameFormatStr", std::quoted(ex_name_fmt_str))
-                        );
-            break;
-        case OUTPUT_JSON:
-        {
-            jsonfmt::print("envmon", drakvuf, info,
-                           keyval("ExtendedNameFormat", ex_name_fmt),
-                           keyval("ExtendedNameFormatStr", ex_name_fmt_str)
-                          );
-            break;
-        }
-        default:
-        case OUTPUT_DEFAULT:
-            fmt::print("envmon", drakvuf, info,
-                       keyval("ExtendedNameFormat", ex_name_fmt),
-                       keyval("ExtendedNameFormatStr", std::quoted(ex_name_fmt_str))
-                      );
-            break;
-    }
+    fmt::print(p->m_output_format, "envmon", drakvuf, info,
+               keyval("ExtendedNameFormat", fmt::Nval(ex_name_fmt)),
+               keyval("ExtendedNameFormatStr", fmt::Qstr(ex_name_fmt_str))
+    );
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -265,39 +239,11 @@ static event_response_t trap_DefineDosDeviceW_cb(drakvuf_t drakvuf, drakvuf_trap
 
     wmi_lock.unlock();
 
-    switch (p->m_output_format)
-    {
-        case OUTPUT_CSV:
-            csvfmt::print("envmon", drakvuf, info,
-                          keyval("Flags", flags),
-                          keyval("DeviceName", std::quoted(device_name)),
-                          keyval("TargetPath", std::quoted(target_path))
-                         );
-            break;
-        case OUTPUT_KV:
-            kvfmt::print("envmon", drakvuf, info,
-                         keyval("Flags", flags.c_str()),
-                         keyval("DeviceName", std::quoted(device_name)),
-                         keyval("TargetPath", std::quoted(target_path))
-                        );
-            break;
-        case OUTPUT_JSON:
-        {
-            jsonfmt::print("envmon", drakvuf, info,
-                           keyval("Flags", flags.c_str()),
-                           keyval("DeviceName", device_name),
-                           keyval("TargetPath", target_path)
-                          );
-            break;
-        }
-        default:
-            fmt::print("envmon", drakvuf, info,
-                       keyval("Flags", flags.c_str()),
-                       keyval("DeviceName", std::quoted(device_name)),
-                       keyval("TargetPath", std::quoted(target_path))
-                      );
-            break;
-    }
+    fmt::print(p->m_output_format, "envmon", drakvuf, info,
+                  keyval("Flags", fmt::Qstr(flags)),
+                  keyval("DeviceName", fmt::Qstr(device_name)),
+                  keyval("TargetPath", fmt::Qstr(target_path))
+                 );
 
     vmi_free_unicode_str(device_name_us);
     vmi_free_unicode_str(target_path_us);
@@ -311,24 +257,7 @@ static event_response_t trap_GetComputerNameW_cb(drakvuf_t drakvuf, drakvuf_trap
     if (!p)
         return VMI_EVENT_RESPONSE_NONE;
 
-    switch (p->m_output_format)
-    {
-        case OUTPUT_CSV:
-            csvfmt::print("envmon", drakvuf, info);
-            break;
-        case OUTPUT_KV:
-            kvfmt::print("envmon", drakvuf, info);
-            break;
-        case OUTPUT_JSON:
-        {
-            jsonfmt::print("envmon", drakvuf, info);
-            break;
-        }
-        default:
-        case OUTPUT_DEFAULT:
-            fmt::print("envmon", drakvuf, info);
-            break;
-    }
+    fmt::print(p->m_output_format, "envmon", drakvuf, info);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -338,24 +267,7 @@ static event_response_t trap_IsNativeVhdBoot_cb(drakvuf_t drakvuf, drakvuf_trap_
     if (!p)
         return VMI_EVENT_RESPONSE_NONE;
 
-    switch (p->m_output_format)
-    {
-        case OUTPUT_CSV:
-            csvfmt::print("envmon", drakvuf, info);
-            break;
-        case OUTPUT_KV:
-            kvfmt::print("envmon", drakvuf, info);
-            break;
-        case OUTPUT_JSON:
-        {
-            jsonfmt::print("envmon", drakvuf, info);
-            break;
-        }
-        default:
-        case OUTPUT_DEFAULT:
-            fmt::print("envmon", drakvuf, info);
-            break;
-    }
+    fmt::print(p->m_output_format, "envmon", drakvuf, info);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -372,36 +284,10 @@ static event_response_t trap_GetComputerNameExW_cb(drakvuf_t drakvuf, drakvuf_tr
     if (name_type < ComputerNameMax)
         name_type_str = computer_name_formats[name_type];
 
-    switch (p->m_output_format)
-    {
-        case OUTPUT_CSV:
-            csvfmt::print("envmon", drakvuf, info,
-                          keyval("NameType", name_type),
-                          keyval("NameTypeStr", std::quoted(name_type_str))
-                         );
-            break;
-        case OUTPUT_KV:
-            kvfmt::print("envmon", drakvuf, info,
-                         keyval("NameType", name_type),
-                         keyval("NameTypeStr", std::quoted(name_type_str))
-                        );
-            break;
-        case OUTPUT_JSON:
-        {
-            jsonfmt::print("envmon", drakvuf, info,
-                           keyval("NameType", name_type),
-                           keyval("NameTypeStr", name_type_str)
-                          );
-            break;
-        }
-        default:
-        case OUTPUT_DEFAULT:
-            fmt::print("envmon", drakvuf, info,
-                       keyval("NameType", name_type),
-                       keyval("NameTypeStr", std::quoted(name_type_str))
-                      );
-            break;
-    }
+    fmt::print(p->m_output_format, "envmon", drakvuf, info,
+                  keyval("NameType", fmt::Nval(name_type)),
+                  keyval("NameTypeStr", fmt::Qstr(name_type_str))
+                 );
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -417,31 +303,18 @@ static event_response_t trap_GetAdaptersAddresses_cb(drakvuf_t drakvuf, drakvuf_
     switch (p->m_output_format)
     {
         case OUTPUT_CSV:
-            csvfmt::print("envmon", drakvuf, info,
-                          keyval("Family", family.c_str()),
-                          keyval("Flags", flags.c_str())
+        case OUTPUT_JSON:
+        case OUTPUT_DEFAULT:
+            fmt::print(p->m_output_format, "envmon", drakvuf, info,
+                          keyval("Family", fmt::Qstr(family)),
+                          keyval("Flags", fmt::Qstr(flags))
                          );
             break;
         case OUTPUT_KV:
             kvfmt::print("envmon", drakvuf, info,
-                         keyval("Family", family.c_str()),
-                         keyval("Flags", flags.c_str())
+                         keyval("Family", fmt::Rstr(family)),
+                         fmt::Rstr(flags)
                         );
-            break;
-        case OUTPUT_JSON:
-        {
-            jsonfmt::print("envmon", drakvuf, info,
-                           keyval("Family", family.c_str()),
-                           keyval("Flags", flags.c_str())
-                          );
-            break;
-        }
-        default:
-        case OUTPUT_DEFAULT:
-            fmt::print("envmon", drakvuf, info,
-                       keyval("Family", family.c_str()),
-                       keyval("Flags", flags.c_str())
-                      );
             break;
     }
     return VMI_EVENT_RESPONSE_NONE;
@@ -454,32 +327,9 @@ static event_response_t trap_WNetGetProviderNameW_cb(drakvuf_t drakvuf, drakvuf_
         return VMI_EVENT_RESPONSE_NONE;
 
     const auto net_type = drakvuf_get_function_argument(drakvuf, info, 1);
-    switch (p->m_output_format)
-    {
-        case OUTPUT_CSV:
-            csvfmt::print("envmon", drakvuf, info,
-                          keyval("NetType", net_type)
-                         );
-            break;
-        case OUTPUT_KV:
-            kvfmt::print("envmon", drakvuf, info,
-                         keyval("NetType", net_type)
-                        );
-            break;
-        case OUTPUT_JSON:
-        {
-            jsonfmt::print("envmon", drakvuf, info,
-                           keyval("NetType", net_type)
-                          );
-            break;
-        }
-        default:
-        case OUTPUT_DEFAULT:
-            fmt::print("envmon", drakvuf, info,
-                       keyval("NetType", net_type)
-                      );
-            break;
-    }
+    fmt::print(p->m_output_format, "envmon", drakvuf, info,
+              keyval("NetType", fmt::Nval(net_type))
+             );
     return VMI_EVENT_RESPONSE_NONE;
 }
 

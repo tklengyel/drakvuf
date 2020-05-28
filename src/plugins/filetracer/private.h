@@ -107,7 +107,8 @@
 
 #include <string>
 #include "plugins/plugin_utils.h"
-#include "filetracer.h"
+#include "win.h"
+#include "linux.h"
 
 struct wrapper
 {
@@ -117,7 +118,7 @@ struct wrapper
 
     addr_t handle;
 
-    filetracer *f;
+    win_filetracer *f;
     addr_t obj_attr;
     std::string attrs;
     std::string share;
@@ -134,7 +135,7 @@ struct linux_wrapper
 
     addr_t handle;
 
-    filetracer *f;
+    linux_filetracer *f;
     std::string filename;
     std::string flags;
     std::string modes;

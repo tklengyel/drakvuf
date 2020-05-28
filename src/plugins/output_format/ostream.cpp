@@ -102,15 +102,35 @@
 *                                                                         *
 ***************************************************************************/
 
-#ifndef PLUGINS_OUTPUT_FORMAT_H
-#define PLUGINS_OUTPUT_FORMAT_H
+#include "ostream.h"
 
-#include "output_format/common.h"
-#include "output_format/csvfmt.h"
-#include "output_format/deffmt.h"
-#include "output_format/jsonfmt.h"
-#include "output_format/kvfmt.h"
+#include <sstream>
 
-#include "output_format/xfmt.h"
+#include <stdio.h>
+#include <unistd.h>
 
-#endif
+namespace fmt
+{
+
+class StrBuf : public std::stringbuf
+{
+protected:
+    int sync() final
+    {
+        // this is required because of printf() logging
+        fflush(stdout);
+
+        int size = pptr() - pbase();
+        if (write(STDOUT_FILENO, pbase(), size) == size)
+        {
+            seekpos(0);
+            return 0;
+        }
+        return -1;
+    }
+};
+
+static StrBuf outbuf;
+std::ostream cout(&outbuf);
+
+} // namespace fmt

@@ -102,43 +102,48 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef FILETRACER_WIN_H
-#define FILETRACER_WIN_H
+#ifndef DRAKVUF_PLUGINS_TYPE_TRAITS_HELPERS_H
+#define DRAKVUF_PLUGINS_TYPE_TRAITS_HELPERS_H
+#pragma once
 
-#include "plugins/private.h"
-#include "plugins/plugins.h"
+#include <type_traits>
 
-class win_filetracer
-{
-public:
-    GSList *traps;
-    size_t* offsets;
-    output_format_t format;
-    GSList *traps_to_free;
+template<class T>
+struct always_false: std::false_type {};
 
-    addr_t newfile_name_offset;
-    addr_t newfile_name_length_offset;
-    addr_t newfile_root_offset;
-    addr_t basic_creation_offset;
-    addr_t basic_last_access_offset;
-    addr_t basic_last_write_offset;
-    addr_t basic_change_time_offset;
-    addr_t basic_attributes_offset;
+/**/
 
-    drakvuf_trap_t trap[7] =
-    {
-        [0 ... 6] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.pid = 4,
-            .breakpoint.addr_type = ADDR_RVA,
-            .breakpoint.module = "ntoskrnl.exe",
-            .type = BREAKPOINT,
-            .data = (void*)this
-        }
-    };
+template <class T, class = void>
+struct has_begin_helper : std::false_type {};
 
-    win_filetracer(drakvuf_t drakvuf, output_format_t output);
-    ~win_filetracer();
-};
+template <class T>
+struct has_begin_helper<T, std::void_t<decltype(std::begin(std::declval<T>()))>> : std::true_type {};
 
-#endif
+template <class T, class = void>
+struct has_end_helper : std::false_type {};
+
+template <class T>
+struct has_end_helper<T, std::void_t<decltype(std::end(std::declval<T>()))>> : std::true_type {};
+
+
+template <class T, class = void>
+struct is_iterable_helper : std::false_type {};
+
+template <class T>
+struct is_iterable_helper<T, std::enable_if_t<has_begin_helper<T>::value&& has_end_helper<T>::value, void>> : std::true_type {};
+
+template <class T>
+struct is_iterable : is_iterable_helper<T> {};
+
+/**/
+
+template <class T, class = void>
+struct is_printable_helper : std::false_type {};
+
+template <class T>
+struct is_printable_helper<T, std::void_t<decltype(std::declval<std::ostream>().operator<<(std::declval<T>()))>> : std::true_type {};
+
+template <class T>
+struct is_printable : is_printable_helper<T> {};
+
+#endif // DRAKVUF_PLUGINS_TYPE_TRAITS_HELPERS_H

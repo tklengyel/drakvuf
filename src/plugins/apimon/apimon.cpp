@@ -378,7 +378,8 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
             // success, nothing to do
             break;
         case USERMODE_ARCH_UNSUPPORTED:
-            PRINT_DEBUG("[APIMON] Usermode hooking is not supported on this architecture/bitness, these features will be disabled\n");
+        case USERMODE_OS_UNSUPPORTED:
+            PRINT_DEBUG("[APIMON] Usermode hooking is not supported on this architecture/bitness/os version, these features will be disabled\n");
             break;
         default:
             PRINT_DEBUG("[APIMON] Failed to subscribe to libusermode\n");
