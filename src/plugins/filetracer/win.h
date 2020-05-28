@@ -111,10 +111,10 @@
 class win_filetracer
 {
 public:
-    GSList *traps;
+    GSList* traps;
     size_t* offsets;
     output_format_t format;
-    GSList *traps_to_free;
+    GSList* traps_to_free;
 
     addr_t newfile_name_offset;
     addr_t newfile_name_length_offset;

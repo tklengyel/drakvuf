@@ -111,11 +111,10 @@
 class linux_filetracer
 {
 public:
-    GSList *traps;
     addr_t kaslr;
     size_t* offsets;
     output_format_t format;
-    GSList *traps_to_free;
+    GSList* traps_to_free;
 
     drakvuf_trap_t trap[22] =
     {
@@ -191,4 +190,4 @@ static const char* linux_pt_regs_names[__PT_REGS_MAX] =
     [PT_REGS_SS] = "ss",
 };
 
-#endif //FILETRACER_LINUX_H
+#endif
