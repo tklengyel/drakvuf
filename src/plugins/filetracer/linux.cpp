@@ -397,7 +397,7 @@ static event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     struct file *do_filp_open(
         int dfd,
         struct filename *pathname,
-    	const struct open_flags *op
+        const struct open_flags *op
     )
     */
 
@@ -537,8 +537,8 @@ static event_response_t memfd_create_file_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 {
     /*
     int memfd_create(
-    	const char __user *uname,
-    	unsigned int flags
+        const char __user *uname,
+        unsigned int flags
     )
     */
 
@@ -599,7 +599,7 @@ static event_response_t rename_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     std::string file_name = g_strdup_printf("%s", get_filepath(drakvuf, info, vmi, dentry_addr).data());
     drakvuf_release_vmi(drakvuf);
     if (file_name.empty())
-        return VMI_EVENT_RESPONSE_NONE;
+        return 0;
     lw->args["old_name"] = file_name;
 
     dentry_addr = drakvuf_get_function_argument(drakvuf, info, 4);
@@ -878,7 +878,7 @@ static event_response_t link_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     std::string file_name = g_strdup_printf("%s", get_filepath(drakvuf, info, vmi, dentry_addr).data());
     drakvuf_release_vmi(drakvuf);
     if (file_name.empty())
-        return VMI_EVENT_RESPONSE_NONE;
+        return 0;
 
     lw->args["link_name"] = file_name;
 
