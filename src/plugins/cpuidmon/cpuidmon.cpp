@@ -199,6 +199,8 @@ event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             info->regs->rcx = 0;
             info->regs->rdx = 0;
         }
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
     return 0;
