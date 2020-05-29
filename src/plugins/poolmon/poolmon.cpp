@@ -147,7 +147,6 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     char tag[5] = { [0 ... 4] = '\0' };
     struct pooltag* s = NULL;
     const char* pool_type_str;
-    gchar* escaped_pname = NULL;
 
     access_context_t ctx;
     memset(&ctx, 0, sizeof(access_context_t));
