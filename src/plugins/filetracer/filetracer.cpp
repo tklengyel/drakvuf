@@ -118,14 +118,22 @@ filetracer::filetracer(drakvuf_t drakvuf, output_format_t output)
     this->os = drakvuf_get_os_type(drakvuf);
     if (this->os == VMI_OS_WINDOWS)
     {
-        new win_filetracer(drakvuf, output);
+        this->wf = new win_filetracer(drakvuf, output);
     }
     else
     {
-        new linux_filetracer(drakvuf, output);
+        this->lf = new linux_filetracer(drakvuf, output);
     }
 }
 
 filetracer::~filetracer()
 {
+    if (this->os == VMI_OS_WINDOWS)
+    {
+        delete this->wf;
+    }
+    else
+    {
+        delete this->lf;
+    }
 }

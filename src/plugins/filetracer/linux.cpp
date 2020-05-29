@@ -599,7 +599,10 @@ static event_response_t rename_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     std::string file_name = g_strdup_printf("%s", get_filepath(drakvuf, info, vmi, dentry_addr).data());
     drakvuf_release_vmi(drakvuf);
     if (file_name.empty())
-        return 0;
+    {
+        delete lw;
+        return VMI_EVENT_RESPONSE_NONE;
+    }
     lw->args["old_name"] = file_name;
 
     dentry_addr = drakvuf_get_function_argument(drakvuf, info, 4);
@@ -878,7 +881,10 @@ static event_response_t link_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     std::string file_name = g_strdup_printf("%s", get_filepath(drakvuf, info, vmi, dentry_addr).data());
     drakvuf_release_vmi(drakvuf);
     if (file_name.empty())
-        return 0;
+    {
+        delete lw;
+        return VMI_EVENT_RESPONSE_NONE;
+    }
 
     lw->args["link_name"] = file_name;
 

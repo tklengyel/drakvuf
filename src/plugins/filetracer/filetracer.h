@@ -114,6 +114,8 @@ class filetracer: public plugin
 {
 public:
     os_t os;
+    win_filetracer* wf;
+    linux_filetracer* lf;
     filetracer(drakvuf_t drakvuf, output_format_t output);
     ~filetracer();
 };
