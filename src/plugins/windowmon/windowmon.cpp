@@ -106,6 +106,7 @@
 #include <cassert>
 
 #include "windowmon.h"
+#include "plugins/output_format.h"
 
 static char const* get_value_name(unicode_string_t* us)
 {
@@ -134,8 +135,6 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     windowmon* c = static_cast<windowmon*>(info->trap->data);
 
-    gchar* escaped_pname = NULL;
-
     auto class_va = drakvuf_get_function_argument(drakvuf, info, 3);
     auto name_va = drakvuf_get_function_argument(drakvuf, info, 4);
 
@@ -145,46 +144,19 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     auto window_class = get_value_name(class_us);
     auto window_name = get_value_name(name_us);
 
-    switch (c->format)
+    if (c->format == OUTPUT_JSON)
     {
-        case OUTPUT_CSV:
-            printf("windowmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   info->attached_proc_data.userid, window_class, window_name);
-            break;
-        case OUTPUT_KV:
-            printf("windowmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Class=%s,Name=%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   info->trap->name, window_class, window_name);
-            break;
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"windowmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Method\" : \"%s\","
-                    "\"Class\" : %s,"
-                    "\"Name\" : %s,"
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                    info->trap->name,
-                    window_class, window_name);
-            g_free(escaped_pname);
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[WINDOWMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" CLASS:%s NAME:%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   USERIDSTR(drakvuf), info->attached_proc_data.userid, window_class, window_name);
-            break;
+        jsonfmt::print("windowmon", drakvuf, info,
+                       keyval("Class", fmt::Qstr(window_class)),
+                       keyval("Name", fmt::Qstr(window_name))
+                      );
+    }
+    else
+    {
+        fmt::print(c->format, "windowmon", drakvuf, info,
+                   keyval("Class", fmt::Rstr(window_class)),
+                   keyval("Name", fmt::Rstr(window_name))
+                  );
     }
 
     vmi_free_unicode_str(class_us);

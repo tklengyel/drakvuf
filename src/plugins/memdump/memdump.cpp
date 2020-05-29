@@ -111,6 +111,7 @@
 #include <libdrakvuf/json-util.h>
 
 #include "memdump.h"
+#include "plugins/output_format.h"
 #include "private.h"
 
 #define DUMP_NAME_PLACEHOLDER "(not configured)"
@@ -133,7 +134,7 @@ static void save_file_metadata(const drakvuf_trap_info_t* info,
     if (!fp)
         return;
 
-    json_object *jobj = json_object_new_object();
+    json_object* jobj = json_object_new_object();
     json_object_object_add(jobj, "Method", json_object_new_string(method));
     json_object_object_add(jobj, "DumpReason", json_object_new_string(dump_reason));
     json_object_object_add(jobj, "DumpAddress", json_object_new_string_fmt("0x%" PRIx64, dump_address));
@@ -162,7 +163,7 @@ static void save_file_metadata(const drakvuf_trap_info_t* info,
  * File is stored in a path provided in --memdump-dir command line option and named according to the scheme:
  * <process_pid>_<base_address>_<counter>.dmp
  *
- * For some dumps, a custom structure `extras` may be optionally provided together with `printout_extras` method
+ * For some dumps, a custom structure `extras` may be optionally provided
  * which will enrich the default data printout.
  */
 bool dump_memory_region(
@@ -174,7 +175,7 @@ bool dump_memory_region(
     size_t len_bytes,
     const char* reason,
     extras_t* extras,
-    void (*printout_extras)(drakvuf_t drakvuf, output_format_t format, extras_t* extras))
+    bool print_extras)
 {
     char* metafile = nullptr;
     char* file = nullptr;
@@ -184,9 +185,6 @@ bool dump_memory_region(
     void** access_ptrs = nullptr;
     FILE* fp = nullptr;
     bool ret = false;
-
-    gchar* escaped_pname = nullptr;
-    gchar* escaped_fname = nullptr;
 
     const gchar* chk_str = nullptr;
 
@@ -200,6 +198,9 @@ bool dump_memory_region(
     GChecksum* checksum = nullptr;
 
     size_t tmp_len_bytes = len_bytes;
+
+    std::optional<fmt::Nval<decltype(extras->write_virtual_memory_extras.target_pid)>> target_pid;
+    std::optional<fmt::Xval<decltype(extras->write_virtual_memory_extras.base_address)>> write_addr;
 
     if (!plugin->memdump_dir)
     {
@@ -298,73 +299,56 @@ bool dump_memory_region(
         goto done;
 
     if (asprintf(&metafile, "%s/memdump.%06d", plugin->memdump_dir, ++plugin->dumps_count) < 0)
-      goto done;
+        goto done;
 
     save_file_metadata(info, metafile, file, len_bytes, ctx->addr, info->trap->name, reason, extras);
 
     ret = true;
 
 printout:
-    switch (plugin->m_output_format)
+    if (print_extras)
     {
-        case OUTPUT_CSV:
-            printf("memdump," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",\"%s\",%d,%" PRIx64 ",%" PRIu64 ",\"%s\"",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   info->attached_proc_data.userid, info->trap->name, reason, info->attached_proc_data.pid, ctx->addr, len_bytes, display_file);
-
-            if (printout_extras)
-                printout_extras(drakvuf, plugin->m_output_format, extras);
-            break;
-        case OUTPUT_KV:
-            printf("memdump Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,DumpReason=\"%s\",DumpPID=%d,DumpAddr=%" PRIx64 ",DumpSize=%" PRIu64 ",SN=%d",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   info->trap->name, reason, info->attached_proc_data.pid, ctx->addr, len_bytes, plugin->dumps_count);
-
-            if (printout_extras)
-                printout_extras(drakvuf, plugin->m_output_format, extras);
-            break;
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            escaped_fname = drakvuf_escape_str(display_file);
-            printf( "{"
-                    "\"Plugin\": \"memdump\", "
-                    "\"TimeStamp\":" "\"" FORMAT_TIMEVAL "\", "
-                    "\"ProcessName\": %s, "
-                    "\"UserName\": \"%s\", "
-                    "\"UserId\": %" PRIu64 ", "
-                    "\"PID\": %d, "
-                    "\"PPID\": %d, "
-                    "\"Method\": \"%s\", "
-                    "\"DumpReason\": \"%s\", "
-                    "\"DumpPID\": %d, "
-                    "\"DumpAddr\": \"0x%" PRIx64 "\", "
-                    "\"DumpSize\": \"0x%" PRIx64 "\", "
-                    "\"DumpFilename\": %s",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                    info->trap->name, reason, info->attached_proc_data.pid, ctx->addr,
-                    len_bytes, escaped_fname);
-            if (printout_extras)
-                printout_extras(drakvuf, plugin->m_output_format, extras);
-            printf("}");
-            g_free(escaped_fname);
-            g_free(escaped_pname);
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[MEMDUMP] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\" Reason:\"%s\" Process:%d Base:0x%" PRIx64 " Size:%" PRIu64 " File:\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   USERIDSTR(drakvuf), info->attached_proc_data.userid, info->trap->name, reason, info->attached_proc_data.pid, ctx->addr,
-                   len_bytes, display_file);
-
-            if (printout_extras)
-                printout_extras(drakvuf, plugin->m_output_format, extras);
-            break;
+        target_pid = fmt::Nval(extras->write_virtual_memory_extras.target_pid);
+        write_addr = fmt::Xval(extras->write_virtual_memory_extras.base_address, false);
     }
-
-    printf("\n");
+    if (plugin->m_output_format == OUTPUT_KV)
+    {
+        kvfmt::print("memdump", drakvuf, info,
+                     keyval("DumpReason", fmt::Qstr(reason)),
+                     keyval("DumpPID", fmt::Nval(info->attached_proc_data.pid)),
+                     keyval("DumpAddr", fmt::Xval(ctx->addr, false)),
+                     keyval("DumpSize", fmt::Xval(len_bytes)),
+                     keyval("DumpFilename", fmt::Qstr(display_file)),
+                     keyval("SN", fmt::Nval(plugin->dumps_count)),
+                     keyval("TargetPID", target_pid),
+                     keyval("WriteAddr", write_addr)
+                    );
+    }
+    else if (plugin->m_output_format == OUTPUT_JSON)
+    {
+        jsonfmt::print("memdump", drakvuf, info,
+                       keyval("DumpReason", fmt::Qstr(reason)),
+                       keyval("DumpPID", fmt::Nval(info->attached_proc_data.pid)),
+                       keyval("DumpAddr", fmt::Xval(ctx->addr)),
+                       keyval("DumpSize", fmt::Xval(len_bytes)),
+                       keyval("DumpFilename", fmt::Qstr(display_file)),
+                       keyval("DumpsCount", fmt::Nval(plugin->dumps_count)),
+                       keyval("TargetPID", target_pid),
+                       keyval("WriteAddr", write_addr)
+                      );
+    }
+    else
+    {
+        fmt::print(plugin->m_output_format, "memdump", drakvuf, info,
+                   keyval("Reason", fmt::Qstr(reason)),
+                   keyval("Process", fmt::Nval(info->attached_proc_data.pid)),
+                   keyval("Base", fmt::Xval(ctx->addr)),
+                   keyval("Size", fmt::Nval(len_bytes)),
+                   keyval("File", fmt::Qstr(display_file)),
+                   keyval("TargetPID", target_pid),
+                   keyval("WriteAddr", write_addr)
+                  );
+    }
 
 done:
     free(file);
@@ -447,7 +431,7 @@ bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* pl
             ctx.addr = begin;
 
             if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len, "Stack heuristic",
-                                    nullptr, nullptr))
+                                    nullptr, false))
             {
                 PRINT_DEBUG("[MEMDUMP] Failed to save memory dump - internal error\n");
             }
@@ -564,7 +548,7 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
         ctx.addr = mmvad.starting_vpn << 12;
         size_t len_bytes = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
 
-        if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len_bytes, "Possible binary detected", nullptr, nullptr))
+        if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len_bytes, "Possible binary detected", nullptr, false))
         {
             PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
         }
@@ -583,7 +567,7 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
         if (len_bytes > 0x1000 && pte_valid && page_writeable && page_executable)
         {
-            if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len_bytes, "Interesting RWX memory", nullptr, nullptr))
+            if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len_bytes, "Interesting RWX memory", nullptr, false))
             {
                 PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
             }
@@ -653,7 +637,7 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
         ctx.addr = mmvad.starting_vpn << 12;
         size_t len_bytes = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
 
-        if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len_bytes, "Possible binary detected", nullptr, nullptr))
+        if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len_bytes, "Possible binary detected", nullptr, false))
         {
             PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
         }
@@ -661,32 +645,6 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
 
     drakvuf_release_vmi(drakvuf);
     return VMI_EVENT_RESPONSE_NONE;
-}
-
-static void printout_write_virtual_memory(drakvuf_t drakvuf, output_format_t format, extras_t* xtr)
-{
-    switch (format)
-    {
-        case OUTPUT_CSV:
-            printf(",%d,%" PRIx64 "",
-                   xtr->write_virtual_memory_extras.target_pid, xtr->write_virtual_memory_extras.base_address);
-            break;
-        case OUTPUT_KV:
-            printf(",TargetPID=%d,WriteAddr=%" PRIx64 "",
-                   xtr->write_virtual_memory_extras.target_pid, xtr->write_virtual_memory_extras.base_address);
-            break;
-        case OUTPUT_JSON:
-            printf( ", "
-                    "\"TargetPID\": %d, "
-                    "\"WriteAddr\": \"0x%" PRIx64 "\"",
-                    xtr->write_virtual_memory_extras.target_pid, xtr->write_virtual_memory_extras.base_address);
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf(" TargetPID:%d WriteAddr:%" PRIx64 "",
-                   xtr->write_virtual_memory_extras.target_pid, xtr->write_virtual_memory_extras.base_address);
-            break;
-    }
 }
 
 static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -743,7 +701,7 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
         },
     };
 
-    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, buffer_size, "NtWriteVirtualMemory called", &extras, printout_write_virtual_memory))
+    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, buffer_size, "NtWriteVirtualMemory called", &extras, true))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
     }
@@ -762,14 +720,15 @@ bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     addr_t data_size = 0;
 
-    access_context_t ctx = {
+    access_context_t ctx =
+    {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
         .addr = info->regs->rcx
     };
 
-	const auto ptr_size = is_syswow ? sizeof(uint32_t) : sizeof(addr_t);
-	ctx.addr += ptr_size;
+    const auto ptr_size = is_syswow ? sizeof(uint32_t) : sizeof(addr_t);
+    ctx.addr += ptr_size;
 
     if (vmi_read(lg.vmi, &ctx, ptr_size, &data_size, nullptr) != VMI_SUCCESS)
     {
@@ -779,9 +738,9 @@ bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     PRINT_DEBUG("[MEMDUMP.NET] dumping assembly from memory (size = %lu)\n", data_size);
 
-	ctx.addr += ptr_size;
+    ctx.addr += ptr_size;
 
-    if (!dump_memory_region(drakvuf, lg.vmi, info, plugin, &ctx, data_size, ".NET AssemblyNative::LoadImage", nullptr, nullptr))
+    if (!dump_memory_region(drakvuf, lg.vmi, info, plugin, &ctx, data_size, ".NET AssemblyNative::LoadImage", nullptr, false))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
         return false;
