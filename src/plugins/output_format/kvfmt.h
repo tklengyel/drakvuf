@@ -159,7 +159,10 @@ struct DataPrinter
     template <class Tv = T>
     static bool print(std::ostream& os, const fmt::Xval<Tv>& data, char)
     {
-        os << data.value;
+        auto ff = os.flags();
+        auto base = data.withbase ? "0x" : "";
+        os << base << std::uppercase << std::hex << data.value;
+        os.flags(ff);
         return true;
     }
 

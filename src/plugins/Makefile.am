@@ -114,6 +114,7 @@ sources += syscalls/linux.h
 sources += syscalls/win.cpp
 sources += syscalls/win.h
 sources += syscalls/private.h
+sources += syscalls/args_walker.h
 endif
 
 if PLUGIN_POOLMON
