@@ -232,6 +232,15 @@ struct DataPrinter
     {
         return TuplePrinter<decltype(data), sizeof...(Ts)>::print(os, data, sep);
     }
+
+    template <class... Ts>
+    static bool print(std::ostream& os, const std::variant<Ts...>& data, char sep)
+    {
+        return std::visit([&os, sep](auto&& arg) mutable
+        {
+            return print_data(os, arg, sep);
+        }, data);
+    }
 };
 
 template <class T>

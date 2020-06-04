@@ -137,6 +137,7 @@
 #include "plugins/plugins.h"
 #include "private.h"
 #include "socketmon.h"
+#include "plugins/output_format.h"
 
 struct wrapper
 {
@@ -222,141 +223,32 @@ static char const* tcp_state_string(int tcp_state)
 
 static void print_udpa_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data, int addressfamily, char const* lip, int port)
 {
-    gchar* escaped_pname = NULL;
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",\"%s\",%" PRIi64 ",%d,%d,%s,%s,%d\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->attached_proc_data.name, info->attached_proc_data.userid,
-                   owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                   udp_addressfamily_string(addressfamily),
-                   lip, port);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64","
-                   "Owner=\"%s\",OwnerId=%" PRIi64 ",OwnerPID=%d,OwnerPPID=%d,Protocol=%s,LocalIp=%s,LocalPort=%d\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                   info->attached_proc_data.name, info->attached_proc_data.userid,
-                   owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                   udp_addressfamily_string(addressfamily),
-                   lip, port);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": \"%s\","
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Owner\": \"%s\","
-                    "\"OwnerId\": %" PRIi64 ","
-                    "\"OwnerPID\" : %d,"
-                    "\"OwnerPPID\": %d,"
-                    "\"Protocol\": \"%s\","
-                    "\"LocalIp\": \"%s\","
-                    "\"LocalPort\": %d"
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                    owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                    udp_addressfamily_string(addressfamily),
-                    lip, port);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s %s:%d\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                   owner_proc_data.name, USERIDSTR(drakvuf), owner_proc_data.userid,
-                   udp_addressfamily_string(addressfamily),
-                   lip, port);
-            break;
-    }
+    fmt::print(s->format, "socketmon", drakvuf, info,
+               keyval("Owner", fmt::Qstr(owner_proc_data.name)),
+               keyval("OwnerId", fmt::Nval(owner_proc_data.userid)),
+               keyval("OwnerPID", fmt::Nval(owner_proc_data.pid)),
+               keyval("OwnerPPID", fmt::Nval(owner_proc_data.ppid)),
+               keyval("Protocol", fmt::Rstr(udp_addressfamily_string(addressfamily))),
+               keyval("LocalIp", fmt::Rstr(lip ?: "")),
+               keyval("LocalPort", fmt::Nval(port))
+              );
 }
 
 static void print_tcpe(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data,
                        int addressfamily, int tcp_state, char const* lip, int localport, char const* rip, int remoteport)
 {
-    gchar* escaped_pname = NULL;
-
-    switch (s->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%" PRIi64 ",%d,%d,%s,%s,%s,%d,%s,%d\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->attached_proc_data.name, info->attached_proc_data.userid,
-                   owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                   tcp_addressfamily_string(addressfamily),
-                   tcp_state_string(tcp_state),
-                   lip, localport, rip, remoteport);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",UserId=%" PRIi64 ","
-                   "Owner=\"%s\",OwnerId=%" PRIi64 ",OwnerPID=%d,OwnerPPID=%d,Protocol=%s,TcpState=%s,"
-                   "LocalIp=%s,LocalPort=%d,RemoteIp=%s,RemotePort=%d\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                   info->attached_proc_data.name, info->attached_proc_data.userid,
-                   owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                   tcp_addressfamily_string(addressfamily),
-                   tcp_state_string(tcp_state),
-                   lip, localport, rip, remoteport);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": \"%s\","
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Owner\": \"%s\","
-                    "\"OwnerId\": %" PRIi64 ","
-                    "\"OwnerPID\" : %d,"
-                    "\"OwnerPPID\": %d,"
-                    "\"Protocol\": \"%s\","
-                    "\"TcpState\": \"%s\","
-                    "\"LocalIp\": \"%s\","
-                    "\"LocalPort\": %d,"
-                    "\"RemoteIp\": \"%s\","
-                    "\"RemotePort\": %d"
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                    owner_proc_data.name, owner_proc_data.userid, owner_proc_data.pid, owner_proc_data.ppid,
-                    tcp_addressfamily_string(addressfamily),
-                    tcp_state_string(tcp_state),
-                    lip, localport, rip, remoteport);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " Owner:\"%s\" %s:%" PRIi64 " %s State:%s Local:%s:%d Remote:%s:%d\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->attached_proc_data.name, USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                   owner_proc_data.name, USERIDSTR(drakvuf), owner_proc_data.userid,
-                   tcp_addressfamily_string(addressfamily),
-                   tcp_state_string(tcp_state),
-                   lip, localport, rip, remoteport);
-            break;
-    }
+    fmt::print(s->format, "socketmon", drakvuf, info,
+               keyval("Owner", fmt::Qstr(owner_proc_data.name)),
+               keyval("OwnerId", fmt::Nval(owner_proc_data.userid)),
+               keyval("OwnerPID", fmt::Nval(owner_proc_data.pid)),
+               keyval("OwnerPPID", fmt::Nval(owner_proc_data.ppid)),
+               keyval("Protocol", fmt::Rstr(tcp_addressfamily_string(addressfamily))),
+               keyval("TcpState", fmt::Rstr(tcp_state_string(tcp_state))),
+               keyval("LocalIp", fmt::Rstr(lip ?: "")),
+               keyval("LocalPort", fmt::Nval(localport)),
+               keyval("RemoteIp", fmt::Rstr(rip ?: "")),
+               keyval("RemotePort", fmt::Nval(remoteport))
+              );
 }
 
 template<typename udp_endpoint_struct, typename inetaf_struct, typename local_address_struct>
@@ -526,7 +418,7 @@ static event_response_t tcpe_win10_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
 static event_response_t tcpe_win10_x64_1803_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-  return tcpe_cb<tcp_endpoint_win10_x64_1803, inetaf_win10_x64, addr_info_x64, local_address_x64>(drakvuf, info);
+    return tcpe_cb<tcp_endpoint_win10_x64_1803, inetaf_win10_x64, addr_info_x64, local_address_x64>(drakvuf, info);
 }
 
 // TODO Return static qualifier after fixing UDP monitor
@@ -572,51 +464,11 @@ event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 /* ----------------------------------------------------- */
 
-static void print_dns_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* sm, const char* function_name, const char* dns_name)
+static void print_dns_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* sm, const char* dns_name)
 {
-    gchar* escaped_pname = NULL;
-
-    switch (sm->format)
-    {
-        case OUTPUT_CSV:
-            printf("socketmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",\"%s\",\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->attached_proc_data.name, dns_name, function_name);
-            break;
-
-        case OUTPUT_KV:
-            printf("socketmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",DnsName=\"%s\",Method=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                   info->attached_proc_data.name, dns_name, function_name);
-            break;
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"socketmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"DnsName\": \"%s\","
-                    "\"Method\": \"%s\""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                    dns_name, function_name);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[SOCKETMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" DNS_NAME:\"%s\" METHOD:\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   dns_name, function_name);
-            break;
-    }
+    fmt::print(sm->format, "socketmon", drakvuf, info,
+               keyval("DnsName", fmt::Qstr(dns_name ?: ""))
+              );
 }
 
 static event_response_t trap_DnsQuery_A_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -636,7 +488,7 @@ static event_response_t trap_DnsQuery_A_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         vmi_lock_guard vmi_lg(drakvuf);
         return vmi_read_str(vmi_lg.vmi, &ctx);
     }();
-    print_dns_info(drakvuf, info, sm, info->trap->name, dns_name);
+    print_dns_info(drakvuf, info, sm, dns_name);
     g_free(dns_name);
 
     return 0;
@@ -663,7 +515,7 @@ static event_response_t trap_DnsQuery_W_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
     if (domain_name_us)
     {
-        print_dns_info(drakvuf, info, sm, info->trap->name, (char*)domain_name_us->contents);
+        print_dns_info(drakvuf, info, sm, (char*)domain_name_us->contents);
     }
     else
     {
@@ -707,7 +559,7 @@ static event_response_t trap_DnsQueryExW_cb(drakvuf_t drakvuf, drakvuf_trap_info
 
     if (domain_name_us)
     {
-        print_dns_info(drakvuf, info, sm, info->trap->name, (char*)domain_name_us->contents);
+        print_dns_info(drakvuf, info, sm, (char*)domain_name_us->contents);
     }
     else
     {
@@ -738,7 +590,7 @@ static event_response_t trap_DnsQueryExA_cb(drakvuf_t drakvuf, drakvuf_trap_info
         return vmi_read_str(vmi_lg.vmi, &ctx);
     }();
 
-    print_dns_info(drakvuf, info, sm, info->trap->name, dns_name);
+    print_dns_info(drakvuf, info, sm, dns_name);
     g_free(dns_name);
 
     return 0;
@@ -775,7 +627,7 @@ static event_response_t trap_DnsQueryEx_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
     if (domain_name_us)
     {
-        print_dns_info(drakvuf, info, sm, info->trap->name, (const char*)domain_name_us->contents);
+        print_dns_info(drakvuf, info, sm, (const char*)domain_name_us->contents);
     }
     else
     {

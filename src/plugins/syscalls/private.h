@@ -450,13 +450,10 @@ struct wrapper
      .args = (const arg_t*)&_name ## _arg                        \
    }
 
-void print_header(output_format_t format, drakvuf_t drakvuf,
-                  bool syscall, const drakvuf_trap_info_t* info,
-                  int nr, const char *module, const syscall_t *sc,
+void print_syscall(output_format_t format, drakvuf_t drakvuf,
+                  bool syscall, drakvuf_trap_info_t* info,
+                  int nr, uint32_t nargs, void* args_data, const char *module, syscalls *s, const syscall_t *sc,
                   uint64_t ret, const char *extra_info);
-void print_nargs(output_format_t format, uint32_t nargs);
-void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data);
-void print_footer(output_format_t format, uint32_t nargs, bool syscall);
 void free_trap(gpointer p);
 
 #endif // commoncsproto_h

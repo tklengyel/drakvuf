@@ -112,28 +112,15 @@
 namespace jsonfmt
 {
 
+constexpr char separator = ',';
+
+
 template <class T>
 constexpr bool print_data(std::ostream& os, const T& data, char sep);
 
 
 template<class T, std::size_t N>
-struct TuplePrinter
-{
-    static bool print(std::ostream& os, const T& data, char sep)
-    {
-        if constexpr (N > 0)
-        {
-            bool printed_prev = TuplePrinter<T, N-1>::print(os, data, sep);
-            if (printed_prev)
-                os << sep;
-            bool printed = print_data(os, std::get<N-1>(data), sep);
-            if (!printed && printed_prev)
-                fmt::unputc(os);
-            return printed;
-        }
-        return false;
-    }
-};
+struct TuplePrinter;
 
 template <class T, class = void, class...>
 struct DataPrinter
@@ -179,7 +166,9 @@ struct DataPrinter
     template <class Tv = T>
     static bool print(std::ostream& os, const fmt::Rstr<Tv>& data, char)
     {
-        os << data.value;
+        // raw string produces malformed json
+        // so force quoting it
+        os << std::quoted(data.value);
         return true;
     }
 
@@ -221,11 +210,13 @@ struct DataPrinter
             "Unsupported JSON printer key type");
 
         auto pos = os.tellp();
+        os << '{';
         if (print_data(os, fmt::Qstr(data.first), 0))
         {
             os << ':';
             if (print_data(os, data.second, ','))
             {
+                os << '}';
                 return true;
             }
         }
@@ -234,28 +225,76 @@ struct DataPrinter
     }
 
     template <class... Ts>
-    static bool print(std::ostream& os, const std::tuple<Ts...>& data, char sep)
+    static bool print(std::ostream& os, const std::variant<Ts...>& data, char sep)
     {
-        return TuplePrinter<decltype(data), sizeof...(Ts)>::print(os, data, sep);
+        return std::visit([&os, sep](auto&& arg) mutable
+        {
+            return print_data(os, arg, sep);
+        }, data);
     }
 };
 
 template <class T>
 struct DataPrinter<T, std::enable_if_t<is_iterable<T>::value, void>>
 {
-    static bool print(std::ostream& os, const T& data, char sep)
+    template <bool Mapped>
+    static bool print_values(std::ostream& os, const T& data, char sep)
     {
+        size_t printed_count = 0;
         bool printed = false;
         for (const auto& v : data)
         {
             bool printed_prev = printed;
             if (printed)
                 os << sep;
-            printed = print_data(os, v, sep);
+
+            if constexpr (Mapped)
+                printed = DataPrinter<T>::print(os, v, sep);
+            else
+                printed = print_data(os, v, sep);
+
+            if (printed)
+                ++printed_count;
+
             if (!printed && printed_prev)
                 fmt::unputc(os);
         }
+        return printed_count > 0;
+    }
+
+    static bool print(std::ostream& os, const T& data, char sep)
+    {
+        constexpr bool mapped = has_mapped_type<T>::value;
+        if constexpr (mapped)
+            os << '{';
+        else
+            os << '[';
+
+        print_values<mapped>(os, data, sep);
+
+        if constexpr (mapped)
+            os << '}';
+        else
+            os << ']';
+
         return true;
+    }
+
+    template <class Tk, class Tv>
+    static bool print(std::ostream& os, const std::pair<Tk, Tv>& data, char sep)
+    {
+        std::ostringstream ss;
+        bool printed = print_data(ss, data, sep);
+        if (printed)
+        {
+            const auto& str = ss.str();
+            if constexpr (has_mapped_type<T>::value)
+                os << str;
+            else
+                // remove {}
+                os << str.substr(1, str.size() - 2);
+        }
+        return printed;
     }
 };
 
@@ -287,6 +326,61 @@ constexpr bool print_data(std::ostream& os, const T& data, const Ts& ... rest)
 
 /**/
 
+using MapStub = std::map<int, int>;
+
+template<class T, std::size_t N>
+struct TuplePrinter
+{
+    static bool print(std::ostream& os, const T& data, char sep)
+    {
+        if constexpr (N > 0)
+        {
+            bool printed_prev = TuplePrinter<T, N-1>::print(os, data, sep);
+            if (printed_prev)
+                os << sep;
+            bool printed = DataPrinter<MapStub>::print(os, std::get<N-1>(data), sep);
+            if (!printed && printed_prev)
+                fmt::unputc(os);
+            return printed;
+        }
+        return false;
+    }
+};
+
+template <class... Tx, class... Ts>
+constexpr bool print_mapstub_data(std::ostream& os, const std::tuple<Tx...>& data, const Ts& ... rest)
+{
+    return TuplePrinter<decltype(data), sizeof...(Ts)>::print(os, data, separator);
+}
+
+template <class T, class... Ts>
+constexpr bool print_mapstub_data(std::ostream& os, const T& data, const Ts& ... rest)
+{
+    constexpr char sep = ',';
+    bool printed = false;
+    if constexpr (is_iterable<T>::value)
+    {
+        printed = DataPrinter<T>::print_values<true>(os, data, sep);
+    }
+    else
+    {
+        printed = DataPrinter<MapStub>::print(os, data, sep);
+    }
+    bool printed_rest = false;
+
+    if constexpr (sizeof...(rest) > 0)
+    {
+        if (printed)
+            os << sep;
+        printed_rest = print_mapstub_data(os, rest...);
+        if (!printed_rest && printed)
+            fmt::unputc(os);
+    }
+    return printed || printed_rest;
+}
+
+/**/
+
 inline void print_common_data(std::ostream& os, const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     if (info)
@@ -295,17 +389,17 @@ inline void print_common_data(std::ostream& os, const char* plugin_name, drakvuf
         if (info->trap->name)
             method = fmt::Qstr(info->trap->name);
 
-        print_data(os,
-                   keyval("Plugin", fmt::Qstr(plugin_name)),
-                   keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-                   keyval("PID", fmt::Nval(info->attached_proc_data.pid)),
-                   keyval("PPID", fmt::Nval(info->attached_proc_data.ppid)),
-                   keyval("TID", fmt::Nval(info->attached_proc_data.tid)),
-                   keyval("UserName", fmt::Qstr(USERIDSTR(drakvuf))),
-                   keyval("UserId", fmt::Nval(info->proc_data.userid)),
-                   keyval("ProcessName", fmt::Qstr(info->attached_proc_data.name)),
-                   keyval("Method", method)
-                  );
+        print_mapstub_data(os,
+                           keyval("Plugin", fmt::Qstr(plugin_name)),
+                           keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
+                           keyval("PID", fmt::Nval(info->attached_proc_data.pid)),
+                           keyval("PPID", fmt::Nval(info->attached_proc_data.ppid)),
+                           keyval("TID", fmt::Nval(info->attached_proc_data.tid)),
+                           keyval("UserName", fmt::Qstr(USERIDSTR(drakvuf))),
+                           keyval("UserId", fmt::Nval(info->proc_data.userid)),
+                           keyval("ProcessName", fmt::Qstr(info->attached_proc_data.name)),
+                           keyval("Method", method)
+                          );
     }
 }
 
@@ -326,7 +420,7 @@ void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info
         constexpr char sep = ',';
         if (printed)
             fmt::cout << sep;
-        if (!print_data(fmt::cout, args...))
+        if (!print_mapstub_data(fmt::cout, args...))
             fmt::unputc(fmt::cout);
     }
 
