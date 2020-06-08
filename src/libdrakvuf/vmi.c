@@ -619,6 +619,29 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     g_free( (gpointer)proc_data.name );
     g_free( (gpointer)attached_proc_data.name );
 
+    uint32_t count, tos, lbr_loop;
+    uint64_t from, to;
+
+    xc_monitor_get_lbr(drakvuf->xen->xc, drakvuf->domID, event->vcpu_id, ~0, &count, &tos, &from, &to);
+
+    printf("\t VM trapped to Xen with INT3 @ 0x%lx\n", event->interrupt_event.gla);
+    printf("\t LBR size: %u TOS: %u\n", count, tos);
+
+    lbr_loop = tos + 1;
+    do
+    {
+        if ( lbr_loop >= count )
+            lbr_loop = 0;
+
+        xc_monitor_get_lbr(drakvuf->xen->xc, drakvuf->domID, event->vcpu_id, lbr_loop, &count, &tos, &from, &to);
+        printf("\t LBR %u: 0x%lx -> 0x%lx\n", lbr_loop, from, to);
+
+        if ( lbr_loop == tos )
+            break;
+
+        lbr_loop++;
+    } while( 1 );
+
     process_free_requests(drakvuf);
 
     // Check if we have traps still active on this breakpoint
@@ -1565,6 +1588,8 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         return 0;
     }
     PRINT_DEBUG("Altp2m view X created with ID %u\n", drakvuf->altp2m_idx);
+
+    xc_monitor_enable_lbr(drakvuf->xen->xc, drakvuf->domID);
 
     /*
      * We will use the idr view to map all shadow pages to the sink page in case
