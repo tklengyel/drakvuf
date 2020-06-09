@@ -298,8 +298,8 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_
     {
         const char* method = info->trap->name ?: "";
         std::string procname = "\"";
-        procname += info->attached_proc_data.name;
-        procname += "\"";
+//XXX        procname += info->attached_proc_data.name;
+//XXX        procname += "\"";
 
         print_data(os,
                    keyval("TIME", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
