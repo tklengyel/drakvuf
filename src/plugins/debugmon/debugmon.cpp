@@ -160,7 +160,8 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     else
     {
-        fmt::print(s->format, "debugmon", drakvuf, info, tuple);
+//XXX
+//        fmt::print(s->format, "debugmon", drakvuf, info, tuple);
     }
 
     return 0;

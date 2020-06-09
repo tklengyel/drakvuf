@@ -182,7 +182,8 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
         else
         {
-            fmt::print(f->format, "bsodmon", drakvuf, info, tuple);
+//XXX
+//            fmt::print(f->format, "bsodmon", drakvuf, info, tuple);
         }
     }
 
