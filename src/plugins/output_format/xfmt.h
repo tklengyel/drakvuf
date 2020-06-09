@@ -123,7 +123,7 @@ void print(output_format_t format, const char* plugin_name, drakvuf_t drakvuf, d
             jsonfmt::print(plugin_name, drakvuf, info, args...);
             break;
         case OUTPUT_DEFAULT:
-            deffmt::print(plugin_name, drakvuf, info, args...);
+//XXX            deffmt::print(plugin_name, drakvuf, info, args...);
             break;
     }
 }
