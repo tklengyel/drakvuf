@@ -339,15 +339,16 @@ printout:
     }
     else
     {
-        fmt::print(plugin->m_output_format, "memdump", drakvuf, info,
-                   keyval("Reason", fmt::Qstr(reason)),
-                   keyval("Process", fmt::Nval(info->attached_proc_data.pid)),
-                   keyval("Base", fmt::Xval(ctx->addr)),
-                   keyval("Size", fmt::Nval(len_bytes)),
-                   keyval("File", fmt::Qstr(display_file)),
-                   keyval("TargetPID", target_pid),
-                   keyval("WriteAddr", write_addr)
-                  );
+//XXX
+//        fmt::print(plugin->m_output_format, "memdump", drakvuf, info,
+//                   keyval("Reason", fmt::Qstr(reason)),
+//                   keyval("Process", fmt::Nval(info->attached_proc_data.pid)),
+//                   keyval("Base", fmt::Xval(ctx->addr)),
+//                   keyval("Size", fmt::Nval(len_bytes)),
+//                   keyval("File", fmt::Qstr(display_file)),
+//                   keyval("TargetPID", target_pid),
+//                   keyval("WriteAddr", write_addr)
+//                  );
     }
 
 done:
