@@ -289,8 +289,8 @@ void print_syscall(output_format_t format, drakvuf_t drakvuf,
                     args_walker = ArgsWalker<defarg_t>(drakvuf, info, sc, args_data, s->reg_size, default_arg);
                 }
                 deffmt::print("syscall", drakvuf, info,
-                              keyval("Module", fmt::Rstr(module)),
-                              keyval("Arguments", args_walker)
+                              keyval("Module", fmt::Rstr(module))//,
+//                              keyval("Arguments", args_walker)
                              );
             }
             else
