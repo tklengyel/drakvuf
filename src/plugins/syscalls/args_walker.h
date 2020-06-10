@@ -112,7 +112,7 @@
 
 #include <functional>
 
-
+/*
 inline const char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
    if (arg.dir == DIR_IN || arg.dir == DIR_INOUT)
@@ -143,7 +143,7 @@ inline const char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
 
     return nullptr;
 }
-
+*/
 template <class R>
 class ArgsWalker
 {
@@ -161,7 +161,7 @@ public:
 
         R operator*() const
         {
-            return walker.arg_invoke(i);
+            return walker.arg_handler(nullptr, "xxx", 123);
         }
 
         bool operator!=(const Iterator& rhs) const
@@ -175,23 +175,14 @@ public:
             return *this;
         }
     };
-/*XXX
-    ArgsWalker()
-        : drakvuf(nullptr)
-        , info(nullptr)
-        , sc(nullptr)
-        , args_data(nullptr)
-        , reg_size(0)
-        , nargs(0)
-    {}
-*/
+
     ArgsWalker(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data, uint8_t reg_size, HandlerType&& handler)
         : drakvuf(drakvuf)
         , info(info)
         , sc(sc)
         , args_data(args_data)
         , reg_size(reg_size)
-        , nargs(args_data ? sc->num_args : 0)
+        , nargs(0)
         , arg_handler(std::forward<HandlerType>(handler))
     {}
 
@@ -203,31 +194,6 @@ public:
         return Iterator(nargs, *this);
     }
 
-    R arg_invoke(size_t i) const
-    {
-        return arg_handler(arg(i), arg_str(i), arg_val(i));
-    }
-
-private:
-    const arg_t* arg(size_t i) const
-    {
-        if (i >= nargs) return nullptr;
-        return &sc->args[i];
-    }
-
-    const char* arg_str(size_t i) const
-    {
-        if (i >= nargs) return nullptr;
-        return extract_string(drakvuf, info, sc->args[i], arg_val(i));
-    }
-
-    addr_t arg_val(size_t i) const
-    {
-        if (i >= nargs) return 0;
-        return reg_size == 4
-            ? static_cast<const uint32_t*>(args_data)[i]
-            : static_cast<const uint64_t*>(args_data)[i];
-    }
 
 private:
     drakvuf_t drakvuf;
@@ -236,7 +202,7 @@ private:
     const void* args_data;
     uint8_t reg_size;
     size_t nargs;
-
+public:
     HandlerType arg_handler;
 };
 

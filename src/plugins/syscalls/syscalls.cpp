@@ -165,6 +165,7 @@ using defarg_t = fmt::Rstr<std::string>;
 
 static defarg_t default_arg(const arg_t* arg, const char* str, addr_t val)
 {
+/*
     std::ostringstream ss;
 
     ss  << "\t"
@@ -183,6 +184,7 @@ static defarg_t default_arg(const arg_t* arg, const char* str, addr_t val)
     ss << "\n";
 
     return ss.str();
+*/  return std::string("qwe");
 }
 
 void print_syscall(output_format_t format, drakvuf_t drakvuf,
@@ -286,7 +288,7 @@ void print_syscall(output_format_t format, drakvuf_t drakvuf,
                 std::optional<ArgsWalker<defarg_t>> args_walker;
                 if (nargs)
                 {
-                    args_walker = ArgsWalker<defarg_t>(drakvuf, info, sc, args_data, 8/*s->reg_size*/, default_arg);
+                    args_walker = ArgsWalker<defarg_t>(drakvuf, info, sc, args_data, s->reg_size, default_arg);
                 }
                 deffmt::print("syscall", drakvuf, info,
                               keyval("Module", fmt::Rstr(module)),
