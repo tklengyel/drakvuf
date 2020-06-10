@@ -162,7 +162,7 @@ static jsonarg_t json_arg(const arg_t* arg, const char* str, addr_t val)
 }
 
 using defarg_t = fmt::Rstr<std::string>;
-/*XXX
+
 static defarg_t default_arg(const arg_t* arg, const char* str, addr_t val)
 {
     std::ostringstream ss;
@@ -184,7 +184,7 @@ static defarg_t default_arg(const arg_t* arg, const char* str, addr_t val)
 
     return ss.str();
 }
-*/
+
 void print_syscall(output_format_t format, drakvuf_t drakvuf,
                    bool syscall, drakvuf_trap_info_t* info,
                    int nr, uint32_t nargs, void* args_data, const char* module, syscalls* s, const syscall_t* sc,
@@ -286,7 +286,7 @@ void print_syscall(output_format_t format, drakvuf_t drakvuf,
                 std::optional<ArgsWalker<defarg_t>> args_walker;
                 if (nargs)
                 {
-//XXX                    args_walker = ArgsWalker<defarg_t>(drakvuf, info, sc, args_data, s->reg_size, default_arg);
+                    args_walker = ArgsWalker<defarg_t>(drakvuf, info, sc, args_data, 8/*s->reg_size*/, default_arg);
                 }
                 deffmt::print("syscall", drakvuf, info,
                               keyval("Module", fmt::Rstr(module)),
