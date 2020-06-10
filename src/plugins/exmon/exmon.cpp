@@ -247,8 +247,9 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     else
     {
         reg_t exception_record = 0;
-        reg_t exception_code;
-        uint64_t rip, rax, rbx, rcx, rdx, rsp, rbp, rsi, rdi, r8, r9, r10, r11;
+        reg_t exception_code = 0;
+        uint64_t rip = 0, rax = 0, rbx = 0, rcx = 0, rdx = 0, rsp = 0, rbp = 0, rsi = 0, rdi = 0;
+        uint64_t r8 = 0, r9 = 0, r10 = 0, r11 = 0;
 
         ctx.addr = info->regs->r8;
         if ( VMI_FAILURE == vmi_read(vmi, &ctx, e->ktrap_frame_size, trap_frame, NULL) )
@@ -285,21 +286,21 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         fmt::print(e->format, "exmon", drakvuf, info,
                    keyval("RSP", fmt::Nval(info->regs->rsp)),
                    keyval("ExceptionRecord", fmt::Xval(exception_record)),
-//                   keyval("ExceptionCode", fmt::Xval(exception_code)),
+                   keyval("ExceptionCode", fmt::Xval(exception_code)),
                    keyval("FirstChance", fmt::Nval(first_chance & 1)),
-//                   keyval("RIP", fmt::Xval(rip, false)),
-//                   keyval("RAX", fmt::Xval(rax, false)),
-//                   keyval("RBX", fmt::Xval(rbx, false)),
-//                   keyval("RCX", fmt::Xval(rcx, false)),
-//                   keyval("RDX", fmt::Xval(rdx, false)),
-//                   keyval("RDI", fmt::Xval(rdi, false)),
-//                   keyval("RSI", fmt::Xval(rsi, false)),
-//                   keyval("RBP", fmt::Xval(rbp, false)),
-//                   keyval("RSP", fmt::Xval(rsp, false)),
-//                   keyval("R8", fmt::Xval(r8, false)),
-//                   keyval("R9", fmt::Xval(r9, false)),
-//                   keyval("R10", fmt::Xval(r10, false)),
-//                   keyval("R11", fmt::Xval(r11, false)),
+                   keyval("RIP", fmt::Xval(rip, false)),
+                   keyval("RAX", fmt::Xval(rax, false)),
+                   keyval("RBX", fmt::Xval(rbx, false)),
+                   keyval("RCX", fmt::Xval(rcx, false)),
+                   keyval("RDX", fmt::Xval(rdx, false)),
+                   keyval("RDI", fmt::Xval(rdi, false)),
+                   keyval("RSI", fmt::Xval(rsi, false)),
+                   keyval("RBP", fmt::Xval(rbp, false)),
+                   keyval("RSP", fmt::Xval(rsp, false)),
+                   keyval("R8", fmt::Xval(r8, false)),
+                   keyval("R9", fmt::Xval(r9, false)),
+                   keyval("R10", fmt::Xval(r10, false)),
+                   keyval("R11", fmt::Xval(r11, false)),
                    keyval("Name", proc_name_opt)
                   );
     }
