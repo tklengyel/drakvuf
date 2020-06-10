@@ -278,7 +278,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         auto previous_mode = info->regs->r9 & 0xfful;
         if (previous_mode == 1)
             proc_name_opt = fmt::Qstr(info->attached_proc_data.base_addr ? info->attached_proc_data.name : "NOPROC");
-
+/*XXX
         fmt::print(e->format, "exmon", drakvuf, info,
                    keyval("RSP", fmt::Nval(info->regs->rsp)),
                    keyval("ExceptionRecord", fmt::Xval(info->regs->rcx)),
@@ -298,7 +298,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                    keyval("R10", fmt::Xval(r10, false)),
                    keyval("R11", fmt::Xval(r11, false)),
                    keyval("Name", proc_name_opt)
-                  );
+                  );*/
     }
 
 done:
