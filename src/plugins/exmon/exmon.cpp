@@ -281,8 +281,8 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         fmt::print(e->format, "exmon", drakvuf, info,
                    keyval("RSP", fmt::Nval(info->regs->rsp)),
-//                   keyval("ExceptionRecord", fmt::Xval(info->regs->rcx)),
-//                   keyval("ExceptionCode", fmt::Xval(exception_code)),
+                   keyval("ExceptionRecord", fmt::Xval(info->regs->rcx)),
+                   keyval("ExceptionCode", fmt::Xval(exception_code)),
                    keyval("FirstChance", fmt::Nval(first_chance & 1)),
 //                   keyval("RIP", fmt::Xval(rip, false)),
 //                   keyval("RAX", fmt::Xval(rax, false)),
