@@ -177,12 +177,11 @@ void librarymon::print_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, c
 
     if (m_output_format == OUTPUT_DEFAULT)
     {
-//XXX
-//        deffmt::print("librarymon", drakvuf, info,
-//                      keyval("EPROCESS", fmt::Xval(info->proc_data.base_addr)),
-//                      keyval("MODULE_NAME", fmt::Qstr(cname)),
-//                      keyval("MODULE_PATH", fmt::Qstr(cpath))
-//                     );
+        deffmt::print("librarymon", drakvuf, info,
+                      keyval("EPROCESS", fmt::Xval(info->proc_data.base_addr)),
+                      keyval("MODULE_NAME", fmt::Qstr(cname)),
+                      keyval("MODULE_PATH", fmt::Qstr(cpath))
+                     );
         return;
     }
     fmt::print(m_output_format, "librarymon", drakvuf, info,
