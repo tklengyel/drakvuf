@@ -290,8 +290,8 @@ void print_syscall(output_format_t format, drakvuf_t drakvuf,
                 }
                 deffmt::print("syscall", drakvuf, info,
                               keyval("Module", fmt::Rstr(module)),
-                              keyval("VCPU", fmt::Nval(info->vcpu)),
-                              keyval("CR3", fmt::Xval(info->regs->cr3))//XXX,
+                              keyval("VCPU", fmt::Nval(info->vcpu))//,
+//                              keyval("CR3", fmt::Xval(info->regs->cr3)),
 //                              keyval("Arguments", args_walker)
                              );
             }
