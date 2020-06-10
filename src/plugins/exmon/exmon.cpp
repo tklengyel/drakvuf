@@ -278,27 +278,27 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         auto previous_mode = info->regs->r9 & 0xfful;
         if (previous_mode == 1)
             proc_name_opt = fmt::Qstr(info->attached_proc_data.base_addr ? info->attached_proc_data.name : "NOPROC");
-/*XXX
+
         fmt::print(e->format, "exmon", drakvuf, info,
                    keyval("RSP", fmt::Nval(info->regs->rsp)),
-                   keyval("ExceptionRecord", fmt::Xval(info->regs->rcx)),
-                   keyval("ExceptionCode", fmt::Xval(exception_code)),
+//                   keyval("ExceptionRecord", fmt::Xval(info->regs->rcx)),
+//                   keyval("ExceptionCode", fmt::Xval(exception_code)),
                    keyval("FirstChance", fmt::Nval(first_chance & 1)),
-                   keyval("RIP", fmt::Xval(rip, false)),
-                   keyval("RAX", fmt::Xval(rax, false)),
-                   keyval("RBX", fmt::Xval(rbx, false)),
-                   keyval("RCX", fmt::Xval(rcx, false)),
-                   keyval("RDX", fmt::Xval(rdx, false)),
-                   keyval("RDI", fmt::Xval(rdi, false)),
-                   keyval("RSI", fmt::Xval(rsi, false)),
-                   keyval("RBP", fmt::Xval(rbp, false)),
-                   keyval("RSP", fmt::Xval(rsp, false)),
-                   keyval("R8", fmt::Xval(r8, false)),
-                   keyval("R9", fmt::Xval(r9, false)),
-                   keyval("R10", fmt::Xval(r10, false)),
-                   keyval("R11", fmt::Xval(r11, false)),
+//                   keyval("RIP", fmt::Xval(rip, false)),
+//                   keyval("RAX", fmt::Xval(rax, false)),
+//                   keyval("RBX", fmt::Xval(rbx, false)),
+//                   keyval("RCX", fmt::Xval(rcx, false)),
+//                   keyval("RDX", fmt::Xval(rdx, false)),
+//                   keyval("RDI", fmt::Xval(rdi, false)),
+//                   keyval("RSI", fmt::Xval(rsi, false)),
+//                   keyval("RBP", fmt::Xval(rbp, false)),
+//                   keyval("RSP", fmt::Xval(rsp, false)),
+//                   keyval("R8", fmt::Xval(r8, false)),
+//                   keyval("R9", fmt::Xval(r9, false)),
+//                   keyval("R10", fmt::Xval(r10, false)),
+//                   keyval("R11", fmt::Xval(r11, false)),
                    keyval("Name", proc_name_opt)
-                  );*/
+                  );
     }
 
 done:
