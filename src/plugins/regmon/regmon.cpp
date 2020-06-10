@@ -149,13 +149,12 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     if (reg->format == OUTPUT_DEFAULT)
     {
-//XXX
-//        deffmt::print("regmon", drakvuf, info,
-//                      keyval("EPROCESS", fmt::Xval(info->proc_data.base_addr)),
-//                      keyval("Key", fmt::Rstr(key_name)),
-//                      keyval("ValueName", value_name_opt),
-//                      keyval("Value", value_opt)
-//                     );
+        deffmt::print("regmon", drakvuf, info,
+                      keyval("EPROCESS", fmt::Xval(info->proc_data.base_addr)),
+                      keyval("Key", fmt::Rstr(key_name)),
+                      keyval("ValueName", value_name_opt),
+                      keyval("Value", value_opt)
+                     );
     }
     else
     {
