@@ -297,13 +297,13 @@ void print_syscall(output_format_t format, drakvuf_t drakvuf,
             }
             else
             {
-//                deffmt::print("sysret", drakvuf, info,
-//                              keyval("Module", fmt::Rstr(module)),
-//                              keyval("VCPU", fmt::Nval(info->vcpu)),
-//XXX                              keyval("CR3", fmt::Xval(info->regs->cr3)),
-//                              keyval("Ret", fmt::Nval(ret)),
-//                              keyval("Info", fmt::Rstr(extra_info ?: ""))
-//                             );
+                deffmt::print("sysret", drakvuf, info,
+                              keyval("Module", fmt::Rstr(module)),
+                              keyval("VCPU", fmt::Nval(info->vcpu)),
+                              keyval("CR3", fmt::Xval(info->regs->cr3)),
+                              keyval("Ret", fmt::Nval(ret)),
+                              keyval("Info", fmt::Rstr(extra_info ?: ""))
+                             );
             }
             break;
     }
