@@ -246,6 +246,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     else
     {
+        reg_t exception_record = 0;
         reg_t exception_code;
         uint64_t rip, rax, rbx, rcx, rdx, rsp, rbp, rsi, rdi, r8, r9, r10, r11;
 
@@ -279,7 +280,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         if (previous_mode == 1)
             proc_name_opt = fmt::Qstr(info->attached_proc_data.base_addr ? info->attached_proc_data.name : "NOPROC");
 
-        reg_t exception_record = info->regs->rcx;
+        exception_record = info->regs->rcx;
 
         fmt::print(e->format, "exmon", drakvuf, info,
                    keyval("RSP", fmt::Nval(info->regs->rsp)),
