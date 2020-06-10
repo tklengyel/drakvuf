@@ -288,22 +288,22 @@ void print_syscall(output_format_t format, drakvuf_t drakvuf,
                 {
                     args_walker = ArgsWalker<defarg_t>(drakvuf, info, sc, args_data, s->reg_size, default_arg);
                 }
-                deffmt::print("syscall", drakvuf, info,
-                              keyval("Module", fmt::Rstr(module)),
-                              keyval("VCPU", fmt::Nval(info->vcpu)),
+//                deffmt::print("syscall", drakvuf, info,
+//                              keyval("Module", fmt::Rstr(module)),
+//                              keyval("VCPU", fmt::Nval(info->vcpu)),
 //XXX                              keyval("CR3", fmt::Xval(info->regs->cr3)),
-                              keyval("Arguments", args_walker)
-                             );
+//                              keyval("Arguments", args_walker)
+//                             );
             }
             else
             {
-                deffmt::print("sysret", drakvuf, info,
-                              keyval("Module", fmt::Rstr(module)),
-                              keyval("VCPU", fmt::Nval(info->vcpu)),
+//                deffmt::print("sysret", drakvuf, info,
+//                              keyval("Module", fmt::Rstr(module)),
+//                              keyval("VCPU", fmt::Nval(info->vcpu)),
 //XXX                              keyval("CR3", fmt::Xval(info->regs->cr3)),
-                              keyval("Ret", fmt::Nval(ret)),
-                              keyval("Info", fmt::Rstr(extra_info ?: ""))
-                             );
+//                              keyval("Ret", fmt::Nval(ret)),
+//                              keyval("Info", fmt::Rstr(extra_info ?: ""))
+//                             );
             }
             break;
     }
