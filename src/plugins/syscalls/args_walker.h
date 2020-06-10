@@ -175,7 +175,7 @@ public:
             return *this;
         }
     };
-
+/*XXX
     ArgsWalker()
         : drakvuf(nullptr)
         , info(nullptr)
@@ -184,7 +184,7 @@ public:
         , reg_size(0)
         , nargs(0)
     {}
-
+*/
     ArgsWalker(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data, uint8_t reg_size, HandlerType&& handler)
         : drakvuf(drakvuf)
         , info(info)
