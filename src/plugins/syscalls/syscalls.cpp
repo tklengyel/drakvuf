@@ -162,11 +162,11 @@ static jsonarg_t json_arg(const arg_t* arg, const char* str, addr_t val)
 }
 
 using defarg_t = fmt::Rstr<std::string>;
-
+/*XXX
 static defarg_t default_arg(const arg_t* arg, const char* str, addr_t val)
 {
     std::ostringstream ss;
-/*
+
     ss  << "\t"
         << arg_direction_names[arg->dir]
         << " "
@@ -175,7 +175,7 @@ static defarg_t default_arg(const arg_t* arg, const char* str, addr_t val)
         << arg->name
         << ": "
         << std::showbase << std::hex << val;
-*/
+
     if (str)
     {
         ss << " -> '" << str << "'";
@@ -184,7 +184,7 @@ static defarg_t default_arg(const arg_t* arg, const char* str, addr_t val)
 
     return ss.str();
 }
-
+*/
 void print_syscall(output_format_t format, drakvuf_t drakvuf,
                    bool syscall, drakvuf_trap_info_t* info,
                    int nr, uint32_t nargs, void* args_data, const char* module, syscalls* s, const syscall_t* sc,
