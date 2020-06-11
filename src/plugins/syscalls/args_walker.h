@@ -202,9 +202,8 @@ public:
 private:
     const arg_t* arg(size_t i) const
     {
-        return nullptr;
-//        if (i >= nargs) return nullptr;
-//        return &sc->args[i];
+        if (i >= nargs) return nullptr;
+        return &sc->args[i];
     }
 
     const char* arg_str(size_t i) const
@@ -216,11 +215,10 @@ private:
 
     addr_t arg_val(size_t i) const
     {
-        return 0;
-//        if (i >= nargs) return 0;
-//        return reg_size == 4
-//            ? static_cast<const uint32_t*>(args_data)[i]
-//            : static_cast<const uint64_t*>(args_data)[i];
+        if (i >= nargs) return 0;
+        return reg_size == 4
+            ? static_cast<const uint32_t*>(args_data)[i]
+            : static_cast<const uint64_t*>(args_data)[i];
     }
 
 private:
