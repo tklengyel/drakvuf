@@ -196,7 +196,7 @@ public:
 
     R arg_invoke(size_t i) const
     {
-        return walker.arg_handler(nullptr, "", 0);
+        return arg_handler(nullptr, "", 0);
 //        return arg_handler(arg(i), arg_str(i), arg_val(i));
     }
 
