@@ -179,6 +179,9 @@ public:
     ArgsWalker(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data, uint8_t reg_size, HandlerType&& handler)
         : drakvuf(drakvuf)
         , info(info)
+        , sc(sc)
+        , args_data(args_data)
+        , reg_size(reg_size)
         , arg_handler(std::forward<HandlerType>(handler))
     {}
 
@@ -193,6 +196,9 @@ public:
 private:
     drakvuf_t drakvuf;
     drakvuf_trap_info_t* info;
+    const syscall_t* sc;
+    const void* args_data;
+    uint8_t reg_size;
 
 public:
     HandlerType arg_handler;
