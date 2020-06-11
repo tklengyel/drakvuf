@@ -191,7 +191,7 @@ public:
     }
 
     Iterator end() const {
-        return Iterator(nargs, *this);
+        return Iterator(0/*nargs*/, *this);
     }
 
     R arg_invoke(size_t i) const
@@ -202,8 +202,9 @@ public:
 private:
     const arg_t* arg(size_t i) const
     {
-        if (i >= nargs) return nullptr;
-        return &sc->args[i];
+        return nullptr;
+//        if (i >= nargs) return nullptr;
+//        return &sc->args[i];
     }
 
     const char* arg_str(size_t i) const
