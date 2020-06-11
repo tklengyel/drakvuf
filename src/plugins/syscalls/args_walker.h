@@ -191,7 +191,7 @@ public:
     }
 
     Iterator end() const {
-        return Iterator(0/*nargs*/, *this);
+        return Iterator(nargs, *this);
     }
 
     R arg_invoke(size_t i) const
