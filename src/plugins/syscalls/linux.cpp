@@ -222,7 +222,8 @@ static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     const syscall_t *sc = w->num < NUM_SYSCALLS_LINUX ? linuxsc::linux_syscalls[w->num] : NULL;
 
-    print_syscall(s->format, drakvuf, false, info, w->num, 0, NULL, info->trap->breakpoint.module, s, sc, info->regs->rax, NULL);
+    print_header(s->format, drakvuf, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, NULL);
+    print_footer(s->format, 0, false);
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
     s->traps = g_slist_remove(s->traps, info->trap);
@@ -276,7 +277,13 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         nargs = 0;
     }
 
-    print_syscall(s->format, drakvuf, true, info, nr, nargs, buf, info->trap->breakpoint.module, s, sc, 0, NULL);
+    print_header(s->format, drakvuf, true, info, nr, info->trap->breakpoint.module, sc, 0, NULL);
+    if ( nargs )
+    {
+        print_nargs(s->format, nargs);
+        print_args(s, drakvuf, info, sc, buf);
+    }
+    print_footer(s->format, nargs, true);
 
     struct wrapper *wr = g_slice_new0(struct wrapper);
     wr->s = s;
@@ -292,7 +299,6 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     ret_trap->type = BREAKPOINT;
     ret_trap->cb = linux_ret_cb;
     ret_trap->data = wr;
-    ret_trap->name = nullptr;
 
     if ( drakvuf_add_trap(drakvuf, ret_trap) )
        s->traps = g_slist_prepend(s->traps, ret_trap);
@@ -338,7 +344,6 @@ void setup_linux(drakvuf_t drakvuf, syscalls *s)
     trap->type = BREAKPOINT;
     trap->cb = linux_cb;
     trap->data = w;
-    trap->name = nullptr;
 
     if ( drakvuf_add_trap(drakvuf, trap) )
         s->traps = g_slist_prepend(s->traps, trap);

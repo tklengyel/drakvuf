@@ -134,7 +134,8 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!exit_status_str)
         exit_status_str = ntstatus_format_string(ntstatus_t(info->regs->rax), exit_status_buf, sizeof(exit_status_buf));
 
-    print_syscall(s->format, drakvuf, false, info, w->num, 0, NULL, info->trap->breakpoint.module, s, sc, info->regs->rax, exit_status_str);
+    print_header(s->format, drakvuf, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, exit_status_str);
+    print_footer(s->format, 0, false);
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
     s->traps = g_slist_remove(s->traps, info->trap);
@@ -203,7 +204,13 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
-    print_syscall(s->format, drakvuf, true, info, w->num, nargs, buf, w->type, s, sc, 0, NULL);
+    print_header(s->format, drakvuf, true, info, w->num, w->type, sc, 0, NULL);
+    if ( nargs )
+    {
+        print_nargs(s->format, nargs);
+        print_args(s, drakvuf, info, sc, buf);
+    }
+    print_footer(s->format, nargs, true);
     g_free(buf);
 
     addr_t ret = 0;
@@ -224,7 +231,6 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     ret_trap->type = BREAKPOINT;
     ret_trap->cb = ret_cb;
     ret_trap->data = (void*)wr;
-    ret_trap->name = nullptr;
 
     if ( drakvuf_add_trap(drakvuf, ret_trap) )
         s->traps = g_slist_prepend(s->traps, ret_trap);
@@ -313,7 +319,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
 
         if ( s->filter && ( !symbol || !g_hash_table_contains(s->filter, symbol->name) ) )
         {
-            PRINT_DEBUG("Syscall %s filtered out by syscalls filter file\n", symbol ? symbol->name : "<unknown>");
+            PRINT_DEBUG("Syscall %s filtered out by syscalls filter file\n", symbol ? symbol->name : "<unknowm>");
             continue;
         }
 
@@ -332,7 +338,6 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
         trap->type = BREAKPOINT;
         trap->cb = syscall_cb;
         trap->data = w;
-        trap->name = nullptr;
 
         if ( drakvuf_add_trap(drakvuf, trap) )
             s->traps = g_slist_prepend(s->traps, trap);
