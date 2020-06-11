@@ -209,8 +209,8 @@ private:
     const char* arg_str(size_t i) const
     {
         return "";
-//        if (i >= nargs) return nullptr;
-//        return extract_string(drakvuf, info, sc->args[i], arg_val(i));
+        if (i >= nargs) return nullptr;
+        return extract_string(drakvuf, info, sc->args[i], arg_val(i));
     }
 
     addr_t arg_val(size_t i) const
@@ -228,7 +228,7 @@ private:
     const void* args_data;
     uint8_t reg_size;
     size_t nargs;
-public:
+
     HandlerType arg_handler;
 };
 
