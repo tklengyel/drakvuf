@@ -161,7 +161,8 @@ public:
 
         R operator*() const
         {
-            return walker.arg_invoke(i);
+            return walker.arg_handler(nullptr, "", 0);
+//            return walker.arg_invoke(i);
         }
 
         bool operator!=(const Iterator& rhs) const
@@ -230,7 +231,7 @@ private:
     const void* args_data;
     uint8_t reg_size;
     size_t nargs;
-
+public:
     HandlerType arg_handler;
 };
 
