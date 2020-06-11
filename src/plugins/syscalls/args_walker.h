@@ -214,10 +214,11 @@ private:
 
     addr_t arg_val(size_t i) const
     {
-        if (i >= nargs) return 0;
-        return reg_size == 4
-            ? static_cast<const uint32_t*>(args_data)[i]
-            : static_cast<const uint64_t*>(args_data)[i];
+return 0;
+//        if (i >= nargs) return 0;
+//        return reg_size == 4
+//            ? static_cast<const uint32_t*>(args_data)[i]
+//            : static_cast<const uint64_t*>(args_data)[i];
     }
 
 private:
