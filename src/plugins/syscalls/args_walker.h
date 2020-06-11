@@ -182,6 +182,7 @@ public:
         , sc(sc)
         , args_data(args_data)
         , reg_size(reg_size)
+        , nargs(args_data ? sc->num_args : 0)
         , arg_handler(std::forward<HandlerType>(handler))
     {}
 
@@ -199,6 +200,7 @@ private:
     const syscall_t* sc;
     const void* args_data;
     uint8_t reg_size;
+    size_t nargs;
 
 public:
     HandlerType arg_handler;
