@@ -177,7 +177,9 @@ public:
     };
 
     ArgsWalker(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data, uint8_t reg_size, HandlerType&& handler)
-        : arg_handler(std::forward<HandlerType>(handler))
+        : drakvuf(drakvuf)
+        , info(info)
+        , arg_handler(std::forward<HandlerType>(handler))
     {}
 
     Iterator begin() const {
@@ -188,6 +190,9 @@ public:
         return Iterator(0, *this);
     }
 
+private:
+    drakvuf_t drakvuf;
+    drakvuf_trap_info_t* info;
 
 public:
     HandlerType arg_handler;
