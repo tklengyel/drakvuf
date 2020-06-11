@@ -208,7 +208,6 @@ private:
 
     const char* arg_str(size_t i) const
     {
-        return "";
         if (i >= nargs) return nullptr;
         return extract_string(drakvuf, info, sc->args[i], arg_val(i));
     }
