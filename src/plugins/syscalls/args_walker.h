@@ -196,8 +196,7 @@ public:
 
     R arg_invoke(size_t i) const
     {
-        return arg_handler(nullptr, "", 0);
-//        return arg_handler(arg(i), arg_str(i), arg_val(i));
+        return arg_handler(arg(i), ""/*arg_str(i)*/, 0/*arg_val(i)*/);
     }
 
 private:
