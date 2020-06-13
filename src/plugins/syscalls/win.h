@@ -3944,7 +3944,14 @@ SYSCALL(NtUserSetWindowShowState, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowStationUser, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowWord, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowsHookAW, NTSTATUS, 0);
-SYSCALL(NtUserSetWindowsHookEx, NTSTATUS, 0);
+SYSCALL(NtUserSetWindowsHookEx, HHOOK, 6,
+		"Mod", "", DIR_IN, HINSTANCE,
+		"UnsafeModuleName", "", DIR_IN, PUNICODE_STRING,
+		"ThreadId", "", DIR_IN, DWORD,
+		"HookId", "", DIR_IN, INT,
+		"HookProc", "", DIR_IN, HOOKPROC,
+		"Ansi", "", DIR_IN, BOOLEAN,
+);
 SYSCALL(NtUserSfmDestroyLogicalSurfaceBinding, NTSTATUS, 0);
 SYSCALL(NtUserSfmDxBindSwapChain, NTSTATUS, 0);
 SYSCALL(NtUserSfmDxGetSwapChainStats, NTSTATUS, 0);
