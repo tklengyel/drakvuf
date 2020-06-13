@@ -711,14 +711,14 @@ static event_response_t chown_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* in
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+/*
+Commented as kernel symbol varies with distros.
 static event_response_t utimes_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    /*
-    static int utimes_common(
-        const struct path *path,
-        struct timespec64 *times
-    )
-    */
+    // static int utimes_common(
+    //     const struct path *path,
+    //     struct timespec64 *times
+    // )
 
     PRINT_DEBUG("Filetracer Callback : %s \n", info->trap->name);
     struct linux_wrapper* lw = new linux_wrapper;
@@ -746,6 +746,7 @@ static event_response_t utimes_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     delete lw;
     return VMI_EVENT_RESPONSE_NONE;
 }
+*/
 
 static event_response_t access_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -1016,7 +1017,7 @@ linux_filetracer::linux_filetracer(drakvuf_t drakvuf, output_format_t output)
     // File Attributes
     register_trap(drakvuf, "chmod_common", &trap[10], chmod_file_cb);
     register_trap(drakvuf, "chown_common", &trap[11], chown_file_cb);
-    register_trap(drakvuf, "utimes_common.isra.0", &trap[12], utimes_file_cb);
+    // register_trap(drakvuf, "utimes_common.isra.0", &trap[12], utimes_file_cb);
     register_trap(drakvuf, "do_faccessat", &trap[13], access_file_cb);
 
     // Directory Operations
