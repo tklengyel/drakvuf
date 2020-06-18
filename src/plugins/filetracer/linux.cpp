@@ -536,11 +536,11 @@ static event_response_t llseek_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 /*
 static event_response_t memfd_create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    
+
     // int memfd_create(
     //     const char __user *uname,
     //     unsigned int flags
-    // )    
+    // )
 
     PRINT_DEBUG("Filetracer Callback : %s \n", info->trap->name);
     struct linux_wrapper* lw = new linux_wrapper;
@@ -945,13 +945,13 @@ static event_response_t symbolic_link_file_cb(drakvuf_t drakvuf, drakvuf_trap_in
 /*
 static event_response_t read_link_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    
+
     // int vfs_readlink(
     //     struct dentry *dentry,
     //     char __user *buffer,
     //     int buflen
     // )
-    
+
 
     PRINT_DEBUG("Filetracer Callback : %s \n", info->trap->name);
     struct linux_wrapper* lw = new linux_wrapper;
