@@ -533,14 +533,14 @@ static event_response_t llseek_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+/*
 static event_response_t memfd_create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    /*
-    int memfd_create(
-        const char __user *uname,
-        unsigned int flags
-    )
-    */
+    
+    // int memfd_create(
+    //     const char __user *uname,
+    //     unsigned int flags
+    // )    
 
     PRINT_DEBUG("Filetracer Callback : %s \n", info->trap->name);
     struct linux_wrapper* lw = new linux_wrapper;
@@ -553,6 +553,7 @@ static event_response_t memfd_create_file_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     delete lw;
     return VMI_EVENT_RESPONSE_NONE;
 }
+*/
 
 static event_response_t mknod_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -746,17 +747,16 @@ static event_response_t utimes_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     delete lw;
     return VMI_EVENT_RESPONSE_NONE;
 }
-*/
+
 
 static event_response_t access_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    /*
-    long do_faccessat(
-        int dfd,
-        const char __user *filename,
-        int mode
-    )
-    */
+
+    // long do_faccessat(
+    //     int dfd,
+    //     const char __user *filename,
+    //     int mode
+    // )
 
     PRINT_DEBUG("Filetracer Callback : %s \n", info->trap->name);
     struct linux_wrapper* lw = new linux_wrapper;
@@ -770,6 +770,7 @@ static event_response_t access_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     delete lw;
     return VMI_EVENT_RESPONSE_NONE;
 }
+*/
 
 // /* ---------------DIRECTORY OPERATIONS CALLBACK--------- */
 
@@ -941,15 +942,16 @@ static event_response_t symbolic_link_file_cb(drakvuf_t drakvuf, drakvuf_trap_in
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+/*
 static event_response_t read_link_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    /*
-    int vfs_readlink(
-        struct dentry *dentry,
-        char __user *buffer,
-        int buflen
-    )
-    */
+    
+    // int vfs_readlink(
+    //     struct dentry *dentry,
+    //     char __user *buffer,
+    //     int buflen
+    // )
+    
 
     PRINT_DEBUG("Filetracer Callback : %s \n", info->trap->name);
     struct linux_wrapper* lw = new linux_wrapper;
@@ -963,6 +965,7 @@ static event_response_t read_link_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     delete lw;
     return VMI_EVENT_RESPONSE_NONE;
 }
+*/
 
 /* ----------------------------------------------------- */
 
@@ -1008,7 +1011,7 @@ linux_filetracer::linux_filetracer(drakvuf_t drakvuf, output_format_t output)
     register_trap(drakvuf, "vfs_write", &trap[2], write_file_cb);
     register_trap(drakvuf, "filp_close", &trap[3], close_file_cb);
     register_trap(drakvuf, "vfs_llseek", &trap[4], llseek_file_cb);
-    register_trap(drakvuf, "__x64_sys_memfd_create", &trap[5], memfd_create_file_cb);
+    // register_trap(drakvuf, "__x64_sys_memfd_create", &trap[5], memfd_create_file_cb);
     register_trap(drakvuf, "vfs_mknod", &trap[6], mknod_file_cb);
     register_trap(drakvuf, "vfs_rename", &trap[7], rename_file_cb);
     register_trap(drakvuf, "do_truncate", &trap[8], truncate_file_cb);
@@ -1018,7 +1021,7 @@ linux_filetracer::linux_filetracer(drakvuf_t drakvuf, output_format_t output)
     register_trap(drakvuf, "chmod_common", &trap[10], chmod_file_cb);
     register_trap(drakvuf, "chown_common", &trap[11], chown_file_cb);
     // register_trap(drakvuf, "utimes_common.isra.0", &trap[12], utimes_file_cb);
-    register_trap(drakvuf, "do_faccessat", &trap[13], access_file_cb);
+    // register_trap(drakvuf, "do_faccessat", &trap[13], access_file_cb);
 
     // Directory Operations
     register_trap(drakvuf, "vfs_mkdir", &trap[14], mkdir_cb);
@@ -1030,7 +1033,7 @@ linux_filetracer::linux_filetracer(drakvuf_t drakvuf, output_format_t output)
     register_trap(drakvuf, "vfs_link", &trap[18], link_file_cb);
     register_trap(drakvuf, "vfs_unlink", &trap[19], unlink_file_cb);
     register_trap(drakvuf, "vfs_symlink", &trap[20], symbolic_link_file_cb);
-    register_trap(drakvuf, "vfs_readlink", &trap[21], read_link_cb);
+    // register_trap(drakvuf, "vfs_readlink", &trap[21], read_link_cb);
 }
 
 linux_filetracer::~linux_filetracer()

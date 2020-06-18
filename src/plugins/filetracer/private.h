@@ -555,7 +555,7 @@ enum
     _DENTRY_D_NAME,
     _DENTRY_D_INODE,
     _QSTR_NAME,
-    _TIMESPEC64_TV_SEC,
+    // _TIMESPEC64_TV_SEC,
 
     __LINUX_OFFSET_MAX,
 };
@@ -576,7 +576,7 @@ static const char* linux_offset_names[__OFFSET_MAX][2] =
     [_DENTRY_D_NAME] = {"dentry", "d_name"},
     [_DENTRY_D_INODE] = {"dentry", "d_inode"},
     [_QSTR_NAME] = {"qstr", "name"},
-    [_TIMESPEC64_TV_SEC] = {"timespec64", "tv_sec"},
+    // [_TIMESPEC64_TV_SEC] = {"timespec64", "tv_sec"},
 };
 
 // Linux Inode Flags
