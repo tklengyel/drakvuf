@@ -442,6 +442,7 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
     this->kernel_base = drakvuf_get_kernel_base(drakvuf);
     this->reg_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
     this->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    this->disable_sysret = c->disable_sysret;
 
     if ( c->syscalls_filter_file )
         this->filter = read_syscalls_filter(c->syscalls_filter_file);
