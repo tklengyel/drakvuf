@@ -106,7 +106,7 @@
 #include <libvmi/libvmi.h>
 
 #include "exmon.h"
-#include "private.h"
+#include "plugins/output_format.h"
 
 enum offset
 {
@@ -161,41 +161,10 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [KTRAP_FRAME_R11] = {"_KTRAP_FRAME", "R11"},
 };
 
-static void print_program_info(uint8_t previous_mode, char const* user_format, drakvuf_trap_info_t* info)
-{
-    exmon* e = (exmon*)info->trap->data;
-    if (previous_mode == 1)
-    {
-        if (info->attached_proc_data.base_addr)
-        {
-            const char* escaped_pname = info->attached_proc_data.name;
-            if (e->format == OUTPUT_JSON)
-            {
-                escaped_pname = (const char*)drakvuf_escape_str (info->attached_proc_data.name);
-            }
-            printf(user_format, info->attached_proc_data.pid, info->attached_proc_data.ppid, escaped_pname);
-            if (e->format == OUTPUT_JSON)
-            {
-                g_free ((void*) escaped_pname);
-            }
-        }
-        else printf(user_format, 0, 0, "NOPROC");
-    }
-    else
-    {
-        if (e->format == OUTPUT_JSON)
-            printf("}");
-
-        printf("\n");
-    }
-}
-
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     exmon* e = (exmon*)info->trap->data;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    const char* str_format;
-    const char* user_format;
     uint32_t first_chance;
     char* trap_frame=(char*)g_try_malloc0(e->ktrap_frame_size);  // Generic pointer that allows addressing byte-aligned offests
 
@@ -210,6 +179,8 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     memset(&ctx, 0, sizeof(access_context_t));
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
+
+    std::optional<fmt::Qstr<const char*>> proc_name_opt;
 
     if (e->pm != VMI_PM_IA32E)
     {
@@ -253,41 +224,32 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         memcpy(&ebp, trap_frame+e->offsets[KTRAP_FRAME_EBP], sizeof(uint32_t));
         memcpy(&hwesp, trap_frame+e->offsets[KTRAP_FRAME_HWESP], sizeof(uint32_t));
 
-        switch (e->format)
-        {
-            case OUTPUT_CSV:
-                str_format=CSV_FORMAT32;
-                user_format=CSV_FORMAT_USER;
-                break;
-            case OUTPUT_KV:
-                str_format=KV_FORMAT32;
-                user_format=KV_FORMAT_USER;
-                break;
-            case OUTPUT_JSON:
-                str_format=JSON_FORMAT32;
-                user_format=JSON_FORMAT_USER;
-                break;
-            default:
-            case OUTPUT_DEFAULT:
-                str_format=DEFAULT_FORMAT32;
-                user_format=DEFAULT_FORMAT_USER;
-                break;
-        }
+        if (previous_mode == 1)
+            proc_name_opt = fmt::Qstr(info->attached_proc_data.base_addr ? info->attached_proc_data.name : "NOPROC");
 
-        printf(str_format,
-               UNPACK_TIMEVAL(info->timestamp),
-               (uint32_t)info->regs->rsp,
-               (uint32_t)exception_record,
-               (uint32_t)exception_code,
-               (uint32_t)first_chance,
-               eip, eax, ebx, ecx, edx, edi, esi, ebp, hwesp);
-
-        print_program_info(previous_mode, user_format, info);
+        fmt::print(e->format, "exmon", drakvuf, info,
+                   keyval("RSP", fmt::Xval(info->regs->rsp, false)),
+                   keyval("ExceptionRecord", fmt::Xval(exception_record)),
+                   keyval("ExceptionCode", fmt::Xval(exception_code)),
+                   keyval("FirstChance", fmt::Nval(first_chance)),
+                   keyval("EIP", fmt::Xval(eip, false)),
+                   keyval("EAX", fmt::Xval(eax, false)),
+                   keyval("EBX", fmt::Xval(ebx, false)),
+                   keyval("ECX", fmt::Xval(ecx, false)),
+                   keyval("EDX", fmt::Xval(edx, false)),
+                   keyval("EDI", fmt::Xval(edi, false)),
+                   keyval("ESI", fmt::Xval(esi, false)),
+                   keyval("EBP", fmt::Xval(ebp, false)),
+                   keyval("ESP", fmt::Xval(hwesp, false)),
+                   keyval("Name", proc_name_opt)
+                  );
     }
     else
     {
-        reg_t exception_code;
-        uint64_t rip, rax, rbx, rcx, rdx, rsp, rbp, rsi, rdi, r8, r9, r10, r11;
+        reg_t exception_record = 0;
+        reg_t exception_code = 0;
+        uint64_t rip = 0, rax = 0, rbx = 0, rcx = 0, rdx = 0, rsp = 0, rbp = 0, rsi = 0, rdi = 0;
+        uint64_t r8 = 0, r9 = 0, r10 = 0, r11 = 0;
 
         ctx.addr = info->regs->r8;
         if ( VMI_FAILURE == vmi_read(vmi, &ctx, e->ktrap_frame_size, trap_frame, NULL) )
@@ -315,33 +277,32 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         memcpy(&r10, trap_frame+e->offsets[KTRAP_FRAME_R10], sizeof(uint64_t));
         memcpy(&r11, trap_frame+e->offsets[KTRAP_FRAME_R11], sizeof(uint64_t));
 
-        switch (e->format)
-        {
-            case OUTPUT_CSV:
-                str_format=CSV_FORMAT64;
-                user_format=CSV_FORMAT_USER;
-                break;
-            case OUTPUT_KV:
-                str_format=KV_FORMAT64;
-                user_format=KV_FORMAT_USER;
-                break;
-            case OUTPUT_JSON:
-                str_format=JSON_FORMAT64;
-                user_format=JSON_FORMAT_USER;
-                break;
-            default:
-            case OUTPUT_DEFAULT:
-                str_format=DEFAULT_FORMAT64;
-                user_format=DEFAULT_FORMAT_USER;
-                break;
-        }
+        auto previous_mode = info->regs->r9 & 0xfful;
+        if (previous_mode == 1)
+            proc_name_opt = fmt::Qstr(info->attached_proc_data.base_addr ? info->attached_proc_data.name : "NOPROC");
 
-        printf(str_format,
-               UNPACK_TIMEVAL(info->timestamp),
-               info->regs->rcx, exception_code, first_chance & 1,
-               rip, rax, rbx, rcx, rdx, rsp, rbp, rsi, rdi, r8, r9, r10, r11);
+        exception_record = info->regs->rcx;
 
-        print_program_info((uint8_t)(info->regs->r9), user_format, info);
+        fmt::print(e->format, "exmon", drakvuf, info,
+                   keyval("RSP", fmt::Nval(info->regs->rsp)),
+                   keyval("ExceptionRecord", fmt::Xval(exception_record)),
+                   keyval("ExceptionCode", fmt::Xval(exception_code)),
+                   keyval("FirstChance", fmt::Nval(first_chance & 1)),
+                   keyval("RIP", fmt::Xval(rip, false)),
+                   keyval("RAX", fmt::Xval(rax, false)),
+                   keyval("RBX", fmt::Xval(rbx, false)),
+                   keyval("RCX", fmt::Xval(rcx, false)),
+                   keyval("RDX", fmt::Xval(rdx, false)),
+                   keyval("RDI", fmt::Xval(rdi, false)),
+                   keyval("RSI", fmt::Xval(rsi, false)),
+                   keyval("RBP", fmt::Xval(rbp, false)),
+                   keyval("RSP", fmt::Xval(rsp, false)),
+                   keyval("R8", fmt::Xval(r8, false)),
+                   keyval("R9", fmt::Xval(r9, false)),
+                   keyval("R10", fmt::Xval(r10, false)),
+                   keyval("R11", fmt::Xval(r11, false)),
+                   keyval("Name", proc_name_opt)
+                  );
     }
 
 done:

@@ -105,6 +105,7 @@
 #include <libvmi/libvmi.h>
 
 #include "dkommon.h"
+#include "plugins/output_format.h"
 
 #include <algorithm>
 
@@ -131,45 +132,9 @@ static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_inf
 {
     dkommon* d = static_cast<dkommon*>(info->trap->data);
 
-    gchar* escaped_pname = NULL;
-
-    switch (d->format)
-    {
-        case OUTPUT_CSV:
-            printf("dkommon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"Hidden Process\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid);
-            break;
-        case OUTPUT_KV:
-            printf("dkommon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Message=\"Hidden Process\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"dkommon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Message\": \"Hidden Process\""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid);
-
-            g_free(escaped_pname);
-            break;
-
-        case OUTPUT_DEFAULT:
-        default:
-            printf("[DKOMMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " MESSAGE:\"Hidden Process\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, USERIDSTR(drakvuf), info->attached_proc_data.userid);
-            break;
-    }
+    fmt::print(d->format, "dkommon", drakvuf, info,
+               keyval("Message", fmt::Qstr("Hidden Process"))
+              );
 }
 
 static event_response_t check_hidden_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -219,93 +184,19 @@ static event_response_t notify_zero_page_write(drakvuf_t drakvuf, drakvuf_trap_i
 {
     dkommon* d = static_cast<dkommon*>(info->trap->data);
 
-    gchar* escaped_pname = NULL;
-
-    switch (d->format)
-    {
-        case OUTPUT_CSV:
-            printf("dkommon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"Zero Page Write\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid);
-            break;
-        case OUTPUT_KV:
-            printf("dkommon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Message=\"Zero Page Write\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"dkommon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Message\": \"Zero Page Write\""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid);
-
-            g_free(escaped_pname);
-            break;
-
-        case OUTPUT_DEFAULT:
-        default:
-            printf("[DKOMMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " MESSAGE:\"Zero Page Write\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, USERIDSTR(drakvuf), info->attached_proc_data.userid);
-            break;
-    }
+    fmt::print(d->format, "dkommon", drakvuf, info,
+               keyval("Message", fmt::Qstr("Zero Page Write"))
+              );
 
     return 0;
 }
 
 static void print_driver(drakvuf_t drakvuf, drakvuf_trap_info_t* info, output_format_t format, const char* message, const char* name)
 {
-    gchar* escaped_pname = NULL;
-
-    switch (format)
-    {
-        case OUTPUT_CSV:
-            printf("dkommon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid, message, name);
-            break;
-        case OUTPUT_KV:
-            printf("dkommon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Message=\"%s\",DriverName=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name, message, name);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"dkommon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Message\": \"%s\","
-                    "\"DriverName\": \"%s\""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                    message, name);
-
-            g_free(escaped_pname);
-            break;
-
-        case OUTPUT_DEFAULT:
-        default:
-            printf("[DKOMMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " MESSAGE:\"%s\" DRIVERNAME:\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                   message, name);
-            break;
-    }
+    fmt::print(format, "dkommon", drakvuf, info,
+               keyval("Message", fmt::Qstr(message)),
+               keyval("DriverName", fmt::Qstr(name))
+              );
 }
 
 static std::vector<std::string> enumerate_drivers(dkommon* d, drakvuf_t drakvuf)

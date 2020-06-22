@@ -132,14 +132,16 @@ private:
     {
         .type = REGISTER,
         .reg = CR3,
-        .data = this
+        .data = this,
+        .name = nullptr
     };
 
     drakvuf_trap_t drivers_trap =
     {
         .type = REGISTER,
         .reg = CR3,
-        .data = this
+        .data = this,
+        .name = nullptr
     };
 
     drakvuf_trap_t zeropage_trap =
@@ -148,7 +150,8 @@ private:
         .memaccess.gfn = 0,
         .memaccess.type = PRE,
         .memaccess.access = VMI_MEMACCESS_W,
-        .data = this
+        .data = this,
+        .name = nullptr
     };
 };
 

@@ -119,6 +119,7 @@
 
 #include <libvmi/libvmi.h>
 #include "objmon.h"
+#include "plugins/output_format.h"
 
 /*
  NTKERNELAPI
@@ -152,7 +153,6 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     struct ckey ckey = {};
 
-    gchar* escaped_pname = NULL;
     access_context_t ctx;
     memset(&ctx, 0, sizeof(access_context_t));
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -172,49 +172,24 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     vmi_read_32(vmi, &ctx, &ckey.key);
 
+    auto key = std::string(ckey._key, 4);
+
     switch (o->format)
     {
         case OUTPUT_CSV:
-            printf("objmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%c%c%c%c",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid,
-                   ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
+        case OUTPUT_DEFAULT:
+            fmt::print(o->format, "objmon", drakvuf, info,
+                       keyval("Key", fmt::Rstr(key))
+                      );
             break;
 
         case OUTPUT_KV:
-            printf("objmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Key=\"%c%c%c%c\"",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
-            break;
-
         case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"objmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Key\" : \"%c%c%c%c\""
-                    "}", // EOL below
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[OBJMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" '%c%c%c%c'",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
-                   ckey._key[0], ckey._key[1], ckey._key[2], ckey._key[3]);
+            fmt::print(o->format, "objmon", drakvuf, info,
+                       keyval("Key", fmt::Qstr(key))
+                      );
             break;
     }
-
-    printf("\n");
 
     drakvuf_release_vmi(drakvuf);
     return 0;

@@ -109,24 +109,24 @@
 #include <list>
 
 typedef enum
-  {
-   INVALID,
-   WriteVirtualMemoryExtras,
-   __MAX_EXTRAX__
-  } extras_type_t;
+{
+    INVALID,
+    WriteVirtualMemoryExtras,
+    __MAX_EXTRAX__
+} extras_type_t;
 
 typedef struct
 {
-  extras_type_t type;
-  union
-  {
-    struct
+    extras_type_t type;
+    union
     {
-      vmi_pid_t target_pid;
-      char* target_name;
-      addr_t base_address;
-    } write_virtual_memory_extras;
-  };
+        struct
+        {
+            vmi_pid_t target_pid;
+            char* target_name;
+            addr_t base_address;
+        } write_virtual_memory_extras;
+    };
 } extras_t;
 
 class memdump;

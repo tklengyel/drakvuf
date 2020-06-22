@@ -121,6 +121,7 @@
 #include "../plugins.h"
 #include "private.h"
 #include "debugmon.h"
+#include "plugins/output_format.h"
 
 # define HVMOP_TRAP_ext_int    0
 # define HVMOP_TRAP_nmi        2
@@ -143,55 +144,23 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
 
     debugmon* s = (debugmon*)info->trap->data;
-    gchar* escaped_pname = NULL;
 
-    switch (s->format)
+    auto tuple = std::make_tuple(
+                     keyval("RIP", fmt::Xval(info->regs->rip)),
+                     keyval("DebugType", fmt::Nval(info->debug->type)),
+                     keyval("DebugTypeStr", fmt::Qstr(debug_type[info->debug->type]))
+                 );
+    if (s->format == OUTPUT_JSON)
     {
-        case OUTPUT_CSV:
-            printf("debugmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%" PRIx64 ",%" PRIi32 ",%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid,
-                   info->regs->rip, info->debug->type, debug_type[info->debug->type]);
-            break;
-
-        case OUTPUT_KV:
-            printf("debugmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
-                   "RIP=0x%" PRIx64",DebugType=%" PRIi32 ",DebugTypeStr=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   info->regs->rip, info->debug->type, debug_type[info->debug->type]);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"debugmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"VCPU\": %" PRIu32 ","
-                    "\"CR3\": %" PRIu64 ","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"RIP\" : %" PRIu64","
-                    "\"DebugType\" : %" PRIi32 ","
-                    "\"DebugTypeStr\": \"%s\""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    info->vcpu, info->regs->cr3, escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                    info->regs->rip, info->debug->type, debug_type[info->debug->type]);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[DEBUGMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64". "
-                   "RIP: 0x%" PRIx64". Debug type: %" PRIi32 ",%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                   info->regs->rip, info->debug->type, debug_type[info->debug->type]);
-            break;
+        jsonfmt::print("debugmon", drakvuf, info,
+                       keyval("VCPU", fmt::Nval(info->vcpu)),
+                       keyval("CR3", fmt::Nval(info->regs->cr3)),
+                       tuple
+                      );
+    }
+    else
+    {
+        fmt::print(s->format, "debugmon", drakvuf, info, tuple);
     }
 
     return 0;
@@ -206,6 +175,7 @@ debugmon::debugmon(drakvuf_t _drakvuf, output_format_t _output)
     this->debug.cb = debug_cb;
     this->debug.data = (void*)this;
     this->debug.type = DEBUG;
+    this->debug.name = nullptr;
 
     if ( !drakvuf_add_trap(drakvuf, &this->debug) )
     {

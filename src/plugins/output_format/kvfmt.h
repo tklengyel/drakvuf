@@ -159,7 +159,10 @@ struct DataPrinter
     template <class Tv = T>
     static bool print(std::ostream& os, const fmt::Xval<Tv>& data, char)
     {
-        os << data.value;
+        auto ff = os.flags();
+        auto base = data.withbase ? "0x" : "";
+        os << base << std::uppercase << std::hex << data.value;
+        os.flags(ff);
         return true;
     }
 
@@ -231,6 +234,15 @@ struct DataPrinter
     static bool print(std::ostream& os, const std::tuple<Ts...>& data, char sep)
     {
         return TuplePrinter<decltype(data), sizeof...(Ts)>::print(os, data, sep);
+    }
+
+    template <class... Ts>
+    static bool print(std::ostream& os, const std::variant<Ts...>& data, char sep)
+    {
+        return std::visit([&os, sep](auto&& arg) mutable
+        {
+            return print_data(os, arg, sep);
+        }, data);
     }
 };
 
