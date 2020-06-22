@@ -122,6 +122,7 @@
 #include "../plugins.h"
 #include "private.h"
 #include "poolmon.h"
+#include "plugins/output_format.h"
 
 static GTree* pooltag_build_tree()
 {
@@ -146,7 +147,6 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     char tag[5] = { [0 ... 4] = '\0' };
     struct pooltag* s = NULL;
     const char* pool_type_str;
-    gchar* escaped_pname = NULL;
 
     access_context_t ctx;
     memset(&ctx, 0, sizeof(access_context_t));
@@ -184,67 +184,44 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     pool_type_str = pool_type<MaxPoolType ? pool_types[pool_type] : "unknown_pool_type";
 
-    switch (p->format)
+    std::optional<fmt::Rstr<decltype(s->source)>> source;
+    std::optional<fmt::Rstr<decltype(s->description)>> description;
+    if (s)
     {
-        case OUTPUT_CSV:
-            printf("poolmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s,%" PRIu64 "",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, tag,
-                   pool_type_str, size);
-            if (s)
-                printf(",%s,%s", s->source, s->description);
-            break;
-
-        case OUTPUT_KV:
-            printf("poolmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
-                   "Tag=%s,Type=%s,Size=%" PRIu64,
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   tag, pool_type_str, size);
-            if (s)
-                printf(",Source=%s,Description=%s", s->source, s->description);
-            break;
-
-        case OUTPUT_JSON:
-            // Remove non-ascii characters from tag
-            for (size_t i = 0; i < sizeof(tag); ++i)
-            {
-                if (!isascii(tag[i]))
-                    tag[i] = '?';
-            }
-
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"poolmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"VCPU\": %" PRIu32 ","
-                    "\"CR3\": %" PRIu64 ","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Tag\": \"%s\","
-                    "\"PoolType\": \"%s\","
-                    "\"Size\": %" PRIu64  ""
-                    "}",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    info->vcpu, info->regs->cr3, escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid,
-                    tag, pool_type_str, size);
-            g_free(escaped_pname);
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[POOLMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s (type: %s, size: %" PRIu64 ")",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, tag,
-                   pool_type_str, size);
-            if (s)
-                printf(": %s,%s", s->source, s->description);
-            break;
+        source = fmt::Rstr(s->source);
+        description = fmt::Rstr(s->description);
     }
 
-    printf("\n");
+    auto tuple = std::make_tuple(
+                     keyval("Tag", fmt::Rstr(tag)),
+                     keyval("Type", fmt::Rstr(pool_type_str)),
+                     keyval("Size", fmt::Nval(size)),
+                     keyval("Source", source),
+                     keyval("Description", description)
+                 );
+    if (p->format == OUTPUT_JSON)
+    {
+        // Remove non-ascii characters from tag
+        for (size_t i = 0; i < sizeof(tag); ++i)
+        {
+            if (!isascii(tag[i]))
+                tag[i] = '?';
+        }
+
+        jsonfmt::print("poolmon", drakvuf, info,
+                       keyval("VCPU", fmt::Nval(info->vcpu)),
+                       keyval("CR3", fmt::Nval(info->regs->cr3)),
+                       keyval("Tag", fmt::Qstr(tag)),
+                       keyval("Type", fmt::Qstr(pool_type_str)),
+                       keyval("Size", fmt::Nval(size)),
+                       keyval("Source", source),
+                       keyval("Description", description)
+                      );
+    }
+    else
+    {
+        fmt::print(p->format, "poolmon", drakvuf, info, tuple);
+    }
 
     return 0;
 }

@@ -106,51 +106,13 @@
 #include <cassert>
 
 #include "clipboardmon.h"
+#include "plugins/output_format.h"
 
 static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     clipboardmon* c = static_cast<clipboardmon*>(info->trap->data);
 
-    gchar* escaped_pname = NULL;
-
-    switch (c->format)
-    {
-        case OUTPUT_CSV:
-            printf("clipboardmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   info->attached_proc_data.userid);
-            break;
-        case OUTPUT_KV:
-            printf("clipboardmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   info->trap->name);
-            break;
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"clipboardmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Method\" : \"%s\","
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                    info->trap->name);
-            g_free(escaped_pname);
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[CLIPBOARDMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   USERIDSTR(drakvuf), info->attached_proc_data.userid);
-            break;
-    }
+    fmt::print(c->format, "clipboardmon", drakvuf, info);
 
     return VMI_EVENT_RESPONSE_NONE;
 }

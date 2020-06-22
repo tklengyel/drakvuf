@@ -17,7 +17,8 @@ public:
         .breakpoint.addr_type = ADDR_RVA,
         .breakpoint.module = "ntoskrnl.exe",
         .type = BREAKPOINT,
-        .data = (void*)this
+        .data = (void*)this,
+        .name = nullptr
     };
 
     delaymon(drakvuf_t drakvuf, output_format_t output);

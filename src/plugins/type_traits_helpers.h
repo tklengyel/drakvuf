@@ -146,4 +146,16 @@ struct is_printable_helper<T, std::void_t<decltype(std::declval<std::ostream>().
 template <class T>
 struct is_printable : is_printable_helper<T> {};
 
+/**/
+
+template <class T>
+std::true_type has_mapped_type_helper(typename T::mapped_type*);
+
+template <class>
+std::false_type has_mapped_type_helper(...);
+
+template <class T>
+struct has_mapped_type : decltype(has_mapped_type_helper<T>(nullptr))
+{};
+
 #endif // DRAKVUF_PLUGINS_TYPE_TRAITS_HELPERS_H

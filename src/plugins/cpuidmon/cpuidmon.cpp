@@ -121,68 +121,32 @@
 #include "../plugins.h"
 #include "private.h"
 #include "cpuidmon.h"
+#include "plugins/output_format.h"
 
 event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
 
     cpuidmon* s = (cpuidmon*)info->trap->data;
-    gchar* escaped_pname = NULL;
 
-    switch (s->format)
+    auto tuple = std::make_tuple(
+                     keyval("Leaf", fmt::Xval(info->cpuid->leaf)),
+                     keyval("Subleaf", fmt::Xval(info->cpuid->subleaf)),
+                     keyval("RAX", fmt::Xval(info->regs->rax)),
+                     keyval("RBX", fmt::Xval(info->regs->rbx)),
+                     keyval("RCX", fmt::Xval(info->regs->rcx)),
+                     keyval("RDX", fmt::Xval(info->regs->rdx))
+                 );
+    if (s->format == OUTPUT_JSON)
     {
-        case OUTPUT_CSV:
-            printf("cpuidmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid);
-            break;
-
-        case OUTPUT_KV:
-            printf("cpuidmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\","
-                   "Leaf=0x%" PRIx32 ",Subleaf=0x%" PRIx32","
-                   "RAX=0x%" PRIx64 ",RBX=0x%" PRIx64 ",RCX=0x%" PRIx64 ",RDX=0x%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   info->cpuid->leaf, info->cpuid->subleaf,
-                   info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"cpuidmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"VCPU\": %" PRIu32 ","
-                    "\"CR3\": %" PRIu64 ","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"Leaf\": %" PRIu32 ","
-                    "\"Subleaf\": %" PRIu32 ","
-                    "\"RAX\": %" PRIu64 ","
-                    "\"RBX\": %" PRIu64 ","
-                    "\"RCX\": %" PRIu64 ","
-                    "\"RDX\": %" PRIu64 ""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    info->vcpu, info->regs->cr3, escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                    info->cpuid->leaf, info->cpuid->subleaf,
-                    info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[CPUIDMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64". "
-                   "Leaf: 0x%" PRIx32 ". Subleaf: 0x%" PRIx32". "
-                   "RAX: 0x%" PRIx64 " RBX: 0x%" PRIx64 " RCX: 0x%" PRIx64 " RDX: 0x%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                   info->cpuid->leaf, info->cpuid->subleaf,
-                   info->regs->rax, info->regs->rbx, info->regs->rcx, info->regs->rdx
-                  );
-            break;
+        jsonfmt::print("cpuidmon", drakvuf, info,
+                       keyval("VCPU", fmt::Nval(info->vcpu)),
+                       keyval("CR3", fmt::Nval(info->regs->cr3)),
+                       tuple
+                      );
+    }
+    else
+    {
+        fmt::print(s->format, "cpuidmon", drakvuf, info, tuple);
     }
 
     if ( s->stealth )
@@ -214,6 +178,7 @@ cpuidmon::cpuidmon(drakvuf_t _drakvuf, bool _stealth, output_format_t _output)
     this->cpuid.cb = cpuid_cb;
     this->cpuid.data = (void*)this;
     this->cpuid.type = CPUID;
+    this->cpuid.name = nullptr;
 
     if ( !drakvuf_add_trap(drakvuf, &this->cpuid) )
     {

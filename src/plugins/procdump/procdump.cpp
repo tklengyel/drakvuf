@@ -115,6 +115,7 @@
 #include "procdump.h"
 #include "private.h"
 #include "minidump.h"
+#include "plugins/output_format.h"
 
 using namespace std::string_literals;
 
@@ -236,7 +237,7 @@ static bool read_vm(drakvuf_t drakvuf, addr_t dtb, addr_t start, size_t size,
             if (access_ptrs[i])
             {
                 if (res)
-                    res = procdump_ctx->writer->append(static_cast<uint8_t *>(access_ptrs[i]), VMI_PS_4KB);
+                    res = procdump_ctx->writer->append(static_cast<uint8_t*>(access_ptrs[i]), VMI_PS_4KB);
                 munmap(access_ptrs[i], VMI_PS_4KB);
             }
             else if (res)
@@ -410,18 +411,11 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     {
         // If there is no VADs left than the file have been processed
         save_file_metadata(ctx, &info->proc_data);
-        switch (ctx->plugin->m_output_format)
-        {
-            case OUTPUT_KV:
-                printf("procdump Time=" FORMAT_TIMEVAL
-                       ",PID=%d,PPID=%d,ProcessName=\"%s\",DumpReason="
-                       "\"TerminateProcess\",DumpSize=%" PRIu64 ",SN=%lu\n",
-                       UNPACK_TIMEVAL(info->timestamp), ctx->pid, ctx->ppid,
-                       ctx->name.data(), ctx->size, ctx->idx);
-                break;
-            default:
-                break;
-        }
+        fmt::print(ctx->plugin->m_output_format, "procdump", drakvuf, info,
+                   keyval("DumpReason", fmt::Qstr("TerminateProcess")),
+                   keyval("DumpSize", fmt::Nval(ctx->size)),
+                   keyval("SN", fmt::Nval(ctx->idx))
+                  );
     }
     // One could not restore all registers at once like this:
     //     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t)),
@@ -639,7 +633,7 @@ static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pr
     for (auto vad: ctx->vads)
     {
         struct mdmp_memory_descriptor64 range(vad.first,
-                vad.second.total_number_of_ptes * VMI_PS_4KB);
+                                              vad.second.total_number_of_ptes * VMI_PS_4KB);
         memory_ranges.push_back(range);
     }
 
@@ -651,19 +645,19 @@ static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pr
     thread_ctx.set(is32bit, info->regs);
 
     auto mdmp = minidump(time_stamp,
-                        is32bit,
-                        plugin->num_cpus,
-                        plugin->win_major,
-                        plugin->win_minor,
-                        plugin->win_build_number,
-                        plugin->vendor,
-                        plugin->version_information,
-                        plugin->feature_information,
-                        plugin->amd_extended_cpu_features,
-                        csdversion,
-                        memory_ranges,
-                        {thread},
-                        {thread_ctx});
+                         is32bit,
+                         plugin->num_cpus,
+                         plugin->win_major,
+                         plugin->win_minor,
+                         plugin->win_build_number,
+                         plugin->vendor,
+                         plugin->version_information,
+                         plugin->feature_information,
+                         plugin->amd_extended_cpu_features,
+                         csdversion,
+                         memory_ranges,
+    {thread},
+    {thread_ctx});
 
     if (!ctx->writer->append((const uint8_t*)&mdmp, sizeof(mdmp)))
     {
