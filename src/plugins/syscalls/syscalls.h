@@ -113,6 +113,7 @@ struct syscalls_config
 {
     const char* syscalls_filter_file;
     const char* win32k_profile;
+    bool disable_sysret;
 };
 
 class syscalls: public plugin
@@ -126,6 +127,7 @@ public:
     bool is32bit;
     output_format_t format;
     os_t os;
+    bool disable_sysret;
 
     size_t *offsets;
 

@@ -274,6 +274,9 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     print_footer(s->format, nargs, true);
 
+    if ( s->disable_sysret )
+        return 0;
+
     struct wrapper *wr = g_slice_new0(struct wrapper);
     wr->s = s;
     wr->num = nr;
