@@ -460,7 +460,7 @@ struct wrapper
      .args = (const arg_t*)&_name ## _arg                        \
    }
 
-void print_header(output_format_t format, drakvuf_t drakvuf,
+void print_header(output_format_t format, drakvuf_t drakvuf, os_t os,
                   bool syscall, const drakvuf_trap_info_t* info,
                   int nr, const char *module, const syscall_t *sc,
                   uint64_t ret, const char *extra_info);
