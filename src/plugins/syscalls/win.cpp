@@ -134,7 +134,7 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!exit_status_str)
         exit_status_str = ntstatus_format_string(ntstatus_t(info->regs->rax), exit_status_buf, sizeof(exit_status_buf));
 
-    print_header(s->format, drakvuf, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, exit_status_str);
+    print_header(s->format, drakvuf, VMI_OS_WINDOWS, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, exit_status_str);
     print_footer(s->format, 0, false);
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
@@ -204,7 +204,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
-    print_header(s->format, drakvuf, true, info, w->num, w->type, sc, 0, NULL);
+    print_header(s->format, drakvuf, VMI_OS_WINDOWS, true, info, w->num, w->type, sc, 0, NULL);
     if ( nargs )
     {
         print_nargs(s->format, nargs);
