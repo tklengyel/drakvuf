@@ -135,7 +135,7 @@ struct procdump_ctx
     x86_registers_t saved_regs;
     uint64_t idx;
     addr_t pool;
-    const uint64_t POOL_SIZE_IN_PAGES = 0x100;
+    const uint64_t POOL_SIZE_IN_PAGES = 0x400;
     size_t size;
     size_t current_dump_size;
     string data_file_name;
