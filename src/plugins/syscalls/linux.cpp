@@ -212,7 +212,7 @@ static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     const syscall_t *sc = w->num < NUM_SYSCALLS_LINUX ? linuxsc::linux_syscalls[w->num] : NULL;
 
-    print_header(s->format, drakvuf, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, NULL);
+    print_header(s->format, drakvuf, VMI_OS_LINUX, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, NULL);
     print_footer(s->format, 0, false);
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
@@ -266,7 +266,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         nargs = 0;
     }
 
-    print_header(s->format, drakvuf, true, info, nr, info->trap->breakpoint.module, sc, 0, NULL);
+    print_header(s->format, drakvuf, VMI_OS_LINUX, true, info, nr, info->trap->breakpoint.module, sc, 0, NULL);
     if ( nargs )
     {
         print_nargs(s->format, nargs);

@@ -145,7 +145,7 @@ static char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const 
     return nullptr;
 }
 
-void print_header(output_format_t format, drakvuf_t drakvuf,
+void print_header(output_format_t format, drakvuf_t drakvuf, os_t os,
                   bool syscall, const drakvuf_trap_info_t* info,
                   int nr, const char *module, const syscall_t *sc,
                   uint64_t ret, const char *extra_info)
@@ -153,6 +153,7 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
     gchar* escaped_pname = NULL;
     const char *name = sc ? sc->name : info->trap->name;
     const char *type = NULL;
+    const proc_data_t *proc_data = os == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
 
     switch (format)
     {
@@ -163,8 +164,8 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
                    ",%s,%" PRIi64 \
                    ",%" PRIi32 ",%s,%s",
                    type, UNPACK_TIMEVAL(info->timestamp), info->vcpu,
-                   info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
+                   info->regs->cr3, proc_data->name, proc_data->pid, proc_data->ppid,
+                    USERIDSTR(drakvuf), proc_data->userid,
                    nr, module, name);
             if ( !syscall )
                 printf(",%lu,%s", ret, extra_info);
@@ -176,8 +177,8 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
                    ",UserName=\"%s\",UserId=%" PRIu64 \
                    ",Syscall=%" PRIi32 ",Module=\"%s\",Method=\"%s\"",
                    type, UNPACK_TIMEVAL(info->timestamp), info->vcpu,
-                   info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                   USERIDSTR(drakvuf), info->attached_proc_data.userid,
+                   info->regs->cr3, proc_data->name, proc_data->pid, proc_data->ppid,
+                   USERIDSTR(drakvuf), proc_data->userid,
                    nr, module, name);
             if ( !syscall )
                 printf(",Ret=%lu,Info=\"%s\"", ret, extra_info?:"");
@@ -185,7 +186,7 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
         case OUTPUT_JSON:
             // print_footer() puts single EOL at end of JSON doc to simplify parsing on other end
             type = syscall ? "syscall" : "sysret";
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
+            escaped_pname = drakvuf_escape_str(proc_data->name);
             printf( "{"
                     "\"Plugin\": \"syscalls\","
                     "\"Type\" : \"%s\","
@@ -203,8 +204,8 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
                     "\"Args\": {",
                     type, UNPACK_TIMEVAL(info->timestamp),
                     info->vcpu, info->regs->cr3, escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
+                    USERIDSTR(drakvuf), proc_data->userid,
+                    proc_data->pid, proc_data->ppid, proc_data->tid,
                     module, name);
 
             if ( syscall )
@@ -225,8 +226,8 @@ void print_header(output_format_t format, drakvuf_t drakvuf,
                    " %s:%" PRIi64 \
                    " %" PRIi32 ":%s!%s",
                    type, UNPACK_TIMEVAL(info->timestamp), info->vcpu,
-                   info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
-                   USERIDSTR(drakvuf), info->attached_proc_data.userid,
+                   info->regs->cr3, proc_data->name, proc_data->pid, proc_data->ppid, proc_data->tid,
+                   USERIDSTR(drakvuf), proc_data->userid,
                    nr, module, name);
             if ( !syscall )
                 printf(" Ret:%lu Info:%s", ret, extra_info ?: "");
