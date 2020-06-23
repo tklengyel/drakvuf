@@ -191,7 +191,9 @@ static void print_usage()
             "\t -v, --verbose             Turn on verbose (debug) output\n"
 #endif
 #ifdef ENABLE_PLUGIN_SYSCALLS
-            "\t -S <syscalls filter>      File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
+            "\t -S, --syscall-hooks-list <syscalls filter>\n"
+            "\t                           File with list of syscalls for trap in syscalls plugin (trap all if parameter is absent)\n"
+            "\t --disable-sysret          Do not monitor syscall results\n"
 #endif
 #ifdef ENABLE_PLUGIN_BSODMON
             "\t -b                        Exit from execution as soon as a BSoD is detected\n"
@@ -303,7 +305,8 @@ int main(int argc, char** argv)
         opt_procdump_dir,
         opt_compress_procdumps,
         opt_json_clr,
-        opt_json_mscorwks
+        opt_json_mscorwks,
+        opt_disable_sysret,
     };
     const option long_opts[] =
     {
@@ -330,6 +333,8 @@ int main(int argc, char** argv)
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
         {"json-clr", required_argument, NULL, opt_json_clr},
         {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
+        {"syscall-hooks-list", required_argument, NULL, 'S'},
+        {"disable-sysret", no_argument, NULL, opt_disable_sysret},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:h";
@@ -431,9 +436,14 @@ int main(int argc, char** argv)
                 verbose = true;
                 break;
 #endif
+#ifdef ENABLE_PLUGIN_SYSCALLS
             case 'S':
                 options.syscalls_filter_file = optarg;
                 break;
+            case opt_disable_sysret:
+                options.disable_sysret = true;
+                break;
+#endif
             case 'M':
                 options.dump_modified_files = true;
                 break;

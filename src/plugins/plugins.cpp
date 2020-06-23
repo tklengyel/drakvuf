@@ -162,6 +162,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     {
                         .syscalls_filter_file = options->syscalls_filter_file,
                         .win32k_profile = options->win32k_profile,
+                        .disable_sysret = options->disable_sysret,
                     };
                     this->plugins[plugin_id] = new syscalls(this->drakvuf, &config, this->output);
                     break;
