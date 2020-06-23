@@ -150,6 +150,10 @@ enum
     MMPTE_PROTOTYPE,
 };
 
+#define MM_SOFTWARE_PROTECTION_OFFSET 5
+#define MM_PROTOTYPE_PROTECTION_OFFSET 11
+
+#define MM_RWX_MASK           0x7
 #define MM_GUARD_PAGE         0x10
 
 // Assume that valid page is accessible
@@ -161,7 +165,7 @@ static bool IS_MMPTE_VALID(uint64_t mmpte)
 // Assume that MM_GUARD_PAGE shoulbe reset to page been accessible
 static bool IS_MMPTE_ACCESSIBLE(uint64_t protection)
 {
-    return (protection & 0x7) && !(protection & MM_GUARD_PAGE);
+    return (protection & MM_RWX_MASK) && !(protection & MM_GUARD_PAGE);
 }
 
 /*
@@ -180,21 +184,21 @@ static bool IS_MMPTE_TRANSITION(uint64_t mmpte)
 
 static bool IS_MMPTE_PROTOTYPE_ACCESSIBLE(uint64_t mmpte)
 {
-    auto is_accessible = IS_MMPTE_ACCESSIBLE((mmpte >> 11));
+    auto is_accessible = IS_MMPTE_ACCESSIBLE((mmpte >> MM_PROTOTYPE_PROTECTION_OFFSET));
     return VMI_GET_BIT(mmpte, 10) &&
            is_accessible;
 }
 
 static bool IS_MMPTE_TRANSITION_ACCESSIBLE(uint64_t mmpte)
 {
-    auto is_accessible = IS_MMPTE_ACCESSIBLE((mmpte >> 5));
+    auto is_accessible = IS_MMPTE_ACCESSIBLE((mmpte >> MM_SOFTWARE_PROTECTION_OFFSET));
     return VMI_GET_BIT(mmpte, 11) &&
            is_accessible;
 }
 
 static bool IS_MMPTE_SOFTWARE_ACCESSIBLE(uint64_t mmpte)
 {
-    auto is_accessible = IS_MMPTE_ACCESSIBLE((mmpte >> 5));
+    auto is_accessible = IS_MMPTE_ACCESSIBLE((mmpte >> MM_SOFTWARE_PROTECTION_OFFSET));
     return !IS_MMPTE_VALID(mmpte) &&
            !IS_MMPTE_PROTOTYPE(mmpte) &&
            !IS_MMPTE_TRANSITION(mmpte) &&
