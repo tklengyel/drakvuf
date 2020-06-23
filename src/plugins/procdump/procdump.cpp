@@ -799,7 +799,7 @@ static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
         return detach(drakvuf, info, ctx);
     else
     {
-        for (auto dll = ctx->dlls.begin(); dll != ctx->dlls.end();)
+        for (auto dll = ctx->dlls.begin(); dll != ctx->dlls.end(); ++dll)
         {
             auto vad = ctx->vads.find(dll->first);
             if (vad == ctx->vads.end() ||
@@ -810,8 +810,6 @@ static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
                             dll->first, dll->second.total_number_of_ptes);
                 dll->second.zero_fill = true;
             }
-            else
-                ++dll;
         }
 
         ctx->vads.clear();
