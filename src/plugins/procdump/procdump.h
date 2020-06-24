@@ -143,6 +143,7 @@ public:
 
     addr_t malloc_va;
     addr_t memcpy_va;
+    addr_t clean_process_va;
 
     uint16_t win_build_number;
     uint16_t win_major;
