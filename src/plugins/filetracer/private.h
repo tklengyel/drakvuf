@@ -134,13 +134,13 @@ struct linux_wrapper
     uint64_t rsp;
 
     linux_filetracer* f;
-    std::string filename;
-    std::string flags;
-    std::string modes;
+    GString* filename = g_string_new(NULL);
+    GString* flags = g_string_new(NULL);
+    GString* modes = g_string_new(NULL);
     int permissions;
-    std::string uid;
-    std::string gid;
-    std::map<std::string, std::string> args;
+    GString* uid = g_string_new(NULL);
+    GString* gid = g_string_new(NULL);
+    std::map<std::string, GString*> args;
 };
 
 struct pool_header_x86
