@@ -449,6 +449,7 @@ struct wrapper
     struct wrapper *w;
     uint16_t num;
     addr_t tid;
+    addr_t stack_fingerprint;
 };
 
 #define SYSCALL(_name, _ret, _num_args, ...)                     \

@@ -122,7 +122,7 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
      * Multiple syscalls might hit the same return address so make sure we are
      * handling the correct thread's return here.
      */
-    if ( info->proc_data.tid != wr->tid )
+    if ( info->proc_data.tid != wr->tid || wr->stack_fingerprint != info->regs->rsp)
         return 0;
 
     struct wrapper *w = (struct wrapper *)wr->w;
@@ -225,6 +225,15 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     wr->tid = info->proc_data.tid;
     wr->w = w;
+    if ( 4 == s->reg_size )
+    {
+        wr->stack_fingerprint = info->regs->rsp + 4 /*return address*/ + 4 * nargs;
+    }
+    else
+    {
+        wr->stack_fingerprint = info->regs->rsp + 8 /*return address*/;
+    }
+    
 
     ret_trap->breakpoint.lookup_type = LOOKUP_DTB;
     ret_trap->breakpoint.addr_type = ADDR_VA;
