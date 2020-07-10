@@ -754,36 +754,31 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
 }
 
 static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
-    // First check if NtCreateThreadEx syscall was invoked from CreateRemoteThread. 
+    // Check if trap is related to memdump plugin.
+    memdump* plugin = get_trap_plugin<memdump>(info);
+    if (!plugin) {
+        PRINT_DEBUG("[MEMDUMP] Failed to retrieve plugin\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    // Now check if NtCreateThreadEx syscall was invoked from CreateRemoteThread.
     // In such case the target process should differ from the caller.
 
     // IN HANDLE ProcessHandle
     addr_t target_process_handle = drakvuf_get_function_argument(drakvuf, info, 4);
-
     vmi_pid_t target_process_pid;
     if (!drakvuf_get_pid_from_handle(drakvuf, info, target_process_handle, &target_process_pid)) {
         PRINT_DEBUG("[MEMDUMP] Failed to retrieve target process pid\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    addr_t caller_process = drakvuf_get_current_process(drakvuf, info);
-    if (!caller_process) {
-        PRINT_DEBUG("[MEMDUMP] Failed to retrieve caller process\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-    vmi_pid_t caller_process_pid;
-    if (!drakvuf_get_process_pid(drakvuf, caller_process, &caller_process_pid)) {
-        PRINT_DEBUG("[MEMDUMP] Failed to retrieve caller process pid\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    if (target_process_pid == caller_process_pid) {
+    if (target_process_pid == info->proc_data.pid) {
         // NtCreateThreadEx has not been invoked from CreateRemoteThread
         // and so it's not suspicious enought to create dump.
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    // Now retrieve information about the segment to which the StartRoutine 
+    // Now retrieve information about the segment to which the StartRoutine
     // points to. Double check if it's executable and if so – dump this segment.
 
     // IN PVOID StartRoutine
@@ -802,20 +797,18 @@ static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    vmi_lock_guard lg(drakvuf);
 
     addr_t target_process_dtb;
-    if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, target_process_pid, &target_process_dtb)) {
+    if (VMI_SUCCESS != vmi_pid_to_dtb(lg.vmi, target_process_pid, &target_process_dtb)) {
         PRINT_DEBUG("[MEMDUMP] Failed to retrieve dtb\n");
-        drakvuf_release_vmi(drakvuf);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
     // Get page protection flags.
     page_info_t p_info = {};
-    if (VMI_SUCCESS != vmi_pagetable_lookup_extended(vmi, target_process_dtb, start_routine, &p_info)) {
+    if (VMI_SUCCESS != vmi_pagetable_lookup_extended(lg.vmi, target_process_dtb, start_routine, &p_info)) {
         PRINT_DEBUG("[MEMDUMP] Failed to retrieve page protection flags\n");
-        drakvuf_release_vmi(drakvuf);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -824,7 +817,6 @@ static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_
 
     if (!page_valid || !page_execute) {
         PRINT_DEBUG("[MEMDUMP] Page invalid or not executable\n");
-        drakvuf_release_vmi(drakvuf);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -835,18 +827,12 @@ static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_
         .dtb = target_process_dtb,
         .addr = mmvad.starting_vpn * VMI_PS_4KB
     };
-    memdump* plugin = get_trap_plugin<memdump>(info);
-    if (!plugin) {
-        PRINT_DEBUG("[MEMDUMP] Failed to retrieve plugin\n");
-        drakvuf_release_vmi(drakvuf);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+
     size_t dump_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
-    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, dump_size, "CreateRemoteThread heuristic", nullptr, false)) {
+    if (!dump_memory_region(drakvuf, lg.vmi, info, plugin, &ctx, dump_size, "CreateRemoteThread heuristic", nullptr, false)) {
         PRINT_DEBUG("[MEMDUMP] Failed to dump memory\n");
     }
 
-    drakvuf_release_vmi(drakvuf);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
