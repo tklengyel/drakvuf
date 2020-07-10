@@ -184,6 +184,16 @@ struct return_hook_target_entry_t
         pid(pid), plugin(plugin), argument_printers(argument_printers) {}
 };
 
+struct hook_target_view_t
+{
+    std::string target_name;
+    addr_t offset;
+    target_hook_state state;
+
+    hook_target_view_t(std::string target_name, addr_t offset, target_hook_state state)
+        : target_name(target_name), offset(offset), state(state) {}
+};
+
 struct dll_view_t
 {
     // relevant while loading
@@ -195,7 +205,7 @@ struct dll_view_t
 };
 
 typedef void (*dll_pre_hook_cb)(drakvuf_t, const dll_view_t*, void*);
-typedef void (*dll_post_hook_cb)(drakvuf_t, const dll_view_t*, void*);
+typedef void (*dll_post_hook_cb)(drakvuf_t, const dll_view_t*, const std::vector<hook_target_view_t> *targets, void*);
 
 struct usermode_cb_registration {
     dll_pre_hook_cb pre_cb;
