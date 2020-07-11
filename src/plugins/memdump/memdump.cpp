@@ -711,6 +711,89 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
+    // Check if trap is related to memdump plugin.
+    memdump* plugin = get_trap_plugin<memdump>(info);
+    if (!plugin) {
+        PRINT_DEBUG("[MEMDUMP] Failed to retrieve plugin\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    // Now check if NtCreateThreadEx syscall was invoked from CreateRemoteThread.
+    // In such case the target process should differ from the caller.
+
+    // IN HANDLE ProcessHandle
+    addr_t target_process_handle = drakvuf_get_function_argument(drakvuf, info, 4);
+    vmi_pid_t target_process_pid;
+    if (!drakvuf_get_pid_from_handle(drakvuf, info, target_process_handle, &target_process_pid)) {
+        PRINT_DEBUG("[MEMDUMP] Failed to retrieve target process pid\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    if (target_process_pid == info->proc_data.pid) {
+        // NtCreateThreadEx has not been invoked from CreateRemoteThread
+        // and so it's not suspicious enought to create dump.
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    // Now retrieve information about the segment to which the StartRoutine
+    // points to. Double check if it's executable and if so – dump this segment.
+
+    // IN PVOID StartRoutine
+    addr_t start_routine = drakvuf_get_function_argument(drakvuf, info, 5);
+
+    // Retrieve target_process as start_routine points inside it's address space.
+    addr_t target_process;
+    if (!drakvuf_find_process(drakvuf, target_process_pid, nullptr, &target_process)) {
+        PRINT_DEBUG("[MEMDUMP] Failed to retrieve target_process\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    mmvad_info_t mmvad;
+    if (!drakvuf_find_mmvad(drakvuf, target_process, start_routine, &mmvad)) {
+        PRINT_DEBUG("[MEMDUMP] Failed to find mmvad\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    vmi_lock_guard lg(drakvuf);
+
+    addr_t target_process_dtb;
+    if (VMI_SUCCESS != vmi_pid_to_dtb(lg.vmi, target_process_pid, &target_process_dtb)) {
+        PRINT_DEBUG("[MEMDUMP] Failed to retrieve dtb\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    // Get page protection flags.
+    page_info_t p_info = {};
+    if (VMI_SUCCESS != vmi_pagetable_lookup_extended(lg.vmi, target_process_dtb, start_routine, &p_info)) {
+        PRINT_DEBUG("[MEMDUMP] Failed to retrieve page protection flags\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    bool page_valid = (p_info.x86_ia32e.pte_value & (1UL << 0)) != 0;
+    bool page_execute = (p_info.x86_ia32e.pte_value & (1UL << 63)) == 0;
+
+    if (!page_valid || !page_execute) {
+        PRINT_DEBUG("[MEMDUMP] Page invalid or not executable\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    // Finally dump the suspicious segment.
+
+    access_context_t ctx = {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = target_process_dtb,
+        .addr = mmvad.starting_vpn * VMI_PS_4KB
+    };
+
+    size_t dump_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
+    if (!dump_memory_region(drakvuf, lg.vmi, info, plugin, &ctx, dump_size, "CreateRemoteThread heuristic", nullptr, false)) {
+        PRINT_DEBUG("[MEMDUMP] Failed to dump memory\n");
+    }
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plugin)
 {
     vmi_lock_guard lg(drakvuf);
@@ -788,7 +871,8 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
     if (!register_trap<memdump>(drakvuf, nullptr, this, free_virtual_memory_hook_cb,    bp.for_syscall_name("NtFreeVirtualMemory")) ||
         !register_trap<memdump>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
         !register_trap<memdump>(drakvuf, nullptr, this, terminate_process_hook_cb,      bp.for_syscall_name("NtTerminateProcess")) ||
-        !register_trap<memdump>(drakvuf, nullptr, this, write_virtual_memory_hook_cb,   bp.for_syscall_name("NtWriteVirtualMemory")))
+        !register_trap<memdump>(drakvuf, nullptr, this, write_virtual_memory_hook_cb,   bp.for_syscall_name("NtWriteVirtualMemory")) ||
+        !register_trap<memdump>(drakvuf, nullptr, this, create_remote_thread_hook_cb,   bp.for_syscall_name("NtCreateThreadEx")))
     {
         throw -1;
     }
