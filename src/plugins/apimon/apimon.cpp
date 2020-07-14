@@ -310,7 +310,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static void print_addresses(drakvuf_t drakvuf, apimon *plugin, const dll_view_t *dll, const std::vector<hook_target_view_t> *targets)
+static void print_addresses(drakvuf_t drakvuf, apimon *plugin, const dll_view_t *dll, const std::vector<hook_target_view_t>& targets)
 {
     unicode_string_t* dll_name;
     json_object *j_root;
@@ -331,7 +331,7 @@ static void print_addresses(drakvuf_t drakvuf, apimon *plugin, const dll_view_t 
     j_root = json_object_new_object();
     j_rvas = json_object_new_object();
 
-    for (auto const& target : *targets)
+    for (auto const& target : targets)
     {
         if (target.state == HOOK_OK)
             json_object_object_add(j_rvas, target.target_name.c_str(), json_object_new_int(target.offset));
@@ -375,7 +375,7 @@ static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* ex
         vmi_free_unicode_str(dll_name);
 }
 
-static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::vector<hook_target_view_t>* targets, void* extra)
+static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::vector<hook_target_view_t>& targets, void* extra)
 {
     apimon* plugin = (apimon*)extra;
     print_addresses(drakvuf, plugin, dll, targets);
