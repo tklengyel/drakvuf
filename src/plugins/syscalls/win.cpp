@@ -227,11 +227,20 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     wr->w = w;
     if ( 4 == s->reg_size )
     {
-        wr->stack_fingerprint = info->regs->rsp + 4 /*return address*/ + 4 * nargs;
+        // For 32-bit Windows, the calling convention of the syscall api is _stdcall, which means the callee to clear the stack space.
+        // So when the function returns, the value of the stack pointer should be the current rsp add the size of the parameters and
+        // the size of the return address (4 bytes)
+        // See : https://docs.microsoft.com/en-us/cpp/cpp/stdcall?view=vs-2019
+        wr->stack_fingerprint = info->regs->rsp + 4 * nargs + 4;
     }
     else
     {
-        wr->stack_fingerprint = info->regs->rsp + 8 /*return address*/;
+        // For 64-bit windows calling convention, the stack pointer remains unchanged before and after the function call. Caller's prolog
+        // code has already allocated space for all the register and stack parameters required by callee at the bottom of the stack, and 
+        // caller's epilog code will deallocate the fixed stack allocation. So when the function returns, the value of the stack pointer
+        // should be the current rsp add the size of the return address (8 bytes)
+        // See : https://docs.microsoft.com/en-us/cpp/build/x64-software-conventions?view=vs-2019
+        wr->stack_fingerprint = info->regs->rsp + 8;
     }
     
 
