@@ -122,7 +122,7 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
      * Multiple syscalls might hit the same return address so make sure we are
      * handling the correct thread's return here.
      */
-    if ( info->proc_data.tid != wr->tid )
+    if ( info->proc_data.tid != wr->tid || wr->stack_fingerprint != info->regs->rsp)
         return 0;
 
     struct wrapper *w = (struct wrapper *)wr->w;
@@ -225,6 +225,20 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     wr->tid = info->proc_data.tid;
     wr->w = w;
+    if ( 4 == s->reg_size )
+    {
+        // For 32-bit Windows, the calling convention of the syscall api is _stdcall, which means the callee to clear the stack space.
+        // So when the function returns, the value of the stack pointer should be the current rsp add the size of the parameters and
+        // the size of the return address (4 bytes)
+        wr->stack_fingerprint = info->regs->rsp + 4 * nargs + 4;
+    }
+    else
+    {
+        // For 64-bit windows calling convention, the stack pointer remains unchanged before and after the function call.
+        // So when the function returns, the value of the stack pointer should be the current rsp add the size of the return address (8 bytes)
+        // See : https://docs.microsoft.com/en-us/cpp/build/x64-software-conventions?view=vs-2019
+        wr->stack_fingerprint = info->regs->rsp + 8;
+    }
 
     ret_trap->breakpoint.lookup_type = LOOKUP_DTB;
     ret_trap->breakpoint.addr_type = ADDR_VA;
