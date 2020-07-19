@@ -181,6 +181,7 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [TEB_LASTERRORVALUE] = { "_TEB", "LastErrorValue" },
     [ETHREAD_CID] = {"_ETHREAD", "Cid" },
     [ETHREAD_TCB] = { "_ETHREAD", "Tcb" },
+    [ETHREAD_WIN32STARTADDRESS] = { "_ETHREAD", "Win32StartAddress" },
     [ETHREAD_THREADLISTENTRY] = { "_ETHREAD", "ThreadListEntry" },
     [CLIENT_ID_UNIQUETHREAD] = {"_CLIENT_ID", "UniqueThread" },
     [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
