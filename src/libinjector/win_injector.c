@@ -154,8 +154,13 @@ struct injector
 
     // For shellcode execution
     addr_t payload, payload_addr, memset;
+    // For readfile/writefile
+    addr_t create_file, read_file, write_file, close_handle, expand_env;
     size_t binary_size, payload_size;
     uint32_t status;
+    uint32_t file_handle;
+    FILE* host_file;
+    unicode_string_t expanded_target;
 
     // For process doppelganging shellcode
     addr_t binary, binary_addr, saved_bp;
@@ -449,6 +454,85 @@ static bool setup_memset_stack(injector_t injector, drakvuf_trap_info_t* info)
     init_int_argument(&args[1], 0);
     init_int_argument(&args[2], injector->payload_size + injector->binary_size);
     init_int_argument(&args[3], 0);
+
+    return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+}
+
+static bool setup_expand_env_stack(injector_t injector, drakvuf_trap_info_t* info)
+{
+    struct argument args[3] = { {0} };
+
+    init_unicode_argument(&args[0], injector->target_file_us);
+    init_int_argument(&args[1], injector->payload_addr);
+    init_int_argument(&args[2], 256);
+
+    return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+}
+
+static bool setup_create_file_stack(injector_t injector, drakvuf_trap_info_t* info)
+{
+    struct argument args[7] = { {0} };
+
+    init_int_argument(&args[0], injector->payload_addr);
+
+    if (injector->method == INJECT_METHOD_READ_FILE)
+        init_int_argument(&args[1], GENERIC_READ);
+    else
+        init_int_argument(&args[1], GENERIC_WRITE);
+
+    init_int_argument(&args[2], FILE_SHARE_READ);
+    init_int_argument(&args[3], 0);
+
+    if (injector->method == INJECT_METHOD_READ_FILE)
+        init_int_argument(&args[4], OPEN_EXISTING);
+    else
+        init_int_argument(&args[4], CREATE_NEW);
+
+    init_int_argument(&args[5], FILE_ATTRIBUTE_NORMAL);
+    init_int_argument(&args[6], 0);
+
+    return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+}
+
+static bool setup_read_file_stack(injector_t injector, drakvuf_trap_info_t* info)
+{
+    struct argument args[5] = { {0} };
+
+    // ReadFile(HANDLE, lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, NULL)
+
+    // first page is reserved for lpNumberOfBytesRead value
+    init_int_argument(&args[0], injector->file_handle);
+    init_int_argument(&args[1], injector->payload_addr + FILE_BUF_RESERVED);
+    init_int_argument(&args[2], injector->payload_size - FILE_BUF_RESERVED);
+    init_int_argument(&args[3], injector->payload_addr);
+    init_int_argument(&args[4], 0);
+
+    return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+}
+
+static bool setup_write_file_stack(injector_t injector, drakvuf_trap_info_t* info, size_t amount)
+{
+    struct argument args[5] = { {0} };
+
+    // WriteFile(HANDLE, lpBuffer, nNumberOfBytesToWrite, lpNumberOfBytesWritten, NULL)
+
+    // first page is reserved for lpNumberOfBytesWritten value
+    init_int_argument(&args[0], injector->file_handle);
+    init_int_argument(&args[1], injector->payload_addr + FILE_BUF_RESERVED);
+    init_int_argument(&args[2], amount);
+    init_int_argument(&args[3], injector->payload_addr);
+    init_int_argument(&args[4], 0);
+
+    return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
+}
+
+static bool setup_close_handle_stack(injector_t injector, drakvuf_trap_info_t* info)
+{
+    struct argument args[1] = { {0} };
+
+    // CloseHandle(HANDLE)
+
+    init_int_argument(&args[0], injector->file_handle);
 
     return setup_stack(injector->drakvuf, info, args, ARRAY_SIZE(args));
 }
@@ -1010,6 +1094,8 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                 break;
             case INJECT_METHOD_SHELLCODE:
             case INJECT_METHOD_DOPP:
+            case INJECT_METHOD_READ_FILE:
+            case INJECT_METHOD_WRITE_FILE:
                 success = setup_virtual_alloc_stack(injector, info);
                 break;
             default:
@@ -1024,7 +1110,10 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             return 0;
         }
 
-        if (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method)
+        if (INJECT_METHOD_SHELLCODE == injector->method ||
+            INJECT_METHOD_DOPP == injector->method ||
+            INJECT_METHOD_WRITE_FILE == injector->method ||
+            INJECT_METHOD_READ_FILE == injector->method)
         {
             injector->status = STATUS_ALLOC_OK;
         }
@@ -1065,7 +1154,258 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     // Execute the payload
     if ( !injector->is32bit && STATUS_PHYS_ALLOC_OK == injector->status)
     {
-        return inject_payload(drakvuf, info);
+        if (INJECT_METHOD_READ_FILE != injector->method &&
+            INJECT_METHOD_WRITE_FILE != injector->method)
+        {
+            return inject_payload(drakvuf, info);
+        }
+        else
+        {
+            PRINT_DEBUG("Expanding shell...\n");
+
+            if (!setup_expand_env_stack(injector, info))
+            {
+                PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+                return 0;
+            }
+
+            info->regs->rip = injector->expand_env;
+
+            injector->status = STATUS_EXPAND_ENV_OK;
+
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        }
+    }
+
+    if ( !injector->is32bit && STATUS_EXPAND_ENV_OK == injector->status )
+    {
+        PRINT_DEBUG("Env expand status: %lx\n", info->regs->rax);
+
+        if (!info->regs->rax)
+        {
+            PRINT_DEBUG("Failed to expand environemnt variables!\n");
+            return 0;
+        }
+
+//	uint64_t i;
+	uint8_t buf[FILE_BUF_SIZE];
+        unicode_string_t in;
+
+	access_context_t ctx = { 0 };
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+        ctx.addr = injector->payload_addr;
+
+        if (info->regs->rax * 2 > FILE_BUF_SIZE)
+        {
+            PRINT_DEBUG("Env expand reported more than the buffer can carry.\n");
+            return 0;
+        }
+
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+        vmi_read(vmi, &ctx, info->regs->rax * 2, buf, NULL);
+        drakvuf_release_vmi(drakvuf);
+
+        in.contents = buf;
+        in.length = info->regs->rax * 2;
+        in.encoding = "UTF-16";
+
+        if (VMI_SUCCESS != vmi_convert_str_encoding(&in, &injector->expanded_target, "UTF-8"))
+        {
+            PRINT_DEBUG("Failed to convert buffer\n");
+            return 0;
+        }
+
+        PRINT_DEBUG("Expanded: %s\n", injector->expanded_target.contents);
+        PRINT_DEBUG("Opening file...\n");
+
+        if (!setup_create_file_stack(injector, info))
+        {
+            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+            return 0;
+        }
+
+        info->regs->rip = injector->create_file;
+
+        injector->status = STATUS_CREATE_FILE_OK;
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+
+    if (!injector->is32bit &&
+        ( STATUS_CREATE_FILE_OK == injector->status || STATUS_WRITE_FILE_OK == injector->status ) &&
+        INJECT_METHOD_WRITE_FILE == injector->method)
+    {
+        uint8_t buf[FILE_BUF_SIZE];
+        size_t amount;
+
+        if (STATUS_CREATE_FILE_OK == injector->status)
+        {
+            PRINT_DEBUG("File create result %lx\n", info->regs->rax);
+            if (info->regs->rax == (~0ULL) || !info->regs->rax)
+            {
+                PRINT_DEBUG("Failed to open guest file\n");
+                return 0;
+            }
+
+            injector->file_handle = info->regs->rax;
+            injector->host_file = fopen(injector->binary_path, "rb");
+
+            if (!injector->host_file)
+            {
+                PRINT_DEBUG("Failed to open host file\n");
+                return 0;
+            }
+        }
+
+        PRINT_DEBUG("Writing file...\n");
+        amount = fread(buf + FILE_BUF_RESERVED, 1, FILE_BUF_SIZE - FILE_BUF_RESERVED, injector->host_file);
+        PRINT_DEBUG("Amount: %lx\n", amount);
+
+        if (!amount)
+        {
+            PRINT_DEBUG("Finishing\n");
+
+            if (!setup_close_handle_stack(injector, info))
+            {
+                PRINT_DEBUG("Failed to setup stack for closing handle\n");
+                return 0;
+            }
+
+            info->regs->rip = injector->close_handle;
+
+            injector->status = STATUS_CLOSE_FILE_OK;
+
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        }
+        else
+        {
+            PRINT_DEBUG("Writing...\n");
+
+            if (!setup_write_file_stack(injector, info, amount))
+            {
+                PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+                return 0;
+            }
+        }
+
+        access_context_t ctx = { 0 };
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+        ctx.addr = injector->payload_addr + FILE_BUF_RESERVED;
+
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+        vmi_write(vmi, &ctx, amount, buf + FILE_BUF_RESERVED, NULL);
+        drakvuf_release_vmi(drakvuf);
+
+        info->regs->rip = injector->write_file;
+
+        injector->status = STATUS_WRITE_FILE_OK;
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+
+    if (!injector->is32bit &&
+        STATUS_CREATE_FILE_OK == injector->status &&
+        INJECT_METHOD_READ_FILE == injector->method)
+    {
+        PRINT_DEBUG("File create result %lx\n", info->regs->rax);
+
+        if (info->regs->rax == (~0ULL) || !info->regs->rax)
+        {
+            PRINT_DEBUG("Failed to open file\n");
+            return 0;
+        }
+
+        injector->file_handle = info->regs->rax;
+        injector->host_file = fopen(injector->binary_path, "wb");
+
+        PRINT_DEBUG("Reading file...\n");
+
+        if (!setup_read_file_stack(injector, info))
+        {
+            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+            return 0;
+        }
+
+        info->regs->rip = injector->read_file;
+
+        injector->status = STATUS_READ_FILE_OK;
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+
+    if (!injector->is32bit && STATUS_READ_FILE_OK == injector->status)
+    {
+        uint8_t buf[FILE_BUF_SIZE];
+
+        PRINT_DEBUG("File read result: %lx\n", info->regs->rax);
+
+        access_context_t ctx = { 0 };
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+        ctx.addr = injector->payload_addr;
+
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+        vmi_read(vmi, &ctx, FILE_BUF_SIZE, buf, NULL);
+        drakvuf_release_vmi(drakvuf);
+
+        uint32_t* num_bytes = (uint32_t*)buf;
+
+        if (*num_bytes > FILE_BUF_SIZE)
+        {
+            *num_bytes = FILE_BUF_SIZE;
+            PRINT_DEBUG("Number of bytes read by ReadFile is greater than the buffer size, truncating.\n");
+        }
+
+        fwrite(buf + FILE_BUF_RESERVED, *num_bytes, 1, injector->host_file);
+
+        if (info->regs->rax != 0 && *num_bytes != 0)
+        {
+            if (!setup_read_file_stack(injector, info))
+            {
+                PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+                return 0;
+            }
+
+            info->regs->rip = injector->read_file;
+
+            injector->status = STATUS_READ_FILE_OK;
+        }
+        else
+        {
+            PRINT_DEBUG("Finishing\n");
+
+            if (!setup_close_handle_stack(injector, info))
+            {
+                PRINT_DEBUG("Failed to setup stack for closing handle\n");
+                return 0;
+            }
+
+            injector->status = STATUS_CLOSE_FILE_OK;
+        }
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
+
+    if ( !injector->is32bit && STATUS_CLOSE_FILE_OK == injector->status )
+    {
+        PRINT_DEBUG("Close handle RAX: 0x%lx\n", info->regs->rax);
+        fclose(injector->host_file);
+
+        if (info->regs->rax == ~0ULL || !info->regs->rax)
+        {
+            PRINT_DEBUG("Failed to close guest file handle\n");
+            return 0;
+        }
+
+        if (!injector_set_hijacked(injector, info))
+            return 0;
+
+        injector->status = STATUS_EXEC_OK;
+        memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
     // Handle breakpoint on PspCallProcessNotifyRoutines()
@@ -1160,9 +1500,18 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         PRINT_DEBUG("Injected\n");
         injector->rc = INJECTOR_SUCCEEDED;
     }
-    else if ( (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method) && STATUS_EXEC_OK == injector->status)
+    else if ( (INJECT_METHOD_SHELLCODE == injector->method ||
+               INJECT_METHOD_DOPP == injector->method) &&
+              STATUS_EXEC_OK == injector->status)
     {
         PRINT_DEBUG("Shellcode executed\n");
+        injector->rc = INJECTOR_SUCCEEDED;
+    }
+    else if ( (INJECT_METHOD_READ_FILE == injector->method ||
+               INJECT_METHOD_WRITE_FILE == injector->method) &&
+              STATUS_EXEC_OK == injector->status)
+    {
+        PRINT_DEBUG("File operation executed OK\n");
         injector->rc = INJECTOR_SUCCEEDED;
     }
 
@@ -1287,6 +1636,11 @@ static void print_injection_info(output_format_t format, const char* file, injec
     else
     {
         arguments = "";
+    }
+
+    if (injector->expanded_target.contents)
+    {
+        process_name = (char *)injector->expanded_target.contents;
     }
 
     char* escaped_pname = g_strescape(process_name, NULL);
@@ -1546,6 +1900,31 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
 
         injector->memset = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "memset", injector->global_search);
         if (!injector->memset) return false;
+        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc", injector->global_search);
+    }
+    else if (INJECT_METHOD_WRITE_FILE == injector->method || INJECT_METHOD_READ_FILE == injector->method)
+    {
+        injector->payload_size = FILE_BUF_SIZE;
+
+        injector->memset = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "memset", injector->global_search);
+        if (!injector->memset) return false;
+        injector->create_file = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateFileW", injector->global_search);
+        if (!injector->create_file) return false;
+        injector->expand_env = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "ExpandEnvironmentStringsW", injector->global_search);
+        if (!injector->expand_env) return false;
+
+        if (INJECT_METHOD_WRITE_FILE == injector->method)
+        {
+            injector->write_file = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "WriteFile", injector->global_search);
+            if (!injector->write_file) return false;
+        }
+        else if (INJECT_METHOD_READ_FILE == injector->method)
+        {
+            injector->read_file = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "ReadFile", injector->global_search);
+            if (!injector->read_file) return false;
+        }
+
+        injector->close_handle = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CloseHandle", injector->global_search);
         injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc", injector->global_search);
     }
 
