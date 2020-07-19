@@ -181,6 +181,7 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
             escaped_pname = drakvuf_escape_str(info->proc_data.name);
             printf( "{"
                     "\"Plugin\": \"apimon\", "
+                    "\"Event\": \"api_called\", "
                     "\"TimeStamp\":" "\"" FORMAT_TIMEVAL "\", "
                     "\"ProcessName\": %s, "
                     "\"UserName\": \"%s\", "
@@ -309,6 +310,49 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+static void print_addresses(drakvuf_t drakvuf, apimon *plugin, const dll_view_t *dll, const std::vector<hook_target_view_t>& targets)
+{
+    unicode_string_t* dll_name;
+    json_object *j_root;
+    json_object *j_rvas;
+    vmi_pid_t pid;
+    vmi_lock_guard lg(drakvuf);
+
+    dll_name = drakvuf_read_unicode_va(lg.vmi, dll->mmvad.file_name_ptr, 0);
+
+    if (plugin->m_output_format != OUTPUT_JSON)
+        return;
+
+    if (!dll_name || !dll_name->contents)
+        goto out;
+
+    vmi_dtb_to_pid(lg.vmi, dll->dtb, &pid);
+
+    j_root = json_object_new_object();
+    j_rvas = json_object_new_object();
+
+    for (auto const& target : targets)
+    {
+        if (target.state == HOOK_OK)
+            json_object_object_add(j_rvas, target.target_name.c_str(), json_object_new_int(target.offset));
+    }
+
+    json_object_object_add(j_root, "Plugin", json_object_new_string("apimon"));
+    json_object_object_add(j_root, "Event", json_object_new_string("dll_loaded"));
+    json_object_object_add(j_root, "Rva", j_rvas);
+    json_object_object_add(j_root, "DllBase", json_object_new_string_fmt("0x%lx", dll->real_dll_base));
+    json_object_object_add(j_root, "DllName", json_object_new_string((const char *)dll_name->contents));
+    json_object_object_add(j_root, "PID", json_object_new_int(pid));
+
+    printf("%s\n", json_object_to_json_string(j_root));
+
+    json_object_put(j_root);
+
+out:
+    if (dll_name)
+        vmi_free_unicode_str(dll_name);
+}
+
 static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
 {
     apimon* plugin = (apimon*)extra;
@@ -331,8 +375,10 @@ static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* ex
         vmi_free_unicode_str(dll_name);
 }
 
-static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
+static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::vector<hook_target_view_t>& targets, void* extra)
 {
+    apimon* plugin = (apimon*)extra;
+    print_addresses(drakvuf, plugin, dll, targets);
     PRINT_DEBUG("[APIMON] DLL hooked - done\n");
 }
 
