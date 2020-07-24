@@ -164,8 +164,7 @@ echo "GRUB_CMDLINE_XEN_DEFAULT=\"dom0_mem=4096M,max:4096M dom0_max_vcpus=4 dom0_
 echo "/usr/local/lib" > /etc/ld.so.conf.d/xen.conf
 ldconfig
 echo "none /proc/xen xenfs defaults,nofail 0 0" >> /etc/fstab
-echo "xen-evtchn" >> /etc/modules
-echo "xen-privcmd" >> /etc/modules
+echo "xen-evtchn" >> /etc/modulesecho "xen-privcmd" >> /etc/modules
 update-rc.d xencommons defaults 19 18
 </code></pre>
 
@@ -205,18 +204,19 @@ maxvcpus = 2
 builder = "hvm"
 boot = "cd"
 hap = 1
-acpi = 1
 on_poweroff = "destroy"
 on_reboot = "destroy"
 on_crash = "destroy"
-vnc=1
-vnclisten="0.0.0.0"
+vnc = 1
+vnclisten = "0.0.0.0"
+stdvga = 1
 usb = 1
 usbdevice = "tablet"
+audio = 1
+soundhw = "hda"
+viridian = 1
 altp2m = 2
-shadow_memory = 16
-audio=1
-soundhw='hda'
+shadow_memory = 32
 vif = [ 'type=ioemu,model=e1000,bridge=xenbr0,mac=00:06:5B:BA:7C:01' ]
 disk = [ 'phy:/dev/vg/windows7-sp1,hda,w', 'file:/path/to/your/windows7.iso,hdc:cdrom,r' ]
 </pre></code>
