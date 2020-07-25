@@ -17,7 +17,7 @@ else
     apt-get update
 fi
 
-apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive clang python-dev gcc-7 g++-7
+apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive clang python3-dev gcc-7 g++-7
 
 HAS_PYTHON_IS_PYTHON=$(apt-cache search --names-only '^python-is-python2$')
 
