@@ -59,7 +59,6 @@ cp -avr /build/usr/bin/* deb/usr/bin/
 
 mkdir -p deb/usr/lib/
 cp -avr /build/usr/lib/* deb/usr/lib/
-mv deb/usr/lib/python3/site-packages deb/usr/lib/python3/dist-packages
 
 mkdir -p deb/usr/include/
 cp -avr /build/usr/include/* deb/usr/include/
