@@ -108,6 +108,8 @@
 #include <vector>
 #include <list>
 
+#define THREAD_WOW64_CONTEXT 29
+
 typedef enum
 {
     INVALID,
