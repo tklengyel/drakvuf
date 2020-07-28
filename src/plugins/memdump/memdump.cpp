@@ -405,8 +405,7 @@ static bool dump_if_points_to_executable_memory(
         .addr = mmvad.starting_vpn * VMI_PS_4KB
     };
     size_t dump_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
-    bool print_extras = extras ? true : false;
-    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, dump_size, reason, extras, print_extras)) {
+    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, dump_size, reason, extras, extras == nullptr)) {
         PRINT_DEBUG("[MEMDUMP] Failed to dump memory\n");
         return false;
     }
@@ -821,7 +820,7 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
 
     // We are only interested in calls that set thread context.
     addr_t thread_information_class = drakvuf_get_function_argument(drakvuf, info, 2);
-    if (thread_information_class != THREAD_WOW64_CONTEXT) {
+    if (thread_information_class != ThreadWow64Context) {
         return VMI_EVENT_RESPONSE_NONE;
     }
 
