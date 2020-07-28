@@ -805,7 +805,7 @@ static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_
 
 static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
     // This hook is intended to dump malware core from 32 bit packers that rely on Process Hollowing technique.
-    // This technique uses NtSetContextThread, and SysWOW64 translates NtSetContextThread to NtSetInformationThread 
+    // This technique uses NtSetContextThread, and SysWOW64 translates NtSetContextThread to NtSetInformationThread
     // internally.
     // NTSTATUS NtSetInformationThread(
     //     HANDLE          ThreadHandle,
