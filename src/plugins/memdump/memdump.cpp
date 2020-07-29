@@ -277,6 +277,11 @@ bool dump_memory_region(
     fclose(fp);
 
     chk_str = g_checksum_get_string(checksum);
+    if (plugin->dumped_hashes.find(chk_str) != plugin->dumped_hashes.end()) {
+        // We have already dumped this memory region.
+        goto done;
+    }
+    plugin->dumped_hashes.insert(chk_str);
 
     // The file name format for the memory dump file is:
     // <dump base address>_<contents hash>

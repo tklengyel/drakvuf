@@ -106,6 +106,7 @@
 #define MEMDUMP_H
 
 #include <vector>
+#include <unordered_set>
 #include <memory>
 
 #include <glib.h>
@@ -133,6 +134,7 @@ public:
     size_t kthread_process_rva;
 
     std::vector<plugin_target_config_entry_t> wanted_hooks;
+    std::unordered_set<std::string> dumped_hashes;
 
     memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
     ~memdump();
