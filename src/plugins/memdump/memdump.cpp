@@ -196,6 +196,7 @@ bool dump_memory_region(
     size_t num_pages;
 
     GChecksum* checksum = nullptr;
+    std::string dump_hash;
 
     size_t tmp_len_bytes = len_bytes;
 
@@ -277,11 +278,12 @@ bool dump_memory_region(
     fclose(fp);
 
     chk_str = g_checksum_get_string(checksum);
-    if (plugin->dumped_hashes.find(chk_str) != plugin->dumped_hashes.end()) {
+    dump_hash.assign(chk_str);
+    if (plugin->dumped_hashes.find(dump_hash) != plugin->dumped_hashes.end()) {
         // We have already dumped this memory region.
         goto done;
     }
-    plugin->dumped_hashes.insert(chk_str);
+    plugin->dumped_hashes.insert(dump_hash);
 
     // The file name format for the memory dump file is:
     // <dump base address>_<contents hash>
