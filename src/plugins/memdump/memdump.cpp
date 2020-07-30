@@ -196,7 +196,6 @@ bool dump_memory_region(
     size_t num_pages;
 
     GChecksum* checksum = nullptr;
-    std::string dump_hash;
 
     size_t tmp_len_bytes = len_bytes;
 
@@ -278,22 +277,13 @@ bool dump_memory_region(
     fclose(fp);
 
     chk_str = g_checksum_get_string(checksum);
-    dump_hash.assign(chk_str);
-    if (plugin->dumped_hashes.find(dump_hash) != plugin->dumped_hashes.end()) {
-        // We have already dumped this memory region.
-        goto done;
-    }
-    plugin->dumped_hashes.insert(dump_hash);
 
-    // The file name format for the memory dump file is:
-    // <dump base address>_<contents hash>
-    // This was set in order to satisfy the following issues:
-    // * when disassembling, it is required to know the dump's image base, here it could be obtained
-    //   just by looking at the file name which is handy both for humans and automated processing
-    // * de-duplication - sometimes, different heuristics may want to dump the same piece of memory;
-    //   unless there is a change in image base or contents, repeated memory dumps would get exactly
-    //   the same file name
-    if (asprintf(&file, "%llx_%.16s", (unsigned long long) ctx->addr, chk_str) < 0)
+    // The file name format for the memory dump file is just a <contents hash>.
+    // This way we solve de-duplication – sometimes, different heuristics may want to dump the same
+    // piece of memory; unless there is a change in image content, repeated memory dumps would get
+    // exactly the same file name.
+    // Note that DumpAddress required for further analysis is stored inside dump metadata.
+    if (asprintf(&file, "%.16s", chk_str) < 0)
         goto done;
 
     if (asprintf(&file_path, "%s/%s", plugin->memdump_dir, file) < 0)
