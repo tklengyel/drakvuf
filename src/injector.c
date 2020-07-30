@@ -325,8 +325,10 @@ int main(int argc, char** argv)
                                args);
 
     if (injection_result)
+    {
         if (output == OUTPUT_DEFAULT)
             printf("Process startup success\n");
+    }
     else
     {
         if (output == OUTPUT_DEFAULT)
