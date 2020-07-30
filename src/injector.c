@@ -305,7 +305,8 @@ int main(int argc, char** argv)
         if (!injection_thread)
             injection_thread = injection_pid;
 
-    printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
+    if (output == OUTPUT_DEFAULT)
+        printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
 
     int injection_result = injector_start_app(
                                drakvuf,
@@ -324,10 +325,12 @@ int main(int argc, char** argv)
                                args);
 
     if (injection_result)
-        printf("Process startup success\n");
+        if (output == OUTPUT_DEFAULT)
+            printf("Process startup success\n");
     else
     {
-        printf("Process startup failed\n");
+        if (output == OUTPUT_DEFAULT)
+            printf("Process startup failed\n");
         rc = 1;
     }
 
