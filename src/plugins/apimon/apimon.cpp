@@ -138,18 +138,18 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     if(!strcmp(info->trap->name, "CryptGenKey"))
         extra_data = CryptGenKey_hook(drakvuf, info, ret_target->arguments);
 
-    std::vector<fmt::Qstr<std::string>> fmt_args;
+    std::vector<fmt::Qstr<std::string>> fmt_args{};
     {
         const auto &args = ret_target->arguments;
         const auto &printers = ret_target->argument_printers;
-        auto arg = std::cbegin(args);
-        auto printer = std::cbegin(printers);
-        for (; arg != std::cend(args) && printer != std::cend(printers); ++arg, ++printer) {
+        for (auto [arg, printer] = std::tuple(std::cbegin(args), std::cbegin(printers));
+             arg != std::cend(args) && printer != std::cend(printers);
+             ++arg, ++printer) {
             fmt_args.push_back(fmt::Qstr((*printer)->print(drakvuf, info, *arg)));
         }
     }
 
-    std::vector<std::pair<std::string, fmt::Qstr<std::string>>> fmt_extra;
+    std::vector<std::pair<std::string, fmt::Qstr<std::string>>> fmt_extra{};
     for (const auto &extra : extra_data) {
         fmt_extra.push_back(std::make_pair(extra.first, fmt::Qstr(extra.second)));
     }
