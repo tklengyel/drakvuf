@@ -293,7 +293,8 @@ private:
                 os << sep;
 
             bool printed_rest = DataPrinter<T>::print_data(os, sep, args...);
-            if (!printed_rest)
+            // Undo separator printing when rest wasn't printed
+            if (printed && !printed_rest)
                 fmt::unputc(os);
             printed = printed || printed_rest;
         }
