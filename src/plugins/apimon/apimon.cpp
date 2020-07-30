@@ -142,9 +142,9 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     {
         const auto &args = ret_target->arguments;
         const auto &printers = ret_target->argument_printers;
-        auto arg = std::begin(args);
-        auto printer = std::begin(printers);
-        for (; arg != std::end(args) && printer != std::end(printers); ++arg, ++printer) {
+        auto arg = std::cbegin(args);
+        auto printer = std::cbegin(printers);
+        for (; arg != std::cend(args) && printer != std::cend(printers); ++arg, ++printer) {
             fmt_args.push_back(fmt::Qstr((*printer)->print(drakvuf, info, *arg)));
         }
     }
