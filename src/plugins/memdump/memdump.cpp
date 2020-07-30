@@ -405,7 +405,7 @@ static bool dump_if_points_to_executable_memory(
         .addr = mmvad.starting_vpn * VMI_PS_4KB
     };
     size_t dump_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
-    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, dump_size, reason, extras, extras == nullptr)) {
+    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, dump_size, reason, extras, nullptr == extras)) {
         PRINT_DEBUG("[MEMDUMP] Failed to dump memory\n");
         return false;
     }
