@@ -30,11 +30,6 @@ apt-get --quiet --yes build-dep xen
 apt-get autoremove -y
 apt-get clean
 
-if [ "$SYSTEM" = "Debian" ]
-then
-    patch /usr/include/linux/swab.h /tmp/swab.patch
-fi
-
 rm -rf /var/lib/apt/lists* /tmp/* /var/tmp/*
 
 rm /usr/bin/gcc /usr/bin/g++

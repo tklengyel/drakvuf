@@ -1,8 +1,0 @@
-138c138
-< #if BITS_PER_LONG == 64
----
-> #if __BITS_PER_LONG == 64
-140c140
-< #else /* BITS_PER_LONG == 32 */
----
-> #else /* __BITS_PER_LONG == 32 */
