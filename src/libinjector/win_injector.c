@@ -1187,11 +1187,10 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             return 0;
         }
 
-//	uint64_t i;
-	uint8_t buf[FILE_BUF_SIZE];
+        uint8_t buf[FILE_BUF_SIZE];
         unicode_string_t in;
 
-	access_context_t ctx = { 0 };
+        access_context_t ctx = { 0 };
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
         ctx.dtb = info->regs->cr3;
         ctx.addr = injector->payload_addr;
@@ -1640,7 +1639,7 @@ static void print_injection_info(output_format_t format, const char* file, injec
 
     if (injector->expanded_target.contents)
     {
-        process_name = (char *)injector->expanded_target.contents;
+        process_name = (char*)injector->expanded_target.contents;
     }
 
     char* escaped_pname = g_strescape(process_name, NULL);
