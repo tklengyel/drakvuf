@@ -127,14 +127,22 @@ static inline void print_help(void)
             "\t -r <path to json>         The OS kernel's JSON\n"
             "\t -d <domain ID or name>    The domain's ID or name\n"
             "\t -i <injection pid>        The PID(WIN) | TGID(LINUX) of the process to hijack for injection\n"
-            "\t -e <inject_file>          The executable to start with injection\n"
+            "\t -e <inject_file>          File to be injected:\n"
+            "\t                             for -m createproc/shellexec/shellcode/doppelganging: the executable to start with injection\n"
+            "\t                             for -m readfile/writefile: the guest path of the file to be read/written\n"
             "Optional inputs:\n"
             "\t -l                        Use libvmi.conf\n"
             "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
             "\t -m <inject_method>        The injection method [WIN] (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
+            "\t                           [WIN] special file operation methods:\n"
+            "\t                             readfile - pull a file (specified by guest path -e) from the VM and store it on host path specified by -B\n"
+            "\t                             writefile - push a file (specified by host path -B) to the VM and store it on guest path specified by -e\n"
             "\t -f <args for exec>        [LINUX] - Arguments specified for exec to include (requires -m execproc)\n"
             "\t                           [LINUX] (execproc -> int execlp(const char *file, const char *arg0, ..., const char *argn, (char *)0); for Linux kernel 4.18+, 64bit only) (Maximum 10 args)\n"
-            "\t [-B] <path>               The host path of the windows binary to inject (requires -m doppelganging)\n"
+            "\t [-B] <path>               The host path of the Windows binary:\n"
+            "\t                             for -m doppelganging: to inject into the guest VM\n"
+            "\t                             for -m readfile: where to store the file read out from VM\n"
+            "\t                             for -m writefile: to write into the guest VM\n"
             "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
             "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i) (LINUX: Injects to TGID Thread if ThreadID not specified)\n"
             "\t -c <current_working_dir>  The current working directory for injected executable\n"
@@ -163,6 +171,7 @@ int main(int argc, char** argv)
     const char* args[10] = {};
     int args_count = 0;
     addr_t kpgd = 0;
+    output_format_t output = OUTPUT_DEFAULT;
 
     fprintf(stderr, "%s %s v%s Copyright (C) 2014-2020 Tamas K Lengyel\n",
             PACKAGE_NAME, argv[0], PACKAGE_VERSION);
@@ -173,7 +182,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:f:k:vlg")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:f:k:vlgo:")) != -1)
         switch (c)
         {
             case 'r':
@@ -207,6 +216,10 @@ int main(int argc, char** argv)
                     injection_method = INJECT_METHOD_EXECPROC;
                 else if (!strncmp(optarg, "linuxshellcode", 14))
                     injection_method = INJECT_METHOD_SHELLCODE_LINUX;
+                else if (!strncmp(optarg, "readfile", 8))
+                    injection_method = INJECT_METHOD_READ_FILE;
+                else if (!strncmp(optarg, "writefile", 9))
+                    injection_method = INJECT_METHOD_WRITE_FILE;
                 else
                 {
                     fprintf(stderr, "Unrecognized injection method\n");
@@ -236,6 +249,14 @@ int main(int argc, char** argv)
                 break;
             case 'k':
                 kpgd = strtoull(optarg, NULL, 0);
+                break;
+            case 'o':
+                if (!strncmp(optarg, "csv", 3))
+                    output = OUTPUT_CSV;
+                if (!strncmp(optarg, "kv", 2))
+                    output = OUTPUT_KV;
+                if (!strncmp(optarg, "json", 4))
+                    output = OUTPUT_JSON;
                 break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
@@ -285,7 +306,8 @@ int main(int argc, char** argv)
         if (!injection_thread)
             injection_thread = injection_pid;
 
-    printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
+    if (output == OUTPUT_DEFAULT)
+        printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
 
     int injection_result = injector_start_app(
                                drakvuf,
@@ -294,7 +316,7 @@ int main(int argc, char** argv)
                                inject_file,
                                inject_cwd,
                                injection_method,
-                               OUTPUT_DEFAULT,
+                               output,
                                binary_path,
                                target_process,
                                false,
@@ -304,10 +326,14 @@ int main(int argc, char** argv)
                                args);
 
     if (injection_result)
-        printf("Process startup success\n");
+    {
+        if (output == OUTPUT_DEFAULT)
+            printf("Process startup success\n");
+    }
     else
     {
-        printf("Process startup failed\n");
+        if (output == OUTPUT_DEFAULT)
+            printf("Process startup failed\n");
         rc = 1;
     }
 

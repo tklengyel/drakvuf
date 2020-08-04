@@ -109,3 +109,20 @@ enum offset
 
     OFFSET_MAX
 };
+
+// size of the buffer that would be allocated for readfile/writefile operations
+#define FILE_BUF_SIZE (4096 * 256)
+// reserved portion at the beginning of the buffer to place
+// lpNumberOfBytesRead/lpNumberOfBytesWritten variables
+#define FILE_BUF_RESERVED (8)
+
+// flags for CreateFile
+#define GENERIC_READ     (0x80000000)
+#define GENERIC_WRITE    (0x40000000)
+
+#define FILE_SHARE_READ  (0x00000001)
+
+#define CREATE_NEW       (1)
+#define OPEN_EXISTING    (3)
+
+#define FILE_ATTRIBUTE_NORMAL  (0x00000080)
