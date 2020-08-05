@@ -411,7 +411,7 @@ inline auto get_common_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         method = fmt::Qstr(info->trap->name);
 
     return std::make_tuple(
-               keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
+               keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
                keyval("PID", fmt::Nval(info->attached_proc_data.pid)),
                keyval("PPID", fmt::Nval(info->attached_proc_data.ppid)),
                keyval("TID", fmt::Nval(info->attached_proc_data.tid)),
