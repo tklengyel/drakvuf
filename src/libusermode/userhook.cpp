@@ -962,6 +962,10 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
             {
                 e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UnicodePrinter()));
             }
+            else if (arg_type == "lpvoid*")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new PointerToPointerPrinter()));
+            }
             else if (arg_type == "pulong")
             {
                 e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UlongPrinter()));

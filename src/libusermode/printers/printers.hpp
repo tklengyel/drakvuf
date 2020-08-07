@@ -143,6 +143,12 @@ public:
     std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 
+class PointerToPointerPrinter : public ArgumentPrinter
+{
+public:
+    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
+};
+
 class UlongPrinter : public ArgumentPrinter
 {
 public:
