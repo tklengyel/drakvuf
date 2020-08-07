@@ -168,6 +168,26 @@ std::string UlongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint
     return stream.str();
 }
 
+std::string PointerToPointerPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
+{
+    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = argument
+    };
+    addr_t value = 0;
+    if (drakvuf_is_wow64(drakvuf, info))
+        vmi_read_32(vmi, &ctx, reinterpret_cast<uint32_t*>(&value));
+    else
+        vmi_read_addr(vmi, &ctx, &value);
+    drakvuf_release_vmi(drakvuf);
+    std::stringstream stream;
+    stream << "0x" << std::hex << value;
+    return stream.str();
+}
+
 std::string GuidPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
     auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
