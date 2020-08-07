@@ -966,6 +966,10 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
             {
                 e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new PointerToPointerPrinter()));
             }
+            else if (arg_type == "refclsid" || arg_type == "refiid")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new GuidPrinter()));
+            }
             else if (arg_type == "pulong")
             {
                 e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UlongPrinter()));
