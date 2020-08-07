@@ -3781,7 +3781,14 @@ SYSCALL(NtUserManageGestureHandlerWindow, NTSTATUS, 0);
 SYSCALL(NtUserMapPointsByVisualIdentifier, NTSTATUS, 0);
 SYSCALL(NtUserMapVirtualKeyEx, NTSTATUS, 0);
 SYSCALL(NtUserMenuItemFromPoint, NTSTATUS, 0);
-SYSCALL(NtUserMessageCall, NTSTATUS, 0);
+SYSCALL(NtUserMessageCall, NTSTATUS, 7,
+		"hWnd", "", DIR_IN, HWND,
+		"Msg", "", DIR_IN, UINT,
+		"wParam", "", DIR_IN, WPARAM,
+		"lParam", "", DIR_IN, LPARAM,
+		"ResultInfo", "", DIR_IN, ULONG_PTR,
+		"dwType", "", DIR_IN, DWORD,
+		"Ansi", "", DIR_IN, BOOLEAN);
 SYSCALL(NtUserMinMaximize, NTSTATUS, 0);
 SYSCALL(NtUserModifyUserStartupInfoFlags, NTSTATUS, 0);
 SYSCALL(NtUserModifyWindowTouchCapability, NTSTATUS, 0);
@@ -3951,7 +3958,11 @@ SYSCALL(NtUserSetWindowDisplayAffinity, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowFNID, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowFeedbackSetting, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowGroup, NTSTATUS, 0);
-SYSCALL(NtUserSetWindowLong, NTSTATUS, 0);
+SYSCALL(NtUserSetWindowLong, NTSTATUS, 4,
+		"hWnd", "", DIR_IN, HWND,
+		"nIndex", "", DIR_IN, INT,
+		"dwNewLong", "", DIR_IN, LONG,
+		"Ansi", "", DIR_IN, BOOLEAN);
 SYSCALL(NtUserSetWindowLongPtr, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowPlacement, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowPos, NTSTATUS, 0);
