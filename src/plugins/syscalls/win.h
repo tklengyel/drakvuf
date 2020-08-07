@@ -3453,7 +3453,10 @@ SYSCALL(NtUserCallMsgFilter, NTSTATUS, 0);
 SYSCALL(NtUserCallNextHookEx, NTSTATUS, 0);
 SYSCALL(NtUserCallNoParam, NTSTATUS, 0);
 SYSCALL(NtUserCallOneParam, NTSTATUS, 0);
-SYSCALL(NtUserCallTwoParam, NTSTATUS, 0);
+SYSCALL(NtUserCallTwoParam, NTSTATUS, 3,
+		"Param1", "", DIR_IN, DWORD,
+		"Param2", "", DIR_IN, DWORD,
+		"Routine", "", DIR_IN, DWORD);
 SYSCALL(NtUserCanBrokerForceForeground, NTSTATUS, 0);
 SYSCALL(NtUserChangeClipboardChain, NTSTATUS, 0);
 SYSCALL(NtUserChangeDisplaySettings, NTSTATUS, 0);
