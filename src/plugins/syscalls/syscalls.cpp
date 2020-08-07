@@ -113,7 +113,7 @@
 #include "win.h"
 #include "linux.h"
 
-static char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
+static char* extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
     if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
     {
@@ -131,14 +131,12 @@ static char* extract_string(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const 
 
         else if ( arg.type == PCHAR )
         {
-            char* str = drakvuf_read_ascii_str(drakvuf, info, val);
-            return str;
+            return drakvuf_read_ascii_str(drakvuf, info, val);
         }
 
-        if ( !strcmp(arg.name, "FileHandle") )
+        else if ( s->os == VMI_OS_WINDOWS )
         {
-            char* filename = drakvuf_get_filename_from_handle(drakvuf, info, val);
-            if ( filename ) return filename;
+            return win_extract_string(s, drakvuf, info, arg, val);
         }
     }
 
@@ -341,7 +339,7 @@ void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const
         else
             memcpy(&val, &args_data64[i], sizeof(uint64_t));
 
-        char* str = extract_string(drakvuf, info, sc->args[i], val);
+        char* str = extract_string(s, drakvuf, info, sc->args[i], val);
 
         switch (s->format)
         {
