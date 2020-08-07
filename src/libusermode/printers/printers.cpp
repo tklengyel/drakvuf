@@ -145,10 +145,41 @@ std::string WideStringPrinter::getBuffer(vmi_instance_t vmi, const access_contex
     return str_obj == NULL ? "" : (char*)str_obj->contents;
 }
 
-std::string UnicodePrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const
+std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
-    auto str_obj = drakvuf_read_unicode_common(vmi, ctx);
-    return str_obj == NULL ? "" : (char*)str_obj->contents;
+    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = argument
+    };
+    std::string str;
+    if (drakvuf_is_wow64(drakvuf, info))
+    {
+        struct
+        {
+            uint16_t length;
+            uint16_t max_length;
+            uint32_t buffer;
+        } __attribute__((packed)) us;
+
+        if (VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(us), &us, nullptr))
+        {
+            ctx.addr = us.buffer;
+            auto str_obj = drakvuf_read_wchar_string(vmi, &ctx);
+            str = str_obj == NULL ? "" : (char*)str_obj->contents;
+        }
+    }
+    else
+    {
+        auto str_obj = drakvuf_read_unicode_common(vmi, &ctx);
+        str = str_obj == NULL ? "" : (char*)str_obj->contents;
+    }
+    drakvuf_release_vmi(drakvuf);
+    std::stringstream stream;
+    stream << "0x" << std::hex << argument << ":\"" << str << "\"";
+    return stream.str();
 }
 
 std::string UlongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
