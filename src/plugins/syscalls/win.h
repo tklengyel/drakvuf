@@ -106,6 +106,7 @@
 #define SYSCALLS_WIN_H
 
 void setup_windows(drakvuf_t drakvuf, syscalls *s);
+char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val);
 
 #define NUMBER_SERVICE_TABLES   2
 #define NTOS_SERVICE_INDEX      0
@@ -133,6 +134,19 @@ typedef struct sst_x86 {
     uint32_t ServiceLimit;
     uint32_t ArgumentTable;
 } __attribute__((packed)) system_service_table_x86;
+
+enum windows_structs_offsets
+{
+	_OBJECT_ATTRIBUTES_ObjectName,
+    _OBJECT_ATTRIBUTES_RootDirectory,
+	_WINDOWS_STRUCTS_OFFSETS_MAX
+};
+
+static const char* windows_structs_offsets_names[_WINDOWS_STRUCTS_OFFSETS_MAX][2] =
+{
+    [_OBJECT_ATTRIBUTES_ObjectName] = {"_OBJECT_ATTRIBUTES", "ObjectName"},
+    [_OBJECT_ATTRIBUTES_RootDirectory] = {"_OBJECT_ATTRIBUTES", "RootDirectory"},
+};
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-braces"
