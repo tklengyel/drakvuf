@@ -143,6 +143,12 @@ private:
     std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx);
 };
 
+class UlongPrinter : public ArgumentPrinter
+{
+public:
+    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
+};
+
 class BitMaskPrinter : public ArgumentPrinter
 {
     std::map < uint64_t, std::string > dict;
