@@ -151,7 +151,7 @@ std::string UnicodePrinter::getBuffer(vmi_instance_t vmi, const access_context_t
     return str_obj == NULL ? "" : (char*)str_obj->contents;
 }
 
-std::string UlongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
+std::string UlongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument)
 {
     auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
     access_context_t ctx =
