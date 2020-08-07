@@ -182,6 +182,23 @@ std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, ui
     return stream.str();
 }
 
+std::string UlongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
+{
+    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = argument
+    };
+    uint32_t value = 0;
+    vmi_read_32(vmi, &ctx, &value);
+    drakvuf_release_vmi(drakvuf);
+    std::stringstream stream;
+    stream << "0x" << std::hex << value;
+    return stream.str();
+}
+
 BitMaskPrinter::BitMaskPrinter(std::map < uint64_t, std::string > dict) : dict(dict)
 {
     // intentionally empty
