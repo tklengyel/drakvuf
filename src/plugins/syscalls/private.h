@@ -146,6 +146,7 @@ typedef enum
     FS_INFORMATION_CLASS,
     HANDLE,
     HINSTANCE,
+    HWND,
     HHOOK,
     HOOKPROC,
     INT,
@@ -161,6 +162,7 @@ typedef enum
     LANGID,
     LCID,
     LONG,
+    LPARAM,
     LPGUID,
     MEMORY_INFORMATION_CLASS,
     MEMORY_RESERVE_TYPE,
@@ -264,6 +266,7 @@ typedef enum
     TOKEN_TYPE,
     TRANSACTIONMANAGER_INFORMATION_CLASS,
     TRANSACTION_INFORMATION_CLASS,
+    UINT,
     ULONG,
     ULONG_PTR,
     USHORT,
@@ -272,7 +275,8 @@ typedef enum
     WAIT_TYPE,
     WIN32_PROTECTION_MASK,
     WINAPI,
-    WORKERFACTORYINFOCLASS
+    WORKERFACTORYINFOCLASS,
+    WPARAM
 } type_t;
 
 static const char* type_names[]
@@ -296,6 +300,7 @@ static const char* type_names[]
     [FS_INFORMATION_CLASS] = "FS_INFORMATION_CLASS",
     [HANDLE] = "HANDLE",
     [HINSTANCE] = "HINSTANCE",
+    [HWND] = "HWND",
     [HHOOK] = "HHOOK",
     [HOOKPROC] = "HOOKPROC",
     [INT] = "INT",
@@ -311,6 +316,7 @@ static const char* type_names[]
     [LANGID] = "LANGID",
     [LCID] = "LCID",
     [LONG] = "LONG",
+    [LPARAM] = "LPARAM",
     [LPGUID] = "LPGUID",
     [MEMORY_INFORMATION_CLASS] = "MEMORY_INFORMATION_CLASS",
     [MEMORY_RESERVE_TYPE] = "MEMORY_RESERVE_TYPE",
@@ -414,6 +420,7 @@ static const char* type_names[]
     [TOKEN_TYPE] = "TOKEN_TYPE",
     [TRANSACTIONMANAGER_INFORMATION_CLASS] = "TRANSACTIONMANAGER_INFORMATION_CLASS",
     [TRANSACTION_INFORMATION_CLASS] = "TRANSACTION_INFORMATION_CLASS",
+    [UINT] = "UINT",
     [ULONG] = "ULONG",
     [ULONG_PTR] = "ULONG_PTR",
     [USHORT] = "USHORT",
@@ -422,7 +429,8 @@ static const char* type_names[]
     [WAIT_TYPE] = "WAIT_TYPE",
     [WIN32_PROTECTION_MASK] = "WIN32_PROTECTION_MASK",
     [WINAPI] = "WINAPI",
-    [WORKERFACTORYINFOCLASS] = "WORKERFACTORYINFOCLASS"
+    [WORKERFACTORYINFOCLASS] = "WORKERFACTORYINFOCLASS",
+    [WPARAM] = "WPARAM"
 };
 
 typedef struct
