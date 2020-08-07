@@ -108,7 +108,7 @@
 #include <libvmi/libvmi.h>
 #include <libdrakvuf/libdrakvuf.h>
 
-std::string ArgumentPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument)
+std::string ArgumentPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
     std::stringstream stream;
     stream << "0x" << std::hex << argument;
@@ -117,7 +117,7 @@ std::string ArgumentPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, u
 
 ArgumentPrinter::~ArgumentPrinter() {}
 
-std::string StringPrinterInterface::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument)
+std::string StringPrinterInterface::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
     auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
     access_context_t ctx =
@@ -133,19 +133,19 @@ std::string StringPrinterInterface::print(drakvuf_t drakvuf, drakvuf_trap_info* 
     return stream.str();
 }
 
-std::string AsciiPrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx)
+std::string AsciiPrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const
 {
     char *str = vmi_read_str(vmi, ctx);
     return str ? str : "";
 }
 
-std::string WideStringPrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx)
+std::string WideStringPrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const
 {
     auto str_obj = drakvuf_read_wchar_string(vmi, ctx);
     return str_obj == NULL ? "" : (char*)str_obj->contents;
 }
 
-std::string UnicodePrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx)
+std::string UnicodePrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const
 {
     auto str_obj = drakvuf_read_unicode_common(vmi, ctx);
     return str_obj == NULL ? "" : (char*)str_obj->contents;
@@ -156,13 +156,13 @@ BitMaskPrinter::BitMaskPrinter(std::map < uint64_t, std::string > dict) : dict(d
     // intentionally empty
 }
 
-std::string BitMaskPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument)
+std::string BitMaskPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
     std::stringstream stream;
     stream << "0x" << std::hex << argument << ": ";
     if (argument == 0 && this->dict.find(0) != this->dict.end())
     {
-        stream << this->dict[0];
+        stream << this->dict.at(0);
     }
     else
     {
@@ -177,7 +177,7 @@ std::string BitMaskPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, ui
                 }
                 else
                 {
-                    stream << " | ";
+                    stream << "|";
                 }
                 stream << element.second;
             }
