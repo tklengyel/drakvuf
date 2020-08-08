@@ -177,7 +177,7 @@ bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_inst
     init_int_argument(&args[1], BYTES_TO_READ);
     init_int_argument(&args[2], 0);
 
-    if (!setup_stack_locked(drakvuf, vmi, info, args, 3))
+    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 3))
         return false;
 
     info->regs->rip = injector->f->exallocatepool_va;
@@ -210,7 +210,7 @@ bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_
     init_struct_argument(&args[7], byte_offset);
     init_int_argument(&args[8], 0);
 
-    if (!setup_stack_locked(drakvuf, vmi, info, args, 9))
+    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 9))
         return false;
 
     injector->ntreadfile_info.io_status_block = args[4].data_on_stack;
@@ -239,7 +239,7 @@ bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instan
     init_int_argument(&args[3], sizeof(dev_info));
     init_int_argument(&args[4], 4); // FileFsDeviceInformation
 
-    if (!setup_stack_locked(drakvuf, vmi, info, args, 5))
+    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 5))
         return false;
 
     injector->ntqueryobject_info.out = args[2].data_on_stack;
