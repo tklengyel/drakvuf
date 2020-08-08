@@ -184,7 +184,7 @@ static bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     init_int_argument(&args[2], 0);
 
     vmi_lock_guard vmi_lg(drakvuf);
-    if (!setup_stack_locked(drakvuf, vmi_lg.vmi, info, args, 3))
+    if (!setup_stack_locked(drakvuf, vmi_lg.vmi, info->regs, args, 3))
         return false;
 
     info->regs->rip = ctx->plugin->malloc_va;
@@ -356,7 +356,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     init_int_argument(&args[2], ctx->current_dump_size);
 
     vmi_lock_guard vmi_lg(drakvuf);
-    if (!setup_stack_locked(drakvuf, vmi_lg.vmi, info, args, 3))
+    if (!setup_stack_locked(drakvuf, vmi_lg.vmi, info->regs, args, 3))
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Failed to inject "
                     "RtlCopyMemoryNonTemporal\n",
