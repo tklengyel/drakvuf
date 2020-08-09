@@ -477,7 +477,9 @@ static event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     if (!drakvuf_add_trap(drakvuf, trap))
     {
         printf("Failed to trap return at 0x%lx\n", rsp);
+        free_gstrings(lw);
         delete lw;
+        g_free(trap);
     }
     else
         f->traps_to_free = g_slist_prepend(f->traps_to_free, trap);
@@ -1138,6 +1140,7 @@ linux_filetracer::~linux_filetracer()
             drakvuf_trap_t* t = (drakvuf_trap_t*)loop->data;
             struct linux_wrapper* lw = (struct linux_wrapper*)t->data;
 
+            free_gstrings(lw);
             delete lw;
             g_free(loop->data);
 
