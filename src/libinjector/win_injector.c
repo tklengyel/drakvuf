@@ -1574,6 +1574,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     drakvuf_remove_trap(drakvuf, info->trap, NULL);
     drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
+    copy_gprs(&regs.x86, &injector->saved_regs);
     vmi = drakvuf_lock_and_get_vmi(drakvuf);
     vmi_set_vcpuregs(vmi, &regs, info->vcpu);
     drakvuf_release_vmi(drakvuf);
