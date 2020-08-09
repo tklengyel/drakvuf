@@ -831,7 +831,7 @@ static bool setup_wait_for_injected_process_trap(injector_t injector)
     return true;
 }
 
-static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info, registers_t *regs)
 {
     injector_t injector = info->trap->data;
 
@@ -847,7 +847,7 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
         access_context_t ctx = {0};
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-        ctx.dtb = info->regs->cr3;
+        ctx.dtb = regs->x86.cr3;
         ctx.addr = injector->binary_addr;
 
         vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -879,7 +879,7 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     // Write payload into guest's memory
     access_context_t ctx = {0};
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
+    ctx.dtb = regs->x86.cr3;
     ctx.addr = injector->payload_addr;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -892,13 +892,13 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         return 0;
     }
 
-    if (!setup_stack(injector->drakvuf, info->regs, NULL, 4))
+    if (!setup_stack(injector->drakvuf, &regs->x86, NULL, 4))
     {
         PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
         return 0;
     }
 
-    info->regs->rip = injector->payload_addr;
+    regs->x86.rip = injector->payload_addr;
 
     // At some point the shellcode will call NtCreateThreadEx() wich in turn
     // will cause a call to PspCallProcessNotifyRoutines(). In our case,
@@ -929,7 +929,11 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     PRINT_DEBUG("Executing the payload..\n");
 
-    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    vmi_set_vcpuregs(vmi, regs, info->vcpu);
+    drakvuf_release_vmi(drakvuf);
+
+    return 0;
 }
 
 static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -1185,7 +1189,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         if (INJECT_METHOD_READ_FILE != injector->method &&
             INJECT_METHOD_WRITE_FILE != injector->method)
         {
-            return inject_payload(drakvuf, info);
+            return inject_payload(drakvuf, info, &regs);
         }
         else
         {
@@ -1541,7 +1545,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             vmi_set_vcpuregs(vmi, &regs, info->vcpu);
             drakvuf_release_vmi(drakvuf);
 
-            return 0;//VMI_EVENT_RESPONSE_SET_REGISTERS;
+            return 0;
         }
         else
         {
