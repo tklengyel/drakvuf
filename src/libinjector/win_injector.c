@@ -1451,9 +1451,15 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         copy_gprs(&regs.x86, &injector->saved_regs);
 
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+
         vmi = drakvuf_lock_and_get_vmi(drakvuf);
         vmi_set_vcpuregs(vmi, &regs, info->vcpu);
         drakvuf_release_vmi(drakvuf);
+
+        PRINT_DEBUG("File operation executed OK\n");
+        injector->rc = INJECTOR_SUCCEEDED;
 
         return 0;
     }
@@ -1561,13 +1567,6 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
               STATUS_EXEC_OK == injector->status)
     {
         PRINT_DEBUG("Shellcode executed\n");
-        injector->rc = INJECTOR_SUCCEEDED;
-    }
-    else if ( (INJECT_METHOD_READ_FILE == injector->method ||
-               INJECT_METHOD_WRITE_FILE == injector->method) &&
-              STATUS_EXEC_OK == injector->status)
-    {
-        PRINT_DEBUG("File operation executed OK\n");
         injector->rc = INJECTOR_SUCCEEDED;
     }
 
