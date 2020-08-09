@@ -831,7 +831,7 @@ static bool setup_wait_for_injected_process_trap(injector_t injector)
     return true;
 }
 
-static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info, registers_t *regs)
+static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info, registers_t* regs)
 {
     injector_t injector = info->trap->data;
 
