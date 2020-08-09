@@ -110,6 +110,7 @@
 
 #include "../plugins.h"
 #include "regmon.h"
+#include "plugins/output_format.h"
 
 #include <vector>
 #include <string>
@@ -137,83 +138,31 @@ enum RegistryValueTypes
 static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, char const* key_name, char const* value_name, char const* value)
 {
     regmon* reg = (regmon*)info->trap->data;
-    gchar* escaped_pname = NULL;
-    gchar* escaped_key = NULL;
 
-    switch ( reg->format )
+    std::optional<fmt::Qstr<decltype(value_name)>> value_name_opt;
+    std::optional<fmt::Qstr<decltype(value)>> value_opt;
+
+    if (value_name)
+        value_name_opt = fmt::Qstr(value_name);
+    if (value)
+        value_opt = fmt::Qstr(value);
+
+    if (reg->format == OUTPUT_DEFAULT)
     {
-        case OUTPUT_CSV:
-            printf("regmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid, info->trap->name, key_name );
-            if (value_name)
-                printf(",%s", value_name);
-            if (value)
-                printf(",\"%s\"", value);
-            printf("\n");
-            break;
-
-        case OUTPUT_KV:
-            printf("regmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Key=\"%s\"",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   info->trap->name, key_name);
-            if (value_name)
-                printf(",ValueName=\"%s\"", value_name);
-            if (value)
-                printf(",Value=\"%s\"", value);
-            printf("\n");
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            escaped_key   = drakvuf_escape_str(key_name);
-
-            printf( "{"
-                    "\"Plugin\" : \"regmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"TID\": %d,"
-                    "\"Method\" : \"%s\","
-                    "\"Key\" : %s",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
-                    info->trap->name,
-                    escaped_key);
-            if (value_name)
-            {
-                gchar* escaped_vname = drakvuf_escape_str(value_name);
-                printf(",\"ValueName\":%s", escaped_vname);
-                g_free(escaped_vname);
-            }
-            if (value)
-            {
-                gchar* escaped_val = drakvuf_escape_str(value);
-                printf(",\"Value\":%s", escaped_val);
-                g_free(escaped_val);
-            }
-
-            printf("}\n");
-
-            g_free(escaped_key);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[REGMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ", EPROCESS:0x%" PRIx64 ", PID:%d, PPID:%d, \"%s\" %s:%" PRIi64 " %s:%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.base_addr, info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   USERIDSTR(drakvuf), info->attached_proc_data.userid, info->trap->name, key_name );
-            if (value_name)
-                printf(",%s", value_name);
-            if (value)
-                printf(", VALUE:\"%s\"", value);
-            printf("\n");
-            break;
+        deffmt::print("regmon", drakvuf, info,
+                      keyval("EPROCESS", fmt::Xval(info->proc_data.base_addr)),
+                      keyval("Key", fmt::Rstr(key_name)),
+                      keyval("ValueName", value_name_opt),
+                      keyval("Value", value_opt)
+                     );
+    }
+    else
+    {
+        fmt::print(reg->format, "regmon", drakvuf, info,
+                   keyval("Key", fmt::Qstr(key_name)),
+                   keyval("ValueName", value_name_opt),
+                   keyval("Value", value_opt)
+                  );
     }
 }
 

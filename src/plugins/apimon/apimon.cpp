@@ -110,6 +110,7 @@
 #include <assert.h>
 #include <libdrakvuf/json-util.h>
 
+#include "plugins/output_format.h"
 #include "apimon.h"
 #include "private.h"
 #include "crypto.h"
@@ -120,31 +121,6 @@ static void free_trap(drakvuf_trap_t* trap)
     return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)trap->data;
     delete ret_target;
     delete trap;
-}
-
-void print_arguments(drakvuf_t drakvuf, drakvuf_trap_info* info, std::vector < uint64_t > arguments, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers)
-{
-    json_object *jobj = json_object_new_array();
-
-    for (size_t i = 0; i < arguments.size(); i++)
-    {
-        json_object_array_add(jobj, json_object_new_string(argument_printers[i]->print(drakvuf, info, arguments[i]).c_str()));
-    }
-
-    printf("%s", json_object_get_string(jobj));
-
-    json_object_put(jobj);
-}
-
-void print_extra_data(std::map < std::string, std::string > extra_data)
-{
-    size_t i = 0;
-    for (auto it = extra_data.begin(); it != extra_data.end(); it++, i++)
-    {
-        printf("\"%s\": \"%s\"", it->first.c_str(), it->second.c_str());
-        if (i < extra_data.size() - 1)
-            printf(", ");
-    }
 }
 
 static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
@@ -162,60 +138,31 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     if(!strcmp(info->trap->name, "CryptGenKey"))
         extra_data = CryptGenKey_hook(drakvuf, info, ret_target->arguments);
 
-    gchar* escaped_pname;
-    switch (plugin->m_output_format)
+    std::vector<fmt::Qstr<std::string>> fmt_args{};
     {
-        case OUTPUT_CSV:
-            printf("apimon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",0x%" PRIx64 ",0x%" PRIx64 ",",
-            UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-            info->proc_data.userid, info->trap->name, info->regs->rax, info->regs->rip);
-            print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
-            break;
-        case OUTPUT_KV:
-            printf("apimon Time=" FORMAT_TIMEVAL ",VCPU=%" PRIu32 ",CR3=0x%" PRIx64 ",PID=%d,PPID=%d,ProcessName=\"%s\",UserID=%" PRIi64 ",Method=\"%s\",CalledFrom=0x%" PRIx64 ",ReturnValue=0x%" PRIx64 ",Arguments=",
-            UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-            info->proc_data.userid, info->trap->name, info->regs->rip, info->regs->rax);
-            print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
-            break;
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            printf( "{"
-                    "\"Plugin\": \"apimon\", "
-                    "\"TimeStamp\":" "\"" FORMAT_TIMEVAL "\", "
-                    "\"ProcessName\": %s, "
-                    "\"UserName\": \"%s\", "
-                    "\"UserId\": %" PRIu64 ", "
-                    "\"PID\": %d, "
-                    "\"PPID\": %d, "
-                    "\"TID\": %d, "
-                    "\"Method\": \"%s\", "
-                    "\"CalledFrom\": \"0x%" PRIx64 "\", "
-                    "\"ReturnValue\": \"0x%" PRIx64 "\", "
-                    "\"Arguments\": ",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
-                    info->trap->name,
-                    info->regs->rip,
-                    info->regs->rax);
-
-            print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
-            printf(", "
-                   "\"Extra\": {");
-            print_extra_data(extra_data);
-            printf("}}");
-            g_free(escaped_pname);
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[APIMON-USERHOOK] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 " ProcessName:\"%s\" UserID:%" PRIi64 " Method:\"%s\" CalledFrom:0x%" PRIx64 " ReturnValue:0x%" PRIx64 " Arguments:",
-            UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-            info->proc_data.userid, info->trap->name, info->regs->rax, info->regs->rip);
-            print_arguments(drakvuf, info, ret_target->arguments, ret_target->argument_printers);
-            break;
+        const auto &args = ret_target->arguments;
+        const auto &printers = ret_target->argument_printers;
+        for (auto [arg, printer] = std::tuple(std::cbegin(args), std::cbegin(printers));
+             arg != std::cend(args) && printer != std::cend(printers);
+             ++arg, ++printer) {
+            fmt_args.push_back(fmt::Qstr((*printer)->print(drakvuf, info, *arg)));
+        }
     }
-    printf("\n");
+
+    std::vector<std::pair<std::string, fmt::Qstr<std::string>>> fmt_extra{};
+    for (const auto &extra : extra_data) {
+        fmt_extra.push_back(std::make_pair(extra.first, fmt::Qstr(extra.second)));
+    }
+
+    fmt::print(plugin->m_output_format, "apimon", drakvuf, info,
+        keyval("Event", fmt::Qstr("api_called")),
+        keyval("ProcessName", fmt::Qstr(info->proc_data.name)),
+        keyval("Method", fmt::Qstr(info->trap->name)),
+        keyval("CalledFrom", fmt::Xval(info->regs->rip)),
+        keyval("ReturnValue", fmt::Xval(info->regs->rax)),
+        keyval("Arguments", fmt_args),
+        keyval("Extra", fmt_extra)
+    );
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
     return VMI_EVENT_RESPONSE_NONE;
@@ -309,6 +256,49 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+static void print_addresses(drakvuf_t drakvuf, apimon *plugin, const dll_view_t *dll, const std::vector<hook_target_view_t>& targets)
+{
+    unicode_string_t* dll_name;
+    json_object *j_root;
+    json_object *j_rvas;
+    vmi_pid_t pid;
+    vmi_lock_guard lg(drakvuf);
+
+    dll_name = drakvuf_read_unicode_va(lg.vmi, dll->mmvad.file_name_ptr, 0);
+
+    if (plugin->m_output_format != OUTPUT_JSON)
+        return;
+
+    if (!dll_name || !dll_name->contents)
+        goto out;
+
+    vmi_dtb_to_pid(lg.vmi, dll->dtb, &pid);
+
+    j_root = json_object_new_object();
+    j_rvas = json_object_new_object();
+
+    for (auto const& target : targets)
+    {
+        if (target.state == HOOK_OK)
+            json_object_object_add(j_rvas, target.target_name.c_str(), json_object_new_int(target.offset));
+    }
+
+    json_object_object_add(j_root, "Plugin", json_object_new_string("apimon"));
+    json_object_object_add(j_root, "Event", json_object_new_string("dll_loaded"));
+    json_object_object_add(j_root, "Rva", j_rvas);
+    json_object_object_add(j_root, "DllBase", json_object_new_string_fmt("0x%lx", dll->real_dll_base));
+    json_object_object_add(j_root, "DllName", json_object_new_string((const char *)dll_name->contents));
+    json_object_object_add(j_root, "PID", json_object_new_int(pid));
+
+    printf("%s\n", json_object_to_json_string(j_root));
+
+    json_object_put(j_root);
+
+out:
+    if (dll_name)
+        vmi_free_unicode_str(dll_name);
+}
+
 static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
 {
     apimon* plugin = (apimon*)extra;
@@ -331,8 +321,10 @@ static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* ex
         vmi_free_unicode_str(dll_name);
 }
 
-static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
+static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::vector<hook_target_view_t>& targets, void* extra)
 {
+    apimon* plugin = (apimon*)extra;
+    print_addresses(drakvuf, plugin, dll, targets);
     PRINT_DEBUG("[APIMON] DLL hooked - done\n");
 }
 

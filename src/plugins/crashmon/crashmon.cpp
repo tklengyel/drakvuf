@@ -105,45 +105,13 @@
 #include <libvmi/libvmi.h>
 
 #include "crashmon.h"
+#include "plugins/output_format.h"
 
 static void print_crashed_process_information(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, vmi_pid_t ppid, const char* name)
 {
     crashmon* d = static_cast<crashmon*>(info->trap->data);
-    gchar* escaped_pname = NULL;
 
-    switch (d->format)
-    {
-        case OUTPUT_CSV:
-            printf("crashmon," FORMAT_TIMEVAL ",%" PRIu32 ",%" PRIu32 ",\"%s\",%" PRIi64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name, info->attached_proc_data.userid);
-            break;
-        case OUTPUT_KV:
-            printf("crashmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name);
-            break;
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"crashmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d"
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    info->attached_proc_data.userid,
-                    pid,
-                    ppid);
-            g_free(escaped_pname);
-            break;
-        case OUTPUT_DEFAULT:
-        default:
-            printf("[CRASHMON] TIME:" FORMAT_TIMEVAL " PID:%" PRIu32 " PPID:0x%" PRIu32 ",\"%s\" %s:%" PRIi64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), pid, ppid, name, USERIDSTR(drakvuf), info->attached_proc_data.userid);
-            break;
-    }
+    fmt::print(d->format, "crashmon", drakvuf, info);
 }
 
 static event_response_t check_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info)

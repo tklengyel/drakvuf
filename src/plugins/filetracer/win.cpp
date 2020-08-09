@@ -521,7 +521,7 @@ static void print_basic_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf
                     "\"PPID\": %d,"
                     "\"TID\": %d,"
                     "\"Operation\" : \"%s\","
-                    "\"FileHandle\" : \"0x%" PRIx32 "\""
+                    "\"FileHandle\" : \"0x%" PRIx32 "\","
                     "\"FileName\" : %s,"
                     "\"CreationTime\": %" PRIu64 ","
                     "\"LastAccessTime\": %" PRIu64 ","

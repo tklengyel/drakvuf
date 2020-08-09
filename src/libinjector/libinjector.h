@@ -132,6 +132,8 @@ typedef enum
     INJECT_METHOD_SHELLEXEC,
     INJECT_METHOD_SHELLCODE,
     INJECT_METHOD_DOPP,
+    INJECT_METHOD_READ_FILE,
+    INJECT_METHOD_WRITE_FILE,
     // linux
     INJECT_METHOD_EXECPROC,
     INJECT_METHOD_SHELLCODE_LINUX,
@@ -153,11 +155,16 @@ typedef enum
     STATUS_NULL,
     STATUS_ALLOC_OK,
     STATUS_PHYS_ALLOC_OK,
+    STATUS_EXPAND_ENV_OK,
     STATUS_WRITE_OK,
     STATUS_EXEC_OK,
     STATUS_BP_HIT,
     STATUS_CREATE_OK,
     STATUS_RESUME_OK,
+    STATUS_CREATE_FILE_OK,
+    STATUS_READ_FILE_OK,
+    STATUS_WRITE_FILE_OK,
+    STATUS_CLOSE_FILE_OK,
     __STATUS_MAX
 } status_type_t;
 
@@ -185,13 +192,13 @@ void init_unicode_argument(struct argument* arg,
     init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
 
 bool setup_stack(drakvuf_t drakvuf,
-                 drakvuf_trap_info_t* info,
+                 x86_registers_t *regs,
                  struct argument args[],
                  int nb_args) NOEXCEPT;
 
 bool setup_stack_locked(drakvuf_t drakvuf,
                         vmi_instance_t vmi,
-                        drakvuf_trap_info_t* info,
+                        x86_registers_t *regs,
                         struct argument args[],
                         int nb_args) NOEXCEPT;
 

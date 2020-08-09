@@ -104,6 +104,7 @@
 
 #include "wmimon.h"
 #include "private.h"
+#include "plugins/output_format.h"
 
 bool FAILED(unsigned long rax)
 {
@@ -405,49 +406,10 @@ event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_
 
     wmi_lock.unlock();
 
-    switch (plugin->m_output_format)
-    {
-        case OUTPUT_CSV:
-            printf("wmimon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s,%s,%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(object->contents), reinterpret_cast<char*>(method->contents));
-            break;
-        case OUTPUT_KV:
-            printf("wmimon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Object=\"%s\",Function=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(object->contents),
-                   reinterpret_cast<char*>(method->contents));
-            break;
-        case OUTPUT_JSON:
-        {
-            char proc_name[] = "invalid";
-            printf("{"
-                   "\"Plugin\" : \"wmimon\","
-                   "\"TimeStamp\" :"
-                   "\"" FORMAT_TIMEVAL "\","
-                   "\"ProcessName\": \"%s\","
-                   "\"PID\" : %d,"
-                   "\"PPID\": %d,"
-                   "\"Method\" : \"%s\","
-                   "\"Object\": \"%s\", "
-                   "\"Function\": \"%s\","
-                   "}\n",
-                   UNPACK_TIMEVAL(info->timestamp),
-                   proc_name,
-                   info->attached_proc_data.pid,
-                   info->attached_proc_data.ppid,
-                   info->trap->name,
-                   reinterpret_cast<char*>(object->contents),
-                   reinterpret_cast<char*>(method->contents));
-            break;
-        }
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[WMIMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s,Object:\"%s\",Function:\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   info->trap->name, reinterpret_cast<char*>(object->contents), reinterpret_cast<char*>(method->contents));
-            break;
-    }
+    fmt::print(plugin->m_output_format, "wmimon", drakvuf, info,
+               keyval("Object", fmt::Qstr(reinterpret_cast<const char*>(object->contents))),
+               keyval("Function", fmt::Qstr(reinterpret_cast<const char*>(method->contents)))
+              );
 
     vmi_free_unicode_str(object);
     vmi_free_unicode_str(method);
@@ -523,46 +485,9 @@ event_response_t GetObject_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    switch (plugin->m_output_format)
-    {
-        case OUTPUT_CSV:
-            printf("wmimon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s,%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(object->contents));
-            break;
-        case OUTPUT_KV:
-            printf("wmimon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Object=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(object->contents));
-            break;
-        case OUTPUT_JSON:
-        {
-            char proc_name[] = "invalid";
-            printf("{"
-                   "\"Plugin\" : \"wmimon\","
-                   "\"TimeStamp\" :"
-                   "\"" FORMAT_TIMEVAL "\","
-                   "\"ProcessName\": \"%s\","
-                   "\"PID\" : %d,"
-                   "\"PPID\": %d,"
-                   "\"Method\" : \"%s\","
-                   "\"Object\": \"%s\""
-                   "}\n",
-                   UNPACK_TIMEVAL(info->timestamp),
-                   proc_name,
-                   info->attached_proc_data.pid,
-                   info->attached_proc_data.ppid,
-                   info->trap->name,
-                   reinterpret_cast<char*>(object->contents));
-            break;
-        }
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[WMIMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s,Object:\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   info->trap->name, reinterpret_cast<char*>(object->contents));
-            break;
-    }
+    fmt::print(plugin->m_output_format, "wmimon", drakvuf, info,
+               keyval("Object", fmt::Qstr(reinterpret_cast<const char*>(object->contents)))
+              );
 
     vmi_free_unicode_str(object);
     return VMI_EVENT_RESPONSE_NONE;
@@ -636,46 +561,9 @@ event_response_t ExecQuery_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    switch (plugin->m_output_format)
-    {
-        case OUTPUT_CSV:
-            printf("wmimon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s,%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(command->contents));
-            break;
-        case OUTPUT_KV:
-            printf("wmimon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Command=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(command->contents));
-            break;
-        case OUTPUT_JSON:
-        {
-            char proc_name[] = "invalid";
-            printf("{"
-                   "\"Plugin\" : \"wmimon\","
-                   "\"TimeStamp\" :"
-                   "\"" FORMAT_TIMEVAL "\","
-                   "\"ProcessName\": \"%s\","
-                   "\"PID\" : %d,"
-                   "\"PPID\": %d,"
-                   "\"Method\" : \"%s\","
-                   "\"Command\": \"%s\""
-                   "}\n",
-                   UNPACK_TIMEVAL(info->timestamp),
-                   proc_name,
-                   info->attached_proc_data.pid,
-                   info->attached_proc_data.ppid,
-                   info->trap->name,
-                   reinterpret_cast<char*>(command->contents));
-            break;
-        }
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[WMIMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s,Command:\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   info->trap->name, reinterpret_cast<char*>(command->contents));
-            break;
-    }
+    fmt::print(plugin->m_output_format, "wmimon", drakvuf, info,
+               keyval("Command", fmt::Qstr(reinterpret_cast<const char*>(command->contents)))
+              );
 
     vmi_free_unicode_str(command);
     return VMI_EVENT_RESPONSE_NONE;
@@ -749,46 +637,9 @@ event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_in
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    switch (plugin->m_output_format)
-    {
-        case OUTPUT_CSV:
-            printf("wmimon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%s,%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3,
-                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(resource->contents));
-            break;
-        case OUTPUT_KV:
-            printf("wmimon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Resource=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                   info->attached_proc_data.name, info->trap->name, reinterpret_cast<char*>(resource->contents));
-            break;
-        case OUTPUT_JSON:
-        {
-            char proc_name[] = "invalid";
-            printf("{"
-                   "\"Plugin\" : \"wmimon\","
-                   "\"TimeStamp\" :"
-                   "\"" FORMAT_TIMEVAL "\","
-                   "\"ProcessName\": \"%s\","
-                   "\"PID\" : %d,"
-                   "\"PPID\": %d,"
-                   "\"Method\" : \"%s\","
-                   "\"Resource\" : \"%s\""
-                   "}\n",
-                   UNPACK_TIMEVAL(info->timestamp),
-                   proc_name,
-                   info->attached_proc_data.pid,
-                   info->attached_proc_data.ppid,
-                   info->trap->name,
-                   reinterpret_cast<char*>(resource->contents));
-            break;
-        }
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[WMIMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\":%s,Resource:%s\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   info->trap->name, reinterpret_cast<char*>(resource->contents));
-            break;
-    }
+    fmt::print(plugin->m_output_format, "wmimon", drakvuf, info,
+               keyval("Resource", fmt::Qstr(reinterpret_cast<const char*>(resource->contents)))
+              );
 
     vmi_free_unicode_str(resource);
 

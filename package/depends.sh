@@ -17,7 +17,7 @@ else
     apt-get update
 fi
 
-apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive clang python-dev gcc-7 g++-7
+apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive clang python3-dev gcc-7 g++-7
 
 HAS_PYTHON_IS_PYTHON=$(apt-cache search --names-only '^python-is-python2$')
 
@@ -29,11 +29,6 @@ fi
 apt-get --quiet --yes build-dep xen
 apt-get autoremove -y
 apt-get clean
-
-if [ "$SYSTEM" = "Debian" ]
-then
-    patch /usr/include/linux/swab.h /tmp/swab.patch
-fi
 
 rm -rf /var/lib/apt/lists* /tmp/* /var/tmp/*
 

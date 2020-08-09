@@ -115,6 +115,7 @@
 #include "procdump.h"
 #include "private.h"
 #include "minidump.h"
+#include "plugins/output_format.h"
 
 using namespace std::string_literals;
 
@@ -168,6 +169,12 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
 static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
         drakvuf_trap_info_t* info);
 
+static event_response_t complete_stage1(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                                        procdump_ctx* ctx);
+
+static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
+        drakvuf_trap_info_t* info);
+
 static bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
                                  procdump_ctx* ctx)
 {
@@ -177,7 +184,7 @@ static bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     init_int_argument(&args[2], 0);
 
     vmi_lock_guard vmi_lg(drakvuf);
-    if (!setup_stack_locked(drakvuf, vmi_lg.vmi, info, args, 3))
+    if (!setup_stack_locked(drakvuf, vmi_lg.vmi, info->regs, args, 3))
         return false;
 
     info->regs->rip = ctx->plugin->malloc_va;
@@ -190,17 +197,17 @@ static bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 // Returns true if next count pages is mapped and false otherwise.
 static bool max_contigious_range(const std::vector<uint64_t>& prototype_ptes,
                                  uint32_t total_number_of_ptes, uint32_t idx,
-                                 uint32_t& count)
+                                 uint32_t& count, uint64_t max_pages)
 {
     // No check for null pointer for purpose
     count = 0;
     if (idx >= total_number_of_ptes)
         return true;
 
-    bool skip = !IS_MMPTE_ACCESSIBLE(prototype_ptes[idx]);
-    for (auto i = idx; i < total_number_of_ptes; ++i)
+    bool skip = !IS_MMPTE_DUMPABLE(prototype_ptes[idx]);
+    for (auto i = idx; i < total_number_of_ptes && i < idx + max_pages; ++i)
     {
-        if (skip == !IS_MMPTE_ACCESSIBLE(prototype_ptes[i]))
+        if (skip == !IS_MMPTE_DUMPABLE(prototype_ptes[i]))
             ++count;
         else
             break;
@@ -236,7 +243,7 @@ static bool read_vm(drakvuf_t drakvuf, addr_t dtb, addr_t start, size_t size,
             if (access_ptrs[i])
             {
                 if (res)
-                    res = procdump_ctx->writer->append(static_cast<uint8_t *>(access_ptrs[i]), VMI_PS_4KB);
+                    res = procdump_ctx->writer->append(static_cast<uint8_t*>(access_ptrs[i]), VMI_PS_4KB);
                 munmap(access_ptrs[i], VMI_PS_4KB);
             }
             else if (res)
@@ -297,7 +304,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     auto total_number_of_ptes = vad->second.total_number_of_ptes;
     uint32_t ptes_to_dump = 0;
     auto skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
-                                     vad->second.idx, ptes_to_dump);
+                                     vad->second.idx, ptes_to_dump, ctx->POOL_SIZE_IN_PAGES);
 
     if (!ptes_to_dump)
     {
@@ -314,7 +321,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
             ctx->writer->append(zeros, VMI_PS_4KB);
         vad->second.idx += ptes_to_dump;
         skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
-                                    vad->second.idx, ptes_to_dump);
+                                    vad->second.idx, ptes_to_dump, ctx->POOL_SIZE_IN_PAGES);
         if (0 == ptes_to_dump)
         {
             ctx->vads.erase(vad_start);
@@ -349,7 +356,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     init_int_argument(&args[2], ctx->current_dump_size);
 
     vmi_lock_guard vmi_lg(drakvuf);
-    if (!setup_stack_locked(drakvuf, vmi_lg.vmi, info, args, 3))
+    if (!setup_stack_locked(drakvuf, vmi_lg.vmi, info->regs, args, 3))
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Failed to inject "
                     "RtlCopyMemoryNonTemporal\n",
@@ -359,33 +366,84 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
 
     info->regs->rip = ctx->plugin->memcpy_va;
 
-    ctx->bp->cb = rtlcopymemory_cb;
+    ctx->bp2->cb = rtlcopymemory_cb;
 
     return RTLCOPY_INJECT;
 }
 
-static bool dump_next_vads(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+static bool dump_next_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
                            procdump_ctx* ctx)
 {
     while (!ctx->vads.empty())
     {
-        if (2 == ctx->vads.begin()->second.type)
+        auto vad = ctx->vads.begin();
+        if (vad->second.zero_fill)
+        {
+            uint8_t zeros[VMI_PS_4KB] = {};
+            for (uint32_t i = 0; i < vad->second.total_number_of_ptes; ++i)
+                ctx->writer->append(zeros, VMI_PS_4KB);
+            ctx->vads.erase(vad->first);
+        }
+        else
         {
             switch (dump_with_rtlcopymemory(drakvuf, info, ctx))
             {
                 case RTLCOPY_INJECT:
                     return true;
                 case RTLCOPY_GO_NEXT_VAD:
-                    continue;
+                    break;
                 case RTLCOPY_RETRY_WITH_MMAP:
                 default:
+                    dump_with_mmap(drakvuf, info, ctx);
                     break;
             }
         }
-
-        dump_with_mmap(drakvuf, info, ctx);
     }
 
+    return false;
+}
+
+#define VAD_TYPE_DLL 2
+
+static bool dump_next_vads(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                           procdump_ctx* ctx)
+{
+    while (!ctx->vads.empty())
+    {
+        if (VAD_TYPE_DLL == ctx->vads.begin()->second.type)
+        {
+            // To avoid raises (aka BSODs) dump DLLs at stage 2
+            auto vad = ctx->vads.begin();
+            auto vad_start = vad->first;
+            ctx->dlls[vad_start] = vad->second;
+            ctx->vads.erase(vad_start);
+        }
+        else
+            dump_with_mmap(drakvuf, info, ctx);
+    }
+
+    // Go to stage 2
+    complete_stage1(drakvuf, info, ctx);
+    ctx->bp2 = (drakvuf_trap_t*)g_slice_new0(drakvuf_trap_t);
+    ctx->bp2->type = BREAKPOINT;
+    ctx->bp2->cb = terminate_process_cb2;
+    ctx->bp2->data = ctx;
+    ctx->bp2->name = nullptr;
+    ctx->bp2->breakpoint.lookup_type = LOOKUP_DTB;
+    ctx->bp2->breakpoint.dtb = info->regs->cr3;
+    ctx->bp2->breakpoint.addr_type = ADDR_VA;
+    ctx->bp2->breakpoint.addr = ctx->plugin->clean_process_va;
+    if (drakvuf_add_trap(drakvuf, ctx->bp2))
+    {
+        ctx->plugin->traps = g_slist_prepend(ctx->plugin->traps, ctx->bp2);
+        return true;
+    }
+    else
+    {
+        PRINT_DEBUG("[PROCDUMP] Failed to trap return location of injected "
+                    "function call @ 0x%lx!\n",
+                    ctx->bp2->breakpoint.addr);
+    }
     return false;
 }
 
@@ -401,28 +459,9 @@ static void free_trap(gpointer p)
     g_slice_free(drakvuf_trap_t, t);
 }
 
-static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                               procdump_ctx* ctx)
+static void restore_registers(drakvuf_trap_info_t* info,
+                              procdump_ctx* ctx)
 {
-    ctx->writer->finish();
-
-    if (ctx->vads.empty())
-    {
-        // If there is no VADs left than the file have been processed
-        save_file_metadata(ctx, &info->proc_data);
-        switch (ctx->plugin->m_output_format)
-        {
-            case OUTPUT_KV:
-                printf("procdump Time=" FORMAT_TIMEVAL
-                       ",PID=%d,PPID=%d,ProcessName=\"%s\",DumpReason="
-                       "\"TerminateProcess\",DumpSize=%" PRIu64 ",SN=%lu\n",
-                       UNPACK_TIMEVAL(info->timestamp), ctx->pid, ctx->ppid,
-                       ctx->name.data(), ctx->size, ctx->idx);
-                break;
-            default:
-                break;
-        }
-    }
     // One could not restore all registers at once like this:
     //     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t)),
     // because thus kernel structures could be affected.
@@ -446,11 +485,49 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     info->regs->r13 = ctx->saved_regs.r13;
     info->regs->r14 = ctx->saved_regs.r14;
     info->regs->r15 = ctx->saved_regs.r15;
+}
 
+static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                               procdump_ctx* ctx)
+{
+    ctx->writer->finish();
+
+    if (ctx->vads.empty())
+    {
+        // If there is no VADs left than the file have been processed
+        save_file_metadata(ctx, &info->proc_data);
+        fmt::print(ctx->plugin->m_output_format, "procdump", drakvuf, info,
+                   keyval("DumpReason", fmt::Qstr("TerminateProcess")),
+                   keyval("DumpSize", fmt::Nval(ctx->size)),
+                   keyval("SN", fmt::Nval(ctx->idx))
+                  );
+    }
+
+    restore_registers(info, ctx);
     free_pool(ctx->plugin->pools, ctx->pool);
     ctx->plugin->terminating.at(ctx->pid) = 0;
+    if (ctx->bp)
+    {
+        ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
+        drakvuf_remove_trap(drakvuf, ctx->bp, (drakvuf_trap_free_t)free_trap);
+    }
+    if (ctx->bp2)
+    {
+        ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp2);
+        drakvuf_remove_trap(drakvuf, ctx->bp2, (drakvuf_trap_free_t)free_trap);
+    }
+
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+}
+
+static event_response_t complete_stage1(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                                        procdump_ctx* ctx)
+{
+    restore_registers(info, ctx);
     ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
+    ctx->bp->data = nullptr;
     drakvuf_remove_trap(drakvuf, ctx->bp, (drakvuf_trap_free_t)free_trap);
+    ctx->bp = nullptr;
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
@@ -488,7 +565,7 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
                     ctx->current_dump_size, ctx->size);
     }
 
-    if (dump_next_vads(drakvuf, info, ctx))
+    if (dump_next_dlls(drakvuf, info, ctx))
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     else
         return detach(drakvuf, info, ctx);
@@ -552,7 +629,7 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
     // * Sections mapped with NtMapViewOfSection: VadType is 0
     if (!vad_commit_charge)
         return false;
-    if (!(vad_type == 2 || vad_type == 0))
+    if (!(vad_type == VAD_TYPE_DLL || vad_type == 0))
         return false;
 
     // MiAllocateVad sets CommitCharge to MM_MAX_COMMIT
@@ -575,7 +652,7 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
     }
 
     std::vector<addr_t> prototype_pte;
-    if (vad_type == 2)
+    if (vad_type == VAD_TYPE_DLL)
     {
         auto ptes = mmvad->total_number_of_ptes;
         if (len_pages == ptes)
@@ -614,7 +691,7 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
                 mmvad->ending_vpn, len_pages, len_bytes, vad_commit, vad_type,
                 vad_commit_charge);
 
-    ctx->vads[vad_start] = {vad_type, len_pages, prototype_pte, 0};
+    ctx->vads[vad_start] = {vad_type, len_pages, prototype_pte, 0, false};
     ctx->size += len_bytes;
 
     return false;
@@ -638,32 +715,47 @@ static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pr
     vector<struct mdmp_memory_descriptor64> memory_ranges;
     for (auto vad: ctx->vads)
     {
-        struct mdmp_memory_descriptor64 range(vad.first,
-                vad.second.total_number_of_ptes * VMI_PS_4KB);
-        memory_ranges.push_back(range);
+        if (VAD_TYPE_DLL != vad.second.type)
+        {
+            struct mdmp_memory_descriptor64 range(vad.first,
+                    vad.second.total_number_of_ptes * VMI_PS_4KB);
+            memory_ranges.push_back(range);
+        }
+    }
+    for (auto vad: ctx->vads)
+    {
+        if (VAD_TYPE_DLL == vad.second.type)
+        {
+            struct mdmp_memory_descriptor64 range(vad.first,
+                    vad.second.total_number_of_ptes * VMI_PS_4KB);
+            memory_ranges.push_back(range);
+        }
     }
 
+    // TODO Store all threads of the process
     struct mdmp_thread thread;
     thread.thread_id = info->attached_proc_data.tid;
+    // TODO Get Teb and StackBase from attached thread
     thread.teb = drakvuf_get_current_thread_teb(drakvuf, info);
     thread.stack.start_of_memory_range = drakvuf_get_current_thread_stackbase(drakvuf, info);
     union thread_context thread_ctx;
+    // TODO Get registers from attached thread _KTHREAD.TrapFrame
     thread_ctx.set(is32bit, info->regs);
 
     auto mdmp = minidump(time_stamp,
-                        is32bit,
-                        plugin->num_cpus,
-                        plugin->win_major,
-                        plugin->win_minor,
-                        plugin->win_build_number,
-                        plugin->vendor,
-                        plugin->version_information,
-                        plugin->feature_information,
-                        plugin->amd_extended_cpu_features,
-                        csdversion,
-                        memory_ranges,
-                        {thread},
-                        {thread_ctx});
+                         is32bit,
+                         plugin->num_cpus,
+                         plugin->win_major,
+                         plugin->win_minor,
+                         plugin->win_build_number,
+                         plugin->vendor,
+                         plugin->version_information,
+                         plugin->feature_information,
+                         plugin->amd_extended_cpu_features,
+                         csdversion,
+                         memory_ranges,
+    {thread},
+    {thread_ctx});
 
     if (!ctx->writer->append((const uint8_t*)&mdmp, sizeof(mdmp)))
     {
@@ -672,6 +764,64 @@ static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pr
     }
 
     return true;
+}
+
+static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
+        drakvuf_trap_info_t* info)
+{
+    if (!info->attached_proc_data.pid)
+    {
+        PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to get "
+                    "attached process\n",
+                    info->proc_data.pid, info->proc_data.tid);
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    auto ctx = static_cast<struct procdump_ctx*>(info->trap->data);
+    if (!ctx)
+    {
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    if (info->attached_proc_data.pid != ctx->pid)
+    {
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    // The thread could change
+    ctx->tid = info->attached_proc_data.tid;
+    ctx->plugin->terminating[ctx->pid] = ctx->tid;
+
+    // Get virtual address space map of the process
+    drakvuf_traverse_mmvad(drakvuf, info->attached_proc_data.base_addr, dump_mmvad,
+                           ctx);
+    if (ctx->vads.empty())
+        return detach(drakvuf, info, ctx);
+    else
+    {
+        for (auto dll = ctx->dlls.begin(); dll != ctx->dlls.end(); ++dll)
+        {
+            auto vad = ctx->vads.find(dll->first);
+            if (vad == ctx->vads.end() ||
+                vad->second.total_number_of_ptes != dll->second.total_number_of_ptes ||
+                vad->second.prototype_ptes.size() != dll->second.prototype_ptes.size())
+            {
+                PRINT_DEBUG("[PROCDUMP] DLL at %#lx of %ld PTEs disappered\n",
+                            dll->first, dll->second.total_number_of_ptes);
+                dll->second.zero_fill = true;
+            }
+        }
+
+        ctx->vads.clear();
+        ctx->vads.swap(ctx->dlls);
+    }
+
+    // Save registers to restore process/thread state
+    memcpy(&ctx->saved_regs, info->regs, sizeof(x86_registers_t));
+    if (dump_next_dlls(drakvuf, info, ctx))
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    else
+        return detach(drakvuf, info, ctx);
 }
 
 static event_response_t terminate_process_cb(drakvuf_t drakvuf,
@@ -816,6 +966,7 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
     , terminating()
     , malloc_va()
     , memcpy_va()
+    , clean_process_va()
     , win_build_number(0)
     , win_major(0)
     , win_minor(0)
@@ -832,6 +983,8 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
         get_function_va(drakvuf, "ntoskrnl.exe", "ExAllocatePoolWithTag");
     this->memcpy_va =
         get_function_va(drakvuf, "ntoskrnl.exe", "RtlCopyMemoryNonTemporal");
+    this->clean_process_va =
+        get_function_va(drakvuf, "ntoskrnl.exe", "MmCleanProcessAddressSpace");
 
     vmi_lock_guard vmi(drakvuf);
     num_cpus = vmi_get_num_vcpus(vmi);
@@ -851,7 +1004,7 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
     breakpoint_in_system_process_searcher bp;
     if (!register_trap<procdump>(
             drakvuf, nullptr, this, terminate_process_cb,
-            bp.for_syscall_name("MmCleanProcessAddressSpace")))
+            bp.for_syscall_name("NtTerminateProcess")))
     {
         throw -1;
     }

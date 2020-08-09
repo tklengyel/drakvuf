@@ -120,7 +120,8 @@ private:
     {
         .type = REGISTER,
         .reg = CR3,
-        .data = this
+        .data = this,
+        .name = nullptr
     };
 };
 

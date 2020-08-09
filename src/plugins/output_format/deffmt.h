@@ -160,7 +160,8 @@ struct DataPrinter
     static bool print(std::ostream& os, const fmt::Xval<Tv>& data, char)
     {
         auto ff = os.flags();
-        os << (data.withbase ? "0x" : "") << std::uppercase << std::hex << data.value;
+        auto base = data.withbase ? "0x" : "";
+        os << base << std::uppercase << std::hex << data.value;
         os.flags(ff);
         return true;
     }
@@ -234,6 +235,14 @@ struct DataPrinter
     {
         return TuplePrinter<decltype(data), sizeof...(Ts)>::print(os, data, sep);
     }
+
+    template <class... Ts>
+    static bool print(std::ostream& os, const std::variant<Ts...>& data, char sep)
+    {
+        return std::visit([&os, sep](auto&& arg) mutable {
+            return print_data(os, arg, sep);
+        }, data);
+    }
 };
 
 template <class T>
@@ -289,7 +298,7 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_
     {
         const char* method = info->trap->name ?: "";
         std::string procname = "\"";
-        procname += info->attached_proc_data.name;
+        procname += info->attached_proc_data.name ?: "NOPROC";
         procname += "\"";
 
         print_data(os,

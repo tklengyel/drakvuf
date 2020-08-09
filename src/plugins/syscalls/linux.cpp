@@ -118,22 +118,14 @@ static status_t linux_build_argbuf(void* buf, vmi_instance_t vmi,
                                    const syscall_t* sc,
                                    addr_t pt_regs_addr)
 {
-    int nargs = 0;
-    status_t rc = VMI_SUCCESS;
-
     if (NULL == sc)
-    {
-        rc = VMI_FAILURE;
-        goto exit;
-    }
+        return VMI_FAILURE;
 
-    nargs = sc->num_args;
+    int nargs = sc->num_args;
 
     // get arguments only if we know how many to get
     if (0 == nargs)
-    {
-        goto exit;
-    }
+        return VMI_SUCCESS;
 
     // Now now, only support legacy syscall arg passing on 32 bit
     if ( 4 == s->reg_size )
@@ -171,7 +163,7 @@ static status_t linux_build_argbuf(void* buf, vmi_instance_t vmi,
                 if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &pt_regs[i]) )
                 {
                     fprintf(stderr, "vmi_read_va(%p) failed\n", (void*)ctx.addr);
-                    goto exit;
+                    return VMI_FAILURE;
                 }
             }
 
@@ -206,13 +198,11 @@ static status_t linux_build_argbuf(void* buf, vmi_instance_t vmi,
         }
     }
 
-exit:
-    return rc;
+    return VMI_SUCCESS;
 }
 
 static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    vmi_lock_guard lg(drakvuf);
     struct wrapper *w = (struct wrapper *)info->trap->data;
 
     if ( w->tid != info->proc_data.tid )
@@ -222,7 +212,7 @@ static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     const syscall_t *sc = w->num < NUM_SYSCALLS_LINUX ? linuxsc::linux_syscalls[w->num] : NULL;
 
-    print_header(s->format, drakvuf, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, NULL);
+    print_header(s->format, drakvuf, VMI_OS_LINUX, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, NULL);
     print_footer(s->format, 0, false);
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
@@ -233,7 +223,7 @@ static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
 static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
     struct wrapper *w = (struct wrapper *)info->trap->data;
     syscalls* s = w->s;
 
@@ -259,7 +249,6 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     vmi_read_addr_va(vmi, info->regs->rsp, 0, &ret);
-    drakvuf_release_vmi(drakvuf);
 
     if ( nr<NUM_SYSCALLS_LINUX )
     {
@@ -277,13 +266,16 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         nargs = 0;
     }
 
-    print_header(s->format, drakvuf, true, info, nr, info->trap->breakpoint.module, sc, 0, NULL);
+    print_header(s->format, drakvuf, VMI_OS_LINUX, true, info, nr, info->trap->breakpoint.module, sc, 0, NULL);
     if ( nargs )
     {
         print_nargs(s->format, nargs);
         print_args(s, drakvuf, info, sc, buf);
     }
     print_footer(s->format, nargs, true);
+
+    if ( s->disable_sysret )
+        return 0;
 
     struct wrapper *wr = g_slice_new0(struct wrapper);
     wr->s = s;

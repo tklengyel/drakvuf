@@ -122,6 +122,7 @@ enum win_wow_offsets
     WOW_CONTEXT_EBP,
     WOW_CONTEXT_EIP,
     WOW_CONTEXT_ESP,
+    WOW_CONTEXT_EAX,
 
     __WIN_WOW_OFFSETS_MAX
 };

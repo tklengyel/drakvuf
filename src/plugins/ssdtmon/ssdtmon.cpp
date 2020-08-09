@@ -121,54 +121,18 @@
 #include "../plugins.h"
 #include "private.h"
 #include "ssdtmon.h"
+#include "plugins/output_format.h"
 
 event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    gchar* escaped_pname = NULL;
     ssdtmon* s = (ssdtmon*)info->trap->data;
 
     if ( info->trap_pa > s->kiservicetable - 8 && info->trap_pa <= s->kiservicetable + sizeof(uint32_t) * s->kiservicelimit + sizeof(uint32_t) - 1 )
     {
         int64_t table_index = (info->trap_pa - s->kiservicetable) / sizeof(uint32_t);
-        switch (s->format)
-        {
-            case OUTPUT_CSV:
-                printf("ssdtmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ", %" PRIi64 "\n",
-                       UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, table_index);
-                break;
-
-            case OUTPUT_KV:
-                printf("ssdtmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",TableIndex=%" PRIi64 "\n",
-                       UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name, table_index);
-                break;
-
-            case OUTPUT_JSON:
-                escaped_pname = drakvuf_escape_str(info->proc_data.name);
-                printf( "{"
-                        "\"Plugin\" : \"ssdtmon\","
-                        "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                        "\"ProcessName\": %s,"
-                        "\"UserName\": \"%s\","
-                        "\"UserId\": %" PRIu64 ","
-                        "\"PID\" : %d,"
-                        "\"PPID\": %d,"
-                        "\"TableIndex\": %" PRIi64
-                        "}\n",
-                        UNPACK_TIMEVAL(info->timestamp),
-                        escaped_pname,
-                        USERIDSTR(drakvuf), info->proc_data.userid,
-                        info->proc_data.pid, info->proc_data.ppid,
-                        table_index);
-                g_free(escaped_pname);
-                break;
-
-            default:
-            case OUTPUT_DEFAULT:
-                printf("[SSDTMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" Table index:%" PRIi64 "\n",
-                       UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                       USERIDSTR(drakvuf), info->proc_data.userid, table_index);
-                break;
-        }
+        fmt::print(s->format, "ssdtmon", drakvuf, info,
+                   keyval("TableIndex", fmt::Nval(table_index))
+                  );
     }
     return 0;
 }
@@ -225,6 +189,7 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, output_format_t output)
 
     this->ssdtwrite.cb = write_cb;
     this->ssdtwrite.data = (void*)this;
+    this->ssdtwrite.name = nullptr;
     this->ssdtwrite.type = MEMACCESS;
     this->ssdtwrite.memaccess.gfn = this->kiservicetable >> 12;
     this->ssdtwrite.memaccess.type = PRE;

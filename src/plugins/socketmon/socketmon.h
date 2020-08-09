@@ -128,7 +128,8 @@ public:
         .breakpoint.addr_type = ADDR_RVA,
         .breakpoint.module = "tcpip.sys",
         .type = BREAKPOINT,
-        .data = (void*)this
+        .data = (void*)this,
+        .name = nullptr
     };
 
     drakvuf_trap_t dnsapi_traps[6] =
@@ -138,7 +139,8 @@ public:
             .breakpoint.addr_type = ADDR_VA,
             .breakpoint.module = "dnsapi.dll",
             .type = BREAKPOINT,
-            .data = (void*)this
+            .data = (void*)this,
+            .name = nullptr
         }
     };
 

@@ -136,7 +136,7 @@ void init_unicode_argument(struct argument* arg, unicode_string_t* us)
         init_int_argument(arg, 0);
 }
 
-static addr_t place_string_on_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void const* str, size_t str_len)
+static addr_t place_string_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, void const* str, size_t str_len)
 {
     if (!str) return 0;
 
@@ -151,7 +151,7 @@ static addr_t place_string_on_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = regs->cr3,
         .addr = addr,
     };
 
@@ -161,7 +161,7 @@ static addr_t place_string_on_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* 
     return addr;
 }
 
-static addr_t place_string_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void const* str, size_t str_len)
+static addr_t place_string_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, void const* str, size_t str_len)
 {
     if (!str) return addr;
     // String length with null terminator
@@ -180,7 +180,7 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = regs->cr3,
         .addr = addr,
     };
 
@@ -190,7 +190,7 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* 
     return status == VMI_FAILURE ? 0 : addr;
 }
 
-static addr_t place_struct_on_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void* data, size_t size)
+static addr_t place_struct_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, void* data, size_t size)
 {
     const uint32_t stack_align = 64;
 
@@ -200,7 +200,7 @@ static addr_t place_struct_on_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = regs->cr3,
         .addr = addr,
     };
 
@@ -209,7 +209,7 @@ static addr_t place_struct_on_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* 
     return status == VMI_FAILURE ? 0 : addr;
 }
 
-static addr_t place_struct_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void* data, size_t size)
+static addr_t place_struct_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, void* data, size_t size)
 {
     /* According to Microsoft Doc "Building C/C++ Programs":
      * > The alignment of the beginning of a structure or a union is the maximum
@@ -221,7 +221,7 @@ static addr_t place_struct_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = regs->cr3,
         .addr = addr,
     };
 
@@ -230,9 +230,9 @@ static addr_t place_struct_on_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* 
     return status == VMI_FAILURE ? 0 : addr;
 }
 
-static bool setup_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct argument args[], int nb_args)
+static bool setup_stack_32(vmi_instance_t vmi, x86_registers_t* regs, struct argument args[], int nb_args)
 {
-    addr_t addr = info->regs->rsp;
+    addr_t addr = regs->rsp;
 
     // make room for strings and structs into guest's stack
     for (int i = 0; i < nb_args; i++)
@@ -240,12 +240,12 @@ static bool setup_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct
         switch (args[i].type)
         {
             case ARGUMENT_STRING:
-                addr = place_string_on_stack_32(vmi, info, addr, args[i].data, args[i].size);
+                addr = place_string_on_stack_32(vmi, regs, addr, args[i].data, args[i].size);
                 if ( !addr ) goto err;
                 args[i].data_on_stack = addr;
                 break;
             case ARGUMENT_STRUCT:
-                addr = place_struct_on_stack_32(vmi, info, addr, args[i].data, args[i].size);
+                addr = place_struct_on_stack_32(vmi, regs, addr, args[i].data, args[i].size);
                 if ( !addr ) goto err;
                 args[i].data_on_stack = addr;
                 break;
@@ -260,7 +260,7 @@ static bool setup_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = regs->cr3,
     };
 
     // write parameters into guest's stack
@@ -275,11 +275,11 @@ static bool setup_stack_32(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct
     // save the return address
     addr -= 0x4;
     ctx.addr = addr;
-    if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*) &info->regs->rip))
+    if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*) &regs->rip))
         goto err;
 
     // grow the stack
-    info->regs->rsp = addr;
+    regs->rsp = addr;
 
     return 1;
 
@@ -287,17 +287,17 @@ err:
     return 0;
 }
 
-static bool setup_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct argument args[], int nb_args)
+static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct argument args[], int nb_args)
 {
     uint64_t nul64 = 0;
 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = regs->cr3,
     };
 
-    addr_t addr = info->regs->rsp;
+    addr_t addr = regs->rsp;
 
     if ( args )
     {
@@ -307,12 +307,12 @@ static bool setup_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct
             switch (args[i].type)
             {
                 case ARGUMENT_STRING:
-                    addr = place_string_on_stack_64(vmi, info, addr, args[i].data, args[i].size);
+                    addr = place_string_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
                     if ( !addr ) goto err;
                     args[i].data_on_stack = addr;
                     break;
                 case ARGUMENT_STRUCT:
-                    addr = place_struct_on_stack_64(vmi, info, addr, args[i].data, args[i].size);
+                    addr = place_struct_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
                     if ( !addr ) goto err;
                     args[i].data_on_stack = addr;
                     break;
@@ -358,19 +358,19 @@ static bool setup_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct
         {
             default:
                 // p4
-                info->regs->r9 = args[3].data_on_stack;
+                regs->r9 = args[3].data_on_stack;
             // fall through
             case 3:
                 // p3
-                info->regs->r8 = args[2].data_on_stack;
+                regs->r8 = args[2].data_on_stack;
             // fall through
             case 2:
                 // p2
-                info->regs->rdx = args[1].data_on_stack;
+                regs->rdx = args[1].data_on_stack;
             // fall through
             case 1:
                 // p1
-                info->regs->rcx = args[0].data_on_stack;
+                regs->rcx = args[0].data_on_stack;
             // fall through
             case 0:
                 break;
@@ -389,11 +389,11 @@ static bool setup_stack_64(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct
     // save the return address
     addr -= 0x8;
     ctx.addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &info->regs->rip))
+    if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &regs->rip))
         goto err;
 
     // grow the stack
-    info->regs->rsp = addr;
+    regs->rsp = addr;
 
     return 1;
 
@@ -401,7 +401,7 @@ err:
     return 0;
 }
 
-static addr_t place_string_on_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr, void const* str, size_t str_len)
+static addr_t place_string_on_linux_stack(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, void const* str, size_t str_len)
 {
     if (!str) return addr;
     // String length with null terminator
@@ -421,7 +421,7 @@ static addr_t place_string_on_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = regs->cr3,
         .addr = addr,
     };
 
@@ -431,22 +431,22 @@ static addr_t place_string_on_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_
     return status == VMI_FAILURE ? 0 : addr;
 }
 
-bool setup_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct argument args[], int nb_args)
+bool setup_linux_stack(vmi_instance_t vmi, x86_registers_t* regs, struct argument args[], int nb_args)
 {
     uint64_t nul64 = 0;
 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = regs->cr3,
     };
 
-    addr_t addr = info->regs->rsp;
+    addr_t addr = regs->rsp;
 
-    // unsigned int cpl = info->regs->cs_sel & 3;
+    // unsigned int cpl = regs->cs_sel & 3;
     // PRINT_DEBUG("CPL value is : %d\n", cpl);
 
-    addr = info->regs->rsp;
+    addr = regs->rsp;
 
     if ( args )
     {
@@ -456,12 +456,12 @@ bool setup_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct arg
             switch (args[i].type)
             {
                 case ARGUMENT_STRING:
-                    addr = place_string_on_linux_stack(vmi, info, addr, args[i].data, args[i].size);
+                    addr = place_string_on_linux_stack(vmi, regs, addr, args[i].data, args[i].size);
                     if ( !addr ) goto err;
                     args[i].data_on_stack = addr;
                     break;
                 case ARGUMENT_STRUCT:
-                    addr = place_struct_on_stack_64(vmi, info, addr, args[i].data, args[i].size);
+                    addr = place_struct_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
                     if ( !addr ) goto err;
                     args[i].data_on_stack = addr;
                     break;
@@ -505,22 +505,22 @@ bool setup_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct arg
         switch (nb_args)
         {
             default:
-                info->regs->r9 = args[5].data_on_stack;
+                regs->r9 = args[5].data_on_stack;
             // fall through
             case 5:
-                info->regs->r8 = args[4].data_on_stack;
+                regs->r8 = args[4].data_on_stack;
             // fall through
             case 4:
-                info->regs->rcx = args[3].data_on_stack;
+                regs->rcx = args[3].data_on_stack;
             // fall through
             case 3:
-                info->regs->rdx = args[2].data_on_stack;
+                regs->rdx = args[2].data_on_stack;
             // fall through
             case 2:
-                info->regs->rsi = args[1].data_on_stack;
+                regs->rsi = args[1].data_on_stack;
             // fall through
             case 1:
-                info->regs->rdi = args[0].data_on_stack;
+                regs->rdi = args[0].data_on_stack;
             // fall through
             case 0:
                 break;
@@ -530,12 +530,12 @@ bool setup_linux_stack(vmi_instance_t vmi, drakvuf_trap_info_t* info, struct arg
     // save the return address
     addr -= 0x8;
     ctx.addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &info->regs->rip))
+    if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &regs->rip))
         goto err;
 
     // grow the stack
-    info->regs->rsp = addr;
-    info->regs->rbp = addr;
+    regs->rsp = addr;
+    regs->rbp = addr;
 
     return true;
 
@@ -546,18 +546,18 @@ err:
 bool setup_stack_locked(
     drakvuf_t drakvuf,
     vmi_instance_t vmi,
-    drakvuf_trap_info_t* info,
+    x86_registers_t* regs,
     struct argument args[],
     int nb_args)
 {
     if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
     {
         bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
-        return is32bit ? setup_stack_32(vmi, info, args, nb_args) : setup_stack_64(vmi, info, args, nb_args);
+        return is32bit ? setup_stack_32(vmi, regs, args, nb_args) : setup_stack_64(vmi, regs, args, nb_args);
     }
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {
-        return setup_linux_stack(vmi, info, args, nb_args);
+        return setup_linux_stack(vmi, regs, args, nb_args);
     }
     else
         return false;
@@ -565,13 +565,13 @@ bool setup_stack_locked(
 
 bool setup_stack(
     drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
+    x86_registers_t* regs,
     struct argument args[],
     int nb_args)
 {
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    bool success = setup_stack_locked(drakvuf, vmi, info, args, nb_args);
+    bool success = setup_stack_locked(drakvuf, vmi, regs, args, nb_args);
     drakvuf_release_vmi(drakvuf);
     return success;
 }

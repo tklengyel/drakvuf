@@ -107,6 +107,7 @@
 #include "bsodmon.h"
 #include "private.h"
 #include "bugcheck.h"
+#include "plugins/output_format.h"
 
 static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -122,7 +123,6 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     uint64_t code = 0;
     uint64_t params[4] = { 0 };
     const char* bugcheck_name = "UNKNOWN_CODE" ;
-    gchar* escaped_pname = NULL;
 
     bool is32bit = drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E;
 
@@ -163,54 +163,27 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if ( f->bugcheck_map.find( code ) != f->bugcheck_map.end() )
         bugcheck_name = f->bugcheck_map[ code ];
 
-    switch (f->format)
     {
-        case OUTPUT_CSV:
-            printf("bsodmon," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%" PRIx64
-                   ",\"%s\",%" PRIx64 ",%" PRIx64 ",%" PRIx64 ",%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   info->attached_proc_data.userid, code, bugcheck_name, params[0], params[1], params[2], params[3]);
-            break;
-        case OUTPUT_KV:
-            printf("bsodmon Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",BugCheckCode=%" PRIx64
-                   ",BugCheckName=\"%s\",BugCheckParameter1=%" PRIx64 ",BugCheckParameter2=%" PRIx64 ",BugCheckParameter2=%" PRIx64
-                   ",BugCheckParameter4=%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                   info->attached_proc_data.name, code, bugcheck_name, params[0], params[1], params[2], params[3]);
-            break;
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            printf( "{"
-                    "\"Plugin\" : \"bsodmon\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"VCPU\": %" PRIu32 ","
-                    "\"CR3\": %" PRIu64 ","
-                    "\"ProcessName\": %s,"
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"BugCheckCode\": %" PRIu64 ","
-                    "\"BugCheckName\": \"%s\","
-                    "\"BugCheckParameter1\": %" PRIu64 ","
-                    "\"BugCheckParameter2\": %" PRIu64 ","
-                    "\"BugCheckParameter3\": %" PRIu64 ","
-                    "\"BugCheckParameter4\": %" PRIu64
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    info->vcpu, info->regs->cr3, escaped_pname,
-                    info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid,
-                    code, bugcheck_name, params[0], params[1], params[2], params[3]);
-            g_free(escaped_pname);
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[BSODMON] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64
-                   " BugCheckCode:%" PRIx64 " BugCheckName:%s BugCheckParameter1:%" PRIx64 " BugCheckParameter2:%" PRIx64
-                   " BugCheckParameter3:%" PRIx64 " BugCheckParameter4:%" PRIx64 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   USERIDSTR(drakvuf), info->attached_proc_data.userid, code, bugcheck_name, params[0], params[1], params[2], params[3]);
-            break;
+        auto tuple = std::make_tuple(
+                         keyval("BugCheckCode", fmt::Xval(code, false)),
+                         keyval("BugCheckName", fmt::Qstr(bugcheck_name)),
+                         keyval("BugCheckParameter1", fmt::Xval(params[0], false)),
+                         keyval("BugCheckParameter2", fmt::Xval(params[1], false)),
+                         keyval("BugCheckParameter3", fmt::Xval(params[2], false)),
+                         keyval("BugCheckParameter4", fmt::Xval(params[3], false))
+                     );
+        if (f->format == OUTPUT_JSON)
+        {
+            jsonfmt::print("bsodmon", drakvuf, info,
+                           keyval("VCPU", fmt::Nval(info->vcpu)),
+                           keyval("CR3", fmt::Nval(info->regs->cr3)),
+                           tuple
+                          );
+        }
+        else
+        {
+            fmt::print(f->format, "bsodmon", drakvuf, info, tuple);
+        }
     }
 
 done:

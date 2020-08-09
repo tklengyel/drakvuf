@@ -108,25 +108,64 @@
 #include <vector>
 #include <list>
 
+
+typedef enum _THREADINFOCLASS {
+    ThreadBasicInformation,
+    ThreadTimes,
+    ThreadPriority,
+    ThreadBasePriority,
+    ThreadAffinityMask,
+    ThreadImpersonationToken,
+    ThreadDescriptorTableEntry,
+    ThreadEnableAlignmentFaultFixup,
+    ThreadEventPair_Reusable,
+    ThreadQuerySetWin32StartAddress,
+    ThreadZeroTlsCell,
+    ThreadPerformanceCount,
+    ThreadAmILastThread,
+    ThreadIdealProcessor,
+    ThreadPriorityBoost,
+    ThreadSetTlsArrayAddress,
+    ThreadIsIoPending,
+    ThreadHideFromDebugger,
+    ThreadBreakOnTermination,
+    ThreadSwitchLegacyState,
+    ThreadIsTerminated,
+    ThreadLastSystemCall,
+    ThreadIoPriority,
+    ThreadCycleTime,
+    ThreadPagePriority,
+    ThreadActualBasePriority,
+    ThreadTebInformation,
+    ThreadCSwitchMon,
+    ThreadCSwitchPmu,
+    ThreadWow64Context,
+    ThreadGroupInformation,
+    ThreadUmsInformation,
+    ThreadCounterProfiling,
+    ThreadIdealProcessorEx,
+    MaxThreadInfoClass
+} THREADINFOCLASS;
+
 typedef enum
-  {
-   INVALID,
-   WriteVirtualMemoryExtras,
-   __MAX_EXTRAX__
-  } extras_type_t;
+{
+    INVALID,
+    WriteVirtualMemoryExtras,
+    __MAX_EXTRAX__
+} extras_type_t;
 
 typedef struct
 {
-  extras_type_t type;
-  union
-  {
-    struct
+    extras_type_t type;
+    union
     {
-      vmi_pid_t target_pid;
-      char* target_name;
-      addr_t base_address;
-    } write_virtual_memory_extras;
-  };
+        struct
+        {
+            vmi_pid_t target_pid;
+            char* target_name;
+            addr_t base_address;
+        } write_virtual_memory_extras;
+    };
 } extras_t;
 
 class memdump;

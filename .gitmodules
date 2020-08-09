@@ -1,7 +1,3 @@
-[submodule "xen"]
-	path = xen
-	url = https://github.com/tklengyel/xen
-	ignore = dirty
 [submodule "libvmi"]
 	path = libvmi
 	url = https://github.com/tklengyel/libvmi

@@ -122,6 +122,7 @@ static const char* win_wow_offset_names[__WIN_WOW_OFFSETS_MAX][2] =
     [WOW_CONTEXT_EBP]       = { "_CONTEXT", "Ebp" },
     [WOW_CONTEXT_EIP]       = { "_CONTEXT", "Eip" },
     [WOW_CONTEXT_ESP]       = { "_CONTEXT", "Esp" },
+    [WOW_CONTEXT_EAX]       = { "_CONTEXT", "Eax" },
 };
 
 #endif
