@@ -128,18 +128,15 @@
 
 void free_gstrings(struct linux_wrapper* lw)
 {
-    if (lw)
+
+    g_string_free(lw->filename, TRUE);
+    g_string_free(lw->flags, TRUE);
+    g_string_free(lw->modes, TRUE);
+    g_string_free(lw->uid, TRUE);
+    g_string_free(lw->gid, TRUE);
+    for (auto arg : lw->args)
     {
-        g_string_free(lw->filename, TRUE);
-        g_string_free(lw->flags, TRUE);
-        g_string_free(lw->modes, TRUE);
-        g_string_free(lw->uid, TRUE);
-        g_string_free(lw->gid, TRUE);
-        for (auto arg : lw->args)
-        {
-            g_string_free(arg.second, TRUE);
-            // g_free(arg.first);
-        }
+        g_string_free(arg.second, TRUE);
     }
 }
 
@@ -354,7 +351,6 @@ int get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_wrapper* l
 
     if (g_strcmp0(lw->filename->str, "") == 0)
     {
-        g_string_free(lw->filename, TRUE);
         return 0;
     }
 
