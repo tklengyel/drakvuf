@@ -1,0 +1,20 @@
+[submodule "xen"]
+	path = xen
+	url = https://github.com/tklengyel/xen
+	ignore = dirty
+[submodule "libvmi"]
+	path = libvmi
+	url = https://github.com/tklengyel/libvmi
+	ignore = dirty
+[submodule "drakvuf-doppelganging"]
+	path = drakvuf-doppelganging
+	url = https://github.com/tklengyel/drakvuf-doppelganging.git
+	ignore = dirty
+[submodule "volatility3"]
+	path = volatility3
+	url = https://github.com/tklengyel/volatility3
+	ignore = dirty
+[submodule "dwarf2json"]
+	path = dwarf2json
+	url = https://github.com/tklengyel/dwarf2json
+	ignore = dirty
