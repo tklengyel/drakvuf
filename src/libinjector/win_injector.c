@@ -659,9 +659,7 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     regs.x86.rip = injector->exec_func;
     injector->status = STATUS_CREATE_OK;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-    drakvuf_release_vmi(drakvuf);
+    set_regs(drakvuf, &regs, info->vcpu);
 
     return 0;
 }
@@ -929,9 +927,7 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     PRINT_DEBUG("Executing the payload..\n");
 
-    vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    vmi_set_vcpuregs(vmi, regs, info->vcpu);
-    drakvuf_release_vmi(drakvuf);
+    set_regs(drakvuf, regs, info->vcpu);
 
     return 0;
 }
@@ -992,10 +988,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             }
 
             copy_gprs(&regs.x86, &injector->saved_regs);
-
-            vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-            drakvuf_release_vmi(drakvuf);
+            set_regs(drakvuf, &regs, info->vcpu);
 
             return 0;
         }
@@ -1044,9 +1037,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                 drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
             }
 
-            vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-            drakvuf_release_vmi(drakvuf);
+            set_regs(drakvuf, &regs, info->vcpu);
         }
 
         return 0;
@@ -1066,10 +1057,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             injector->rc = INJECTOR_FAILED;
 
         copy_gprs(&regs.x86, &injector->saved_regs);
-
-        vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-        drakvuf_release_vmi(drakvuf);
+        set_regs(drakvuf, &regs, info->vcpu);
 
         if (injector->rc == INJECTOR_SUCCEEDED)
         {
@@ -1150,9 +1138,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         regs.x86.rip = injector->exec_func;
 
-        vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-        drakvuf_release_vmi(drakvuf);
+        set_regs(drakvuf, &regs, info->vcpu);
 
         return 0;
     }
@@ -1176,9 +1162,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         PRINT_DEBUG("Payload is at: 0x%lx\n", injector->payload_addr);
 
-        vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-        drakvuf_release_vmi(drakvuf);
+        set_regs(drakvuf, &regs, info->vcpu);
 
         return 0;
     }
@@ -1205,9 +1189,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
             injector->status = STATUS_EXPAND_ENV_OK;
 
-            vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-            drakvuf_release_vmi(drakvuf);
+            set_regs(drakvuf, &regs, info->vcpu);
 
             return 0;
         }
@@ -1264,9 +1246,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         injector->status = STATUS_CREATE_FILE_OK;
 
-        vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-        drakvuf_release_vmi(drakvuf);
+        set_regs(drakvuf, &regs, info->vcpu);
 
         return 0;
     }
@@ -1314,10 +1294,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             regs.x86.rip = injector->close_handle;
 
             injector->status = STATUS_CLOSE_FILE_OK;
-
-            vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-            drakvuf_release_vmi(drakvuf);
+            set_regs(drakvuf, &regs, info->vcpu);
 
             return 0;
         }
@@ -1341,8 +1318,9 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         vmi = drakvuf_lock_and_get_vmi(drakvuf);
         vmi_write(vmi, &ctx, amount, buf + FILE_BUF_RESERVED, NULL);
-        vmi_set_vcpuregs(vmi, &regs, info->vcpu);
         drakvuf_release_vmi(drakvuf);
+
+        set_regs(drakvuf, &regs, info->vcpu);
 
         injector->status = STATUS_WRITE_FILE_OK;
 
@@ -1430,9 +1408,8 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             injector->status = STATUS_CLOSE_FILE_OK;
         }
 
-        vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-        drakvuf_release_vmi(drakvuf);
+
+        set_regs(drakvuf, &regs, info->vcpu);
 
         return 0;
     }
@@ -1458,9 +1435,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
-        vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-        drakvuf_release_vmi(drakvuf);
+        set_regs(drakvuf, &regs, info->vcpu);
 
         PRINT_DEBUG("File operation executed OK\n");
         injector->rc = INJECTOR_SUCCEEDED;
@@ -1501,9 +1476,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         injector->status = STATUS_EXEC_OK;
 
-        vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-        drakvuf_release_vmi(drakvuf);
+        set_regs(drakvuf, &regs, info->vcpu);
 
         return 0;
     }
@@ -1547,9 +1520,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             regs.x86.rip = injector->resume_thread;
             injector->status = STATUS_RESUME_OK;
 
-            vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-            drakvuf_release_vmi(drakvuf);
+            set_regs(drakvuf, &regs, info->vcpu);
 
             return 0;
         }
@@ -1578,9 +1549,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
     copy_gprs(&regs.x86, &injector->saved_regs);
-    vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    vmi_set_vcpuregs(vmi, &regs, info->vcpu);
-    drakvuf_release_vmi(drakvuf);
+    set_regs(drakvuf, &regs, info->vcpu);
 
     return 0;
 }

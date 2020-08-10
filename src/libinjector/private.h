@@ -168,3 +168,12 @@ static inline void copy_gprs(x86_registers_t *dst, x86_registers_t *src)
     dst->r14 = src->r14;
     dst->r15 = src->r15;
 }
+
+static inline void set_regs(drakvuf_t drakvuf, registers_t *regs, int vcpu)
+{
+    drakvuf_pause(drakvuf);
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    vmi_set_vcpuregs(vmi, regs, vcpu);
+    drakvuf_release_vmi(drakvuf);
+    drakvuf_resume(drakvuf);
+}
