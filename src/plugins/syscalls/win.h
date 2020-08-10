@@ -2406,6 +2406,31 @@ SYSCALL(NtUnmapViewOfSection, NTSTATUS, 2,
 		"ProcessHandle", "", DIR_IN, HANDLE,
 		"BaseAddress", "", DIR_IN, PVOID,
 );
+SYSCALL(NtUserCallTwoParam, NTSTATUS, 3,
+		"Param1", "", DIR_IN, DWORD,
+		"Param2", "", DIR_IN, DWORD,
+		"Routine", "", DIR_IN, DWORD);
+SYSCALL(NtUserMessageCall, NTSTATUS, 7,
+		"hWnd", "", DIR_IN, HWND,
+		"Msg", "", DIR_IN, UINT,
+		"wParam", "", DIR_IN, WPARAM,
+		"lParam", "", DIR_IN, LPARAM,
+		"ResultInfo", "", DIR_IN, ULONG_PTR,
+		"dwType", "", DIR_IN, DWORD,
+		"Ansi", "", DIR_IN, BOOLEAN);
+SYSCALL(NtUserSetWindowLong, NTSTATUS, 4,
+		"hWnd", "", DIR_IN, HWND,
+		"nIndex", "", DIR_IN, INT,
+		"dwNewLong", "", DIR_IN, LONG,
+		"Ansi", "", DIR_IN, BOOLEAN);
+SYSCALL(NtUserSetWindowsHookEx, HHOOK, 6,
+		"Mod", "", DIR_IN, HINSTANCE,
+		"UnsafeModuleName", "", DIR_IN, PUNICODE_STRING,
+		"ThreadId", "", DIR_IN, DWORD,
+		"HookId", "", DIR_IN, INT,
+		"HookProc", "", DIR_IN, HOOKPROC,
+		"Ansi", "", DIR_IN, BOOLEAN,
+);
 SYSCALL(NtVdmControl, NTSTATUS, 2,
 		"Service", "", DIR_IN, VDMSERVICECLASS,
 		"ServiceData", "", DIR_INOUT, PVOID,
@@ -3453,10 +3478,6 @@ SYSCALL(NtUserCallMsgFilter, NTSTATUS, 0);
 SYSCALL(NtUserCallNextHookEx, NTSTATUS, 0);
 SYSCALL(NtUserCallNoParam, NTSTATUS, 0);
 SYSCALL(NtUserCallOneParam, NTSTATUS, 0);
-SYSCALL(NtUserCallTwoParam, NTSTATUS, 3,
-		"Param1", "", DIR_IN, DWORD,
-		"Param2", "", DIR_IN, DWORD,
-		"Routine", "", DIR_IN, DWORD);
 SYSCALL(NtUserCanBrokerForceForeground, NTSTATUS, 0);
 SYSCALL(NtUserChangeClipboardChain, NTSTATUS, 0);
 SYSCALL(NtUserChangeDisplaySettings, NTSTATUS, 0);
@@ -3767,14 +3788,6 @@ SYSCALL(NtUserManageGestureHandlerWindow, NTSTATUS, 0);
 SYSCALL(NtUserMapPointsByVisualIdentifier, NTSTATUS, 0);
 SYSCALL(NtUserMapVirtualKeyEx, NTSTATUS, 0);
 SYSCALL(NtUserMenuItemFromPoint, NTSTATUS, 0);
-SYSCALL(NtUserMessageCall, NTSTATUS, 7,
-		"hWnd", "", DIR_IN, HWND,
-		"Msg", "", DIR_IN, UINT,
-		"wParam", "", DIR_IN, WPARAM,
-		"lParam", "", DIR_IN, LPARAM,
-		"ResultInfo", "", DIR_IN, ULONG_PTR,
-		"dwType", "", DIR_IN, DWORD,
-		"Ansi", "", DIR_IN, BOOLEAN);
 SYSCALL(NtUserMinMaximize, NTSTATUS, 0);
 SYSCALL(NtUserModifyUserStartupInfoFlags, NTSTATUS, 0);
 SYSCALL(NtUserModifyWindowTouchCapability, NTSTATUS, 0);
@@ -3944,11 +3957,6 @@ SYSCALL(NtUserSetWindowDisplayAffinity, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowFNID, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowFeedbackSetting, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowGroup, NTSTATUS, 0);
-SYSCALL(NtUserSetWindowLong, NTSTATUS, 4,
-		"hWnd", "", DIR_IN, HWND,
-		"nIndex", "", DIR_IN, INT,
-		"dwNewLong", "", DIR_IN, LONG,
-		"Ansi", "", DIR_IN, BOOLEAN);
 SYSCALL(NtUserSetWindowLongPtr, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowPlacement, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowPos, NTSTATUS, 0);
@@ -3958,14 +3966,6 @@ SYSCALL(NtUserSetWindowShowState, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowStationUser, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowWord, NTSTATUS, 0);
 SYSCALL(NtUserSetWindowsHookAW, NTSTATUS, 0);
-SYSCALL(NtUserSetWindowsHookEx, HHOOK, 6,
-		"Mod", "", DIR_IN, HINSTANCE,
-		"UnsafeModuleName", "", DIR_IN, PUNICODE_STRING,
-		"ThreadId", "", DIR_IN, DWORD,
-		"HookId", "", DIR_IN, INT,
-		"HookProc", "", DIR_IN, HOOKPROC,
-		"Ansi", "", DIR_IN, BOOLEAN,
-);
 SYSCALL(NtUserSfmDestroyLogicalSurfaceBinding, NTSTATUS, 0);
 SYSCALL(NtUserSfmDxBindSwapChain, NTSTATUS, 0);
 SYSCALL(NtUserSfmDxGetSwapChainStats, NTSTATUS, 0);
