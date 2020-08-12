@@ -936,7 +936,8 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 {
     injector_t injector = info->trap->data;
 
-    PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx. vcpu %i\n", info->regs->rip, info->regs->cr3, info->vcpu);
+    PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx. vcpu %i. TID %u\n",
+                info->regs->rip, info->regs->cr3, info->vcpu, info->proc_data.tid);
 
     if ( info->proc_data.pid != injector->target_pid )
     {
@@ -953,6 +954,12 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         PRINT_DEBUG("INT3 received but '%s' TID (%u) doesn't match target process (%u)\n",
                     info->proc_data.name, info->proc_data.tid, injector->target_tid);
         return 0;
+    }
+    else if (!injector->target_tid)
+    {
+        PRINT_DEBUG("Target TID not provided by the user, pinning TID to %u\n",
+                    info->proc_data.tid);
+        injector->target_tid = info->proc_data.tid;
     }
 
     if (injector->target_rsp && info->regs->rsp <= injector->target_rsp)
