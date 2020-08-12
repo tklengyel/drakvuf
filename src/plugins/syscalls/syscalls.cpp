@@ -107,14 +107,19 @@
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
 #include <assert.h>
+#include <variant>
+#include <vector>
 
+#include "plugins/output_format.h"
 #include "syscalls.h"
 #include "private.h"
 #include "win.h"
 #include "linux.h"
 
-static char* extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
+static std::string extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
+    char* cstr = nullptr;
+
     if ( arg.dir == DIR_IN || arg.dir == DIR_INOUT )
     {
         if ( arg.type == PUNICODE_STRING )
@@ -122,268 +127,72 @@ static char* extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t*
             unicode_string_t* us = drakvuf_read_unicode(drakvuf, info, val);
             if ( us )
             {
-                char* str = (char*)us->contents;
+                cstr = (char*)us->contents;
                 us->contents = nullptr;
                 vmi_free_unicode_str(us);
-                return str;
             }
         }
 
         else if ( arg.type == PCHAR )
         {
-            return drakvuf_read_ascii_str(drakvuf, info, val);
+            cstr = drakvuf_read_ascii_str(drakvuf, info, val);
         }
 
         else if ( s->os == VMI_OS_WINDOWS )
         {
-            return win_extract_string(s, drakvuf, info, arg, val);
+            cstr = win_extract_string(s, drakvuf, info, arg, val);
         }
     }
 
-    return nullptr;
+    std::string str;
+    if (cstr)
+    {
+        str = std::string(cstr);
+        g_free(cstr);
+    }
+    return str;
 }
 
-void print_header(output_format_t format, drakvuf_t drakvuf, os_t os,
-                  bool syscall, const drakvuf_trap_info_t* info,
-                  int nr, const char *module, const syscall_t *sc,
-                  uint64_t ret, const char *extra_info)
+void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
+                   bool syscall, drakvuf_trap_info_t* info,
+                   int nr, const char *module, const syscall_t *sc,
+                   unsigned int nargs, std::vector<uint64_t>& args,
+                   uint64_t ret, const char *extra_info)
 {
-    gchar* escaped_pname = NULL;
-    const char *name = sc ? sc->name : info->trap->name;
-    const char *type = NULL;
-    const proc_data_t *proc_data = os == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
+    if (sc)
+        info->trap->name = sc->name;
 
-    switch (format)
+    if (syscall)
     {
-        case OUTPUT_CSV:
-            type = syscall ? "syscall" : "sysret";
-            printf("%s," FORMAT_TIMEVAL ",%" PRIu32 \
-                   ",0x%" PRIx64 ",\"%s\",%d,%d" \
-                   ",%s,%" PRIi64 \
-                   ",%" PRIi32 ",%s,%s",
-                   type, UNPACK_TIMEVAL(info->timestamp), info->vcpu,
-                   info->regs->cr3, proc_data->name, proc_data->pid, proc_data->ppid,
-                    USERIDSTR(drakvuf), proc_data->userid,
-                   nr, module, name);
-            if ( !syscall )
-                printf(",%lu,%s", ret, extra_info);
-            break;
-        case OUTPUT_KV:
-            type = syscall ? "syscall" : "sysret";
-            printf("%s Time=" FORMAT_TIMEVAL ",vCPU=%" PRIu32 \
-                   ",CR3=0x%" PRIx64 ",ProcessName=\"%s\",PID=%d,PPID=%d" \
-                   ",UserName=\"%s\",UserId=%" PRIu64 \
-                   ",Syscall=%" PRIi32 ",Module=\"%s\",Method=\"%s\"",
-                   type, UNPACK_TIMEVAL(info->timestamp), info->vcpu,
-                   info->regs->cr3, proc_data->name, proc_data->pid, proc_data->ppid,
-                   USERIDSTR(drakvuf), proc_data->userid,
-                   nr, module, name);
-            if ( !syscall )
-                printf(",Ret=%lu,Info=\"%s\"", ret, extra_info?:"");
-            break;
-        case OUTPUT_JSON:
-            // print_footer() puts single EOL at end of JSON doc to simplify parsing on other end
-            type = syscall ? "syscall" : "sysret";
-            escaped_pname = drakvuf_escape_str(proc_data->name);
-            printf( "{"
-                    "\"Plugin\": \"syscalls\","
-                    "\"Type\" : \"%s\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"VCPU\": %" PRIu32 ","
-                    "\"CR3\": %" PRIu64 ","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"TID\": %d,"
-                    "\"Module\": \"%s\","
-                    "\"Method\": \"%s\","
-                    "\"Args\": {",
-                    type, UNPACK_TIMEVAL(info->timestamp),
-                    info->vcpu, info->regs->cr3, escaped_pname,
-                    USERIDSTR(drakvuf), proc_data->userid,
-                    proc_data->pid, proc_data->ppid, proc_data->tid,
-                    module, name);
-
-            if ( syscall )
-                printf("\"Args\": [");
-            else
-                printf("\"Ret\": %" PRIu64 ","
-                       "\"Info\": \"%s\"",
-                        ret, extra_info ?: "");
-
-            g_free(escaped_pname);
-            break;
-
-        case OUTPUT_DEFAULT:
-        default:
-            type = syscall ? "[SYSCALL]" : "[SYSRET]";
-            printf("%s TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 \
-                   " CR3:0x%" PRIx64 ",\"%s\" PID:%d PPID:%d TID:%d"
-                   " %s:%" PRIi64 \
-                   " %" PRIi32 ":%s!%s",
-                   type, UNPACK_TIMEVAL(info->timestamp), info->vcpu,
-                   info->regs->cr3, proc_data->name, proc_data->pid, proc_data->ppid, proc_data->tid,
-                   USERIDSTR(drakvuf), proc_data->userid,
-                   nr, module, name);
-            if ( !syscall )
-                printf(" Ret:%lu Info:%s", ret, extra_info ?: "");
-            break;
-    }
-}
-
-void print_nargs(output_format_t format, uint32_t nargs)
-{
-    switch (format)
-    {
-        case OUTPUT_CSV:
-            printf(",%" PRIu32, nargs);
-            break;
-        case OUTPUT_KV:
-        case OUTPUT_JSON:
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            printf(" Arguments: %" PRIu32 "\n", nargs);
-            break;
-    }
-}
-
-static void print_csv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val, const char* str)
-{
-    printf(",%s,%s,%s,", arg_direction_names[arg.dir], type_names[arg.type], arg.name);
-
-    if ( 4 == s->reg_size )
-        printf("0x%" PRIx32 ",", static_cast<uint32_t>(val));
-    else
-        printf("0x%" PRIx64 ",", static_cast<uint64_t>(val));
-
-    if ( str )
-    {
-        printf("%s", str);
-    }
-
-    printf(",");
-}
-
-static void print_kv_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val, const char* str)
-{
-    if ( str )
-    {
-        printf(",%s=\"%s\"", arg.name, str);
-        return;
-    }
-
-    if ( 4 == s->reg_size )
-        printf(",%s=0x%" PRIx32, arg.name, static_cast<uint32_t>(val));
-    else
-        printf(",%s=0x%" PRIx64, arg.name, static_cast<uint64_t>(val));
-}
-
-
-static void print_json_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, size_t i, addr_t val, const char* str)
-{
-    const arg_t& arg = sc->args[i];
-
-    if ( str )
-    {
-        gchar* escaped = drakvuf_escape_str(str);
-        printf("{\"%s\" : %s}", arg.name, escaped);
-        g_free(escaped);
-    }
-    else
-    {
-        if ( 4 == s->reg_size )
-            printf("{\"%s\" :%"  PRIu32 "}", arg.name, static_cast<uint32_t>(val));
-        else
-            printf("{\"%s\" :%" PRIu64 "}", arg.name, static_cast<uint64_t>(val));
-    }
-
-    if (i < sc->num_args-1)
-        printf(",");
-}
-
-static void print_default_arg(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val, const char* str)
-{
-    printf("\t%s %s %s: ", arg_direction_names[arg.dir], type_names[arg.type], arg.name);
-
-    if ( 4 == s->reg_size )
-        printf("0x%" PRIx32, static_cast<uint32_t>(val));
-    else
-        printf("0x%" PRIx64, static_cast<uint64_t>(val));
-
-    if ( str )
-    {
-        printf(" -> '%s'", str);
-    }
-
-    printf("\n");
-}
-
-void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data)
-{
-    if ( !args_data )
-        return;
-
-    size_t nargs = sc->num_args;
-    uint32_t* args_data32 = (uint32_t*)args_data;
-    uint64_t* args_data64 = (uint64_t*)args_data;
-
-    for ( size_t i=0; i<nargs; i++ )
-    {
-        addr_t val = 0;
-
-        if ( 4 == s->reg_size )
-            memcpy(&val, &args_data32[i], sizeof(uint32_t));
-        else
-            memcpy(&val, &args_data64[i], sizeof(uint64_t));
-
-        char* str = extract_string(s, drakvuf, info, sc->args[i], val);
-
-        switch (s->format)
+        std::vector<std::pair<const char*, std::variant<fmt::Qstr<std::string>, fmt::Xval<unsigned long>>>> fmt_args;
+        for (size_t i = 0; i < args.size(); ++i)
         {
-            case OUTPUT_CSV:
-                print_csv_arg(s, drakvuf, info, sc->args[i], val, str);
-                break;
-            case OUTPUT_KV:
-                print_kv_arg(s, drakvuf, info, sc->args[i], val, str);
-                break;
-            case OUTPUT_JSON:
-                print_json_arg(s, drakvuf, info, sc, i, val, str);
-                break;
-            default:
-            case OUTPUT_DEFAULT:
-                print_default_arg(s, drakvuf, info, sc->args[i], val, str);
-                break;
+            auto str = extract_string(s, drakvuf, info, sc->args[i], args[i]);
+            if ( !str.empty() )
+                fmt_args.push_back(keyval(sc->args[i].name, fmt::Qstr(str)));
+            else
+                fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(args[i])));
         }
 
-        g_free(str);
+        fmt::print(s->format, "syscall", drakvuf, info,
+            keyval("Module", fmt::Qstr(module)),
+            keyval("vCPU", fmt::Nval(info->vcpu)),
+            keyval("CR3", fmt::Xval(info->regs->cr3)),
+            keyval("Syscall", fmt::Nval(nr)),
+            keyval("NArgs", fmt::Nval(args.size())),
+            fmt_args
+        );
     }
-}
-
-void print_footer(output_format_t format, uint32_t nargs, bool syscall)
-{
-    switch (format)
+    else
     {
-        case OUTPUT_CSV:
-            printf("\n");
-            break;
-        case OUTPUT_KV:
-            printf("\n");
-            break;
-        case OUTPUT_JSON:
-            // close JSON args object and document
-            if ( syscall )
-                printf("] } }\n");
-            else
-                printf("} }\n");
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            if ( nargs == 0 )
-                printf("\n");
-            break;
+        fmt::print(s->format, "sysret", drakvuf, info,
+            keyval("Module", fmt::Qstr(module)),
+            keyval("vCPU", fmt::Nval(info->vcpu)),
+            keyval("CR3", fmt::Xval(info->regs->cr3)),
+            keyval("Syscall", fmt::Nval(nr)),
+            keyval("Ret", fmt::Nval(ret)),
+            keyval("Info", fmt::Rstr(extra_info ?: ""))
+        );
     }
 }
 

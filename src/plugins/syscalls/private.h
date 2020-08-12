@@ -469,10 +469,11 @@ struct wrapper
      .args = (const arg_t*)&_name ## _arg                        \
    }
 
-void print_header(output_format_t format, drakvuf_t drakvuf, os_t os,
-                  bool syscall, const drakvuf_trap_info_t* info,
-                  int nr, const char *module, const syscall_t *sc,
-                  uint64_t ret, const char *extra_info);
+void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
+                   bool syscall, drakvuf_trap_info_t* info,
+                   int nr, const char *module, const syscall_t *sc,
+                   unsigned int nargs, std::vector<uint64_t>& args,
+                   uint64_t ret, const char *extra_info);
 void print_nargs(output_format_t format, uint32_t nargs);
 void print_args(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const syscall_t* sc, void* args_data);
 void print_footer(output_format_t format, uint32_t nargs, bool syscall);

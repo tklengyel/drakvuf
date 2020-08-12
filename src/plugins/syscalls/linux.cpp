@@ -107,6 +107,7 @@
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
 #include <assert.h>
+#include <vector>
 
 #include "syscalls.h"
 #include "private.h"
@@ -212,8 +213,8 @@ static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     const syscall_t *sc = w->num < NUM_SYSCALLS_LINUX ? linuxsc::linux_syscalls[w->num] : NULL;
 
-    print_header(s->format, drakvuf, VMI_OS_LINUX, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, NULL);
-    print_footer(s->format, 0, false);
+    std::vector<uint64_t> args;
+    print_syscall(s, drakvuf, VMI_OS_LINUX, false, info, w->num, info->trap->breakpoint.module, sc, 0, args, info->regs->rax, nullptr);
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
     s->traps = g_slist_remove(s->traps, info->trap);
@@ -228,7 +229,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     syscalls* s = w->s;
 
     unsigned int nargs = 0;
-    uint8_t buf[sizeof(uint64_t) * 8] = {0};
+    std::vector<uint64_t> args(8);
     const syscall_t* sc = NULL;
     addr_t pt_regs = 0;
 
@@ -259,20 +260,14 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             return 0;
     }
 
-    int rc = linux_build_argbuf(buf, vmi, info, s, sc, pt_regs);
+    int rc = linux_build_argbuf(&args[0], vmi, info, s, sc, pt_regs);
     if ( VMI_SUCCESS != rc )
     {
         // Don't extract any args
         nargs = 0;
     }
 
-    print_header(s->format, drakvuf, VMI_OS_LINUX, true, info, nr, info->trap->breakpoint.module, sc, 0, NULL);
-    if ( nargs )
-    {
-        print_nargs(s->format, nargs);
-        print_args(s, drakvuf, info, sc, buf);
-    }
-    print_footer(s->format, nargs, true);
+    print_syscall(s, drakvuf, VMI_OS_LINUX, true, info, nr, info->trap->breakpoint.module, sc, nargs, args, 0, NULL);
 
     if ( s->disable_sysret )
         return 0;
