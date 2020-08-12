@@ -1293,8 +1293,8 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                 return 0;
             }
         }
-	else
-	{
+        else
+        {
             if (!regs.x86.rax)
             {
                 PRINT_DEBUG("Failed to write to the guest file\n");
