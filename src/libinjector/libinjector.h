@@ -165,6 +165,7 @@ typedef enum
     STATUS_READ_FILE_OK,
     STATUS_WRITE_FILE_OK,
     STATUS_CLOSE_FILE_OK,
+    STATUS_GET_LAST_ERROR,
     __STATUS_MAX
 } status_type_t;
 
