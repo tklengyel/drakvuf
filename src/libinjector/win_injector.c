@@ -143,6 +143,7 @@ struct injector
 
     // Internal:
     drakvuf_t drakvuf;
+    GMutex global_lock;
     bool is32bit, hijacked, resumed, detected;
     injection_method_t method;
     bool global_search;
@@ -936,7 +937,8 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 {
     injector_t injector = info->trap->data;
 
-    PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx. vcpu %i\n", info->regs->rip, info->regs->cr3, info->vcpu);
+    PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx. vcpu %i. TID %u\n",
+                info->regs->rip, info->regs->cr3, info->vcpu, info->proc_data.tid);
 
     if ( info->proc_data.pid != injector->target_pid )
     {
@@ -948,12 +950,25 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     if (info->regs->rip != info->trap->breakpoint.addr)
         return 0;
 
+    // on multi-vCPU systems, multiple injector_int3_cb might be active at the same time
+    // so we do need thread safety here
+    g_mutex_lock(&injector->global_lock);
+
     if (injector->target_tid && (uint32_t)info->proc_data.tid != injector->target_tid)
     {
         PRINT_DEBUG("INT3 received but '%s' TID (%u) doesn't match target process (%u)\n",
                     info->proc_data.name, info->proc_data.tid, injector->target_tid);
+        g_mutex_unlock(&injector->global_lock);
         return 0;
     }
+    else if (!injector->target_tid)
+    {
+        PRINT_DEBUG("Target TID not provided by the user, pinning TID to %u\n",
+                    info->proc_data.tid);
+        injector->target_tid = info->proc_data.tid;
+    }
+
+    g_mutex_unlock(&injector->global_lock);
 
     if (injector->target_rsp && info->regs->rsp <= injector->target_rsp)
     {
@@ -2008,6 +2023,7 @@ injector_status_t injector_start_app_on_win(
     }
 
     injector->drakvuf = drakvuf;
+    g_mutex_init(&injector->global_lock);
     injector->target_pid = pid;
     injector->target_tid = tid;
     injector->target_file_us = target_file_us;
