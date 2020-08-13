@@ -682,9 +682,7 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     if (w->rsp && info->regs->rsp <= w->rsp)
         return VMI_EVENT_RESPONSE_NONE;
 
-    // Return if NtCreateFile failed
-    if (info->regs->rax)
-        return VMI_EVENT_RESPONSE_NONE;
+    const char* is_success = info->regs->rax ? "FAIL" : "SUCCESS";
 
     uint32_t handle = 0;
     access_context_t ctx =
@@ -702,25 +700,23 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     gchar* escaped_pname = NULL;
     gchar* escaped_fname = NULL;
 
-    if (!handle) goto done;
-
     info->trap->data = w->f;
     file_path = objattr_read(drakvuf, info, w->obj_attr, handle);
 
     switch (w->f->format)
     {
         case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,0x%" PRIx32 ",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"",
+            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,0x%" PRIx32 ",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid, info->trap->name,
-                   file_path.c_str(), handle, w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str());
+                   file_path.c_str(), handle, w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str(), is_success);
             printf("\n");
             break;
 
         case OUTPUT_KV:
             printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\",Handle=0x%x"
-                   ",%s,%s,%s,%s,%s",
+                   ",%s,%s,%s,%s,%s,Status=\"%s\"",
                    UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   info->trap->name, file_path.c_str(), handle, w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str());
+                   info->trap->name, file_path.c_str(), handle, w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str(), is_success);
             printf("\n");
             break;
 
@@ -744,13 +740,14 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
                     "\"FileAttributes\": \"%s\","
                     "\"ShareAccess\": \"%s\","
                     "\"CreateDisposition\": \"%s\","
-                    "\"CreateOptions\": \"%s\"",
+                    "\"CreateOptions\": \"%s\","
+                    "\"Status\": \"%s\"",
                     UNPACK_TIMEVAL(info->timestamp),
                     escaped_pname,
                     USERIDSTR(drakvuf), info->attached_proc_data.userid,
                     info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
                     info->trap->name, escaped_fname, handle,
-                    w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str());
+                    w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str(), is_success);
 
             printf("}\n");
             g_free(escaped_fname);
@@ -760,15 +757,14 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         default:
         case OUTPUT_DEFAULT:
             printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s HANDLE:0x%x"
-                   " DESIREDACCESS:\"%s\" FILEATTRIBUTES:\"%s\" SHAREACCESS:\"%s\" CREATEDISPOSITION:\"%s\" CREATEOPTIONS:\"%s\"",
+                   " DESIREDACCESS:\"%s\" FILEATTRIBUTES:\"%s\" SHAREACCESS:\"%s\" CREATEDISPOSITION:\"%s\" CREATEOPTIONS:\"%s\" STATUS:\"%s\"",
                    UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
                    USERIDSTR(drakvuf), info->attached_proc_data.userid, info->trap->name, file_path.c_str(), handle,
-                   w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str());
+                   w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str(), is_success);
             printf("\n");
             break;
     }
 
-done:
     w->f->traps_to_free = g_slist_remove(w->f->traps_to_free, info->trap);
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)g_free);
     delete w;
