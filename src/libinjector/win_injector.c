@@ -155,7 +155,7 @@ struct injector
     // For shellcode execution
     addr_t payload, payload_addr, memset;
     // For readfile/writefile
-    addr_t create_file, read_file, write_file, close_handle, expand_env;
+    addr_t create_file, read_file, write_file, close_handle, expand_env, get_last_error;
     size_t binary_size, payload_size;
     uint32_t status;
     uint32_t file_handle;
@@ -535,6 +535,11 @@ static bool setup_close_handle_stack(injector_t injector, x86_registers_t* regs)
     init_int_argument(&args[0], injector->file_handle);
 
     return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
+}
+
+static bool setup_get_last_error_stack(injector_t injector, x86_registers_t* regs)
+{
+    return setup_stack(injector->drakvuf, regs, NULL, 0);
 }
 
 static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info)
@@ -1271,6 +1276,18 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             if (regs.x86.rax == (~0ULL) || !regs.x86.rax)
             {
                 PRINT_DEBUG("Failed to open guest file\n");
+
+                if (!setup_get_last_error_stack(injector, &regs.x86))
+                {
+                    PRINT_DEBUG("Failed to setup stack for get last error\n");
+                    return 0;
+                }
+
+                regs.x86.rip = injector->get_last_error;
+
+                injector->status = STATUS_GET_LAST_ERROR;
+                set_regs(drakvuf, &regs, info->vcpu);
+
                 return 0;
             }
 
@@ -1280,6 +1297,26 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             if (!injector->host_file)
             {
                 PRINT_DEBUG("Failed to open host file\n");
+                return 0;
+            }
+        }
+        else
+        {
+            if (!regs.x86.rax)
+            {
+                PRINT_DEBUG("Failed to write to the guest file\n");
+
+                if (!setup_get_last_error_stack(injector, &regs.x86))
+                {
+                    PRINT_DEBUG("Failed to setup stack for get last error\n");
+                    return 0;
+                }
+
+                regs.x86.rip = injector->get_last_error;
+
+                injector->status = STATUS_GET_LAST_ERROR;
+                set_regs(drakvuf, &regs, info->vcpu);
+
                 return 0;
             }
         }
@@ -1421,6 +1458,22 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         return 0;
     }
 
+    if ( !injector->is32bit && STATUS_GET_LAST_ERROR == injector->status )
+    {
+        PRINT_DEBUG("Last error: 0x%lx\n", regs.x86.rax);
+
+        copy_gprs(&regs.x86, &injector->saved_regs);
+
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+
+        set_regs(drakvuf, &regs, info->vcpu);
+
+        injector->rc = INJECTOR_FAILED;
+
+        return 0;
+    }
+
     if ( !injector->is32bit && STATUS_CLOSE_FILE_OK == injector->status )
     {
         PRINT_DEBUG("Close handle RAX: 0x%lx\n", regs.x86.rax);
@@ -1428,12 +1481,19 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         if (regs.x86.rax == ~0ULL || !regs.x86.rax)
         {
-            PRINT_DEBUG("Failed to close guest file handle\n");
+            if (!setup_get_last_error_stack(injector, &regs.x86))
+            {
+                PRINT_DEBUG("Failed to setup stack for get last error\n");
+                return 0;
+            }
+
+            injector->status = STATUS_GET_LAST_ERROR;
+            regs.x86.rip = injector->get_last_error;
+
+            set_regs(drakvuf, &regs, info->vcpu);
+
             return 0;
         }
-
-        if (!injector_set_hijacked(injector, info))
-            return 0;
 
         injector->status = STATUS_EXEC_OK;
 
@@ -1964,6 +2024,9 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
         }
 
         injector->close_handle = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CloseHandle", injector->global_search);
+        if (!injector->close_handle) return false;
+        injector->get_last_error = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "GetLastError", injector->global_search);
+        if (!injector->get_last_error) return false;
         injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc", injector->global_search);
     }
 
