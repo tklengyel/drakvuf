@@ -954,13 +954,17 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
             {
                 e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new AsciiPrinter()));
             }
-            else if (arg_type == "lpcwstr" || arg_type == "lpwstr")
+            else if (arg_type == "lpcwstr" || arg_type == "lpwstr" || arg_type == "bstr")
             {
                 e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new WideStringPrinter()));
             }
             else if (arg_type == "punicode_string")
             {
                 e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UnicodePrinter()));
+            }
+            else if (arg_type == "pulong")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UlongPrinter()));
             }
             else
             {
