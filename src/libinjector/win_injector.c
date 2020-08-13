@@ -1379,7 +1379,19 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         if (regs.x86.rax == (~0ULL) || !regs.x86.rax)
         {
-            PRINT_DEBUG("Failed to open file\n");
+            PRINT_DEBUG("Failed to open guest file\n");
+
+            if (!setup_get_last_error_stack(injector, &regs.x86))
+            {
+                PRINT_DEBUG("Failed to setup stack for get last error\n");
+                return 0;
+            }
+
+            regs.x86.rip = injector->get_last_error;
+
+            injector->status = STATUS_GET_LAST_ERROR;
+            set_regs(drakvuf, &regs, info->vcpu);
+
             return 0;
         }
 
@@ -1397,7 +1409,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         regs.x86.rip = injector->read_file;
 
         injector->status = STATUS_READ_FILE_OK;
-
+        set_regs(drakvuf, &regs, info->vcpu);
 
         return 0;
     }
@@ -1407,6 +1419,24 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         uint8_t buf[FILE_BUF_SIZE];
 
         PRINT_DEBUG("File read result: %lx\n", regs.x86.rax);
+
+        if (!regs.x86.rax)
+        {
+            PRINT_DEBUG("Failed to read the guest file\n");
+
+            if (!setup_get_last_error_stack(injector, &regs.x86))
+            {
+                PRINT_DEBUG("Failed to setup stack for get last error\n");
+                return 0;
+            }
+
+            regs.x86.rip = injector->get_last_error;
+
+            injector->status = STATUS_GET_LAST_ERROR;
+            set_regs(drakvuf, &regs, info->vcpu);
+
+            return 0;
+        }
 
         access_context_t ctx = { 0 };
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -1427,7 +1457,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         fwrite(buf + FILE_BUF_RESERVED, *num_bytes, 1, injector->host_file);
 
-        if (regs.x86.rax != 0 && *num_bytes != 0)
+        if (*num_bytes != 0)
         {
             if (!setup_read_file_stack(injector, &regs.x86))
             {
