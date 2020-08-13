@@ -113,34 +113,34 @@
 class ArgumentPrinter
 {
 public:
-    virtual std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument);
+    virtual std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
     virtual ~ArgumentPrinter();
 };
 
 class StringPrinterInterface : public ArgumentPrinter
 {
 protected:
-    virtual std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) = 0;
+    virtual std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const = 0;
 public:
-    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument);
+    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 
 class AsciiPrinter : public StringPrinterInterface
 {
 private:
-    std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx);
+    std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const;
 };
 
 class WideStringPrinter : public StringPrinterInterface
 {
 private:
-    std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx);
+    std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const;
 };
 
 class UnicodePrinter : public StringPrinterInterface
 {
 private:
-    std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx);
+    std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const;
 };
 
 class BitMaskPrinter : public ArgumentPrinter
@@ -148,7 +148,7 @@ class BitMaskPrinter : public ArgumentPrinter
     std::map < uint64_t, std::string > dict;
 public:
     BitMaskPrinter(std::map < uint64_t, std::string > dict);
-    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument);
+    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 
 #endif
