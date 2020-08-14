@@ -263,14 +263,14 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
         {
             fprintf(stderr, "Critical error in re-copying remapped gfn\n");
             drakvuf->interrupted = -1;
-            return 0;
+            goto done;
         }
 
         if ( VMI_FAILURE == vmi_write_pa(drakvuf->vmi, pass->remapped_gfn->r<<12, VMI_PS_4KB, &backup, NULL) )
         {
             fprintf(stderr, "Critical error in re-copying remapped gfn\n");
             drakvuf->interrupted = -1;
-            return 0;
+            goto done;
         }
 
         loop = (GSList*)pass->traps;
@@ -285,7 +285,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             {
                 fprintf(stderr, "Critical error in re-copying remapped gfn\n");
                 drakvuf->interrupted = -1;
-                return 0;
+                goto done;
             }
 
             if ( test == bp )
@@ -311,8 +311,9 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                 }
                 else if ( VMI_FAILURE == vmi_write_8_pa(drakvuf->vmi, (pass->remapped_gfn->r << 12) + (*pa & VMI_BIT_MASK(0, 11)), &bp) )
                 {
+                    fprintf(stderr, "Failed to set breakpoint in post_mem_cb!\n");
                     drakvuf->interrupted = -1;
-                    return 0;
+                    goto done;
                 }
             }
 
@@ -501,7 +502,18 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             }
         }
 
-        PRINT_DEBUG("Switching to altp2m view %u on vCPU %u\n", event->slat_id, event->vcpu_id);
+        if ( drakvuf->step_event[event->vcpu_id]->callback == post_mem_cb )
+        {
+            fprintf(stderr, "Error, post_mem_cb wasn't called when expected!\n");
+            drakvuf->interrupted = -1;
+            g_slice_free(struct memcb_pass, pass);
+            g_free( (gpointer)proc_data.name );
+            g_free( (gpointer)attached_proc_data.name );
+            return 0;
+        }
+
+        PRINT_DEBUG("Switching to altp2m view %u on vCPU %u and waiting for post_mem cb\n",
+                    event->slat_id, event->vcpu_id);
 
         drakvuf->step_event[event->vcpu_id]->callback = post_mem_cb;
         drakvuf->step_event[event->vcpu_id]->data = pass;
@@ -1421,7 +1433,7 @@ void drakvuf_loop(drakvuf_t drakvuf)
     PRINT_DEBUG("DRAKVUF loop finished\n");
 }
 
-bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
+bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
 {
 
     int rc;
@@ -1603,7 +1615,8 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf)
         return 0;
     }
 
-    if ( xen_version() >= 14 )
+    // TODO: Fast singlestep is disabled by default for now while a bug is being fixed upstream in Xen
+    if ( fast_singlestep && xen_version() >= 14 )
         drakvuf->int3_response_flags = VMI_EVENT_RESPONSE_SLAT_ID |     // Switch to this ID immediately
                                        VMI_EVENT_RESPONSE_NEXT_SLAT_ID; // Switch to next ID after singlestepping a single instruction
     else
