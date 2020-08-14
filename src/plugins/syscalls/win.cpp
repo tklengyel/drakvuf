@@ -523,6 +523,8 @@ char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* in
                                         file_root ? "\\" : "",
                                         file_name_us->contents);
 
+        vmi_free_unicode_str(file_name_us);
+
         return file_path;
     }
 
