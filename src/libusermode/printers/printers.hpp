@@ -137,10 +137,10 @@ private:
     std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const;
 };
 
-class UnicodePrinter : public StringPrinterInterface
+class UnicodePrinter : public ArgumentPrinter
 {
-private:
-    std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const;
+public:
+    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 
 class UlongPrinter : public ArgumentPrinter
