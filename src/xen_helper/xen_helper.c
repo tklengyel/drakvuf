@@ -312,3 +312,13 @@ int xen_version(void)
 
     return version;
 }
+
+bool xen_get_vcpu_ctx(xen_interface_t* xen, domid_t domID, int vcpu, vcpu_guest_context_any_t* ctx)
+{
+    return xc_vcpu_getcontext(xen->xc, domID, vcpu, ctx) == 0;
+}
+
+bool xen_set_vcpu_ctx(xen_interface_t* xen, domid_t domID, int vcpu, vcpu_guest_context_any_t* ctx)
+{
+    return xc_vcpu_setcontext(xen->xc, domID, vcpu, ctx) == 0;
+}

@@ -150,30 +150,23 @@ injector_status_t injector_start_app_on_win(drakvuf_t drakvuf,
                               injector_t* injector_to_be_freed,
                               bool global_search);
 
-static inline void copy_gprs(x86_registers_t *dst, x86_registers_t *src)
+static inline void copy_gprs(registers_t *dst, registers_t *src)
 {
-    dst->rip = src->rip;
-    dst->rsp = src->rsp;
-    dst->rbp = src->rbp;
-    dst->rax = src->rax;
-    dst->rbx = src->rbx;
-    dst->rcx = src->rcx;
-    dst->rdx = src->rdx;
-    dst->r8 = src->r8;
-    dst->r9 = src->r9;
-    dst->r10 = src->r10;
-    dst->r11 = src->r11;
-    dst->r12 = src->r12;
-    dst->r13 = src->r13;
-    dst->r14 = src->r14;
-    dst->r15 = src->r15;
-}
-
-static inline void set_regs(drakvuf_t drakvuf, registers_t *regs, int vcpu)
-{
-    drakvuf_pause(drakvuf);
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    vmi_set_vcpuregs(vmi, regs, vcpu);
-    drakvuf_release_vmi(drakvuf);
-    drakvuf_resume(drakvuf);
+    dst->x86.rip = src->x86.rip;
+    dst->x86.rsp = src->x86.rsp;
+    dst->x86.rbp = src->x86.rbp;
+    dst->x86.rax = src->x86.rax;
+    dst->x86.rbx = src->x86.rbx;
+    dst->x86.rcx = src->x86.rcx;
+    dst->x86.rdx = src->x86.rdx;
+    dst->x86.rdi = src->x86.rdi;
+    dst->x86.rsi = src->x86.rsi;
+    dst->x86.r8 = src->x86.r8;
+    dst->x86.r9 = src->x86.r9;
+    dst->x86.r10 = src->x86.r10;
+    dst->x86.r11 = src->x86.r11;
+    dst->x86.r12 = src->x86.r12;
+    dst->x86.r13 = src->x86.r13;
+    dst->x86.r14 = src->x86.r14;
+    dst->x86.r15 = src->x86.r15;
 }
