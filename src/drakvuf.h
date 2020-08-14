@@ -152,7 +152,8 @@ public:
               bool verbose,
               bool leave_paused,
               bool libvmi_conf,
-              addr_t kpgd);
+              addr_t kpgd,
+              bool fast_singlestep);
     ~drakvuf_c();
 
     int is_initialized();

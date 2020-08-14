@@ -361,7 +361,8 @@ bool drakvuf_init (drakvuf_t* drakvuf,
                    const char* json_wow_profile,
                    const bool verbose,
                    const bool libvmi_conf,
-                   const addr_t kpgd) NOEXCEPT;
+                   const addr_t kpgd,
+                   const bool fast_singlestep) NOEXCEPT;
 void drakvuf_close (drakvuf_t drakvuf, const bool pause) NOEXCEPT;
 bool drakvuf_add_trap(drakvuf_t drakvuf,
                       drakvuf_trap_t* trap) NOEXCEPT;
