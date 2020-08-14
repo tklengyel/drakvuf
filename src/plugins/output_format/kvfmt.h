@@ -218,14 +218,18 @@ struct DataPrinter
             "Unsupported KV printer key type");
 
         auto pos = os.tellp();
-        if (print_data(os, fmt::Rstr(data.first), 0))
+        auto is_print_data = true;
+        if (!is_iterable<Tv>::value)
         {
-            os << '=';
-            if (print_data(os, data.second, ';'))
-            {
-                return true;
-            }
+            if (print_data(os, fmt::Rstr(data.first), 0))
+                os << '=';
+            else
+                is_print_data = false;
         }
+
+        if (is_print_data && print_data(os, data.second, ','))
+            return true;
+
         os.seekp(pos);
         return false;
     }
@@ -251,6 +255,9 @@ struct DataPrinter<T, std::enable_if_t<is_iterable<T>::value, void>>
 {
     static bool print(std::ostream& os, const T& data, char sep)
     {
+        if (data.empty())
+            return false;
+
         bool printed = false;
         for (const auto& v : data)
         {
