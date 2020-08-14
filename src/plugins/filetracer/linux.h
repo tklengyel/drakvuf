@@ -102,38 +102,92 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <glib.h>
-#include <inttypes.h>
-#include <libvmi/libvmi.h>
-#include <assert.h>
+#ifndef FILETRACER_LINUX_H
+#define FILETRACER_LINUX_H
 
-#include "filetracer.h"
-#include "private.h"
-#include "linux.h"
-#include "win.h"
+#include "plugins/private.h"
+#include "plugins/plugins.h"
 
-filetracer::filetracer(drakvuf_t drakvuf, output_format_t output)
+class linux_filetracer
 {
-    this->os = drakvuf_get_os_type(drakvuf);
-    if (this->os == VMI_OS_WINDOWS)
-    {
-        this->wf = new win_filetracer(drakvuf, output);
-    }
-    else
-    {
-        this->lf = new linux_filetracer(drakvuf, output);
-    }
-}
+public:
+    addr_t kaslr;
+    size_t* offsets;
+    output_format_t format;
+    GSList* traps_to_free;
 
-filetracer::~filetracer()
+    drakvuf_trap_t trap[22] =
+    {
+        [0 ... 21] = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 0,
+            .breakpoint.addr_type = ADDR_VA,
+            .breakpoint.module = "linux",
+            .type = BREAKPOINT,
+            .data = (void*)this
+        }
+    };
+
+    linux_filetracer(drakvuf_t drakvuf, output_format_t output);
+    ~linux_filetracer();
+};
+
+enum linux_pt_regs
 {
-    if (this->os == VMI_OS_WINDOWS)
-    {
-        delete this->wf;
-    }
-    else
-    {
-        delete this->lf;
-    }
-}
+    PT_REGS_R15,
+    PT_REGS_R14,
+    PT_REGS_R13,
+    PT_REGS_R12,
+    PT_REGS_RBP,
+    PT_REGS_RBX,
+
+    PT_REGS_R11,
+    PT_REGS_R10,
+    PT_REGS_R9,
+    PT_REGS_R8,
+    PT_REGS_RAX,
+    PT_REGS_RCX,
+    PT_REGS_RDX,
+    PT_REGS_RSI,
+    PT_REGS_RDI,
+
+    PT_REGS_ORIG_RAX,
+
+    PT_REGS_RIP,
+    PT_REGS_CS,
+    PT_REGS_EFLAGS,
+    PT_REGS_RSP,
+    PT_REGS_SS,
+
+    __PT_REGS_MAX
+};
+
+static const char* linux_pt_regs_names[__PT_REGS_MAX] =
+{
+    [PT_REGS_R15] = "r15",
+    [PT_REGS_R14] = "r14",
+    [PT_REGS_R13] = "r13",
+    [PT_REGS_R12] = "r12",
+    [PT_REGS_RBP] = "bp",
+    [PT_REGS_RBX] = "bx",
+
+    [PT_REGS_R11] = "r11",
+    [PT_REGS_R10] = "r10",
+    [PT_REGS_R9] = "r9",
+    [PT_REGS_R8] = "r8",
+    [PT_REGS_RAX] = "ax",
+    [PT_REGS_RCX] = "cx",
+    [PT_REGS_RDX] = "dx",
+    [PT_REGS_RSI] = "si",
+    [PT_REGS_RDI] = "di",
+
+    [PT_REGS_ORIG_RAX] = "orig_ax",
+
+    [PT_REGS_RIP] = "ip",
+    [PT_REGS_CS] = "cs",
+    [PT_REGS_EFLAGS] = "flags",
+    [PT_REGS_RSP] = "sp",
+    [PT_REGS_SS] = "ss",
+};
+
+#endif

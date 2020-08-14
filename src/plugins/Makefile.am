@@ -126,6 +126,10 @@ if PLUGIN_FILETRACER
 sources += filetracer/filetracer.cpp
 sources += filetracer/filetracer.h
 sources += filetracer/private.h
+sources += filetracer/linux.cpp
+sources += filetracer/linux.h
+sources += filetracer/win.cpp
+sources += filetracer/win.h
 sources += filetracer/win_acl.cpp
 sources += filetracer/win_acl.h
 endif

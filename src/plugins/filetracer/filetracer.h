@@ -107,35 +107,15 @@
 
 #include "plugins/private.h"
 #include "plugins/plugins.h"
+#include "win.h"
+#include "linux.h"
 
 class filetracer: public plugin
 {
 public:
-    output_format_t format;
-
-    size_t* offsets;
-    addr_t newfile_name_offset;
-    addr_t newfile_name_length_offset;
-    addr_t newfile_root_offset;
-    addr_t basic_creation_offset;
-    addr_t basic_last_access_offset;
-    addr_t basic_last_write_offset;
-    addr_t basic_change_time_offset;
-    addr_t basic_attributes_offset;
-
-    drakvuf_trap_t trap[7] =
-    {
-        [0 ... 6] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.pid = 4,
-            .breakpoint.addr_type = ADDR_RVA,
-            .breakpoint.module = "ntoskrnl.exe",
-            .type = BREAKPOINT,
-            .data = (void*)this
-        }
-    };
-
-    GSList *traps_to_free;
+    os_t os;
+    win_filetracer* wf;
+    linux_filetracer* lf;
     filetracer(drakvuf_t drakvuf, output_format_t output);
     ~filetracer();
 };

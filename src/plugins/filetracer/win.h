@@ -102,38 +102,43 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <glib.h>
-#include <inttypes.h>
-#include <libvmi/libvmi.h>
-#include <assert.h>
+#ifndef FILETRACER_WIN_H
+#define FILETRACER_WIN_H
 
-#include "filetracer.h"
-#include "private.h"
-#include "linux.h"
-#include "win.h"
+#include "plugins/private.h"
+#include "plugins/plugins.h"
 
-filetracer::filetracer(drakvuf_t drakvuf, output_format_t output)
+class win_filetracer
 {
-    this->os = drakvuf_get_os_type(drakvuf);
-    if (this->os == VMI_OS_WINDOWS)
-    {
-        this->wf = new win_filetracer(drakvuf, output);
-    }
-    else
-    {
-        this->lf = new linux_filetracer(drakvuf, output);
-    }
-}
+public:
+    GSList* traps;
+    size_t* offsets;
+    output_format_t format;
+    GSList* traps_to_free;
 
-filetracer::~filetracer()
-{
-    if (this->os == VMI_OS_WINDOWS)
+    addr_t newfile_name_offset;
+    addr_t newfile_name_length_offset;
+    addr_t newfile_root_offset;
+    addr_t basic_creation_offset;
+    addr_t basic_last_access_offset;
+    addr_t basic_last_write_offset;
+    addr_t basic_change_time_offset;
+    addr_t basic_attributes_offset;
+
+    drakvuf_trap_t trap[7] =
     {
-        delete this->wf;
-    }
-    else
-    {
-        delete this->lf;
-    }
-}
+        [0 ... 6] = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 4,
+            .breakpoint.addr_type = ADDR_RVA,
+            .breakpoint.module = "ntoskrnl.exe",
+            .type = BREAKPOINT,
+            .data = (void*)this
+        }
+    };
+
+    win_filetracer(drakvuf_t drakvuf, output_format_t output);
+    ~win_filetracer();
+};
+
+#endif
