@@ -204,6 +204,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
+    vmi.unlock();
     print_header(s->format, drakvuf, VMI_OS_WINDOWS, true, info, w->num, w->type, sc, 0, NULL);
     if ( nargs )
     {
@@ -212,6 +213,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     print_footer(s->format, nargs, true);
     g_free(buf);
+    vmi.lock();
 
     if ( s->disable_sysret )
         return 0;
@@ -411,6 +413,14 @@ void setup_windows(drakvuf_t drakvuf, syscalls *s)
         s->sst[1][1] = sst[1].ServiceLimit;
     }
 
+    s->offsets = (size_t*)g_try_malloc0(_WINDOWS_STRUCTS_OFFSETS_MAX * sizeof(size_t));
+    if ( !s->offsets )
+        throw -1;
+
+    for (int i = 0; i < _WINDOWS_STRUCTS_OFFSETS_MAX; ++i)
+        if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, windows_structs_offsets_names[i][0], windows_structs_offsets_names[i][1], &s->offsets[i]) )
+            throw -1;
+
     start += s->kernel_base;
 
     addr_t dtb;
@@ -475,4 +485,54 @@ void setup_windows(drakvuf_t drakvuf, syscalls *s)
         PRINT_DEBUG("Failed to trap win32k syscall entries\n");
         throw -1;
     }
+}
+
+char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
+{
+    vmi_lock_guard vmi(drakvuf);
+    if ( arg.type == POBJECT_ATTRIBUTES )
+    {
+        access_context_t ctx;
+        ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+        ctx.dtb = info->regs->cr3;
+
+        addr_t file_root_handle = 0;
+        ctx.addr = val + s->offsets[_OBJECT_ATTRIBUTES_RootDirectory];
+        if ( VMI_FAILURE == vmi_read_addr(vmi.vmi, &ctx, &file_root_handle) )
+            return nullptr;
+
+        char* file_root = drakvuf_get_filename_from_handle(drakvuf, info, file_root_handle);
+
+        ctx.addr = val + s->offsets[_OBJECT_ATTRIBUTES_ObjectName];
+        if ( VMI_FAILURE == vmi_read_addr(vmi.vmi, &ctx, &ctx.addr) )
+        {
+            g_free(file_root);
+            return nullptr;
+        }
+
+        unicode_string_t* file_name_us = drakvuf_read_unicode(drakvuf, info, ctx.addr);
+
+        if ( !file_name_us )
+        {
+            g_free(file_root);
+            return nullptr;
+        }
+
+        char* file_path = g_strdup_printf("%s%s%s",
+                                        file_root ?: "",
+                                        file_root ? "\\" : "",
+                                        file_name_us->contents);
+
+        vmi_free_unicode_str(file_name_us);
+
+        return file_path;
+    }
+
+    if ( !strcmp(arg.name, "FileHandle") )
+    {
+        char* filename = drakvuf_get_filename_from_handle(drakvuf, info, val);
+        if ( filename ) return filename;
+    }
+
+    return nullptr;
 }
