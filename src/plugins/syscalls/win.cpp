@@ -413,7 +413,7 @@ void setup_windows(drakvuf_t drakvuf, syscalls *s)
         s->sst[1][1] = sst[1].ServiceLimit;
     }
 
-    s->offsets = (size_t*)g_try_malloc0(1);
+    s->offsets = (size_t*)g_try_malloc0(_WINDOWS_STRUCTS_OFFSETS_MAX * sizeof(size_t));
     if ( !s->offsets )
         throw -1;
 
