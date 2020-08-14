@@ -171,6 +171,7 @@ static void print_usage()
             "\t -x <plugin>               Don't activate the specified plugin\n"
             "\t -a <plugin>               Activate the specified plugin\n"
             "\t -p                        Leave domain paused after DRAKVUF exits\n"
+            "\t -F                        Enable fast singlestepping (requires Xen 4.14+)\n"
 #ifdef ENABLE_DOPPELGANGING
             "\t -B <path>                 The host path of the windows binary to inject (requires -m doppelganging)\n"
             "\t -P <target>               The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
@@ -269,6 +270,7 @@ int main(int argc, char** argv)
     bool verbose = false;
     bool leave_paused = false;
     bool libvmi_conf = false;
+    bool fast_singlestep = false;
     addr_t kpgd = 0;
     plugins_options options = {};
     bool disabled_all = false; // Used to disable all plugin once
@@ -335,9 +337,10 @@ int main(int argc, char** argv)
         {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
         {"syscall-hooks-list", required_argument, NULL, 'S'},
         {"disable-sysret", no_argument, NULL, opt_disable_sysret},
+        {"fast-singlestep", no_argument, NULL, 'F'},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:h";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
@@ -456,6 +459,9 @@ int main(int argc, char** argv)
             case 'l':
                 libvmi_conf = true;
                 break;
+            case 'F':
+                fast_singlestep = true;
+                break;
             case 'k':
                 kpgd = strtoull(optarg, NULL, 0);
                 break;
@@ -549,7 +555,7 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = new drakvuf_c(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd);
+        drakvuf = new drakvuf_c(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd, fast_singlestep);
     }
     catch (const std::exception& e)
     {

@@ -156,7 +156,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     g_free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool _verbose, bool libvmi_conf, addr_t kpgd)
+bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool _verbose, bool libvmi_conf, addr_t kpgd, bool fast_singlestep)
 {
 
     if ( !domain || !json_kernel_path )
@@ -196,7 +196,7 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
 
     drakvuf_pause(*drakvuf);
 
-    if (!init_vmi(*drakvuf, libvmi_conf))
+    if (!init_vmi(*drakvuf, libvmi_conf, fast_singlestep))
         goto err;
 
     switch ((*drakvuf)->os)
