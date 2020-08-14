@@ -840,3 +840,30 @@ int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, event_cb_t event_cb, void* d
     drakvuf_event_fd_generate(drakvuf);
     return 1;
 }
+
+bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, int vcpu, registers_t* regs)
+{
+    vcpu_guest_context_any_t ctx;
+
+    if ( !xen_get_vcpu_ctx(drakvuf->xen, drakvuf->domID, vcpu, &ctx) )
+        return false;
+
+    // HVM guests are always treated as x64 by Xen
+    ctx.x64.user_regs.rip = regs->x86.rip;
+    ctx.x64.user_regs.rax = regs->x86.rax;
+    ctx.x64.user_regs.rbx = regs->x86.rbx;
+    ctx.x64.user_regs.rcx = regs->x86.rcx;
+    ctx.x64.user_regs.rdx = regs->x86.rdx;
+    ctx.x64.user_regs.rbp = regs->x86.rbp;
+    ctx.x64.user_regs.rsp = regs->x86.rsp;
+    ctx.x64.user_regs.r8 = regs->x86.r8;
+    ctx.x64.user_regs.r9 = regs->x86.r9;
+    ctx.x64.user_regs.r10 = regs->x86.r10;
+    ctx.x64.user_regs.r11 = regs->x86.r11;
+    ctx.x64.user_regs.r12 = regs->x86.r12;
+    ctx.x64.user_regs.r13 = regs->x86.r13;
+    ctx.x64.user_regs.r14 = regs->x86.r14;
+    ctx.x64.user_regs.r15 = regs->x86.r15;
+
+    return xen_set_vcpu_ctx(drakvuf->xen, drakvuf->domID, vcpu, &ctx);
+}

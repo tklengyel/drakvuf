@@ -137,5 +137,6 @@ void xen_resume(xen_interface_t* xen, domid_t domID);
 void xen_force_resume(xen_interface_t* xen, domid_t domID);
 bool xen_enable_altp2m(xen_interface_t* xen, domid_t domID);
 int xen_version(void);
-
+bool xen_get_vcpu_ctx(xen_interface_t *xen, domid_t domID, int vcpu, vcpu_guest_context_any_t *regs);
+bool xen_set_vcpu_ctx(xen_interface_t *xen, domid_t domID, int vcpu, vcpu_guest_context_any_t *regs);
 #endif
