@@ -170,7 +170,7 @@ struct injector
     const char* target_process;
 
     addr_t process_info;
-    x86_registers_t saved_regs;
+    registers_t saved_regs;
 
     drakvuf_trap_t bp;
     GSList* memtraps;
@@ -664,7 +664,7 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     regs.x86.rip = injector->exec_func;
     injector->status = STATUS_CREATE_OK;
 
-    set_regs(drakvuf, &regs, info->vcpu);
+    drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
     return 0;
 }
@@ -932,7 +932,7 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     PRINT_DEBUG("Executing the payload..\n");
 
-    set_regs(drakvuf, regs, info->vcpu);
+    drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, regs);
 
     return 0;
 }
@@ -999,8 +999,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                 injector->rc = INJECTOR_SUCCEEDED;
             }
 
-            copy_gprs(&regs.x86, &injector->saved_regs);
-            set_regs(drakvuf, &regs, info->vcpu);
+            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
 
             return 0;
         }
@@ -1021,7 +1020,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                 drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
             }
 
-            copy_gprs(&regs.x86, &injector->saved_regs);
+            copy_gprs(&regs, &injector->saved_regs);
 
             if (injector->pid && injector->tid)
             {
@@ -1049,7 +1048,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                 drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
             }
 
-            set_regs(drakvuf, &regs, info->vcpu);
+            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
         }
 
         return 0;
@@ -1068,8 +1067,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         else
             injector->rc = INJECTOR_FAILED;
 
-        copy_gprs(&regs.x86, &injector->saved_regs);
-        set_regs(drakvuf, &regs, info->vcpu);
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
 
         if (injector->rc == INJECTOR_SUCCEEDED)
         {
@@ -1150,7 +1148,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         regs.x86.rip = injector->exec_func;
 
-        set_regs(drakvuf, &regs, info->vcpu);
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
         return 0;
     }
@@ -1174,7 +1172,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         PRINT_DEBUG("Payload is at: 0x%lx\n", injector->payload_addr);
 
-        set_regs(drakvuf, &regs, info->vcpu);
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
         return 0;
     }
@@ -1201,7 +1199,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
             injector->status = STATUS_EXPAND_ENV_OK;
 
-            set_regs(drakvuf, &regs, info->vcpu);
+            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
             return 0;
         }
@@ -1258,7 +1256,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         injector->status = STATUS_CREATE_FILE_OK;
 
-        set_regs(drakvuf, &regs, info->vcpu);
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
         return 0;
     }
@@ -1286,7 +1284,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                 regs.x86.rip = injector->get_last_error;
 
                 injector->status = STATUS_GET_LAST_ERROR;
-                set_regs(drakvuf, &regs, info->vcpu);
+                drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
                 return 0;
             }
@@ -1315,7 +1313,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                 regs.x86.rip = injector->get_last_error;
 
                 injector->status = STATUS_GET_LAST_ERROR;
-                set_regs(drakvuf, &regs, info->vcpu);
+                drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
                 return 0;
             }
@@ -1338,7 +1336,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             regs.x86.rip = injector->close_handle;
 
             injector->status = STATUS_CLOSE_FILE_OK;
-            set_regs(drakvuf, &regs, info->vcpu);
+            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
             return 0;
         }
@@ -1364,7 +1362,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         vmi_write(vmi, &ctx, amount, buf + FILE_BUF_RESERVED, NULL);
         drakvuf_release_vmi(drakvuf);
 
-        set_regs(drakvuf, &regs, info->vcpu);
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
         injector->status = STATUS_WRITE_FILE_OK;
 
@@ -1390,7 +1388,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             regs.x86.rip = injector->get_last_error;
 
             injector->status = STATUS_GET_LAST_ERROR;
-            set_regs(drakvuf, &regs, info->vcpu);
+            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
             return 0;
         }
@@ -1409,7 +1407,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         regs.x86.rip = injector->read_file;
 
         injector->status = STATUS_READ_FILE_OK;
-        set_regs(drakvuf, &regs, info->vcpu);
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
         return 0;
     }
@@ -1433,7 +1431,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             regs.x86.rip = injector->get_last_error;
 
             injector->status = STATUS_GET_LAST_ERROR;
-            set_regs(drakvuf, &regs, info->vcpu);
+            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
             return 0;
         }
@@ -1483,7 +1481,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         }
 
 
-        set_regs(drakvuf, &regs, info->vcpu);
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
         return 0;
     }
@@ -1492,12 +1490,10 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     {
         PRINT_DEBUG("Last error: 0x%lx\n", regs.x86.rax);
 
-        copy_gprs(&regs.x86, &injector->saved_regs);
-
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
-        set_regs(drakvuf, &regs, info->vcpu);
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
 
         injector->rc = INJECTOR_FAILED;
 
@@ -1520,19 +1516,17 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             injector->status = STATUS_GET_LAST_ERROR;
             regs.x86.rip = injector->get_last_error;
 
-            set_regs(drakvuf, &regs, info->vcpu);
+            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
             return 0;
         }
 
         injector->status = STATUS_EXEC_OK;
 
-        copy_gprs(&regs.x86, &injector->saved_regs);
-
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
         drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
-        set_regs(drakvuf, &regs, info->vcpu);
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
 
         PRINT_DEBUG("File operation executed OK\n");
         injector->rc = INJECTOR_SUCCEEDED;
@@ -1573,7 +1567,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         injector->status = STATUS_EXEC_OK;
 
-        set_regs(drakvuf, &regs, info->vcpu);
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
         return 0;
     }
@@ -1617,7 +1611,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             regs.x86.rip = injector->resume_thread;
             injector->status = STATUS_RESUME_OK;
 
-            set_regs(drakvuf, &regs, info->vcpu);
+            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
             return 0;
         }
@@ -1645,8 +1639,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     drakvuf_remove_trap(drakvuf, info->trap, NULL);
     drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
-    copy_gprs(&regs.x86, &injector->saved_regs);
-    set_regs(drakvuf, &regs, info->vcpu);
+    drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
 
     return 0;
 }
