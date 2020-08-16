@@ -193,7 +193,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     auto tuple = std::make_tuple(
-                     keyval("Tag", fmt::Rstr(tag)),
+                     keyval("Tag", fmt::Rstr((const char*)tag)),
                      keyval("Type", fmt::Rstr(pool_type_str)),
                      keyval("Size", fmt::Nval(size)),
                      keyval("Source", source),
