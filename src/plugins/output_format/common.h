@@ -200,48 +200,35 @@ struct Rstr
 template<class T>
 struct Rstr<T,
            std::enable_if_t<
-           std::is_same_v<T, char*>,
+           std::is_same_v<std::decay_t<T>, std::string>
+           || std::is_same_v<std::decay_t<T>, std::string_view>,
            void>
-           >: ValHolder<const std::remove_pointer_t<T>*>
+           >: ValHolder<T>
 {
-    using const_ptr_t = const std::remove_pointer_t<T>* ;
-
-    Rstr(T v): ValHolder<const_ptr_t>(std::move(v))
-    {
-        if constexpr (std::is_same_v<T, const char*>)
-        {
-            if (ValHolder<const_ptr_t>::value == nullptr)
-                ValHolder<const_ptr_t>::value = "(null)";
-        }
-    }
+    Rstr(T v): ValHolder<T>(std::move(v)) {}
 };
 
 template<class T>
 struct Rstr<T,
            std::enable_if_t<
-           std::is_same_v<T, const char*>
-           || std::is_same_v<std::decay_t<T>, std::string>
-           || std::is_same_v<std::decay_t<T>, std::string_view>,
+           std::is_same_v<T, const char*>,
            void>
-           >: ValHolder<T>
+           >: ValHolder<std::string>
 {
-    Rstr(char* v): Rstr<const T>(v) {}
-
-    Rstr(T v): ValHolder<T>(std::move(v))
+    Rstr(T v): ValHolder<std::string>(std::string())
     {
-        if constexpr (std::is_same_v<T, const char*>)
-        {
-            if (ValHolder<T>::value == nullptr)
-                ValHolder<T>::value = "(null)";
-        }
+        if (v == nullptr)
+            ValHolder<std::string>::value = std::string("(null)");
+        else
+            ValHolder<std::string>::value = std::string(v);
     }
 };
 
 /* format specific quoted string value */
 template<class T>
-struct Qstr: Rstr<T>
+struct Qstr: Rstr<std::string>
 {
-    Qstr(T v): Rstr<T>(std::move(v)) {}
+    Qstr(T v): Rstr<std::string>(std::move(v)) {}
 };
 
 } // namespace fmt
