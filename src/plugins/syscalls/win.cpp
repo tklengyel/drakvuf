@@ -519,11 +519,12 @@ char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* in
         }
 
         char* file_path = g_strdup_printf("%s%s%s",
-                                        file_root ?: "",
-                                        file_root ? "\\" : "",
-                                        file_name_us->contents);
+                                          file_root ?: "",
+                                          file_root ? "\\" : "",
+                                          file_name_us->contents);
 
         vmi_free_unicode_str(file_name_us);
+        g_free(file_root);
 
         return file_path;
     }
