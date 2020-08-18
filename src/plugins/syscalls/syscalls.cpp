@@ -164,7 +164,7 @@ void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
 
     if (syscall)
     {
-        std::vector<std::pair<const char*, std::variant<fmt::Qstr<std::string>, fmt::Xval<unsigned long>>>> fmt_args;
+        std::vector<std::pair<std::string, fmt::Aarg>> fmt_args;
         for (size_t i = 0; i < args.size(); ++i)
         {
             auto str = extract_string(s, drakvuf, info, sc->args[i], args[i]);

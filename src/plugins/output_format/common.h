@@ -231,6 +231,9 @@ struct Qstr: Rstr<std::string>
     Qstr(T v): Rstr<std::string>(std::move(v)) {}
 };
 
+/* Any argument type */
+using Aarg = std::variant<fmt::Nval<unsigned long>, fmt::Xval<unsigned long>, fmt::Fval<long double>, fmt::Rstr<std::string>, fmt::Qstr<std::string>>;
+
 } // namespace fmt
 
 #endif // PLUGINS_OUTPUT_FORMAT_COMMON_H
