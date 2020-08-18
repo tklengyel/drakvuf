@@ -260,7 +260,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             return 0;
     }
 
-    int rc = linux_build_argbuf(&args[0], vmi, info, s, sc, pt_regs);
+    int rc = linux_build_argbuf(args.data(), vmi, info, s, sc, pt_regs);
     if ( VMI_SUCCESS != rc )
     {
         // Don't extract any args
