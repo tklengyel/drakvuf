@@ -156,8 +156,6 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     fmt::print(plugin->m_output_format, "apimon", drakvuf, info,
         keyval("Event", fmt::Qstr("api_called")),
-        keyval("ProcessName", fmt::Qstr(info->proc_data.name)),
-        keyval("Method", fmt::Qstr(info->trap->name)),
         keyval("CalledFrom", fmt::Xval(info->regs->rip)),
         keyval("ReturnValue", fmt::Xval(info->regs->rax)),
         keyval("Arguments", fmt_args),
