@@ -136,7 +136,7 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         exit_status_str = ntstatus_format_string(ntstatus_t(info->regs->rax), exit_status_buf, sizeof(exit_status_buf));
 
     std::vector<uint64_t> args;
-    print_syscall(s, drakvuf, VMI_OS_WINDOWS, false, info, w->num, info->trap->breakpoint.module, sc, 0, args, info->regs->rax, exit_status_str);
+    print_syscall(s, drakvuf, VMI_OS_WINDOWS, false, info, w->num, info->trap->breakpoint.module, sc, args, info->regs->rax, exit_status_str);
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
     s->traps = g_slist_remove(s->traps, info->trap);
@@ -201,7 +201,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     vmi.unlock();
-    print_syscall(s, drakvuf, VMI_OS_WINDOWS, true, info, w->num, w->type, sc, nargs, args, 0, NULL);
+    print_syscall(s, drakvuf, VMI_OS_WINDOWS, true, info, w->num, w->type, sc, args, 0, NULL);
     vmi.lock();
 
     if ( s->disable_sysret )
