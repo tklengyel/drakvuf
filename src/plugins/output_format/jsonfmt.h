@@ -142,7 +142,7 @@ public:
     template <class Tv = T>
     static bool print(std::ostream& os, const fmt::Xval<Tv>& data, char)
     {
-        os << data.value;
+        os << "\"0x" << std::hex << data.value << "\"" << std::dec;
         return true;
     }
 
