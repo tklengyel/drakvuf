@@ -108,10 +108,15 @@
 #include <libvmi/libvmi.h>
 #include <libdrakvuf/libdrakvuf.h>
 
+ArgumentPrinter::ArgumentPrinter(std::string arg_name) : name(arg_name)
+{
+    // intentionally empty
+}
+
 std::string ArgumentPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
     std::stringstream stream;
-    stream << "0x" << std::hex << argument;
+    stream << name << "=0x" << std::hex << argument;
     return stream.str();
 }
 
@@ -129,7 +134,7 @@ std::string StringPrinterInterface::print(drakvuf_t drakvuf, drakvuf_trap_info* 
     std::string str = getBuffer(vmi, &ctx);
     drakvuf_release_vmi(drakvuf);
     std::stringstream stream;
-    stream << "0x" << std::hex << argument << ":\"" << str << "\"";
+    stream << name << "=0x" << std::hex << argument << ":\"" << str << "\"";
     return stream.str();
 }
 
@@ -178,7 +183,7 @@ std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, ui
     }
     drakvuf_release_vmi(drakvuf);
     std::stringstream stream;
-    stream << "0x" << std::hex << argument << ":\"" << str << "\"";
+    stream << name << "=0x" << std::hex << argument << ":\"" << str << "\"";
     return stream.str();
 }
 
@@ -195,7 +200,7 @@ std::string UlongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint
     vmi_read_32(vmi, &ctx, &value);
     drakvuf_release_vmi(drakvuf);
     std::stringstream stream;
-    stream << "0x" << std::hex << value;
+    stream << name << "=0x" << std::hex << value;
     return stream.str();
 }
 
@@ -215,7 +220,7 @@ std::string PointerToPointerPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info*
         vmi_read_addr(vmi, &ctx, &value);
     drakvuf_release_vmi(drakvuf);
     std::stringstream stream;
-    stream << "0x" << std::hex << value;
+    stream << name << "=0x" << std::hex << value;
     return stream.str();
 }
 
@@ -245,10 +250,12 @@ std::string GuidPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint6
         guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1],
         guid.Data4[2], guid.Data4[3], guid.Data4[4],
         guid.Data4[5], guid.Data4[6], guid.Data4[7]);
-    return std::string(stream);
+    return name + "=" + std::string(stream);
 }
 
-BitMaskPrinter::BitMaskPrinter(std::map < uint64_t, std::string > dict) : dict(dict)
+BitMaskPrinter::BitMaskPrinter(std::string arg_name, std::map < uint64_t, std::string > dict)
+    : ArgumentPrinter(arg_name)
+    , dict(dict)
 {
     // intentionally empty
 }
@@ -256,7 +263,7 @@ BitMaskPrinter::BitMaskPrinter(std::map < uint64_t, std::string > dict) : dict(d
 std::string BitMaskPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
     std::stringstream stream;
-    stream << "0x" << std::hex << argument << ": ";
+    stream << name << "=0x" << std::hex << argument << ": ";
     if (argument == 0 && this->dict.find(0) != this->dict.end())
     {
         stream << this->dict.at(0);

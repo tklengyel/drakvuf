@@ -890,13 +890,13 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
     {
         // if the DLL hook list was not provided, we provide some simple defaults
         std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec1;
-        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter()));
-        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter()));
+        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("wVersionRequired")));
+        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("lpWSAData")));
         wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", "log+stack", std::move(arg_vec1));
 
         std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec2;
-        arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter()));
-        arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter()));
+        arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("ExitCode")));
+        arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("Unknown")));
         wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", "log+stack", std::move(arg_vec2));
         return;
     }
@@ -919,7 +919,6 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
         wanted_hooks->push_back(plugin_target_config_entry_t());
         plugin_target_config_entry_t &e = wanted_hooks->back();
 
-        std::string arg_type;
         if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
             throw -1;
 
@@ -948,36 +947,54 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
                 throw -1;
         }
 
-        while (std::getline(ss, arg_type, ',') && !arg_type.empty())
+        std::string arg;
+        size_t arg_idx = 0;
+        while (std::getline(ss, arg, ',') && !arg.empty())
         {
-            if (arg_type == "lpcstr" || arg_type == "lpctstr")
+            auto pos = arg.find_first_of(':');
+            std::string arg_name;
+            std::string arg_type;
+            if (pos == std::string::npos)
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new AsciiPrinter()));
-            }
-            else if (arg_type == "lpcwstr" || arg_type == "lpwstr" || arg_type == "bstr")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new WideStringPrinter()));
-            }
-            else if (arg_type == "punicode_string")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UnicodePrinter()));
-            }
-            else if (arg_type == "pulong")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UlongPrinter()));
-            }
-            else if (arg_type == "lpvoid*")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new PointerToPointerPrinter()));
-            }
-            else if (arg_type == "refclsid" || arg_type == "refiid")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new GuidPrinter()));
+                arg_name = std::string("Arg") + std::to_string(arg_idx);
+                arg_type = arg;
             }
             else
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new ArgumentPrinter()));
+                arg_name = arg.substr(0, pos);
+                arg_type = arg.substr(pos + 1);
             }
+
+            if (arg_type == "lpcstr" || arg_type == "lpctstr")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new AsciiPrinter(arg_name)));
+            }
+            else if (arg_type == "lpcwstr" || arg_type == "lpwstr" || arg_type == "bstr")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new WideStringPrinter(arg_name)));
+            }
+            else if (arg_type == "punicode_string")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UnicodePrinter(arg_name)));
+            }
+            else if (arg_type == "pulong")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UlongPrinter(arg_name)));
+            }
+            else if (arg_type == "lpvoid*")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new PointerToPointerPrinter(arg_name)));
+            }
+            else if (arg_type == "refclsid" || arg_type == "refiid")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new GuidPrinter(arg_name)));
+            }
+            else
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new ArgumentPrinter(arg_name)));
+            }
+
+            ++arg_idx;
         }
     }
 }

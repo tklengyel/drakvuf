@@ -112,7 +112,11 @@
 
 class ArgumentPrinter
 {
+protected:
+    std::string name;
 public:
+    ArgumentPrinter(std::string arg_name);
+
     virtual std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
     virtual ~ArgumentPrinter();
 };
@@ -122,6 +126,8 @@ class StringPrinterInterface : public ArgumentPrinter
 protected:
     virtual std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const = 0;
 public:
+    using ArgumentPrinter::ArgumentPrinter;
+
     std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 
@@ -129,35 +135,49 @@ class AsciiPrinter : public StringPrinterInterface
 {
 private:
     std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const;
+
+public:
+    using StringPrinterInterface::StringPrinterInterface;
 };
 
 class WideStringPrinter : public StringPrinterInterface
 {
 private:
     std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const;
+
+public:
+    using StringPrinterInterface::StringPrinterInterface;
 };
 
 class UnicodePrinter : public ArgumentPrinter
 {
 public:
+    using ArgumentPrinter::ArgumentPrinter;
+
     std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 
 class UlongPrinter : public ArgumentPrinter
 {
 public:
+    using ArgumentPrinter::ArgumentPrinter;
+
     std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 
 class GuidPrinter : public ArgumentPrinter
 {
 public:
+    using ArgumentPrinter::ArgumentPrinter;
+
     std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 
 class PointerToPointerPrinter : public ArgumentPrinter
 {
 public:
+    using ArgumentPrinter::ArgumentPrinter;
+
     std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 
@@ -165,7 +185,7 @@ class BitMaskPrinter : public ArgumentPrinter
 {
     std::map < uint64_t, std::string > dict;
 public:
-    BitMaskPrinter(std::map < uint64_t, std::string > dict);
+    BitMaskPrinter(std::string arg_name, std::map < uint64_t, std::string > dict);
     std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 
