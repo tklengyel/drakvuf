@@ -175,7 +175,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if ( VMI_FAILURE == vmi_read(vmi, &ctx, s->reg_size * nargs, &tmp_args[0], NULL) )
                 nargs = 0;
 
-            for (auto const& i: tmp_args)
+            for (size_t i = 0; i < nargs; ++i)
                 args[i] = tmp_args[i];
         }
         else
