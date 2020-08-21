@@ -107,6 +107,7 @@
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
 #include <assert.h>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -155,7 +156,7 @@ static std::string extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_i
 
 void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
                    bool syscall, drakvuf_trap_info_t* info,
-                   int nr, const char *module, const syscall_t *sc,
+                   int nr, std::string module, const syscall_t *sc,
                    const std::vector<uint64_t>& args,
                    uint64_t ret, const char *extra_info)
 {
@@ -166,14 +167,13 @@ void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
     {
         std::vector<std::pair<std::string, fmt::Aarg>> fmt_args;
         for (size_t i = 0; i < args.size(); ++i)
-            if (sc)
-            {
-                auto str = extract_string(s, drakvuf, info, sc->args[i], args[i]);
-                if ( !str.empty() )
-                    fmt_args.push_back(keyval(sc->args[i].name, fmt::Qstr(str)));
-                else
-                    fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(args[i])));
-            }
+        {
+            auto str = extract_string(s, drakvuf, info, sc->args[i], args[i]);
+            if ( !str.empty() )
+                fmt_args.push_back(keyval(sc->args[i].name, fmt::Qstr(str)));
+            else
+                fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(args[i])));
+        }
 
         fmt::print(s->format, "syscall", drakvuf, info,
             keyval("Module", fmt::Qstr(module)),
