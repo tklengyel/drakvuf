@@ -296,9 +296,10 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_
 {
     if (info)
     {
+        proc_data_t* proc_data = info->os == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
         const char* method = info->trap->name ?: "";
         std::string procname = "\"";
-        procname += info->attached_proc_data.name ?: "NOPROC";
+        procname += proc_data->name ?: "NOPROC";
         procname += "\"";
 
         print_data(os,
@@ -307,8 +308,8 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_
                    keyval("CR3", fmt::Xval(info->regs->cr3)),
                    keyval(procname.c_str(), fmt::Rstr(method)),
                    keyval(USERIDSTR(drakvuf), fmt::Nval(info->proc_data.userid)),
-                   keyval("PID", fmt::Nval(info->attached_proc_data.pid)),
-                   keyval("PPID", fmt::Nval(info->attached_proc_data.ppid))
+                   keyval("PID", fmt::Nval(proc_data->pid)),
+                   keyval("PPID", fmt::Nval(proc_data->ppid))
                   );
     }
 }

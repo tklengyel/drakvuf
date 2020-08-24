@@ -288,15 +288,16 @@ inline void print_common_data(std::ostream& os, drakvuf_trap_info_t* info)
         if (info->trap->name)
             method = fmt::Rstr(info->trap->name);
 
+        proc_data_t* proc_data = info->os == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
         print_data(os,
                    keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
                    keyval("VCPU", fmt::Nval(info->vcpu)),
                    keyval("CR3", fmt::Xval(info->regs->cr3)),
                    keyval("UserId", fmt::Nval(info->proc_data.userid)),
-                   keyval("PID", fmt::Nval(info->attached_proc_data.pid)),
-                   keyval("PPID", fmt::Nval(info->attached_proc_data.ppid)),
-                   keyval("TID", fmt::Nval(info->attached_proc_data.tid)),
-                   keyval("ProcessName", fmt::Qstr(info->attached_proc_data.name)),
+                   keyval("PID", fmt::Nval(proc_data->pid)),
+                   keyval("PPID", fmt::Nval(proc_data->ppid)),
+                   keyval("TID", fmt::Nval(proc_data->tid)),
+                   keyval("ProcessName", fmt::Qstr(proc_data->name)),
                    keyval("Method", method)
                   );
     }

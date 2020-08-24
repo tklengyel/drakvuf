@@ -376,6 +376,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
+    trap_info.os = vmi_get_ostype(vmi);
     trap_info.timestamp = g_get_real_time();
     trap_info.regs = event->x86_regs;
     trap_info.vcpu = event->vcpu_id;
@@ -589,6 +590,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
+    trap_info.os = vmi_get_ostype(vmi);
     trap_info.timestamp = g_get_real_time();
     trap_info.regs = event->x86_regs;
     trap_info.vcpu = event->vcpu_id;
@@ -674,6 +676,7 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
+    trap_info.os = vmi_get_ostype(vmi);
     trap_info.timestamp = g_get_real_time();
     trap_info.regs = event->x86_regs;
     trap_info.vcpu = event->vcpu_id;
@@ -742,6 +745,7 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
+    trap_info.os = vmi_get_ostype(vmi);
     trap_info.timestamp = g_get_real_time();
     trap_info.regs = event->x86_regs;
     trap_info.vcpu = event->vcpu_id;
@@ -812,6 +816,7 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf_trap_info_t trap_info;
     memset(&trap_info, 0, sizeof(drakvuf_trap_info_t));
 
+    trap_info.os = vmi_get_ostype(vmi);
     trap_info.timestamp = g_get_real_time();
     trap_info.regs = event->x86_regs;
     trap_info.vcpu = event->vcpu_id;
