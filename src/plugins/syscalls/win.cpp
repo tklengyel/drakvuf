@@ -107,6 +107,8 @@
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
 #include <assert.h>
+#include <string>
+#include <vector>
 
 #include <libdrakvuf/ntstatus.h>
 
@@ -134,8 +136,8 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!exit_status_str)
         exit_status_str = ntstatus_format_string(ntstatus_t(info->regs->rax), exit_status_buf, sizeof(exit_status_buf));
 
-    print_header(s->format, drakvuf, VMI_OS_WINDOWS, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, exit_status_str);
-    print_footer(s->format, 0, false);
+    std::vector<uint64_t> args;
+    print_syscall(s, drakvuf, VMI_OS_WINDOWS, false, info, w->num, std::string(info->trap->breakpoint.module), sc, args, info->regs->rax, exit_status_str);
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
     s->traps = g_slist_remove(s->traps, info->trap);
@@ -150,23 +152,15 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     const syscall_t *sc = w->sc;
     syscalls *s = w->s;
 
-    unsigned int nargs = 0;
-    size_t size = 0;
-    void *buf = NULL;
-
-    if ( sc )
-    {
-        nargs = sc->num_args;
-        size = s->reg_size * nargs;
-        buf = g_try_malloc0(sizeof(char)*size);
-    }
+    unsigned int nargs = sc ? sc->num_args : 0;
+    std::vector<uint64_t> args(nargs);
 
     access_context_t ctx;
     memset(&ctx, 0, sizeof(access_context_t));
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
-    if ( nargs && buf )
+    if (nargs)
     {
         // get arguments only if we know how many to get
 
@@ -178,41 +172,37 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             // multiply num args by 4 for 32 bit systems to get the number of bytes we need
             // to read from the stack.  assumes standard calling convention (cdecl) for the
             // visual studio compile.
-            if ( VMI_FAILURE == vmi_read(vmi, &ctx, size, buf, NULL) )
+            std::vector<uint32_t> tmp_args(nargs);
+            if ( VMI_FAILURE == vmi_read(vmi, &ctx, s->reg_size * nargs, &tmp_args[0], NULL) )
                 nargs = 0;
+
+            for (size_t i = 0; i < nargs; ++i)
+                args[i] = tmp_args[i];
         }
         else
         {
             // 64 bit os
-            uint64_t *buf64 = (uint64_t*)buf;
             if ( nargs > 0 )
-                buf64[0] = info->regs->rcx;
+                args[0] = info->regs->rcx;
             if ( nargs > 1 )
-                buf64[1] = info->regs->rdx;
+                args[1] = info->regs->rdx;
             if ( nargs > 2 )
-                buf64[2] = info->regs->r8;
+                args[2] = info->regs->r8;
             if ( nargs > 3 )
-                buf64[3] = info->regs->r9;
+                args[3] = info->regs->r9;
             if ( nargs > 4 )
             {
                 // first 4 agrs passed via rcx, rdx, r8, and r9
                 ctx.addr = info->regs->rsp+0x28;  // jump over homing space + base pointer
                 size_t sp_size = s->reg_size * (nargs-4);
-                if ( VMI_FAILURE == vmi_read(vmi, &ctx, sp_size, &(buf64[4]), NULL) )
+                if ( VMI_FAILURE == vmi_read(vmi, &ctx, sp_size, &args[4], NULL) )
                     nargs = 0;
             }
         }
     }
 
     vmi.unlock();
-    print_header(s->format, drakvuf, VMI_OS_WINDOWS, true, info, w->num, w->type, sc, 0, NULL);
-    if ( nargs )
-    {
-        print_nargs(s->format, nargs);
-        print_args(s, drakvuf, info, sc, buf);
-    }
-    print_footer(s->format, nargs, true);
-    g_free(buf);
+    print_syscall(s, drakvuf, VMI_OS_WINDOWS, true, info, w->num, std::string(w->type), sc, args, 0, NULL);
     vmi.lock();
 
     if ( s->disable_sysret )

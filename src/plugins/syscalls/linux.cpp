@@ -107,45 +107,46 @@
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
 #include <assert.h>
+#include <string>
+#include <vector>
 
 #include "syscalls.h"
 #include "private.h"
 #include "linux.h"
 
 // Builds the argument buffer from the current context, returns status
-static status_t linux_build_argbuf(void* buf, vmi_instance_t vmi,
-                                   drakvuf_trap_info_t* info, syscalls *s,
-                                   const syscall_t* sc,
-                                   addr_t pt_regs_addr)
+static std::vector<uint64_t> linux_build_argbuf(vmi_instance_t vmi,
+                                                drakvuf_trap_info_t* info, syscalls *s,
+                                                const syscall_t* sc,
+                                                addr_t pt_regs_addr)
 {
+    std::vector<uint64_t> args;
+
     if (NULL == sc)
-        return VMI_FAILURE;
+        return args;
 
     int nargs = sc->num_args;
 
     // get arguments only if we know how many to get
     if (0 == nargs)
-        return VMI_SUCCESS;
+        return args;
 
     // Now now, only support legacy syscall arg passing on 32 bit
     if ( 4 == s->reg_size )
     {
-        uint32_t* buf32 = (uint32_t*)buf;
         if ( nargs > 0 )
-            buf32[0] = (uint32_t) info->regs->rbx;
+            args.push_back(info->regs->rbx);
         if ( nargs > 1 )
-            buf32[1] = (uint32_t) info->regs->rcx;
+            args.push_back(info->regs->rcx);
         if ( nargs > 2 )
-            buf32[2] = (uint32_t) info->regs->rdx;
+            args.push_back(info->regs->rdx);
         if ( nargs > 3 )
-            buf32[3] = (uint32_t) info->regs->rsi;
+            args.push_back(info->regs->rsi);
         if ( nargs > 4 )
-            buf32[4] = (uint32_t) info->regs->rdi;
+            args.push_back(info->regs->rdi);
     }
     else if ( 8 == s->reg_size )
     {
-        uint64_t* buf64 = (uint64_t*)buf;
-
         // Support both calling conventions for 64 bit Linux syscalls
         if (pt_regs_addr)
         {
@@ -163,42 +164,42 @@ static status_t linux_build_argbuf(void* buf, vmi_instance_t vmi,
                 if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &pt_regs[i]) )
                 {
                     fprintf(stderr, "vmi_read_va(%p) failed\n", (void*)ctx.addr);
-                    return VMI_FAILURE;
+                    return args;
                 }
             }
 
             if ( nargs > 0 )
-                buf64[0] = pt_regs[PT_REGS_RDI];
+                args.push_back(pt_regs[PT_REGS_RDI]);
             if ( nargs > 1 )
-                buf64[1] = pt_regs[PT_REGS_RSI];
+                args.push_back(pt_regs[PT_REGS_RSI]);
             if ( nargs > 2 )
-                buf64[2] = pt_regs[PT_REGS_RDX];
+                args.push_back(pt_regs[PT_REGS_RDX]);
             if ( nargs > 3 )
-                buf64[3] = pt_regs[PT_REGS_RCX];
+                args.push_back(pt_regs[PT_REGS_RCX]);
             if ( nargs > 4 )
-                buf64[4] = pt_regs[PT_REGS_R8];
+                args.push_back(pt_regs[PT_REGS_R8]);
             if ( nargs > 5 )
-                buf64[5] = pt_regs[PT_REGS_R9];
+                args.push_back(pt_regs[PT_REGS_R9]);
         }
         else
         {
             // The args are passed directly via registers in sycall context
             if ( nargs > 0 )
-                buf64[0] = info->regs->rdi;
+                args.push_back(info->regs->rdi);
             if ( nargs > 1 )
-                buf64[1] = info->regs->rsi;
+                args.push_back(info->regs->rsi);
             if ( nargs > 2 )
-                buf64[2] = info->regs->rdx;
+                args.push_back(info->regs->rdx);
             if ( nargs > 3 )
-                buf64[3] = info->regs->rcx;
+                args.push_back(info->regs->rcx);
             if ( nargs > 4 )
-                buf64[4] = info->regs->r8;
+                args.push_back(info->regs->r8);
             if ( nargs > 5 )
-                buf64[5] = info->regs->r9;
+                args.push_back(info->regs->r9);
         }
     }
 
-    return VMI_SUCCESS;
+    return args;
 }
 
 static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -212,8 +213,8 @@ static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     const syscall_t *sc = w->num < NUM_SYSCALLS_LINUX ? linuxsc::linux_syscalls[w->num] : NULL;
 
-    print_header(s->format, drakvuf, VMI_OS_LINUX, false, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax, NULL);
-    print_footer(s->format, 0, false);
+    std::vector<uint64_t> args;
+    print_syscall(s, drakvuf, VMI_OS_LINUX, false, info, w->num, std::string(info->trap->breakpoint.module), sc, args, info->regs->rax, nullptr);
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
     s->traps = g_slist_remove(s->traps, info->trap);
@@ -227,8 +228,6 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     struct wrapper *w = (struct wrapper *)info->trap->data;
     syscalls* s = w->s;
 
-    unsigned int nargs = 0;
-    uint8_t buf[sizeof(uint64_t) * 8] = {0};
     const syscall_t* sc = NULL;
     addr_t pt_regs = 0;
 
@@ -253,26 +252,14 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if ( nr<NUM_SYSCALLS_LINUX )
     {
         sc = linuxsc::linux_syscalls[nr];
-        nargs = sc->num_args;
 
-       if ( s->filter && !g_hash_table_contains(s->filter, sc->name) )
+        if ( s->filter && !g_hash_table_contains(s->filter, sc->name) )
             return 0;
     }
 
-    int rc = linux_build_argbuf(buf, vmi, info, s, sc, pt_regs);
-    if ( VMI_SUCCESS != rc )
-    {
-        // Don't extract any args
-        nargs = 0;
-    }
+    auto args = linux_build_argbuf(vmi, info, s, sc, pt_regs);
 
-    print_header(s->format, drakvuf, VMI_OS_LINUX, true, info, nr, info->trap->breakpoint.module, sc, 0, NULL);
-    if ( nargs )
-    {
-        print_nargs(s->format, nargs);
-        print_args(s, drakvuf, info, sc, buf);
-    }
-    print_footer(s->format, nargs, true);
+    print_syscall(s, drakvuf, VMI_OS_LINUX, true, info, nr, std::string(info->trap->breakpoint.module), sc, args, 0, NULL);
 
     if ( s->disable_sysret )
         return 0;
