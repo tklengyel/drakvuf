@@ -1110,13 +1110,6 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         return 1;
     }
 
-    /* Check if we have memtraps on this page */
-    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &current_gfn);
-    vmi_mem_access_t old_access = VMI_MEMACCESS_INVALID;
-
-    if (s)
-        old_access = s->memaccess.access;
-
     container = (struct wrapper*)g_slice_alloc0(sizeof(struct wrapper));
     if ( !container )
         return 0;
@@ -1198,7 +1191,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
      */
     container->breakpoint.guard.type = MEMACCESS;
     /* We need to merge rights of the previous traps on this page (if any) */
-    container->breakpoint.guard.memaccess.access = VMI_MEMACCESS_RW | old_access;
+    container->breakpoint.guard.memaccess.access = VMI_MEMACCESS_RW;
     container->breakpoint.guard.memaccess.type = PRE;
     container->breakpoint.guard.memaccess.gfn = current_gfn;
     container->breakpoint.guard2.type = MEMACCESS;
