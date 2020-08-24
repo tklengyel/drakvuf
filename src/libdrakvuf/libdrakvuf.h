@@ -184,7 +184,6 @@ typedef struct drakvuf_trap drakvuf_trap_t;
 
 typedef struct drakvuf_trap_info
 {
-    os_t os;
     gint64 timestamp;
     unsigned int vcpu;
     uint16_t altp2m_idx;

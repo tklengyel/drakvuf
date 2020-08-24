@@ -296,7 +296,7 @@ inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_
 {
     if (info)
     {
-        proc_data_t* proc_data = info->os == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
+        proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
         const char* method = info->trap->name ?: "";
         std::string procname = "\"";
         procname += proc_data->name ?: "NOPROC";

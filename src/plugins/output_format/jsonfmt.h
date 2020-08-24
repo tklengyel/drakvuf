@@ -410,7 +410,7 @@ inline auto get_common_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (info->trap->name)
         method = fmt::Qstr(info->trap->name);
 
-    proc_data_t* proc_data = info->os == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
+    proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
     return std::make_tuple(
                keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
                keyval("PID", fmt::Nval(proc_data->pid)),
