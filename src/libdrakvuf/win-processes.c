@@ -471,8 +471,8 @@ static bool win_get_thread_id(drakvuf_t drakvuf, addr_t ethread, uint32_t* threa
 {
     addr_t p_tid ;
     if ( vmi_read_addr_va( drakvuf->vmi, ethread + drakvuf->offsets[ ETHREAD_CID ] + drakvuf->offsets[ CLIENT_ID_UNIQUETHREAD ],
-                            0,
-                            &p_tid ) == VMI_SUCCESS )
+                           0,
+                           &p_tid ) == VMI_SUCCESS )
     {
         *thread_id = p_tid;
 
