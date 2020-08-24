@@ -416,8 +416,6 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     drakvuf_release_vmi(drakvuf);
 
-    gchar* escaped_pname = NULL;
-    gchar* escaped_client_name = NULL;
     char* name = nullptr;
     addr_t client_process = 0;
     if (drakvuf_find_process(drakvuf, data->client_id, nullptr, &client_process))
@@ -571,7 +569,6 @@ done:
 static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx)
 {
     struct process_visitor_ctx* ctx = reinterpret_cast<struct process_visitor_ctx*>(visitor_ctx);
-    gchar* escaped_pname = NULL;
 
     proc_data_t data = {};
     if (!drakvuf_get_process_data(drakvuf, process, &data))
