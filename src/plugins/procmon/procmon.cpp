@@ -351,6 +351,10 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
     if (!drakvuf_get_pid_from_handle(drakvuf, info, new_process_handle, &new_pid))
         new_pid = 0;
 
+    uint32_t new_tid;
+    if (!drakvuf_get_tid_from_handle(drakvuf, info, new_thread_handle, &new_tid))
+        new_tid = 0;
+
     print_process_creation_result(plugin, drakvuf, info, status, new_pid, user_process_parameters_addr);
     return VMI_EVENT_RESPONSE_NONE;
 }
