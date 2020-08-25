@@ -324,6 +324,7 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
 static event_response_t create_user_process_hook(
     drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     addr_t process_handle_addr,
+    addr_t thread_handle_addr,
     addr_t user_process_parameters_addr)
 {
     auto plugin = get_trap_plugin<procmon>(info);
