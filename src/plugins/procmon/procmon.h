@@ -117,6 +117,7 @@ public:
     addr_t dll_path;
     addr_t current_directory_handle;
     addr_t current_directory_dospath;
+    addr_t cid_tid;
 
     procmon(drakvuf_t drakvuf, output_format_t output);
 };
