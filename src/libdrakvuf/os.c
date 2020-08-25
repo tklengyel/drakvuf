@@ -501,6 +501,14 @@ bool drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
     return false;
 }
 
+bool drakvuf_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid)
+{
+    if ( drakvuf->osi.get_tid_from_handle )
+        return drakvuf->osi.get_tid_from_handle(drakvuf, info, handle, tid);
+
+    return false;
+}
+
 bool drakvuf_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx)
 {
     if ( drakvuf->osi.get_wow_context )
