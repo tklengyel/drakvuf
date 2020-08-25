@@ -505,6 +505,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.mmvad_commit_charge = win_mmvad_commit_charge;
     drakvuf->osi.mmvad_type = win_mmvad_type;
     drakvuf->osi.get_pid_from_handle = win_get_pid_from_handle;
+    drakvuf->osi.get_tid_from_handle = win_get_tid_from_handle;
     drakvuf->osi.get_wow_context = win_get_wow_context;
     drakvuf->osi.get_user_stack32 = win_get_user_stack32;
     drakvuf->osi.get_user_stack64 = win_get_user_stack64;

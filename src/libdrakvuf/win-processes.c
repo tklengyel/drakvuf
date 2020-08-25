@@ -467,6 +467,21 @@ bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uin
     return false ;
 }
 
+static bool win_get_thread_id(drakvuf_t drakvuf, addr_t ethread, uint32_t* thread_id)
+{
+    addr_t p_tid ;
+    if ( vmi_read_addr_va( drakvuf->vmi, ethread + drakvuf->offsets[ ETHREAD_CID ] + drakvuf->offsets[ CLIENT_ID_UNIQUETHREAD ],
+                           0,
+                           &p_tid ) == VMI_SUCCESS )
+    {
+        *thread_id = p_tid;
+
+        return true;
+    }
+
+    return false ;
+}
+
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1560,4 +1575,27 @@ bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
 
     addr_t eprocess_base = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
     return drakvuf_get_process_pid(drakvuf, eprocess_base, pid);
+}
+
+bool win_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid)
+{
+    if (handle == 0 || handle == UINT64_MAX)
+    {
+        *tid = info->proc_data.tid;
+        return false;
+    }
+
+    if (!info->proc_data.base_addr)
+    {
+        return false;
+    }
+
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    if (!obj)
+    {
+        return false;
+    }
+
+    addr_t ethread = obj + drakvuf->offsets[OBJECT_HEADER_BODY];
+    return win_get_thread_id(drakvuf, ethread, tid);
 }
