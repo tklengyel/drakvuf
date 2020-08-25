@@ -2424,6 +2424,12 @@ SYSCALL(NtUserCallTwoParam, NTSTATUS, 3,
 		"Param1", "", DIR_IN, DWORD,
 		"Param2", "", DIR_IN, DWORD,
 		"Routine", "", DIR_IN, DWORD);
+SYSCALL(NtUserGetAsyncKeyState, SHORT, 1,
+               "Key", "", DIR_IN, INT
+);
+SYSCALL(NtUserGetKeyState, SHORT, 1,
+               "VirtKey", "", DIR_IN, INT
+);
 SYSCALL(NtUserMessageCall, NTSTATUS, 7,
 		"hWnd", "", DIR_IN, HWND,
 		"Msg", "", DIR_IN, UINT,
@@ -3610,7 +3616,6 @@ SYSCALL(NtUserGetActiveProcessesDpis, NTSTATUS, 0);
 SYSCALL(NtUserGetAltTabInfo, NTSTATUS, 0);
 SYSCALL(NtUserGetAncestor, NTSTATUS, 0);
 SYSCALL(NtUserGetAppImeLevel, NTSTATUS, 0);
-SYSCALL(NtUserGetAsyncKeyState, NTSTATUS, 0);
 SYSCALL(NtUserGetAtomName, NTSTATUS, 0);
 SYSCALL(NtUserGetAutoRotationState, NTSTATUS, 0);
 SYSCALL(NtUserGetCIMSSM, NTSTATUS, 0);
@@ -3667,7 +3672,6 @@ SYSCALL(NtUserGetInteractiveControlInfo, NTSTATUS, 0);
 SYSCALL(NtUserGetInteractiveCtrlSupportedWaveforms, NTSTATUS, 0);
 SYSCALL(NtUserGetInternalWindowPos, NTSTATUS, 0);
 SYSCALL(NtUserGetKeyNameText, NTSTATUS, 0);
-SYSCALL(NtUserGetKeyState, NTSTATUS, 0);
 SYSCALL(NtUserGetKeyboardLayout, NTSTATUS, 0);
 SYSCALL(NtUserGetKeyboardLayoutList, NTSTATUS, 0);
 SYSCALL(NtUserGetKeyboardLayoutName, NTSTATUS, 0);
