@@ -113,6 +113,7 @@
 #include "../plugins.h"
 #include "../plugin_utils.h"
 #include "filedelete.h"
+#include "plugins/output_format.h"
 #include "private.h"
 
 #include <libinjector/libinjector.h>
@@ -120,7 +121,6 @@
 
 using std::ostringstream;
 using std::string;
-using std::toupper;
 
 const char* offset_names[__OFFSET_MAX][2] =
 {
@@ -273,71 +273,13 @@ static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_
     return ret;
 }
 
-static void print_file_info(FILE* stream, filedelete* f, const char* userid_str, const drakvuf_trap_info_t* info, const string& filename_s, const string& prefix_s, const string& data_s)
-{
-    gchar* escaped_pname = NULL;
-    gchar* escaped_fname = NULL;
-    char const* filename = filename_s.empty() ? "" : filename_s.c_str();
-    char const* prefix = prefix_s.empty() ? "" : prefix_s.c_str();
-    char const* data = data_s.empty() ? "" : data_s.c_str();
-
-    switch (f->format)
-    {
-        case OUTPUT_CSV:
-            fprintf(stream, "%s," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",\"%s\",%s\n",
-                   prefix, UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   info->proc_data.userid, filename, data);
-            break;
-        case OUTPUT_KV:
-            fprintf(stream, "%s Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,FileName=\"%s\"%s\n",
-                   prefix, UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, filename, data);
-            break;
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-            escaped_fname = drakvuf_escape_str(filename);
-            fprintf(stream,
-                    "{"
-                    "\"Plugin\" : \"%s\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"TID\": %d,"
-                    "\"Method\" : \"%s\","
-                    "\"FileName\" : %s"
-                    "%s"
-                    "}\n",
-                    prefix, UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    userid_str, info->proc_data.userid,
-                    info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
-                    info->trap->name, escaped_fname, data);
-            g_free(escaped_fname);
-            g_free(escaped_pname);
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            fprintf(stream, "[%s] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64" \"%s\"%s\n",
-                   prefix, UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   userid_str, info->proc_data.userid, filename, data);
-            break;
-    }
-
-}
-
-static void print_filedelete_information(filedelete* f, const char* userid_str,
-                                         const drakvuf_trap_info_t* info,
+static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf,
+                                         drakvuf_trap_info_t* info,
                                          const char* filename,
                                          file_extraction_reason_t reason,
                                          size_t bytes_read, uint64_t fo_flags,
                                          int seq_number)
 {
-    string prefix{"fileextractor"};
-    ostringstream data;
-
     std::string flags = parse_flags(fo_flags, fo_flags_map, f->format);
     std::string r;
     switch(reason)
@@ -355,60 +297,52 @@ static void print_filedelete_information(filedelete* f, const char* userid_str,
 
     switch (f->format)
     {
-        case OUTPUT_CSV:
-            data << "," << bytes_read << "0x" << std::hex << fo_flags << std::dec << "(" << flags << ")" << "," << seq_number << "," << r;
-            break;
         case OUTPUT_KV:
-            data << ",Size=" << bytes_read << ",Flags=0x" << std::hex << fo_flags << std::dec;
-            if (!flags.empty()) data << "," << flags;
-            data << ",SN=" << seq_number;
-            data << ",Reason=\"" << r << "\"";
+            kvfmt::print("fileextractor", drakvuf, info,
+                keyval("FileName", fmt::Qstr(filename)),
+                keyval("Size", fmt::Nval(bytes_read)),
+                keyval("Flags", fmt::Xval(fo_flags)),
+                fmt::Rstr(flags),
+                keyval("SN", fmt::Nval(seq_number)),
+                keyval("Reason", fmt::Qstr(r))
+            );
             break;
         case OUTPUT_JSON:
-            data << ",\"Size\" : " << bytes_read << ",\"Flags\" : " << fo_flags << ",\"FlagsExpanded\" : \"" << flags << "\"";
-            data << ",\"SeqNum\" : " << seq_number;
-            data << ",\"Reason\" :\"" << r << "\"";
+            jsonfmt::print("fileextractor", drakvuf, info,
+                keyval("FileName", fmt::Qstr(filename)),
+                keyval("Size", fmt::Nval(bytes_read)),
+                keyval("Flags", fmt::Xval(fo_flags)),
+                keyval("FlagsExpanded", fmt::Qstr(flags)),
+                keyval("SeqNum", fmt::Nval(seq_number)),
+                keyval("Reason", fmt::Qstr(r))
+            );
             break;
         default:
+        case OUTPUT_CSV:
         case OUTPUT_DEFAULT:
-            for (auto& c: prefix) c = toupper(c);
-            data << " SIZE:" << bytes_read << " FO_FLAGS:0x" << std::hex << fo_flags << std::dec << "(" << flags << ")";
-            data << " SN:" << seq_number;
-            data << " REASON:\"" << r << "\"";
+            fmt::print(f->format, "fileextractor", drakvuf, info,
+                keyval("FILE", fmt::Qstr(filename)),
+                keyval("SIZE", fmt::Nval(bytes_read)),
+                keyval("FO_FLAGS", fmt::Xval(fo_flags)),
+                keyval("FLAGS", fmt::Qstr(flags)),
+                keyval("SN", fmt::Nval(seq_number)),
+                keyval("REASON", fmt::Qstr(r))
+            );
             break;
     }
-
-    print_file_info(stdout, f, userid_str, info, filename, prefix, data.str());
 }
 
-static void print_extraction_failure(filedelete* f, const char* userid_str, drakvuf_trap_info_t* info, const string& filename, const string& message)
+static void print_extraction_failure(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const string& filename, const string& message)
 {
-    string prefix{"fileextractor_fail"};
-    ostringstream data;
-
-    switch (f->format)
-    {
-        case OUTPUT_CSV:
-            data << ",\"" << message << "\"";
-            break;
-        case OUTPUT_KV:
-            data << ",Message=\"" << message << "\"";
-            break;
-        case OUTPUT_JSON:
-            data << ",\"Message\" : \"" << message << "\"";
-            break;
-        default:
-        case OUTPUT_DEFAULT:
-            for (auto& c: prefix) c = toupper(c);
-            data << " MESSAGE:\"" << message << "\"";
-            break;
-    }
-    print_file_info(stderr, f, userid_str, info, filename, prefix, data.str());
+    fmt::print(f->format, "fileextractor_fail", drakvuf, info,
+        keyval("FileName", fmt::Qstr(filename)),
+        keyval("Message", fmt::Qstr(message))
+    );
 }
 
 static void save_file_metadata(filedelete* f,
-                               const char* userid_str,
-                               const drakvuf_trap_info_t* info,
+                               drakvuf_t drakvuf,
+                               drakvuf_trap_info_t* info,
                                int sequence_number,
                                addr_t control_area,
                                const char* filename,
@@ -458,13 +392,13 @@ static void save_file_metadata(filedelete* f,
     fclose(fp);
 
     json_object_put(jobj);
-    print_filedelete_information(f, userid_str, info, filename, reason,
+    print_filedelete_information(f, drakvuf, info, filename, reason,
                                  file_size, fo_flags, sequence_number);
 }
 
 static void extract_ca_file(filedelete* f,
                             drakvuf_t drakvuf,
-                            const drakvuf_trap_info_t* info,
+                            drakvuf_trap_info_t* info,
                             vmi_instance_t vmi,
                             addr_t control_area,
                             access_context_t* ctx,
@@ -570,12 +504,12 @@ static void extract_ca_file(filedelete* f,
 
     fclose(fp);
 
-    save_file_metadata(f, USERIDSTR(drakvuf), info, curr_sequence_number, control_area, filename, reason, filesize, fo_flags);
+    save_file_metadata(f, drakvuf, info, curr_sequence_number, control_area, filename, reason, filesize, fo_flags);
 }
 
 static void extract_file(filedelete* f,
                          drakvuf_t drakvuf,
-                         const drakvuf_trap_info_t* info,
+                         drakvuf_trap_info_t* info,
                          vmi_instance_t vmi,
                          addr_t file_pa,
                          access_context_t* ctx,
@@ -764,18 +698,18 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         else
         {
             auto filesize = injector->ntreadfile_info.bytes_read;
-            save_file_metadata(f, USERIDSTR(drakvuf), info, curr_sequence_number, 0, filename.c_str(), reason, filesize, injector->fo_flags);
+            save_file_metadata(f, drakvuf, info, curr_sequence_number, 0, filename.c_str(), reason, filesize, injector->fo_flags);
         }
     }
     else if (STATUS_END_OF_FILE != status)
     {
         if (injector->ntreadfile_info.bytes_read)
-            save_file_metadata(f, USERIDSTR(drakvuf), info, injector->curr_sequence_number, 0, filename.c_str(), reason, injector->ntreadfile_info.bytes_read, injector->fo_flags, status);
+            save_file_metadata(f, drakvuf, info, injector->curr_sequence_number, 0, filename.c_str(), reason, injector->ntreadfile_info.bytes_read, injector->fo_flags, status);
 
         ostringstream msg;
         msg << "ZwReadFile failed with status " << status;
 
-        print_extraction_failure(injector->f, USERIDSTR(drakvuf), info, filename, msg.str());
+        print_extraction_failure(injector->f, drakvuf, info, filename, msg.str());
 
         PRINT_DEBUG("[FILEDELETE2] [ReadFile] Failed to read %s with status 0x%lx and IO_STATUS_BLOCK = { Status 0x%x; Size 0x%lx} \n",
                     f->files[{info->proc_data.pid, injector->handle}].first.c_str(), info->regs->rax, isb_status, isb_size);
@@ -831,7 +765,7 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     else
     {
         auto filename = injector->f->files[{info->proc_data.pid, injector->handle}].first;
-        print_extraction_failure(injector->f, USERIDSTR(drakvuf), info, filename,
+        print_extraction_failure(injector->f, drakvuf, info, filename,
                                  "ExAllocatePoolWithTag failed to allocate pool");
     }
 
@@ -867,7 +801,7 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         ostringstream msg;
         msg << "ZwQueryVolumeInformationFile failed with status " << info->regs->rax;
 
-        print_extraction_failure(injector->f, USERIDSTR(drakvuf), info, filename, msg.str());
+        print_extraction_failure(injector->f, drakvuf, info, filename, msg.str());
 
         goto handled;
     }
@@ -893,7 +827,7 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             ostringstream msg;
             msg << "ZwQueryVolumeInformationFile stop processing device type " << dev_info.device_type;
 
-            print_extraction_failure(injector->f, USERIDSTR(drakvuf), info, filename, msg.str());
+            print_extraction_failure(injector->f, drakvuf, info, filename, msg.str());
             goto handled;
         }
 
@@ -954,7 +888,7 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     bool is_synchronous = (fo_flags & FO_SYNCHRONOUS_IO);
     if (!is_synchronous)
     {
-        print_extraction_failure(f, USERIDSTR(drakvuf), info, filename, "Not synchronous file");
+        print_extraction_failure(f, drakvuf, info, filename, "Not synchronous file");
         return START_READFILE_ERROR;
     }
 
