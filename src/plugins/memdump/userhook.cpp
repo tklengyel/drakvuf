@@ -159,7 +159,7 @@ static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* ex
         {
             if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
             {
-                drakvuf_request_usermode_hook(drakvuf, dll, wanted_hook.type, wanted_hook.function_name.c_str(), wanted_hook.offset, usermode_hook_cb, std::vector < std::unique_ptr< ArgumentPrinter > >(), plugin);
+                drakvuf_request_usermode_hook(drakvuf, dll, &wanted_hook, usermode_hook_cb, plugin);
             }
         }
     }

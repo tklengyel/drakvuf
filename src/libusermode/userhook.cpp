@@ -823,14 +823,14 @@ usermode_reg_status_t userhook::init(drakvuf_t drakvuf)
     return USERMODE_REGISTER_SUCCESS;
 }
 
-void userhook::request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, target_hook_type type, const char* func_name, addr_t offset, callback_t callback, const std::vector< std::unique_ptr < ArgumentPrinter > > &argument_printers, void* extra)
+void userhook::request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra)
 {
     dll_t* p_dll = (dll_t*)const_cast<dll_view_t*>(dll);
 
-    if (type == HOOK_BY_NAME)
-        p_dll->targets.emplace_back(func_name, callback, argument_printers, extra);
+    if (target->type == HOOK_BY_NAME)
+        p_dll->targets.emplace_back(target->function_name, target->clsid, callback, target->argument_printers, extra);
     else // HOOK_BY_OFFSET
-        p_dll->targets.emplace_back(func_name, offset, callback, argument_printers, extra);
+        p_dll->targets.emplace_back(target->function_name, target->clsid, target->offset, callback, target->argument_printers, extra);
 }
 
 void userhook::register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg)
@@ -874,13 +874,13 @@ usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, user
     return USERMODE_REGISTER_SUCCESS;
 }
 
-bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, target_hook_type type, const char* func_name, addr_t offset, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers, void* extra)
+bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra)
 {
     if (!instance || !instance->initialized) {
         return false;
     }
 
-    instance->request_usermode_hook(drakvuf, dll, type, func_name, offset, callback, argument_printers, extra);
+    instance->request_usermode_hook(drakvuf, dll, target, callback, extra);
     return true;
 }
 
@@ -928,8 +928,22 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
         e.type = HOOK_BY_NAME;
 
         std::string log_strategy_or_offset;
-        if (!std::getline(ss, log_strategy_or_offset, ','))
+        std::string token;
+        if (!std::getline(ss, token, ','))
+        {
             throw -1;
+        }
+
+        if (token == "clsid")
+        {
+            if (!std::getline(ss, e.clsid, ',') || e.clsid.empty())
+                throw -1;
+
+            if (!std::getline(ss, log_strategy_or_offset, ','))
+                throw -1;
+        }
+        else
+            log_strategy_or_offset = token;
 
         if (log_strategy_or_offset == "log" || log_strategy_or_offset == "log+stack" || log_strategy_or_offset == "stack")
         {
