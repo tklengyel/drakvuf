@@ -122,6 +122,7 @@
 
 #include <libvmi/libvmi.h>
 #include "plugins/plugins.h"
+#include "plugins/output_format.h"
 #include "private.h"
 #include "win.h"
 #include "win_acl.h"
@@ -144,94 +145,47 @@ static void print_file_obj_info(drakvuf_t drakvuf,
                                 string dacl = string())
 {
     win_filetracer* f = (win_filetracer*)info->trap->data;
-    gchar* escaped_pname = NULL;
-    gchar* escaped_fname = NULL;
 
     switch (f->format)
     {
-        case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,0x%" PRIx32,
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid, info->trap->name, file_path, handle);
-            if (!file_attr.empty()) printf(",\"%s\"", file_attr.data());
-            if (!security_flags.empty()) printf(",\"%s\"", security_flags.data());
-            if (!owner.empty()) printf(",%s", owner.data());
-            if (!group.empty()) printf(",%s", group.data());
-            if (!sacl.empty()) printf(",%s", sacl.data());
-            if (!dacl.empty()) printf(",%s", dacl.data());
-            printf("\n");
-            break;
-
         case OUTPUT_KV:
-            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\",Handle=0x%" PRIx32,
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   info->trap->name, file_path, handle);
-            if (!file_attr.empty()) printf(",%s", file_attr.data());
-            if (!security_flags.empty()) printf(",%s", security_flags.data());
-            if (!owner.empty()) printf(",%s", owner.data());
-            if (!group.empty()) printf(",%s", group.data());
-            if (!sacl.empty()) printf(",%s", sacl.data());
-            if (!dacl.empty()) printf(",%s", dacl.data());
-            printf("\n");
-            break;
-
-        case OUTPUT_JSON:
-            escaped_fname = drakvuf_escape_str(file_path);
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-
-            printf( "{"
-                    "\"Plugin\" : \"filetracer\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"TID\": %d,"
-                    "\"Method\": \"%s\","
-                    "\"FileName\": %s,"
-                    "\"Handle\": \"0x%" PRIx32 "\"",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
-                    info->trap->name, escaped_fname, handle);
-
-            if (!file_attr.empty())
-                printf(",\"ObjectAttributes\" : \"%s\"", file_attr.data());
-            if (!security_flags.empty() || !owner.empty() || !group.empty())
-            {
-                printf(",\"SecurityDescriptor\" : {");
-
-                if (!security_flags.empty())
-                    printf("\"Control\" : \"%s\"", security_flags.data());
-                else
-                    printf("\"Control\" : null");
-                if (!owner.empty()) printf(",%s", owner.data());
-                if (!group.empty()) printf(",%s", group.data());
-                if (!sacl.empty()) printf(",%s", sacl.data());
-                if (!dacl.empty()) printf(",%s", dacl.data());
-
-                printf("}");
-            }
-
-            printf("}\n");
-            g_free(escaped_fname);
-            g_free(escaped_pname);
+            kvfmt::print("filetracer", drakvuf, info,
+                keyval("FileName", fmt::Qstr(file_path)),
+                keyval("FileHandle", fmt::Xval(handle)),
+                fmt::Rstr(file_attr),
+                fmt::Rstr(security_flags),
+                fmt::Rstr(owner),
+                fmt::Rstr(group),
+                fmt::Rstr(sacl),
+                fmt::Rstr(dacl)
+            );
             break;
 
         default:
         case OUTPUT_DEFAULT:
-            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%sHANDLE:0x%" PRIx32,
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   USERIDSTR(drakvuf), info->attached_proc_data.userid, info->trap->name, file_path, handle);
-            if (!file_attr.empty()) printf(",\"%s\"", file_attr.data());
-            if (!security_flags.empty()) printf(",\"%s\"", security_flags.data());
-            if (!owner.empty()) printf(",%s", owner.data());
-            if (!group.empty()) printf(",%s", group.data());
-            if (!sacl.empty()) printf(",%s", sacl.data());
-            if (!dacl.empty()) printf(",%s", dacl.data());
-            printf("\n");
+        case OUTPUT_CSV:
+        case OUTPUT_JSON:
+        {
+            std::vector<std::pair<std::string, fmt::Rstr<std::string>>> security_descriptor;
+            if (!security_flags.empty())
+                security_descriptor.emplace_back("Control", security_flags);
+            if (!owner.empty())
+                security_descriptor.emplace_back("Owner", owner);
+            if (!group.empty())
+                security_descriptor.emplace_back("Group", group);
+            if (!sacl.empty())
+                security_descriptor.emplace_back("Sacl", sacl);
+            if (!dacl.empty())
+                security_descriptor.emplace_back("Dacl", dacl);
+
+            fmt::print(f->format, "filetracer", drakvuf, info,
+                keyval("FileName", fmt::Qstr(file_path)),
+                keyval("FileHandle", fmt::Xval(handle)),
+                keyval("ObjectAttributes", fmt::Qstr(file_attr)),
+                keyval("SecurityDescriptor", security_descriptor)
+            );
             break;
+        }
     }
 }
 
@@ -394,71 +348,23 @@ static char* get_parent_folder(char const* file_name)
 
 static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, addr_t fileinfo)
 {
-    gchar* escaped_pname = NULL;
-    gchar* escaped_fname = NULL;
-    const char* syscall_name = info->trap->name;
     const char* operation_name = "FileDispositionInformation";
     win_filetracer* f = (win_filetracer*)info->trap->data;
     char* file = drakvuf_get_filename_from_handle(drakvuf, info, handle);
     if ( !file )
         return;
 
-    switch (f->format)
-    {
-        case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,%s, 0x%" PRIx32 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid,
-                   syscall_name, operation_name, file, handle);
-            break;
-
-        case OUTPUT_KV:
-            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Operation=%s,File=\"%s\",Handle=0x%" PRIx32 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   syscall_name, operation_name, file, handle);
-            break;
-
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            escaped_fname = drakvuf_escape_str(file);
-            printf( "{"
-                    "\"Plugin\" : \"filetracer\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"TID\": %d,"
-                    "\"Method\" : \"%s\","
-                    "\"Operation\" : \"%s\","
-                    "\"FileName\" : %s,"
-                    "\"Handle\" : \"0x%" PRIx32 "\""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
-                    syscall_name, operation_name, escaped_fname, handle);
-
-            g_free(escaped_fname);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,%s HANDLE:0x%" PRIx32 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                   syscall_name, operation_name, file, handle);
-            break;
-    }
+    fmt::print(f->format, "filetracer", drakvuf, info,
+        keyval("Operation", fmt::Rstr(operation_name)),
+        keyval("FileName", fmt::Qstr(file)),
+        keyval("FileHandle", fmt::Xval(handle))
+    );
 
     g_free(file);
 }
 
 static void print_basic_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo)
 {
-    gchar* escaped_pname = NULL;
-    gchar* escaped_fname = NULL;
     win_filetracer* f = (win_filetracer*)info->trap->data;
     const char* operation_name = "FileBasicInformation";
 
@@ -494,69 +400,24 @@ static void print_basic_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf
     char* filename_ = drakvuf_get_filename_from_handle(drakvuf, info, src_file_handle);
     const char* filename = filename_ ? : "<UNKNOWN>";
 
-    switch (f->format)
-    {
-        case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%" PRIx32 ",\"%s\",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid,
-                   operation_name, src_file_handle, filename, creation, access, write, change, parse_flags(attributes, file_flags_and_attrs, f->format).c_str());
-            break;
+    fmt::print(f->format, "filetracer", drakvuf, info,
+        keyval("Operation", fmt::Rstr(operation_name)),
+        keyval("FileHandle", fmt::Xval(src_file_handle)),
+        keyval("FileName", fmt::Qstr(filename)),
+        keyval("CreationTime", fmt::Xval(creation)),
+        keyval("LastAccessTime", fmt::Xval(access)),
+        keyval("LastWriteTime", fmt::Xval(write)),
+        keyval("ChangeTime", fmt::Xval(change)),
+        keyval("FileAttributes", fmt::Qstr(parse_flags(attributes, file_flags_and_attrs, f->format)))
+    );
 
-        case OUTPUT_KV:
-            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Operation=%s,FileHandle=%" PRIx32 ",FileName=\"%s\",CreationTime=%" PRIu64 ",LastAccessTime=%" PRIu64 ",LastWriteTime=%" PRIu64 ",ChangeTime=%" PRIu64 ",FileAttributes=\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   operation_name, src_file_handle, filename, creation, access, write, change, parse_flags(attributes, file_flags_and_attrs, f->format).c_str());
-            break;
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            escaped_fname = drakvuf_escape_str(filename);
-
-            printf( "{"
-                    "\"Plugin\" : \"filetracer\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"TID\": %d,"
-                    "\"Operation\" : \"%s\","
-                    "\"FileHandle\" : \"0x%" PRIx32 "\","
-                    "\"FileName\" : %s,"
-                    "\"CreationTime\": %" PRIu64 ","
-                    "\"LastAccessTime\": %" PRIu64 ","
-                    "\"LastWriteTime\": %" PRIu64 ","
-                    "\"ChangeTime\": %" PRIu64 ","
-                    "\"FileAttributes\": \"%s\""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
-                    operation_name, src_file_handle, escaped_fname, creation, access, write, change,
-                    parse_flags(attributes, file_flags_and_attrs, f->format).c_str());
-
-            g_free(escaped_pname);
-            g_free(escaped_fname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 "%s,%" PRIx32 ",\"%s\",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",%" PRIu64 ",\"%s\"\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                   operation_name, src_file_handle, filename, creation, access, write, change, parse_flags(attributes, file_flags_and_attrs, f->format).c_str());
-            break;
-    }
+    if (filename_)
+        g_free(filename_);
 }
 
 static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo)
 {
-    gchar* escaped_pname = NULL;
-    gchar* escaped_fname_src = NULL;
-    gchar* escaped_fname_dst = NULL;
-
     win_filetracer* f = (win_filetracer*)info->trap->data;
-    const char* syscall_name = info->trap->name;
     const char* operation_name = "FileRenameInformation";
 
     access_context_t ctx;
@@ -607,57 +468,12 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     }
     vmi_free_unicode_str(dst_file_name_us);
 
-    switch (f->format)
-    {
-        case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,%s,%s,0x%" PRIx32 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid,
-                   syscall_name, operation_name, src_file, dst_file_p, src_file_handle);
-            break;
-
-        case OUTPUT_KV:
-            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,Operation=%s,FileSrc=\"%s\",FileDst=\"%s\",Handle=0x%" PRIx32 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   syscall_name, operation_name,
-                   src_file, dst_file_p, src_file_handle);
-            break;
-        case OUTPUT_JSON:
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-            escaped_fname_src = drakvuf_escape_str(src_file);
-            escaped_fname_dst = drakvuf_escape_str(dst_file_p);
-            printf( "{"
-                    "\"Plugin\" : \"filetracer\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"TID\": %d,"
-                    "\"Method\" : \"%s\","
-                    "\"Operation\" : \"%s\","
-                    "\"SrcFileName\" : %s,"
-                    "\"DstFileName\" : %s,"
-                    "\"Handle\": \"0x%" PRIx32 "\""
-                    "}\n",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
-                    syscall_name, operation_name, escaped_fname_src, escaped_fname_dst, src_file_handle );
-
-            g_free(escaped_fname_dst);
-            g_free(escaped_fname_src);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s,%s,%s,0x%" PRIx32 "\n",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                   syscall_name, operation_name, src_file, dst_file_p, src_file_handle);
-            break;
-    }
+    fmt::print(f->format, "filetracer", drakvuf, info,
+        keyval("Operation", fmt::Rstr(operation_name)),
+        keyval("FileSrc", fmt::Qstr(src_file)),
+        keyval("FileDst", fmt::Qstr(dst_file_p)),
+        keyval("FileHandle", fmt::Xval(src_file_handle))
+    );
 
     g_free(dst_file_p);
     g_free(src_file);
@@ -697,71 +513,39 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     drakvuf_release_vmi(drakvuf);
 
     string file_path;
-    gchar* escaped_pname = NULL;
-    gchar* escaped_fname = NULL;
 
     info->trap->data = w->f;
     file_path = objattr_read(drakvuf, info, w->obj_attr, handle);
 
     switch (w->f->format)
     {
-        case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64",%s,%s,0x%" PRIx32 ",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\"",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name, info->attached_proc_data.userid, info->trap->name,
-                   file_path.c_str(), handle, w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str(), is_success);
-            printf("\n");
-            break;
-
-        case OUTPUT_KV:
-            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\",Handle=0x%x"
-                   ",%s,%s,%s,%s,%s,Status=\"%s\"",
-                   UNPACK_TIMEVAL(info->timestamp), info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.name,
-                   info->trap->name, file_path.c_str(), handle, w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str(), is_success);
-            printf("\n");
-            break;
-
-        case OUTPUT_JSON:
-            escaped_fname = drakvuf_escape_str(file_path.c_str());
-            escaped_pname = drakvuf_escape_str(info->attached_proc_data.name);
-
-            printf( "{"
-                    "\"Plugin\" : \"filetracer\","
-                    "\"TimeStamp\" :" "\"" FORMAT_TIMEVAL "\","
-                    "\"ProcessName\": %s,"
-                    "\"UserName\": \"%s\","
-                    "\"UserId\": %" PRIu64 ","
-                    "\"PID\" : %d,"
-                    "\"PPID\": %d,"
-                    "\"TID\": %d,"
-                    "\"Method\": \"%s\","
-                    "\"FileName\": %s,"
-                    "\"Handle\": \"0x%x\","
-                    "\"DesiredAccess\": \"%s\","
-                    "\"FileAttributes\": \"%s\","
-                    "\"ShareAccess\": \"%s\","
-                    "\"CreateDisposition\": \"%s\","
-                    "\"CreateOptions\": \"%s\","
-                    "\"Status\": \"%s\"",
-                    UNPACK_TIMEVAL(info->timestamp),
-                    escaped_pname,
-                    USERIDSTR(drakvuf), info->attached_proc_data.userid,
-                    info->attached_proc_data.pid, info->attached_proc_data.ppid, info->attached_proc_data.tid,
-                    info->trap->name, escaped_fname, handle,
-                    w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str(), is_success);
-
-            printf("}\n");
-            g_free(escaped_fname);
-            g_free(escaped_pname);
+       case OUTPUT_KV:
+            kvfmt::print("filetracer", drakvuf, info,
+                keyval("FileName", fmt::Qstr(file_path)),
+                keyval("FileHandle", fmt::Xval(handle)),
+                fmt::Rstr(w->access),
+                fmt::Rstr(w->attrs),
+                fmt::Rstr(w->share),
+                fmt::Rstr(w->disp),
+                fmt::Rstr(w->opts),
+                keyval("Status", fmt::Qstr(is_success))
+            );
             break;
 
         default:
+        case OUTPUT_CSV:
+        case OUTPUT_JSON:
         case OUTPUT_DEFAULT:
-            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s HANDLE:0x%x"
-                   " DESIREDACCESS:\"%s\" FILEATTRIBUTES:\"%s\" SHAREACCESS:\"%s\" CREATEDISPOSITION:\"%s\" CREATEOPTIONS:\"%s\" STATUS:\"%s\"",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->attached_proc_data.name,
-                   USERIDSTR(drakvuf), info->attached_proc_data.userid, info->trap->name, file_path.c_str(), handle,
-                   w->access.c_str(), w->attrs.c_str(), w->share.c_str(), w->disp.c_str(), w->opts.c_str(), is_success);
-            printf("\n");
+            fmt::print(w->f->format, "filetracer", drakvuf, info,
+                keyval("FileName", fmt::Qstr(file_path)),
+                keyval("Handle", fmt::Xval(handle)),
+                keyval("DesiredAccess", fmt::Qstr(w->access)),
+                keyval("FileAttributes", fmt::Qstr(w->attrs)),
+                keyval("ShareAccess", fmt::Qstr(w->share)),
+                keyval("CreateDisposition", fmt::Qstr(w->disp)),
+                keyval("CreateOptions", fmt::Qstr(w->opts)),
+                keyval("Status", fmt::Qstr(is_success))
+            );
             break;
     }
 
