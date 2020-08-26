@@ -349,6 +349,7 @@ static event_response_t create_user_process_hook(
 
     data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
     data->new_process_handle_addr = process_handle_addr;
+    data->new_thread_handle_addr = thread_handle_addr;
     data->user_process_parameters_addr = user_process_parameters_addr;
     return VMI_EVENT_RESPONSE_NONE;
 }
