@@ -133,7 +133,7 @@ struct open_process_result_t: public call_result_t<T>
 template<typename T>
 struct open_thread_result_t: public call_result_t<T>
 {
-    open_thread_result_t(T* src) : call_result_t<T>(src), thread_handle_addr(), desired_access(), object_attributes_addr(), client_id{} {}
+    open_thread_result_t(T* src) : call_result_t<T>(src), thread_handle_addr(), desired_access(), object_attributes_addr(), client_id(), unique_thread() {}
 
     addr_t thread_handle_addr;
     uint32_t desired_access;
@@ -145,7 +145,7 @@ struct open_thread_result_t: public call_result_t<T>
 template<typename T>
 struct process_creation_result_t: public call_result_t<T>
 {
-    process_creation_result_t(T* src) : call_result_t<T>(src), new_process_handle_addr(), user_process_parameters_addr() {}
+    process_creation_result_t(T* src) : call_result_t<T>(src), new_process_handle_addr(), new_thread_handle_addr(), user_process_parameters_addr() {}
 
     addr_t new_process_handle_addr;
     addr_t new_thread_handle_addr;
