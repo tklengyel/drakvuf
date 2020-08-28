@@ -138,6 +138,11 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     if(!strcmp(info->trap->name, "CryptGenKey"))
         extra_data = CryptGenKey_hook(drakvuf, info, ret_target->arguments);
 
+    std::optional<fmt::Qstr<std::string>> clsid;
+
+    if (!ret_target->clsid.empty())
+        clsid = fmt::Qstr(ret_target->clsid);
+
     std::vector<fmt::Rstr<std::string>> fmt_args{};
     {
         const auto &args = ret_target->arguments;
@@ -156,6 +161,7 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     fmt::print(plugin->m_output_format, "apimon", drakvuf, info,
         keyval("Event", fmt::Qstr("api_called")),
+        keyval("CLSID", clsid),
         keyval("CalledFrom", fmt::Xval(info->regs->rip)),
         keyval("ReturnValue", fmt::Xval(info->regs->rax)),
         keyval("Arguments", fmt_args),
@@ -199,7 +205,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    return_hook_target_entry_t* ret_target = new (std::nothrow) return_hook_target_entry_t(target->pid, target->plugin, target->argument_printers);
+    return_hook_target_entry_t* ret_target = new (std::nothrow) return_hook_target_entry_t(target->pid, target->clsid, target->plugin, target->argument_printers);
 
     if (!ret_target)
     {
@@ -310,7 +316,7 @@ static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* ex
         {
             if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
             {
-                drakvuf_request_usermode_hook(drakvuf, dll, wanted_hook.type, wanted_hook.function_name.c_str(), wanted_hook.offset, usermode_hook_cb, wanted_hook.argument_printers, plugin);
+                drakvuf_request_usermode_hook(drakvuf, dll, &wanted_hook, usermode_hook_cb, plugin);
             }
         }
     }
