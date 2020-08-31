@@ -167,6 +167,6 @@ struct TOKEN_PRIVILEGES
     struct LUID_AND_ATTRIBUTES privileges[1];
 } __attribute__((packed));
 
-std::string stringify_privilege(struct LUID_AND_ATTRIBUTES& privilege);
+std::pair<std::string, fmt::Aarg> stringify_privilege(struct LUID_AND_ATTRIBUTES& privilege);
 
 #endif
