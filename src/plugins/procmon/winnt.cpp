@@ -127,7 +127,7 @@ std::string stringify_protection_attributes(uint32_t attributes, char sep)
         if (num > 1)
             result.append(1, sep);
 
-        switch (attributes)
+        switch (attr)
         {
             case PAGE_NOACCESS:
                 result.append("PAGE_NOACCESS");
