@@ -102,10 +102,13 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "privileges.h"
 #include <stdio.h>
+#include <utility>
 
-std::string stringify_privilege(struct LUID_AND_ATTRIBUTES& privilege)
+#include "plugins/output_format.h"
+#include "privileges.h"
+
+std::pair<std::string, fmt::Aarg> stringify_privilege(struct LUID_AND_ATTRIBUTES& privilege)
 {
     std::string attribute;
     switch (privilege.attributes)
@@ -136,78 +139,78 @@ std::string stringify_privilege(struct LUID_AND_ATTRIBUTES& privilege)
     switch (privilege.luid)
     {
         case SE_CREATE_TOKEN_PRIVILEGE:
-            return std::string("SE_CREATE_TOKEN_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_CREATE_TOKEN_PRIVILEGE", fmt::Rstr(attribute));
         case SE_ASSIGNPRIMARYTOKEN_PRIVILEGE:
-            return std::string("SE_ASSIGNPRIMARYTOKEN_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_ASSIGNPRIMARYTOKEN_PRIVILEGE", fmt::Rstr(attribute));
         case SE_LOCK_MEMORY_PRIVILEGE:
-            return std::string("SE_LOCK_MEMORY_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_LOCK_MEMORY_PRIVILEGE", fmt::Rstr(attribute));
         case SE_INCREASE_QUOTA_PRIVILEGE:
-            return std::string("SE_INCREASE_QUOTA_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_INCREASE_QUOTA_PRIVILEGE", fmt::Rstr(attribute));
         case SE_MACHINE_ACCOUNT_PRIVILEGE:
-            return std::string("SE_MACHINE_ACCOUNT_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_MACHINE_ACCOUNT_PRIVILEGE", fmt::Rstr(attribute));
         case SE_TCB_PRIVILEGE:
-            return std::string("SE_TCB_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_TCB_PRIVILEGE", fmt::Rstr(attribute));
         case SE_SECURITY_PRIVILEGE:
-            return std::string("SE_SECURITY_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_SECURITY_PRIVILEGE", fmt::Rstr(attribute));
         case SE_TAKE_OWNERSHIP_PRIVILEGE:
-            return std::string("SE_TAKE_OWNERSHIP_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_TAKE_OWNERSHIP_PRIVILEGE", fmt::Rstr(attribute));
         case SE_LOAD_DRIVER_PRIVILEGE:
-            return std::string("SE_LOAD_DRIVER_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_LOAD_DRIVER_PRIVILEGE", fmt::Rstr(attribute));
         case SE_SYSTEM_PROFILE_PRIVILEGE:
-            return std::string("SE_SYSTEM_PROFILE_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_SYSTEM_PROFILE_PRIVILEGE", fmt::Rstr(attribute));
         case SE_SYSTEMTIME_PRIVILEGE:
-            return std::string("SE_SYSTEMTIME_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_SYSTEMTIME_PRIVILEGE", fmt::Rstr(attribute));
         case SE_PROF_SINGLE_PROCESS_PRIVILEGE:
-            return std::string("SE_PROF_SINGLE_PROCESS_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_PROF_SINGLE_PROCESS_PRIVILEGE", fmt::Rstr(attribute));
         case SE_INC_BASE_PRIORITY_PRIVILEGE:
-            return std::string("SE_INC_BASE_PRIORITY_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_INC_BASE_PRIORITY_PRIVILEGE", fmt::Rstr(attribute));
         case SE_CREATE_PAGEFILE_PRIVILEGE:
-            return std::string("SE_CREATE_PAGEFILE_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_CREATE_PAGEFILE_PRIVILEGE", fmt::Rstr(attribute));
         case SE_CREATE_PERMANENT_PRIVILEGE:
-            return std::string("SE_CREATE_PERMANENT_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_CREATE_PERMANENT_PRIVILEGE", fmt::Rstr(attribute));
         case SE_BACKUP_PRIVILEGE:
-            return std::string("SE_BACKUP_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_BACKUP_PRIVILEGE", fmt::Rstr(attribute));
         case SE_RESTORE_PRIVILEGE:
-            return std::string("SE_RESTORE_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_RESTORE_PRIVILEGE", fmt::Rstr(attribute));
         case SE_SHUTDOWN_PRIVILEGE:
-            return std::string("SE_SHUTDOWN_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_SHUTDOWN_PRIVILEGE", fmt::Rstr(attribute));
         case SE_DEBUG_PRIVILEGE:
-            return std::string("SE_DEBUG_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_DEBUG_PRIVILEGE", fmt::Rstr(attribute));
         case SE_AUDIT_PRIVILEGE:
-            return std::string("SE_AUDIT_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_AUDIT_PRIVILEGE", fmt::Rstr(attribute));
         case SE_SYSTEM_ENVIRONMENT_PRIVILEGE:
-            return std::string("SE_SYSTEM_ENVIRONMENT_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_SYSTEM_ENVIRONMENT_PRIVILEGE", fmt::Rstr(attribute));
         case SE_CHANGE_NOTIFY_PRIVILEGE:
-            return std::string("SE_CHANGE_NOTIFY_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_CHANGE_NOTIFY_PRIVILEGE", fmt::Rstr(attribute));
         case SE_REMOTE_SHUTDOWN_PRIVILEGE:
-            return std::string("SE_REMOTE_SHUTDOWN_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_REMOTE_SHUTDOWN_PRIVILEGE", fmt::Rstr(attribute));
         case SE_UNDOCK_PRIVILEGE:
-            return std::string("SE_UNDOCK_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_UNDOCK_PRIVILEGE", fmt::Rstr(attribute));
         case SE_SYNC_AGENT_PRIVILEGE:
-            return std::string("SE_SYNC_AGENT_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_SYNC_AGENT_PRIVILEGE", fmt::Rstr(attribute));
         case SE_ENABLE_DELEGATION_PRIVILEGE:
-            return std::string("SE_ENABLE_DELEGATION_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_ENABLE_DELEGATION_PRIVILEGE", fmt::Rstr(attribute));
         case SE_MANAGE_VOLUME_PRIVILEGE:
-            return std::string("SE_MANAGE_VOLUME_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_MANAGE_VOLUME_PRIVILEGE", fmt::Rstr(attribute));
         case SE_IMPERSONATE_PRIVILEGE:
-            return std::string("SE_IMPERSONATE_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_IMPERSONATE_PRIVILEGE", fmt::Rstr(attribute));
         case SE_CREATE_GLOBAL_PRIVILEGE:
-            return std::string("SE_CREATE_GLOBAL_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_CREATE_GLOBAL_PRIVILEGE", fmt::Rstr(attribute));
         case SE_TRUSTED_CREDMAN_ACCESS_PRIVILEGE:
-            return std::string("SE_TRUSTED_CREDMAN_ACCESS_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_TRUSTED_CREDMAN_ACCESS_PRIVILEGE", fmt::Rstr(attribute));
         case SE_RELABEL_PRIVILEGE:
-            return std::string("SE_RELABEL_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_RELABEL_PRIVILEGE", fmt::Rstr(attribute));
         case SE_INC_WORKING_SET_PRIVILEGE:
-            return std::string("SE_INC_WORKING_SET_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_INC_WORKING_SET_PRIVILEGE", fmt::Rstr(attribute));
         case SE_TIME_ZONE_PRIVILEGE:
-            return std::string("SE_TIME_ZONE_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_TIME_ZONE_PRIVILEGE", fmt::Rstr(attribute));
         case SE_CREATE_SYMBOLIC_LINK_PRIVILEGE:
-            return std::string("SE_CREATE_SYMBOLIC_LINK_PRIVILEGE") + std::string("=") + attribute;
+            return keyval("SE_CREATE_SYMBOLIC_LINK_PRIVILEGE", fmt::Rstr(attribute));
         default:
         {
             char tmp[64] = {0};
             snprintf(tmp, 64, "0x%" PRIx64, privilege.luid);
-            return std::string(tmp) + std::string("=") + attribute;
+            return keyval(tmp, fmt::Rstr(attribute));
         }
     }
 }
