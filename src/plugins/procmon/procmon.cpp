@@ -626,7 +626,7 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
 
 static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    std::string privileges;
+    std::vector<std::pair<std::string, fmt::Aarg>> privileges;
     struct TOKEN_PRIVILEGES* newstate = nullptr;
     // HANDLE TokenHandle
     uint32_t token_handle = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -638,7 +638,7 @@ static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_tr
         return VMI_EVENT_RESPONSE_NONE;
 
     if (disable_all)
-        privileges = "DisableAll=1";
+        privileges.push_back(keyval("DisableAll", fmt::Nval(1UL)));
     else
     {
         auto vmi = vmi_lock_guard(drakvuf);
@@ -667,17 +667,13 @@ static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_tr
                 goto done;
         }
 
-        privileges = stringify_privilege(newstate->privileges[0]);
-        for (size_t i = 1; i < newstate->privilege_count; ++i)
-        {
-            privileges.append(",");
-            privileges.append(stringify_privilege(newstate->privileges[i]));
-        }
+        for (size_t i = 0; i < newstate->privilege_count; ++i)
+            privileges.push_back(stringify_privilege(newstate->privileges[i]));
     }
 
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
         keyval("ProcessHandle", fmt::Nval(token_handle)),
-        keyval("NewState", fmt::Qstr(privileges))
+        keyval("NewState", privileges)
     );
 
 done:
@@ -705,7 +701,7 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx
         keyval("PPID", fmt::Nval(data.ppid)),
         keyval("TID", fmt::Nval(data.tid)),
         keyval("Method", fmt::Qstr("null")),
-        keyval("FILE", fmt::Qstr(data.name))
+        keyval("RunningProcess", fmt::Qstr(data.name))
     );
 
     g_free(const_cast<char*>(data.name));
