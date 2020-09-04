@@ -188,9 +188,6 @@ struct DataPrinter
     template <class Tv = T>
     static bool print(std::ostream& os, const fmt::Qstr<Tv>& data, char)
     {
-        if (data.value.empty())
-            return false;
-
         os << '"' << data.value << '"';
         return true;
     }
