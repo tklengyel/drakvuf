@@ -103,7 +103,11 @@
 #*************************************************************************#
 
 AC_PREREQ([2.60])
-AC_INIT([DRAKVUF], m4_join([], [0.8-git], m4_esyscmd_s([git log -1 --date=format:%Y%m%d%H%M%S --pretty=format:%cd]), [+], m4_esyscmd_s([git describe --always]), [-1]), [tamas@tklengyel.com], [], [https://drakvuf.com])
+AC_INIT([DRAKVUF],
+        m4_join([], [0.8-git],
+            m4_esyscmd_s([git log -1 --date=format:%Y%m%d%H%M%S --pretty=format:%cd]), [+], m4_esyscmd_s([git describe --always]), [-1]),
+        [tamas@tklengyel.com], [],
+        [https://drakvuf.com])
 AM_INIT_AUTOMAKE([1.10 no-define foreign subdir-objects])
 LT_INIT
 AC_CONFIG_HEADERS([config.h])
@@ -114,6 +118,13 @@ AC_PROG_CXX(clang++)
 AX_REQUIRE_DEFINED([AX_CXX_COMPILE_STDCXX])
 AX_CXX_COMPILE_STDCXX([17], [ext], [mandatory])
 CXXFLAGS="-std=gnu++17"
+
+######################################################
+
+AC_LANG_PUSH([C++])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [[bool test[2] = { [1] = 1, [0] = 0 };]])], [],
+    [AC_ERROR(Your C++ compiler ($CXX) is not supported. Please use clang++ (clang-9 or clang-10)!)])
+AC_LANG_POP([C++])
 
 ######################################################
 
