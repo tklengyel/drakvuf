@@ -188,9 +188,16 @@ struct wrapper_t
 
     handle_t handle;
     uint64_t fo_flags;
+    uint64_t file_size;
+    uint64_t file_offset;
+    uint64_t bytes_to_read;
+    handle_t section_handle;
+    addr_t view_base;
+    bool finish_status;
+    void* buffer;
 
-    reg_t target_cr3;
-    uint32_t target_thread_id;
+    vmi_pid_t target_pid;
+    uint32_t target_tid;
     addr_t eprocess_base;
 
     x86_registers_t saved_regs;
@@ -202,15 +209,30 @@ struct wrapper_t
         struct
         {
             addr_t out;
-            size_t size;
-        } ntqueryobject_info;
+        } queryvolumeinfo;
+
+        struct
+        {
+            addr_t out;
+        } queryinfo;
+
+        struct
+        {
+            addr_t handle;
+        } createsection;
+
+        struct
+        {
+            addr_t base;
+            addr_t size;
+        } mapview;
 
         struct
         {
             size_t bytes_read;
             addr_t out;
             addr_t io_status_block;
-        } ntreadfile_info;
+        } readfile;
     };
 
     drakvuf_trap_t* bp;
@@ -239,6 +261,18 @@ struct _LARGE_INTEGER
     uint64_t QuadPart;
 } __attribute__((packed));
 
+// NOTE The size of structure should be 0x18
+#define FileStandardInformation 5
+struct FILE_STANDARD_INFORMATION {
+  uint64_t allocation_size;
+  uint64_t end_of_file;
+  uint32_t number_of_links;
+  uint8_t  delete_pending;
+  uint8_t  directory;
+  uint16_t  dummy;
+} __attribute__((packed));
+
+#define FileFsDeviceInformation 4
 struct FILE_FS_DEVICE_INFORMATION
 {
     uint32_t device_type;
@@ -252,9 +286,13 @@ static const uint64_t BYTES_TO_READ = 0x10000;
  *************************************/
 event_response_t exfreepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 event_response_t waitobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t mapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t unmapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 /***************************
  * ## Helpers for injection
@@ -262,8 +300,12 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 bool inject_free_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
 bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
 bool inject_waitobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
+bool inject_queryvolumeinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
+bool inject_queryinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
+bool inject_createsection(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
+bool inject_mapview(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
+bool inject_unmapview(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
+bool inject_memcpy(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
 
 /********************
  *  ## Other helpers
