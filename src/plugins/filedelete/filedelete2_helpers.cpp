@@ -135,7 +135,7 @@ void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     wrapper_t* injector = (wrapper_t*)info->trap->data;
     filedelete* f = injector->f;
 
-    f->closing_handles[std::make_pair(info->regs->cr3, injector->target_thread_id)] = true;
+    f->closing_handles[std::make_pair(injector->target_pid, injector->target_tid)] = true;
     free_pool(f->pools, injector->pool);
 
     // One could not restore all registers at once like this:
@@ -163,7 +163,7 @@ void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     info->regs->r15 = injector->saved_regs.r15;
 
     drakvuf_remove_trap(drakvuf, injector->bp, (drakvuf_trap_free_t)free);
-
+    g_free(injector->buffer);
     g_free(injector);
 }
 
@@ -187,44 +187,144 @@ bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_inst
     return true;
 }
 
-bool inject_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
+bool inject_memcpy(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
 {
     // Remove stack arguments and home space from previous injection
     info->regs->rsp = injector->saved_regs.rsp;
 
-    struct argument args[9] = {};
-    struct _LARGE_INTEGER byte_offset = { .QuadPart = injector->ntreadfile_info.bytes_read };
-    struct IO_STATUS_BLOCK_32 io_status_block_32 = {};
-    struct IO_STATUS_BLOCK_64 io_status_block_64 = {};
+    injector->bytes_to_read = std::min(injector->file_size - injector->file_offset, BYTES_TO_READ);
 
-    init_int_argument(&args[0], injector->handle);
-    init_int_argument(&args[1], 0);
-    init_int_argument(&args[2], 0);
-    init_int_argument(&args[3], 0);
-    if (injector->is32bit)
-        init_struct_argument(&args[4], io_status_block_32);
-    else
-        init_struct_argument(&args[4], io_status_block_64);
-    init_int_argument(&args[5], injector->pool);
-    init_int_argument(&args[6], BYTES_TO_READ);
-    init_struct_argument(&args[7], byte_offset);
-    init_int_argument(&args[8], 0);
+    struct argument args[3] = {};
+    init_int_argument(&args[0], injector->pool);
+    init_int_argument(&args[1], injector->view_base);
+    init_int_argument(&args[2], injector->bytes_to_read);
 
-    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 9))
+    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 3))
         return false;
 
-    injector->ntreadfile_info.io_status_block = args[4].data_on_stack;
-    injector->ntreadfile_info.out = args[5].data_on_stack;
-
-    info->regs->rip = injector->f->readfile_va;
-
-    injector->bp->cb = readfile_cb;
+    info->regs->rip = injector->f->memcpy_va;
+    injector->bp->cb = memcpy_cb;
 
     return true;
 }
 
-bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
+bool inject_unmapview(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
 {
+    // Remove stack arguments and home space from previous injection
+    info->regs->rsp = injector->saved_regs.rsp;
+
+    struct argument args[2] = {};
+
+    init_int_argument(&args[0], 0xffffffffffffffff); // current process pseudo handle
+    init_int_argument(&args[1], injector->view_base);
+
+    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 2))
+        return false;
+
+    info->regs->rip = injector->f->unmapview_va;
+    injector->bp->cb = unmapview_cb;
+
+    return true;
+}
+
+bool inject_mapview(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
+{
+    // Remove stack arguments and home space from previous injection
+    info->regs->rsp = injector->saved_regs.rsp;
+
+    struct argument args[10] = {};
+    uint64_t base = 0;
+    struct _LARGE_INTEGER offset = { 0 };
+    offset.QuadPart = injector->file_offset;
+    uint64_t view_size = std::min(injector->file_size - injector->file_offset, BYTES_TO_READ);
+
+    init_int_argument   (&args[0], injector->section_handle); // SectionHandle
+    init_int_argument   (&args[1], 0xffffffffffffffff); // ProcessHandle = current process pseudo handle
+    init_struct_argument(&args[2], base); // BaseAddress
+    init_int_argument   (&args[3], 0); // ZeroBits
+    init_int_argument   (&args[4], 0); // CommitSize
+    init_struct_argument(&args[5], offset); // SectionOffset
+    init_struct_argument(&args[6], view_size); // ViewSize
+    init_int_argument   (&args[7], 1); // InheritDisposition
+    init_int_argument   (&args[8], 0); // AllocationType
+    init_int_argument   (&args[9], 2); // Win32Protect
+
+    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 10))
+        return false;
+
+    injector->mapview.base = args[2].data_on_stack;
+    injector->mapview.size = args[6].data_on_stack;
+
+    info->regs->rip = injector->f->mapview_va;
+    injector->bp->cb = mapview_cb;
+
+    return true;
+}
+
+bool inject_createsection(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
+{
+    // Remove stack arguments and home space from previous injection
+    info->regs->rsp = injector->saved_regs.rsp;
+
+    struct argument args[7] = {};
+    handle_t section_handle = 0;
+    struct _LARGE_INTEGER max_size = { 0 };
+    max_size.QuadPart = injector->file_size;
+
+    init_struct_argument(&args[0], section_handle); // SectionHandle
+    init_int_argument(&args[1], 0xf0005); // DesiredAccess = SECTION_MAP_READ | SECTION_QUERY
+    init_int_argument(&args[2], 0); // ObjectAttributes = 0
+    init_struct_argument(&args[3], max_size); // MaximumSize = 0
+    init_int_argument(&args[4], 2); // SectionPageProtection = PAGE_READONLY
+    init_int_argument(&args[5], 0x8000000); // AllocationAttributes = SEC_COMMIT
+    init_int_argument(&args[6], injector->handle); // FileHandle
+
+    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 7))
+        return false;
+
+    injector->createsection.handle = args[0].data_on_stack;
+
+    info->regs->rip = injector->f->createsection_va;
+    injector->bp->cb = injected_createsection_cb;
+
+    return true;
+}
+
+bool inject_queryinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
+{
+    // Remove stack arguments and home space from previous injection
+    info->regs->rsp = injector->saved_regs.rsp;
+
+    struct argument args[5] = {};
+    struct IO_STATUS_BLOCK_32 io_status_block_32 = {};
+    struct IO_STATUS_BLOCK_64 io_status_block_64 = {};
+    struct FILE_STANDARD_INFORMATION dev_info = {};
+
+    init_int_argument(&args[0], injector->handle);
+    if (injector->is32bit)
+        init_struct_argument(&args[1], io_status_block_32);
+    else
+        init_struct_argument(&args[1], io_status_block_64);
+    init_struct_argument(&args[2], dev_info);
+    init_int_argument(&args[3], sizeof(dev_info));
+    init_int_argument(&args[4], FileStandardInformation);
+
+    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 5))
+        return false;
+
+    injector->queryinfo.out = args[2].data_on_stack;
+
+    info->regs->rip = injector->f->queryinfo_va;
+    injector->bp->cb = queryinfo_cb;
+
+    return true;
+}
+
+bool inject_queryvolumeinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
+{
+    // Remove stack arguments and home space from previous injection
+    info->regs->rsp = injector->saved_regs.rsp;
+
     struct argument args[5] = {};
     struct IO_STATUS_BLOCK_32 io_status_block_32 = {};
     struct IO_STATUS_BLOCK_64 io_status_block_64 = {};
@@ -237,15 +337,15 @@ bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instan
         init_struct_argument(&args[1], io_status_block_64);
     init_struct_argument(&args[2], dev_info);
     init_int_argument(&args[3], sizeof(dev_info));
-    init_int_argument(&args[4], 4); // FileFsDeviceInformation
+    init_int_argument(&args[4], FileFsDeviceInformation);
 
     if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 5))
         return false;
 
-    injector->ntqueryobject_info.out = args[2].data_on_stack;
+    injector->queryvolumeinfo.out = args[2].data_on_stack;
 
     injector->bp->type = BREAKPOINT;
-    injector->bp->cb = queryobject_cb;
+    injector->bp->cb = queryvolumeinfo_cb;
     injector->bp->data = injector;
     injector->bp->breakpoint.lookup_type = LOOKUP_DTB;
     injector->bp->breakpoint.dtb = info->regs->cr3;
@@ -259,7 +359,7 @@ bool inject_queryobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instan
         return false;
     }
 
-    info->regs->rip = injector->f->queryobject_va;
+    info->regs->rip = injector->f->queryvolumeinfo_va;
 
     return true;
 }
