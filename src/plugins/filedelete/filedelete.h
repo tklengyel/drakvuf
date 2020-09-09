@@ -163,11 +163,16 @@ public:
     ~filedelete();
 
     // For `filedelete2`
-    addr_t queryobject_va;
+    addr_t queryvolumeinfo_va;
+    addr_t queryinfo_va;
+    addr_t createsection_va;
+    addr_t mapview_va;
+    addr_t unmapview_va;
     addr_t readfile_va;
     addr_t waitobject_va;
     addr_t exallocatepool_va;
     addr_t exfreepool_va;
+    addr_t memcpy_va;
 
     // Maps virtual address of buffer to free flag:
     // * `true` means pools is free;

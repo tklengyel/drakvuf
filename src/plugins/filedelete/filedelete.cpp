@@ -182,7 +182,7 @@ static bool get_file_object_handle_count(drakvuf_t drakvuf, drakvuf_trap_info_t*
     if (!handle_count)
         return false;
 
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->attached_proc_data.base_addr, handle);
     if (!obj)
         return false; // Break operatioin to not crash VM
 
@@ -209,7 +209,7 @@ static bool get_file_object_handle_count(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
 static bool get_file_object_flags(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, filedelete* f, handle_t handle, uint64_t* flags)
 {
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->attached_proc_data.base_addr, handle);
     if (!obj)
         return false; // Break operatioin to not crash VM
 
@@ -235,10 +235,10 @@ static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_
 {
     // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
 
-    if (!info->proc_data.base_addr)
+    if (!info->attached_proc_data.base_addr)
         return {};
 
-    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->proc_data.base_addr, handle);
+    addr_t obj = drakvuf_get_obj_by_handle(drakvuf, info->attached_proc_data.base_addr, handle);
 
     if (!obj)
         return {};
@@ -373,9 +373,9 @@ static void save_file_metadata(filedelete* f,
     json_object_object_add(jobj, "FileFlags", json_object_new_string_fmt("0x%lx (%s)", fo_flags, parse_flags(fo_flags, fo_flags_map, OUTPUT_DEFAULT, "0").c_str()));
     json_object_object_add(jobj, "SequenceNumber", json_object_new_int(sequence_number));
     json_object_object_add(jobj, "ControlArea", json_object_new_string_fmt("0x%lx", control_area));
-    json_object_object_add(jobj, "PID", json_object_new_int64(static_cast<uint64_t>(info->proc_data.pid)));
-    json_object_object_add(jobj, "PPID", json_object_new_int64(static_cast<uint64_t>(info->proc_data.ppid)));
-    json_object_object_add(jobj, "ProcessName", json_object_new_string(info->proc_data.name));
+    json_object_object_add(jobj, "PID", json_object_new_int64(static_cast<uint64_t>(info->attached_proc_data.pid)));
+    json_object_object_add(jobj, "PPID", json_object_new_int64(static_cast<uint64_t>(info->attached_proc_data.ppid)));
+    json_object_object_add(jobj, "ProcessName", json_object_new_string(info->attached_proc_data.name));
 
     if (!ntstatus)
     {
@@ -600,12 +600,13 @@ static bool save_file_chunk(filedelete* f, int file_sequence_number, void* buffe
     return success;
 }
 
+// TODO Replace `is_success` with `injector->finish_status`
 static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, bool is_success)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
     filedelete* f = injector->f;
-    auto filename = f->files[{info->proc_data.pid, injector->handle}].first;
-    auto reason = f->files[{info->proc_data.pid, injector->handle}].second;
+    auto filename = f->files[{info->attached_proc_data.pid, injector->handle}].first;
+    auto reason = f->files[{info->attached_proc_data.pid, injector->handle}].second;
 
     if (!is_success)
         grab_file_by_handle(f, drakvuf, vmi, info, injector->handle, reason);
@@ -614,16 +615,13 @@ static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
-event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
     filedelete* f = injector->f;
 
-    if (info->regs->cr3 != injector->target_cr3)
-        return 0;
-
-    if (info->proc_data.tid != injector->target_thread_id)
-        return 0;
+    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
+        return VMI_EVENT_RESPONSE_NONE;
 
     auto response = 0;
 
@@ -631,100 +629,180 @@ event_response_t readfile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = injector->ntreadfile_info.io_status_block,
+        .addr = injector->pool,
     };
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    const uint32_t status = info->regs->rax;
-    uint32_t isb_status = 0; // `isb` is `IO_STATUS_BLOCK`
-    size_t isb_size = 0;
-    bool is_success = false;
-    auto filename = f->files[{info->proc_data.pid, injector->handle}].first;
-    auto reason = f->files[{info->proc_data.pid, injector->handle}].second;
+    if (injector->curr_sequence_number < 0) injector->curr_sequence_number = ++f->sequence_number;
+    const int curr_sequence_number = injector->curr_sequence_number;
 
-    if (injector->is32bit)
+    if (VMI_SUCCESS == vmi_read(vmi, &ctx, injector->bytes_to_read, injector->buffer, NULL) &&
+        save_file_chunk(f, curr_sequence_number, injector->buffer, injector->bytes_to_read))
     {
-        struct IO_STATUS_BLOCK_32 io_status_block;
-        if ((VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(io_status_block), &io_status_block, NULL)))
-            goto err;
+        injector->file_offset += injector->bytes_to_read;
+        if (injector->file_offset >= injector->file_size)
+        {
+            auto filename = f->files[{info->attached_proc_data.pid, injector->handle}].first;
+            auto reason = f->files[{info->attached_proc_data.pid, injector->handle}].second;
+            save_file_metadata(f, drakvuf, info, curr_sequence_number, 0, filename.c_str(), reason, injector->bytes_to_read, injector->fo_flags);
 
-        isb_status = io_status_block.status;
-        isb_size = io_status_block.info;
+            injector->finish_status = true;
+        }
     }
     else
     {
-        struct IO_STATUS_BLOCK_64 io_status_block;
-        if ((VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(io_status_block), &io_status_block, NULL)))
-            goto err;
-
-        isb_status = io_status_block.status;
-        isb_size = io_status_block.info;
+        PRINT_DEBUG("[FILEDELETE2] [RtlCopyMemory] Error. Stop processing (PID %d, TID %d, FileName '%s', status 0x%lx).\n",
+                    info->attached_proc_data.pid, info->attached_proc_data.tid, f->files[{info->attached_proc_data.pid, injector->handle}].first.c_str(), info->regs->rax);
     }
 
-    if ( STATUS_SUCCESS == status && isb_size )
+    if (inject_unmapview(drakvuf, info, vmi, injector))
+        response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+    else
+        response = finish_readfile(drakvuf, info, vmi, injector->finish_status);
+
+    drakvuf_release_vmi(drakvuf);
+
+    return response;
+}
+
+event_response_t unmapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    wrapper_t* injector = (wrapper_t*)info->trap->data;
+
+    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    vmi_lock_guard vmi(drakvuf);
+    if (injector->file_offset < injector->file_size)
     {
-        if (injector->curr_sequence_number < 0) injector->curr_sequence_number = ++f->sequence_number;
-        const int curr_sequence_number = injector->curr_sequence_number;
+        if (inject_mapview(drakvuf, info, vmi, injector))
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
 
-        void* buffer = g_try_malloc0(isb_size);
+    return finish_readfile(drakvuf, info, vmi, injector->finish_status);
+}
 
-        ctx.addr = injector->ntreadfile_info.out;
-        if (VMI_FAILURE == vmi_read(vmi, &ctx, isb_size, buffer, NULL))
+event_response_t mapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    wrapper_t* injector = (wrapper_t*)info->trap->data;
+
+    auto response = 0;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
+        goto done;
+
+    if (info->regs->rax)
+    {
+        auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+        ostringstream msg;
+        msg << "ZwMapViewOfSection failed with status 0x" << std::hex << info->regs->rax;
+        print_extraction_failure(injector->f, drakvuf, info, filename,
+                                 msg.str());
+    }
+    else
+    {
+        access_context_t ctx =
         {
-            g_free(buffer);
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = injector->mapview.base,
+        };
+
+        if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(injector->view_base), &injector->view_base, NULL)))
+        {
+            PRINT_DEBUG("[FILEDELETE2] [ZwMapViewOfSection] Failed to read view base\n");
             goto err;
         }
 
-        bool success = save_file_chunk(f, curr_sequence_number, buffer, isb_size);
-        g_free(buffer);
-        if (!success)
-            goto err;
-
-        injector->ntreadfile_info.bytes_read += isb_size;
-
-        if (BYTES_TO_READ == isb_size)
+        ctx.addr = injector->mapview.size;
+        uint64_t view_size = 0;
+        if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(view_size), &view_size, NULL)))
         {
-            if (inject_readfile(drakvuf, info, vmi, injector))
+            PRINT_DEBUG("[FILEDELETE2] [ZwMapViewOfSection] Failed to read view size\n");
+            goto err;
+        }
+
+        addr_t pool = find_pool(injector->f->pools);
+        if (!pool)
+        {
+            if (inject_allocate_pool(drakvuf, info, vmi, injector))
             {
                 response = VMI_EVENT_RESPONSE_SET_REGISTERS;
                 goto done;
             }
-            else
-            {
-                goto err;
-            }
         }
         else
         {
-            auto filesize = injector->ntreadfile_info.bytes_read;
-            save_file_metadata(f, drakvuf, info, curr_sequence_number, 0, filename.c_str(), reason, filesize, injector->fo_flags);
+            injector->pool = pool;
+            if (inject_memcpy(drakvuf, info, vmi, injector))
+            {
+                response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+                goto done;
+            }
         }
     }
-    else if (STATUS_END_OF_FILE != status)
-    {
-        if (injector->ntreadfile_info.bytes_read)
-            save_file_metadata(f, drakvuf, info, injector->curr_sequence_number, 0, filename.c_str(), reason, injector->ntreadfile_info.bytes_read, injector->fo_flags, status);
-
-        ostringstream msg;
-        msg << "ZwReadFile failed with status " << status;
-
-        print_extraction_failure(injector->f, drakvuf, info, filename, msg.str());
-
-        PRINT_DEBUG("[FILEDELETE2] [ReadFile] Failed to read %s with status 0x%lx and IO_STATUS_BLOCK = { Status 0x%x; Size 0x%lx} \n",
-                    f->files[{info->proc_data.pid, injector->handle}].first.c_str(), info->regs->rax, isb_status, isb_size);
-        goto err;
-    }
-
-    is_success = true;
-    goto handled;
 
 err:
-    PRINT_DEBUG("[FILEDELETE2] [ReadFile] Error. Stop processing (CR3 0x%lx, TID %d, FileName '%s', status 0x%lx).\n",
-                info->regs->cr3, info->proc_data.tid, f->files[{info->proc_data.pid, injector->handle}].first.c_str(), info->regs->rax);
+    PRINT_DEBUG("[FILEDELETE2] [ZwMapViewOfSection] Error. Stop processing (PID %d, TID %d).\n",
+                info->attached_proc_data.pid, info->attached_proc_data.tid);
 
-handled:
-    response = finish_readfile(drakvuf, info, vmi, is_success);
+    response = finish_readfile(drakvuf, info, vmi, false);
+
+done:
+    drakvuf_release_vmi(drakvuf);
+
+    return response;
+}
+
+event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    wrapper_t* injector = (wrapper_t*)info->trap->data;
+
+    auto response = 0;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
+        goto done;
+
+    if (info->regs->rax)
+    {
+        auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+        ostringstream msg;
+        msg << "ZwCreateSection failed with status 0x" << std::hex << info->regs->rax;
+        print_extraction_failure(injector->f, drakvuf, info, filename,
+                                 msg.str());
+    }
+    else
+    {
+        access_context_t ctx =
+        {
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = injector->createsection.handle,
+        };
+
+        if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(injector->section_handle), &injector->section_handle, NULL)))
+        {
+            PRINT_DEBUG("[FILEDELETE2] [ZwCreateSection] Failed to read section handle\n");
+            goto err;
+        }
+
+        if (inject_mapview(drakvuf, info, vmi, injector))
+        {
+            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            goto done;
+        }
+    }
+
+err:
+    PRINT_DEBUG("[FILEDELETE2] [ZwCreateSection] Error. Stop processing (PID %d, TID %d).\n",
+                info->attached_proc_data.pid, info->attached_proc_data.tid);
+
+    response = finish_readfile(drakvuf, info, vmi, false);
 
 done:
     drakvuf_release_vmi(drakvuf);
@@ -741,10 +819,7 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    if (info->regs->cr3 != injector->target_cr3)
-        goto done;
-
-    if (info->proc_data.tid != injector->target_thread_id)
+    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
         goto done;
 
     if (info->regs->rax)
@@ -752,7 +827,7 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         injector->f->pools[info->regs->rax] = true;
 
         injector->pool = info->regs->rax;
-        if (inject_readfile(drakvuf, info, vmi, injector))
+        if (inject_memcpy(drakvuf, info, vmi, injector))
         {
             response = VMI_EVENT_RESPONSE_SET_REGISTERS;
             goto done;
@@ -764,14 +839,14 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     else
     {
-        auto filename = injector->f->files[{info->proc_data.pid, injector->handle}].first;
+        auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
         print_extraction_failure(injector->f, drakvuf, info, filename,
                                  "ExAllocatePoolWithTag failed to allocate pool");
     }
 
 err:
-    PRINT_DEBUG("[FILEDELETE2] [ExAllocatePoolWithTag] Error. Stop processing (CR3 0x%lx, TID %d).\n",
-                info->regs->cr3, info->proc_data.tid);
+    PRINT_DEBUG("[FILEDELETE2] [ExAllocatePoolWithTag] Error. Stop processing (PID %d, TID %d).\n",
+                info->attached_proc_data.pid, info->attached_proc_data.tid);
 
     response = finish_readfile(drakvuf, info, vmi, false);
 
@@ -781,25 +856,22 @@ done:
     return response;
 }
 
-event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
 
     auto response = 0;
 
-    if (info->regs->cr3 != injector->target_cr3)
-        return 0;
-
-    if (info->proc_data.tid != injector->target_thread_id)
-        return 0;
+    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
+        return VMI_EVENT_RESPONSE_NONE;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     if (info->regs->rax)
     {
-        auto filename = injector->f->files[{info->proc_data.pid, injector->handle}].first;
+        auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
         ostringstream msg;
-        msg << "ZwQueryVolumeInformationFile failed with status " << info->regs->rax;
+        msg << "ZwQueryVolumeInformationFile failed with status 0x" << std::hex << info->regs->rax;
 
         print_extraction_failure(injector->f, drakvuf, info, filename, msg.str());
 
@@ -811,19 +883,19 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
-            .addr = injector->ntqueryobject_info.out,
+            .addr = injector->queryvolumeinfo.out,
         };
 
         struct FILE_FS_DEVICE_INFORMATION dev_info = {};
         if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct FILE_FS_DEVICE_INFORMATION), &dev_info, NULL)))
         {
-            PRINT_DEBUG("[FILEDELETE2] [QueryObject] Failed to read FsDeviceInformation\n");
+            PRINT_DEBUG("[FILEDELETE2] [ZwQueryVolumeInformationFile] Failed to read FsDeviceInformation\n");
             goto err;
         }
 
         if (7 != dev_info.device_type) // FILE_DEVICE_DISK
         {
-            auto filename = injector->f->files[{info->proc_data.pid, injector->handle}].first;
+            auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
             ostringstream msg;
             msg << "ZwQueryVolumeInformationFile stop processing device type " << dev_info.device_type;
 
@@ -831,31 +903,86 @@ event_response_t queryobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             goto handled;
         }
 
-        injector->ntreadfile_info.bytes_read = 0UL;
-
-        addr_t pool = find_pool(injector->f->pools);
-        if (!pool)
+        injector->readfile.bytes_read = 0UL;
+        if (inject_queryinfo(drakvuf, info, vmi, injector))
         {
-            if (inject_allocate_pool(drakvuf, info, vmi, injector))
-            {
-                response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-                goto done;
-            }
-        }
-        else
-        {
-            injector->pool = pool;
-            if (inject_readfile(drakvuf, info, vmi, injector))
-            {
-                response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-                goto done;
-            }
+            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            goto done;
         }
     }
 
 err:
-    PRINT_DEBUG("[FILEDELETE2] [QueryObject] Error. Stop processing (CR3 0x%lx, TID %d).\n",
-                info->regs->cr3, info->proc_data.tid);
+    PRINT_DEBUG("[FILEDELETE2] [ZwQueryVolumeInformationFile] Error. Stop processing (PID %d, TID %d).\n",
+                info->attached_proc_data.pid, info->attached_proc_data.tid);
+
+handled:
+    response = finish_readfile(drakvuf, info, vmi, false);
+
+done:
+    drakvuf_release_vmi(drakvuf);
+
+    return response;
+}
+
+event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    wrapper_t* injector = (wrapper_t*)info->trap->data;
+
+    auto response = VMI_EVENT_RESPONSE_NONE;
+
+    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
+        return response;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    if (info->regs->rax)
+    {
+        auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+        ostringstream msg;
+        msg << "ZwQueryInformationFile failed with status 0x" << std::hex << info->regs->rax;
+
+        print_extraction_failure(injector->f, drakvuf, info, filename, msg.str());
+
+        goto handled;
+    }
+    else
+    {
+        access_context_t ctx =
+        {
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = injector->queryvolumeinfo.out,
+        };
+
+        struct FILE_STANDARD_INFORMATION dev_info = {};
+        if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(dev_info), &dev_info, NULL)))
+        {
+            PRINT_DEBUG("[FILEDELETE2] [ZwQueryInformationFile] Failed to read FsDeviceInformation\n");
+            goto err;
+        }
+
+        if (0 == dev_info.end_of_file)
+        {
+            auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+            print_extraction_failure(injector->f, drakvuf, info, filename, "Zero size file");
+            goto handled;
+        }
+
+        injector->readfile.bytes_read = 0UL;
+        injector->file_size = dev_info.end_of_file;
+
+        auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+
+        if (inject_createsection(drakvuf, info, vmi, injector))
+        {
+            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            goto done;
+        }
+    }
+
+err:
+    PRINT_DEBUG("[FILEDELETE2] [ZwQueryInformationFile] Error. Stop processing (PID %d, TID %d).\n",
+                info->attached_proc_data.pid, info->attached_proc_data.tid);
 
 handled:
     response = finish_readfile(drakvuf, info, vmi, false);
@@ -880,19 +1007,9 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 {
     *response = VMI_EVENT_RESPONSE_NONE;
     filedelete* f = (filedelete*)info->trap->data;
-
     uint64_t fo_flags = 0;
-    if (!get_file_object_flags(drakvuf, info, vmi, f, handle, &fo_flags))
-        return START_READFILE_ERROR;
 
-    bool is_synchronous = (fo_flags & FO_SYNCHRONOUS_IO);
-    if (!is_synchronous)
-    {
-        print_extraction_failure(f, drakvuf, info, filename, "Not synchronous file");
-        return START_READFILE_ERROR;
-    }
-
-    if ( 0 == info->proc_data.base_addr )
+    if ( 0 == info->attached_proc_data.base_addr )
     {
         PRINT_DEBUG("[FILEDELETE2] Failed to get process base on vCPU 0x%d\n",
                     info->vcpu);
@@ -903,7 +1020,7 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
      * Check if process/thread is being processed. If so skip it. Add it into
      * regestry otherwise.
      */
-    auto thread = std::make_pair(info->regs->cr3, info->proc_data.tid);
+    auto thread = std::make_pair(info->attached_proc_data.pid, info->attached_proc_data.tid);
     auto thread_it = f->closing_handles.find(thread);
     auto map_end = f->closing_handles.end();
     if (map_end != thread_it)
@@ -911,14 +1028,19 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         bool handled = thread_it->second;
         if (handled)
         {
-            f->files.erase({info->proc_data.pid, handle});
+            f->files.erase({info->attached_proc_data.pid, handle});
             f->closing_handles.erase(thread);
         }
 
         return START_READFILE_SUCCEED;
     }
     else
+    {
+        if (!get_file_object_flags(drakvuf, info, vmi, f, handle, &fo_flags))
+            return START_READFILE_ERROR;
+
         f->closing_handles[thread] = false;
+    }
 
     /*
      * Real function body.
@@ -937,19 +1059,28 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         return START_READFILE_ERROR;
     }
 
+    injector->buffer = g_try_malloc0(BYTES_TO_READ);
+    if (!injector->buffer)
+    {
+        g_free(injector->bp);
+        g_free(injector);
+        return START_READFILE_ERROR;
+    }
+
     injector->f = f;
     injector->bp->name = info->trap->name;
     injector->handle = handle;
     injector->fo_flags = fo_flags;
     injector->is32bit = (f->pm != VMI_PM_IA32E);
-    injector->target_cr3 = info->regs->cr3;
     injector->curr_sequence_number = -1;
-    injector->eprocess_base = info->proc_data.base_addr;
-    injector->target_thread_id = info->proc_data.tid;
+    injector->eprocess_base = info->attached_proc_data.base_addr;
+    injector->target_pid = info->attached_proc_data.pid;
+    injector->target_tid = info->attached_proc_data.tid;
+    injector->finish_status = false;
 
     memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
-    if (inject_queryobject(drakvuf, info, vmi, injector))
+    if (inject_queryvolumeinfo(drakvuf, info, vmi, injector))
     {
         *response = VMI_EVENT_RESPONSE_SET_REGISTERS;
         return START_READFILE_SUCCEED;
@@ -965,7 +1096,7 @@ static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
-                    info->proc_data.pid, info->proc_data.tid);
+                    info->attached_proc_data.pid, info->attached_proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1012,7 +1143,7 @@ static void createfile_cb_impl(drakvuf_t drakvuf, drakvuf_trap_info_t* info, add
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
-                    info->proc_data.pid, info->proc_data.tid);
+                    info->attached_proc_data.pid, info->attached_proc_data.tid);
         return;
     }
 
@@ -1087,7 +1218,7 @@ static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
-                    info->proc_data.pid, info->proc_data.tid);
+                    info->attached_proc_data.pid, info->attached_proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1131,7 +1262,7 @@ static event_response_t writefile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
-                    info->proc_data.pid, info->proc_data.tid);
+                    info->attached_proc_data.pid, info->attached_proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1162,7 +1293,7 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
-                    info->proc_data.pid, info->proc_data.tid);
+                    info->attached_proc_data.pid, info->attached_proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1212,7 +1343,7 @@ static event_response_t createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
                     "attached process\n",
-                    info->proc_data.pid, info->proc_data.tid);
+                    info->attached_proc_data.pid, info->attached_proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1298,11 +1429,16 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
     }
     else
     {
-        this->queryobject_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryVolumeInformationFile");
+        this->queryvolumeinfo_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryVolumeInformationFile");
+        this->queryinfo_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryInformationFile");
+        this->createsection_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwCreateSection");
+        this->mapview_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwMapViewOfSection");
+        this->unmapview_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwUnmapViewOfSection");
         this->readfile_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwReadFile");
         this->waitobject_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwWaitForSingleObject");
         this->exallocatepool_va = get_function_va(drakvuf, "ntoskrnl.exe", "ExAllocatePoolWithTag");
         this->exfreepool_va = get_function_va(drakvuf, "ntoskrnl.exe", "ExFreePoolWithTag");
+        this->memcpy_va = get_function_va(drakvuf, "ntoskrnl.exe", "RtlCopyMemoryNonTemporal");
 
         assert(sizeof(traps)/sizeof(traps[0]) > 3);
         register_trap(drakvuf, "NtSetInformationFile", &traps[0], setinformation_cb);
