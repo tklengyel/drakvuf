@@ -1062,8 +1062,8 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     injector->buffer = g_try_malloc0(BYTES_TO_READ);
     if (!injector->buffer)
     {
-        g_free(injector);
         g_free(injector->bp);
+        g_free(injector);
         return START_READFILE_ERROR;
     }
 
