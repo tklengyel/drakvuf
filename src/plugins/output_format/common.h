@@ -215,20 +215,14 @@ struct Rstr<T,
            void>
            >: ValHolder<std::string>
 {
-    Rstr(T v): ValHolder<std::string>(std::string())
-    {
-        if (v == nullptr)
-            ValHolder<std::string>::value = std::string("(null)");
-        else
-            ValHolder<std::string>::value = std::string(v);
-    }
+    Rstr(T v): ValHolder<std::string>(std::string_view(v).empty() ? std::string("(null)") : std::string(v)) {}
 };
 
 /* format specific quoted string value */
 template<class T>
 struct Qstr: Rstr<std::string>
 {
-    Qstr(T v): Rstr<std::string>(std::move(v)) {}
+    Qstr(T v): Rstr<std::string>(std::string_view(v).empty() ? std::string("(null)") : std::move(v)) {}
 };
 
 /* Any argument type */
