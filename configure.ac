@@ -413,6 +413,13 @@ AC_ARG_WITH([stdlib],
 AS_IF([test "x$with_stdlib" != "xsystem"],
   [CXXFLAGS="$CXXFLAGS -stdlib=$with_stdlib"])
 
+AC_ARG_ENABLE([ipt],
+  [AS_HELP_STRING([--enable-ipt],
+    [Enable Intel Processor Trace support (special Xen version required) @<:@no@:>@])],
+  [enable_ipt="$enableval"],
+  [enable_ipt="no"])
+AM_CONDITIONAL([ENABLE_IPT], [test x$enable_ipt = xyes])
+
 #####################################################
 # AUTOHARDEN START
 # We want to check for compiler flag support, but there is no way to make

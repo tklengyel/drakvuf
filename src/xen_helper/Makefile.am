@@ -134,5 +134,9 @@ if SANITIZE
 #AM_LDFLAGS += $(SANITIZE_LDFLAGS)
 endif
 
+if ENABLE_IPT
+AM_CFLAGS += $(HARDEN_CFLAGS) -DENABLE_IPT
+endif
+
 noinst_LTLIBRARIES= libxenhelper.la
 libxenhelper_la_SOURCES= $(h_sources) $(c_sources)

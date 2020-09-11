@@ -112,6 +112,8 @@
 #define XEN_ALTP2M_external 2
 #endif
 
+#define UNUSED(x) (void)(x)
+
 bool xen_init_interface(xen_interface_t** xen)
 {
 
@@ -151,6 +153,10 @@ bool xen_init_interface(xen_interface_t** xen)
     }
     (*xen)->evtchn_fd = xc_evtchn_fd((*xen)->evtchn);
 
+#ifdef ENABLE_IPT
+    (*xen)->fmem = xenforeignmemory_open(0, 0);
+#endif
+
     return 1;
 
 err:
@@ -172,6 +178,10 @@ void xen_free_interface(xen_interface_t* xen)
             xc_interface_close(xen->xc);
         if (xen->evtchn)
             xc_evtchn_close(xen->evtchn);
+#ifdef ENABLE_IPT
+        if (xen->fmem)
+            xenforeignmemory_close(xen->fmem);
+#endif
         g_free(xen);
     }
 }
@@ -322,3 +332,120 @@ bool xen_set_vcpu_ctx(xen_interface_t* xen, domid_t domID, int vcpu, vcpu_guest_
 {
     return xc_vcpu_setcontext(xen->xc, domID, vcpu, ctx) == 0;
 }
+
+#ifdef ENABLE_IPT
+int xen_enable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state)
+{
+    int rc = xc_vmtrace_pt_enable(xen->xc, domID, vcpu);
+
+    if (rc)
+    {
+        fprintf(stderr, "Failed to call xc_vmtrace_pt_enable\n");
+        return 0;
+    }
+
+    rc = xc_vmtrace_pt_get_offset(xen->xc, domID, vcpu, NULL, &ipt_state->size);
+
+    if (rc)
+    {
+        fprintf(stderr, "Failed to get trace buffer size\n");
+        return 0;
+    }
+
+    ipt_state->fres = xenforeignmemory_map_resource(
+                          xen->fmem, domID, XENMEM_resource_vmtrace_buf,
+                          /* vcpu: */ vcpu,
+                          /* frame: */ 0,
+                          /* num_frames: */ ipt_state->size >> XC_PAGE_SHIFT,
+                          (void**)&ipt_state->buf,
+                          PROT_READ, 0);
+
+    if (!ipt_state->buf)
+    {
+        fprintf(stderr, "Failed to map trace buffer\n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state)
+{
+    uint64_t offset;
+    int rc;
+
+    rc = xc_vmtrace_pt_get_offset(xen->xc, domID, vcpu, &offset, NULL);
+
+    if (rc == ENODATA)
+    {
+        fprintf(stderr, "xc_vmtrace_pt_get_offset returned ENODATA\n");
+        ipt_state->last_offset = ipt_state->offset;
+        return 1;
+    }
+    else if (rc)
+    {
+        fprintf(stderr, "Failed to call xc_vmtrace_pt_get_offset: %d\n", rc);
+        return 0;
+    }
+
+    ipt_state->last_offset = ipt_state->offset;
+    ipt_state->offset = offset;
+    return 1;
+}
+
+int xen_disable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state)
+{
+    int rc = xenforeignmemory_unmap_resource(xen->fmem, ipt_state->fres);
+
+    if (rc)
+    {
+        fprintf(stderr, "Failed to unmap resource\n");
+        return 0;
+    }
+
+    rc = xenforeignmemory_close(xen->fmem);
+
+    if (rc)
+    {
+        fprintf(stderr, "Failed to close fmem\n");
+        return 0;
+    }
+
+    rc = xc_vmtrace_pt_disable(xen->xc, domID, vcpu);
+
+    if (rc)
+    {
+        fprintf(stderr, "Failed to call xc_vmtrace_pt_disable\n");
+        return 0;
+    }
+
+    return 1;
+}
+#else
+int xen_enable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state)
+{
+    UNUSED(xen);
+    UNUSED(domID);
+    UNUSED(vcpu);
+    UNUSED(ipt_state);
+    return 0;
+}
+
+int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state)
+{
+    UNUSED(xen);
+    UNUSED(domID);
+    UNUSED(vcpu);
+    UNUSED(ipt_state);
+    return 0;
+}
+
+int xen_disable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state)
+{
+    UNUSED(xen);
+    UNUSED(domID);
+    UNUSED(vcpu);
+    UNUSED(ipt_state);
+    return 0;
+}
+#endif
