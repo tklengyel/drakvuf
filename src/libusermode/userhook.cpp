@@ -296,7 +296,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info *
 
 fail:
     PRINT_DEBUG("[USERHOOK] Failed to add trap :(\n");
-    delete trap;
+    g_slice_free(drakvuf_trap_t, trap);
     return false;
 }
 
