@@ -561,21 +561,10 @@ PKG_CHECK_MODULES([VMI], [libvmi >= 0.11], [], [AC_ERROR([LibVMI not found])])
 PKG_CHECK_MODULES([JSONC], [json-c], [], [AC_ERROR([libjson-c not found])])
 AS_IF([test x$plugin_procdump == xyes],
     [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
-
-AC_CHECK_LIB([xencall], [xencall_buffers_never_fault])
-AC_CHECK_LIB([xenforeignmemory], [xenforeignmemory_map_resource])
-
-#AC_CHECK_HEADER([xenstore.h])
-#AC_CHECK_LIB(xenstore, [xc_read, xs_transaction_start], [], [AC_ERROR([Xenstore not found!])])
-
-# Check for Xenctrl
-AC_CHECK_HEADERS([xenctrl.h], [], [AC_ERROR([XenCtrl missing! Did you install libxc yet?])])
-AC_CHECK_LIB([xenctrl], [xc_interface_open], [], [AC_ERROR([XenCtrl is unusable! Do you have libxc installed?])])
-
-AC_CHECK_HEADERS([libxl_utils.h], [], [AC_ERROR([Xenlight (libxl) headers are not usable])])
-AC_CHECK_LIB(xenlight, libxl_name_to_domid, [], [AC_ERROR([Xenlight does not have required features!])])
-
-AC_CHECK_LIB([xentoollog], [xtl_logger_destroy])
+PKG_CHECK_MODULES([LIBXC], [xencontrol], [], [AC_ERROR([libxc not found])])
+PKG_CHECK_MODULES([LIBXL], [xenlight], [], [AC_ERROR([libxl not found])])
+PKG_CHECK_MODULES([XENFMEM], [xenforeignmemory], [], [AC_ERROR([xenforeignmemory not found])])
+PKG_CHECK_MODULES([XENTOOLLOG], [xentoollog], [], [AC_ERROR([xentoollog not found])])
 
 if test x$repl = xyes; then
   AC_PATH_PROG(PYTHON3, python3, nopython)
