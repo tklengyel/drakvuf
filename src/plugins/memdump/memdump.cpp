@@ -188,7 +188,6 @@ bool dump_memory_region(
 
     const gchar* chk_str = nullptr;
 
-    addr_t input_addr;
     addr_t aligned_addr;
     addr_t intra_page_offset;
     size_t aligned_len;
@@ -209,8 +208,6 @@ bool dump_memory_region(
         display_file = DUMP_NAME_PLACEHOLDER;
         goto printout;
     }
-
-    input_addr = ctx->addr;
 
     aligned_addr = ctx->addr & ~(VMI_PS_4KB - 1);
     intra_page_offset = ctx->addr & (VMI_PS_4KB - 1);
