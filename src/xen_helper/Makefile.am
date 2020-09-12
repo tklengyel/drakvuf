@@ -108,6 +108,11 @@ c_sources = xen_helper.c
 AM_CPPFLAGS = -I$(top_srcdir)
 AM_CFLAGS  = $(CFLAGS) $(LIBXC_CFLAGS) $(LIBXL_CFLAGS) \
              $(XENTOOLLOG_CFLAGS) $(XENFMEM_CFLAGS) $(GLIB_CFLAGS)
+
+AM_LDFLAGS = $(LDFLAGS) $(LIBXC_LIBS) $(LIBXL_LIBS) \
+             $(XENTOOLLOG_LIBS) $(XENFMEM_LIBS) $(GLIB_LIBS)
+
+if DEBUG
 AM_CFLAGS += -Wall -Wextra -Werror -g -ggdb3
 AM_CFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
              -Wpointer-arith -Winit-self -Wshadow \
@@ -115,8 +120,7 @@ AM_CFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
              -Wmissing-prototypes -Wredundant-decls \
              -Wfloat-equal -Wundef -Wvla \
              -Wc++-compat
-AM_LDFLAGS = $(LDFLAGS) $(LIBXC_LIBS) $(LIBXL_LIBS) \
-             $(XENTOOLLOG_LIBS) $(XENFMEM_LIBS) $(GLIB_LIBS)
+endif
 
 if HARDENING
 AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
