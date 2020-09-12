@@ -446,8 +446,6 @@ bool setup_linux_stack(vmi_instance_t vmi, x86_registers_t* regs, struct argumen
     // unsigned int cpl = regs->cs_sel & 3;
     // PRINT_DEBUG("CPL value is : %d\n", cpl);
 
-    addr = regs->rsp;
-
     if ( args )
     {
         // make room for strings and structs into guest's stack
