@@ -612,7 +612,6 @@ static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
 static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
                        void* callback_data)
 {
-    bool vad_commit = drakvuf_is_mmvad_commited(drakvuf, mmvad);
     uint32_t vad_type = drakvuf_mmvad_type(drakvuf, mmvad);
     uint64_t width = 0;
     uint64_t vad_commit_charge =
@@ -621,6 +620,10 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
     addr_t vad_start = mmvad->starting_vpn * VMI_PS_4KB;
     uint64_t len_pages = mmvad->ending_vpn - mmvad->starting_vpn + 1;
     uint64_t len_bytes = len_pages * VMI_PS_4KB;
+
+#ifdef DRAKVUF_DEBUG
+    bool vad_commit = drakvuf_is_mmvad_commited(drakvuf, mmvad);
+#endif
 
     // Dump only:
     // * Memory allocated with NtAllocateVirtualMemory and committed:
