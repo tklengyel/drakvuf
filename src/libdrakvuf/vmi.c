@@ -619,12 +619,18 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     trap_info.attached_proc_data.tid       = attached_proc_data.tid;
 
     drakvuf->in_callback = 1;
-    GSList* loop = s->traps;
-    while (loop)
+    GSList* lists[2] = {drakvuf->catchall_breakpoint, s->traps};
+    // catchall breakpoint will not be fired
+    // if there are no "normal" subscribers for this trap
+    for (int i = 0; s->traps && i < 2; i++)
     {
-        trap_info.trap = (drakvuf_trap_t*)loop->data;
-        rsp |= trap_info.trap->cb(drakvuf, &trap_info);
-        loop = loop->next;
+        GSList* loop = lists[i];
+        while (loop)
+        {
+            trap_info.trap = (drakvuf_trap_t*)loop->data;
+            rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+            loop = loop->next;
+        }
     }
     drakvuf->in_callback = 0;
 
@@ -1005,6 +1011,8 @@ void remove_trap(drakvuf_t drakvuf,
             if ( !drakvuf->cpuid )
                 control_cpuid_trap(drakvuf, 0);
             break;
+        case CATCHALL_BREAKPOINT:
+            drakvuf->catchall_breakpoint = g_slist_remove(drakvuf->catchall_breakpoint, trap);
         case __INVALID_TRAP_TYPE: /* fall-through */
         default:
             break;
@@ -1698,6 +1706,8 @@ void close_vmi(drakvuf_t drakvuf)
         g_slist_free(drakvuf->cpuid);
     if (drakvuf->cr3)
         g_slist_free(drakvuf->cr3);
+    if (drakvuf->catchall_breakpoint)
+        g_slist_free(drakvuf->catchall_breakpoint);
     if (drakvuf->memaccess_lookup_gfn)
         g_hash_table_destroy(drakvuf->memaccess_lookup_gfn);
     if (drakvuf->memaccess_lookup_trap)

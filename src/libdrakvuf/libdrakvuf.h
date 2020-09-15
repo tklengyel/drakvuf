@@ -158,7 +158,8 @@ typedef enum trap_type
     MEMACCESS,
     REGISTER,
     DEBUG,
-    CPUID
+    CPUID,
+    CATCHALL_BREAKPOINT
 } trap_type_t;
 
 typedef enum memaccess_type
