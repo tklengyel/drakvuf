@@ -6,7 +6,7 @@ services:
 git:
     submodules: false
 addons:
-  apt:
+   apt:
     update: true
     packages:
     - clang-10
@@ -203,30 +203,40 @@ jobs:
 #
 # Coverity (broken at the moment on focal with clang-10)
 #
-#    - if: branch = master
-#      env:
-#        - TEST="Coverity"
-#      addons:
-#        coverity_scan:
-#            project:
-#                name: "$COVERITY_PROJECT_NAME"
-#                description: "Build submitted via Travis CI"
-#            notification_email: $COVERITY_NOTIFICATION_EMAIL
-#            build_command_prepend: "./autogen.sh; ./configure --enable-debug; make clean"
-#            build_command:   "make"
-#            branch_pattern: $COVERITY_BRANCH_PATTERN
-#      before_install:
-#        - sudo apt-get update
-#        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev clang-10
-#        - git submodule update --init libvmi
-#        - cd libvmi
-#        - autoreconf -vif
-#        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-#        - make
-#        - make install
-#        - cd ..
-#      script:
-#        - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
+    # - if: branch = master
+    - env:
+        - TEST="Coverity"
+      addons:
+        coverity_scan:
+            project:
+                name: "$COVERITY_PROJECT_NAME"
+                description: "Build submitted via Travis CI"
+            notification_email: $COVERITY_NOTIFICATION_EMAIL
+            build_command_prepend: "./autogen.sh; ./configure --enable-debug; make clean"
+            build_command:   "make"
+            branch_pattern: $COVERITY_BRANCH_PATTERN
+        apt:
+            update: true
+            packages:
+              - clang-10
+              - clang-tools-10
+              - bison
+              - flex
+              - libjson-c-dev
+              - autoconf-archive
+              - libxen-dev
+      before_install:
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev clang-10
+        - git submodule update --init libvmi
+        - cd libvmi
+        - autoreconf -vif
+        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
+        - make
+        - make install
+        - cd ..
+      script:
+        - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
 
 #
 # SonarCloud
