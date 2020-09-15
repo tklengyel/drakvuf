@@ -112,12 +112,16 @@ AM_CPPFLAGS += $(VMI_CFLAGS)
 AM_CPPFLAGS += $(GLIB_CFLAGS)
 AM_CPPFLAGS += $(JSONC_CFLAGS)
 AM_CPPFLAGS += $(PYTHON_CFLAGS)
+AM_CPPFLAGS += $(PYTHON3_CFLAGS)
+AM_CPPFLAGS += $(PYTHON3_EMBED_CFLAGS)
 
 AM_LDFLAGS =  $(LDFLAGS)
 AM_LDFLAGS += $(VMI_LIBS)
 AM_LDFLAGS += $(GLIB_LIBS)
 AM_LDFLAGS += $(JSONC_LIBS)
 AM_LDFLAGS += $(PYTHON_LIBS)
+AM_LDFLAGS += $(PYTHON3_LIBS)
+AM_LDFLAGS += $(PYTHON3_EMBED_LIBS)
 
 AM_CXXFLAGS = $(CXXFLAGS)
 if HARDENING
@@ -134,7 +138,7 @@ AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
 AM_CXXFLAGS += -Wno-missing-field-initializers -Wno-unused-parameter
 AM_CXXFLAGS += -Wno-initializer-overrides -Wno-unknown-warning-option
 AM_CXXFLAGS += -Wno-c99-designator -ferror-limit=0 -Wno-reorder-init-list
-AM_CXXFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
+AM_CXXFLAGS += -Wcast-qual -Wstrict-aliasing \
                -Wpointer-arith -Winit-self -Wshadow \
                -Wredundant-decls -Wfloat-equal -Wundef -Wvla
 # Note that -pg is incompatible with HARDENING

@@ -567,6 +567,8 @@ PKG_CHECK_MODULES([XENFMEM], [xenforeignmemory], [], [AC_ERROR([xenforeignmemory
 PKG_CHECK_MODULES([XENTOOLLOG], [xentoollog], [], [AC_ERROR([xentoollog not found])])
 
 if test x$repl = xyes; then
+  PKG_CHECK_MODULES([PYTHON3], [python3])
+  PKG_CHECK_MODULES([PYTHON3_EMBED], [python3-embed], [], [AC_MSG_NOTICE(python3-embed not found)])
   AC_PATH_PROG(PYTHON3, python3, nopython)
   AS_IF([test "$ac_cv_path_PYTHON3" = "nopython"],
     AC_MSG_ERROR([could not find python or python3]),
