@@ -116,6 +116,7 @@
 struct apimon_config
 {
     const char* dll_hooks_list;
+    const bool print_no_addr;
 };
 
 class apimon: public pluginex

@@ -108,7 +108,7 @@
 #include <libvmi/libvmi.h>
 #include <libdrakvuf/libdrakvuf.h>
 
-ArgumentPrinter::ArgumentPrinter(std::string arg_name) : name(arg_name)
+ArgumentPrinter::ArgumentPrinter(std::string arg_name, bool print_no_addr) : name(arg_name), print_no_addr(print_no_addr)
 {
     // intentionally empty
 }
@@ -134,7 +134,10 @@ std::string StringPrinterInterface::print(drakvuf_t drakvuf, drakvuf_trap_info* 
     std::string str = getBuffer(vmi, &ctx);
     drakvuf_release_vmi(drakvuf);
     std::stringstream stream;
-    stream << name << "=0x" << std::hex << argument << ":\"" << str << "\"";
+    stream << name << "=";
+    if (!print_no_addr)
+        stream << "0x" << std::hex << argument << ":";
+    stream << "\"" << str << "\"";
     return stream.str();
 }
 
@@ -183,7 +186,10 @@ std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, ui
     }
     drakvuf_release_vmi(drakvuf);
     std::stringstream stream;
-    stream << name << "=0x" << std::hex << argument << ":\"" << str << "\"";
+    stream << name << "=";
+    if (!print_no_addr)
+        stream << "0x" << std::hex << argument << ":";
+    stream << "\"" << str << "\"";
     return stream.str();
 }
 
@@ -253,8 +259,8 @@ std::string GuidPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint6
     return name + "=" + std::string(stream);
 }
 
-BitMaskPrinter::BitMaskPrinter(std::string arg_name, std::map < uint64_t, std::string > dict)
-    : ArgumentPrinter(arg_name)
+BitMaskPrinter::BitMaskPrinter(std::string arg_name, bool print_no_addr, std::map < uint64_t, std::string > dict)
+    : ArgumentPrinter(arg_name, print_no_addr)
     , dict(dict)
 {
     // intentionally empty

@@ -230,12 +230,16 @@ static void print_usage()
 #ifdef ENABLE_PLUGIN_MEMDUMP
             "\t --memdump-dir <directory>\n"
             "\t                           Where to store memory dumps\n"
-            "\t --dll-hooks-list <file>\n"
-            "\t                           List of DLL functions to be hooked (see wiki)\n"
             "\t --json-clr <path to json>\n"
             "\t                           The JSON profile for clr.dll\n"
             "\t --json-mscorwks <path to json>\n"
             "\t                           The JSON profile for mscorewks.dll\n"
+#endif
+#if defined(ENABLE_PLUGIN_MEMDUMP) || defined(ENABLE_PLUGIN_APIMON)
+            "\t --dll-hooks-list <file>\n"
+            "\t                           List of DLL functions to be hooked (see wiki)\n"
+            "\t --userhook-no-addr\n"
+            "\t                           List of DLL functions to be hooked (see wiki)\n"
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP
             "\t --procdump-dir <directory>\n"
@@ -309,6 +313,7 @@ int main(int argc, char** argv)
         opt_json_clr,
         opt_json_mscorwks,
         opt_disable_sysret,
+        opt_userhook_no_addr,
     };
     const option long_opts[] =
     {
@@ -337,6 +342,7 @@ int main(int argc, char** argv)
         {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
         {"syscall-hooks-list", required_argument, NULL, 'S'},
         {"disable-sysret", no_argument, NULL, opt_disable_sysret},
+        {"userhook-no-addr", no_argument, NULL, opt_userhook_no_addr},
         {"fast-singlestep", no_argument, NULL, 'F'},
         {NULL, 0, NULL, 0}
     };
@@ -488,6 +494,9 @@ int main(int argc, char** argv)
                 break;
             case opt_json_mpr:
                 options.mpr_profile = optarg;
+                break;
+            case opt_userhook_no_addr:
+                options.userhook_no_addr = true;
                 break;
 #ifdef ENABLE_PLUGIN_WMIMON
             case opt_json_ole32:
