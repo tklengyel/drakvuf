@@ -252,6 +252,8 @@ struct drakvuf
     fd_info_t fd_info_lookup;  // auto-generated for fast drakvuf_loop lookups
     int poll_rc;
 
+    uint64_t event_counter;    // incremental unique trap event ID
+
     ipt_state_t ipt_state[MAX_DRAKVUF_VCPU];
 };
 
