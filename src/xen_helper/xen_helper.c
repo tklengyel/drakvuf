@@ -178,10 +178,8 @@ void xen_free_interface(xen_interface_t* xen)
             xc_interface_close(xen->xc);
         if (xen->evtchn)
             xc_evtchn_close(xen->evtchn);
-#ifdef ENABLE_IPT
         if (xen->fmem)
             xenforeignmemory_close(xen->fmem);
-#endif
         g_free(xen);
     }
 }
