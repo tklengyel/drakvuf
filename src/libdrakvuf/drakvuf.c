@@ -349,6 +349,15 @@ bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
     return 0;
 }
 
+bool inject_trap_catchall_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+{
+    if ( !drakvuf->catchall_breakpoint )
+        return 0;
+
+    drakvuf->catchall_breakpoint = g_slist_prepend(drakvuf->catchall_breakpoint, trap);
+    return 1;
+};
+
 bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     if ( !drakvuf->debug && !control_debug_trap(drakvuf, 1) )
@@ -399,6 +408,9 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
             break;
         case CPUID:
             ret = inject_trap_cpuid(drakvuf, trap);
+            break;
+        case CATCHALL_BREAKPOINT:
+            ret = inject_trap_catchall_breakpoint(drakvuf, trap);
             break;
         case __INVALID_TRAP_TYPE: /* fall-through */
         default:

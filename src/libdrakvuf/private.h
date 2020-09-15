@@ -238,7 +238,7 @@ struct drakvuf
     GHashTable* memaccess_lookup_trap; // key: trap pointer
     // val: struct memaccess
 
-    GSList* cr0, *cr3, *cr4, *debug, *cpuid;
+    GSList* cr0, *cr3, *cr4, *debug, *cpuid, *catchall_breakpoint;
 
     GSList* event_fd_info;     // the list of registered event FDs
     struct pollfd* event_fds;  // auto-generated pollfd for poll()
@@ -333,6 +333,7 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap);
+bool inject_trap_catchall_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 
 event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event);
 event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event);
