@@ -620,7 +620,9 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     drakvuf->in_callback = 1;
     GSList* lists[2] = {drakvuf->catchall_breakpoint, s->traps};
-    for (int i = 0; i < 2; i++)
+    // catchall breakpoint will not be fired
+    // if there are no "normal" subscribers for this trap
+    for (int i = 0; s->traps && i < 2; i++)
     {
         GSList* loop = lists[i];
         while (loop)
