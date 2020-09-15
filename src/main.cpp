@@ -239,7 +239,7 @@ static void print_usage()
             "\t --dll-hooks-list <file>\n"
             "\t                           List of DLL functions to be hooked (see wiki)\n"
             "\t --userhook-no-addr\n"
-            "\t                           List of DLL functions to be hooked (see wiki)\n"
+            "\t                           Stop printing addresses of string arguments in apimon and memdump\n"
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP
             "\t --procdump-dir <directory>\n"
