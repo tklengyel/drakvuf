@@ -334,7 +334,15 @@ bool xen_set_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vc
 #ifdef ENABLE_IPT
 int xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state)
 {
-    int rc = xc_vmtrace_pt_enable(xen->xc, domID, vcpu);
+    int rc = xc_vmtrace_pt_set_option(xen->xc, domID, vcpu, XEN_DOMCTL_VMTRACE_PT_DIS_RETC, 1);
+
+    if (rc)
+    {
+        fprintf(stderr, "Failed to call xc_vmtrace_pt_set_option\n");
+        return 0;
+    }
+
+    rc = xc_vmtrace_pt_enable(xen->xc, domID, vcpu);
 
     if (rc)
     {
