@@ -245,6 +245,8 @@ struct drakvuf
     int event_fd_cnt;          // auto-generated for poll()
     fd_info_t fd_info_lookup;  // auto-generated for fast drakvuf_loop lookups
     int poll_rc;
+
+    ipt_state_t ipt_state[16];
 };
 
 struct breakpoint

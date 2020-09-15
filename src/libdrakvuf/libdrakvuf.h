@@ -607,6 +607,10 @@ bool drakvuf_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
 
 bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, int vcpu, registers_t *regs) NOEXCEPT;
 
+bool drakvuf_enable_ipt(drakvuf_t drakvuf, unsigned int vcpu, uint8_t** buf, uint64_t* size);
+bool drakvuf_get_ipt_offset(drakvuf_t drakvuf, unsigned int vcpu, uint64_t* offset, uint64_t* last_offset);
+bool drakvuf_disable_ipt(drakvuf_t drakvuf, unsigned int vcpu);
+
 /*---------------------------------------------------------
  * Event FD functions
  */
