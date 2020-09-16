@@ -111,6 +111,7 @@
 
 #include <libxl_utils.h>
 #include <xenctrl.h>
+#include <xenforeignmemory.h>
 
 typedef struct xen_interface
 {
@@ -120,7 +121,20 @@ typedef struct xen_interface
     xentoollog_logger* xl_logger;
     xc_evtchn *evtchn;             // the Xen event channel
     int evtchn_fd;                 // its FD
+
+    xenforeignmemory_handle *fmem;
 } xen_interface_t;
+
+typedef struct ipt_state
+{
+    uint8_t *buf;
+    uint64_t size;
+
+    uint64_t offset;
+    uint64_t last_offset;
+
+    xenforeignmemory_resource_handle *fres;
+} ipt_state_t;
 
 /* FUNCTIONS */
 
@@ -139,4 +153,8 @@ bool xen_enable_altp2m(xen_interface_t* xen, domid_t domID);
 int xen_version(void);
 bool xen_get_vcpu_ctx(xen_interface_t *xen, domid_t domID, int vcpu, vcpu_guest_context_any_t *regs);
 bool xen_set_vcpu_ctx(xen_interface_t *xen, domid_t domID, int vcpu, vcpu_guest_context_any_t *regs);
+
+int xen_enable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state);
+int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state);
+int xen_disable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state);
 #endif
