@@ -383,7 +383,8 @@ static event_response_t process_create_ex_return_hook(drakvuf_t drakvuf, drakvuf
         keyval("SectionHandle", fmt::Xval(data->section_handle)),
         keyval("DebugPort", fmt::Xval(data->debug_port)),
         keyval("ExceptionPort", fmt::Xval(data->exception_port)),
-        keyval("JobMemberLevel", fmt::Nval(data->job_member_level))
+        keyval("JobMemberLevel", fmt::Nval(data->job_member_level)),
+        keyval("NewPid", fmt::Nval(new_pid))
     );
 
     return VMI_EVENT_RESPONSE_NONE;
