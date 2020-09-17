@@ -240,6 +240,8 @@ jobs:
             token: "$SONAR_TOKEN"
       script:
         - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev clang-10
         - git submodule update --init libvmi
         - cd libvmi
         - autoreconf -vif
