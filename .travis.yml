@@ -204,9 +204,9 @@ jobs:
 #
 # Coverity (broken at the moment on focal with clang-10)
 #
-    - if: branch = master
-      env:
+    - env:
         - TEST="Coverity"
+      #if: branch = master
       addons:
         coverity_scan:
             project:
@@ -232,15 +232,17 @@ jobs:
 #
 # SonarCloud
 #
-    - if: branch = master
-      env:
+    - env:
         - TEST="SonarCloud"
+      #if: branch = master
       addons:
         sonarcloud:
             organization: "drakvuf"
             token: "$SONAR_TOKEN"
       script:
-        - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
+#        - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
+        - sudo apt-get update
+        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev clang-10
         - git submodule update --init libvmi
         - cd libvmi
         - autoreconf -vif
