@@ -203,10 +203,10 @@ jobs:
 
 #
 # Coverity (broken at the moment on focal with clang-10)
+#if: branch = master
 #
     - env:
         - TEST="Coverity"
-      #if: branch = master
       addons:
         coverity_scan:
             project:
@@ -231,10 +231,10 @@ jobs:
 
 #
 # SonarCloud
+#if: branch = master
 #
     - env:
         - TEST="SonarCloud"
-      #if: branch = master
       addons:
         sonarcloud:
             organization: "drakvuf"
