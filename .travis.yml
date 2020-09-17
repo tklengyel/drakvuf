@@ -232,6 +232,7 @@ jobs:
 #
 # SonarCloud
 #if: branch = master
+#        - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
 #
     - env:
         - TEST="SonarCloud"
@@ -240,7 +241,6 @@ jobs:
             organization: "drakvuf"
             token: "$SONAR_TOKEN"
       script:
-#        - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
         - sudo apt-get update
         - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev clang-10
         - git submodule update --init libvmi
