@@ -605,7 +605,7 @@ addr_t drakvuf_get_function_argument(drakvuf_t drakvuf,
 bool drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid) NOEXCEPT;
 bool drakvuf_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid) NOEXCEPT;
 
-bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, int vcpu, registers_t *regs) NOEXCEPT;
+bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, unsigned int vcpu, registers_t *regs) NOEXCEPT;
 
 /*---------------------------------------------------------
  * Event FD functions

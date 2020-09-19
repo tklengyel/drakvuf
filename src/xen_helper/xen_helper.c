@@ -321,18 +321,18 @@ int xen_version(void)
     return version;
 }
 
-bool xen_get_vcpu_ctx(xen_interface_t* xen, domid_t domID, int vcpu, vcpu_guest_context_any_t* ctx)
+bool xen_get_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* ctx)
 {
     return xc_vcpu_getcontext(xen->xc, domID, vcpu, ctx) == 0;
 }
 
-bool xen_set_vcpu_ctx(xen_interface_t* xen, domid_t domID, int vcpu, vcpu_guest_context_any_t* ctx)
+bool xen_set_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* ctx)
 {
     return xc_vcpu_setcontext(xen->xc, domID, vcpu, ctx) == 0;
 }
 
 #ifdef ENABLE_IPT
-int xen_enable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state)
+int xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state)
 {
     int rc = xc_vmtrace_pt_enable(xen->xc, domID, vcpu);
 
@@ -367,7 +367,7 @@ int xen_enable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* i
     return 1;
 }
 
-int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state)
+int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state)
 {
     uint64_t offset;
     int rc;
@@ -391,7 +391,7 @@ int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_
     return 1;
 }
 
-int xen_disable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state)
+int xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state)
 {
     int rc = xenforeignmemory_unmap_resource(xen->fmem, ipt_state->fres);
 
@@ -420,7 +420,7 @@ int xen_disable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* 
     return 1;
 }
 #else
-int xen_enable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state)
+int xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state)
 {
     UNUSED(xen);
     UNUSED(domID);
@@ -429,7 +429,7 @@ int xen_enable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* i
     return 0;
 }
 
-int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state)
+int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state)
 {
     UNUSED(xen);
     UNUSED(domID);
@@ -438,7 +438,7 @@ int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_
     return 0;
 }
 
-int xen_disable_ipt(xen_interface_t* xen, domid_t domID, int vcpu, ipt_state_t* ipt_state)
+int xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state)
 {
     UNUSED(xen);
     UNUSED(domID);
