@@ -1,6 +1,7 @@
 os: linux
 dist: focal
 language: c
+compiler: clang
 services:
     - docker
 git:
@@ -18,9 +19,7 @@ addons:
     - libxen-dev
 env:
   global:
-    - CC=clang-10
-    - CPP=clang-cpp-10
-    - CXX=clang++-10
+    - PATH=/usr/lib/llvm-10/bin:$PATH
     - INSTALLDIR=$PWD/usr/local/
     - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
     - C_INCLUDE_PATH=$PWD/usr/local/include
@@ -28,6 +27,30 @@ env:
     - PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
     - LDFLAGS="-L$PWD/usr/local/lib"
     - CFLAGS="-I$PWD/usr/local/include"
+cache:
+  ccache: true
+  directories:
+    - $INSTALLDIR
+before_install:
+    - |
+      export CC="ccache clang"
+      export CXX="ccache clang++"
+      export CPP="ccache clang-cpp"
+      if [[ -z $SKIP_LIBVMI ]]; then
+         git submodule update --init libvmi
+         LIBVMI_HASH=$(git ls-files -s libvmi | cut -f2 '-d ')
+         CACHED_HASH=$(cat $INSTALLDIR/libvmi_hash || echo -n "")
+         if [[ "$LIBVMI_HASH" != "$CACHED_HASH" ]]; then
+             cd libvmi
+             autoreconf -vif
+             ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
+             make
+             rm -rf $INSTALLDIR
+             make install
+             echo $LIBVMI_HASH > $INSTALLDIR/libvmi_hash
+             cd ..
+         fi
+      fi
 
 jobs:
     include:
@@ -37,6 +60,7 @@ jobs:
 #
     - env:
         - TEST="whitespace"
+        - SKIP_LIBVMI=1
       script:
         - git remote add upstream https://github.com/$TRAVIS_REPO_SLUG.git
         - git fetch upstream
@@ -48,7 +72,8 @@ jobs:
     - env:
         - TEST="astyle"
         - ARTISTIC_STYLE_OPTIONS=".astylerc"
-      before_install:
+        - SKIP_LIBVMI=1
+      install:
         - sudo apt-get -q -y install astyle
       script:
         - astyle -Q `find . -name "*.c" -o -name ".h" -o -name ".cpp" -name ".hpp"` > astyle.out
@@ -66,6 +91,7 @@ jobs:
 #
     - env:
         - TEST="cppcheck"
+        - SKIP_LIBVMI=1
       addons:
         snaps:
           - cppcheck
@@ -77,84 +103,41 @@ jobs:
 #
     - env:
         - TEST="compile"
-      before_install:
-        - git submodule update --init libvmi
-        - cd libvmi
-        - autoreconf -vif
-        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-        - make
-        - make install
-        - cd ..
       install:
         - ./autogen.sh
       script:
         - ./configure --prefix=${INSTALLDIR} || cat config.log
         - make
-        - make install
 
     - env:
         - TEST="compile with plugin disabled"
-      before_install:
-        - git submodule update --init libvmi
-        - cd libvmi
-        - autoreconf -vif
-        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-        - make
-        - make install
-        - cd ..
       install:
         - ./autogen.sh
       script:
         - ./configure --prefix=${INSTALLDIR} --disable-plugin-syscalls || cat config.log
         - make
-        - make install
 
     - env:
         - TEST="compile debug"
-      before_install:
-        - git submodule update --init libvmi
-        - cd libvmi
-        - autoreconf -vif
-        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-        - make
-        - make install
-        - cd ..
       install:
         - ./autogen.sh
       script:
         - ./configure --prefix=${INSTALLDIR} --enable-debug --enable-sanitize || cat config.log
         - make
-        - make install
 
     - env:
         - TEST="compile debug with plugin disabled"
-      before_install:
-        - git submodule update --init libvmi
-        - cd libvmi
-        - autoreconf -vif
-        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-        - make
-        - make install
-        - cd ..
       install:
         - ./autogen.sh
       script:
         - ./configure --prefix=${INSTALLDIR} --enable-debug --disable-plugin-syscalls || cat config.log
         - make
-        - make install
 
     - env:
         - TEST="compile from make dist tarball"
-      before_install:
-        - git submodule update --init libvmi
-        - cd libvmi
-        - autoreconf -vif
-        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-        - make
-        - make install
-        - cd ..
-      script:
+      install:
         - ./autogen.sh
+      script:
         - ./configure --prefix=${INSTALLDIR} || cat config.log
         - make dist
         - mkdir build && cd build
@@ -163,20 +146,11 @@ jobs:
         - ./autogen.sh
         - ./configure --prefix=${INSTALLDIR} || cat config.log
         - make
-        - make install
 
     - env:
         - TEST="compile debug with REPL enabled"
-      before_install:
-        - sudo pip3 install ctypesgen ipython
-        - git submodule update --init libvmi
-        - cd libvmi
-        - autoreconf -vif
-        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-        - make
-        - make install
-        - cd ..
       install:
+        - sudo pip3 install ctypesgen ipython
         - ./autogen.sh
       script:
         - ./configure --enable-debug --enable-sanitize --enable-repl || cat config.log
@@ -188,13 +162,6 @@ jobs:
     - env:
         - TEST="scan-build"
       install:
-        - git submodule update --init libvmi
-        - cd libvmi
-        - autoreconf -vif
-        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-        - make
-        - make install
-        - cd ..
         - ./autogen.sh
       script:
         - scan-build-10 --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
@@ -223,7 +190,6 @@ jobs:
 #        - autoreconf -vif
 #        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
 #        - make
-#        - make install
 #        - cd ..
 #      script:
 #        - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
@@ -238,17 +204,18 @@ jobs:
         sonarcloud:
             organization: "drakvuf"
             token: "$SONAR_TOKEN"
+        apt:
+            update: true
+            packages:
+              - clang-10
+              - clang-tools-10
+              - bison
+              - flex
+              - libjson-c-dev
+              - autoconf-archive
+              - libxen-dev
       script:
         - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
-        - sudo apt-get update
-        - sudo apt-get -q -y install bison flex libjson-c-dev autoconf-archive libxen-dev clang-10
-        - git submodule update --init libvmi
-        - cd libvmi
-        - autoreconf -vif
-        - ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-        - make
-        - make install
-        - cd ..
         - ./autogen.sh
         - ./configure --enable-debug
         - build-wrapper-linux-x86-64 --out-dir bw-output make -j2
