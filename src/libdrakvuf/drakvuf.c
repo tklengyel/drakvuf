@@ -853,7 +853,7 @@ int drakvuf_event_fd_add(drakvuf_t drakvuf, int fd, event_cb_t event_cb, void* d
     return 1;
 }
 
-bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, int vcpu, registers_t* regs)
+bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, unsigned int vcpu, registers_t* regs)
 {
     vcpu_guest_context_any_t ctx;
 
