@@ -882,9 +882,9 @@ bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, int vcpu, registers_t* regs)
 
 static bool is_valid_vcpu(drakvuf_t drakvuf, unsigned int vcpu)
 {
-    // VMs with more than 16 vCPUs are not supported for usage with IPT
-    // this limit is DRAKVUF specific
-    return vcpu < 16 && drakvuf->vcpus > vcpu;
+    // VMs with more than MAX_DRAKVUF_VCPU vCPUs are not
+    // supported for usage with IPT, this limit is DRAKVUF specific
+    return vcpu < MAX_DRAKVUF_VCPU && drakvuf->vcpus > vcpu;
 }
 
 bool drakvuf_enable_ipt(drakvuf_t drakvuf, unsigned int vcpu, uint8_t** buf, uint64_t* size)
