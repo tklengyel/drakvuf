@@ -114,8 +114,9 @@ class ArgumentPrinter
 {
 protected:
     std::string name;
+    bool print_no_addr;
 public:
-    ArgumentPrinter(std::string arg_name);
+    ArgumentPrinter(std::string arg_name, bool print_no_addr);
 
     virtual std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
     virtual ~ArgumentPrinter();
@@ -185,7 +186,7 @@ class BitMaskPrinter : public ArgumentPrinter
 {
     std::map < uint64_t, std::string > dict;
 public:
-    BitMaskPrinter(std::string arg_name, std::map < uint64_t, std::string > dict);
+    BitMaskPrinter(std::string arg_name, bool print_no_addr, std::map < uint64_t, std::string > dict);
     std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 

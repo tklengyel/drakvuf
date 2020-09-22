@@ -337,7 +337,7 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
 {
     try
     {
-        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, &this->wanted_hooks);
+        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, &this->wanted_hooks);
     }
     catch (int e)
     {

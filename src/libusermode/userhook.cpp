@@ -884,19 +884,19 @@ bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, con
     return true;
 }
 
-void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, std::vector<plugin_target_config_entry_t>* wanted_hooks)
+void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, const bool print_no_addr, std::vector<plugin_target_config_entry_t>* wanted_hooks)
 {
     if (!dll_hooks_list_path)
     {
         // if the DLL hook list was not provided, we provide some simple defaults
         std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec1;
-        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("wVersionRequired")));
-        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("lpWSAData")));
+        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("wVersionRequired", print_no_addr)));
+        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("lpWSAData", print_no_addr)));
         wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", "log+stack", std::move(arg_vec1));
 
         std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec2;
-        arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("ExitCode")));
-        arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("Unknown")));
+        arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("ExitCode", print_no_addr)));
+        arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("Unknown", print_no_addr)));
         wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", "log+stack", std::move(arg_vec2));
         return;
     }
@@ -981,31 +981,31 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
 
             if (arg_type == "lpcstr" || arg_type == "lpctstr")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new AsciiPrinter(arg_name)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new AsciiPrinter(arg_name, print_no_addr)));
             }
             else if (arg_type == "lpcwstr" || arg_type == "lpwstr" || arg_type == "bstr")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new WideStringPrinter(arg_name)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new WideStringPrinter(arg_name, print_no_addr)));
             }
             else if (arg_type == "punicode_string")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UnicodePrinter(arg_name)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UnicodePrinter(arg_name, print_no_addr)));
             }
             else if (arg_type == "pulong")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UlongPrinter(arg_name)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UlongPrinter(arg_name, print_no_addr)));
             }
             else if (arg_type == "lpvoid*")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new PointerToPointerPrinter(arg_name)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new PointerToPointerPrinter(arg_name, print_no_addr)));
             }
             else if (arg_type == "refclsid" || arg_type == "refiid")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new GuidPrinter(arg_name)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new GuidPrinter(arg_name, print_no_addr)));
             }
             else
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new ArgumentPrinter(arg_name)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new ArgumentPrinter(arg_name, print_no_addr)));
             }
 
             ++arg_idx;
