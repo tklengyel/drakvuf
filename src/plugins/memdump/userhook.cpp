@@ -179,7 +179,7 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
 {
     try
     {
-        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, &this->wanted_hooks);
+        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, &this->wanted_hooks);
     }
     catch (int e)
     {

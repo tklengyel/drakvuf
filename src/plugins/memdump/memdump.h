@@ -119,6 +119,7 @@ struct memdump_config
     const char* dll_hooks_list;
     const char* clr_profile;
     const char* mscorwks_profile;
+    const bool print_no_addr;
 };
 
 class memdump: public pluginex
