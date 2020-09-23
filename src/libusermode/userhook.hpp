@@ -184,7 +184,7 @@ struct return_hook_target_entry_t
     const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers;
 
     return_hook_target_entry_t(vmi_pid_t pid, std::string clsid, void* plugin, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers) :
-        pid(pid), clsid(clsid), plugin(plugin), argument_printers(argument_printers) {}
+        pid(pid), trap(nullptr), clsid(clsid), plugin(plugin), argument_printers(argument_printers) {}
 };
 
 struct hook_target_view_t
