@@ -1514,9 +1514,9 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
     unsigned int i;
     /*
      * Setup singlestep event handlers but don't turn on MTF.
-     * Max 16 CPUs!
+     * Max MAX_DRAKVUF_VCPU CPUs!
      */
-    for (i = 0; i < drakvuf->vcpus && i < 16; i++)
+    for (i = 0; i < drakvuf->vcpus && i < MAX_DRAKVUF_VCPU; i++)
     {
         drakvuf->step_event[i] = (vmi_event_t*)g_try_malloc0(sizeof(vmi_event_t));
         if ( !drakvuf->step_event[i] )

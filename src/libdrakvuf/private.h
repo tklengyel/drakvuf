@@ -152,6 +152,12 @@ extern bool verbose;
  */
 #define VMI_FLUSH_RATE 100
 
+/*
+ * How many vCPUs are supported per single DomU
+ * this value could be increased if needed
+ */
+#define MAX_DRAKVUF_VCPU 16
+
 struct fd_info
 {
     int fd;
@@ -197,7 +203,7 @@ struct drakvuf
     vmi_event_t mem_event;
     vmi_event_t debug_event;
     vmi_event_t cpuid_event;
-    vmi_event_t* step_event[16];
+    vmi_event_t* step_event[MAX_DRAKVUF_VCPU];
 
     size_t* offsets;
     size_t* sizes;
@@ -245,6 +251,8 @@ struct drakvuf
     int event_fd_cnt;          // auto-generated for poll()
     fd_info_t fd_info_lookup;  // auto-generated for fast drakvuf_loop lookups
     int poll_rc;
+
+    ipt_state_t ipt_state[MAX_DRAKVUF_VCPU];
 };
 
 struct breakpoint
