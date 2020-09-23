@@ -140,7 +140,7 @@ struct plugin_target_config_entry_t
     {}
 
     plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, std::string&& log_strategy, std::vector< std::unique_ptr< ArgumentPrinter > > &&argument_printers)
-        : dll_name(std::move(dll_name)), type(HOOK_BY_NAME), function_name(std::move(function_name)), log_strategy(std::move(log_strategy)), argument_printers(std::move(argument_printers))
+        : dll_name(std::move(dll_name)), type(HOOK_BY_NAME), function_name(std::move(function_name)), offset(), log_strategy(std::move(log_strategy)), argument_printers(std::move(argument_printers))
     {}
 };
 
