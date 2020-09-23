@@ -879,3 +879,49 @@ bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, unsigned int vcpu, registers_t* re
 
     return xen_set_vcpu_ctx(drakvuf->xen, drakvuf->domID, vcpu, &ctx);
 }
+
+static bool is_valid_vcpu(drakvuf_t drakvuf, unsigned int vcpu)
+{
+    // VMs with more than MAX_DRAKVUF_VCPU vCPUs are not
+    // supported for usage with IPT, this limit is DRAKVUF specific
+    return vcpu < MAX_DRAKVUF_VCPU && drakvuf->vcpus > vcpu;
+}
+
+bool drakvuf_enable_ipt(drakvuf_t drakvuf, unsigned int vcpu, uint8_t** buf, uint64_t* size)
+{
+    if ( !is_valid_vcpu(drakvuf, vcpu) )
+        return false;
+
+    if ( !xen_enable_ipt(drakvuf->xen, drakvuf->domID, vcpu, &drakvuf->ipt_state[vcpu]) )
+        return false;
+
+    *buf = drakvuf->ipt_state[vcpu].buf;
+    *size = drakvuf->ipt_state[vcpu].size;
+
+    return true;
+}
+
+bool drakvuf_get_ipt_offset(drakvuf_t drakvuf, unsigned int vcpu, uint64_t* offset, uint64_t* last_offset)
+{
+    if ( !is_valid_vcpu(drakvuf, vcpu) )
+        return false;
+
+    if ( !xen_get_ipt_offset(drakvuf->xen, drakvuf->domID, vcpu, &drakvuf->ipt_state[vcpu]) )
+        return false;
+
+    *offset = drakvuf->ipt_state[vcpu].offset;
+    *last_offset = drakvuf->ipt_state[vcpu].last_offset;
+
+    return true;
+}
+
+bool drakvuf_disable_ipt(drakvuf_t drakvuf, unsigned int vcpu)
+{
+    if ( !is_valid_vcpu(drakvuf, vcpu) )
+        return false;
+
+    if ( !xen_disable_ipt(drakvuf->xen, drakvuf->domID, vcpu, &drakvuf->ipt_state[vcpu]) )
+        return false;
+
+    return true;
+}
