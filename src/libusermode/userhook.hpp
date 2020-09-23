@@ -166,11 +166,11 @@ struct hook_target_entry_t
     void* plugin;
 
     hook_target_entry_t(std::string target_name, std::string clsid, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers, void* plugin)
-        : type(HOOK_BY_NAME), target_name(target_name), clsid(clsid), offset(0), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), plugin(plugin)
+        : pid(0), type(HOOK_BY_NAME), target_name(target_name), clsid(clsid), offset(0), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), trap(nullptr), plugin(plugin)
     {}
 
     hook_target_entry_t(std::string target_name, std::string clsid, addr_t offset, callback_t callback, const std::vector < std::unique_ptr < ArgumentPrinter > > &argument_printers, void* plugin)
-        : type(HOOK_BY_OFFSET), target_name(target_name), clsid(clsid), offset(offset), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), plugin(plugin)
+        : pid(0), type(HOOK_BY_OFFSET), target_name(target_name), clsid(clsid), offset(offset), callback(callback), argument_printers(argument_printers), state(HOOK_FIRST_TRY), trap(nullptr), plugin(plugin)
     {}
 };
 
