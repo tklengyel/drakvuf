@@ -1405,17 +1405,16 @@ static addr_t get_function_va(drakvuf_t drakvuf, const char* lib, const char* fu
 }
 
 filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_format_t output)
-    : sequence_number()
+    : offsets(new size_t[__OFFSET_MAX])
+    , dump_folder(c->dump_folder)
+    , pm(drakvuf_get_page_mode(drakvuf))
+    , format(output)
+    , use_injector(c->filedelete_use_injector)
+    , sequence_number()
 {
-    this->pm = drakvuf_get_page_mode(drakvuf);
-
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     this->domid = vmi_get_vmid(vmi);
     drakvuf_release_vmi(drakvuf);
-
-    this->dump_folder = c->dump_folder;
-    this->format = output;
-    this->use_injector = c->filedelete_use_injector;
 
     if (!this->use_injector)
     {
@@ -1449,8 +1448,6 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
         register_trap(drakvuf, "NtOpenFile",           &traps[5], openfile_cb);
     }
 
-    this->offsets = (size_t*)malloc(sizeof(size_t)*__OFFSET_MAX);
-
     if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, this->offsets) )
         throw -1;
 
@@ -1465,5 +1462,5 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
 
 filedelete::~filedelete()
 {
-    free(this->offsets);
+    delete[] offsets;
 }
