@@ -115,14 +115,15 @@ class dkommon: public plugin
 {
 public:
     const output_format_t format;
-    addr_t list_addr_offset;
-    addr_t flink_offset;
-    addr_t blink_offset;
     size_t* offsets;
-    addr_t modules_list_va;
 
     std::vector<vmi_pid_t> processes_list;
     std::vector<std::string> drivers_list;
+
+    addr_t list_addr_offset = 0;
+    addr_t flink_offset = 0;
+    addr_t blink_offset = 0;
+    addr_t modules_list_va = 0;
 
     dkommon(drakvuf_t drakvuf, const void* config, output_format_t output);
     ~dkommon();
