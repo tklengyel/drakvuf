@@ -762,9 +762,9 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
 }
 
 win_filetracer::win_filetracer(drakvuf_t drakvuf, output_format_t output)
-    : format{output}, traps_to_free(NULL)
+    : format{output}
+    , offsets(new size_t[__OFFSET_MAX])
 {
-    this->offsets = new size_t[__OFFSET_MAX];
     int addr_size = drakvuf_get_address_width(drakvuf); // 4 or 8 (bytes)
 
     if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets) )

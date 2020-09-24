@@ -147,32 +147,32 @@ public:
         }
     };
     size_t* offsets;
-    size_t control_area_size;
-    size_t mmpte_size;
+    size_t control_area_size = 0;
+    size_t mmpte_size = 0;
 
     const char* dump_folder;
     page_mode_t pm;
-    uint32_t domid;
+    uint32_t domid = 0;
     output_format_t format;
-    bool use_injector;
+    bool use_injector = false;
 
     std::map<std::pair<vmi_pid_t, handle_t>, std::pair<file_name_t, file_extraction_reason_t>> files;
-    int sequence_number;
+    int sequence_number = 0;
 
     filedelete(drakvuf_t drakvuf, const filedelete_config* config, output_format_t output);
     ~filedelete();
 
     // For `filedelete2`
-    addr_t queryvolumeinfo_va;
-    addr_t queryinfo_va;
-    addr_t createsection_va;
-    addr_t mapview_va;
-    addr_t unmapview_va;
-    addr_t readfile_va;
-    addr_t waitobject_va;
-    addr_t exallocatepool_va;
-    addr_t exfreepool_va;
-    addr_t memcpy_va;
+    addr_t queryvolumeinfo_va = 0;
+    addr_t queryinfo_va = 0;
+    addr_t createsection_va = 0;
+    addr_t mapview_va = 0;
+    addr_t unmapview_va = 0;
+    addr_t readfile_va = 0;
+    addr_t waitobject_va = 0;
+    addr_t exallocatepool_va = 0;
+    addr_t exfreepool_va = 0;
+    addr_t memcpy_va = 0;
 
     // Maps virtual address of buffer to free flag:
     // * `true` means pools is free;
