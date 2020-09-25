@@ -193,6 +193,7 @@ typedef struct drakvuf_trap_info
     addr_t trap_pa;
     x86_registers_t* regs;
     drakvuf_trap_t* trap;
+    uint64_t event_uid; /* Unique sequential event identifier */
     union
     {
         const cpuid_event_t* cpuid; /* For CPUID traps */

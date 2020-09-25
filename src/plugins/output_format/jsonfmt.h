@@ -419,7 +419,8 @@ inline auto get_common_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                keyval("UserName", fmt::Qstr(USERIDSTR(drakvuf))),
                keyval("UserId", fmt::Nval(info->proc_data.userid)),
                keyval("ProcessName", fmt::Qstr(proc_data->name)),
-               keyval("Method", method)
+               keyval("Method", method),
+               keyval("EventUID", fmt::Xval(info->event_uid))
            );
 }
 
