@@ -439,7 +439,7 @@ static event_response_t create_process_ex_hook(
     if (!plugin)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto trap = plugin->register_trap<procmon, process_creation_result_t<procmon>>(
+    auto trap = plugin->register_trap<procmon, process_create_ex_result_t<procmon>>(
                     drakvuf,
                     info,
                     plugin,
