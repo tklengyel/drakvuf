@@ -118,6 +118,7 @@ protected:
 public:
     ArgumentPrinter(std::string arg_name, bool print_no_addr);
 
+    std::string get_name() const;
     virtual std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
     virtual ~ArgumentPrinter();
 };

@@ -102,201 +102,24 @@
  *                                                                         *
  ***************************************************************************/
 
-#include "printers.hpp"
-#include <string>
-#include <iomanip>
-#include <libvmi/libvmi.h>
-#include <libdrakvuf/libdrakvuf.h>
+#ifndef RPCMON_H
+#define RPCMON_H
 
-ArgumentPrinter::ArgumentPrinter(std::string arg_name, bool print_no_addr) : name(arg_name), print_no_addr(print_no_addr)
+#include <vector>
+#include <memory>
+
+#include <glib.h>
+#include <libusermode/userhook.hpp>
+#include "plugins/private.h"
+#include "plugins/plugins_ex.h"
+
+class rpcmon: public pluginex
 {
-    // intentionally empty
-}
+public:
+    std::vector<plugin_target_config_entry_t> wanted_hooks;
 
-std::string ArgumentPrinter::get_name() const
-{
-    return name;
-}
+    rpcmon(drakvuf_t drakvuf, output_format_t output);
+    ~rpcmon();
+};
 
-std::string ArgumentPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
-{
-    std::stringstream stream;
-    stream << name << "=0x" << std::hex << argument;
-    return stream.str();
-}
-
-ArgumentPrinter::~ArgumentPrinter() {}
-
-std::string StringPrinterInterface::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
-{
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = argument
-    };
-    std::string str = getBuffer(vmi, &ctx);
-    drakvuf_release_vmi(drakvuf);
-    std::stringstream stream;
-    stream << name << "=";
-    if (!print_no_addr)
-        stream << "0x" << std::hex << argument << ":";
-    stream << "\"" << str << "\"";
-    return stream.str();
-}
-
-std::string AsciiPrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const
-{
-    char *str = vmi_read_str(vmi, ctx);
-    return str ? str : "";
-}
-
-std::string WideStringPrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const
-{
-    auto str_obj = drakvuf_read_wchar_string(vmi, ctx);
-    return str_obj == NULL ? "" : (char*)str_obj->contents;
-}
-
-std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
-{
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = argument
-    };
-    std::string str;
-    if (drakvuf_is_wow64(drakvuf, info))
-    {
-        struct
-        {
-            uint16_t length;
-            uint16_t max_length;
-            uint32_t buffer;
-        } __attribute__((packed)) us;
-
-        if (VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(us), &us, nullptr))
-        {
-            ctx.addr = us.buffer;
-            auto str_obj = drakvuf_read_wchar_string(vmi, &ctx);
-            str = str_obj == NULL ? "" : (char*)str_obj->contents;
-        }
-    }
-    else
-    {
-        auto str_obj = drakvuf_read_unicode_common(vmi, &ctx);
-        str = str_obj == NULL ? "" : (char*)str_obj->contents;
-    }
-    drakvuf_release_vmi(drakvuf);
-    std::stringstream stream;
-    stream << name << "=";
-    if (!print_no_addr)
-        stream << "0x" << std::hex << argument << ":";
-    stream << "\"" << str << "\"";
-    return stream.str();
-}
-
-std::string UlongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
-{
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = argument
-    };
-    uint32_t value = 0;
-    vmi_read_32(vmi, &ctx, &value);
-    drakvuf_release_vmi(drakvuf);
-    std::stringstream stream;
-    stream << name << "=0x" << std::hex << value;
-    return stream.str();
-}
-
-std::string PointerToPointerPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
-{
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = argument
-    };
-    addr_t value = 0;
-    if (drakvuf_is_wow64(drakvuf, info))
-        vmi_read_32(vmi, &ctx, reinterpret_cast<uint32_t*>(&value));
-    else
-        vmi_read_addr(vmi, &ctx, &value);
-    drakvuf_release_vmi(drakvuf);
-    std::stringstream stream;
-    stream << name << "=0x" << std::hex << value;
-    return stream.str();
-}
-
-std::string GuidPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
-{
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = argument
-    };
-
-    struct
-    {
-        uint32_t Data1;
-        uint16_t Data2;
-        uint16_t Data3;
-        uint8_t Data4[8];
-    } __attribute__((packed, aligned(4))) guid;
-    memset(&guid, 0, sizeof(guid));
-    vmi_read(vmi, &ctx, sizeof(guid), &guid, nullptr);
-    drakvuf_release_vmi(drakvuf);
-    const int sz = 64;
-    char stream[sz] = {0};
-    snprintf(stream, sz, "\"%08X-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX\"",
-        guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1],
-        guid.Data4[2], guid.Data4[3], guid.Data4[4],
-        guid.Data4[5], guid.Data4[6], guid.Data4[7]);
-    return name + "=" + std::string(stream);
-}
-
-BitMaskPrinter::BitMaskPrinter(std::string arg_name, bool print_no_addr, std::map < uint64_t, std::string > dict)
-    : ArgumentPrinter(arg_name, print_no_addr)
-    , dict(dict)
-{
-    // intentionally empty
-}
-
-std::string BitMaskPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
-{
-    std::stringstream stream;
-    stream << name << "=0x" << std::hex << argument << ": ";
-    if (argument == 0 && this->dict.find(0) != this->dict.end())
-    {
-        stream << this->dict.at(0);
-    }
-    else
-    {
-        bool first = true;
-        for (std::pair<uint64_t, std::string> element : this->dict)
-        {
-            if (argument & element.first)
-            {
-                if (first)
-                {
-                    first = false;
-                }
-                else
-                {
-                    stream << "|";
-                }
-                stream << element.second;
-            }
-        }
-    }
-    return stream.str();
-}
+#endif

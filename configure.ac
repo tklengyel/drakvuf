@@ -368,6 +368,16 @@ if test x$plugin_procdump = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PROCDUMP, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_rpcmon],
+  [AS_HELP_STRING([--disable-plugin-rpcmon],
+    [Enable the RPC call tracing plugin @<:@yes@:>@])],
+  [plugin_rpcmon="$enableval"],
+  [plugin_rpcmon="yes"])
+AM_CONDITIONAL([PLUGIN_RPCMON], [test x$plugin_rpcmon = xyes])
+if test x$plugin_rpcmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_RPCMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -641,6 +651,7 @@ WMIMon:       $plugin_wmimon
 MEMDump:      $plugin_memdump
 ProcDump:     $plugin_procdump
 APIMon:       $plugin_apimon
+RPCMon:       $plugin_rpcmon
 -------------------------------------------------------------------------------
 REPL:         $repl
 -------------------------------------------------------------------------------])
