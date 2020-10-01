@@ -351,9 +351,6 @@ bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
 bool inject_trap_catchall_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
-    if ( !drakvuf->catchall_breakpoint )
-        return 0;
-
     drakvuf->catchall_breakpoint = g_slist_prepend(drakvuf->catchall_breakpoint, trap);
     return 1;
 };
