@@ -310,7 +310,7 @@ fi
 
 AC_ARG_ENABLE([plugin_librarymon],
   [AS_HELP_STRING([--disable-plugin-librarymon],
-    [Enable the windows kernel bugcheck watching plugin @<:@yes@:>@])],
+    [Enable the windows library monitor plugin @<:@yes@:>@])],
   [plugin_librarymon="$enableval"],
   [plugin_librarymon="yes"])
 AM_CONDITIONAL([PLUGIN_LIBRARYMON], [test x$plugin_librarymon = xyes])
@@ -330,9 +330,9 @@ fi
 
 AC_ARG_ENABLE([plugin_wmimon],
   [AS_HELP_STRING([--disable-plugin-wmimon],
-    [Enable the windows kernel bugcheck watching plugin @<:@yes@:>@])],
+    [Enable the WMI monitor plugin @<:@no@:>@])],
   [plugin_wmimon="$enableval"],
-  [plugin_wmimon="yes"])
+  [plugin_wmimon="no"])
 AM_CONDITIONAL([PLUGIN_WMIMON], [test x$plugin_wmimon = xyes])
 if test x$plugin_wmimon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_WMIMON, 1, "")
@@ -647,11 +647,13 @@ ClipboardMon: $plugin_clipboardmon
 WindowMon:    $plugin_windowmon
 LibraryMon:   $plugin_librarymon
 DKOMmon:      $plugin_dkommon
-WMIMon:       $plugin_wmimon
 MEMDump:      $plugin_memdump
 ProcDump:     $plugin_procdump
 APIMon:       $plugin_apimon
 RPCMon:       $plugin_rpcmon
+-------------------------------------------------------------------------------
+Deprecated Plugins
+WMIMon:       $plugin_wmimon
 -------------------------------------------------------------------------------
 REPL:         $repl
 -------------------------------------------------------------------------------])
