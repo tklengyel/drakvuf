@@ -154,9 +154,9 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
         }
     }
 
-    std::vector<std::pair<std::string, fmt::Qstr<std::string>>> fmt_extra{};
+    std::map<std::string, fmt::Qstr<std::string>> fmt_extra{};
     for (const auto &extra : extra_data) {
-        fmt_extra.push_back(std::make_pair(extra.first, fmt::Qstr(extra.second)));
+        fmt_extra.insert(std::make_pair(extra.first, fmt::Qstr(extra.second)));
     }
 
     fmt::print(plugin->m_output_format, "apimon", drakvuf, info,
