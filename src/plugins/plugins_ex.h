@@ -325,9 +325,10 @@ struct breakpoint_by_dtb_searcher
                 .addr = info->regs->rsp,
             };
 
-            addr_t ret_addr;
+            addr_t ret_addr = 0;
             vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            status_t status = vmi_read_addr(vmi, &ctx, &ret_addr);
+            size_t ptr_width = drakvuf_is_wow64(drakvuf, info) ? 4 : 8;
+            status_t status = vmi_read(vmi, &ctx, ptr_width, &ret_addr, nullptr);
             drakvuf_release_vmi(drakvuf);
 
             if (status != VMI_SUCCESS)
@@ -361,9 +362,10 @@ struct breakpoint_by_pid_searcher
                 .addr = info->regs->rsp,
             };
 
-            addr_t ret_addr;
+            addr_t ret_addr = 0;
             vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            status_t status = vmi_read_addr(vmi, &ctx, &ret_addr);
+            size_t ptr_width = drakvuf_is_wow64(drakvuf, info) ? 4 : 8;
+            status_t status = vmi_read(vmi, &ctx, ptr_width, &ret_addr, nullptr);
             drakvuf_release_vmi(drakvuf);
 
             if (status != VMI_SUCCESS)
