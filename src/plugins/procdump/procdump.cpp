@@ -840,6 +840,27 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
         return VMI_EVENT_RESPONSE_NONE;
     }
 
+    uint32_t handle = 0;
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    if (is32bit)
+    {
+        access_context_t ctx = {
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = info->regs->rsp + 4
+        };
+        vmi_lock_guard vmi(drakvuf);
+        vmi_read_32(vmi, &ctx, &handle);
+    }
+    else
+    {
+        handle = info->regs->rcx;
+    }
+
+    // If current process terminates other one we should not dump current
+    if (0 != handle && 0xffffffff != handle)
+        return VMI_EVENT_RESPONSE_NONE;
+
     auto plugin = get_trap_plugin<procdump>(info);
     if (!plugin)
     {
