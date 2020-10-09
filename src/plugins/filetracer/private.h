@@ -129,15 +129,15 @@ struct wrapper
 
 struct linux_wrapper
 {
-    vmi_pid_t pid;
-    uint32_t tid;
-    uint64_t rsp;
+    vmi_pid_t pid = 0;
+    uint32_t tid = 0;
+    uint64_t rsp = 0;
+    int permissions = 0;
 
     linux_filetracer* f;
     GString* filename = g_string_new(NULL);
     GString* flags = g_string_new(NULL);
     GString* modes = g_string_new(NULL);
-    int permissions;
     GString* uid = g_string_new(NULL);
     GString* gid = g_string_new(NULL);
     std::map<std::string, GString*> args;
