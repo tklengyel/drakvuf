@@ -117,6 +117,7 @@ struct procdump_config
 {
     const char* procdump_dir;
     bool compress_procdumps;
+    std::map<vmi_pid_t, bool>& terminated_processes;
 };
 
 enum pool_status
@@ -134,6 +135,7 @@ using terminating_map_t = std::map<vmi_pid_t, uint32_t>;
 class procdump : public pluginex
 {
 public:
+    std::map<vmi_pid_t, bool>& terminated_processes;
     std::string const procdump_dir;
     bool const use_compression;
     GSList* traps;

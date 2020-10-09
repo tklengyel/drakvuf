@@ -371,7 +371,7 @@ bool drakvuf_add_trap(drakvuf_t drakvuf,
 void drakvuf_remove_trap (drakvuf_t drakvuf,
                           drakvuf_trap_t* trap,
                           drakvuf_trap_free_t free_routine) NOEXCEPT;
-void drakvuf_loop (drakvuf_t drakvuf) NOEXCEPT;
+void drakvuf_loop (drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), void* data) NOEXCEPT;
 void drakvuf_interrupt (drakvuf_t drakvuf,
                         int sig) NOEXCEPT;
 int drakvuf_is_interrupted(drakvuf_t drakvuf) NOEXCEPT;

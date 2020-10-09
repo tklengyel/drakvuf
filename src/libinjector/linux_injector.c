@@ -637,6 +637,10 @@ static event_response_t linux_injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_i
     return 0;
 }
 
+static bool is_interrupted(drakvuf_t drakvuf, void* data __attribute__((unused)))
+{
+    return drakvuf_is_interrupted(drakvuf);
+}
 
 static bool inject(drakvuf_t drakvuf, injector_t injector)
 {
@@ -657,7 +661,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     if (!drakvuf_is_interrupted(drakvuf))
     {
         PRINT_DEBUG("Starting injection loop\n");
-        drakvuf_loop(drakvuf);
+        drakvuf_loop(drakvuf, is_interrupted, NULL);
     }
 
     if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))

@@ -120,7 +120,8 @@ injector_status_t injector_start_app(
     bool global_search,
     bool wait_for_exit,
     int args_count,
-    const char* args[])
+    const char* args[],
+    vmi_pid_t* injected_pid)
 {
     if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
     {
@@ -136,10 +137,13 @@ injector_status_t injector_start_app(
                                          break_loop_on_detection,
                                          injector_to_be_freed,
                                          global_search,
-                                         wait_for_exit);
+                                         wait_for_exit,
+                                         injected_pid);
     }
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {
+        *injected_pid = 0;
+
         if (!tid)
             tid = pid;
 
@@ -154,4 +158,13 @@ injector_status_t injector_start_app(
     }
     else
         return 0;
+}
+
+void injector_terminate(drakvuf_t drakvuf,
+                        vmi_pid_t injection_pid,
+                        uint32_t injection_tid,
+                        vmi_pid_t pid)
+{
+    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
+        injector_terminate_on_win(drakvuf, injection_pid, injection_tid, pid);
 }

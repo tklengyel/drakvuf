@@ -168,6 +168,8 @@ static void print_usage()
             "\t -g                        Search required for injection functions in all processes\n"
             "\t -j, --injection-timeout <seconds>\n"
             "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
+            "\t --terminate               Terminate injected process\n"
+            "\t --termination-timeout     Timeout to wait for process termination (in seconds)\n"
             "\t -t <timeout>              Timeout (in seconds)\n"
             "\t -o <format>               Output format (default, csv, kv, or json)\n"
             "\t -x <plugin>               Don't activate the specified plugin\n"
@@ -277,10 +279,13 @@ int main(int argc, char** argv)
     bool libvmi_conf = false;
     bool fast_singlestep = false;
     addr_t kpgd = 0;
-    plugins_options options = {};
+    std::map<vmi_pid_t, bool> terminated_processes;
+    plugins_options options = { .terminated_processes = terminated_processes };
     bool disabled_all = false; // Used to disable all plugin once
     const char* args[10] = {};
     int args_count = 0;
+    bool terminate = false;
+    int termination_timeout = 20;
 
     eprint_current_time();
 
@@ -315,6 +320,8 @@ int main(int argc, char** argv)
         opt_json_mscorwks,
         opt_disable_sysret,
         opt_userhook_no_addr,
+        opt_terminate,
+        opt_termination_timeout,
     };
     const option long_opts[] =
     {
@@ -330,6 +337,8 @@ int main(int argc, char** argv)
         {"json-iphlpapi", required_argument, NULL, opt_json_iphlpapi},
         {"json-mpr", required_argument, NULL, opt_json_mpr},
         {"injection-timeout", required_argument, NULL, 'j'},
+        {"terminate", no_argument, NULL, opt_terminate},
+        {"termination-timeout", required_argument, NULL, opt_termination_timeout},
         {"verbose", no_argument, NULL, 'v'},
         {"help", no_argument, NULL, 'h'},
         {"json-ole32", required_argument, NULL, opt_json_ole32},
@@ -375,6 +384,12 @@ int main(int argc, char** argv)
                 break;
             case 'j':
                 injection_timeout = atoi(optarg);
+                break;
+            case opt_terminate:
+                terminate = true;
+                break;
+            case opt_termination_timeout:
+                termination_timeout = atoi(optarg);
                 break;
             case 'm':
                 if (!strncmp(optarg, "shellexec", 9))
@@ -584,10 +599,11 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, nullptr);
     sigaction(SIGALRM, &act, nullptr);
 
+    vmi_pid_t injected_pid = 0;
     if (injection_pid > 0 && inject_file)
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout, injection_global_search, args_count, args);
+        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout, injection_global_search, args_count, args, &injected_pid);
         switch (ret)
         {
             case INJECTOR_FAILED_WITH_ERROR_CODE:
@@ -610,6 +626,9 @@ int main(int argc, char** argv)
 
     /* Start the event listener */
     drakvuf->loop(timeout);
+
+    if (terminate && injected_pid)
+        drakvuf->terminate(injection_pid, injection_thread, injected_pid, termination_timeout, terminated_processes);
 
     PRINT_DEBUG("Finished DRAKVUF loop\n");
 

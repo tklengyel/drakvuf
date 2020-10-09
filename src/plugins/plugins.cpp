@@ -348,6 +348,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     {
                         .procdump_dir = options->procdump_dir,
                         .compress_procdumps = options->compress_procdumps,
+                        .terminated_processes = options->terminated_processes
                     };
                     this->plugins[plugin_id] =
                         std::make_unique<procdump>(this->drakvuf, &config, this->output);

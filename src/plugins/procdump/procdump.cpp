@@ -507,7 +507,9 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 
     restore_registers(info, ctx);
     free_pool(ctx->plugin->pools, ctx->pool);
+    // TODO Check if this would be erased
     ctx->plugin->terminating.at(ctx->pid) = 0;
+    ctx->plugin->terminated_processes[ctx->pid] = true;
     if (ctx->bp)
     {
         ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
@@ -869,12 +871,19 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     if (it != plugin->terminating.end())
     {
         if (!it->second)
+        {
+            // TODO Check if this line could be reached (look "detach" function)
             plugin->terminating.erase(info->attached_proc_data.pid);
+            plugin->terminated_processes[info->attached_proc_data.pid] = true;
+        }
 
         return VMI_EVENT_RESPONSE_NONE;
     }
     else
+    {
         plugin->terminating[info->attached_proc_data.pid] = info->attached_proc_data.tid;
+        plugin->terminated_processes[info->attached_proc_data.pid] = false;
+    }
 
     // TODO Move into constructor
     auto ctx = new procdump_ctx;
@@ -979,6 +988,7 @@ static addr_t get_function_va(drakvuf_t drakvuf, const char* lib,
 procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
                    output_format_t output)
     : pluginex(drakvuf, output)
+    , terminated_processes(config->terminated_processes)
     , procdump_dir{config->procdump_dir ?: ""}
     , use_compression{config->compress_procdumps}
     , traps(nullptr)

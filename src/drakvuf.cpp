@@ -200,10 +200,15 @@ void drakvuf_c::interrupt(int signal)
     drakvuf_interrupt(drakvuf, signal);
 }
 
+static bool is_interrupted(drakvuf_t drakvuf, void*)
+{
+    return drakvuf_is_interrupted(drakvuf);
+}
+
 void drakvuf_c::loop(int duration)
 {
     GThread* timeout_thread = startup_timer(this, duration);
-    drakvuf_loop(drakvuf);
+    drakvuf_loop(drakvuf, is_interrupted, nullptr);
     cleanup_timer(this, timeout_thread);
 }
 
@@ -228,7 +233,8 @@ injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                                         int timeout,
                                         bool global_search,
                                         int args_count,
-                                        const char* args[])
+                                        const char* args[],
+                                        vmi_pid_t* injected_pid)
 {
     GThread* timeout_thread = startup_timer(this, timeout);
 
@@ -246,7 +252,8 @@ injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                                  global_search,
                                  false,
                                  args_count,
-                                 args);
+                                 args,
+                                 injected_pid);
 
 
     if (INJECTOR_SUCCEEDED != rc)
@@ -254,4 +261,39 @@ injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
 
     cleanup_timer(this, timeout_thread);
     return rc;
+}
+
+struct termination_info
+{
+    std::map<vmi_pid_t, bool>& proc;
+    vmi_pid_t pid;
+
+    termination_info(std::map<vmi_pid_t, bool>& proc, vmi_pid_t pid)
+        : proc(proc)
+        , pid(pid) {}
+};
+
+static bool is_terminated(drakvuf_t drakvuf, void* data)
+{
+    auto info = (struct termination_info*)data;
+    if (drakvuf_is_interrupted(drakvuf) ||
+        (info->proc.find(info->pid) != info->proc.end() &&
+        info->proc[info->pid]))
+        return true;
+    else
+        return false;
+};
+
+void drakvuf_c::terminate(vmi_pid_t injection_pid,
+                          uint32_t injection_tid,
+                          vmi_pid_t pid,
+                          int termination_timeout,
+                          std::map<vmi_pid_t, bool>& terminated_processes)
+{
+    if (terminated_processes.find(pid) == terminated_processes.end())
+        injector_terminate(drakvuf, injection_pid, injection_tid, pid);
+    GThread* timeout_thread = startup_timer(this, termination_timeout);
+    struct termination_info info(terminated_processes, pid);
+    drakvuf_loop(drakvuf, is_terminated, &info);
+    cleanup_timer(this, timeout_thread);
 }
