@@ -1066,12 +1066,12 @@ static event_response_t injector_int3_terminate_cb(drakvuf_t drakvuf, drakvuf_tr
 
         struct argument args[3] = { {0} };
 
-        #define PROCESS_TERMINATE 0x1
-        #define PROCESS_CREATE_THREAD 0x2
-        #define PROCESS_VM_OPERATION 0x8
-        #define PROCESS_VM_WRITE 0x10
-        #define PROCESS_VM_READ 0x20
-        #define PROCESS_QUERY_INFORMATION 0x400
+#define PROCESS_TERMINATE 0x1
+#define PROCESS_CREATE_THREAD 0x2
+#define PROCESS_VM_OPERATION 0x8
+#define PROCESS_VM_WRITE 0x10
+#define PROCESS_VM_READ 0x20
+#define PROCESS_QUERY_INFORMATION 0x400
 
         // OpenProcess(PROCESS_TERMINATE, false, PID)
         init_int_argument(&args[0], PROCESS_TERMINATE | PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ | PROCESS_QUERY_INFORMATION);
@@ -1916,6 +1916,9 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
 
 static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 {
+    if (!output || !size || !file)
+        return false;
+
     long payload_size = 0;
     unsigned char* data = NULL;
     FILE* fp = fopen(file, "rb");
