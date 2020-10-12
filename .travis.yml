@@ -56,29 +56,6 @@ jobs:
     include:
 
 #
-# Whitespace check
-#
-    - env:
-        - TEST="whitespace"
-        - SKIP_LIBVMI=1
-      script:
-        - git remote add upstream https://github.com/$TRAVIS_REPO_SLUG.git
-        - git fetch upstream
-        - git diff --check upstream/master
-
-#
-# cppcheck
-#
-    - env:
-        - TEST="cppcheck"
-        - SKIP_LIBVMI=1
-      addons:
-        snaps:
-          - cppcheck
-      script:
-        - cppcheck --error-exitcode=1 --force ./src
-
-#
 # compile tests
 #
     - env:

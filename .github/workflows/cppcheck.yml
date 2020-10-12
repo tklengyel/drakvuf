@@ -9,5 +9,6 @@ jobs:
       - uses: actions/checkout@v2
       - name: cppcheck
         run: |
-          sudo snap install cppcheck
-          cppcheck --error-exitcode=1 --force ./src
+          sudo apt-get update -q
+          sudo apt-get install -y cppcheck
+          cppcheck --error-exitcode=1 --force --language=c++ ./src
