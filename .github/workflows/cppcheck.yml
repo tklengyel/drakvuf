@@ -1,0 +1,13 @@
+name: cppcheck
+on:
+  pull_request:
+    branches: [ master ]
+jobs:
+  cppcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: cppcheck
+        run: |
+          sudo snap install cppcheck
+          cppcheck --error-exitcode=1 --force ./src
