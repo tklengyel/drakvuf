@@ -135,7 +135,7 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     std::map < std::string, std::string > extra_data;
 
-    if(!strcmp(info->trap->name, "CryptGenKey"))
+    if (!strcmp(info->trap->name, "CryptGenKey"))
         extra_data = CryptGenKey_hook(drakvuf, info, ret_target->arguments);
 
     std::optional<fmt::Qstr<std::string>> clsid;
@@ -145,28 +145,30 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     std::vector<fmt::Rstr<std::string>> fmt_args{};
     {
-        const auto &args = ret_target->arguments;
-        const auto &printers = ret_target->argument_printers;
+        const auto& args = ret_target->arguments;
+        const auto& printers = ret_target->argument_printers;
         for (auto [arg, printer] = std::tuple(std::cbegin(args), std::cbegin(printers));
              arg != std::cend(args) && printer != std::cend(printers);
-             ++arg, ++printer) {
+             ++arg, ++printer)
+        {
             fmt_args.push_back(fmt::Rstr((*printer)->print(drakvuf, info, *arg)));
         }
     }
 
     std::map<std::string, fmt::Qstr<std::string>> fmt_extra{};
-    for (const auto &extra : extra_data) {
+    for (const auto& extra : extra_data)
+    {
         fmt_extra.insert(std::make_pair(extra.first, fmt::Qstr(extra.second)));
     }
 
     fmt::print(plugin->m_output_format, "apimon", drakvuf, info,
-        keyval("Event", fmt::Qstr("api_called")),
-        keyval("CLSID", clsid),
-        keyval("CalledFrom", fmt::Xval(info->regs->rip)),
-        keyval("ReturnValue", fmt::Xval(info->regs->rax)),
-        keyval("Arguments", fmt_args),
-        keyval("Extra", fmt_extra)
-    );
+               keyval("Event", fmt::Qstr("api_called")),
+               keyval("CLSID", clsid),
+               keyval("CalledFrom", fmt::Xval(info->regs->rip)),
+               keyval("ReturnValue", fmt::Xval(info->regs->rax)),
+               keyval("Arguments", fmt_args),
+               keyval("Extra", fmt_extra)
+              );
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
     return VMI_EVENT_RESPONSE_NONE;
@@ -185,11 +187,11 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     bool is_syswow = drakvuf_is_wow64(drakvuf, info);
 
     access_context_t ctx =
-            {
-                    .translate_mechanism = VMI_TM_PROCESS_DTB,
-                    .dtb = info->regs->cr3,
-                    .addr = info->regs->rsp
-            };
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rsp
+    };
 
     bool success = false;
     addr_t ret_addr = 0;
@@ -260,11 +262,11 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static void print_addresses(drakvuf_t drakvuf, apimon *plugin, const dll_view_t *dll, const std::vector<hook_target_view_t>& targets)
+static void print_addresses(drakvuf_t drakvuf, apimon* plugin, const dll_view_t* dll, const std::vector<hook_target_view_t>& targets)
 {
     unicode_string_t* dll_name;
-    json_object *j_root;
-    json_object *j_rvas;
+    json_object* j_root;
+    json_object* j_rvas;
     vmi_pid_t pid;
     vmi_lock_guard lg(drakvuf);
 
@@ -291,7 +293,7 @@ static void print_addresses(drakvuf_t drakvuf, apimon *plugin, const dll_view_t 
     json_object_object_add(j_root, "Event", json_object_new_string("dll_loaded"));
     json_object_object_add(j_root, "Rva", j_rvas);
     json_object_object_add(j_root, "DllBase", json_object_new_string_fmt("0x%lx", dll->real_dll_base));
-    json_object_object_add(j_root, "DllName", json_object_new_string((const char *)dll_name->contents));
+    json_object_object_add(j_root, "DllName", json_object_new_string((const char*)dll_name->contents));
     json_object_object_add(j_root, "PID", json_object_new_int(pid));
 
     printf("%s\n", json_object_to_json_string(j_root));
@@ -361,15 +363,17 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
         return;
     }
 
-    usermode_cb_registration reg = {
-            .pre_cb = on_dll_discovered,
-            .post_cb = on_dll_hooked,
-            .extra = (void *)this
+    usermode_cb_registration reg =
+    {
+        .pre_cb = on_dll_discovered,
+        .post_cb = on_dll_hooked,
+        .extra = (void*)this
     };
 
     usermode_reg_status_t status = drakvuf_register_usermode_callback(drakvuf, &reg);
 
-    switch (status) {
+    switch (status)
+    {
         case USERMODE_REGISTER_SUCCESS:
             // success, nothing to do
             break;

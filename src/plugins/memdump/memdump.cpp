@@ -364,45 +364,51 @@ static bool dump_if_points_to_executable_memory(
     addr_t process_base,
     addr_t target_addr,
     const char* reason,
-    extras_t *extras)
+    extras_t* extras)
 {
     memdump* plugin = get_trap_plugin<memdump>(info);
     if (!plugin)
         return false;
 
     addr_t dtb;
-    if (!drakvuf_get_process_dtb(drakvuf, process_base, &dtb)) {
+    if (!drakvuf_get_process_dtb(drakvuf, process_base, &dtb))
+    {
         PRINT_DEBUG("[MEMDUMP] Failed to retrieve process dtb\n");
         return false;
     }
 
     // Get page protection flags.
     page_info_t p_info = {};
-    if (VMI_SUCCESS != vmi_pagetable_lookup_extended(vmi, dtb, target_addr, &p_info)) {
+    if (VMI_SUCCESS != vmi_pagetable_lookup_extended(vmi, dtb, target_addr, &p_info))
+    {
         PRINT_DEBUG("[MEMDUMP] Failed to retrieve page protection flags\n");
         return false;
     }
 
     bool page_valid = (p_info.x86_ia32e.pte_value & (1UL << 0)) != 0;
     bool page_execute = (p_info.x86_ia32e.pte_value & (1UL << 63)) == 0;
-    if (!page_valid || !page_execute) {
+    if (!page_valid || !page_execute)
+    {
         return false;
     }
 
     // Segment is valid and executable – dump it.
     mmvad_info_t mmvad;
-    if (!drakvuf_find_mmvad(drakvuf, process_base, target_addr, &mmvad)) {
+    if (!drakvuf_find_mmvad(drakvuf, process_base, target_addr, &mmvad))
+    {
         PRINT_DEBUG("[MEMDUMP] Failed to find mmvad\n");
         return false;
     }
 
-    access_context_t ctx {
+    access_context_t ctx
+    {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = dtb,
         .addr = mmvad.starting_vpn * VMI_PS_4KB
     };
     size_t dump_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
-    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, dump_size, reason, extras, extras != nullptr)) {
+    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, dump_size, reason, extras, extras != nullptr))
+    {
         PRINT_DEBUG("[MEMDUMP] Failed to dump memory\n");
         return false;
     }
@@ -760,10 +766,12 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
+static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
     // Check if trap is related to memdump plugin.
     memdump* plugin = get_trap_plugin<memdump>(info);
-    if (!plugin) {
+    if (!plugin)
+    {
         PRINT_DEBUG("[MEMDUMP] Failed to retrieve plugin\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
@@ -774,12 +782,14 @@ static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_
     // IN HANDLE ProcessHandle
     addr_t target_process_handle = drakvuf_get_function_argument(drakvuf, info, 4);
     vmi_pid_t target_process_pid;
-    if (!drakvuf_get_pid_from_handle(drakvuf, info, target_process_handle, &target_process_pid)) {
+    if (!drakvuf_get_pid_from_handle(drakvuf, info, target_process_handle, &target_process_pid))
+    {
         PRINT_DEBUG("[MEMDUMP] Failed to retrieve target process pid\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (target_process_pid == info->proc_data.pid) {
+    if (target_process_pid == info->proc_data.pid)
+    {
         // NtCreateThreadEx has not been invoked from CreateRemoteThread
         // and so it's not suspicious enought to create dump.
         return VMI_EVENT_RESPONSE_NONE;
@@ -787,7 +797,8 @@ static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_
 
     // Retrieve target_process as start_routine points inside it's address space.
     addr_t target_process;
-    if (!drakvuf_find_process(drakvuf, target_process_pid, nullptr, &target_process)) {
+    if (!drakvuf_find_process(drakvuf, target_process_pid, nullptr, &target_process))
+    {
         PRINT_DEBUG("[MEMDUMP] Failed to retrieve target_process\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
@@ -799,7 +810,8 @@ static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
+static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
     // This hook is intended to dump malware core from 32 bit packers that rely on Process Hollowing technique.
     // This technique uses NtSetContextThread, and SysWOW64 translates NtSetContextThread to NtSetInformationThread
     // internally.
@@ -817,7 +829,8 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
 
     // We are only interested in calls that set thread context.
     addr_t thread_information_class = drakvuf_get_function_argument(drakvuf, info, 2);
-    if (thread_information_class != ThreadWow64Context) {
+    if (thread_information_class != ThreadWow64Context)
+    {
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -825,7 +838,8 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
     addr_t resumed_thread_handle = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t caller_eprocess = drakvuf_get_current_process(drakvuf, info);
     addr_t resumed_ethread;
-    if (!drakvuf_obj_ref_by_handle(drakvuf, info, caller_eprocess, resumed_thread_handle, OBJ_MANAGER_THREAD_OBJECT, &resumed_ethread)) {
+    if (!drakvuf_obj_ref_by_handle(drakvuf, info, caller_eprocess, resumed_thread_handle, OBJ_MANAGER_THREAD_OBJECT, &resumed_ethread))
+    {
         PRINT_DEBUG("[MEMDUMP] Failed to retrieve resumed_ethread\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
@@ -833,16 +847,19 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
     // We are only interested in suspicious actions when NtSetInformationThread has been invoked on remote thread.
     addr_t resumed_eprocess;
     vmi_lock_guard lg(drakvuf);
-    if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, resumed_ethread + plugin->kthread_process_rva, 0, &resumed_eprocess)) {
+    if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, resumed_ethread + plugin->kthread_process_rva, 0, &resumed_eprocess))
+    {
         PRINT_DEBUG("[MEMDUMP] Failed to retrieve resumed process\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
     vmi_pid_t resumed_process_pid;
-    if (!drakvuf_get_process_pid(drakvuf, resumed_eprocess, &resumed_process_pid)) {
+    if (!drakvuf_get_process_pid(drakvuf, resumed_eprocess, &resumed_process_pid))
+    {
         PRINT_DEBUG("[MEMDUMP] Failed to retrieve resumed process pid\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
-    if (resumed_process_pid == info->proc_data.pid) {
+    if (resumed_process_pid == info->proc_data.pid)
+    {
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -850,19 +867,22 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
     // whereas in standard process hollowing entry point is changed by modifying eax register.
     // Both registers are passed in _WOW64_CONTEXT structure from within caller address space.
     addr_t wow64_context = drakvuf_get_function_argument(drakvuf, info, 3);
-    access_context_t ctx = {
+    access_context_t ctx =
+    {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
         .addr = wow64_context + plugin->wow64context_eax_rva
     };
     addr_t eax = 0;
-    if (VMI_SUCCESS != vmi_read_32(lg.vmi, &ctx, (uint32_t*)&eax)) {
+    if (VMI_SUCCESS != vmi_read_32(lg.vmi, &ctx, (uint32_t*)&eax))
+    {
         PRINT_DEBUG("[MEMDUMP] Failed to read eax field from wow64_context\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
     addr_t eip = 0;
     ctx.addr = wow64_context + plugin->wow64context_eip_rva;
-    if (VMI_SUCCESS != vmi_read_32(lg.vmi, &ctx, (uint32_t*)&eip)) {
+    if (VMI_SUCCESS != vmi_read_32(lg.vmi, &ctx, (uint32_t*)&eip))
+    {
         PRINT_DEBUG("[MEMDUMP] Failed to read eip field from wow64_context\n");
         return VMI_EVENT_RESPONSE_NONE;
     }

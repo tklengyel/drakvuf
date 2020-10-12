@@ -119,8 +119,8 @@ struct syscalls_config
 class syscalls: public plugin
 {
 public:
-    GSList *traps;
-    GHashTable *filter;
+    GSList* traps;
+    GHashTable* filter;
     json_object* win32k_json;
 
     uint8_t reg_size;
@@ -129,7 +129,7 @@ public:
     os_t os;
     bool disable_sysret;
 
-    size_t *offsets;
+    size_t* offsets;
 
     addr_t sst[2][2]; // [0=nt][base, limit],[1=win32k][base,limit]
 

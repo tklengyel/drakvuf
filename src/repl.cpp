@@ -196,7 +196,8 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    drakvuf_trap_t inject_trap = {
+    drakvuf_trap_t inject_trap =
+    {
         .type = REGISTER,
         .reg = CR3,
         .cb = &repl_start,

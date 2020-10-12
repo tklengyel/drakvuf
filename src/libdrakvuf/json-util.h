@@ -110,7 +110,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-    struct json_object* json_object_new_string_fmt(const char *format, ...) __attribute__ ((format (printf, 1, 2)));
+struct json_object* json_object_new_string_fmt(const char* format, ...) __attribute__ ((format (printf, 1, 2)));
 #ifdef __cplusplus
 }
 #endif

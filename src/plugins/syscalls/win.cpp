@@ -118,7 +118,7 @@
 
 static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    struct wrapper *wr = (struct wrapper*)info->trap->data;
+    struct wrapper* wr = (struct wrapper*)info->trap->data;
 
     /*
      * Multiple syscalls might hit the same return address so make sure we are
@@ -127,9 +127,9 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if ( info->proc_data.tid != wr->tid || wr->stack_fingerprint != info->regs->rsp)
         return 0;
 
-    struct wrapper *w = (struct wrapper *)wr->w;
-    const syscall_t *sc = w->sc;
-    syscalls *s = w->s;
+    struct wrapper* w = (struct wrapper*)wr->w;
+    const syscall_t* sc = w->sc;
+    syscalls* s = w->s;
 
     char exit_status_buf[NTSTATUS_MAX_FORMAT_STR_SIZE] = {0};
     const char* exit_status_str = ntstatus_to_string(ntstatus_t(info->regs->rax));
@@ -148,9 +148,9 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto vmi = vmi_lock_guard(drakvuf);
-    struct wrapper *w = (struct wrapper*)info->trap->data;
-    const syscall_t *sc = w->sc;
-    syscalls *s = w->s;
+    struct wrapper* w = (struct wrapper*)info->trap->data;
+    const syscall_t* sc = w->sc;
+    syscalls* s = w->s;
 
     unsigned int nargs = sc ? sc->num_args : 0;
     std::vector<uint64_t> args(nargs);
@@ -212,8 +212,8 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if ( VMI_FAILURE == vmi_read_addr_va(vmi, info->regs->rsp, 0, &ret) )
         return 0;
 
-    drakvuf_trap_t *ret_trap = g_slice_new0(drakvuf_trap_t);
-    struct wrapper *wr = g_slice_new0(struct wrapper);
+    drakvuf_trap_t* ret_trap = g_slice_new0(drakvuf_trap_t);
+    struct wrapper* wr = g_slice_new0(struct wrapper);
 
     wr->tid = info->proc_data.tid;
     wr->w = w;
@@ -252,18 +252,18 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
-static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, syscalls *s,
-                                       addr_t cr3, bool ntos, addr_t base, addr_t *sst)
+static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, syscalls* s,
+                                       addr_t cr3, bool ntos, addr_t base, addr_t* sst)
 {
     bool ret = false;
     unsigned int syscall_count = ntos ? NUM_SYSCALLS_NT : NUM_SYSCALLS_WIN32K;
-    const syscall_t **definitions = ntos ? nt : win32k;
+    const syscall_t** definitions = ntos ? nt : win32k;
     int error = -1;
 
-    json_object *json = ntos ? vmi_get_kernel_json(vmi) : s->win32k_json;
+    json_object* json = ntos ? vmi_get_kernel_json(vmi) : s->win32k_json;
     symbols_t* symbols = json ? json_get_symbols(json) : NULL;
 
-    int32_t *table = (int32_t*)g_try_malloc0(sst[1] * sizeof(int32_t));
+    int32_t* table = (int32_t*)g_try_malloc0(sst[1] * sizeof(int32_t));
     if ( !table )
         return ret;
 
@@ -291,7 +291,8 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
              */
             offset = table[syscall_num] >> 4;
             syscall_va = sst[0] + offset;
-        } else
+        }
+        else
             syscall_va = table[syscall_num];
 
         addr_t rva = syscall_va - base;
@@ -332,7 +333,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
             continue;
         }
 
-        struct wrapper *w = g_slice_new0(struct wrapper);
+        struct wrapper* w = g_slice_new0(struct wrapper);
         drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
 
         w->num = syscall_num;
@@ -370,7 +371,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
     return ret;
 }
 
-void setup_windows(drakvuf_t drakvuf, syscalls *s)
+void setup_windows(drakvuf_t drakvuf, syscalls* s)
 {
     auto vmi = vmi_lock_guard(drakvuf);
 
@@ -389,7 +390,9 @@ void setup_windows(drakvuf_t drakvuf, syscalls *s)
         s->sst[0][1] = sst[0].ServiceLimit;
         s->sst[1][0] = sst[1].ServiceTable;
         s->sst[1][1] = sst[1].ServiceLimit;
-    } else {
+    }
+    else
+    {
         if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiFastCallEntry", &start) )
             throw -1;
 

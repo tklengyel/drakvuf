@@ -248,7 +248,7 @@ static void print_usage()
             "\t                           Controls compression of processes dumps on disk\n"
 #endif
             "\t -h, --help                Show this help\n"
-            );
+           );
 }
 
 int main(int argc, char** argv)
@@ -589,13 +589,13 @@ int main(int argc, char** argv)
         injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout, injection_global_search, args_count, args);
         switch (ret)
         {
-        case INJECTOR_FAILED_WITH_ERROR_CODE:
-            rc = 0;
-        case INJECTOR_FAILED:
-            goto exit;
-        case INJECTOR_SUCCEEDED:
-        default:
-            break;
+            case INJECTOR_FAILED_WITH_ERROR_CODE:
+                rc = 0;
+            case INJECTOR_FAILED:
+                goto exit;
+            case INJECTOR_SUCCEEDED:
+            default:
+                break;
         }
     }
 

@@ -15,7 +15,7 @@ jobs:
         run: |
           ARTISTIC_STYLE_OPTIONS=".astylerc" astyle -Q --recursive ./src/*.cpp,*.c,*.hpp,*.h > astyle.out
           TEST=$(cat astyle.out | wc -l)
-          if [ $TEST -gt 3 ]; then echo ::set-output name=body::$body; exit 1; fi
+          if [ $TEST -gt 3 ]; then exit 1; fi
 
       - name: Show required astyle changes
         if: failure()

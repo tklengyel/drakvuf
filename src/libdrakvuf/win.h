@@ -136,7 +136,7 @@ unicode_string_t* win_get_process_csdversion(drakvuf_t drakvuf, addr_t eprocess_
 
 int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-bool win_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t *dtb);
+bool win_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb);
 
 bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
 

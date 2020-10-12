@@ -148,7 +148,7 @@ std::string StringPrinterInterface::print(drakvuf_t drakvuf, drakvuf_trap_info* 
 
 std::string AsciiPrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const
 {
-    char *str = vmi_read_str(vmi, ctx);
+    char* str = vmi_read_str(vmi, ctx);
     return str ? str : "";
 }
 
@@ -258,9 +258,9 @@ std::string GuidPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint6
     const int sz = 64;
     char stream[sz] = {0};
     snprintf(stream, sz, "\"%08X-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX\"",
-        guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1],
-        guid.Data4[2], guid.Data4[3], guid.Data4[4],
-        guid.Data4[5], guid.Data4[6], guid.Data4[7]);
+             guid.Data1, guid.Data2, guid.Data3, guid.Data4[0], guid.Data4[1],
+             guid.Data4[2], guid.Data4[3], guid.Data4[4],
+             guid.Data4[5], guid.Data4[6], guid.Data4[7]);
     return name + "=" + std::string(stream);
 }
 

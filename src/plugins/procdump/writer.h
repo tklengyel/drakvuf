@@ -106,15 +106,17 @@
 
 #include <memory>
 
-class ProcdumpWriter {
+class ProcdumpWriter
+{
 public:
     virtual ~ProcdumpWriter() = default;
 
-    virtual bool append(uint8_t const *data, size_t size) = 0;
+    virtual bool append(uint8_t const* data, size_t size) = 0;
     virtual bool finish() = 0;
 };
 
-class ProcdumpWriterFactory {
+class ProcdumpWriterFactory
+{
 public:
     static std::unique_ptr<ProcdumpWriter> build(std::string const& path, bool use_compression);
 };

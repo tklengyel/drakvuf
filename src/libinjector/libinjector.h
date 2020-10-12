@@ -193,30 +193,30 @@ void init_unicode_argument(struct argument* arg,
     init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
 
 bool setup_stack(drakvuf_t drakvuf,
-                 x86_registers_t *regs,
+                 x86_registers_t* regs,
                  struct argument args[],
                  int nb_args) NOEXCEPT;
 
 bool setup_stack_locked(drakvuf_t drakvuf,
                         vmi_instance_t vmi,
-                        x86_registers_t *regs,
+                        x86_registers_t* regs,
                         struct argument args[],
                         int nb_args) NOEXCEPT;
 
 injector_status_t injector_start_app(drakvuf_t drakvuf,
-                       vmi_pid_t pid,
-                       uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-                       const char* app,
-                       const char* cwd,
-                       injection_method_t method,
-                       output_format_t format,
-                       const char* binary_path,     // if -m = doppelganging
-                       const char* target_process,  // if -m = doppelganging
-                       bool break_loop_on_detection,
-                       injector_t* injector_to_be_freed,
-                       bool global_search, // out: iff break_loop_on_detection is set
-                       int args_count,
-                       const char* args[]) NOEXCEPT;
+                                     vmi_pid_t pid,
+                                     uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
+                                     const char* app,
+                                     const char* cwd,
+                                     injection_method_t method,
+                                     output_format_t format,
+                                     const char* binary_path,     // if -m = doppelganging
+                                     const char* target_process,  // if -m = doppelganging
+                                     bool break_loop_on_detection,
+                                     injector_t* injector_to_be_freed,
+                                     bool global_search, // out: iff break_loop_on_detection is set
+                                     int args_count,
+                                     const char* args[]) NOEXCEPT;
 
 #pragma GCC visibility pop
 

@@ -723,7 +723,7 @@ static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pr
         if (VAD_TYPE_DLL != vad.second.type)
         {
             struct mdmp_memory_descriptor64 range(vad.first,
-                    vad.second.total_number_of_ptes * VMI_PS_4KB);
+                                                  vad.second.total_number_of_ptes * VMI_PS_4KB);
             memory_ranges.push_back(range);
         }
     }
@@ -732,7 +732,7 @@ static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pr
         if (VAD_TYPE_DLL == vad.second.type)
         {
             struct mdmp_memory_descriptor64 range(vad.first,
-                    vad.second.total_number_of_ptes * VMI_PS_4KB);
+                                                  vad.second.total_number_of_ptes * VMI_PS_4KB);
             memory_ranges.push_back(range);
         }
     }

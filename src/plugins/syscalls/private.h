@@ -443,20 +443,21 @@ typedef struct
     type_t          type;
 } arg_t;
 
-typedef struct {
-    const char *name;
+typedef struct
+{
+    const char* name;
     type_t ret;
     unsigned int num_args;
-    const arg_t *args;
+    const arg_t* args;
 } syscall_t;
 
 struct wrapper;
 struct wrapper
 {
-    syscalls *s;
-    const syscall_t *sc;
-    const char *type;
-    struct wrapper *w;
+    syscalls* s;
+    const syscall_t* sc;
+    const char* type;
+    struct wrapper* w;
     uint16_t num;
     addr_t tid;
     addr_t stack_fingerprint;
@@ -473,9 +474,9 @@ struct wrapper
 
 void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
                    bool syscall, drakvuf_trap_info_t* info,
-                   int nr, std::string module, const syscall_t *sc,
+                   int nr, std::string module, const syscall_t* sc,
                    const std::vector<uint64_t>& args,
-                   uint64_t ret, const char *extra_info);
+                   uint64_t ret, const char* extra_info);
 void free_trap(gpointer p);
 
 #endif // commoncsproto_h
