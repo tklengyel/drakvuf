@@ -1,0 +1,36 @@
+name: compile
+on:
+  pull_request:
+    branches: [ master ]
+jobs:
+  compile:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - 'ubuntu-20.04'
+    steps:
+      - uses: actions/checkout@v2
+      - name: Compile
+        run: |
+          # Install packages
+          sudo apt-get update -q
+          sudo apt-get install -y clang-10 autoconf-archive flex bison libjson-c-dev libxen-dev
+          # Set Exports
+          export PATH=/usr/lib/llvm-10/bin:$PATH
+          export CC=clang
+          export CXX=clang++
+          # Compile & install LibVMI
+          git submodule update --init libvmi
+          cd libvmi
+          autoreconf -vif
+          ./configure --disable-kvm --disable-file --disable-bareflank --disable-examples --disable-vmifs
+          make
+          sudo make install
+          sudo ldconfig
+          cd ..
+          # Compile & install DRAKVUF
+          autoreconf -vif
+          ./configure
+          make
+          sudo make install
