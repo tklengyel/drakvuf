@@ -826,7 +826,7 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx
     gint64 t = g_get_real_time();
 
     fmt::print(ctx->format, "procmon", drakvuf, nullptr,
-               keyval("Time", TimeVal{UNPACK_TIMEVAL(t)}),
+               keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(t)}),
                keyval("PID", fmt::Nval(data.pid)),
                keyval("PPID", fmt::Nval(data.ppid)),
                keyval("TID", fmt::Nval(data.tid)),
