@@ -316,7 +316,8 @@ enum context_flags_x64
     CONTEXT_X64_SEGMENTS = 0x100004,
 };
 
-struct __attribute__ ((packed, aligned(4))) context_x86 {
+struct __attribute__ ((packed, aligned(4))) context_x86
+{
 
     uint32_t   context_flags;
     uint32_t   dr0;
@@ -325,7 +326,8 @@ struct __attribute__ ((packed, aligned(4))) context_x86 {
     uint32_t   dr3;
     uint32_t   dr6;
     uint32_t   dr7;
-    struct __attribute__ ((packed, aligned(4))) {
+    struct __attribute__ ((packed, aligned(4)))
+    {
         uint32_t   control_word;
         uint32_t   status_word;
         uint32_t   tag_word;
@@ -518,8 +520,8 @@ struct __attribute__ ((packed, aligned(4))) mdmp_thread
         , teb(0)
         , stack()
         , thread_context()
-        {
-        }
+    {
+    }
 };
 
 struct __attribute__ ((packed, aligned(4))) mdmp_memory_descriptor64
@@ -607,9 +609,9 @@ struct __attribute__ ((packed, aligned(4))) mdmp_thread_list
     array<union thread_context, MDMP_MAX_THREADS> contexts;
 
     mdmp_thread_list(rva64_t rva, bool is32bit,
-                         vector<struct mdmp_thread> threads_,
-                         vector<union thread_context> contexts_,
-                         mdmp_memory_list& memory)
+                     vector<struct mdmp_thread> threads_,
+                     vector<union thread_context> contexts_,
+                     mdmp_memory_list& memory)
         : number_of_threads(MDMP_MAX_THREADS)
         , threads()
         , contexts()

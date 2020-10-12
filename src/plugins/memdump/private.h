@@ -109,7 +109,8 @@
 #include <list>
 
 
-typedef enum _THREADINFOCLASS {
+typedef enum _THREADINFOCLASS
+{
     ThreadBasicInformation,
     ThreadTimes,
     ThreadPriority,

@@ -156,9 +156,9 @@ static std::string extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_i
 
 void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
                    bool syscall, drakvuf_trap_info_t* info,
-                   int nr, std::string module, const syscall_t *sc,
+                   int nr, std::string module, const syscall_t* sc,
                    const std::vector<uint64_t>& args,
-                   uint64_t ret, const char *extra_info)
+                   uint64_t ret, const char* extra_info)
 {
     if (sc)
         info->trap->name = sc->name;
@@ -177,24 +177,24 @@ void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
             }
 
         fmt::print(s->format, "syscall", drakvuf, info,
-            keyval("Module", fmt::Qstr(module)),
-            keyval("vCPU", fmt::Nval(info->vcpu)),
-            keyval("CR3", fmt::Xval(info->regs->cr3)),
-            keyval("Syscall", fmt::Nval(nr)),
-            keyval("NArgs", fmt::Nval(args.size())),
-            fmt_args
-        );
+                   keyval("Module", fmt::Qstr(module)),
+                   keyval("vCPU", fmt::Nval(info->vcpu)),
+                   keyval("CR3", fmt::Xval(info->regs->cr3)),
+                   keyval("Syscall", fmt::Nval(nr)),
+                   keyval("NArgs", fmt::Nval(args.size())),
+                   fmt_args
+                  );
     }
     else
     {
         fmt::print(s->format, "sysret", drakvuf, info,
-            keyval("Module", fmt::Qstr(module)),
-            keyval("vCPU", fmt::Nval(info->vcpu)),
-            keyval("CR3", fmt::Xval(info->regs->cr3)),
-            keyval("Syscall", fmt::Nval(nr)),
-            keyval("Ret", fmt::Nval(ret)),
-            keyval("Info", fmt::Rstr(extra_info ?: ""))
-        );
+                   keyval("Module", fmt::Qstr(module)),
+                   keyval("vCPU", fmt::Nval(info->vcpu)),
+                   keyval("CR3", fmt::Xval(info->regs->cr3)),
+                   keyval("Syscall", fmt::Nval(nr)),
+                   keyval("Ret", fmt::Nval(ret)),
+                   keyval("Info", fmt::Rstr(extra_info ?: ""))
+                  );
     }
 }
 
@@ -234,7 +234,7 @@ void free_trap(gpointer p)
     if ( !p )
         return;
 
-    drakvuf_trap_t *t = (drakvuf_trap_t*)p;
+    drakvuf_trap_t* t = (drakvuf_trap_t*)p;
     if ( t->data )
         g_slice_free(struct wrapper, t->data);
 

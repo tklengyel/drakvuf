@@ -150,15 +150,15 @@ static void print_file_obj_info(drakvuf_t drakvuf,
     {
         case OUTPUT_KV:
             kvfmt::print("filetracer", drakvuf, info,
-                keyval("FileName", fmt::Qstr(file_path)),
-                keyval("FileHandle", fmt::Xval(handle)),
-                fmt::Rstr(file_attr),
-                fmt::Rstr(security_flags),
-                fmt::Rstr(owner),
-                fmt::Rstr(group),
-                fmt::Rstr(sacl),
-                fmt::Rstr(dacl)
-            );
+                         keyval("FileName", fmt::Qstr(file_path)),
+                         keyval("FileHandle", fmt::Xval(handle)),
+                         fmt::Rstr(file_attr),
+                         fmt::Rstr(security_flags),
+                         fmt::Rstr(owner),
+                         fmt::Rstr(group),
+                         fmt::Rstr(sacl),
+                         fmt::Rstr(dacl)
+                        );
             break;
 
         default:
@@ -179,11 +179,11 @@ static void print_file_obj_info(drakvuf_t drakvuf,
                 security_descriptor.emplace_back("Dacl", dacl);
 
             fmt::print(f->format, "filetracer", drakvuf, info,
-                keyval("FileName", fmt::Qstr(file_path)),
-                keyval("FileHandle", fmt::Xval(handle)),
-                keyval("ObjectAttributes", fmt::Qstr(file_attr)),
-                keyval("SecurityDescriptor", security_descriptor)
-            );
+                       keyval("FileName", fmt::Qstr(file_path)),
+                       keyval("FileHandle", fmt::Xval(handle)),
+                       keyval("ObjectAttributes", fmt::Qstr(file_attr)),
+                       keyval("SecurityDescriptor", security_descriptor)
+                      );
             break;
         }
     }
@@ -355,10 +355,10 @@ static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
         return;
 
     fmt::print(f->format, "filetracer", drakvuf, info,
-        keyval("Operation", fmt::Rstr(operation_name)),
-        keyval("FileName", fmt::Qstr(file)),
-        keyval("FileHandle", fmt::Xval(handle))
-    );
+               keyval("Operation", fmt::Rstr(operation_name)),
+               keyval("FileName", fmt::Qstr(file)),
+               keyval("FileHandle", fmt::Xval(handle))
+              );
 
     g_free(file);
 }
@@ -401,15 +401,15 @@ static void print_basic_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf
     const char* filename = filename_ ? : "<UNKNOWN>";
 
     fmt::print(f->format, "filetracer", drakvuf, info,
-        keyval("Operation", fmt::Rstr(operation_name)),
-        keyval("FileHandle", fmt::Xval(src_file_handle)),
-        keyval("FileName", fmt::Qstr(filename)),
-        keyval("CreationTime", fmt::Xval(creation)),
-        keyval("LastAccessTime", fmt::Xval(access)),
-        keyval("LastWriteTime", fmt::Xval(write)),
-        keyval("ChangeTime", fmt::Xval(change)),
-        keyval("FileAttributes", fmt::Qstr(parse_flags(attributes, file_flags_and_attrs, f->format)))
-    );
+               keyval("Operation", fmt::Rstr(operation_name)),
+               keyval("FileHandle", fmt::Xval(src_file_handle)),
+               keyval("FileName", fmt::Qstr(filename)),
+               keyval("CreationTime", fmt::Xval(creation)),
+               keyval("LastAccessTime", fmt::Xval(access)),
+               keyval("LastWriteTime", fmt::Xval(write)),
+               keyval("ChangeTime", fmt::Xval(change)),
+               keyval("FileAttributes", fmt::Qstr(parse_flags(attributes, file_flags_and_attrs, f->format)))
+              );
 
     if (filename_)
         g_free(filename_);
@@ -469,11 +469,11 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     vmi_free_unicode_str(dst_file_name_us);
 
     fmt::print(f->format, "filetracer", drakvuf, info,
-        keyval("Operation", fmt::Rstr(operation_name)),
-        keyval("FileSrc", fmt::Qstr(src_file)),
-        keyval("FileDst", fmt::Qstr(dst_file_p)),
-        keyval("FileHandle", fmt::Xval(src_file_handle))
-    );
+               keyval("Operation", fmt::Rstr(operation_name)),
+               keyval("FileSrc", fmt::Qstr(src_file)),
+               keyval("FileDst", fmt::Qstr(dst_file_p)),
+               keyval("FileHandle", fmt::Xval(src_file_handle))
+              );
 
     g_free(dst_file_p);
     g_free(src_file);
@@ -519,17 +519,17 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
     switch (w->f->format)
     {
-       case OUTPUT_KV:
+        case OUTPUT_KV:
             kvfmt::print("filetracer", drakvuf, info,
-                keyval("FileName", fmt::Qstr(file_path)),
-                keyval("FileHandle", fmt::Xval(handle)),
-                fmt::Rstr(w->access),
-                fmt::Rstr(w->attrs),
-                fmt::Rstr(w->share),
-                fmt::Rstr(w->disp),
-                fmt::Rstr(w->opts),
-                keyval("Status", fmt::Qstr(is_success))
-            );
+                         keyval("FileName", fmt::Qstr(file_path)),
+                         keyval("FileHandle", fmt::Xval(handle)),
+                         fmt::Rstr(w->access),
+                         fmt::Rstr(w->attrs),
+                         fmt::Rstr(w->share),
+                         fmt::Rstr(w->disp),
+                         fmt::Rstr(w->opts),
+                         keyval("Status", fmt::Qstr(is_success))
+                        );
             break;
 
         default:
@@ -537,15 +537,15 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         case OUTPUT_JSON:
         case OUTPUT_DEFAULT:
             fmt::print(w->f->format, "filetracer", drakvuf, info,
-                keyval("FileName", fmt::Qstr(file_path)),
-                keyval("Handle", fmt::Xval(handle)),
-                keyval("DesiredAccess", fmt::Qstr(w->access)),
-                keyval("FileAttributes", fmt::Qstr(w->attrs)),
-                keyval("ShareAccess", fmt::Qstr(w->share)),
-                keyval("CreateDisposition", fmt::Qstr(w->disp)),
-                keyval("CreateOptions", fmt::Qstr(w->opts)),
-                keyval("Status", fmt::Qstr(is_success))
-            );
+                       keyval("FileName", fmt::Qstr(file_path)),
+                       keyval("Handle", fmt::Xval(handle)),
+                       keyval("DesiredAccess", fmt::Qstr(w->access)),
+                       keyval("FileAttributes", fmt::Qstr(w->attrs)),
+                       keyval("ShareAccess", fmt::Qstr(w->share)),
+                       keyval("CreateDisposition", fmt::Qstr(w->disp)),
+                       keyval("CreateOptions", fmt::Qstr(w->opts)),
+                       keyval("Status", fmt::Qstr(is_success))
+                      );
             break;
     }
 

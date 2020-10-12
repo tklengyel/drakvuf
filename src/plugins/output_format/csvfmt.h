@@ -227,7 +227,8 @@ struct DataPrinter
     template <class... Ts>
     static bool print(std::ostream& os, const std::variant<Ts...>& data, char sep)
     {
-        return std::visit([&os, sep](auto&& arg) mutable {
+        return std::visit([&os, sep](auto&& arg) mutable
+        {
             return print_data(os, arg, sep);
         }, data);
     }

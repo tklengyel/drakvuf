@@ -135,10 +135,13 @@ static std::string get_selfpath()
 {
     char buf[PATH_MAX];
     ssize_t len = ::readlink("/proc/self/exe", buf, sizeof(buf) - 1);
-    if (len != -1) {
+    if (len != -1)
+    {
         buf[len] = '\0';
         return std::string(buf);
-    } else {
+    }
+    else
+    {
         PRINT_DEBUG("failed to get executable path!");
         exit(1);
     }
@@ -175,7 +178,7 @@ static void repl_init(drakvuf_t drakvuf)
     }
 
     // import modules
-    if(PyRun_SimpleString("from ctypes import *\nimport IPython\nimport libdrakvuf\n") == -1)
+    if (PyRun_SimpleString("from ctypes import *\nimport IPython\nimport libdrakvuf\n") == -1)
     {
         std::cout << "Failed to load one of dependencies\n";
         PyErr_Print();

@@ -263,13 +263,14 @@ struct _LARGE_INTEGER
 
 // NOTE The size of structure should be 0x18
 #define FileStandardInformation 5
-struct FILE_STANDARD_INFORMATION {
-  uint64_t allocation_size;
-  uint64_t end_of_file;
-  uint32_t number_of_links;
-  uint8_t  delete_pending;
-  uint8_t  directory;
-  uint16_t  dummy;
+struct FILE_STANDARD_INFORMATION
+{
+    uint64_t allocation_size;
+    uint64_t end_of_file;
+    uint32_t number_of_links;
+    uint8_t  delete_pending;
+    uint8_t  directory;
+    uint16_t  dummy;
 } __attribute__((packed));
 
 #define FileFsDeviceInformation 4

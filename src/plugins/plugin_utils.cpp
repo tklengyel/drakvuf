@@ -174,7 +174,7 @@ void dump_registers(const x86_registers_t* regs, string header, string footer)
            regs->fs_base, regs->gs_base, regs->shadow_gs,
            regs->cr0, regs->cr2, regs->cr3, regs->cr4,
            footer.data()
-        );
+          );
 }
 
 static std::string format_flag(string flag, output_format_t format)
@@ -189,7 +189,7 @@ std::string parse_flags(uint64_t flags, const flags_str_t& flags_map, output_for
 {
     string output;
 
-    for (const auto &flag: flags_map)
+    for (const auto& flag: flags_map)
         if ((flag.first & flags) == flag.first)
             output += format_flag(flag.second, format);
 
