@@ -1303,6 +1303,8 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
 
     auto file_info = f->files.find({info->attached_proc_data.pid, handle});
+    const auto reason = file_info->second.second;
+
     if ( f->files.end() == file_info )
         return VMI_EVENT_RESPONSE_NONE;
 
@@ -1329,7 +1331,6 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (f->files.erase({info->attached_proc_data.pid, handle}) > 0)
     {
         // We detect the fact of closing of the previously modified file.
-        auto reason = file_info->second.second;
         grab_file_by_handle(f, drakvuf, vmi.vmi, info, handle, reason);
     }
 
