@@ -844,7 +844,8 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     if (is32bit)
     {
-        access_context_t ctx = {
+        access_context_t ctx =
+        {
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
             .addr = info->regs->rsp + 4
