@@ -351,10 +351,10 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 case PLUGIN_PROCDUMP :
                 {
                     procdump_config config =
-                        {
-                            .procdump_dir = options->procdump_dir,
-                            .compress_procdumps = options->compress_procdumps,
-                        };
+                    {
+                        .procdump_dir = options->procdump_dir,
+                        .compress_procdumps = options->compress_procdumps,
+                    };
                     this->plugins[plugin_id] =
                         new procdump(this->drakvuf, &config, this->output);
                     break;

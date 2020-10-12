@@ -162,17 +162,17 @@ public:
     void pause();
     void resume();
     injector_status_t inject_cmd(vmi_pid_t injection_pid,
-                   uint32_t injection_tid,
-                   const char* inject_cmd,
-                   const char* cwd,
-                   injection_method_t method,
-                   output_format_t format,
-                   const char* binary_path,
-                   const char* target_process,
-                   int timeout,
-                   bool global_search,
-                   int args_count,
-                   const char* args[]);
+                                 uint32_t injection_tid,
+                                 const char* inject_cmd,
+                                 const char* cwd,
+                                 injection_method_t method,
+                                 output_format_t format,
+                                 const char* binary_path,
+                                 const char* target_process,
+                                 int timeout,
+                                 bool global_search,
+                                 int args_count,
+                                 const char* args[]);
     int start_plugins(const bool* plugin_list, const plugins_options* options);
 };
 

@@ -111,9 +111,11 @@
 #include <cstdio>
 #include <cstdint>
 
-namespace {
+namespace
+{
 
-class BaseProcdumpWriter : public ProcdumpWriter {
+class BaseProcdumpWriter : public ProcdumpWriter
+{
 public:
     explicit BaseProcdumpWriter(std::string const& path)
         : file{fopen(path.c_str(), "w")}
@@ -126,7 +128,7 @@ public:
         fclose(file);
     }
 
-    bool append(uint8_t const *data, size_t size) override
+    bool append(uint8_t const* data, size_t size) override
     {
         return (size == 0 || fwrite(data, size, 1, file) == 1);
     }
@@ -137,10 +139,11 @@ public:
     }
 
 private:
-    FILE *file;
+    FILE* file;
 };
 
-class GzippedProcdumpWriter : public BaseProcdumpWriter {
+class GzippedProcdumpWriter : public BaseProcdumpWriter
+{
 public:
     explicit GzippedProcdumpWriter(std::string const& path)
         : BaseProcdumpWriter{path}
@@ -197,8 +200,7 @@ bool GzippedProcdumpWriter::write_impl(int flush)
         }
 
         if (!BaseProcdumpWriter::append(out, sizeof(out) - z_file.avail_out)) return false;
-    }
-    while (z_file.avail_out == 0);
+    } while (z_file.avail_out == 0);
     if (z_file.avail_in != 0)
     {
         PRINT_DEBUG("[PROCDUMP] GZIP fail: z_file.avail_in != 0");

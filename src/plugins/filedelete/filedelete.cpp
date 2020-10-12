@@ -274,60 +274,60 @@ static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_
 }
 
 static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf,
-                                         drakvuf_trap_info_t* info,
-                                         const char* filename,
-                                         file_extraction_reason_t reason,
-                                         size_t bytes_read, uint64_t fo_flags,
-                                         int seq_number)
+        drakvuf_trap_info_t* info,
+        const char* filename,
+        file_extraction_reason_t reason,
+        size_t bytes_read, uint64_t fo_flags,
+        int seq_number)
 {
     std::string flags = parse_flags(fo_flags, fo_flags_map, f->format);
     std::string r;
-    switch(reason)
+    switch (reason)
     {
-    case FILEEXTR_WRITE:
-        r = "WriteFile";
-        break;
-    case FILEEXTR_DELETE:
-        r = "DeleteFile";
-        break;
-    default:
-        r = "Unknown";
-        break;
+        case FILEEXTR_WRITE:
+            r = "WriteFile";
+            break;
+        case FILEEXTR_DELETE:
+            r = "DeleteFile";
+            break;
+        default:
+            r = "Unknown";
+            break;
     }
 
     switch (f->format)
     {
         case OUTPUT_KV:
             kvfmt::print("fileextractor", drakvuf, info,
-                keyval("FileName", fmt::Qstr(filename)),
-                keyval("Size", fmt::Nval(bytes_read)),
-                keyval("Flags", fmt::Xval(fo_flags)),
-                fmt::Rstr(flags),
-                keyval("SN", fmt::Nval(seq_number)),
-                keyval("Reason", fmt::Qstr(r))
-            );
+                         keyval("FileName", fmt::Qstr(filename)),
+                         keyval("Size", fmt::Nval(bytes_read)),
+                         keyval("Flags", fmt::Xval(fo_flags)),
+                         fmt::Rstr(flags),
+                         keyval("SN", fmt::Nval(seq_number)),
+                         keyval("Reason", fmt::Qstr(r))
+                        );
             break;
         case OUTPUT_JSON:
             jsonfmt::print("fileextractor", drakvuf, info,
-                keyval("FileName", fmt::Qstr(filename)),
-                keyval("Size", fmt::Nval(bytes_read)),
-                keyval("Flags", fmt::Xval(fo_flags)),
-                keyval("FlagsExpanded", fmt::Qstr(flags)),
-                keyval("SeqNum", fmt::Nval(seq_number)),
-                keyval("Reason", fmt::Qstr(r))
-            );
+                           keyval("FileName", fmt::Qstr(filename)),
+                           keyval("Size", fmt::Nval(bytes_read)),
+                           keyval("Flags", fmt::Xval(fo_flags)),
+                           keyval("FlagsExpanded", fmt::Qstr(flags)),
+                           keyval("SeqNum", fmt::Nval(seq_number)),
+                           keyval("Reason", fmt::Qstr(r))
+                          );
             break;
         default:
         case OUTPUT_CSV:
         case OUTPUT_DEFAULT:
             fmt::print(f->format, "fileextractor", drakvuf, info,
-                keyval("FILE", fmt::Qstr(filename)),
-                keyval("SIZE", fmt::Nval(bytes_read)),
-                keyval("FO_FLAGS", fmt::Xval(fo_flags)),
-                keyval("FLAGS", fmt::Qstr(flags)),
-                keyval("SN", fmt::Nval(seq_number)),
-                keyval("REASON", fmt::Qstr(r))
-            );
+                       keyval("FILE", fmt::Qstr(filename)),
+                       keyval("SIZE", fmt::Nval(bytes_read)),
+                       keyval("FO_FLAGS", fmt::Xval(fo_flags)),
+                       keyval("FLAGS", fmt::Qstr(flags)),
+                       keyval("SN", fmt::Nval(seq_number)),
+                       keyval("REASON", fmt::Qstr(r))
+                      );
             break;
     }
 }
@@ -335,9 +335,9 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf,
 static void print_extraction_failure(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const string& filename, const string& message)
 {
     fmt::print(f->format, "fileextractor_fail", drakvuf, info,
-        keyval("FileName", fmt::Qstr(filename)),
-        keyval("Message", fmt::Qstr(message))
-    );
+               keyval("FileName", fmt::Qstr(filename)),
+               keyval("Message", fmt::Qstr(message))
+              );
 }
 
 static void save_file_metadata(filedelete* f,
@@ -360,7 +360,7 @@ static void save_file_metadata(filedelete* f,
     if (!fp)
         return;
 
-    json_object *jobj = json_object_new_object();
+    json_object* jobj = json_object_new_object();
     if (!jobj)
     {
         fclose(fp);
@@ -605,8 +605,8 @@ static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
     filedelete* f = injector->f;
-    auto filename = f->files[{info->attached_proc_data.pid, injector->handle}].first;
-    auto reason = f->files[{info->attached_proc_data.pid, injector->handle}].second;
+    auto filename = f->files[ {info->attached_proc_data.pid, injector->handle}].first;
+    auto reason = f->files[ {info->attached_proc_data.pid, injector->handle}].second;
 
     if (!is_success)
         grab_file_by_handle(f, drakvuf, vmi, info, injector->handle, reason);
@@ -643,8 +643,8 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         injector->file_offset += injector->bytes_to_read;
         if (injector->file_offset >= injector->file_size)
         {
-            auto filename = f->files[{info->attached_proc_data.pid, injector->handle}].first;
-            auto reason = f->files[{info->attached_proc_data.pid, injector->handle}].second;
+            auto filename = f->files[ {info->attached_proc_data.pid, injector->handle}].first;
+            auto reason = f->files[ {info->attached_proc_data.pid, injector->handle}].second;
             save_file_metadata(f, drakvuf, info, curr_sequence_number, 0, filename.c_str(), reason, injector->bytes_to_read, injector->fo_flags);
 
             injector->finish_status = true;
@@ -653,7 +653,7 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     else
     {
         PRINT_DEBUG("[FILEDELETE2] [RtlCopyMemory] Error. Stop processing (PID %d, TID %d, FileName '%s', status 0x%lx).\n",
-                    info->attached_proc_data.pid, info->attached_proc_data.tid, f->files[{info->attached_proc_data.pid, injector->handle}].first.c_str(), info->regs->rax);
+                    info->attached_proc_data.pid, info->attached_proc_data.tid, f->files[ {info->attached_proc_data.pid, injector->handle}].first.c_str(), info->regs->rax);
     }
 
     if (inject_unmapview(drakvuf, info, vmi, injector))
@@ -696,7 +696,7 @@ event_response_t mapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if (info->regs->rax)
     {
-        auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+        auto filename = injector->f->files[ {info->attached_proc_data.pid, injector->handle}].first;
         ostringstream msg;
         msg << "ZwMapViewOfSection failed with status 0x" << std::hex << info->regs->rax;
         print_extraction_failure(injector->f, drakvuf, info, filename,
@@ -770,7 +770,7 @@ event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
     if (info->regs->rax)
     {
-        auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+        auto filename = injector->f->files[ {info->attached_proc_data.pid, injector->handle}].first;
         ostringstream msg;
         msg << "ZwCreateSection failed with status 0x" << std::hex << info->regs->rax;
         print_extraction_failure(injector->f, drakvuf, info, filename,
@@ -839,7 +839,7 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     else
     {
-        auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+        auto filename = injector->f->files[ {info->attached_proc_data.pid, injector->handle}].first;
         print_extraction_failure(injector->f, drakvuf, info, filename,
                                  "ExAllocatePoolWithTag failed to allocate pool");
     }
@@ -869,7 +869,7 @@ event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
     if (info->regs->rax)
     {
-        auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+        auto filename = injector->f->files[ {info->attached_proc_data.pid, injector->handle}].first;
         ostringstream msg;
         msg << "ZwQueryVolumeInformationFile failed with status 0x" << std::hex << info->regs->rax;
 
@@ -895,7 +895,7 @@ event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
         if (7 != dev_info.device_type) // FILE_DEVICE_DISK
         {
-            auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+            auto filename = injector->f->files[ {info->attached_proc_data.pid, injector->handle}].first;
             ostringstream msg;
             msg << "ZwQueryVolumeInformationFile stop processing device type " << dev_info.device_type;
 
@@ -937,7 +937,7 @@ event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if (info->regs->rax)
     {
-        auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+        auto filename = injector->f->files[ {info->attached_proc_data.pid, injector->handle}].first;
         ostringstream msg;
         msg << "ZwQueryInformationFile failed with status 0x" << std::hex << info->regs->rax;
 
@@ -963,7 +963,7 @@ event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         if (0 == dev_info.end_of_file)
         {
-            auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+            auto filename = injector->f->files[ {info->attached_proc_data.pid, injector->handle}].first;
             print_extraction_failure(injector->f, drakvuf, info, filename, "Zero size file");
             goto handled;
         }
@@ -971,7 +971,7 @@ event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         injector->readfile.bytes_read = 0UL;
         injector->file_size = dev_info.end_of_file;
 
-        auto filename = injector->f->files[{info->attached_proc_data.pid, injector->handle}].first;
+        auto filename = injector->f->files[ {info->attached_proc_data.pid, injector->handle}].first;
 
         if (inject_createsection(drakvuf, info, vmi, injector))
         {
@@ -1128,7 +1128,7 @@ static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         auto filename = get_file_name(w->f, drakvuf, vmi_lg.vmi, info, handle, nullptr, nullptr);
         if (filename.empty()) filename = "<UNKNOWN>";
 
-        w->f->files[{info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_DELETE};
+        w->f->files[ {info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_DELETE};
     }
 
     delete w;
@@ -1247,7 +1247,7 @@ static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
             auto filename = get_file_name(f, drakvuf, vmi, info, handle, nullptr, nullptr);
             if (filename.empty()) filename = "<UNKNOWN>";
 
-            f->files[{info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_DELETE};
+            f->files[ {info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_DELETE};
         }
     }
 
@@ -1274,7 +1274,7 @@ static event_response_t writefile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     auto filename = get_file_name(f, drakvuf, vmi, info, handle, nullptr, nullptr);
     if (filename.empty()) filename = "<UNKNOWN>";
 
-    f->files[{info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_WRITE};
+    f->files[ {info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_WRITE};
 
     drakvuf_release_vmi(drakvuf);
     return 0;
@@ -1365,7 +1365,7 @@ static event_response_t createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     filename = get_file_name(f, drakvuf, vmi, info, handle, nullptr, nullptr);
     if (filename.empty()) filename = "<UNKNOWN>";
 
-    f->files[{info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_WRITE};
+    f->files[ {info->attached_proc_data.pid, handle}] = {filename, FILEEXTR_WRITE};
 
 done:
     drakvuf_release_vmi(drakvuf);

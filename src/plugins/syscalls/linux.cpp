@@ -116,9 +116,9 @@
 
 // Builds the argument buffer from the current context, returns status
 static std::vector<uint64_t> linux_build_argbuf(vmi_instance_t vmi,
-                                                drakvuf_trap_info_t* info, syscalls *s,
-                                                const syscall_t* sc,
-                                                addr_t pt_regs_addr)
+        drakvuf_trap_info_t* info, syscalls* s,
+        const syscall_t* sc,
+        addr_t pt_regs_addr)
 {
     std::vector<uint64_t> args;
 
@@ -204,14 +204,14 @@ static std::vector<uint64_t> linux_build_argbuf(vmi_instance_t vmi,
 
 static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    struct wrapper *w = (struct wrapper *)info->trap->data;
+    struct wrapper* w = (struct wrapper*)info->trap->data;
 
     if ( w->tid != info->proc_data.tid )
         return 0;
 
-    syscalls *s = w->s;
+    syscalls* s = w->s;
 
-    const syscall_t *sc = w->num < NUM_SYSCALLS_LINUX ? linuxsc::linux_syscalls[w->num] : NULL;
+    const syscall_t* sc = w->num < NUM_SYSCALLS_LINUX ? linuxsc::linux_syscalls[w->num] : NULL;
 
     std::vector<uint64_t> args;
     print_syscall(s, drakvuf, VMI_OS_LINUX, false, info, w->num, std::string(info->trap->breakpoint.module), sc, args, info->regs->rax, nullptr);
@@ -225,7 +225,7 @@ static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto vmi = vmi_lock_guard(drakvuf);
-    struct wrapper *w = (struct wrapper *)info->trap->data;
+    struct wrapper* w = (struct wrapper*)info->trap->data;
     syscalls* s = w->s;
 
     const syscall_t* sc = NULL;
@@ -239,7 +239,9 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
          */
         pt_regs = info->regs->rdi;
         vmi_read_addr_va(vmi, pt_regs + s->offsets[PT_REGS_ORIG_RAX], 0, &nr);
-    } else {
+    }
+    else
+    {
         /*
          * On newer kernels: __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
          */
@@ -264,12 +266,12 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if ( s->disable_sysret )
         return 0;
 
-    struct wrapper *wr = g_slice_new0(struct wrapper);
+    struct wrapper* wr = g_slice_new0(struct wrapper);
     wr->s = s;
     wr->num = nr;
     wr->tid = info->proc_data.tid;
 
-    drakvuf_trap_t *ret_trap = g_slice_new0(drakvuf_trap_t);
+    drakvuf_trap_t* ret_trap = g_slice_new0(drakvuf_trap_t);
     ret_trap->breakpoint.lookup_type = LOOKUP_DTB;
     ret_trap->breakpoint.dtb = info->regs->cr3;
     ret_trap->breakpoint.addr_type = ADDR_VA;
@@ -280,7 +282,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     ret_trap->data = wr;
 
     if ( drakvuf_add_trap(drakvuf, ret_trap) )
-       s->traps = g_slist_prepend(s->traps, ret_trap);
+        s->traps = g_slist_prepend(s->traps, ret_trap);
     else
     {
         g_slice_free(drakvuf_trap_t, ret_trap);
@@ -290,15 +292,15 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
-void setup_linux(drakvuf_t drakvuf, syscalls *s)
+void setup_linux(drakvuf_t drakvuf, syscalls* s)
 {
     s->offsets = (size_t*)g_try_malloc0(__PT_REGS_MAX*sizeof(size_t));
     if ( !s->offsets )
         throw -1;
 
     for ( int i=0; i<__PT_REGS_MAX; i++ )
-         if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "pt_regs", linux_pt_regs_names[i], &s->offsets[i]) )
-             throw -1;
+        if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "pt_regs", linux_pt_regs_names[i], &s->offsets[i]) )
+            throw -1;
 
     addr_t _text;
     if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "_text", &_text) )
@@ -311,7 +313,7 @@ void setup_linux(drakvuf_t drakvuf, syscalls *s)
     addr_t kaslr = s->kernel_base - _text;
 
     drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
-    struct wrapper *w = g_slice_new0(struct wrapper);
+    struct wrapper* w = g_slice_new0(struct wrapper);
 
     w->s = s;
 

@@ -67,26 +67,6 @@ jobs:
         - git diff --check upstream/master
 
 #
-# Astyle check
-#
-    - env:
-        - TEST="astyle"
-        - ARTISTIC_STYLE_OPTIONS=".astylerc"
-        - SKIP_LIBVMI=1
-      install:
-        - sudo apt-get -q -y install astyle
-      script:
-        - astyle -Q `find . -name "*.c" -o -name ".h" -o -name ".cpp" -name ".hpp"` > astyle.out
-        - TEST=$(cat astyle.out | wc -l)
-        - |
-          if [[ $TEST -ne 0 ]]; then
-            cat astyle.out
-            git --no-pager diff
-            echo "Please fix style issues as shown above"
-            exit 1
-          fi
-
-#
 # cppcheck
 #
     - env:
