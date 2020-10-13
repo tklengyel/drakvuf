@@ -46,3 +46,6 @@ src/dirwatch/dirwatch
 src/dirwatch/distributor
 test-drive
 ylwrap
+
+# librepl
+src/librepl/libdrakvuf.py
