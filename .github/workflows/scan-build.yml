@@ -1,0 +1,35 @@
+name: scan-build
+on:
+  pull_request:
+    branches: [ master ]
+jobs:
+  scan-build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - 'ubuntu-20.04'
+    steps:
+      - uses: actions/checkout@v2
+      - name: scan-build
+        run: |
+          # Install packages
+          sudo apt-get update -q
+          sudo apt-get install -y clang-10 clang-tools-10 autoconf-archive flex bison libjson-c-dev libxen-dev
+          # Set Exports
+          export PATH=/usr/lib/llvm-10/bin:$PATH
+          export CC=clang-10
+          export CXX=clang++-10
+          # Compile & install LibVMI
+          git submodule update --init libvmi
+          cd libvmi
+          autoreconf -vif
+          ./configure --disable-kvm --disable-file --disable-bareflank --disable-examples --disable-vmifs
+          make -j2
+          sudo make install
+          sudo ldconfig
+          cd ..
+          # scan-build
+          autoreconf -vif
+          scan-build --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
+          scan-build --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores make -j2
