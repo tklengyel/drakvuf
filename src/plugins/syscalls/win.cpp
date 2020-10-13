@@ -277,7 +277,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
         return ret;
     }
 
-    for ( uint16_t syscall_num = 0; syscall_num < sst[1]; syscall_num++ )
+    for ( addr_t syscall_num = 0; syscall_num < sst[1]; syscall_num++ )
     {
         long offset = 0;
         addr_t syscall_va;
@@ -323,7 +323,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
         }
 
         if ( !symbol )
-            PRINT_DEBUG("\t Syscall %u @ 0x%lx has no debug information matching it with RVA 0x%lx. Table: 0x%lx Offset: 0x%lx\n", syscall_num, syscall_va, rva, sst[0], offset);
+            PRINT_DEBUG("\t Syscall %lu @ 0x%lx has no debug information matching it with RVA 0x%lx. Table: 0x%lx Offset: 0x%lx\n", syscall_num, syscall_va, rva, sst[0], offset);
         else if ( !definition )
             PRINT_DEBUG("\t Syscall %s has no internal definition. New syscall?\n", symbol->name);
 
@@ -353,7 +353,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
             s->traps = g_slist_prepend(s->traps, trap);
         else
         {
-            PRINT_DEBUG("Failed to trap syscall %u @ 0x%lx\n", syscall_num, trap->breakpoint.addr);
+            PRINT_DEBUG("Failed to trap syscall %lu @ 0x%lx\n", syscall_num, trap->breakpoint.addr);
             g_slice_free(struct wrapper, trap->data);
             g_slice_free(drakvuf_trap_t, trap);
         }

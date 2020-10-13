@@ -120,7 +120,7 @@
 #include "linux-offsets.h"
 #include "linux-offsets-map.h"
 
-addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg)
+addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg)
 {
     switch (narg)
     {
