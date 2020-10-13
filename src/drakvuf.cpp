@@ -188,10 +188,10 @@ drakvuf_c::~drakvuf_c()
 
     g_free(injector_to_be_freed);
 
+    delete plugins;
+
     if (drakvuf)
         drakvuf_close(drakvuf, leave_paused);
-
-    delete plugins;
 }
 
 void drakvuf_c::interrupt(int signal)

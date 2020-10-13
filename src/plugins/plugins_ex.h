@@ -108,8 +108,10 @@
 #include <string>
 #include <bitset>
 #include <map>
-#include <new>
 #include <memory>
+#include <vector>
+#include <algorithm>
+#include <functional>
 
 #include "private.h"
 #include "plugins.h"
@@ -149,61 +151,6 @@ std::string FieldToString(const std::map<uint64_t, std::string>& maps, const std
 std::string FieldToString(const std::map<uint64_t, std::string>& maps, uint64_t value);
 
 } // namespace print
-
-template<typename T>
-struct allocator
-{
-    allocator() noexcept {}
-    ~allocator() {}
-
-    template<typename... _Args>
-    inline T* allocate(std::size_t n, _Args&& ... args);
-    void deallocate(T* p, std::size_t n)
-    {
-        delete[] p;
-    }
-};
-
-template<typename T>
-template<typename... _Args>
-inline T* allocator<T>::allocate(std::size_t n, _Args&& ... args)
-{
-    if (n == 1)
-        return new (std::nothrow) T(args...);
-    else
-    {
-        auto p = new (std::nothrow) char(sizeof (T) * n);
-        if (p)
-        {
-            for (std::size_t i = 0; i < n; ++i)
-            {
-                auto t = reinterpret_cast<T*>(p + sizeof(T) * i);
-                new (t)T(args...);
-            }
-        }
-        return reinterpret_cast<T*>(p);
-    }
-}
-
-template<typename T>
-struct plugin_params
-{
-private:
-    T* source;
-
-public:
-    plugin_params(T* src) : source(src) {}
-    virtual ~plugin_params() {}
-
-    T* operator()() const noexcept
-    {
-        return source;
-    }
-    T* plugin() const noexcept
-    {
-        return source;
-    }
-};
 
 struct breakpoint_in_system_process_searcher
 {
@@ -386,119 +333,14 @@ struct breakpoint_by_pid_searcher
     }
 };
 
-class pluginex : public plugin
+struct call_result_t
 {
-public:
-    typedef event_response_t(*hook_cb_t)(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    call_result_t()
+        : target_cr3(), target_thread(), target_rsp()
+    {}
 
-public:
-    pluginex(drakvuf_t drakvuf, output_format_t output);
-    virtual ~pluginex();
-
-public:
-    template<typename P = pluginex, typename Params = plugin_params<P>, typename IB,
-             typename AP = allocator<Params>, typename AT = allocator<drakvuf_trap_t>>
-    drakvuf_trap_t* register_trap(drakvuf_t drakvuf,
-                                  drakvuf_trap_info_t* info,
-                                  P* plugin,
-                                  hook_cb_t hook_cb,
-                                  IB init_breakpoint,
-                                  const char* trap_name = nullptr,
-                                  AP ap = allocator<Params>(),
-                                  AT at = allocator<drakvuf_trap_t>())
-    {
-        std::unique_ptr<Params> params;
-        std::unique_ptr<drakvuf_trap_t> trap;
-        if (!init_memory(plugin, trap, params, hook_cb, trap_name, ap, at))
-            return nullptr;
-
-        if (!init_breakpoint(drakvuf, info, trap.get()))
-        {
-            PRINT_DEBUG("%s for %s\n", ERROR_MSG_ADDING_TRAP, trap_name ? trap_name : trap->name);
-            return nullptr;
-        }
-
-        attach_plugin_params(trap.get());
-        params.release();
-        return trap.release();
-    }
-
-    virtual void destroy_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-    drakvuf_trap_t* detach_plugin_params(drakvuf_trap_t* data);
-    static void destroy_plugin_params(drakvuf_trap_t* data);
-
-protected:
-    void attach_plugin_params(drakvuf_trap_t* data);
-
-    template<typename Plugin, typename Params, typename AP = allocator<Params>, typename AT = allocator<drakvuf_trap_t>>
-    bool init_memory(Plugin* plugin,
-                     std::unique_ptr<drakvuf_trap_t>& trap,
-                     std::unique_ptr<Params>& params,
-                     hook_cb_t hook_cb,
-                     const char* trap_name = nullptr,
-                     AP ap = allocator<Params>(),
-                     AT at = allocator<drakvuf_trap_t>())
-    {
-        trap.reset(at.allocate(1));
-        if (!trap)
-        {
-            PRINT_DEBUG("%s. Failed to allocate a memory for trap of %s\n", ERROR_MSG_ADDING_TRAP, trap_name);
-            return false;
-        }
-
-        params.reset(ap.allocate(1, plugin));
-        if (!params)
-        {
-            PRINT_DEBUG("%s. Failed to allocate a memory for trap params of %s\n", ERROR_MSG_ADDING_TRAP, trap_name);
-            trap.reset();
-            return false;
-        }
-
-        trap->cb = hook_cb;
-        trap->data = params.get();
-        trap->name = trap_name;
-        trap->type = BREAKPOINT;
-        return true;
-    }
-
-public:
-    const output_format_t m_output_format;
-
-private:
-    GSList* m_params;
-};
-
-template<typename P, typename T = plugin_params<P>>
-T* get_trap_params(const drakvuf_trap_t* trap)
-{
-    if (!trap || !trap->data)
-        return nullptr;
-
-    return reinterpret_cast<T*>(trap->data);
-}
-
-template<typename P, typename T = plugin_params<P>>
-T* get_trap_params(const drakvuf_trap_info_t* info)
-{
-    if (!info || !info->trap || !info->trap->data)
-        return nullptr;
-
-    return reinterpret_cast<T*>(info->trap->data);
-}
-
-template<typename P, typename T = plugin_params<P>>
-P* get_trap_plugin(const drakvuf_trap_info_t* info)
-{
-    if (!info || !info->trap || !info->trap->data)
-        return nullptr;
-
-    return (*reinterpret_cast<T*>(info->trap->data))();
-}
-
-template<typename T>
-struct call_result_t : public plugin_params<T>
-{
-    call_result_t(T* src) : plugin_params<T>(src), target_cr3(), target_thread(), target_rsp() {}
+    virtual ~call_result_t()
+    {};
 
     void set_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
     {
@@ -523,5 +365,152 @@ struct call_result_t : public plugin_params<T>
     addr_t target_thread;
     addr_t target_rsp;
 };
+
+struct plugin_data
+{
+    class pluginex* plugin;
+    call_result_t* params;
+
+    plugin_data(pluginex* plugin, call_result_t* params)
+        : plugin(plugin), params(params)
+    {};
+
+    virtual ~plugin_data()
+    {
+        delete params;
+    };
+};
+
+class pluginex : public plugin
+{
+public:
+    typedef event_response_t(*hook_cb_t)(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+    pluginex(drakvuf_t drakvuf, output_format_t output)
+        : m_output_format(output), drakvuf(drakvuf)
+    {};
+
+    virtual ~pluginex()
+    {
+        for (auto& trap : traps)
+            delete_trap(trap);
+    };
+
+    // Params property is optional
+    template<typename Params = void, typename IB>
+    drakvuf_trap_t* register_trap(drakvuf_trap_info_t* info,
+                                  hook_cb_t hook_cb,
+                                  IB init_breakpoint,
+                                  const char* trap_name = nullptr)
+    {
+        auto trap = new drakvuf_trap_t;
+
+        if constexpr (std::is_same_v<Params, void>)
+        {
+            trap->data = new plugin_data(this, nullptr);
+        }
+        else
+        {
+            static_assert(std::is_base_of_v<call_result_t, Params>, "Params must derive from call_result_t");
+            trap->data = new plugin_data(this, new Params);
+        }
+
+        trap->name = trap_name;
+        trap->cb = hook_cb;
+        trap->type = BREAKPOINT;
+
+        if (!init_breakpoint(drakvuf, info, trap))
+        {
+            PRINT_DEBUG("%s for %s\n", ERROR_MSG_ADDING_TRAP, trap_name ? trap_name : trap->name);
+            delete trap;
+            return nullptr;
+        }
+
+        traps.push_back(std::move(trap));
+        return traps.back();
+    }
+
+    void destroy_trap(drakvuf_trap_t* target)
+    {
+        auto it = std::find(traps.begin(), traps.end(), target);
+        if (it == traps.end())
+        {
+            PRINT_DEBUG("[PLUGINEX] BUG: attempted to destroy non-existant trap");
+            throw -1;
+        }
+        traps.erase(it);
+        delete_trap(target);
+    }
+
+    const output_format_t m_output_format;
+
+private:
+    std::vector<drakvuf_trap_t*> traps;
+    drakvuf_t drakvuf;
+
+    void delete_trap(drakvuf_trap_t* target)
+    {
+        drakvuf_remove_trap(drakvuf, target, [](drakvuf_trap_t* trap)
+        {
+            auto data = static_cast<plugin_data*>(trap->data);
+
+            delete data;
+            trap->data = nullptr;
+
+            delete trap;
+        });
+    }
+};
+
+template<typename Params>
+Params* get_trap_params(const drakvuf_trap_t* trap)
+{
+    static_assert(std::is_base_of_v<call_result_t, Params>, "Params must derive from call_result_t");
+
+    if (!trap || !trap->data)
+        return nullptr;
+
+    auto params = dynamic_cast<Params*>(static_cast<plugin_data*>(trap->data)->params);
+    if (!params)
+    {
+        PRINT_DEBUG("[PLUGINEX] nullptr at get_trap_params, this should never happen");
+        throw -1;
+    }
+    return params;
+}
+
+template<typename Params>
+Params* get_trap_params(const drakvuf_trap_info_t* info)
+{
+    static_assert(std::is_base_of_v<call_result_t, Params>, "Params must derive from call_result_t");
+
+    if (!info || !info->trap || !info->trap->data)
+        return nullptr;
+
+    auto params = dynamic_cast<Params*>(static_cast<plugin_data*>(info->trap->data)->params);
+    if (!params)
+    {
+        PRINT_DEBUG("[PLUGINEX] nullptr at get_trap_params, this should never happen");
+        throw -1;
+    }
+    return params;
+}
+
+template<typename Plugin>
+Plugin* get_trap_plugin(const drakvuf_trap_info_t* info)
+{
+    static_assert(std::is_base_of_v<pluginex, Plugin>, "Plugin must derive from pluginex");
+
+    if (!info || !info->trap || !info->trap->data)
+        return nullptr;
+
+    auto plugin = dynamic_cast<Plugin*>(static_cast<plugin_data*>(info->trap->data)->plugin);
+    if (!plugin)
+    {
+        PRINT_DEBUG("[PLUGINEX] nullptr at get_trap_plugin, this should never happen");
+        throw -1;
+    }
+    return plugin;
+}
 
 #endif // PLUGIN_EX_H

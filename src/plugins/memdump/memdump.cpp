@@ -367,8 +367,6 @@ static bool dump_if_points_to_executable_memory(
     extras_t* extras)
 {
     memdump* plugin = get_trap_plugin<memdump>(info);
-    if (!plugin)
-        return false;
 
     addr_t dtb;
     if (!drakvuf_get_process_dtb(drakvuf, process_base, &dtb))
@@ -537,8 +535,6 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
     }
 
     auto plugin = get_trap_plugin<memdump>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
 
     dump_from_stack(drakvuf, info, plugin);
     return VMI_EVENT_RESPONSE_NONE;
@@ -558,8 +554,6 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
     }
 
     auto plugin = get_trap_plugin<memdump>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     access_context_t ctx =
@@ -647,8 +641,6 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
     }
 
     auto plugin = get_trap_plugin<memdump>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     access_context_t ctx =
@@ -721,8 +713,6 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
         return VMI_EVENT_RESPONSE_NONE;
 
     auto plugin = get_trap_plugin<memdump>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     access_context_t ctx =
@@ -768,14 +758,6 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
 
 static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    // Check if trap is related to memdump plugin.
-    memdump* plugin = get_trap_plugin<memdump>(info);
-    if (!plugin)
-    {
-        PRINT_DEBUG("[MEMDUMP] Failed to retrieve plugin\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
     // Now check if NtCreateThreadEx syscall was invoked from CreateRemoteThread.
     // In such case the target process should differ from the caller.
 
@@ -824,8 +806,6 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
 
     // First check if the trap is even related to memdump plugin.
     memdump* plugin = get_trap_plugin<memdump>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
 
     // We are only interested in calls that set thread context.
     addr_t thread_information_class = drakvuf_get_function_argument(drakvuf, info, 2);
@@ -970,15 +950,15 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
         PRINT_DEBUG("mscorwks.dll profile not found, memdump will procede without .NET hooks\n");
 
     breakpoint_in_system_process_searcher bp;
-    if (!register_trap<memdump>(drakvuf, nullptr, this, free_virtual_memory_hook_cb,    bp.for_syscall_name("NtFreeVirtualMemory")) ||
-        !register_trap<memdump>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
-        !register_trap<memdump>(drakvuf, nullptr, this, terminate_process_hook_cb,      bp.for_syscall_name("NtTerminateProcess")) ||
-        !register_trap<memdump>(drakvuf, nullptr, this, write_virtual_memory_hook_cb,   bp.for_syscall_name("NtWriteVirtualMemory")) ||
-        !register_trap<memdump>(drakvuf, nullptr, this, create_remote_thread_hook_cb,   bp.for_syscall_name("NtCreateThreadEx")))
+    if (!register_trap(nullptr, free_virtual_memory_hook_cb,    bp.for_syscall_name("NtFreeVirtualMemory")) ||
+        !register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
+        !register_trap(nullptr, terminate_process_hook_cb,      bp.for_syscall_name("NtTerminateProcess")) ||
+        !register_trap(nullptr, write_virtual_memory_hook_cb,   bp.for_syscall_name("NtWriteVirtualMemory")) ||
+        !register_trap(nullptr, create_remote_thread_hook_cb,   bp.for_syscall_name("NtCreateThreadEx")))
     {
         throw -1;
     }
-    if (json_wow && !register_trap<memdump>(drakvuf, nullptr, this, set_information_thread_hook_cb, bp.for_syscall_name("NtSetInformationThread")))
+    if (json_wow && !register_trap(nullptr, set_information_thread_hook_cb, bp.for_syscall_name("NtSetInformationThread")))
         throw -1;
 
     this->userhook_init(drakvuf, c, output);

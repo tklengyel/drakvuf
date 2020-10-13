@@ -269,38 +269,34 @@ struct search_breakpoint_by_addr
     const wmimon* m_plugin;
 };
 
-template <typename T>
-struct CoCreateInstanse : public call_result_t<T>
+struct CoCreateInstanse : public call_result_t
 {
-    CoCreateInstanse(T* src) : call_result_t<T>(src), CLSID(), IID(), m_vtable() {}
+    CoCreateInstanse() : call_result_t(), CLSID(), IID(), m_vtable() {}
 
     addr_t CLSID;
     addr_t IID;
     addr_t m_vtable;
 };
 
-template <typename T>
-struct ConnectServerParams : public call_result_t<T>
+struct ConnectServerParams : public call_result_t
 {
-    ConnectServerParams(T* src) : call_result_t<T>(src), m_resource(), m_vtable() {}
+    ConnectServerParams() : call_result_t(), m_resource(), m_vtable() {}
 
     addr_t m_resource;
     addr_t m_vtable;
 };
 
-template <typename T>
-struct ExecQueryParams : public call_result_t<T>
+struct ExecQueryParams : public call_result_t
 {
-    ExecQueryParams(T* src) : call_result_t<T>(src), m_command(), m_vtable() {}
+    ExecQueryParams() : call_result_t(), m_command(), m_vtable() {}
 
     addr_t m_command;
     addr_t m_vtable;
 };
 
-template <typename T>
-struct ExecMethodParams : public call_result_t<T>
+struct ExecMethodParams : public call_result_t
 {
-    ExecMethodParams(T* src) : call_result_t<T>(src), m_object(), m_method(), m_vtable() {}
+    ExecMethodParams() : call_result_t(), m_object(), m_method(), m_vtable() {}
 
     addr_t m_object;
     addr_t m_method;
@@ -366,8 +362,8 @@ private:
 
 event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    auto data = get_trap_params<wmimon, ExecMethodParams<wmimon>>(info);
-    auto plugin = get_trap_plugin<wmimon, ExecMethodParams<wmimon>>(info);
+    auto data = get_trap_params<wmimon, ExecMethodParams>(info);
+    auto plugin = get_trap_plugin<wmimon, ExecMethodParams>(info);
     if (!plugin || !data)
     {
         PRINT_DEBUG("[WMIMon] ExecMethodReturn invalid trap params\n");
@@ -427,17 +423,15 @@ event_response_t ExecMethod_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    auto trap = plugin->register_trap<wmimon, ExecMethodParams<wmimon>>(
-                    drakvuf,
+    auto trap = plugin->register_trap<ExecMethodParams>(
                     info,
-                    plugin,
                     ExecMethod_return_handler,
                     breakpoint_by_dtb_searcher());
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto params = get_trap_params<wmimon, ExecMethodParams<wmimon>>(trap);
+    auto params = get_trap_params<wmimon, ExecMethodParams>(trap);
     if (!params)
     {
         plugin->destroy_trap(drakvuf, trap);
@@ -454,8 +448,8 @@ event_response_t ExecMethod_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
 event_response_t GetObject_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    auto data = get_trap_params<wmimon, ExecMethodParams<wmimon>>(info);
-    auto plugin = get_trap_plugin<wmimon, ExecMethodParams<wmimon>>(info);
+    auto data = get_trap_params<wmimon, ExecMethodParams>(info);
+    auto plugin = get_trap_plugin<wmimon, ExecMethodParams>(info);
     if (!plugin || !data)
     {
         PRINT_DEBUG("[WMIMon] GetObjectReturn invalid trap params\n");
@@ -504,17 +498,15 @@ event_response_t GetObject_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    auto trap = plugin->register_trap<wmimon, ExecMethodParams<wmimon>>(
-                    drakvuf,
+    auto trap = plugin->register_trap<ExecMethodParams>(
                     info,
-                    plugin,
                     GetObject_return_handler,
                     breakpoint_by_dtb_searcher());
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto params = get_trap_params<wmimon, ExecMethodParams<wmimon>>(trap);
+    auto params = get_trap_params<wmimon, ExecMethodParams>(trap);
     if (!params)
     {
         plugin->destroy_trap(drakvuf, trap);
@@ -530,8 +522,8 @@ event_response_t GetObject_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 event_response_t ExecQuery_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    auto data = get_trap_params<wmimon, ExecQueryParams<wmimon>>(info);
-    auto plugin = get_trap_plugin<wmimon, ExecQueryParams<wmimon>>(info);
+    auto data = get_trap_params<wmimon, ExecQueryParams>(info);
+    auto plugin = get_trap_plugin<wmimon, ExecQueryParams>(info);
     if (!plugin || !data)
     {
         PRINT_DEBUG("[WMIMon] ExecQueryReturn invalid trap params\n");
@@ -580,17 +572,15 @@ event_response_t ExecQuery_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    auto trap = plugin->register_trap<wmimon, ExecQueryParams<wmimon>>(
-                    drakvuf,
+    auto trap = plugin->register_trap<ExecQueryParams>(
                     info,
-                    plugin,
                     ExecQuery_return_handler,
                     breakpoint_by_dtb_searcher());
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto params = get_trap_params<wmimon, ExecQueryParams<wmimon>>(trap);
+    auto params = get_trap_params<wmimon, ExecQueryParams>(trap);
     if (!params)
     {
         plugin->destroy_trap(drakvuf, trap);
@@ -606,8 +596,8 @@ event_response_t ExecQuery_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    auto data = get_trap_params<wmimon, ConnectServerParams<wmimon>>(info);
-    auto plugin = get_trap_plugin<wmimon, ConnectServerParams<wmimon>>(info);
+    auto data = get_trap_params<wmimon, ConnectServerParams>(info);
+    auto plugin = get_trap_plugin<wmimon, ConnectServerParams>(info);
     if (!plugin || !data)
     {
         PRINT_DEBUG("[WMIMon] ConnectServerReturn invalid trap params\n");
@@ -648,14 +638,9 @@ event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_in
         vtable vt(drakvuf, info, data->m_vtable, 26);
 
         search_breakpoint_by_addr bp(plugin, vt[20]);
-        plugin->register_trap<wmimon>(drakvuf, info, plugin, ExecQuery_handler,
-                                      bp, "ExecQuery");
-
-        plugin->register_trap<wmimon>(drakvuf, info, plugin, GetObject_handler,
-                                      bp.set_addr(vt[6]), "GetObject");
-
-        plugin->register_trap<wmimon>(drakvuf, info, plugin, ExecMethod_handler,
-                                      bp.set_addr(vt[24]), "ExecMethod");
+        plugin->register_trap(info, ExecQuery_handler, bp, "ExecQuery");
+        plugin->register_trap(info, GetObject_handler, bp.set_addr(vt[6]), "GetObject");
+        plugin->register_trap(info, ExecMethod_handler, bp.set_addr(vt[24]), "ExecMethod");
     }
     catch (const std::exception& e)
     {
@@ -676,17 +661,15 @@ event_response_t ConnectServer_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    auto trap = plugin->register_trap<wmimon, ConnectServerParams<wmimon>>(
-                    drakvuf,
+    auto trap = plugin->register_trap<ConnectServerParams>(
                     info,
-                    plugin,
                     ConnectServer_return_handler,
                     breakpoint_by_dtb_searcher());
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto params = get_trap_params<wmimon, ConnectServerParams<wmimon>>(trap);
+    auto params = get_trap_params<wmimon, ConnectServerParams>(trap);
     if (!params)
     {
         plugin->destroy_trap(drakvuf, trap);
@@ -703,8 +686,8 @@ event_response_t ConnectServer_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
 event_response_t CoCreateInstanse_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    auto data = get_trap_params<wmimon, CoCreateInstanse<wmimon>>(info);
-    auto plugin = get_trap_plugin<wmimon, CoCreateInstanse<wmimon>>(info);
+    auto data = get_trap_params<wmimon, CoCreateInstanse>(info);
+    auto plugin = get_trap_plugin<wmimon, CoCreateInstanse>(info);
     if (!plugin || !data)
     {
         PRINT_DEBUG("[WMIMon] CoCreateInstanse_return invalid trap params!\n");
@@ -721,8 +704,7 @@ event_response_t CoCreateInstanse_return_handler(drakvuf_t drakvuf, drakvuf_trap
     {
         vtable vt(drakvuf, info, data->m_vtable, 4);
 
-        plugin->register_trap<wmimon>(drakvuf, info, plugin, ConnectServer_handler,
-                                      search_breakpoint_by_addr(plugin, vt[3]), "ConnectServer");
+        plugin->register_trap(info, ConnectServer_handler, search_breakpoint_by_addr(plugin, vt[3]), "ConnectServer");
     }
     catch (const std::exception& e)
     {
@@ -771,16 +753,12 @@ event_response_t CoCreateInstanse_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
             return VMI_EVENT_RESPONSE_NONE;
     }
 
-    auto trap = plugin->register_trap<wmimon, CoCreateInstanse<wmimon>>(drakvuf,
-                info,
-                plugin,
-                CoCreateInstanse_return_handler,
-                breakpoint_by_dtb_searcher());
+    auto trap = plugin->register_trap<CoCreateInstanse>(info, CoCreateInstanse_return_handler, breakpoint_by_dtb_searcher());
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto params = get_trap_params<wmimon, CoCreateInstanse<wmimon>>(trap);
+    auto params = get_trap_params<wmimon, CoCreateInstanse>(trap);
     if (!params)
     {
         plugin->destroy_trap(drakvuf, trap);
@@ -843,7 +821,7 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
 
     PRINT_DEBUG("[WMIMon] attempt to setup a trap for \"%s::CoCreateInstance\"\n", dll_name);
     breakpoint_in_dll_module_searcher bp(profile, dll_name);
-    if (!register_trap<wmimon>(drakvuf, nullptr, this, CoCreateInstanse_handler, bp.for_syscall_name("CoCreateInstance")))
+    if (!register_trap(nullptr, CoCreateInstanse_handler, bp.for_syscall_name("CoCreateInstance")))
         throw -1;
 
     // if (c->wow_ole32_profile)
