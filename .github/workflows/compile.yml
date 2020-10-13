@@ -11,26 +11,73 @@ jobs:
           - 'ubuntu-20.04'
     steps:
       - uses: actions/checkout@v2
-      - name: Compile
+      - name: Install dependencies
         run: |
           # Install packages
           sudo apt-get update -q
           sudo apt-get install -y clang-10 autoconf-archive flex bison libjson-c-dev libxen-dev
-          # Set Exports
-          export PATH=/usr/lib/llvm-10/bin:$PATH
-          export CC=clang
-          export CXX=clang++
           # Compile & install LibVMI
           git submodule update --init libvmi
           cd libvmi
           autoreconf -vif
           ./configure --disable-kvm --disable-file --disable-bareflank --disable-examples --disable-vmifs
-          make
+          make -j2
           sudo make install
           sudo ldconfig
           cd ..
-          # Compile & install DRAKVUF
-          autoreconf -vif
+      - name: autoreconf
+        run: autoreconf -vif
+      - name: Compile
+        run: |
+          export PATH=/usr/lib/llvm-10/bin:$PATH
+          export CC=clang
+          export CXX=clang++
           ./configure
-          make
-          sudo make install
+          make -j2
+          make -j2 clean
+      - name: Compile debug
+        run: |
+          export PATH=/usr/lib/llvm-10/bin:$PATH
+          export CC=clang
+          export CXX=clang++
+          ./configure --enable-debug
+          make -j2
+          make -j2 clean
+      - name: Compile with plugin disabled
+        run: |
+          export PATH=/usr/lib/llvm-10/bin:$PATH
+          export CC=clang
+          export CXX=clang++
+          ./configure --enable-debug --disable-plugin-syscalls
+          make -j2
+          make -j2 clean
+      - name: Compile with sanitizer enabled
+        run: |
+          export PATH=/usr/lib/llvm-10/bin:$PATH
+          export CC=clang
+          export CXX=clang++
+          ./configure --enable-debug --enable-sanitize
+          make -j2
+          make -j2 clean
+      - name: Compile with REPL
+        run: |
+          sudo pip3 install ctypesgen ipython
+          export PATH=/usr/lib/llvm-10/bin:$PATH
+          export CC=clang
+          export CXX=clang++
+          ./configure --enable-debug --enable-repl
+          make -j2
+          make -j2 clean
+      - name: Compile from make dist tarball
+        run: |
+          export PATH=/usr/lib/llvm-10/bin:$PATH
+          export CC=clang
+          export CXX=clang++
+          ./configure
+          make -j2 dist
+          mkdir build && cd build
+          tar xvf ../drakvuf-*.tar.gz
+          cd *drakvuf*
+          ./autogen.sh
+          ./configure
+          make -j2
