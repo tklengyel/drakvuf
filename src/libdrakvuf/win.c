@@ -382,7 +382,7 @@ bool win_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return drakvuf_get_wow_context(drakvuf, ethread, &wow_ctx);
 }
 
-addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int narg)
+addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg)
 {
     page_mode_t pm = drakvuf_get_page_mode(drakvuf);
     bool is32 = pm != VMI_PM_IA32E || win_is_wow64(drakvuf, info);
