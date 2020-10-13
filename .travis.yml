@@ -36,93 +36,22 @@ before_install:
       export CC="ccache clang"
       export CXX="ccache clang++"
       export CPP="ccache clang-cpp"
-      if [[ -z $SKIP_LIBVMI ]]; then
-         git submodule update --init libvmi
-         LIBVMI_HASH=$(git ls-files -s libvmi | cut -f2 '-d ')
-         CACHED_HASH=$(cat $INSTALLDIR/libvmi_hash || echo -n "")
-         if [[ "$LIBVMI_HASH" != "$CACHED_HASH" ]]; then
-             cd libvmi
-             autoreconf -vif
-             ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-             make
-             rm -rf $INSTALLDIR
-             make install
-             echo $LIBVMI_HASH > $INSTALLDIR/libvmi_hash
-             cd ..
-         fi
+      git submodule update --init libvmi
+      LIBVMI_HASH=$(git ls-files -s libvmi | cut -f2 '-d ')
+      CACHED_HASH=$(cat $INSTALLDIR/libvmi_hash || echo -n "")
+      if [[ "$LIBVMI_HASH" != "$CACHED_HASH" ]]; then
+          cd libvmi
+          autoreconf -vif
+          ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
+          make
+          rm -rf $INSTALLDIR
+          make install
+          echo $LIBVMI_HASH > $INSTALLDIR/libvmi_hash
+          cd ..
       fi
 
 jobs:
     include:
-
-#
-# compile tests
-#
-    - env:
-        - TEST="compile"
-      install:
-        - ./autogen.sh
-      script:
-        - ./configure --prefix=${INSTALLDIR} || cat config.log
-        - make
-
-    - env:
-        - TEST="compile with plugin disabled"
-      install:
-        - ./autogen.sh
-      script:
-        - ./configure --prefix=${INSTALLDIR} --disable-plugin-syscalls || cat config.log
-        - make
-
-    - env:
-        - TEST="compile debug"
-      install:
-        - ./autogen.sh
-      script:
-        - ./configure --prefix=${INSTALLDIR} --enable-debug --enable-sanitize || cat config.log
-        - make
-
-    - env:
-        - TEST="compile debug with plugin disabled"
-      install:
-        - ./autogen.sh
-      script:
-        - ./configure --prefix=${INSTALLDIR} --enable-debug --disable-plugin-syscalls || cat config.log
-        - make
-
-    - env:
-        - TEST="compile from make dist tarball"
-      install:
-        - ./autogen.sh
-      script:
-        - ./configure --prefix=${INSTALLDIR} || cat config.log
-        - make dist
-        - mkdir build && cd build
-        - tar xvf ../drakvuf-*.tar.gz
-        - cd *drakvuf*
-        - ./autogen.sh
-        - ./configure --prefix=${INSTALLDIR} || cat config.log
-        - make
-
-    - env:
-        - TEST="compile debug with REPL enabled"
-      install:
-        - sudo pip3 install ctypesgen ipython
-        - ./autogen.sh
-      script:
-        - ./configure --enable-debug --enable-sanitize --enable-repl || cat config.log
-        - make
-
-#
-# clang scan-build
-#
-    - env:
-        - TEST="scan-build"
-      install:
-        - ./autogen.sh
-      script:
-        - scan-build-10 --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
-        - scan-build-10 --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores make
 
 #
 # Build binary packages and push them as releases on drakvuf-builds
