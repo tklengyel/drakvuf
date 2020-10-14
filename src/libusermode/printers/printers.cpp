@@ -108,6 +108,39 @@
 #include <libvmi/libvmi.h>
 #include <libdrakvuf/libdrakvuf.h>
 
+std::string escape_str(const std::string& s)
+{
+    char const* const hexdig = "0123456789ABCDEF";
+    std::stringstream os;
+
+    for (char c : s)
+    {
+        switch (c)
+        {
+            case '\\':
+                os << "\\\\";
+                break;
+            case '\t':
+                os << "\\t";
+                break;
+            case '\r':
+                os << "\\r";
+                break;
+            case '\n':
+                os << "\\n";
+                break;
+            default:
+                if (c < ' ' || c > '~')
+                    os << "\\x" << hexdig[c >> 4] << hexdig[c & 0xF];
+                else
+                    os << c;
+                break;
+        }
+    }
+
+    return os.str();
+}
+
 ArgumentPrinter::ArgumentPrinter(std::string arg_name, bool print_no_addr) : name(arg_name), print_no_addr(print_no_addr)
 {
     // intentionally empty
@@ -142,7 +175,7 @@ std::string StringPrinterInterface::print(drakvuf_t drakvuf, drakvuf_trap_info* 
     stream << name << "=";
     if (!print_no_addr)
         stream << "0x" << std::hex << argument << ":";
-    stream << "\"" << str << "\"";
+    stream << "\"" << escape_str(str) << "\"";
     return stream.str();
 }
 
@@ -194,7 +227,7 @@ std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, ui
     stream << name << "=";
     if (!print_no_addr)
         stream << "0x" << std::hex << argument << ":";
-    stream << "\"" << str << "\"";
+    stream << "\"" << escape_str(str) << "\"";
     return stream.str();
 }
 
