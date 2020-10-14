@@ -108,7 +108,7 @@
 #include <libvmi/libvmi.h>
 #include <libdrakvuf/libdrakvuf.h>
 
-std::string escape_str(const std::string &s)
+std::string escape_str(const std::string& s)
 {
     char const* const hexdig = "0123456789ABCDEF";
     std::stringstream os;
