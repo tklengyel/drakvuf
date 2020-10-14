@@ -117,16 +117,24 @@ std::string escape_str(const std::string &s)
     {
         switch (c)
         {
-        case '\\': os << "\\\\"; break;
-        case '\t': os << "\\t";  break;
-        case '\r': os << "\\r";  break;
-        case '\n': os << "\\n";  break;
-        default:
-            if (c < ' ' || c > '~')
-                os << "\\x" << hexdig[c >> 4] << hexdig[c & 0xF];
-            else
-                os << c;
-            break;
+            case '\\':
+                os << "\\\\";
+                break;
+            case '\t':
+                os << "\\t";
+                break;
+            case '\r':
+                os << "\\r";
+                break;
+            case '\n':
+                os << "\\n";
+                break;
+            default:
+                if (c < ' ' || c > '~')
+                    os << "\\x" << hexdig[c >> 4] << hexdig[c & 0xF];
+                else
+                    os << c;
+                break;
         }
     }
 
