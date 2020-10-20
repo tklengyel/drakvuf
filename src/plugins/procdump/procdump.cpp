@@ -705,8 +705,6 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
 static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, procdump_ctx* ctx)
 {
     auto plugin = get_trap_plugin<procdump>(info);
-    if (!plugin)
-        return false;
 
     uint32_t time_stamp = g_get_real_time() / G_USEC_PER_SEC;
 
@@ -863,10 +861,6 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
         return VMI_EVENT_RESPONSE_NONE;
 
     auto plugin = get_trap_plugin<procdump>(info);
-    if (!plugin)
-    {
-        return VMI_EVENT_RESPONSE_NONE;
-    }
 
     // The callback could be called if other thread invokes NtTerminateProcess
     // or as a return path from injected function.
@@ -1029,12 +1023,8 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
     __cpuid(0x80000001, r0, amd_extended_cpu_features, r1, r2);
 
     breakpoint_in_system_process_searcher bp;
-    if (!register_trap<procdump>(
-            drakvuf, nullptr, this, terminate_process_cb,
-            bp.for_syscall_name("NtTerminateProcess")))
-    {
+    if (!register_trap(nullptr, terminate_process_cb, bp.for_syscall_name("NtTerminateProcess")))
         throw -1;
-    }
 }
 
 procdump::~procdump()

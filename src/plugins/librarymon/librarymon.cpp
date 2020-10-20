@@ -117,8 +117,6 @@ static event_response_t load_library_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* 
         return VMI_EVENT_RESPONSE_NONE;
 
     auto mon = get_trap_plugin<librarymon>(info);
-    if (!mon)
-        return VMI_EVENT_RESPONSE_NONE;
 
     unicode_string_t path { 0, 0, 0 };
     unicode_string_t name { 0, 0, 0 };
@@ -159,11 +157,11 @@ librarymon::librarymon(drakvuf_t drakvuf, const librarymon_config* c, output_for
     PRINT_DEBUG("Librarymon attempt to setup a trap for \"LdrLoadDll\"\n");
 
     breakpoint_in_dll_module_searcher bp(ntdll_profile, "ntdll.dll");
-    if (!register_trap(drakvuf, nullptr, this, load_library_cb, bp.for_syscall_name("LdrLoadDll")))
+    if (!register_trap(nullptr, load_library_cb, bp.for_syscall_name("LdrLoadDll")))
         throw -1;
 
     PRINT_DEBUG("Librarymon attempt to setup a trap for \"LdrGetDllHandle\"\n");
-    if (!register_trap(drakvuf, nullptr, this, load_library_cb, bp.for_syscall_name("LdrGetDllHandle")))
+    if (!register_trap(nullptr, load_library_cb, bp.for_syscall_name("LdrGetDllHandle")))
         throw -1;
 
 

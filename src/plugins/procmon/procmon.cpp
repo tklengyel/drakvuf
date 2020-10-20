@@ -119,10 +119,9 @@
 namespace
 {
 
-template<typename T>
-struct open_process_result_t: public call_result_t<T>
+struct open_process_result_t: public call_result_t
 {
-    open_process_result_t(T* src) : call_result_t<T>(src), process_handle_addr(), desired_access(), object_attributes_addr(), client_id{} {}
+    open_process_result_t() : call_result_t(), process_handle_addr(), desired_access(), object_attributes_addr(), client_id{} {}
 
     addr_t process_handle_addr;
     uint32_t desired_access;
@@ -130,10 +129,9 @@ struct open_process_result_t: public call_result_t<T>
     uint32_t client_id;
 };
 
-template<typename T>
-struct open_thread_result_t: public call_result_t<T>
+struct open_thread_result_t: public call_result_t
 {
-    open_thread_result_t(T* src) : call_result_t<T>(src), thread_handle_addr(), desired_access(), object_attributes_addr(), client_id(), unique_thread() {}
+    open_thread_result_t() : call_result_t(), thread_handle_addr(), desired_access(), object_attributes_addr(), client_id(), unique_thread() {}
 
     addr_t thread_handle_addr;
     uint32_t desired_access;
@@ -142,20 +140,18 @@ struct open_thread_result_t: public call_result_t<T>
     uint32_t unique_thread;
 };
 
-template<typename T>
-struct process_creation_result_t: public call_result_t<T>
+struct process_creation_result_t: public call_result_t
 {
-    process_creation_result_t(T* src) : call_result_t<T>(src), new_process_handle_addr(), new_thread_handle_addr(), user_process_parameters_addr() {}
+    process_creation_result_t() : call_result_t(), new_process_handle_addr(), new_thread_handle_addr(), user_process_parameters_addr() {}
 
     addr_t new_process_handle_addr;
     addr_t new_thread_handle_addr;
     addr_t user_process_parameters_addr;
 };
 
-template<typename T>
-struct process_create_ex_result_t: public call_result_t<T>
+struct process_create_ex_result_t: public call_result_t
 {
-    process_create_ex_result_t(T* src) : call_result_t<T>(src), process_handle_addr(), desired_access(), object_attributes_addr(), parent_process(), flags(), section_handle(), debug_port(), exception_port(), job_member_level() {}
+    process_create_ex_result_t() : call_result_t(), process_handle_addr(), desired_access(), object_attributes_addr(), parent_process(), flags(), section_handle(), debug_port(), exception_port(), job_member_level() {}
 
     addr_t process_handle_addr;
     uint32_t desired_access;
@@ -289,24 +285,17 @@ static void print_process_creation_result(
 
 static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    auto data = get_trap_params<procmon, process_creation_result_t<procmon>>(info);
-    if (!data)
-    {
-        PRINT_DEBUG("procmon process_creation_return_hook invalid trap params!\n");
-        drakvuf_remove_trap(drakvuf, info->trap, nullptr);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+    auto plugin = get_trap_plugin<procmon>(info);
+    auto params = get_trap_params<process_creation_result_t>(info);
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto* plugin = data->plugin();
-    addr_t user_process_parameters_addr = data->user_process_parameters_addr;
-    addr_t new_thread_handle_addr = data->new_thread_handle_addr;
-    addr_t new_process_handle_addr = data->new_process_handle_addr;
+    addr_t user_process_parameters_addr = params->user_process_parameters_addr;
+    addr_t new_thread_handle_addr = params->new_thread_handle_addr;
+    addr_t new_process_handle_addr = params->new_process_handle_addr;
     reg_t status = info->regs->rax;
 
-    plugin->destroy_trap(drakvuf, info->trap);
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -335,27 +324,21 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
         new_tid = 0;
 
     print_process_creation_result(plugin, drakvuf, info, status, new_process_handle, new_pid, new_thread_handle, new_tid, user_process_parameters_addr);
+    plugin->destroy_trap(info->trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t process_create_ex_return_hook(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    auto data = get_trap_params<procmon, process_create_ex_result_t<procmon>>(info);
-    if (!data)
-    {
-        PRINT_DEBUG("procmon process_creation_return_hook invalid trap params!\n");
-        drakvuf_remove_trap(drakvuf, info->trap, nullptr);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+    auto plugin = get_trap_plugin<procmon>(info);
+    auto params = get_trap_params<process_create_ex_result_t>(info);
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
 
-    auto* plugin = data->plugin();
-    addr_t process_handle_addr = data->process_handle_addr;
+    addr_t process_handle_addr = params->process_handle_addr;
     reg_t status = info->regs->rax;
 
-    plugin->destroy_trap(drakvuf, info->trap);
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -377,17 +360,18 @@ static event_response_t process_create_ex_return_hook(drakvuf_t drakvuf, drakvuf
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
                keyval("Status", fmt::Xval(status)),
                keyval("ProcessHandle", fmt::Xval(process_handle)),
-               keyval("DesiredAccess", fmt::Xval(data->desired_access)),
-               keyval("ObjectAttributes", fmt::Xval(data->object_attributes_addr)),
-               keyval("ParentProcess", fmt::Xval(data->parent_process)),
-               keyval("Flags", fmt::Xval(data->flags)),
-               keyval("SectionHandle", fmt::Xval(data->section_handle)),
-               keyval("DebugPort", fmt::Xval(data->debug_port)),
-               keyval("ExceptionPort", fmt::Xval(data->exception_port)),
-               keyval("JobMemberLevel", fmt::Nval(data->job_member_level)),
+               keyval("DesiredAccess", fmt::Xval(params->desired_access)),
+               keyval("ObjectAttributes", fmt::Xval(params->object_attributes_addr)),
+               keyval("ParentProcess", fmt::Xval(params->parent_process)),
+               keyval("Flags", fmt::Xval(params->flags)),
+               keyval("SectionHandle", fmt::Xval(params->section_handle)),
+               keyval("DebugPort", fmt::Xval(params->debug_port)),
+               keyval("ExceptionPort", fmt::Xval(params->exception_port)),
+               keyval("JobMemberLevel", fmt::Nval(params->job_member_level)),
                keyval("NewPid", fmt::Nval(new_pid))
               );
 
+    plugin->destroy_trap(info->trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -398,29 +382,16 @@ static event_response_t create_user_process_hook(
     addr_t user_process_parameters_addr)
 {
     auto plugin = get_trap_plugin<procmon>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    auto trap = plugin->register_trap<procmon, process_creation_result_t<procmon>>(
-                    drakvuf,
+    auto trap = plugin->register_trap<process_creation_result_t>(
                     info,
-                    plugin,
                     process_creation_return_hook,
                     breakpoint_by_pid_searcher());
-    if (!trap)
-        return VMI_EVENT_RESPONSE_NONE;
 
-    auto data = get_trap_params<procmon, process_creation_result_t<procmon>>(trap);
-    if (!data)
-    {
-        plugin->destroy_plugin_params(plugin->detach_plugin_params(trap));
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
-    data->new_process_handle_addr = process_handle_addr;
-    data->new_thread_handle_addr = thread_handle_addr;
-    data->user_process_parameters_addr = user_process_parameters_addr;
+    auto params = get_trap_params<process_creation_result_t>(trap);
+    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->new_process_handle_addr = process_handle_addr;
+    params->new_thread_handle_addr = thread_handle_addr;
+    params->user_process_parameters_addr = user_process_parameters_addr;
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -437,35 +408,23 @@ static event_response_t create_process_ex_hook(
     uint32_t job_member_level)
 {
     auto plugin = get_trap_plugin<procmon>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    auto trap = plugin->register_trap<procmon, process_create_ex_result_t<procmon>>(
-                    drakvuf,
+    auto trap = plugin->register_trap<process_create_ex_result_t>(
                     info,
-                    plugin,
                     process_create_ex_return_hook,
                     breakpoint_by_pid_searcher());
-    if (!trap)
-        return VMI_EVENT_RESPONSE_NONE;
 
-    auto data = get_trap_params<procmon, process_create_ex_result_t<procmon>>(trap);
-    if (!data)
-    {
-        plugin->destroy_plugin_params(plugin->detach_plugin_params(trap));
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+    auto params = get_trap_params<process_create_ex_result_t>(trap);
 
-    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
-    data->process_handle_addr = process_handle_addr;
-    data->desired_access = desired_access;
-    data->object_attributes_addr = object_attributes_addr;
-    data->parent_process = parent_process;
-    data->flags = flags;
-    data->section_handle = section_handle;
-    data->debug_port = debug_port;
-    data->exception_port = exception_port;
-    data->job_member_level = job_member_level;
+    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->process_handle_addr = process_handle_addr;
+    params->desired_access = desired_access;
+    params->object_attributes_addr = object_attributes_addr;
+    params->parent_process = parent_process;
+    params->flags = flags;
+    params->section_handle = section_handle;
+    params->debug_port = debug_port;
+    params->exception_port = exception_port;
+    params->job_member_level = job_member_level;
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -474,8 +433,6 @@ static event_response_t terminate_process_hook(
     addr_t process_handle, addr_t exit_status)
 {
     auto plugin = get_trap_plugin<procmon>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
 
     vmi_pid_t exit_pid;
     if (!drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &exit_pid))
@@ -531,26 +488,17 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
 
 static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    auto data = get_trap_params<procmon, open_process_result_t<procmon>>(info);
-    if (!data || !data->plugin())
-    {
-        PRINT_DEBUG("procmon open_process_return_hook_cb invalid trap params!\n");
-        drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+    auto plugin = get_trap_plugin<procmon>(info);
+    auto params = get_trap_params<open_process_result_t>(info);
+
+    if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
-        return VMI_EVENT_RESPONSE_NONE;
-
-    procmon* plugin = data->plugin();
-
-    plugin->destroy_trap(drakvuf, info->trap);
 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = data->process_handle_addr,
+        .addr = params->process_handle_addr,
     };
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -563,7 +511,7 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     char* name = nullptr;
     addr_t client_process = 0;
-    if (drakvuf_find_process(drakvuf, data->client_id, nullptr, &client_process))
+    if (drakvuf_find_process(drakvuf, params->client_id, nullptr, &client_process))
         name = drakvuf_get_process_name(drakvuf, client_process, true);
 
     if (!name)
@@ -571,60 +519,49 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
                keyval("ProcessHandle", fmt::Xval(process_handle)),
-               keyval("DesiredAccess", fmt::Xval(data->desired_access)),
-               keyval("ObjectAttributes", fmt::Xval(data->object_attributes_addr)),
-               keyval("ClientID", fmt::Nval(data->client_id)),
+               keyval("DesiredAccess", fmt::Xval(params->desired_access)),
+               keyval("ObjectAttributes", fmt::Xval(params->object_attributes_addr)),
+               keyval("ClientID", fmt::Nval(params->client_id)),
                keyval("ClientName", fmt::Qstr(name))
               );
 
     g_free(name);
+    plugin->destroy_trap(info->trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto plugin = get_trap_plugin<procmon>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    auto trap = plugin->register_trap<procmon, open_process_result_t<procmon>>(
-                    drakvuf,
+    auto trap = plugin->register_trap<open_process_result_t>(
                     info,
-                    plugin,
                     open_process_return_hook_cb,
                     breakpoint_by_pid_searcher());
-    if (!trap)
-        return VMI_EVENT_RESPONSE_NONE;
 
-    auto data = get_trap_params<procmon, open_process_result_t<procmon>>(trap);
-    if (!data)
-    {
-        plugin->destroy_plugin_params(plugin->detach_plugin_params(trap));
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+    auto params = get_trap_params<open_process_result_t>(trap);
 
-    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
 
     // PHANDLE ProcessHandle
-    data->process_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
+    params->process_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
 
     // ACCESS_MASK DesiredAccess
-    data->desired_access = drakvuf_get_function_argument(drakvuf, info, 2);
+    params->desired_access = drakvuf_get_function_argument(drakvuf, info, 2);
 
     // POBJECT_ATTRIBUTES ObjectAttributes
-    data->object_attributes_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    params->object_attributes_addr = drakvuf_get_function_argument(drakvuf, info, 3);
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB, .dtb = info->regs->cr3 };
 
     // PCLIENT_ID ClientId
-    data->client_id = 0;
+    params->client_id = 0;
     ctx.addr = drakvuf_get_function_argument(drakvuf, info, 4);
-    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&data->client_id))
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&params->client_id))
         PRINT_DEBUG("[PROCMON] Failed to read CLIENT_ID\n");
 
-    if (!data->client_id)
-        data->client_id = info->attached_proc_data.pid;
+    if (!params->client_id)
+        params->client_id = info->attached_proc_data.pid;
 
     drakvuf_release_vmi(drakvuf);
     return VMI_EVENT_RESPONSE_NONE;
@@ -632,26 +569,17 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
 static event_response_t open_thread_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    auto data = get_trap_params<procmon, open_thread_result_t<procmon>>(info);
-    if (!data || !data->plugin())
-    {
-        PRINT_DEBUG("procmon open_thread_return_hook_cb invalid trap params!\n");
-        drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+    auto plugin = get_trap_plugin<procmon>(info);
+    auto params = get_trap_params<open_thread_result_t>(info);
+
+    if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
-        return VMI_EVENT_RESPONSE_NONE;
-
-    procmon* plugin = data->plugin();
-
-    plugin->destroy_trap(drakvuf, info->trap);
 
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = data->thread_handle_addr,
+        .addr = params->thread_handle_addr,
     };
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -664,7 +592,7 @@ static event_response_t open_thread_return_hook_cb(drakvuf_t drakvuf, drakvuf_tr
 
     char* name = nullptr;
     addr_t client_process = 0;
-    if (drakvuf_find_process(drakvuf, data->client_id, nullptr, &client_process))
+    if (drakvuf_find_process(drakvuf, params->client_id, nullptr, &client_process))
         name = drakvuf_get_process_name(drakvuf, client_process, true);
 
     if (!name)
@@ -672,64 +600,53 @@ static event_response_t open_thread_return_hook_cb(drakvuf_t drakvuf, drakvuf_tr
 
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
                keyval("ThreadHandle", fmt::Xval(thread_handle)),
-               keyval("DesiredAccess", fmt::Xval(data->desired_access)),
-               keyval("ObjectAttributes", fmt::Xval(data->object_attributes_addr)),
-               keyval("ClientID", fmt::Nval(data->client_id)),
+               keyval("DesiredAccess", fmt::Xval(params->desired_access)),
+               keyval("ObjectAttributes", fmt::Xval(params->object_attributes_addr)),
+               keyval("ClientID", fmt::Nval(params->client_id)),
                keyval("ClientName", fmt::Qstr(name)),
-               keyval("UniqueThread", fmt::Nval(data->unique_thread))
+               keyval("UniqueThread", fmt::Nval(params->unique_thread))
               );
     g_free(name);
+    plugin->destroy_trap(info->trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 static event_response_t open_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto plugin = get_trap_plugin<procmon>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    auto trap = plugin->register_trap<procmon, open_thread_result_t<procmon>>(
-                    drakvuf,
+    auto trap = plugin->register_trap<open_thread_result_t>(
                     info,
-                    plugin,
                     open_thread_return_hook_cb,
                     breakpoint_by_pid_searcher());
-    if (!trap)
-        return VMI_EVENT_RESPONSE_NONE;
 
-    auto data = get_trap_params<procmon, open_thread_result_t<procmon>>(trap);
-    if (!data)
-    {
-        plugin->destroy_plugin_params(plugin->detach_plugin_params(trap));
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+    auto params = get_trap_params<open_thread_result_t>(trap);
 
-    data->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
 
     // PHANDLE ProcessHandle
-    data->thread_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
+    params->thread_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
 
     // ACCESS_MASK DesiredAccess
-    data->desired_access = drakvuf_get_function_argument(drakvuf, info, 2);
+    params->desired_access = drakvuf_get_function_argument(drakvuf, info, 2);
 
     // POBJECT_ATTRIBUTES ObjectAttributes
-    data->object_attributes_addr = drakvuf_get_function_argument(drakvuf, info, 3);
+    params->object_attributes_addr = drakvuf_get_function_argument(drakvuf, info, 3);
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB, .dtb = info->regs->cr3 };
 
     // PCLIENT_ID ClientId
-    data->client_id = 0;
+    params->client_id = 0;
     ctx.addr = drakvuf_get_function_argument(drakvuf, info, 4);
-    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&data->client_id))
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&params->client_id))
         PRINT_DEBUG("[PROCMON] Failed to read CLIENT_ID\n");
 
     ctx.addr += plugin->cid_tid;
-    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&data->unique_thread))
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&params->unique_thread))
         PRINT_DEBUG("[PROCMON] Failed to read CLIENT_ID.UniqueThread\n");
 
-    if (!data->client_id)
-        data->client_id = info->attached_proc_data.pid;
+    if (!params->client_id)
+        params->client_id = info->attached_proc_data.pid;
 
     drakvuf_release_vmi(drakvuf);
     return VMI_EVENT_RESPONSE_NONE;
@@ -743,8 +660,6 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
     uint32_t new_protect = drakvuf_get_function_argument(drakvuf, info, 4);
 
     auto plugin = get_trap_plugin<procmon>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
 
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
                keyval("ProcessHandle", fmt::Xval(process_handle)),
@@ -764,8 +679,6 @@ static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_tr
     addr_t newstate_va = drakvuf_get_function_argument(drakvuf, info, 3);
 
     auto plugin = get_trap_plugin<procmon>(info);
-    if (!plugin)
-        return VMI_EVENT_RESPONSE_NONE;
 
     if (disable_all)
         privileges.push_back(keyval("DisableAll", fmt::Nval(1UL)));
@@ -871,13 +784,13 @@ procmon::procmon(drakvuf_t drakvuf, output_format_t output)
     this->current_directory_dospath = current_directory_offset + curdir_dospath_offset;
 
     breakpoint_in_system_process_searcher bp;
-    if (!register_trap<procmon>(drakvuf, nullptr, this, create_user_process_hook_cb, bp.for_syscall_name("NtCreateUserProcess")) ||
-        !register_trap<procmon>(drakvuf, nullptr, this, create_process_ex_hook_cb, bp.for_syscall_name("NtCreateProcessEx")) ||
-        !register_trap<procmon>(drakvuf, nullptr, this, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
-        !register_trap<procmon>(drakvuf, nullptr, this, open_process_hook_cb, bp.for_syscall_name("NtOpenProcess")) ||
-        !register_trap<procmon>(drakvuf, nullptr, this, open_thread_hook_cb, bp.for_syscall_name("NtOpenThread")) ||
-        !register_trap<procmon>(drakvuf, nullptr, this, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
-        !register_trap<procmon>(drakvuf, nullptr, this, adjust_privileges_token_cb, bp.for_syscall_name("NtAdjustPrivilegesToken")))
+    if (!register_trap(nullptr, create_user_process_hook_cb, bp.for_syscall_name("NtCreateUserProcess")) ||
+        !register_trap(nullptr, create_process_ex_hook_cb, bp.for_syscall_name("NtCreateProcessEx")) ||
+        !register_trap(nullptr, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
+        !register_trap(nullptr, open_process_hook_cb, bp.for_syscall_name("NtOpenProcess")) ||
+        !register_trap(nullptr, open_thread_hook_cb, bp.for_syscall_name("NtOpenThread")) ||
+        !register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
+        !register_trap(nullptr, adjust_privileges_token_cb, bp.for_syscall_name("NtAdjustPrivilegesToken")))
     {
         throw -1;
     }
