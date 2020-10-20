@@ -102,7 +102,6 @@
 *                                                                         *
 ***************************************************************************/
 
-#include <stdexcept>
 #include <libdrakvuf/libdrakvuf.h>
 #include "plugins_ex.h"
 
@@ -122,39 +121,3 @@ std::string FieldToString(const std::map<uint64_t, std::string>& maps, uint64_t 
 
 // Errors
 char ERROR_MSG_ADDING_TRAP[] = "Failed to add a trap";
-
-pluginex::pluginex(drakvuf_t drakvuf, output_format_t output)
-    : m_output_format(output)
-    , m_params()
-{
-}
-
-pluginex::~pluginex()
-{
-    g_slist_free_full(m_params, reinterpret_cast<void (*)(void*)>(destroy_plugin_params));
-}
-
-void pluginex::attach_plugin_params(drakvuf_trap_t* data)
-{
-    m_params = g_slist_append(m_params, data);
-}
-
-drakvuf_trap_t* pluginex::detach_plugin_params(drakvuf_trap_t* data)
-{
-    m_params = g_slist_remove(m_params, data);
-    return data;
-}
-
-void pluginex::destroy_plugin_params(drakvuf_trap_t* trap)
-{
-    if (trap && trap->data)
-        delete reinterpret_cast<plugin_params<pluginex>*>(trap->data);
-
-    delete trap;
-}
-
-void pluginex::destroy_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
-{
-    m_params = g_slist_remove(m_params, trap);
-    drakvuf_remove_trap(drakvuf, trap, destroy_plugin_params);
-}
