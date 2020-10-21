@@ -347,16 +347,6 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
         throw -1;
     }
 
-    auto it = std::begin(this->wanted_hooks);
-
-    while (it != std::end(this->wanted_hooks))
-    {
-        if ((*it).log_strategy != "log" && (*it).log_strategy != "log+stack")
-            it = this->wanted_hooks.erase(it);
-        else
-            ++it;
-    }
-
     if (this->wanted_hooks.empty())
     {
         // don't load this plugin if there is nothing to do

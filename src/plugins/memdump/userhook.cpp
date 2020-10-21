@@ -191,7 +191,7 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
 
     while (it != std::end(this->wanted_hooks))
     {
-        if ((*it).log_strategy != "stack" && (*it).log_strategy != "log+stack")
+        if ((*it).log_strategy != LogStrategy::LOG_AND_STACK)
             it = this->wanted_hooks.erase(it);
         else
             ++it;
@@ -248,7 +248,7 @@ void memdump::setup_dotnet_hooks(drakvuf_t drakvuf, const char* dll_name, const 
     entry.dll_name = dll_name;
     entry.type = HOOK_BY_OFFSET;
     entry.offset = func_rva;
-    entry.log_strategy = "log+stack";
+    entry.log_strategy = LogStrategy::LOG_AND_STACK;
     this->wanted_hooks.push_back(std::move(entry));
 }
 

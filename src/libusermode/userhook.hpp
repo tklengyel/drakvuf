@@ -121,6 +121,12 @@ enum target_hook_type
     HOOK_BY_OFFSET
 };
 
+enum class LogStrategy
+{
+    LOG,
+    LOG_AND_STACK,
+};
+
 struct plugin_target_config_entry_t
 {
     std::string dll_name;
@@ -128,19 +134,19 @@ struct plugin_target_config_entry_t
     std::string function_name;
     std::string clsid;
     addr_t offset;
-    std::string log_strategy;
+    LogStrategy log_strategy;
     std::vector< std::unique_ptr< ArgumentPrinter > > argument_printers;
 
     plugin_target_config_entry_t()
         : dll_name(), function_name(), offset(), log_strategy(), argument_printers()
     {}
 
-    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, addr_t offset, std::string&& log_strategy, std::vector< std::unique_ptr< ArgumentPrinter > >&& argument_printers)
-        : dll_name(std::move(dll_name)), type(HOOK_BY_OFFSET), function_name(std::move(function_name)), offset(offset), log_strategy(std::move(log_strategy)), argument_printers(std::move(argument_printers))
+    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, addr_t offset, LogStrategy log_strategy, std::vector< std::unique_ptr< ArgumentPrinter > >&& argument_printers)
+        : dll_name(std::move(dll_name)), type(HOOK_BY_OFFSET), function_name(std::move(function_name)), offset(offset), log_strategy(log_strategy), argument_printers(std::move(argument_printers))
     {}
 
-    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, std::string&& log_strategy, std::vector< std::unique_ptr< ArgumentPrinter > >&& argument_printers)
-        : dll_name(std::move(dll_name)), type(HOOK_BY_NAME), function_name(std::move(function_name)), offset(), log_strategy(std::move(log_strategy)), argument_printers(std::move(argument_printers))
+    plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, LogStrategy log_strategy, std::vector< std::unique_ptr< ArgumentPrinter > >&& argument_printers)
+        : dll_name(std::move(dll_name)), type(HOOK_BY_NAME), function_name(std::move(function_name)), offset(), log_strategy(log_strategy), argument_printers(std::move(argument_printers))
     {}
 };
 
