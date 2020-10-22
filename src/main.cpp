@@ -112,10 +112,12 @@
 #include <unistd.h>
 #include <glib.h>
 #include <exception>
+#include <memory>
 
 #include "drakvuf.h"
+#include "exitcodes.h"
 
-static drakvuf_c* drakvuf;
+static std::unique_ptr<drakvuf_c> drakvuf;
 
 void close_handler(int signal)
 {
@@ -254,7 +256,6 @@ static void print_usage()
 int main(int argc, char** argv)
 {
     int c;
-    int rc = 1;
     int timeout = 0;
     char const* inject_file = nullptr;
     char const* inject_cwd = nullptr;
@@ -290,7 +291,7 @@ int main(int argc, char** argv)
     {
         eprint_current_time();
         fprintf(stderr, "No plugins have been enabled, nothing to do!\n");
-        return rc;
+        return drakvuf_exit_code_t::FAIL;
     }
 
     int long_index = 0;
@@ -388,7 +389,7 @@ int main(int argc, char** argv)
 #else
                 {
                     fprintf(stderr, "Doppelganging is not available, you need to re-run ./configure!\n");
-                    return rc;
+                    return drakvuf_exit_code_t::FAIL;
                 }
 #endif
                 if (!strncmp(optarg, "execproc", 8))
@@ -533,43 +534,43 @@ int main(int argc, char** argv)
 #endif
             case 'h':
                 print_usage();
-                return 0;
+                return drakvuf_exit_code_t::SUCCESS;
             default:
                 if (isalnum(c))
                     fprintf(stderr, "Unrecognized option: %c\n", c);
                 else
                     fprintf(stderr, "Unrecognized option: %s\n", long_opts[long_index].name);
-                return rc;
+                return drakvuf_exit_code_t::FAIL;
         }
 
     if (!domain)
     {
         fprintf(stderr, "No domain name specified (-d)!\n");
-        return rc;
+        return drakvuf_exit_code_t::FAIL;
     }
 
     if (!json_kernel_path)
     {
         fprintf(stderr, "No kernel JSON profile specified (-r)!\n");
-        return rc;
+        return drakvuf_exit_code_t::FAIL;
     }
 
     if (INJECT_METHOD_DOPP == injection_method && (!binary_path || !target_process))
     {
         fprintf(stderr, "Missing parameters for process doppelganging injection (-B and -P)!\n");
-        return rc;
+        return drakvuf_exit_code_t::FAIL;
     }
 
     PRINT_DEBUG("Starting DRAKVUF initialization\n");
 
     try
     {
-        drakvuf = new drakvuf_c(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd, fast_singlestep);
+        drakvuf = std::make_unique<drakvuf_c>(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd, fast_singlestep);
     }
     catch (const std::exception& e)
     {
         fprintf(stderr, "Failed to initialize DRAKVUF: %s\n", e.what());
-        return rc;
+        return drakvuf_exit_code_t::FAIL;
     }
 
     PRINT_DEBUG("DRAKVUF initializated\n");
@@ -590,29 +591,27 @@ int main(int argc, char** argv)
         switch (ret)
         {
             case INJECTOR_FAILED_WITH_ERROR_CODE:
-                rc = 0;
+                return drakvuf_exit_code_t::SUCCESS;
             case INJECTOR_FAILED:
-                goto exit;
+                return drakvuf_exit_code_t::FAIL;
             case INJECTOR_SUCCEEDED:
-            default:
                 break;
+            case INJECTOR_TIMEOUTED:
+                return drakvuf_exit_code_t::INJECTION_TIMEOUT;
         }
     }
 
     PRINT_DEBUG("Starting plugins\n");
 
     if (drakvuf->start_plugins(plugin_list, &options) < 0)
-        goto exit;
+        return drakvuf_exit_code_t::FAIL;
 
     PRINT_DEBUG("Beginning DRAKVUF loop\n");
 
     /* Start the event listener */
     drakvuf->loop(timeout);
-    rc = 0;
 
     PRINT_DEBUG("Finished DRAKVUF loop\n");
 
-exit:
-    delete drakvuf;
-    return rc;
+    return drakvuf_exit_code_t::SUCCESS;
 }

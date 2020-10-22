@@ -660,6 +660,9 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
         drakvuf_loop(drakvuf);
     }
 
+    if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
+        injector->rc = INJECTOR_TIMEOUTED;
+
     free_memtraps(injector);
 
     // drakvuf_remove_trap(drakvuf, &trap, NULL);
