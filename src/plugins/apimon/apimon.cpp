@@ -347,6 +347,15 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
         throw -1;
     }
 
+    auto& hooks = this->wanted_hooks;
+    auto noLog = [](const auto& entry)
+    {
+        return !entry.actions.log;
+    };
+    hooks.erase(
+        std::remove_if(std::begin(hooks), std::end(hooks), noLog),
+        std::end(hooks));
+
     if (this->wanted_hooks.empty())
     {
         // don't load this plugin if there is nothing to do

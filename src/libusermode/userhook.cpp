@@ -856,15 +856,15 @@ bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, con
     return true;
 }
 
-std::optional<LogStrategy> get_log_strategy(const std::string& str)
+std::optional<HookActions> get_hook_actions(const std::string& str)
 {
     if (str == "log")
     {
-        return LogStrategy::LOG;
+        return HookActions::empty().set_log();
     }
     else if (str == "log+stack")
     {
-        return LogStrategy::LOG_AND_STACK;
+        return HookActions::empty().set_log().set_stack();
     }
 
     return std::nullopt;
@@ -874,16 +874,17 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
 {
     if (!dll_hooks_list_path)
     {
+        const auto log_and_stack = HookActions::empty().set_log().set_stack();
         // if the DLL hook list was not provided, we provide some simple defaults
         std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec1;
         arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("wVersionRequired", print_no_addr)));
         arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("lpWSAData", print_no_addr)));
-        wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", LogStrategy::LOG_AND_STACK, std::move(arg_vec1));
+        wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", log_and_stack, std::move(arg_vec1));
 
         std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec2;
         arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("ExitCode", print_no_addr)));
         arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("Unknown", print_no_addr)));
-        wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", LogStrategy::LOG_AND_STACK, std::move(arg_vec2));
+        wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", log_and_stack, std::move(arg_vec2));
         return;
     }
 
@@ -931,10 +932,10 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
         else
             log_strategy_or_offset = token;
 
-        std::optional<LogStrategy> strategy = get_log_strategy(log_strategy_or_offset);
-        if (strategy)
+        std::optional<HookActions> actions = get_hook_actions(log_strategy_or_offset);
+        if (actions)
         {
-            e.log_strategy = *strategy;
+            e.actions = *actions;
         }
         else
         {
@@ -945,11 +946,11 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
             if (!std::getline(ss, strategy_name, ',') || strategy_name.empty())
                 throw -1;
 
-            strategy = get_log_strategy(strategy_name);
-            if (!strategy)
+            actions = get_hook_actions(strategy_name);
+            if (!actions)
                 throw -1;
 
-            e.log_strategy = *strategy;
+            e.actions = *actions;
         }
 
         std::string arg;
