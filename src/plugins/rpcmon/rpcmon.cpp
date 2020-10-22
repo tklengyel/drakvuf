@@ -382,25 +382,26 @@ rpcmon::rpcmon(drakvuf_t drakvuf, output_format_t output)
 {
     std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec;
 
+    const auto log = HookActions::empty().set_log();
     arg_vec.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("pStubDescriptor", false)));
     arg_vec.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("pFormat", false)));
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrAsyncClientCall", "log", std::move(arg_vec));
+    wanted_hooks.emplace_back("rpcrt4.dll", "NdrAsyncClientCall", log, std::move(arg_vec));
 
     arg_vec.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("pStubDescriptor", false)));
     arg_vec.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("pFormat", false)));
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrAsyncClientCall2", "log", std::move(arg_vec));
+    wanted_hooks.emplace_back("rpcrt4.dll", "NdrAsyncClientCall2", log, std::move(arg_vec));
 
     arg_vec.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("pStubDescriptor", false)));
     arg_vec.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("pFormat", false)));
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall", "log", std::move(arg_vec));
+    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall", log, std::move(arg_vec));
 
     arg_vec.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("pStubDescriptor", false)));
     arg_vec.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("pFormat", false)));
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall2", "log", std::move(arg_vec));
+    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall2", log, std::move(arg_vec));
 
     arg_vec.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("pStubDescriptor", false)));
     arg_vec.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("pFormat", false)));
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall4", "log", std::move(arg_vec));
+    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall4", log, std::move(arg_vec));
 
     usermode_cb_registration reg =
     {

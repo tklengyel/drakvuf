@@ -347,15 +347,14 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
         throw -1;
     }
 
-    auto it = std::begin(this->wanted_hooks);
-
-    while (it != std::end(this->wanted_hooks))
+    auto& hooks = this->wanted_hooks;
+    auto noLog = [](const auto& entry)
     {
-        if ((*it).log_strategy != "log" && (*it).log_strategy != "log+stack")
-            it = this->wanted_hooks.erase(it);
-        else
-            ++it;
-    }
+        return !entry.actions.log;
+    };
+    hooks.erase(
+        std::remove_if(std::begin(hooks), std::end(hooks), noLog),
+        std::end(hooks));
 
     if (this->wanted_hooks.empty())
     {

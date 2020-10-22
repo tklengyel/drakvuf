@@ -118,6 +118,7 @@
 #include <sstream>
 #include <map>
 #include <string>
+#include <optional>
 
 #include <config.h>
 #include <glib.h>
@@ -855,20 +856,35 @@ bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, con
     return true;
 }
 
+std::optional<HookActions> get_hook_actions(const std::string& str)
+{
+    if (str == "log")
+    {
+        return HookActions::empty().set_log();
+    }
+    else if (str == "log+stack")
+    {
+        return HookActions::empty().set_log().set_stack();
+    }
+
+    return std::nullopt;
+}
+
 void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, const bool print_no_addr, std::vector<plugin_target_config_entry_t>* wanted_hooks)
 {
     if (!dll_hooks_list_path)
     {
+        const auto log_and_stack = HookActions::empty().set_log().set_stack();
         // if the DLL hook list was not provided, we provide some simple defaults
         std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec1;
         arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("wVersionRequired", print_no_addr)));
         arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("lpWSAData", print_no_addr)));
-        wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", "log+stack", std::move(arg_vec1));
+        wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", log_and_stack, std::move(arg_vec1));
 
         std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec2;
         arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("ExitCode", print_no_addr)));
         arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("Unknown", print_no_addr)));
-        wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", "log+stack", std::move(arg_vec2));
+        wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", log_and_stack, std::move(arg_vec2));
         return;
     }
 
@@ -916,20 +932,25 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
         else
             log_strategy_or_offset = token;
 
-        if (log_strategy_or_offset == "log" || log_strategy_or_offset == "log+stack" || log_strategy_or_offset == "stack")
+        std::optional<HookActions> actions = get_hook_actions(log_strategy_or_offset);
+        if (actions)
         {
-            e.log_strategy = log_strategy_or_offset;
+            e.actions = *actions;
         }
         else
         {
             e.offset = std::stoull(log_strategy_or_offset, 0, 16);
             e.type = HOOK_BY_OFFSET;
 
-            if (!std::getline(ss, e.log_strategy, ',') || e.log_strategy.empty())
+            std::string strategy_name;
+            if (!std::getline(ss, strategy_name, ',') || strategy_name.empty())
                 throw -1;
 
-            if (e.log_strategy != "log" && e.log_strategy != "log+stack" && e.log_strategy != "stack")
+            actions = get_hook_actions(strategy_name);
+            if (!actions)
                 throw -1;
+
+            e.actions = *actions;
         }
 
         std::string arg;
