@@ -216,6 +216,7 @@ injector_status_t injector_start_app(drakvuf_t drakvuf,
                                      bool break_loop_on_detection,
                                      injector_t* injector_to_be_freed,
                                      bool global_search, // out: iff break_loop_on_detection is set
+                                     bool wait_for_exit,
                                      int args_count,
                                      const char* args[]) NOEXCEPT;
 

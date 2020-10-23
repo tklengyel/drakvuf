@@ -244,6 +244,7 @@ injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
                                  true,
                                  &injector_to_be_freed,
                                  global_search,
+                                 false,
                                  args_count,
                                  args);
 
