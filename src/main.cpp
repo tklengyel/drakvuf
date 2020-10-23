@@ -279,7 +279,7 @@ int main(int argc, char** argv)
     bool libvmi_conf = false;
     bool fast_singlestep = false;
     addr_t kpgd = 0;
-    auto terminated_processes = std::make_shared<std::map<vmi_pid_t, bool>>();
+    auto terminated_processes = std::make_shared<std::unordered_map<vmi_pid_t, bool>>();
     plugins_options options = { .terminated_processes = terminated_processes };
     bool disabled_all = false; // Used to disable all plugin once
     const char* args[10] = {};

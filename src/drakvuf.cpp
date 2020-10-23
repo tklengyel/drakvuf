@@ -265,10 +265,10 @@ injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
 
 struct termination_info
 {
-    std::shared_ptr<const std::map<vmi_pid_t, bool>> proc;
+    std::shared_ptr<const std::unordered_map<vmi_pid_t, bool>> proc;
     vmi_pid_t pid;
 
-    termination_info(std::shared_ptr<const std::map<vmi_pid_t, bool>> proc, vmi_pid_t pid)
+    termination_info(std::shared_ptr<const std::unordered_map<vmi_pid_t, bool>> proc, vmi_pid_t pid)
         : proc(proc)
         , pid(pid) {}
 };
@@ -285,7 +285,7 @@ void drakvuf_c::terminate(vmi_pid_t injection_pid,
                           uint32_t injection_tid,
                           vmi_pid_t pid,
                           int termination_timeout,
-                          std::shared_ptr<const std::map<vmi_pid_t, bool>> terminated_processes)
+                          std::shared_ptr<const std::unordered_map<vmi_pid_t, bool>> terminated_processes)
 {
     if (terminated_processes->find(pid) == terminated_processes->end())
         injector_terminate(drakvuf, injection_pid, injection_tid, pid);
