@@ -118,6 +118,7 @@ injector_status_t injector_start_app(
     bool break_loop_on_detection,
     injector_t* injector_to_be_freed,
     bool global_search,
+    bool wait_for_exit,
     int args_count,
     const char* args[])
 {
@@ -134,7 +135,8 @@ injector_status_t injector_start_app(
                                          target_process,
                                          break_loop_on_detection,
                                          injector_to_be_freed,
-                                         global_search);
+                                         global_search,
+                                         wait_for_exit);
     }
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {

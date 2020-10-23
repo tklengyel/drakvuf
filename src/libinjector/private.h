@@ -148,7 +148,8 @@ injector_status_t injector_start_app_on_win(drakvuf_t drakvuf,
         const char* target_process,
         bool break_loop_on_detection,
         injector_t* injector_to_be_freed,
-        bool global_search);
+        bool global_search,
+        bool wait_for_exit);
 
 static inline void copy_gprs(registers_t* dst, registers_t* src)
 {
