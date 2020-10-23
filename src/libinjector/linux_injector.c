@@ -637,8 +637,9 @@ static event_response_t linux_injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_i
     return 0;
 }
 
-static bool is_interrupted(drakvuf_t drakvuf, void* data __attribute__((unused)))
+static bool is_interrupted(drakvuf_t drakvuf, void* data)
 {
+    UNUSED(data);
     return drakvuf_is_interrupted(drakvuf);
 }
 
