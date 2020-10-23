@@ -157,7 +157,10 @@ injector_status_t injector_start_app(
                                            args);
     }
     else
+    {
+        PRINT_DEBUG("WARNING Unsupported OS!\n");
         return 0;
+    }
 }
 
 void injector_terminate(drakvuf_t drakvuf,
@@ -167,4 +170,6 @@ void injector_terminate(drakvuf_t drakvuf,
 {
     if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
         injector_terminate_on_win(drakvuf, injection_pid, injection_tid, pid);
+    else
+        PRINT_DEBUG("WARNING Unsupported OS!\n");
 }

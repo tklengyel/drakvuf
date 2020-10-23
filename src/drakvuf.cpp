@@ -290,7 +290,7 @@ void drakvuf_c::terminate(vmi_pid_t injection_pid,
     if (terminated_processes->find(pid) == terminated_processes->end())
         injector_terminate(drakvuf, injection_pid, injection_tid, pid);
     GThread* timeout_thread = startup_timer(this, termination_timeout);
-    struct termination_info info(terminated_processes, pid);
+    auto info = termination_info(terminated_processes, pid);
     drakvuf_loop(drakvuf, is_terminated, &info);
     cleanup_timer(this, timeout_thread);
 }
