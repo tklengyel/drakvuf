@@ -509,7 +509,7 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     free_pool(ctx->plugin->pools, ctx->pool);
     // TODO Check if this would be erased
     ctx->plugin->terminating.at(ctx->pid) = 0;
-    ctx->plugin->terminated_processes[ctx->pid] = true;
+    ctx->plugin->terminated_processes->insert_or_assign(ctx->pid, true);
     if (ctx->bp)
     {
         ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
@@ -874,7 +874,7 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
         {
             // TODO Check if this line could be reached (look "detach" function)
             plugin->terminating.erase(info->attached_proc_data.pid);
-            plugin->terminated_processes[info->attached_proc_data.pid] = true;
+            plugin->terminated_processes->insert_or_assign(info->attached_proc_data.pid, true);
         }
 
         return VMI_EVENT_RESPONSE_NONE;
@@ -882,7 +882,7 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     else
     {
         plugin->terminating[info->attached_proc_data.pid] = info->attached_proc_data.tid;
-        plugin->terminated_processes[info->attached_proc_data.pid] = false;
+        plugin->terminated_processes->insert_or_assign(info->attached_proc_data.pid, false);
     }
 
     // TODO Move into constructor

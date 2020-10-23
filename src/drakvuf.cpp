@@ -265,10 +265,10 @@ injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
 
 struct termination_info
 {
-    std::map<vmi_pid_t, bool>& proc;
+    std::shared_ptr<const std::map<vmi_pid_t, bool>> proc;
     vmi_pid_t pid;
 
-    termination_info(std::map<vmi_pid_t, bool>& proc, vmi_pid_t pid)
+    termination_info(std::shared_ptr<const std::map<vmi_pid_t, bool>> proc, vmi_pid_t pid)
         : proc(proc)
         , pid(pid) {}
 };
@@ -276,21 +276,18 @@ struct termination_info
 static bool is_terminated(drakvuf_t drakvuf, void* data)
 {
     auto info = (struct termination_info*)data;
-    if (drakvuf_is_interrupted(drakvuf) ||
-        (info->proc.find(info->pid) != info->proc.end() &&
-        info->proc[info->pid]))
-        return true;
-    else
-        return false;
+    return drakvuf_is_interrupted(drakvuf) ||
+           (info->proc->find(info->pid) != info->proc->end() &&
+            info->proc->at(info->pid));
 };
 
 void drakvuf_c::terminate(vmi_pid_t injection_pid,
                           uint32_t injection_tid,
                           vmi_pid_t pid,
                           int termination_timeout,
-                          std::map<vmi_pid_t, bool>& terminated_processes)
+                          std::shared_ptr<const std::map<vmi_pid_t, bool>> terminated_processes)
 {
-    if (terminated_processes.find(pid) == terminated_processes.end())
+    if (terminated_processes->find(pid) == terminated_processes->end())
         injector_terminate(drakvuf, injection_pid, injection_tid, pid);
     GThread* timeout_thread = startup_timer(this, termination_timeout);
     struct termination_info info(terminated_processes, pid);

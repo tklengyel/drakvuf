@@ -153,9 +153,9 @@ injector_status_t injector_start_app_on_win(drakvuf_t drakvuf,
         vmi_pid_t* injected_pid);
 
 void injector_terminate_on_win(drakvuf_t drakvuf,
-        vmi_pid_t injection_pid,
-        uint32_t injection_tid,
-        vmi_pid_t pid);
+                               vmi_pid_t injection_pid,
+                               uint32_t injection_tid,
+                               vmi_pid_t pid);
 
 static inline void copy_gprs(registers_t* dst, registers_t* src)
 {

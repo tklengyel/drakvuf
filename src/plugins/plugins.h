@@ -143,7 +143,7 @@ struct plugins_options
     bool compress_procdumps = false;    // PLUGIN_PROCDUMP
     const char* clr_profile;            // PLUGIN_MEMDUMP
     const char* mscorwks_profile;       // PLUGIN_MEMDUMP
-    std::map<vmi_pid_t, bool>& terminated_processes; // PLUGIN_PROCDUMP
+    std::shared_ptr<std::map<vmi_pid_t, bool>> terminated_processes; // PLUGIN_PROCDUMP
 };
 
 typedef enum drakvuf_plugin
