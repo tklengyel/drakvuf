@@ -146,6 +146,7 @@ static inline void print_help(void)
             "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
             "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i) (LINUX: Injects to TGID Thread if ThreadID not specified)\n"
             "\t -c <current_working_dir>  The current working directory for injected executable\n"
+            "\t -w                        Inject process and wait untill it terminates (requires -m createproc)\n"
 #ifdef DRAKVUF_DEBUG
             "\t -v                        Turn on verbose (debug) output\n"
 #endif
@@ -168,6 +169,7 @@ int main(int argc, char** argv)
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     bool verbose = 0;
     bool libvmi_conf = false;
+    bool wait_for_exit = false;
     const char* args[10] = {};
     int args_count = 0;
     addr_t kpgd = 0;
@@ -182,7 +184,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:f:k:vlgo:")) != -1)
+    while ((c = getopt (argc, argv, "r:d:i:I:e:m:B:P:f:k:vlgo:w")) != -1)
         switch (c)
         {
             case 'r':
@@ -258,6 +260,9 @@ int main(int argc, char** argv)
                 if (!strncmp(optarg, "json", 4))
                     output = OUTPUT_JSON;
                 break;
+            case 'w':
+                wait_for_exit = true;
+                break;
             default:
                 fprintf(stderr, "Unrecognized option: %c\n", c);
                 return rc;
@@ -322,6 +327,7 @@ int main(int argc, char** argv)
                                false,
                                NULL,
                                injection_global_search,
+                               wait_for_exit,
                                args_count,
                                args);
 
