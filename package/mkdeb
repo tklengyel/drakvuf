@@ -57,6 +57,9 @@ EOF
 mkdir -p deb/usr/bin/
 cp -avr /build/usr/bin/* deb/usr/bin/
 
+# dwarf2json
+cp -avr /build/dwarf2json/dwarf2json deb/usr/bin/
+
 mkdir -p deb/usr/lib/
 cp -avr /build/usr/lib/* deb/usr/lib/
 
