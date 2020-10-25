@@ -66,9 +66,17 @@ jobs:
             echo "::set-output name=release_url::${RELEASE_URL}"
           fi
           echo "::set-output name=artifact_prefix::${ARTIFACT_PREFIX}"
+          XEN_COMMIT=$(git ls-tree HEAD xen | cut -f3 '-d ' | cut -f1 -d$'\t')
+          echo "::set-output name=xen_commit::${XEN_COMMIT}"
       - uses: actions/checkout@v2
         with:
           submodules: recursive
+      - name: Cache Xen intermediate
+        uses: actions/cache@v2
+        with:
+          path: |
+            package/cache
+          key: ${{ matrix.container }}-${{ steps.gen_vars.outputs.xen_commit }}
       - name: Build package
         id: build_drakvuf_deb
         run: |
