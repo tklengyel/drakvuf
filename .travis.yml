@@ -62,7 +62,7 @@ jobs:
         - TEST="package build"
       script:
         - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
-        - git submodule update --init libvmi xen
+        - git submodule update --init libvmi xen dwarf2json
         - travis_wait 60 sh package/build.sh;
       cache:
         directories:
