@@ -67,6 +67,7 @@ jobs:
           fi
           echo "::set-output name=artifact_prefix::${ARTIFACT_PREFIX}"
           XEN_COMMIT=$(git ls-tree HEAD xen | cut -f3 '-d ' | cut -f1 -d$'\t')
+          echo "Xen commit: $XEN_COMMIT"
           echo "::set-output name=xen_commit::${XEN_COMMIT}"
       - uses: actions/checkout@v2
         with:
