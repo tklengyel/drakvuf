@@ -1,26 +1,14 @@
 os: linux
 dist: bionic
 language: c
-compiler: clang
+compiler: gcc
 git:
     submodules: false
-env:
-  global:
-    - INSTALLDIR=$PWD/usr/local/
-    - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
-    - C_INCLUDE_PATH=$PWD/usr/local/include
-    - CPLUS_INCLUDE_PATH=$PWD/usr/local/include
-    - PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
-    - LDFLAGS="-L$PWD/usr/local/lib"
-    - CFLAGS="-I$PWD/usr/local/include"
 cache:
   ccache: true
 before_install:
     - |
-      sudo apt-get install bcc bin86 libpci-dev libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev libglib2.0-dev autoconf automake libtool libjson-c-dev liblzma-dev autoconf-archive libsystemd-dev
-      export CC="ccache clang"
-      export CXX="ccache clang++"
-      export CPP="ccache clang-cpp"
+      sudo apt-get install bcc bin86 libpci-dev libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev libglib2.0-dev autoconf automake libtool libjson-c-dev liblzma-dev autoconf-archive libsystemd-dev clang-10
       git submodule update --init libvmi xen
       cd xen
       ./configure --disable-pvshim
@@ -28,14 +16,19 @@ before_install:
       make -j2 dist-tools
       sudo make -j2 install-xen
       sudo make -j2 install-tools
+      echo "/usr/local/lib" | sudo tee -a /etc/ld.so.conf.d/xen.cfg
+      sudo ldconfig
       cd ..
       cd libvmi
       autoreconf -vif
-      ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
+      ./configure --disable-kvm --disable-file --disable-bareflank --disable-safety-checks --disable-examples
       make
-      rm -rf $INSTALLDIR
-      make install
+      sudo make install
       cd ..
+      export PATH=/usr/lib/llvm-10/bin:$PATH
+      export CC="ccache clang"
+      export CXX="ccache clang++"
+      export CPP="ccache clang-cpp"
 
 jobs:
     include:
