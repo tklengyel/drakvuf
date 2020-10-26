@@ -63,10 +63,14 @@ jobs:
           DISTRIBUTION=$(echo ${{ matrix.container }} | cut -f2 '-d:')
           ARTIFACT_PREFIX="${SYSTEM_ID}_${DISTRIBUTION}"
           echo "Artifact prefix: $ARTIFACT_PREFIX"
-          if [ -f release-url/release-url.txt ] ; then
-            RELEASE_URL=$(cat release-url/release-url.txt)
+          ls -la release-url || :
+          if [ -f release-url/release-url.zip ] ; then
+            cd release-url
+            unzip release-url.zip
+            RELEASE_URL=$(cat release-url.txt)
             echo "Release URL: $RELEASE_URL"
             echo "::set-output name=release_url::${RELEASE_URL}"
+            cd ..
           fi
           echo "::set-output name=artifact_prefix::${ARTIFACT_PREFIX}"
           XEN_COMMIT=$(git ls-tree HEAD xen | cut -f3 '-d ' | cut -f1 -d$'\t')
