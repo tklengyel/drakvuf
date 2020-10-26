@@ -120,6 +120,7 @@
 #include "linux-exports.h"
 #include "linux-offsets.h"
 
+#define ELF_HEADER	        0x464c457f
 #define PAGE_SHIFT          	12
 #define VM_READ		        0x00000001
 #define VM_WRITE	        0x00000002
@@ -158,8 +159,6 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
     addr_t vm_next, nullp = 0;
 
     addr_t text_segment_address = 0;
-    addr_t data_segment_address = 0;
-    addr_t text_segment_size = 0;
     do
     {
         addr_t vm_start;
@@ -203,14 +202,12 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
 
         if (strncmp(libname, lib, strlen(lib)) == 0 )
         {
-            if ((vm_flags & VM_READ) && (vm_flags & VM_EXEC))
-                text_segment_address = vm_start;
-            else if ((vm_flags & VM_READ) && !(vm_flags & VM_WRITE)&& !(vm_flags & VM_EXEC))
-            {
-                data_segment_address = vm_start;
-                text_segment_size = pgoffset;
-                break;
-            }
+            ctx.addr = vm_start;
+            uint32_t elf_header;
+
+            if (VMI_SUCCESS == vmi_read_32(vmi, &ctx, &elf_header))
+                if (elf_header == ELF_HEADER)
+                    text_segment_address = vm_start;
         }
 
 next:
@@ -218,10 +215,11 @@ next:
 
     } while (vm_next != nullp);
 
+    PRINT_DEBUG("text segment: %llx\n", (unsigned long long) text_segment_address);
+
     if (text_segment_address == 0)
         return -1;
 
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     // Parsing ELF header
 
     addr_t program_header_offset;
@@ -243,20 +241,20 @@ next:
 
     int counter = 0;
     uint32_t ph_type;
-    addr_t dynamic_section_offset = 0, offset = 0, ph_offset;
+    addr_t dynamic_section_offset = 0, offset = 0, ph_vaddr;
     while (counter < num_of_program_headers)
     {
         ctx.addr = text_segment_address + offset + program_header_offset + drakvuf->offsets[ELF64PHDR_TYPE];
         if (VMI_FAILURE == vmi_read_32(vmi, &ctx, &ph_type))
             return -1;
 
-        ctx.addr = text_segment_address + offset + program_header_offset + drakvuf->offsets[ELF64PHDR_OFFSET];
-        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ph_offset))
+        ctx.addr = text_segment_address + offset + program_header_offset + drakvuf->offsets[ELF64PHDR_VADDR];
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &ph_vaddr))
             return -1;
 
         if (ph_type == 2)
         {
-            dynamic_section_offset = ph_offset;
+            dynamic_section_offset = ph_vaddr;
             break;
         }
         offset += size_of_program_headers;
@@ -270,9 +268,6 @@ next:
     // addr_t rela_section_offset =0, rela_section_size=0, rela_section_entry=0x18; // set defaults incase not defined
 
     ctx.addr = text_segment_address + dynamic_section_offset;
-
-    if ( dynamic_section_offset > text_segment_size)
-        ctx.addr = data_segment_address - text_segment_size + dynamic_section_offset;
 
     addr_t word, ptr;
     do
