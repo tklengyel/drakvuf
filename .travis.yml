@@ -17,7 +17,7 @@ cache:
   ccache: true
 before_install:
     - |
-      sudo apt-get install bin86 libpci-dev libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev libglib2.0-dev autoconf automake libtool libjson-c-dev liblzma-dev autoconf-archive libsystemd-dev
+      sudo apt-get install bcc bin86 libpci-dev libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev libglib2.0-dev autoconf automake libtool libjson-c-dev liblzma-dev autoconf-archive libsystemd-dev
       export CC="ccache clang"
       export CXX="ccache clang++"
       export CPP="ccache clang-cpp"
