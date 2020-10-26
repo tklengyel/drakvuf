@@ -48,14 +48,14 @@ jobs:
           - "ubuntu:bionic"
           - "ubuntu:focal"
     steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
       - name: Fetch release URL
         if: ${{ github.event_name == 'push' }}
         uses: actions/download-artifact@v1
         with:
           name: release-url
-      - uses: actions/checkout@v2
-        with:
-          submodules: recursive
       - name: Generate variables
         id: gen_vars
         run: |
@@ -64,13 +64,10 @@ jobs:
           ARTIFACT_PREFIX="${SYSTEM_ID}_${DISTRIBUTION}"
           echo "Artifact prefix: $ARTIFACT_PREFIX"
           ls -la release-url || :
-          if [ -f release-url/release-url.zip ] ; then
-            cd release-url
-            unzip release-url.zip
-            RELEASE_URL=$(cat release-url.txt)
+          if [ -f release-url/release-url.txt ] ; then
+            RELEASE_URL=$(cat release-url/release-url.txt)
             echo "Release URL: $RELEASE_URL"
             echo "::set-output name=release_url::${RELEASE_URL}"
-            cd ..
           fi
           echo "::set-output name=artifact_prefix::${ARTIFACT_PREFIX}"
           XEN_COMMIT=$(git ls-tree HEAD xen | cut -f3 '-d ' | cut -f1 -d$'\t')
