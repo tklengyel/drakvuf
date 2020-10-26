@@ -1,25 +1,11 @@
 os: linux
-dist: focal
+dist: bionic
 language: c
 compiler: clang
-services:
-    - docker
 git:
     submodules: false
-addons:
-  apt:
-    update: true
-    packages:
-    - clang-10
-    - clang-tools-10
-    - bison
-    - flex
-    - libjson-c-dev
-    - autoconf-archive
-    - libxen-dev
 env:
   global:
-    - PATH=/usr/lib/llvm-10/bin:$PATH
     - INSTALLDIR=$PWD/usr/local/
     - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
     - C_INCLUDE_PATH=$PWD/usr/local/include
@@ -29,26 +15,26 @@ env:
     - CFLAGS="-I$PWD/usr/local/include"
 cache:
   ccache: true
-  directories:
-    - $INSTALLDIR
 before_install:
     - |
       export CC="ccache clang"
       export CXX="ccache clang++"
       export CPP="ccache clang-cpp"
-      git submodule update --init libvmi
-      LIBVMI_HASH=$(git ls-files -s libvmi | cut -f2 '-d ')
-      CACHED_HASH=$(cat $INSTALLDIR/libvmi_hash || echo -n "")
-      if [[ "$LIBVMI_HASH" != "$CACHED_HASH" ]]; then
-          cd libvmi
-          autoreconf -vif
-          ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-          make
-          rm -rf $INSTALLDIR
-          make install
-          echo $LIBVMI_HASH > $INSTALLDIR/libvmi_hash
-          cd ..
-      fi
+      git submodule update --init libvmi xen
+      cd xen
+      ./configure --disable-pvshim
+      make -j2 dist-xen
+      make -j2 dist-tools
+      sudo make -j2 install-xen
+      sudo make -j2 install-tools
+      cd ..
+      cd libvmi
+      autoreconf -vif
+      ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
+      make
+      rm -rf $INSTALLDIR
+      make install
+      cd ..
 
 jobs:
     include:
@@ -60,18 +46,14 @@ jobs:
       if: branch = master
       env:
         - TEST="Coverity"
-      dist: bionic
       addons:
         apt:
           update: true
           packages:
-            - clang-10
-            - clang-tools-10
             - bison
             - flex
             - libjson-c-dev
             - autoconf-archive
-            - curl
         coverity_scan:
             project:
                 name: "$COVERITY_PROJECT_NAME"
@@ -80,9 +62,6 @@ jobs:
             build_command_prepend: "./autogen.sh; ./configure --enable-debug"
             build_command:   "make"
             branch_pattern: $COVERITY_BRANCH_PATTERN
-      install:
-        - curl -s https://api.github.com/repos/tklengyel/drakvuf-builds/releases/latest | grep deb | grep browser_download_url | awk '{ print $2 }' | xargs wget
-        - sudo dpkg -i drakvuf-bundle-* || sudo apt-get -f install
       script:
         - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
 
@@ -99,13 +78,10 @@ jobs:
         apt:
             update: true
             packages:
-              - clang-10
-              - clang-tools-10
               - bison
               - flex
               - libjson-c-dev
               - autoconf-archive
-              - libxen-dev
       script:
         - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
         - ./autogen.sh
