@@ -215,8 +215,6 @@ next:
 
     } while (vm_next != nullp);
 
-    PRINT_DEBUG("text segment: %llx\n", (unsigned long long) text_segment_address);
-
     if (text_segment_address == 0)
         return -1;
 
