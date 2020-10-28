@@ -130,6 +130,11 @@ static void close_handler(int sig)
     drakvuf_interrupt(drakvuf, sig);
 }
 
+static bool is_interrupted(drakvuf_t drakvuf, void*)
+{
+    return drakvuf_is_interrupted(drakvuf);
+}
+
 int main(int argc, char** argv)
 {
     fprintf(stderr, "%s %s v%s Copyright (C) 2014-2020 Tamas K Lengyel\n",
@@ -197,7 +202,7 @@ int main(int argc, char** argv)
         goto done;
     }
 
-    drakvuf_loop(drakvuf);
+    drakvuf_loop(drakvuf, is_interrupted, nullptr);
 
     for (auto k: stats)
         printf("PID:%d,TID:%d,COUNT:%ld\n", k.first.first, k.first.second, k.second);
