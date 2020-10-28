@@ -174,6 +174,7 @@ int main(int argc, char** argv)
     int args_count = 0;
     addr_t kpgd = 0;
     output_format_t output = OUTPUT_DEFAULT;
+    vmi_pid_t injected_pid = 0;
 
     fprintf(stderr, "%s %s v%s Copyright (C) 2014-2020 Tamas K Lengyel\n",
             PACKAGE_NAME, argv[0], PACKAGE_VERSION);
@@ -329,7 +330,8 @@ int main(int argc, char** argv)
                                injection_global_search,
                                wait_for_exit,
                                args_count,
-                               args);
+                               args,
+                               &injected_pid);
 
     if (injection_result)
     {

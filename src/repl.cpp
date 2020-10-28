@@ -133,6 +133,11 @@ static inline void print_help(void)
            );
 }
 
+static bool is_interrupted(drakvuf_t drakvuf, void*)
+{
+    return drakvuf_is_interrupted(drakvuf);
+}
+
 int main(int argc, char** argv)
 {
     int return_code = 0;
@@ -208,7 +213,7 @@ int main(int argc, char** argv)
         throw -1;
 
     if (!drakvuf_is_interrupted(drakvuf))
-        drakvuf_loop(drakvuf);
+        drakvuf_loop(drakvuf, is_interrupted, nullptr);
 
     return return_code;
 }
