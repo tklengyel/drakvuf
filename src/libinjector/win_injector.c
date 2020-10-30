@@ -1906,9 +1906,6 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
         injector->rc = INJECTOR_TIMEOUTED;
 
-    // Cleanup interruption flag
-    drakvuf_interrupt(drakvuf, 0);
-
     free_memtraps(injector);
 
     drakvuf_remove_trap(drakvuf, &trap, NULL);
