@@ -637,6 +637,15 @@ int main(int argc, char** argv)
             break;
     }
 
+    PRINT_DEBUG("Beginning stop plugins\n");
+
+    bool plugin_stop_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 0};
+    plugin_stop_list[PLUGIN_BSODMON] = 1;
+    if (drakvuf->stop_plugins(plugin_stop_list) < 0)
+        return drakvuf_exit_code_t::FAIL;
+
+    PRINT_DEBUG("Finished stop plugins\n");
+
     if (terminate && injected_pid)
         drakvuf->terminate(injection_pid, injection_thread, injected_pid, termination_timeout, terminated_processes);
 

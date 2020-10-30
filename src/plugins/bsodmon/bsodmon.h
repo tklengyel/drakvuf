@@ -113,11 +113,13 @@
 class bsodmon : public plugin
 {
 public:
+    drakvuf_t drakvuf;
     const output_format_t format;
     std::map<int, const char*> bugcheck_map;
     bool abort_on_bsod;
 
     bsodmon(drakvuf_t drakvuf, bool abort_on_bsod, output_format_t output);
+    ~bsodmon();
 
 private:
     drakvuf_trap_t trap =

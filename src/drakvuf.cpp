@@ -161,6 +161,21 @@ int drakvuf_c::start_plugins(const bool* plugin_list, const plugins_options* opt
     return 1;
 }
 
+int drakvuf_c::stop_plugins(const bool* plugin_list)
+{
+    for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
+    {
+        if (plugin_list[i])
+        {
+            int rc = plugins->stop(static_cast<drakvuf_plugin_t>(i));
+            if (rc < 0)
+                return rc;
+        }
+    }
+
+    return 1;
+}
+
 drakvuf_c::drakvuf_c(const char* domain,
                      const char* json_kernel_path,
                      const char* json_wow_path,
