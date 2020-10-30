@@ -1318,7 +1318,7 @@ static void drakvuf_poll(drakvuf_t drakvuf, unsigned int timeout)
 void drakvuf_loop(drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), void* data)
 {
 
-    PRINT_DEBUG("Started DRAKVUF loop\n");
+    PRINT_DEBUG("Started DRAKVUF polling loop\n");
 
     drakvuf->interrupted = 0;
     drakvuf_force_resume(drakvuf);
@@ -1331,7 +1331,7 @@ void drakvuf_loop(drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), v
     // Ensures all events are processed from the ring
     drakvuf_poll(drakvuf, 0);
 
-    PRINT_DEBUG("DRAKVUF loop finished\n");
+    PRINT_DEBUG("DRAKVUF polling loop finished\n");
 }
 
 bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
