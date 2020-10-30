@@ -252,4 +252,5 @@ usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, user
 bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
 void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, const bool print_no_addr, std::vector<plugin_target_config_entry_t>* wanted_hooks);
 
+bool drakvuf_request_userhook_on_exisitng_process(drakvuf_t drakvuf, addr_t target_process, std::string dll_name, std::string func_name, callback_t cb, void* extra);
 #endif
