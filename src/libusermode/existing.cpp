@@ -121,7 +121,6 @@
 #include "uh-private.hpp"
 
 
-
 struct eh_data_t
 {
     // Arguments provided by the user.
@@ -160,12 +159,16 @@ void free_trap(drakvuf_trap_t *trap)
 }
 
 
+/**
+ * Searches process's InLoadOrderModuleList for given dll library and
+ * sets res_dll_base to its base address. Returns true on success.
+ */
 static
 bool get_dll_base(
     drakvuf_t drakvuf,
     const size_t *offsets,
     addr_t process_base,
-    const std::string& dll_name,
+    std::string dll_name,
     addr_t *res_dll_base)
 {
     addr_t process_dtb = 0;
@@ -217,13 +220,18 @@ bool get_dll_base(
 }
 
 
+/**
+ * Searches given dll's export table for a function with func_name.
+ * Sets res_func_address to the address of the found function.
+ * Returns true on success.
+ */
 static
 bool get_func_addr(
     drakvuf_t drakvuf,
     const size_t *offsets,
     access_context_t ctx,
     addr_t dll_base,
-    const std::string &func_name,
+    std::string func_name,
     addr_t *res_func_addr)
 {
     vmi_lock_guard lg(drakvuf);
@@ -270,6 +278,19 @@ bool get_func_addr(
     return true;
 }
 
+
+/**
+ * This is the main logic behind `drakvuf_request_userhook_on_exisitng_process`.
+ * At this point the vcpu is in the context of target process, allowing us to
+ * request page faults. Function arguments are passed in trap->data (eh_data_t).
+ * 
+ * We need to resolve the target physical address from the virtual function 
+ * address. This might fail as the page might not be mapped yet. In such case 
+ * we request page fault and exit. If everything goes well, the page fault will
+ * be handled and the hook_process_cb will be hit again right after. This time
+ * we should be able to resolve the physical address and finally set the 
+ * requested hook.
+ */
 static
 event_response_t hook_process_cb(
     drakvuf_t drakvuf, 
@@ -279,8 +300,8 @@ event_response_t hook_process_cb(
     const size_t *offsets = eh_data->userhook_plugin->offsets;
 
     if (eh_data->state == HOOK_FIRST_TRY) {
-        // This is first time we are trying to create a hook on process.
-        // Find target function virtual address and store it in trap data, so we don't have to 
+        // This is the first time we are trying to create a hook on process.
+        // It finds target function virtual address and stores it in trap data, so we don't have to 
         // calculate it again on retry.
         addr_t dll_base = 0;
         if (!get_dll_base(drakvuf, offsets, eh_data->target_process, eh_data->dll_name, &dll_base)) {
@@ -313,7 +334,7 @@ event_response_t hook_process_cb(
             return VMI_EVENT_RESPONSE_NONE;
         }
 
-        // Otherwise request page fault.
+        // Otherwise request page fault, exit and wait for hook_process_cb to be hit again.
         if (VMI_SUCCESS != vmi_request_page_fault(lg.vmi, info->vcpu, eh_data->func_addr, 0)) {
             drakvuf_remove_trap(drakvuf, info->trap, free_trap);
             return VMI_EVENT_RESPONSE_NONE;
@@ -322,6 +343,7 @@ event_response_t hook_process_cb(
         return VMI_EVENT_RESPONSE_NONE;
     }
 
+    // We have managed to resolve the physical address. Place the trap.
     drakvuf_trap_t* trap = new drakvuf_trap_t();
     trap->type = BREAKPOINT;
     trap->name = eh_data->func_name.c_str();
@@ -337,6 +359,7 @@ event_response_t hook_process_cb(
     drakvuf_remove_trap(drakvuf, info->trap, free_trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
+
 
 static
 event_response_t wait_for_target_process_cb(
@@ -388,6 +411,12 @@ event_response_t wait_for_target_process_cb(
 }
 
 
+/**
+ * Sets hook on context switch as we cannot yet create a trap on 
+ * target_process's func_name function. This is because the func_name function
+ * physical address might not yet be mapped and hence will require requesting
+ * page faults. Those can only be handled from the target_process context. 
+ */
 void userhook::request_userhook_on_exisitng_process(
     drakvuf_t drakvuf,
     addr_t target_process,
@@ -396,14 +425,13 @@ void userhook::request_userhook_on_exisitng_process(
     callback_t cb, 
     void *extra)
 {
-    // We must first switch to target_process context as we might need to use page faults.
-    // We hook on context switch.
     drakvuf_trap_t *trap = new drakvuf_trap_t();
     trap->type = REGISTER;
     trap->reg = CR3;
     trap->cb = wait_for_target_process_cb;
 
-    // Find target process pid, so we don't have to calculate it every time in the wait_for_target_process_cb.
+    // Find target process pid, so we don't have to calculate it every time in 
+    // the wait_for_target_process_cb.
     vmi_pid_t target_pid;
     if (!drakvuf_get_process_pid(drakvuf, target_process, &target_pid)) {
         delete trap;
@@ -418,6 +446,10 @@ void userhook::request_userhook_on_exisitng_process(
 }
 
 
+/**
+ * This is just a wrapper over a userhook::request_userhook_on_exisitng_process
+ * method.
+ */
 bool drakvuf_request_userhook_on_exisitng_process(
     drakvuf_t drakvuf,
     addr_t target_process,
