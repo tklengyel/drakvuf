@@ -1,6 +1,8 @@
 FROM xen-intermediate
 
 COPY . /build
+RUN cd /build/dwarf2json && \
+    /usr/local/go/bin/go build
 RUN export INSTALL_PATH="/build/usr" && \
     cd /build/libvmi && \
     autoreconf -vif && \

@@ -19,6 +19,9 @@ fi
 
 apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive clang python3-dev gcc-7 g++-7
 
+wget -O /usr/local/go1.15.3.linux-amd64.tar.gz https://golang.org/dl/go1.15.3.linux-amd64.tar.gz
+tar -C /usr/local -xzf /usr/local/go1.15.3.linux-amd64.tar.gz
+
 HAS_PYTHON_IS_PYTHON=$(apt-cache search --names-only '^python-is-python2$')
 
 if [ ! -z "$HAS_PYTHON_IS_PYTHON" ]

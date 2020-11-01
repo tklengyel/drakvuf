@@ -1421,7 +1421,7 @@ static void drakvuf_poll(drakvuf_t drakvuf, unsigned int timeout)
     }
 }
 
-void drakvuf_loop(drakvuf_t drakvuf)
+void drakvuf_loop(drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), void* data)
 {
 
     PRINT_DEBUG("Started DRAKVUF loop\n");
@@ -1429,7 +1429,7 @@ void drakvuf_loop(drakvuf_t drakvuf)
     drakvuf->interrupted = 0;
     drakvuf_force_resume(drakvuf);
 
-    while (!drakvuf->interrupted)
+    while (!is_interrupted(drakvuf, data))
         drakvuf_poll(drakvuf, 1000);
 
     vmi_pause_vm(drakvuf->vmi);

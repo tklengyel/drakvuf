@@ -1,0 +1,99 @@
+name: Build package
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+jobs:
+  release:
+    runs-on: ubuntu-18.04
+    steps:
+    - name: Generate variables
+      id: gen_vars
+      run: |
+        echo "::set-output name=short_sha::$(echo ${GITHUB_SHA} | cut -c1-8)"
+        echo "::set-output name=cur_datetime::$(date '+%Y-%m-%d %H:%M:%S')"
+    - name: Create a Release
+      uses: actions/create-release@v1
+      id: create_release
+      if: ${{ github.event_name == 'push' }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      with:
+        tag_name: build-${{ github.sha }}
+        release_name: DRAKVUF ${{ steps.gen_vars.outputs.cur_datetime }} ${{ steps.gen_vars.outputs.short_sha }}
+        owner: tklengyel
+        repo: drakvuf-builds
+        commitish: master
+        draft: false
+        prerelease: false
+    - name: Store release URL as file
+      if: ${{ github.event_name == 'push' }}
+      run: |
+        echo "${{ steps.create_release.outputs.upload_url }}" > release-url.txt
+    - name: Upload release URL artifact
+      if: ${{ github.event_name == 'push' }}
+      uses: actions/upload-artifact@v1
+      with:
+        name: release-url
+        path: release-url.txt
+  deb:
+    needs: [release]
+    runs-on: ubuntu-18.04
+    strategy:
+      fail-fast: false
+      matrix:
+        container:
+          - "debian:buster"
+          - "ubuntu:bionic"
+          - "ubuntu:focal"
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Fetch release URL
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/download-artifact@v1
+        with:
+          name: release-url
+      - name: Generate variables
+        id: gen_vars
+        run: |
+          SYSTEM_ID=$(echo ${{ matrix.container }} | cut -f1 '-d:')
+          DISTRIBUTION=$(echo ${{ matrix.container }} | cut -f2 '-d:')
+          ARTIFACT_PREFIX="${SYSTEM_ID}_${DISTRIBUTION}"
+          echo "Artifact prefix: $ARTIFACT_PREFIX"
+          ls -la release-url || :
+          if [ -f release-url/release-url.txt ] ; then
+            RELEASE_URL=$(cat release-url/release-url.txt)
+            echo "Release URL: $RELEASE_URL"
+            echo "::set-output name=release_url::${RELEASE_URL}"
+          fi
+          echo "::set-output name=artifact_prefix::${ARTIFACT_PREFIX}"
+          XEN_COMMIT=$(git ls-tree HEAD xen | cut -f3 '-d ' | cut -f1 -d$'\t')
+          echo "Xen commit: $XEN_COMMIT"
+          echo "::set-output name=xen_commit::${XEN_COMMIT}"
+      - name: Cache Xen intermediate
+        uses: actions/cache@v2
+        with:
+          path: |
+            package/cache
+          key: xen-${{ matrix.container }}-${{ steps.gen_vars.outputs.xen_commit }}
+      - name: Build package
+        id: build_drakvuf_deb
+        run: |
+          sh package/build.sh ${{ matrix.container }}
+          DRAKVUF_DEB_PATH=$(find package/out/*.deb | head -n1)
+          DRAKVUF_DEB_NAME=$(basename "$DRAKVUF_DEB_PATH")
+          echo "::set-output name=drakvuf_deb_path::${DRAKVUF_DEB_PATH}"
+          echo "::set-output name=drakvuf_deb_name::${{ steps.gen_vars.outputs.artifact_prefix }}_${DRAKVUF_DEB_NAME}"
+      - name: Upload release asset
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        with:
+          upload_url: ${{ steps.gen_vars.outputs.release_url }}
+          asset_path: ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_path }}
+          asset_name: ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }}
+          asset_content_type: application/vnd.debian.binary-package

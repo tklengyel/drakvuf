@@ -1,83 +1,37 @@
 os: linux
-dist: focal
+dist: bionic
 language: c
-compiler: clang
-services:
-    - docker
+compiler: gcc
 git:
     submodules: false
-addons:
-  apt:
-    update: true
-    packages:
-    - clang-10
-    - clang-tools-10
-    - bison
-    - flex
-    - libjson-c-dev
-    - autoconf-archive
-    - libxen-dev
-env:
-  global:
-    - PATH=/usr/lib/llvm-10/bin:$PATH
-    - INSTALLDIR=$PWD/usr/local/
-    - LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/usr/local/lib
-    - C_INCLUDE_PATH=$PWD/usr/local/include
-    - CPLUS_INCLUDE_PATH=$PWD/usr/local/include
-    - PKG_CONFIG_PATH="$PWD/usr/local/lib/pkgconfig/"
-    - LDFLAGS="-L$PWD/usr/local/lib"
-    - CFLAGS="-I$PWD/usr/local/include"
 cache:
   ccache: true
-  directories:
-    - $INSTALLDIR
 before_install:
     - |
+      sudo apt-get install bcc bin86 libpci-dev libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev libglib2.0-dev autoconf automake libtool libjson-c-dev liblzma-dev autoconf-archive libsystemd-dev clang-10
+      git submodule update --init libvmi xen
+      cd xen
+      ./configure --disable-pvshim
+      make -j2 dist-xen
+      make -j2 dist-tools
+      sudo make -j2 install-xen
+      sudo make -j2 install-tools
+      echo "/usr/local/lib" | sudo tee -a /etc/ld.so.conf.d/xen.cfg
+      sudo ldconfig
+      cd ..
+      cd libvmi
+      autoreconf -vif
+      ./configure --disable-kvm --disable-file --disable-bareflank --disable-safety-checks --disable-examples
+      make
+      sudo make install
+      cd ..
+      export PATH=/usr/lib/llvm-10/bin:$PATH
       export CC="ccache clang"
       export CXX="ccache clang++"
       export CPP="ccache clang-cpp"
-      git submodule update --init libvmi
-      LIBVMI_HASH=$(git ls-files -s libvmi | cut -f2 '-d ')
-      CACHED_HASH=$(cat $INSTALLDIR/libvmi_hash || echo -n "")
-      if [[ "$LIBVMI_HASH" != "$CACHED_HASH" ]]; then
-          cd libvmi
-          autoreconf -vif
-          ./configure --prefix=${INSTALLDIR} --disable-kvm --disable-file --disable-bareflank --disable-safety-checks
-          make
-          rm -rf $INSTALLDIR
-          make install
-          echo $LIBVMI_HASH > $INSTALLDIR/libvmi_hash
-          cd ..
-      fi
 
 jobs:
     include:
-
-#
-# Build binary packages and push them as releases on drakvuf-builds
-#
-    - stage: package
-      if: branch = master
-      env:
-        - TEST="package build"
-      script:
-        - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
-        - git submodule update --init libvmi xen
-        - travis_wait 60 sh package/build.sh;
-      cache:
-        directories:
-          - package/cache
-      before_deploy:
-        - git config --local user.name "drakvuf-builds"
-        - git config --local user.email "drakvuf-builds@tklsoftware.com"
-        - export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
-        - git tag $TRAVIS_TAG
-      deploy:
-        provider: releases
-        edge: true
-        repo: tklengyel/drakvuf-builds
-        file:
-          - package/out/**/*
 
 #
 # Coverity
@@ -86,18 +40,7 @@ jobs:
       if: branch = master
       env:
         - TEST="Coverity"
-      dist: bionic
       addons:
-        apt:
-          update: true
-          packages:
-            - clang-10
-            - clang-tools-10
-            - bison
-            - flex
-            - libjson-c-dev
-            - autoconf-archive
-            - curl
         coverity_scan:
             project:
                 name: "$COVERITY_PROJECT_NAME"
@@ -106,9 +49,6 @@ jobs:
             build_command_prepend: "./autogen.sh; ./configure --enable-debug"
             build_command:   "make"
             branch_pattern: $COVERITY_BRANCH_PATTERN
-      install:
-        - curl -s https://api.github.com/repos/tklengyel/drakvuf-builds/releases/latest | grep deb | grep browser_download_url | awk '{ print $2 }' | xargs wget
-        - sudo dpkg -i drakvuf-bundle-* || sudo apt-get -f install
       script:
         - echo -n | openssl s_client -connect scan.coverity.com:443 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' | sudo tee -a /etc/ssl/certs/ca-
 
@@ -122,16 +62,6 @@ jobs:
         sonarcloud:
             organization: "drakvuf"
             token: "$SONAR_TOKEN"
-        apt:
-            update: true
-            packages:
-              - clang-10
-              - clang-tools-10
-              - bison
-              - flex
-              - libjson-c-dev
-              - autoconf-archive
-              - libxen-dev
       script:
         - 'if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then exit 0; fi'
         - ./autogen.sh

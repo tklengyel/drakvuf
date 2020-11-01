@@ -130,6 +130,7 @@ typedef enum
 {
     // win
     INJECT_METHOD_CREATEPROC,
+    INJECT_METHOD_TERMINATEPROC,
     INJECT_METHOD_SHELLEXEC,
     INJECT_METHOD_SHELLCODE,
     INJECT_METHOD_DOPP,
@@ -160,6 +161,8 @@ typedef enum
     STATUS_WRITE_OK,
     STATUS_EXEC_OK,
     STATUS_BP_HIT,
+    STATUS_OPEN,
+    STATUS_TERMINATE,
     STATUS_CREATE_OK,
     STATUS_RESUME_OK,
     STATUS_CREATE_FILE_OK,
@@ -216,8 +219,15 @@ injector_status_t injector_start_app(drakvuf_t drakvuf,
                                      bool break_loop_on_detection,
                                      injector_t* injector_to_be_freed,
                                      bool global_search, // out: iff break_loop_on_detection is set
+                                     bool wait_for_exit,
                                      int args_count,
-                                     const char* args[]) NOEXCEPT;
+                                     const char* args[],
+                                     vmi_pid_t* injected_pid) NOEXCEPT;
+
+void injector_terminate(drakvuf_t drakvuf,
+                        vmi_pid_t injection_pid,
+                        uint32_t injection_tid,
+                        vmi_pid_t pid);
 
 #pragma GCC visibility pop
 

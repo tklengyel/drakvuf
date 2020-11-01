@@ -146,11 +146,17 @@ struct injector
     bool is32bit, hijacked, resumed, detected;
     injection_method_t method;
     bool global_search;
+    bool wait_for_exit;
     addr_t exec_func;
     reg_t target_rsp;
 
     // For create process
     addr_t resume_thread;
+
+    // For terminate process
+    vmi_pid_t terminate_pid;
+    addr_t open_process;
+    addr_t exit_process;
 
     // For shellcode execution
     addr_t payload, payload_addr, memset;
@@ -594,12 +600,16 @@ static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* 
 }
 
 static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+static event_response_t injector_int3_terminate_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 static bool setup_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
 {
     injector->bp.type = BREAKPOINT;
     injector->bp.name = "entry";
-    injector->bp.cb = injector_int3_cb;
+    if (INJECT_METHOD_TERMINATEPROC == injector->method)
+        injector->bp.cb = injector_int3_terminate_cb;
+    else
+        injector->bp.cb = injector_int3_cb;
     injector->bp.data = injector;
     injector->bp.breakpoint.lookup_type = LOOKUP_DTB;
     injector->bp.breakpoint.dtb = info->regs->cr3;
@@ -796,6 +806,44 @@ done:
     return 0;
 }
 
+static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+    addr_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    uint64_t exit_code = drakvuf_get_function_argument(drakvuf, info, 2);
+    exit_code &= 0xFFFFFFFF;
+
+    vmi_pid_t exit_pid;
+    if (!drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &exit_pid))
+        exit_pid = info->proc_data.pid;
+
+    if ((int)injector->pid != exit_pid)
+        return 0;
+
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+
+    if (!exit_code)
+    {
+        injector->rc = INJECTOR_SUCCEEDED;
+    }
+    else
+    {
+        injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+        injector->error_code.valid = true;
+        injector->error_code.code = exit_code;
+        injector->error_code.string = "PROGRAM_FAILED";
+    }
+
+    injector->detected = true;
+
+    if ( injector->break_loop_on_detection )
+        drakvuf_interrupt(drakvuf, SIGINT);
+    else if ( injector->resumed )
+        drakvuf_interrupt(drakvuf, SIGINT);
+
+    return 0;
+}
+
 static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
@@ -806,13 +854,43 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
     PRINT_DEBUG("Process start detected %i -> 0x%lx\n", injector->pid, info->regs->cr3);
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
 
-    injector->rc = INJECTOR_SUCCEEDED;
-    injector->detected = true;
+    if (injector->wait_for_exit)
+    {
+        addr_t rva;
 
-    if ( injector->break_loop_on_detection )
-        drakvuf_interrupt(drakvuf, SIGINT);
-    else if ( injector->resumed )
-        drakvuf_interrupt(drakvuf, SIGINT);
+        if (!drakvuf_get_kernel_symbol_rva(drakvuf, "NtTerminateProcess", &rva))
+        {
+            PRINT_DEBUG("Failed to find NtTerminateProcess RVA!\n");
+            return 0;
+        }
+
+        drakvuf_trap_t* trap = g_try_malloc0(sizeof(drakvuf_trap_t));
+        trap->type = BREAKPOINT;
+        trap->name = "terminate_proc";
+        trap->cb = wait_for_termination_cb;
+        trap->data = injector;
+        trap->breakpoint.lookup_type = LOOKUP_PID;
+        trap->breakpoint.pid = 4;
+        trap->breakpoint.addr_type = ADDR_RVA;
+        trap->breakpoint.module = "ntoskrnl.exe";
+        trap->breakpoint.rva = rva;
+
+        if (!drakvuf_add_trap(injector->drakvuf, trap))
+        {
+            PRINT_DEBUG("Failed to setup wait_for_termination_cb trap!\n");
+            return 0;
+        }
+    }
+    else
+    {
+        injector->rc = INJECTOR_SUCCEEDED;
+        injector->detected = true;
+
+        if ( injector->break_loop_on_detection )
+            drakvuf_interrupt(drakvuf, SIGINT);
+        else if ( injector->resumed )
+            drakvuf_interrupt(drakvuf, SIGINT);
+    }
 
     return 0;
 }
@@ -933,6 +1011,151 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     PRINT_DEBUG("Executing the payload..\n");
 
     drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, regs);
+
+    return 0;
+}
+
+static event_response_t injector_int3_terminate_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+
+    PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx. vcpu %i. TID %u\n",
+                info->regs->rip, info->regs->cr3, info->vcpu, info->proc_data.tid);
+
+    if ( info->proc_data.pid != injector->target_pid )
+    {
+        PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
+                    info->proc_data.name, info->proc_data.pid, injector->target_pid);
+        return 0;
+    }
+
+    if (info->regs->rip != info->trap->breakpoint.addr)
+        return 0;
+
+    if (injector->target_tid && (uint32_t)info->proc_data.tid != injector->target_tid)
+    {
+        PRINT_DEBUG("INT3 received but '%s' TID (%u) doesn't match target process (%u)\n",
+                    info->proc_data.name, info->proc_data.tid, injector->target_tid);
+        return 0;
+    }
+    else if (!injector->target_tid)
+    {
+        PRINT_DEBUG("Target TID not provided by the user, pinning TID to %u\n",
+                    info->proc_data.tid);
+        injector->target_tid = info->proc_data.tid;
+    }
+
+    if (injector->target_rsp && info->regs->rsp <= injector->target_rsp)
+    {
+        PRINT_DEBUG("INT3 received but RSP (0x%lx) doesn't match target rsp (0x%lx)\n",
+                    info->regs->rsp, injector->target_rsp);
+        return 0;
+    }
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    registers_t regs;
+    vmi_get_vcpuregs(vmi, &regs, info->vcpu);
+    drakvuf_release_vmi(drakvuf);
+
+    if (injector->status == STATUS_NULL)
+    {
+        /* We just hit the RIP from the trapframe */
+        PRINT_DEBUG("Open process %d to terminate it.\n", injector->terminate_pid);
+
+        memcpy(&injector->saved_regs, &regs, sizeof(x86_registers_t));
+
+        struct argument args[3] = { {0} };
+
+        enum
+        {
+            PROCESS_TERMINATE = 0x1,
+            PROCESS_CREATE_THREAD = 0x2,
+            PROCESS_VM_OPERATION = 0x8,
+            PROCESS_VM_WRITE = 0x10,
+            PROCESS_VM_READ = 0x20,
+            PROCESS_QUERY_INFORMATION = 0x400,
+        };
+
+        // OpenProcess(PROCESS_TERMINATE, false, PID)
+        init_int_argument(&args[0], PROCESS_TERMINATE | PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ | PROCESS_QUERY_INFORMATION);
+        init_int_argument(&args[1], 0);
+        init_int_argument(&args[2], injector->terminate_pid);
+
+        if (!setup_stack(injector->drakvuf, &regs.x86, args, ARRAY_SIZE(args)))
+        {
+            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+            return 0;
+        }
+
+        regs.x86.rip = injector->open_process;
+
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
+
+        injector->status = STATUS_OPEN;
+
+        return 0;
+    }
+    else if (injector->status == STATUS_OPEN)
+    {
+        PRINT_DEBUG("Process %d opened with handle %#lx. Terminate it!\n", injector->terminate_pid, regs.x86.rax);
+        struct argument args[7] = { {0} };
+
+        // CreateRemoteThread(handle, NULL, NULL, ExitProcess, 0, NULL, NULL)
+        init_int_argument(&args[0], regs.x86.rax);
+        init_int_argument(&args[1], 0);
+        init_int_argument(&args[2], 0);
+        init_int_argument(&args[3], injector->exit_process);
+        init_int_argument(&args[4], 0);
+        init_int_argument(&args[5], 0);
+        init_int_argument(&args[6], 0);
+
+        if (!setup_stack(injector->drakvuf, &regs.x86, args, ARRAY_SIZE(args)))
+        {
+            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+            return 0;
+        }
+
+        regs.x86.rip = injector->exec_func;
+
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
+
+        injector->status = STATUS_TERMINATE;
+
+        return 0;
+    }
+    else if (injector->status == STATUS_TERMINATE)
+    {
+        if (info->regs->rax)
+            injector->rc = INJECTOR_SUCCEEDED;
+        else
+            injector->rc = INJECTOR_FAILED;
+
+        PRINT_DEBUG("Process %d terminated %ssuccessfully!\n", injector->terminate_pid, regs.x86.rax ? " " : "un");
+
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
+
+        if (injector->rc == INJECTOR_SUCCEEDED)
+        {
+            PRINT_DEBUG("Terminated\n");
+        }
+        else
+        {
+            PRINT_DEBUG("Failed to terminate\n");
+            injector->rc = INJECTOR_FAILED;
+
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+        }
+
+        drakvuf_interrupt(drakvuf, SIGINT);
+
+        return 0;
+    }
+
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+
+    drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
 
     return 0;
 }
@@ -1644,6 +1867,11 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     return 0;
 }
 
+static bool is_interrupted(drakvuf_t drakvuf, void* data __attribute__((unused)))
+{
+    return drakvuf_is_interrupted(drakvuf);
+}
+
 static bool inject(drakvuf_t drakvuf, injector_t injector)
 {
     injector->hijacked = 0;
@@ -1672,7 +1900,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     if (!drakvuf_is_interrupted(drakvuf))
     {
         PRINT_DEBUG("Starting injection loop\n");
-        drakvuf_loop(drakvuf);
+        drakvuf_loop(drakvuf, is_interrupted, NULL);
     }
 
     if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
@@ -1688,6 +1916,9 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
 
 static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 {
+    if (!output || !size || !file)
+        return false;
+
     long payload_size = 0;
     unsigned char* data = NULL;
     FILE* fp = fopen(file, "rb");
@@ -2006,6 +2237,14 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
         if (!injector->resume_thread) return false;
         injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateProcessW", injector->global_search);
     }
+    else if (INJECT_METHOD_TERMINATEPROC == injector->method)
+    {
+        injector->open_process = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "OpenProcess", injector->global_search);
+        if (!injector->open_process) return false;
+        injector->exit_process = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "RtlExitUserProcess", injector->global_search);
+        if (!injector->exit_process) return false;
+        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateRemoteThread", injector->global_search);
+    }
     else if (INJECT_METHOD_SHELLEXEC == injector->method)
     {
         injector->exec_func = get_function_va(drakvuf, eprocess_base, "shell32.dll", "ShellExecuteW", injector->global_search);
@@ -2071,7 +2310,9 @@ injector_status_t injector_start_app_on_win(
     const char* target_process,
     bool break_loop_on_detection,
     injector_t* to_be_freed_later,
-    bool global_search)
+    bool global_search,
+    bool wait_for_exit,
+    vmi_pid_t* injected_pid)
 {
     injector_status_t rc = 0;
     PRINT_DEBUG("Target PID %u to start '%s'\n", pid, file);
@@ -2110,6 +2351,7 @@ injector_status_t injector_start_app_on_win(
     injector->cwd_us = cwd_us;
     injector->method = method;
     injector->global_search = global_search;
+    injector->wait_for_exit = wait_for_exit;
     injector->binary_path = binary_path;
     injector->target_process = target_process;
     injector->status = STATUS_NULL;
@@ -2162,6 +2404,7 @@ injector_status_t injector_start_app_on_win(
     }
 
     rc = injector->rc;
+    *injected_pid = injector->pid;
     PRINT_DEBUG("Finished with injection. Ret: %i.\n", rc);
 
     switch (method)
@@ -2185,4 +2428,32 @@ injector_status_t injector_start_app_on_win(
     }
 
     return rc;
+}
+
+void injector_terminate_on_win(drakvuf_t drakvuf,
+                               vmi_pid_t injection_pid,
+                               uint32_t injection_tid,
+                               vmi_pid_t pid)
+{
+    PRINT_DEBUG("Target PID %u to terminate %u\n", injection_pid, pid);
+    drakvuf_interrupt(drakvuf, 0); // clean
+
+    injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
+
+    injector->method = INJECT_METHOD_TERMINATEPROC;
+    injector->drakvuf = drakvuf;
+    injector->target_pid = injection_pid;
+    injector->target_tid = injection_tid;
+    injector->terminate_pid = pid;
+    injector->status = STATUS_NULL;
+
+    if (!initialize_injector_functions(drakvuf, injector, NULL, NULL))
+    {
+        PRINT_DEBUG("Unable to initialize injector functions\n");
+        free_injector(injector);
+        return;
+    }
+
+    inject(drakvuf, injector);
+    PRINT_DEBUG("Finished with termination. Ret: %i.\n", injector->rc);
 }

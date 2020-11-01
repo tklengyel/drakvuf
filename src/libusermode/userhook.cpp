@@ -971,7 +971,7 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
                 arg_type = arg.substr(pos + 1);
             }
 
-            if (arg_type == "lpcstr" || arg_type == "lpctstr")
+            if (arg_type == "lpstr" || arg_type == "lpcstr" || arg_type == "lpctstr")
             {
                 e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new AsciiPrinter(arg_name, print_no_addr)));
             }
@@ -994,6 +994,10 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
             else if (arg_type == "refclsid" || arg_type == "refiid")
             {
                 e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new GuidPrinter(arg_name, print_no_addr)));
+            }
+            else if (arg_type == "binary16")
+            {
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new Binary16StringPrinter(arg_name, print_no_addr)));
             }
             else
             {

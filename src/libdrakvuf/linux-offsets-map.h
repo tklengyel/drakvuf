@@ -137,6 +137,7 @@ static const char* linux_offset_names[__LINUX_OFFSETS_MAX][2] =
     [ELF64HDR_PHOFF] = {"elf64_hdr", "e_phoff"},
     [ELF64PHDR_TYPE] = {"elf64_phdr", "p_type"},
     [ELF64PHDR_OFFSET] = {"elf64_phdr", "p_offset"},
+    [ELF64PHDR_VADDR] = {"elf64_phdr", "p_vaddr"},
     [ELF64SYM_NAME] = {"elf64_sym", "st_name"},
     [ELF64SYM_VALUE] = {"elf64_sym", "st_value"},
     [ELF64RELA_ADDEND] = {"elf64_rela", "r_addend"},

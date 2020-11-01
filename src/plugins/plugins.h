@@ -113,6 +113,8 @@
 #include <sys/time.h>
 #include <libdrakvuf/libdrakvuf.h>
 
+#include <unordered_map>
+
 struct plugins_options
 {
     const char* dump_folder;            // PLUGIN_FILEDELETE
@@ -141,6 +143,7 @@ struct plugins_options
     bool compress_procdumps = false;    // PLUGIN_PROCDUMP
     const char* clr_profile;            // PLUGIN_MEMDUMP
     const char* mscorwks_profile;       // PLUGIN_MEMDUMP
+    std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes; // PLUGIN_PROCDUMP
 };
 
 typedef enum drakvuf_plugin
