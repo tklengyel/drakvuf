@@ -214,12 +214,21 @@ symbols_t* json_get_symbols(json_object* json)
             }
 
             ret->symbols[i].name = g_strdup(json_object_iter_peek_name(&it));
+
+#ifdef JSONC5
+            ret->symbols[i].rva = json_object_get_uint64(address);
+#else
             ret->symbols[i].rva = json_object_get_int64(address);
+#endif
         }
         else
         {
             ret->symbols[i].name = g_strdup(json_object_iter_peek_name(&it));
+#ifdef JSONC5
+            ret->symbols[i].rva = json_object_get_uint64(json_object_iter_peek_value(&it));
+#else
             ret->symbols[i].rva = json_object_get_int64(json_object_iter_peek_value(&it));
+#endif
         }
 
         /* This may not be an rva but a full VA that needs to made canonical (Linux addr) */
