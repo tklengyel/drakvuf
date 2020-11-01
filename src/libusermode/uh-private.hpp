@@ -181,7 +181,7 @@ public:
     usermode_reg_status_t init(drakvuf_t drakvuf);
     void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
     void request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
-    void request_userhook_on_exisitng_process(drakvuf_t drakvuf, addr_t target_process, std::string dll_name, std::string func_name, callback_t cb, void* extra);
+    void request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, std::string dll_name, std::string func_name, callback_t cb, void* extra);
 };
 
 extern userhook* instance;

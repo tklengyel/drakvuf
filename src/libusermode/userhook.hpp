@@ -266,5 +266,5 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
  * @param[in] extra Additional data which will be set as trap->data.
  * @return true when successfully hooked, false otherwise.
  */
-bool drakvuf_request_userhook_on_exisitng_process(drakvuf_t drakvuf, addr_t target_process, std::string dll_name, std::string func_name, callback_t cb, void* extra);
+bool drakvuf_request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, std::string dll_name, std::string func_name, callback_t cb, void* extra);
 #endif
