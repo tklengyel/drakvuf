@@ -241,6 +241,9 @@ class plugin
 {
 public:
     virtual ~plugin() = default;
+
+    virtual void stop() {}
+    virtual bool is_stopped() { return true; }
 };
 
 class drakvuf_plugins
@@ -255,6 +258,7 @@ public:
     drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
     int start(drakvuf_plugin_t plugin, const plugins_options* config);
     int stop(drakvuf_plugin_t plugin);
+    bool is_stopped(drakvuf_plugin_t plugin);
 };
 
 /***************************************************************************/

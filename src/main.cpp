@@ -641,6 +641,7 @@ int main(int argc, char** argv)
 
     bool plugin_stop_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 0};
     plugin_stop_list[PLUGIN_BSODMON] = 1;
+    plugin_stop_list[PLUGIN_FILEDELETE] = 1;
     if (drakvuf->stop_plugins(plugin_stop_list) < 0)
         return drakvuf_exit_code_t::FAIL;
 

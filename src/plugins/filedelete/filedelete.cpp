@@ -1373,7 +1373,8 @@ static addr_t get_function_va(drakvuf_t drakvuf, const char* lib, const char* fu
 }
 
 filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_format_t output)
-    : offsets(new size_t[__OFFSET_MAX])
+    : drakvuf(drakvuf)
+    , offsets(new size_t[__OFFSET_MAX])
     , dump_folder(c->dump_folder)
     , pm(drakvuf_get_page_mode(drakvuf))
     , format(output)
@@ -1431,4 +1432,15 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
 filedelete::~filedelete()
 {
     delete[] offsets;
+}
+
+void filedelete::stop()
+{
+    for (unsigned long i = 0; i < sizeof(traps)/sizeof(traps[0]); ++i)
+        drakvuf_remove_trap(drakvuf, &traps[i], nullptr);
+}
+
+bool filedelete::is_stopped()
+{
+    return closing_handles.empty();
 }

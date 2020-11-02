@@ -173,6 +173,23 @@ int drakvuf_c::stop_plugins(const bool* plugin_list)
         }
     }
 
+    bool is_stopped;
+    do
+    {
+        // TODO Use `drakvuf_loop(is_stopped)
+        loop(1);
+
+        is_stopped = true;
+
+        for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
+        {
+            if (plugin_list[i])
+            {
+                is_stopped &= plugins->is_stopped(static_cast<drakvuf_plugin_t>(i));
+            }
+        }
+    } while(!is_stopped);
+
     return 1;
 }
 

@@ -166,5 +166,14 @@ bsodmon::bsodmon(drakvuf_t drakvuf, bool _abort_on_bsod, output_format_t output)
 
 bsodmon::~bsodmon()
 {
+}
+
+void bsodmon::stop()
+{
     drakvuf_remove_trap(drakvuf, &trap, nullptr);
+}
+
+bool bsodmon::is_stopped()
+{
+    return true;
 }

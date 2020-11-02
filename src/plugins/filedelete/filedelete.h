@@ -146,6 +146,7 @@ public:
             .data = (void*)this
         }
     };
+    drakvuf_t drakvuf = nullptr;
     size_t* offsets;
     size_t control_area_size = 0;
     size_t mmpte_size = 0;
@@ -161,6 +162,9 @@ public:
 
     filedelete(drakvuf_t drakvuf, const filedelete_config* config, output_format_t output);
     ~filedelete();
+
+    void stop();
+    bool is_stopped();
 
     // For `filedelete2`
     addr_t queryvolumeinfo_va = 0;
