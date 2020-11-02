@@ -188,7 +188,7 @@ int drakvuf_c::stop_plugins(const bool* plugin_list)
                 is_stopped &= plugins->is_stopped(static_cast<drakvuf_plugin_t>(i));
             }
         }
-    } while(!is_stopped);
+    } while (!is_stopped);
 
     return 1;
 }

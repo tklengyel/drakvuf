@@ -372,7 +372,10 @@ public:
             destroy_trap(traps.front());
     }
 
-    virtual bool is_stopped() { return true; }
+    virtual bool is_stopped()
+    {
+        return true;
+    }
 
     // Params property is optional
     template<typename Params = void, typename IB>
