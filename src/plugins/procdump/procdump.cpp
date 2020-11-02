@@ -1044,3 +1044,8 @@ procdump::~procdump()
 
     g_slist_free(this->traps);
 }
+
+bool procdump::is_stopped()
+{
+    return terminating.empty();
+}

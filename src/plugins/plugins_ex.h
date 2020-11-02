@@ -363,9 +363,16 @@ public:
 
     virtual ~pluginex()
     {
-        for (auto& trap : traps)
-            delete_trap(trap);
+        stop();
     };
+
+    virtual void stop()
+    {
+        while (!traps.empty())
+            destroy_trap(traps.front());
+    }
+
+    virtual bool is_stopped() { return true; }
 
     // Params property is optional
     template<typename Params = void, typename IB>
