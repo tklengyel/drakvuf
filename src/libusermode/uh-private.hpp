@@ -166,15 +166,15 @@ class userhook : public pluginex
 {
 public:
     int initialized;
-    size_t* offsets;
+    std::array<size_t, __OFFSET_MAX> offsets;
 
     std::vector<usermode_cb_registration> plugins;
     // map dtb -> list of hooked dlls
     std::map<addr_t, std::vector<dll_t>> loaded_dlls;
 
-    userhook(drakvuf_t drakvuf) : pluginex(drakvuf, OUTPUT_DEFAULT), initialized(0), offsets(new size_t[__OFFSET_MAX])
+    userhook(drakvuf_t drakvuf) : pluginex(drakvuf, OUTPUT_DEFAULT), initialized(0)
     {
-        drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets);
+        drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets.data());
     }
     ~userhook();
 

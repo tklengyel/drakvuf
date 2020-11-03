@@ -822,8 +822,6 @@ userhook::~userhook()
             }
         }
     }
-
-    delete[] offsets;
 }
 
 usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg)

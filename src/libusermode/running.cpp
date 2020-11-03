@@ -121,7 +121,11 @@
 #include "uh-private.hpp"
 
 
-struct er_data_t
+/**
+ * Running hook helper data structure.
+ * Used for passing user arguments and additional data between callbacks.
+ */
+struct rh_data_t
 {
     // Arguments provided by the user.
     addr_t target_process;
@@ -139,7 +143,7 @@ struct er_data_t
     // We need to pass this around as we need offsets.
     userhook* userhook_plugin;
 
-    er_data_t(userhook* userhook_plugin, addr_t target_process, vmi_pid_t target_process_pid,
+    rh_data_t(userhook* userhook_plugin, addr_t target_process, vmi_pid_t target_process_pid,
               std::string dll_name, std::string func_name, callback_t cb, void* extra):
         target_process(target_process), dll_name(dll_name), func_name(func_name), cb(cb),
         extra(extra), state(HOOK_FIRST_TRY), target_process_pid(target_process_pid),
@@ -154,7 +158,7 @@ void free_trap(drakvuf_trap_t* trap)
         return;
 
     if (trap->data)
-        delete (er_data_t*) trap->data;
+        delete (rh_data_t*) trap->data;
 
     delete trap;
 }
@@ -234,7 +238,6 @@ bool get_dll_base(
 static
 bool get_func_addr(
     drakvuf_t drakvuf,
-    const size_t* offsets,
     access_context_t ctx,
     addr_t dll_base,
     std::string func_name,
@@ -291,7 +294,7 @@ bool get_func_addr(
 /**
  * This is the main logic behind `drakvuf_request_userhook_on_running_process`.
  * At this point the vcpu is in the context of target process, allowing us to
- * request page faults. Function arguments are passed in trap->data (er_data_t).
+ * request page faults. Function arguments are passed in trap->data (rh_data_t).
  *
  * We need to resolve the target physical address from the virtual function
  * address. This might fail as the page might not be mapped yet. In such case
@@ -305,22 +308,22 @@ event_response_t hook_process_cb(
     drakvuf_t drakvuf,
     drakvuf_trap_info_t* info)
 {
-    er_data_t* er_data = static_cast<er_data_t*>(info->trap->data);
-    const size_t* offsets = er_data->userhook_plugin->offsets;
+    rh_data_t* rh_data = static_cast<rh_data_t*>(info->trap->data);
+    userhook *userhook_plugin = rh_data->userhook_plugin;
 
-    if (er_data->state == HOOK_FIRST_TRY)
+    if (rh_data->state == HOOK_FIRST_TRY)
     {
         // This is the first time we are trying to create a hook on process.
         // It finds target function virtual address and stores it in trap data, so we don't have to
         // calculate it again on retry.
         addr_t dll_base = 0;
-        if (!get_dll_base(drakvuf, offsets, er_data->target_process, er_data->dll_name, &dll_base))
+        if (!get_dll_base(drakvuf, userhook_plugin->offsets.data(), rh_data->target_process, rh_data->dll_name, &dll_base))
         {
             drakvuf_remove_trap(drakvuf, info->trap, free_trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
 
-        if (!drakvuf_get_process_dtb(drakvuf, er_data->target_process, &er_data->target_process_dtb))
+        if (!drakvuf_get_process_dtb(drakvuf, rh_data->target_process, &rh_data->target_process_dtb))
         {
             drakvuf_remove_trap(drakvuf, info->trap, free_trap);
             return VMI_EVENT_RESPONSE_NONE;
@@ -329,9 +332,9 @@ event_response_t hook_process_cb(
         access_context_t ctx =
         {
             .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = er_data->target_process_dtb
+            .dtb = rh_data->target_process_dtb
         };
-        if (!get_func_addr(drakvuf, offsets, ctx, dll_base, er_data->func_name, &er_data->func_addr))
+        if (!get_func_addr(drakvuf, ctx, dll_base, rh_data->func_name, &rh_data->func_addr))
         {
             drakvuf_remove_trap(drakvuf, info->trap, free_trap);
             return VMI_EVENT_RESPONSE_NONE;
@@ -341,9 +344,9 @@ event_response_t hook_process_cb(
     // Now let's try to resolve physical address of the target function.
     addr_t func_pa = 0;
     vmi_lock_guard lg(drakvuf);
-    if (VMI_SUCCESS != vmi_pagetable_lookup(lg.vmi, er_data->target_process_dtb, er_data->func_addr, &func_pa))
+    if (VMI_SUCCESS != vmi_pagetable_lookup(lg.vmi, rh_data->target_process_dtb, rh_data->func_addr, &func_pa))
     {
-        if (er_data->state == HOOK_PAGEFAULT_RETRY)
+        if (rh_data->state == HOOK_PAGEFAULT_RETRY)
         {
             // We have already tried requesting page fault, so nothing more we can do.
             drakvuf_remove_trap(drakvuf, info->trap, free_trap);
@@ -351,21 +354,21 @@ event_response_t hook_process_cb(
         }
 
         // Otherwise request page fault, exit and wait for hook_process_cb to be hit again.
-        if (VMI_SUCCESS != vmi_request_page_fault(lg.vmi, info->vcpu, er_data->func_addr, 0))
+        if (VMI_SUCCESS != vmi_request_page_fault(lg.vmi, info->vcpu, rh_data->func_addr, 0))
         {
             drakvuf_remove_trap(drakvuf, info->trap, free_trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
-        er_data->state = HOOK_PAGEFAULT_RETRY;
+        rh_data->state = HOOK_PAGEFAULT_RETRY;
         return VMI_EVENT_RESPONSE_NONE;
     }
 
     // We have managed to resolve the physical address. Place the trap.
     drakvuf_trap_t* trap = new drakvuf_trap_t();
     trap->type = BREAKPOINT;
-    trap->name = er_data->func_name.c_str();
-    trap->cb = er_data->cb;
-    trap->data = er_data->extra;
+    trap->name = rh_data->func_name.c_str();
+    trap->cb = rh_data->cb;
+    trap->data = rh_data->extra;
     trap->breakpoint.lookup_type = LOOKUP_NONE;
     trap->breakpoint.addr_type = ADDR_PA;
     trap->breakpoint.addr = func_pa;
@@ -383,9 +386,9 @@ event_response_t wait_for_target_process_cb(
     drakvuf_t drakvuf,
     drakvuf_trap_info_t* info)
 {
-    er_data_t* er_data = static_cast<er_data_t*>(info->trap->data);
+    rh_data_t* rh_data = static_cast<rh_data_t*>(info->trap->data);
     // Wait for target_process.
-    if (info->proc_data.pid != er_data->target_process_pid)
+    if (info->proc_data.pid != rh_data->target_process_pid)
         return VMI_EVENT_RESPONSE_NONE;
 
     // At this point we are is still in kernel mode, so
@@ -395,17 +398,17 @@ event_response_t wait_for_target_process_cb(
     if (!thread)
         return VMI_EVENT_RESPONSE_NONE;
 
-    const size_t* offsets = er_data->userhook_plugin->offsets;
+    userhook *userhook_plugin = rh_data->userhook_plugin;
     vmi_lock_guard lg(drakvuf);
     addr_t trap_frame = 0;
-    if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, thread + offsets[KTHREAD_TRAPFRAME], 0, &trap_frame))
+    if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, thread + userhook_plugin->offsets[KTHREAD_TRAPFRAME], 0, &trap_frame))
     {
         drakvuf_remove_trap(drakvuf, info->trap, free_trap);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
     addr_t rip = 0;
-    if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, trap_frame + offsets[KTRAP_FRAME_RIP], 0, &rip))
+    if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, trap_frame + userhook_plugin->offsets[KTRAP_FRAME_RIP], 0, &rip))
     {
         drakvuf_remove_trap(drakvuf, info->trap, free_trap);
         return VMI_EVENT_RESPONSE_NONE;
@@ -415,14 +418,14 @@ event_response_t wait_for_target_process_cb(
     trap->type = BREAKPOINT;
     trap->name = "Hook process trap";
     trap->cb = hook_process_cb;
-    trap->data = new er_data_t(*er_data);
+    trap->data = new rh_data_t(*rh_data);
     trap->breakpoint.lookup_type = LOOKUP_DTB;
     trap->breakpoint.dtb = info->regs->cr3;
     trap->breakpoint.addr_type = ADDR_VA;
     trap->breakpoint.addr = rip;
     if (!drakvuf_add_trap(drakvuf, trap))
     {
-        delete (er_data_t*) trap->data;
+        delete (rh_data_t*) trap->data;
         delete trap;
     }
 
@@ -459,7 +462,7 @@ void userhook::request_userhook_on_running_process(
         return;
     }
 
-    trap->data = new er_data_t(this, target_process, target_pid, dll_name, func_name, cb, extra);
+    trap->data = new rh_data_t(this, target_process, target_pid, dll_name, func_name, cb, extra);
     if (!drakvuf_add_trap(drakvuf, trap))
     {
         free_trap(trap);
@@ -472,7 +475,7 @@ void userhook::request_userhook_on_running_process(
  * This is just a wrapper over a userhook::request_userhook_on_running_process
  * method.
  */
-bool drakvuf_request_userhook_on_running_process(
+void drakvuf_request_userhook_on_running_process(
     drakvuf_t drakvuf,
     addr_t target_process,
     std::string dll_name,
@@ -481,10 +484,7 @@ bool drakvuf_request_userhook_on_running_process(
     void* extra)
 {
     if (!instance || !instance->initialized)
-    {
-        return false;
-    }
+        throw -1;
 
     instance->request_userhook_on_running_process(drakvuf, target_process, dll_name, func_name, cb, extra);
-    return true;
 }
