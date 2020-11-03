@@ -173,7 +173,7 @@ bool get_dll_base(
     drakvuf_t drakvuf,
     const size_t* offsets,
     addr_t process_base,
-    std::string dll_name,
+    const std::string& dll_name,
     addr_t* res_dll_base)
 {
     addr_t process_dtb = 0;
@@ -240,12 +240,12 @@ bool get_func_addr(
     drakvuf_t drakvuf,
     access_context_t ctx,
     addr_t dll_base,
-    std::string func_name,
+    const std::string& func_name,
     addr_t* res_func_addr)
 {
     vmi_lock_guard lg(drakvuf);
 
-    struct export_table et;
+    export_table et;
     ctx.addr = dll_base;
     if (VMI_SUCCESS != peparse_get_export_table(lg.vmi, &ctx, &et, nullptr, nullptr))
         return false;
@@ -443,8 +443,8 @@ event_response_t wait_for_target_process_cb(
 void userhook::request_userhook_on_running_process(
     drakvuf_t drakvuf,
     addr_t target_process,
-    std::string dll_name,
-    std::string func_name,
+    const std::string& dll_name,
+    const std::string& func_name,
     callback_t cb,
     void* extra)
 {
@@ -478,8 +478,8 @@ void userhook::request_userhook_on_running_process(
 void drakvuf_request_userhook_on_running_process(
     drakvuf_t drakvuf,
     addr_t target_process,
-    std::string dll_name,
-    std::string func_name,
+    const std::string& dll_name,
+    const std::string& func_name,
     callback_t cb,
     void* extra)
 {
