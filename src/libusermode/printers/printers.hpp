@@ -151,6 +151,14 @@ public:
     using StringPrinterInterface::StringPrinterInterface;
 };
 
+class Binary16StringPrinter : public ArgumentPrinter
+{
+public:
+    using ArgumentPrinter::ArgumentPrinter;
+
+    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
+};
+
 class UnicodePrinter : public ArgumentPrinter
 {
 public:

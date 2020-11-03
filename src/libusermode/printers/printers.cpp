@@ -103,6 +103,7 @@
  ***************************************************************************/
 
 #include "printers.hpp"
+#include <array>
 #include <string>
 #include <iomanip>
 #include <libvmi/libvmi.h>
@@ -189,6 +190,32 @@ std::string WideStringPrinter::getBuffer(vmi_instance_t vmi, const access_contex
 {
     auto str_obj = drakvuf_read_wchar_string(vmi, ctx);
     return str_obj == NULL ? "" : (char*)str_obj->contents;
+}
+
+std::string Binary16StringPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
+{
+    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = argument
+    };
+    std::stringstream stream;
+    stream << name << "=";
+    if (!print_no_addr)
+        stream << "0x" << std::hex << argument << ":";
+    stream << "\"";
+    const size_t BUF_SIZE = 16;
+    std::array<uint8_t, BUF_SIZE> buffer;
+    if (VMI_SUCCESS == vmi_read(vmi, &ctx, 16, buffer.data(), nullptr))
+    {
+        for (auto i: buffer)
+            stream << std::setw(2) << std::setfill('0') << (int)i;
+    }
+    stream << "\"";
+    drakvuf_release_vmi(drakvuf);
+    return stream.str();
 }
 
 std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const

@@ -215,14 +215,39 @@ struct Rstr<T,
            void>
            >: ValHolder<std::string>
 {
-    Rstr(T v): ValHolder<std::string>(std::string_view(v).empty() ? std::string("(null)") : std::string(v)) {}
+    Rstr(T v): ValHolder<std::string>(nullptr == v ? std::string("(null)") : std::string(v)) {}
 };
 
 /* format specific quoted string value */
+template<class T, class = void>
+struct Qstr
+{
+    Qstr(T v)
+    {
+        static_assert(always_false<T>::value, "should be the one of: const char*, std::string, std::string_view");
+    }
+};
+
 template<class T>
-struct Qstr: Rstr<std::string>
+struct Qstr<T,
+           std::enable_if_t<
+           std::is_same_v<std::decay_t<T>, std::string>
+           || std::is_same_v<std::decay_t<T>, std::string_view>,
+           void>
+           >: Rstr<std::string>
 {
     Qstr(T v): Rstr<std::string>(std::string_view(v).empty() ? std::string("(null)") : std::move(v)) {}
+};
+
+template<class T>
+struct Qstr<T,
+           std::enable_if_t<
+           std::is_same_v<T, const char*>
+           || std::is_same_v<T, char*>,
+           void>
+           >: Rstr<std::string>
+{
+    Qstr(T v): Rstr<std::string>(nullptr == v ? std::string("(null)") : std::string(v)) {}
 };
 
 /* Any argument type */
