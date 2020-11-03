@@ -170,7 +170,7 @@ struct rh_data_t
 static
 bool get_dll_base(
     drakvuf_t drakvuf,
-    const size_t* offsets,
+    const std::array<size_t, __OFFSET_MAX>& offsets,
     addr_t process_base,
     const std::string& dll_name,
     addr_t* res_dll_base)
@@ -320,7 +320,7 @@ event_response_t hook_process_cb(
         // It finds target function virtual address and stores it in trap data, so we don't have to
         // calculate it again on retry.
         addr_t dll_base = 0;
-        if (!get_dll_base(drakvuf, userhook_plugin->offsets.data(), rh_data->target_process, rh_data->dll_name, &dll_base))
+        if (!get_dll_base(drakvuf, userhook_plugin->offsets, rh_data->target_process, rh_data->dll_name, &dll_base))
         {
             drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
             return VMI_EVENT_RESPONSE_NONE;
