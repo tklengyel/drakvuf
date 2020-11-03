@@ -185,46 +185,49 @@ bool get_dll_base(
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = process_dtb
     };
-    vmi_lock_guard lg(drakvuf);
 
-    addr_t module_list_head = 0;
-    if (!drakvuf_get_module_list(drakvuf, process_base, &module_list_head))
-        return false;
-    addr_t act_module = module_list_head;
+    { // Lock vmi.
+        vmi_lock_guard lg(drakvuf);
 
-    do
-    {
-        // Read dll base.
-        addr_t dll_base;
-        ctx.addr = act_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
-        if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &dll_base))
+        addr_t module_list_head = 0;
+        if (!drakvuf_get_module_list(drakvuf, process_base, &module_list_head))
             return false;
+        addr_t act_module = module_list_head;
 
-        // Read dll base name.
-        ctx.addr = act_module + offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-        unicode_string_t* dll_name_utf16 = vmi_read_unicode_str(lg.vmi, &ctx);
-        unicode_string_t dll_name_utf8;
-        if (dll_name_utf16)
+        do
         {
-            if (VMI_SUCCESS != vmi_convert_str_encoding(dll_name_utf16, &dll_name_utf8, "UTF-8"))
-            {
-                vmi_free_unicode_str(dll_name_utf16);
+            // Read dll base.
+            addr_t dll_base;
+            ctx.addr = act_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
+            if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &dll_base))
                 return false;
-            }
-            vmi_free_unicode_str(dll_name_utf16);
 
-            if (!strncmp(dll_name.c_str(), (const char*)dll_name_utf8.contents, dll_name.size()))
+            // Read dll base name.
+            ctx.addr = act_module + offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
+            unicode_string_t* dll_name_utf16 = vmi_read_unicode_str(lg.vmi, &ctx);
+            unicode_string_t dll_name_utf8;
+            if (dll_name_utf16)
             {
-                *res_dll_base = dll_base;
-                return true;
+                if (VMI_SUCCESS != vmi_convert_str_encoding(dll_name_utf16, &dll_name_utf8, "UTF-8"))
+                {
+                    vmi_free_unicode_str(dll_name_utf16);
+                    return false;
+                }
+                vmi_free_unicode_str(dll_name_utf16);
+
+                if (!strncmp(dll_name.c_str(), (const char*)dll_name_utf8.contents, dll_name.size()))
+                {
+                    *res_dll_base = dll_base;
+                    return true;
+                }
             }
-        }
 
-        ctx.addr = act_module;
-        if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &act_module))
-            return false;
+            ctx.addr = act_module;
+            if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &act_module))
+                return false;
 
-    } while (act_module != module_list_head);
+        } while (act_module != module_list_head);
+    } // Unlock vmi
 
     return false;
 }
@@ -343,25 +346,27 @@ event_response_t hook_process_cb(
 
     // Now let's try to resolve physical address of the target function.
     addr_t func_pa = 0;
-    vmi_lock_guard lg(drakvuf);
-    if (VMI_SUCCESS != vmi_pagetable_lookup(lg.vmi, rh_data->target_process_dtb, rh_data->func_addr, &func_pa))
-    {
-        if (rh_data->state == HOOK_PAGEFAULT_RETRY)
+    { // Lock vmi.
+        vmi_lock_guard lg(drakvuf);
+        if (VMI_SUCCESS != vmi_pagetable_lookup(lg.vmi, rh_data->target_process_dtb, rh_data->func_addr, &func_pa))
         {
-            // We have already tried requesting page fault, so nothing more we can do.
-            drakvuf_remove_trap(drakvuf, info->trap, free_trap);
-            return VMI_EVENT_RESPONSE_NONE;
-        }
+            if (rh_data->state == HOOK_PAGEFAULT_RETRY)
+            {
+                // We have already tried requesting page fault, so nothing more we can do.
+                drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+                return VMI_EVENT_RESPONSE_NONE;
+            }
 
-        // Otherwise request page fault, exit and wait for hook_process_cb to be hit again.
-        if (VMI_SUCCESS != vmi_request_page_fault(lg.vmi, info->vcpu, rh_data->func_addr, 0))
-        {
-            drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+            // Otherwise request page fault, exit and wait for hook_process_cb to be hit again.
+            if (VMI_SUCCESS != vmi_request_page_fault(lg.vmi, info->vcpu, rh_data->func_addr, 0))
+            {
+                drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+                return VMI_EVENT_RESPONSE_NONE;
+            }
+            rh_data->state = HOOK_PAGEFAULT_RETRY;
             return VMI_EVENT_RESPONSE_NONE;
         }
-        rh_data->state = HOOK_PAGEFAULT_RETRY;
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+    } // Unlock Vmi.
 
     // We have managed to resolve the physical address. Place the trap.
     drakvuf_trap_t* trap = new drakvuf_trap_t();
@@ -399,20 +404,22 @@ event_response_t wait_for_target_process_cb(
         return VMI_EVENT_RESPONSE_NONE;
 
     userhook *userhook_plugin = rh_data->userhook_plugin;
-    vmi_lock_guard lg(drakvuf);
-    addr_t trap_frame = 0;
-    if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, thread + userhook_plugin->offsets[KTHREAD_TRAPFRAME], 0, &trap_frame))
-    {
-        drakvuf_remove_trap(drakvuf, info->trap, free_trap);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
     addr_t rip = 0;
-    if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, trap_frame + userhook_plugin->offsets[KTRAP_FRAME_RIP], 0, &rip))
-    {
-        drakvuf_remove_trap(drakvuf, info->trap, free_trap);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+    { // Lock vmi.
+        vmi_lock_guard lg(drakvuf);
+        addr_t trap_frame = 0;
+        if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, thread + userhook_plugin->offsets[KTHREAD_TRAPFRAME], 0, &trap_frame))
+        {
+            drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, trap_frame + userhook_plugin->offsets[KTRAP_FRAME_RIP], 0, &rip))
+        {
+            drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+    } // Unlock vmi.
 
     drakvuf_trap_t* trap = new drakvuf_trap_t();
     trap->type = BREAKPOINT;
