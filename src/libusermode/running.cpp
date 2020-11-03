@@ -148,20 +148,19 @@ struct rh_data_t
         target_process(target_process), dll_name(dll_name), func_name(func_name), cb(cb),
         extra(extra), state(HOOK_FIRST_TRY), target_process_pid(target_process_pid),
         userhook_plugin(userhook_plugin) {}
+
+
+    static void free_trap(drakvuf_trap_t* trap)
+    {
+        if (!trap)
+            return;
+
+        if (trap->data)
+            delete (rh_data_t*) trap->data;
+
+        delete trap;
+    }
 };
-
-
-static
-void free_trap(drakvuf_trap_t* trap)
-{
-    if (!trap)
-        return;
-
-    if (trap->data)
-        delete (rh_data_t*) trap->data;
-
-    delete trap;
-}
 
 
 /**
@@ -186,7 +185,8 @@ bool get_dll_base(
         .dtb = process_dtb
     };
 
-    { // Lock vmi.
+    {
+        // Lock vmi.
         vmi_lock_guard lg(drakvuf);
 
         addr_t module_list_head = 0;
@@ -312,7 +312,7 @@ event_response_t hook_process_cb(
     drakvuf_trap_info_t* info)
 {
     rh_data_t* rh_data = static_cast<rh_data_t*>(info->trap->data);
-    userhook *userhook_plugin = rh_data->userhook_plugin;
+    userhook* userhook_plugin = rh_data->userhook_plugin;
 
     if (rh_data->state == HOOK_FIRST_TRY)
     {
@@ -322,13 +322,13 @@ event_response_t hook_process_cb(
         addr_t dll_base = 0;
         if (!get_dll_base(drakvuf, userhook_plugin->offsets.data(), rh_data->target_process, rh_data->dll_name, &dll_base))
         {
-            drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+            drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
 
         if (!drakvuf_get_process_dtb(drakvuf, rh_data->target_process, &rh_data->target_process_dtb))
         {
-            drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+            drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
 
@@ -339,28 +339,29 @@ event_response_t hook_process_cb(
         };
         if (!get_func_addr(drakvuf, ctx, dll_base, rh_data->func_name, &rh_data->func_addr))
         {
-            drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+            drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
     }
 
     // Now let's try to resolve physical address of the target function.
     addr_t func_pa = 0;
-    { // Lock vmi.
+    {
+        // Lock vmi.
         vmi_lock_guard lg(drakvuf);
         if (VMI_SUCCESS != vmi_pagetable_lookup(lg.vmi, rh_data->target_process_dtb, rh_data->func_addr, &func_pa))
         {
             if (rh_data->state == HOOK_PAGEFAULT_RETRY)
             {
                 // We have already tried requesting page fault, so nothing more we can do.
-                drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+                drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
                 return VMI_EVENT_RESPONSE_NONE;
             }
 
             // Otherwise request page fault, exit and wait for hook_process_cb to be hit again.
             if (VMI_SUCCESS != vmi_request_page_fault(lg.vmi, info->vcpu, rh_data->func_addr, 0))
             {
-                drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+                drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
                 return VMI_EVENT_RESPONSE_NONE;
             }
             rh_data->state = HOOK_PAGEFAULT_RETRY;
@@ -381,7 +382,7 @@ event_response_t hook_process_cb(
     if (!drakvuf_add_trap(drakvuf, trap))
         delete trap;
 
-    drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+    drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -403,20 +404,21 @@ event_response_t wait_for_target_process_cb(
     if (!thread)
         return VMI_EVENT_RESPONSE_NONE;
 
-    userhook *userhook_plugin = rh_data->userhook_plugin;
+    userhook* userhook_plugin = rh_data->userhook_plugin;
     addr_t rip = 0;
-    { // Lock vmi.
+    {
+        // Lock vmi.
         vmi_lock_guard lg(drakvuf);
         addr_t trap_frame = 0;
         if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, thread + userhook_plugin->offsets[KTHREAD_TRAPFRAME], 0, &trap_frame))
         {
-            drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+            drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
 
         if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, trap_frame + userhook_plugin->offsets[KTRAP_FRAME_RIP], 0, &rip))
         {
-            drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+            drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
     } // Unlock vmi.
@@ -436,7 +438,7 @@ event_response_t wait_for_target_process_cb(
         delete trap;
     }
 
-    drakvuf_remove_trap(drakvuf, info->trap, free_trap);
+    drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -472,7 +474,7 @@ void userhook::request_userhook_on_running_process(
     trap->data = new rh_data_t(this, target_process, target_pid, dll_name, func_name, cb, extra);
     if (!drakvuf_add_trap(drakvuf, trap))
     {
-        free_trap(trap);
+        rh_data_t::free_trap(trap);
         return;
     }
 }
