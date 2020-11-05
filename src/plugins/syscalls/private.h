@@ -459,6 +459,7 @@ struct wrapper
     const char* type;
     struct wrapper* w;
     uint16_t num;
+    vmi_pid_t pid;
     addr_t tid;
     addr_t stack_fingerprint;
 };

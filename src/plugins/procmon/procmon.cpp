@@ -288,7 +288,7 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
     auto plugin = get_trap_plugin<procmon>(info);
     auto params = get_trap_params<process_creation_result_t>(info);
 
-    if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     addr_t user_process_parameters_addr = params->user_process_parameters_addr;
@@ -333,7 +333,7 @@ static event_response_t process_create_ex_return_hook(drakvuf_t drakvuf, drakvuf
     auto plugin = get_trap_plugin<procmon>(info);
     auto params = get_trap_params<process_create_ex_result_t>(info);
 
-    if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     addr_t process_handle_addr = params->process_handle_addr;
@@ -388,7 +388,7 @@ static event_response_t create_user_process_hook(
                     breakpoint_by_pid_searcher());
 
     auto params = get_trap_params<process_creation_result_t>(trap);
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info);
     params->new_process_handle_addr = process_handle_addr;
     params->new_thread_handle_addr = thread_handle_addr;
     params->user_process_parameters_addr = user_process_parameters_addr;
@@ -415,7 +415,7 @@ static event_response_t create_process_ex_hook(
 
     auto params = get_trap_params<process_create_ex_result_t>(trap);
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info);
     params->process_handle_addr = process_handle_addr;
     params->desired_access = desired_access;
     params->object_attributes_addr = object_attributes_addr;
@@ -491,7 +491,7 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
     auto plugin = get_trap_plugin<procmon>(info);
     auto params = get_trap_params<open_process_result_t>(info);
 
-    if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     access_context_t ctx =
@@ -540,7 +540,7 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
     auto params = get_trap_params<open_process_result_t>(trap);
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info);
 
     // PHANDLE ProcessHandle
     params->process_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -572,7 +572,7 @@ static event_response_t open_thread_return_hook_cb(drakvuf_t drakvuf, drakvuf_tr
     auto plugin = get_trap_plugin<procmon>(info);
     auto params = get_trap_params<open_thread_result_t>(info);
 
-    if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     access_context_t ctx =
@@ -621,7 +621,7 @@ static event_response_t open_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info
 
     auto params = get_trap_params<open_thread_result_t>(trap);
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info);
 
     // PHANDLE ProcessHandle
     params->thread_handle_addr = drakvuf_get_function_argument(drakvuf, info, 1);

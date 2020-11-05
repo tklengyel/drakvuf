@@ -153,6 +153,13 @@ addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     return ret;
 }
 
+bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
+{
+    return (info->proc_data.pid == pid)
+           && (info->proc_data.tid == tid)
+           && (!rsp || info->regs->rip == rsp);
+}
+
 static bool find_kernbase(drakvuf_t drakvuf)
 {
     if ( VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "_text", &drakvuf->kernbase) )
@@ -184,6 +191,7 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.exportsym_to_va = linux_eprocess_sym2va;
     drakvuf->osi.export_lib_address = get_lib_address;
     drakvuf->osi.get_function_argument = linux_get_function_argument;
+    drakvuf->osi.check_return_context = linux_check_return_context;
 
     return 1;
 }

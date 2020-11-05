@@ -409,10 +409,7 @@ static event_response_t open_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     struct linux_wrapper* lw = (struct linux_wrapper*)info->trap->data;
     addr_t file_struct = 0;
 
-    if (info->proc_data.pid != lw->pid || info->proc_data.tid != lw->tid)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    if (lw->rsp && info->regs->rip != lw->rsp)
+    if (!drakvuf_check_return_context(drakvuf, info, lw->pid, lw->tid, lw->rsp))
         return VMI_EVENT_RESPONSE_NONE;
 
     file_struct = info->regs->rax;

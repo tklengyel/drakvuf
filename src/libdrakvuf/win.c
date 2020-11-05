@@ -436,6 +436,13 @@ bool fill_wow_offsets( drakvuf_t drakvuf, size_t size, const char* names [][2] )
     return 1 ;
 }
 
+bool win_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
+{
+    return (info->attached_proc_data.pid == pid)
+           && (info->attached_proc_data.tid == tid)
+           && (!rsp || info->regs->rsp > rsp);
+}
+
 bool set_os_windows(drakvuf_t drakvuf)
 {
 
@@ -510,6 +517,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_user_stack32 = win_get_user_stack32;
     drakvuf->osi.get_user_stack64 = win_get_user_stack64;
     drakvuf->osi.get_wow_peb = win_get_wow_peb;
+    drakvuf->osi.check_return_context = win_check_return_context;
 
     return true;
 }
