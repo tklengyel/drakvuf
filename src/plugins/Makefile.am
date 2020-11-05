@@ -272,7 +272,7 @@ endif
 if PLUGIN_TLSMON
 sources += tlsmon/tlsmon.cpp
 sources += tlsmon/tlsmon.h
-sources += tlsmon/tlsmon.private.h
+sources += tlsmon/private.h
 endif
 
 ###############################################################################
