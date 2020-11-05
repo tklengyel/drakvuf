@@ -102,6 +102,16 @@
  *                                                                         *
  ***************************************************************************/
 
+/**
+ * General Tlsmon plugin description:
+ * This plugin extracts TLS secrets and logs them in a format:
+ * <CLIENT_RANDOM><MASTER_KEY> 
+ * recognizable by wireshark. This format allows the data to be easily loaded
+ * into wireshark and automatically decrypted.
+ * 
+ * Currently supported:
+ * - extracting secrets from communication based on Schannel.
+ */
 
 #ifndef TLSMON_H
 #define TLSMON_H
@@ -116,10 +126,11 @@
 class tlsmon: public pluginex
 {
 public:
-    std::vector<plugin_target_config_entry_t> wanted_hooks;
-
     tlsmon(drakvuf_t drakvuf, output_format_t output);
     ~tlsmon();
+
+private:
+    void hook_lsass(drakvuf_t drakvuf);
 };
 
 

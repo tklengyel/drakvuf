@@ -314,6 +314,9 @@ event_response_t hook_process_cb(
     rh_data_t* rh_data = static_cast<rh_data_t*>(info->trap->data);
     userhook* userhook_plugin = rh_data->userhook_plugin;
 
+    if (info->proc_data.pid != rh_data->target_process_pid)
+        return VMI_EVENT_RESPONSE_NONE;
+
     if (rh_data->state == HOOK_FIRST_TRY)
     {
         // This is the first time we are trying to create a hook on process.
@@ -381,7 +384,6 @@ event_response_t hook_process_cb(
 
     if (!drakvuf_add_trap(drakvuf, trap))
         delete trap;
-
     drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -492,8 +494,11 @@ void drakvuf_request_userhook_on_running_process(
     callback_t cb,
     void* extra)
 {
-    if (!instance || !instance->initialized)
-        throw -1;
+    // Userhook is a singleton.
+    if (!instance)
+        instance = new userhook(drakvuf);
+    if (!instance->initialized)
+        instance->init(drakvuf);
 
     instance->request_userhook_on_running_process(drakvuf, target_process, dll_name, func_name, cb, extra);
 }
