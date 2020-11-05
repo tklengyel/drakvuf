@@ -112,6 +112,25 @@
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
+
+enum offset
+{
+    KTHREAD_TRAPFRAME,
+    KTRAP_FRAME_RIP,
+    LDR_DATA_TABLE_ENTRY_DLLBASE,
+    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
+    __OFFSET_MAX
+};
+
+static const char* offset_names[__OFFSET_MAX][2] =
+{
+    [KTHREAD_TRAPFRAME] = { "_KTHREAD", "TrapFrame" },
+    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip"},
+    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
+    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
+};
+
+
 struct dll_t
 {
     dll_view_t v;
@@ -147,17 +166,22 @@ class userhook : public pluginex
 {
 public:
     int initialized;
+    std::array<size_t, __OFFSET_MAX> offsets;
 
     std::vector<usermode_cb_registration> plugins;
     // map dtb -> list of hooked dlls
     std::map<addr_t, std::vector<dll_t>> loaded_dlls;
 
-    userhook(drakvuf_t drakvuf) : pluginex(drakvuf, OUTPUT_DEFAULT), initialized(0) {}
+    userhook(drakvuf_t drakvuf) : pluginex(drakvuf, OUTPUT_DEFAULT), initialized(0)
+    {
+        drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets.data());
+    }
     ~userhook();
 
     usermode_reg_status_t init(drakvuf_t drakvuf);
     void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
     void request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
+    void request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, const std::string& dll_name, const std::string& func_name, callback_t cb, void* extra);
 };
 
 extern userhook* instance;
