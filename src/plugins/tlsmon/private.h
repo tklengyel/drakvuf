@@ -1,4 +1,4 @@
- 
+
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
  * DRAKVUF (C) 2014-2020 Tamas K Lengyel.                                  *
@@ -111,7 +111,8 @@
 #include <iomanip>
 
 
-namespace tlsmon_priv {
+namespace tlsmon_priv
+{
 
 constexpr uint32_t NCRYPT_SSL_KEY_MAGIC_BYTES = 0x44444442;
 constexpr uint32_t MASTER_SECRET_MAGIC_BYTES  = 0x73736c35;
@@ -119,7 +120,7 @@ constexpr uint32_t MASTER_SECRET_MAGIC_BYTES  = 0x73736c35;
 constexpr size_t CLIENT_RANDOM_SZ = 0x20;
 constexpr size_t MASTER_KEY_SZ    = 0x30;
 
-/* Could not find whole structure documentation. We are only interested in 
+/* Could not find whole structure documentation. We are only interested in
 magic bytes and pointer to master_secret structure. */
 typedef struct
 {
@@ -135,7 +136,7 @@ typedef struct
     uint32_t magic;
     uint32_t protocol_version;
     char aligment[4];
-    void *cipher_suite_list_entry;
+    void* cipher_suite_list_entry;
     uint32_t is_client_cache;
     char master_key[MASTER_KEY_SZ];
     uint32_t field7;
@@ -154,21 +155,21 @@ typedef struct
     void* buffer;
 } __ncrypt_buffer_t;
 
-typedef struct 
+typedef struct
 {
     uint32_t ulversion;
     uint32_t cbuffers;
-    void *buffers; 
+    void* buffers;
 } __ncrypt_buffer_desc_t;
 
 
 
-std::string byte2str(unsigned char *data, int count)
+std::string byte2str(unsigned char* data, int count)
 {
     std::stringstream ss;
     ss << std::hex;
 
-    for(int i = 0; i < count; ++i)
+    for (int i = 0; i < count; ++i)
         ss << std::setw(2) << std::setfill('0') << (int)data[i];
 
     return ss.str();

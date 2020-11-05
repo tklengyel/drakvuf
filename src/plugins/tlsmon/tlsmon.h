@@ -105,10 +105,10 @@
 /**
  * General Tlsmon plugin description:
  * This plugin extracts TLS secrets and logs them in a format:
- * <CLIENT_RANDOM><MASTER_KEY> 
+ * <CLIENT_RANDOM><MASTER_KEY>
  * recognizable by wireshark. This format allows the data to be easily loaded
  * into wireshark and automatically decrypted.
- * 
+ *
  * Currently supported:
  * - extracting secrets from communication based on Schannel.
  */
