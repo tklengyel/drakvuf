@@ -252,4 +252,18 @@ usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, user
 bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
 void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, const bool print_no_addr, std::vector<plugin_target_config_entry_t>* wanted_hooks);
 
+
+/**
+ * Sets usermode hook on a process that already exists in the system.
+ * Note that this is rather an expensive operation, so whenever possible it is
+ * better to use drakvuf_register_usermode_callback.
+ *
+ * @param[in] drakvuf drakvuf context
+ * @param[in] target_process Base address of the process that we want to hook on.
+ * @param[in] dll_name Name of the dll library that contains func_name.
+ * @param[in] func_name Name of the function we want to hook on.
+ * @param[in] cb Callback which will get invoked when the hook is reached.
+ * @param[in] extra Additional data which will be set as trap->data.
+ */
+void drakvuf_request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, const std::string& dll_name, const std::string& func_name, callback_t cb, void* extra);
 #endif
