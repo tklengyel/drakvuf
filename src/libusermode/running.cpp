@@ -492,8 +492,5 @@ void drakvuf_request_userhook_on_running_process(
     callback_t cb,
     void* extra)
 {
-    if (!instance || !instance->initialized)
-        throw -1;
-
-    instance->request_userhook_on_running_process(drakvuf, target_process, dll_name, func_name, cb, extra);
+    userhook::get_instance(drakvuf).request_userhook_on_running_process(drakvuf, target_process, dll_name, func_name, cb, extra);
 }
