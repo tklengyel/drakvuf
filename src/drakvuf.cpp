@@ -173,24 +173,32 @@ int drakvuf_c::stop_plugins(const bool* plugin_list)
         }
     }
 
-    bool is_stopped;
-    do
-    {
-        // TODO Use `drakvuf_loop(is_stopped)
-        loop(1);
+    return 1;
+}
 
-        is_stopped = true;
+void drakvuf_c::wait_stopped(const bool* plugin_list)
+{
+    auto is_plugins_stopped = [&] (drakvuf_t drakvuf, void*)
+    {
+        if (drakvuf_is_interrupted(drakvuf))
+            return true;
 
         for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
-        {
-            if (plugin_list[i])
-            {
-                is_stopped &= plugins->is_stopped(static_cast<drakvuf_plugin_t>(i));
-            }
-        }
-    } while (!is_stopped);
+            if (plugin_list[i] && !plugins->is_stopped(static_cast<drakvuf_plugin_t>(i)))
+                return false;
 
-    return 1;
+        return true;
+    };
+
+    auto thunk = +[] (drakvuf_t drakvuf, void* data)
+    {
+        return (*static_cast<decltype(is_plugins_stopped)*>(data))(drakvuf, nullptr);
+    };
+
+    // TODO Pass duration argument
+    GThread* timeout_thread = startup_timer(this, 20);
+    drakvuf_loop(drakvuf, thunk, (void*)&is_plugins_stopped);
+    cleanup_timer(this, timeout_thread);
 }
 
 drakvuf_c::drakvuf_c(const char* domain,

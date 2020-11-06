@@ -395,7 +395,7 @@ int drakvuf_plugins::stop(const drakvuf_plugin_t plugin_id)
     {
         PRINT_DEBUG("Stopping plugin %s\n", drakvuf_plugin_names[plugin_id]);
 
-        if ( !drakvuf_plugin_os_support[plugin_id][this->os] )
+        if ( !this->plugins[plugin_id] || !drakvuf_plugin_os_support[plugin_id][this->os] )
             return 0;
 
         try
@@ -422,7 +422,7 @@ bool drakvuf_plugins::is_stopped(const drakvuf_plugin_t plugin_id)
     {
         PRINT_DEBUG("Check is plugin %s stopped\n", drakvuf_plugin_names[plugin_id]);
 
-        if ( !drakvuf_plugin_os_support[plugin_id][this->os] )
+        if ( !this->plugins[plugin_id] || !drakvuf_plugin_os_support[plugin_id][this->os] )
             return true;
 
         try
