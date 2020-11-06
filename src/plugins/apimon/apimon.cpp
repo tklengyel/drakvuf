@@ -337,7 +337,8 @@ static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::v
 apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output)
     : pluginex(drakvuf, output)
 {
-    if (!drakvuf_are_userhooks_supported(drakvuf)) {
+    if (!drakvuf_are_userhooks_supported(drakvuf))
+    {
         PRINT_DEBUG("[APIMON] Usermode hooking not supported.\n");
         return;
     }

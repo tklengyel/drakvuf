@@ -766,7 +766,8 @@ void userhook::register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg)
 
 bool userhook::is_supported(drakvuf_t drakvuf)
 {
-    { // Lock vmi.
+    {
+        // Lock vmi.
         vmi_lock_guard vmi(drakvuf);
         win_build_info_t build;
         if (vmi_get_windows_build_info(vmi.vmi, &build) &&

@@ -380,7 +380,8 @@ static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::v
 rpcmon::rpcmon(drakvuf_t drakvuf, output_format_t output)
     : pluginex(drakvuf, output)
 {
-    if (!drakvuf_are_userhooks_supported(drakvuf)) {
+    if (!drakvuf_are_userhooks_supported(drakvuf))
+    {
         PRINT_DEBUG("[RPCMON] Usermode hooking not supported.\n");
         return;
     }

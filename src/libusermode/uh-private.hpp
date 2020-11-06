@@ -174,9 +174,10 @@ public:
     userhook(drakvuf_t drakvuf);
     ~userhook();
 
-    static userhook& get_instance(drakvuf_t drakvuf) {
+    static userhook& get_instance(drakvuf_t drakvuf)
+    {
         static userhook instance(drakvuf);
-        return instance; 
+        return instance;
     }
 
     static bool is_supported(drakvuf_t drakvuf);
