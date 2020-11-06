@@ -171,9 +171,5 @@ bsodmon::~bsodmon()
 void bsodmon::stop()
 {
     drakvuf_remove_trap(drakvuf, &trap, nullptr);
-}
-
-bool bsodmon::is_stopped()
-{
-    return true;
+    _stopped = true;
 }

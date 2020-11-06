@@ -370,11 +370,7 @@ public:
     {
         while (!traps.empty())
             destroy_trap(traps.front());
-    }
-
-    virtual bool is_stopped()
-    {
-        return true;
+        _stopped = true;
     }
 
     // Params property is optional

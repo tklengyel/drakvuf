@@ -122,7 +122,6 @@ public:
     ~bsodmon();
 
     void stop();
-    bool is_stopped();
 
 private:
     drakvuf_trap_t trap =
