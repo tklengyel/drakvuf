@@ -329,6 +329,16 @@ void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info
     fmt::cout.flush();
 }
 
+inline void print_running_process(const char* plugin_name, drakvuf_t drakvuf, gint64 timestamp, proc_data_t const& proc_data)
+{
+    print(plugin_name, drakvuf, nullptr,
+          keyval("Time", TimeVal{UNPACK_TIMEVAL(timestamp)}),
+          keyval("PID", fmt::Nval(proc_data.pid)),
+          keyval("PPID", fmt::Nval(proc_data.ppid)),
+          keyval("RunningProcess", fmt::Qstr(proc_data.name))
+         );
+}
+
 } // namespace csvfmt
 
 #endif // PLUGINS_OUTPUT_FORMAT_CSVFMT_H
