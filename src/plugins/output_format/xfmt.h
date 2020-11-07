@@ -128,6 +128,25 @@ void print(output_format_t format, const char* plugin_name, drakvuf_t drakvuf, d
     }
 }
 
+inline void print_running_process(output_format_t format, const char* plugin_name, drakvuf_t drakvuf, gint64 timestamp, proc_data_t const& proc_data)
+{
+    switch (format)
+    {
+        case OUTPUT_CSV:
+            csvfmt::print_running_process(plugin_name, drakvuf, timestamp, proc_data);
+            break;
+        case OUTPUT_KV:
+            kvfmt::print_running_process(plugin_name, drakvuf, timestamp, proc_data);
+            break;
+        case OUTPUT_JSON:
+            jsonfmt::print_running_process(plugin_name, drakvuf, timestamp, proc_data);
+            break;
+        case OUTPUT_DEFAULT:
+            deffmt::print_running_process(plugin_name, drakvuf, timestamp, proc_data);
+            break;
+    }
+}
+
 } // namespace fmt
 
 #endif // PLUGINS_OUTPUT_FORMAT_XFMT_H
