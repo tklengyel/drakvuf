@@ -815,7 +815,7 @@ userhook::~userhook()
             {
                 if (target.state == HOOK_OK)
                 {
-                    delete target.trap;
+                    wrap_delete(target.trap);
                 }
             }
         }
