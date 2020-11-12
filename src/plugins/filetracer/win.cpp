@@ -131,8 +131,6 @@ extern const flags_str_t generic_ar;
 
 using std::string;
 
-string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs, uint32_t handle = 0);
-
 static void print_file_obj_info(drakvuf_t drakvuf,
                                 drakvuf_trap_info_t* info,
                                 char const* file_path,
@@ -189,7 +187,7 @@ static void print_file_obj_info(drakvuf_t drakvuf,
     }
 }
 
-string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs, uint32_t handle)
+static string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs, uint32_t handle = 0)
 {
     if (!attrs) return string();
 
@@ -483,19 +481,7 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 {
     struct wrapper* w = (struct wrapper*)info->trap->data;
 
-    if (info->attached_proc_data.pid != w->pid)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    uint32_t tid = 0;
-    if (!drakvuf_get_current_thread_id(drakvuf, info, &tid) && !tid)
-    {
-        PRINT_DEBUG("filetracer: Failed to get TID");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-    if (tid != w->tid)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    if (w->rsp && info->regs->rsp <= w->rsp)
+    if (!drakvuf_check_return_context(drakvuf, info, w->pid, w->tid, w->rsp))
         return VMI_EVENT_RESPONSE_NONE;
 
     const char* is_success = info->regs->rax ? "FAIL" : "SUCCESS";
@@ -578,10 +564,8 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     if (!w) return 0;
     w->f = f;
     w->rsp = info->regs->rsp;
-
     w->pid = info->attached_proc_data.pid;
-    if (!drakvuf_get_current_thread_id(drakvuf, info, &w->tid) && !w->tid)
-        PRINT_DEBUG("filetracer: Failed to get TID");
+    w->tid = info->attached_proc_data.tid;
 
     w->handle = drakvuf_get_function_argument(drakvuf, info, 1);
     if ( !w->handle )

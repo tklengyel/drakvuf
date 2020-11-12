@@ -540,3 +540,11 @@ addr_t drakvuf_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t epro
 
     return 0;
 }
+
+bool drakvuf_check_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
+{
+    if ( drakvuf->osi.check_return_context )
+        return drakvuf->osi.check_return_context(info, pid, tid, rsp);
+
+    return false;
+}

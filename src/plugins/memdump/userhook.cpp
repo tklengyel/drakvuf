@@ -135,8 +135,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
 {
     hook_target_entry_t* target = (hook_target_entry_t*)info->trap->data;
 
-    // TODO check thread_id and cr3?
-    if (target->pid != info->proc_data.pid)
+    if (target->pid != info->attached_proc_data.pid)
         return VMI_EVENT_RESPONSE_NONE;
 
     if (target->target_name == "AssemblyNative::LoadImage")

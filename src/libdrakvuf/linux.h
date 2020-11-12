@@ -134,4 +134,6 @@ bool linux_find_eprocess_and_pid(drakvuf_t drakvuf, vmi_pid_t find_pid, char* co
 
 addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t argument_number);
 
+bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
+
 #endif

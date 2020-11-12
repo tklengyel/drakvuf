@@ -206,8 +206,8 @@ static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 {
     struct wrapper* w = (struct wrapper*)info->trap->data;
 
-    if ( w->tid != info->proc_data.tid )
-        return 0;
+    if (!drakvuf_check_return_context(drakvuf, info, w->pid, w->tid, 0))
+        return VMI_EVENT_RESPONSE_NONE;
 
     syscalls* s = w->s;
 
@@ -269,6 +269,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     struct wrapper* wr = g_slice_new0(struct wrapper);
     wr->s = s;
     wr->num = nr;
+    wr->pid = info->proc_data.pid;
     wr->tid = info->proc_data.tid;
 
     drakvuf_trap_t* ret_trap = g_slice_new0(drakvuf_trap_t);

@@ -472,6 +472,22 @@ bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
                                    drakvuf_trap_info_t* info,
                                    uint32_t* thread_id) NOEXCEPT;
 
+/*
+ * To catch the moment of exiting the currently executing function,
+ * we put a breakpoint on the instruction located at the function's
+ * return address.
+ *
+ * Such a breakpoint can also be triggered on exit from another function
+ * call (called in another thread or even a process), or on exit from a
+ * recursive call.
+ *
+ * This function checks that the callback was triggered on exit from the
+ * function call we need.
+ */
+bool drakvuf_check_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                                  vmi_pid_t target_pid, uint32_t target_tid,
+                                  addr_t target_rsp) NOEXCEPT;
+
 addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf,
                                 const vmi_pid_t pid, const char* proc_name,
                                 const char* mod_name, addr_t rva) NOEXCEPT;

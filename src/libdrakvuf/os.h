@@ -256,6 +256,9 @@ typedef struct os_interface
     addr_t (*get_wow_peb)
     (drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
 
+    bool (*check_return_context)
+    (drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
+
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);

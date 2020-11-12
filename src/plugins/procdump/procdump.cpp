@@ -549,11 +549,8 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
 
     auto ctx = static_cast<struct procdump_ctx*>(info->trap->data);
 
-    if (info->attached_proc_data.pid != ctx->pid ||
-        info->attached_proc_data.tid != ctx->tid)
-    {
+    if (!drakvuf_check_return_context(drakvuf, info, ctx->pid, ctx->tid, 0))
         return VMI_EVENT_RESPONSE_NONE;
-    }
 
     // Restore stack pointer
     // This is crucial because lots of injections could exhaust the kernel stack
@@ -588,11 +585,8 @@ static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
 
     auto ctx = static_cast<struct procdump_ctx*>(info->trap->data);
 
-    if (info->attached_proc_data.pid != ctx->pid ||
-        info->attached_proc_data.tid != ctx->tid)
-    {
+    if (!drakvuf_check_return_context(drakvuf, info, ctx->pid, ctx->tid, 0))
         return VMI_EVENT_RESPONSE_NONE;
-    }
 
     // Restore stack pointer
     // This is crucial because lots of injections could exhaust the kernel stack
