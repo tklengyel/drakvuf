@@ -403,8 +403,10 @@ event_response_t wait_for_target_process_cb(
     // we need to place yet another trap to catch the moment when
     // target process enters usermode.
     addr_t thread = drakvuf_get_current_thread(drakvuf, info);
-    if (!thread)
+    if (!thread) {
         return VMI_EVENT_RESPONSE_NONE;
+        drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
+    }
 
     userhook* userhook_plugin = rh_data->userhook_plugin;
     addr_t rip = 0;
@@ -435,10 +437,7 @@ event_response_t wait_for_target_process_cb(
     trap->breakpoint.addr_type = ADDR_VA;
     trap->breakpoint.addr = rip;
     if (!drakvuf_add_trap(drakvuf, trap))
-    {
-        delete (rh_data_t*) trap->data;
-        delete trap;
-    }
+        rh_data_t::free_trap(trap);
 
     drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
     return VMI_EVENT_RESPONSE_NONE;
@@ -475,10 +474,7 @@ void userhook::request_userhook_on_running_process(
 
     trap->data = new rh_data_t(this, target_process, target_pid, dll_name, func_name, cb, extra);
     if (!drakvuf_add_trap(drakvuf, trap))
-    {
         rh_data_t::free_trap(trap);
-        return;
-    }
 }
 
 
