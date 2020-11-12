@@ -102,8 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <glib.h>
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
@@ -133,8 +131,6 @@ struct ssl_generate_master_key_result_t: public call_result_t
 static
 event_response_t ssl_generate_master_key_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
-    vmi_lock_guard lg(drakvuf);
-
     auto plugin = get_trap_plugin<tlsmon>(info);
     auto params = get_trap_params<ssl_generate_master_key_result_t>(info);
     if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
@@ -146,91 +142,94 @@ event_response_t ssl_generate_master_key_ret_cb(drakvuf_t drakvuf, drakvuf_trap_
         .dtb = info->regs->cr3,
     };
 
-    // We first extract master key by tracing down relevant structures starting
-    // with master_key_handle.
-    addr_t ncrypt_sll_key_addr = 0;
-    ctx.addr = params->master_key_handle_addr;
-    if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &ncrypt_sll_key_addr))
-    {
-        plugin->destroy_trap(info->trap);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    // master_key_handle points to NCryptSslKey structure.
-    tlsmon_priv::__ncrypt_ssl_key_t ncrypt_ssl_key;
-    ctx.addr = ncrypt_sll_key_addr;
-    if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, sizeof(ncrypt_ssl_key), &ncrypt_ssl_key, nullptr))
-    {
-        plugin->destroy_trap(info->trap);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-    // We can validate that we indeed found NCryptSslKey by checking magic
-    // bytes value.
-    if (ncrypt_ssl_key.magic != tlsmon_priv::NCRYPT_SSL_KEY_MAGIC_BYTES)
-    {
-        plugin->destroy_trap(info->trap);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    // NCryptSslKey contains a pointer to SslMasterSecret structure.
-    tlsmon_priv::__ssl_master_secret_t master_secret;
-    ctx.addr = (addr_t) ncrypt_ssl_key.master_secret;
-    if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, sizeof(master_secret), &master_secret, nullptr))
-    {
-        plugin->destroy_trap(info->trap);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-    // Again we can validate that we found SslMasterSecret structure by
-    // checking magic bytes.
-    if (master_secret.magic != tlsmon_priv::MASTER_SECRET_MAGIC_BYTES)
-    {
-        plugin->destroy_trap(info->trap);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-
-    // Now retrieve client random value. pParameterList points to an array of
-    // NCryptBuffer buffers which contains at least client and server random
-    // values.
-    ctx.addr = params->parameter_list_addr;
-    tlsmon_priv::__ncrypt_buffer_desc_t ncrypt_buffer_desc;
-    if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, sizeof(ncrypt_buffer_desc), &ncrypt_buffer_desc, nullptr))
-    {
-        plugin->destroy_trap(info->trap);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    std::vector<tlsmon_priv::__ncrypt_buffer_t> ncrypt_buffers = std::vector<tlsmon_priv::__ncrypt_buffer_t>(ncrypt_buffer_desc.cbuffers);
-    ctx.addr = (addr_t) ncrypt_buffer_desc.buffers;
-    if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, ncrypt_buffer_desc.cbuffers * sizeof(tlsmon_priv::__ncrypt_buffer_t), ncrypt_buffers.data(), nullptr))
-    {
-        plugin->destroy_trap(info->trap);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    // Find the buffer containing client random.
-    auto it = std::find_if(ncrypt_buffers.begin(), ncrypt_buffers.end(), [&](const auto& e)
-    {
-        return e.buffer_type == tlsmon_priv::NCRYPTBUFFER_SSL_CLIENT_RANDOM;
-    });
-    if (it == ncrypt_buffers.end())
-    {
-        plugin->destroy_trap(info->trap);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    // And finally read it.
+    tlsmon_priv::ssl_master_secret_t master_secret;
     std::array<char, tlsmon_priv::CLIENT_RANDOM_SZ> client_random = std::array<char, tlsmon_priv::CLIENT_RANDOM_SZ>();
-    ctx.addr = (addr_t) it->buffer;
-    if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, client_random.size(), client_random.data(), nullptr))
     {
-        plugin->destroy_trap(info->trap);
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+        // Lock vmi.
+        vmi_lock_guard lg(drakvuf);
+        // We first extract master key by tracing down relevant structures starting
+        // with master_key_handle.
+        addr_t ncrypt_sll_key_addr = 0;
+        ctx.addr = params->master_key_handle_addr;
+        if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &ncrypt_sll_key_addr))
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
 
+        // master_key_handle points to NCryptSslKey structure.
+        tlsmon_priv::ncrypt_ssl_key_t ncrypt_ssl_key;
+        ctx.addr = ncrypt_sll_key_addr;
+        if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, sizeof(ncrypt_ssl_key), &ncrypt_ssl_key, nullptr))
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+        // We can validate that we indeed found NCryptSslKey by checking magic
+        // bytes value.
+        if (ncrypt_ssl_key.magic != tlsmon_priv::NCRYPT_SSL_KEY_MAGIC_BYTES)
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        // NCryptSslKey contains a pointer to SslMasterSecret structure.
+        ctx.addr = (addr_t) ncrypt_ssl_key.master_secret;
+        if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, sizeof(master_secret), &master_secret, nullptr))
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+        // Again we can validate that we found SslMasterSecret structure by
+        // checking magic bytes.
+        if (master_secret.magic != tlsmon_priv::MASTER_SECRET_MAGIC_BYTES)
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+
+        // Now retrieve client random value. pParameterList points to an array of
+        // NCryptBuffer buffers which contains at least client and server random
+        // values.
+        ctx.addr = params->parameter_list_addr;
+        tlsmon_priv::ncrypt_buffer_desc_t ncrypt_buffer_desc;
+        if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, sizeof(ncrypt_buffer_desc), &ncrypt_buffer_desc, nullptr))
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        std::vector<tlsmon_priv::ncrypt_buffer_t> ncrypt_buffers = std::vector<tlsmon_priv::ncrypt_buffer_t>(ncrypt_buffer_desc.cbuffers);
+        ctx.addr = (addr_t) ncrypt_buffer_desc.buffers;
+        if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, ncrypt_buffer_desc.cbuffers * sizeof(tlsmon_priv::ncrypt_buffer_t), ncrypt_buffers.data(), nullptr))
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        // Find the buffer containing client random.
+        auto it = std::find_if(ncrypt_buffers.begin(), ncrypt_buffers.end(), [&](const auto& e)
+        {
+            return e.buffer_type == tlsmon_priv::NCRYPTBUFFER_SSL_CLIENT_RANDOM;
+        });
+        if (it == ncrypt_buffers.end())
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        // And finally read it.
+        ctx.addr = (addr_t) it->buffer;
+        if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, client_random.size(), client_random.data(), nullptr))
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+    } // Unlock vmi.
 
     // Output retrieved data in hex format.
-    std::string master_key_str = tlsmon_priv::byte2str((unsigned char*)master_secret.master_key, tlsmon_priv::MASTER_KEY_SZ);
+    std::string master_key_str = tlsmon_priv::byte2str(master_secret.master_key, tlsmon_priv::MASTER_KEY_SZ);
     std::string client_random_str = tlsmon_priv::byte2str((unsigned char*)client_random.data(), tlsmon_priv::CLIENT_RANDOM_SZ);
     fmt::print(plugin->m_output_format, "tlsmon", drakvuf, info,
                keyval("client_random", fmt::Qstr(client_random_str)),

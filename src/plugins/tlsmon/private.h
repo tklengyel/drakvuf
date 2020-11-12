@@ -122,15 +122,15 @@ constexpr size_t MASTER_KEY_SZ    = 0x30;
 
 /* Could not find whole structure documentation. We are only interested in
 magic bytes and pointer to master_secret structure. */
-typedef struct
+struct ncrypt_ssl_key_t
 {
     char field0[4];
     uint32_t magic;
     char field2[8];
     void* master_secret;
-} __ncrypt_ssl_key_t;
+};
 
-typedef struct
+struct ssl_master_secret_t
 {
     uint32_t cb_struct_length;
     uint32_t magic;
@@ -138,29 +138,29 @@ typedef struct
     char aligment[4];
     void* cipher_suite_list_entry;
     uint32_t is_client_cache;
-    char master_key[MASTER_KEY_SZ];
+    unsigned char master_key[MASTER_KEY_SZ];
     uint32_t field7;
-} __ssl_master_secret_t;
+};
 
-enum __ncrypt_buffer_type_t
+enum ncrypt_buffer_type_t
 {
     NCRYPTBUFFER_SSL_CLIENT_RANDOM = 20,
     NCRYPTBUFFER_SSL_SERVER_RANDOM = 21,
 };
 
-typedef struct
+struct ncrypt_buffer_t
 {
     uint32_t cbbuffer;
     uint32_t buffer_type;
     void* buffer;
-} __ncrypt_buffer_t;
+};
 
-typedef struct
+struct ncrypt_buffer_desc_t
 {
     uint32_t ulversion;
     uint32_t cbuffers;
     void* buffers;
-} __ncrypt_buffer_desc_t;
+};
 
 
 
