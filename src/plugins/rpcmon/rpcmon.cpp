@@ -380,6 +380,11 @@ static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::v
 rpcmon::rpcmon(drakvuf_t drakvuf, output_format_t output)
     : pluginex(drakvuf, output)
 {
+    if (!drakvuf_are_userhooks_supported(drakvuf))
+    {
+        PRINT_DEBUG("[RPCMON] Usermode hooking not supported.\n");
+        return;
+    }
     std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec;
 
     const auto log = HookActions::empty().set_log();
@@ -409,22 +414,7 @@ rpcmon::rpcmon(drakvuf_t drakvuf, output_format_t output)
         .post_cb = on_dll_hooked,
         .extra = (void*)this
     };
-
-    usermode_reg_status_t status = drakvuf_register_usermode_callback(drakvuf, &reg);
-
-    switch (status)
-    {
-        case USERMODE_REGISTER_SUCCESS:
-            // success, nothing to do
-            break;
-        case USERMODE_ARCH_UNSUPPORTED:
-        case USERMODE_OS_UNSUPPORTED:
-            PRINT_DEBUG("[RPCMON] Usermode hooking is not supported on this architecture/bitness/os version, these features will be disabled\n");
-            break;
-        default:
-            PRINT_DEBUG("[RPCMON] Failed to subscribe to libusermode\n");
-            throw -1;
-    }
+    drakvuf_register_usermode_callback(drakvuf, &reg);
 }
 
 rpcmon::~rpcmon()
