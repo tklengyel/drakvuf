@@ -404,8 +404,8 @@ event_response_t wait_for_target_process_cb(
     // target process enters usermode.
     addr_t thread = drakvuf_get_current_thread(drakvuf, info);
     if (!thread) {
-        return VMI_EVENT_RESPONSE_NONE;
         drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
+        return VMI_EVENT_RESPONSE_NONE;
     }
 
     userhook* userhook_plugin = rh_data->userhook_plugin;
