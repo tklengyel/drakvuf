@@ -240,15 +240,8 @@ struct usermode_cb_registration
     void* extra;
 };
 
-typedef enum usermode_reg_status
-{
-    USERMODE_REGISTER_ERROR,
-    USERMODE_REGISTER_SUCCESS,
-    USERMODE_ARCH_UNSUPPORTED,
-    USERMODE_OS_UNSUPPORTED,
-} usermode_reg_status_t;
-
-usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
+bool drakvuf_are_userhooks_supported(drakvuf_t drakvuf);
+void drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
 bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
 void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, const bool print_no_addr, std::vector<plugin_target_config_entry_t>* wanted_hooks);
 

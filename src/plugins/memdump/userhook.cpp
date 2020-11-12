@@ -177,6 +177,12 @@ static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::v
 
 void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
 {
+    if (!drakvuf_are_userhooks_supported(drakvuf))
+    {
+        PRINT_DEBUG("[MEMDUMP] Usermode hooking not supported. Some features will be disabled.\n");
+        return;
+    }
+
     try
     {
         drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, &this->wanted_hooks);
@@ -208,19 +214,7 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
         .post_cb = on_dll_hooked,
         .extra = (void*)this
     };
-
-    usermode_reg_status_t status = drakvuf_register_usermode_callback(drakvuf, &reg);
-
-    if (status == USERMODE_ARCH_UNSUPPORTED ||
-        status == USERMODE_OS_UNSUPPORTED)
-    {
-        PRINT_DEBUG("[MEMDUMP] Usermode hooking is not supported on this architecture/bitness/os version, these features will be disabled\n");
-    }
-    else if (status != USERMODE_REGISTER_SUCCESS)
-    {
-        PRINT_DEBUG("[MEMDUMP] Failed to subscribe to libusermode\n");
-        throw -1;
-    }
+    drakvuf_register_usermode_callback(drakvuf, &reg);
 }
 
 void memdump::setup_dotnet_hooks(drakvuf_t drakvuf, const char* dll_name, const char* profile)

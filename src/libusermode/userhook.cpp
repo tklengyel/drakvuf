@@ -132,9 +132,6 @@
 #include "uh-private.hpp"
 
 
-userhook* instance = nullptr;
-
-
 static void wrap_delete(drakvuf_trap_t* trap)
 {
     g_slice_free(drakvuf_trap_t, trap);
@@ -751,46 +748,6 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-usermode_reg_status_t userhook::init(drakvuf_t drakvuf)
-{
-    {
-        vmi_lock_guard vmi(drakvuf);
-        win_build_info_t build;
-        if (vmi_get_windows_build_info(vmi.vmi, &build) &&
-            VMI_OS_WINDOWS_10 == build.version &&
-            15063 >= build.buildnumber)
-        {
-            return USERMODE_OS_UNSUPPORTED;
-        }
-    }
-
-    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-
-    if (pm != VMI_PM_IA32E)
-    {
-        PRINT_DEBUG("[USERHOOK] Usermode hooking is not yet supported on this architecture/bitness.\n");
-        return USERMODE_ARCH_UNSUPPORTED;
-    }
-
-    if (this->initialized)
-    {
-        PRINT_DEBUG("[USERHOOK] Attempted double initialization.\n");
-        return USERMODE_REGISTER_ERROR;
-    }
-
-    breakpoint_in_system_process_searcher bp;
-    if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
-        !register_trap(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection")) ||
-        !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler")) ||
-        !register_trap(nullptr, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
-        !register_trap(nullptr, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite")))
-    {
-        return USERMODE_REGISTER_ERROR;
-    }
-
-    this->initialized = true;
-    return USERMODE_REGISTER_SUCCESS;
-}
 
 void userhook::request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra)
 {
@@ -807,6 +764,47 @@ void userhook::register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg)
     this->plugins.push_back(reg);
 }
 
+bool userhook::is_supported(drakvuf_t drakvuf)
+{
+    {
+        // Lock vmi.
+        vmi_lock_guard vmi(drakvuf);
+        win_build_info_t build;
+        if (vmi_get_windows_build_info(vmi.vmi, &build) &&
+            VMI_OS_WINDOWS_10 == build.version &&
+            15063 >= build.buildnumber)
+        {
+            PRINT_DEBUG("[USERHOOK] Usermode hooking is not yet supported on this operating system.\n");
+            return false;
+        }
+    } // Unlock vmi.
+
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
+    if (pm != VMI_PM_IA32E)
+    {
+        PRINT_DEBUG("[USERHOOK] Usermode hooking is not yet supported on this architecture/bitness.\n");
+        return false;
+    }
+
+    return true;
+}
+
+userhook::userhook(drakvuf_t drakvuf): pluginex(drakvuf, OUTPUT_DEFAULT)
+{
+    if (!is_supported(drakvuf))
+        throw -1;
+
+    drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets.data());
+
+    breakpoint_in_system_process_searcher bp;
+    if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
+        !register_trap(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection")) ||
+        !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler")) ||
+        !register_trap(nullptr, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
+        !register_trap(nullptr, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite")))
+        throw -1;
+}
+
 userhook::~userhook()
 {
     for (auto& it : this->loaded_dlls)
@@ -817,42 +815,21 @@ userhook::~userhook()
             {
                 if (target.state == HOOK_OK)
                 {
-                    delete target.trap;
+                    wrap_delete(target.trap);
                 }
             }
         }
     }
 }
 
-usermode_reg_status_t drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg)
+void drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg)
 {
-    usermode_reg_status_t ret = USERMODE_REGISTER_ERROR;
-
-    if (!instance)
-    {
-        instance = new userhook(drakvuf);
-    }
-
-    if (!instance->initialized)
-    {
-        ret = instance->init(drakvuf);
-
-        if (ret != USERMODE_REGISTER_SUCCESS)
-            return ret;
-    }
-
-    instance->register_plugin(drakvuf, *reg);
-    return USERMODE_REGISTER_SUCCESS;
+    userhook::get_instance(drakvuf).register_plugin(drakvuf, *reg);
 }
 
 bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra)
 {
-    if (!instance || !instance->initialized)
-    {
-        return false;
-    }
-
-    instance->request_usermode_hook(drakvuf, dll, target, callback, extra);
+    userhook::get_instance(drakvuf).request_usermode_hook(drakvuf, dll, target, callback, extra);
     return true;
 }
 
@@ -1007,4 +984,9 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
             ++arg_idx;
         }
     }
+}
+
+bool drakvuf_are_userhooks_supported(drakvuf_t drakvuf)
+{
+    return userhook::is_supported(drakvuf);
 }
