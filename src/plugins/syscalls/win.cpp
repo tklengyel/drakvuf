@@ -124,8 +124,8 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
      * Multiple syscalls might hit the same return address so make sure we are
      * handling the correct thread's return here.
      */
-    if ( info->proc_data.tid != wr->tid || wr->stack_fingerprint != info->regs->rsp)
-        return 0;
+    if (!drakvuf_check_return_context(drakvuf, info, wr->pid, wr->tid, wr->stack_fingerprint - 1))
+        return VMI_EVENT_RESPONSE_NONE;
 
     struct wrapper* w = (struct wrapper*)wr->w;
     const syscall_t* sc = w->sc;
@@ -215,7 +215,8 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     drakvuf_trap_t* ret_trap = g_slice_new0(drakvuf_trap_t);
     struct wrapper* wr = g_slice_new0(struct wrapper);
 
-    wr->tid = info->proc_data.tid;
+    wr->pid = info->attached_proc_data.pid;
+    wr->tid = info->attached_proc_data.tid;
     wr->w = w;
     if ( 4 == s->reg_size )
     {
