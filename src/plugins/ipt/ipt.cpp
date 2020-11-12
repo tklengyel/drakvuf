@@ -121,7 +121,7 @@
  * Dump current IPT logs to disk and annotate them with custom PTWRITE packets
  */
 static inline
-int annotate_ipt(drakvuf_t drakvuf, ipt* plugin, unsigned int vcpu_id, uint32_t* payloads, size_t num_payloads)
+bool annotate_ipt(drakvuf_t drakvuf, ipt* plugin, unsigned int vcpu_id, uint32_t* payloads, size_t num_payloads)
 {
     uint64_t offset;
     uint64_t last_offset;
@@ -135,7 +135,7 @@ int annotate_ipt(drakvuf_t drakvuf, ipt* plugin, unsigned int vcpu_id, uint32_t*
     if (!ret)
     {
         PRINT_DEBUG("annotate_ipt() failed to get ipt offset for vcpu %d\n", vcpu_id);
-        return 0;
+        return false;
     }
 
     PRINT_DEBUG("annotate_ipt() vCPU: %d IPT_CUR: %llx IPT_LAST: %llx\n", vcpu_id, (unsigned long long)offset, (unsigned long long)last_offset);
@@ -156,13 +156,11 @@ int annotate_ipt(drakvuf_t drakvuf, ipt* plugin, unsigned int vcpu_id, uint32_t*
     }
 
     uint8_t ptwrite_packet[10] = {0x02, 0x32,};
-    uint32_t x1 = PTW_ERROR_EMPTY;
-    uint32_t x2 = 0;
 
     for (size_t i = 0; i < num_payloads && !fail; i++)
     {
-        x1 = payloads[(i * 2) + 1];
-        x2 = payloads[i * 2];
+        uint32_t x1 = payloads[(i * 2) + 1];
+        uint32_t x2 = payloads[i * 2];
 
         memcpy(&ptwrite_packet[2], &x1, sizeof(uint32_t));
         memcpy(&ptwrite_packet[6], &x2, sizeof(uint32_t));
@@ -171,15 +169,15 @@ int annotate_ipt(drakvuf_t drakvuf, ipt* plugin, unsigned int vcpu_id, uint32_t*
 
     if (fail)
     {
-        x1 = PTW_ERROR_EMPTY;
-        x2 = 0;
+        uint32_t x1 = PTW_ERROR_EMPTY;
+        uint32_t x2 = 0;
 
         memcpy(&ptwrite_packet[2], &x1, sizeof(uint32_t));
         memcpy(&ptwrite_packet[6], &x2, sizeof(uint32_t));
         fwrite(ptwrite_packet, 10, 1, fd);
     }
 
-    return 1;
+    return true;
 }
 
 struct exec_fault_data
@@ -198,7 +196,7 @@ struct access_fault_result_t: public call_result_t
 static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     struct exec_fault_data* ef_data = (struct exec_fault_data*)info->trap->data;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -223,7 +221,6 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     if (!fp)
     {
         PRINT_DEBUG("[IPT] Frame save path not accessible: %s\n", frame_fn.c_str());
-        drakvuf_release_vmi(drakvuf);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -270,8 +267,6 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
     PRINT_DEBUG("[IPT] Caught X on PA 0x%lx, frame VA %llx, CR3 %lx\n", info->trap_pa, (unsigned long long)info->regs->rip, info->regs->cr3);
 
-    drakvuf_release_vmi(drakvuf);
-
     drakvuf_remove_trap(drakvuf, info->trap, nullptr);
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -285,13 +280,14 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
     if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
         return VMI_EVENT_RESPONSE_NONE;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     page_info_t p_info = {};
-    if (VMI_SUCCESS != vmi_pagetable_lookup_extended(vmi, info->regs->cr3, params->fault_va, &p_info))
     {
-        PRINT_DEBUG("[MEMDUMP] failed to lookup page info\n");
-        drakvuf_release_vmi(drakvuf);
-        return VMI_EVENT_RESPONSE_NONE;
+        auto vmi = vmi_lock_guard(drakvuf);
+        if (VMI_SUCCESS != vmi_pagetable_lookup_extended(vmi, info->regs->cr3, params->fault_va, &p_info))
+        {
+            PRINT_DEBUG("[MEMDUMP] failed to lookup page info\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        }
     }
 
     jsonfmt::print("pagefault", drakvuf, info,
@@ -315,8 +311,6 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
 
     drakvuf_add_trap(drakvuf, exec_trap);
     PRINT_DEBUG("[IPT] Trap X on GFN 0x%lx\n", p_info.paddr >> 12);
-
-    drakvuf_release_vmi(drakvuf);
 
     plugin->destroy_trap(info->trap);
 
@@ -408,7 +402,7 @@ ipt::ipt(drakvuf_t drakvuf, const ipt_config& c, output_format_t output)
 
     if (IPT_MAX_VCPUS < num_vcpus)
     {
-        PRINT_DEBUG("[IPT] Too many vCPUs, the excess ones will be not monitored.\n");
+        fprintf(stderr, "[IPT] Too many vCPUs, the excess ones will be not monitored.\n");
         num_vcpus = IPT_MAX_VCPUS;
     }
 
