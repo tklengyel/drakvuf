@@ -384,8 +384,7 @@ bool win_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg)
 {
-    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-    bool is32 = pm != VMI_PM_IA32E || win_is_wow64(drakvuf, info);
+    bool is32 = drakvuf->pm != VMI_PM_IA32E || win_is_wow64(drakvuf, info);
     if (!is32)
     {
         switch (narg)
@@ -419,6 +418,33 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
     if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
         return 0;
     return ret;
+}
+
+addr_t win_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    bool is32 = drakvuf->pm != VMI_PM_IA32E || win_is_wow64(drakvuf, info);
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rsp,
+    };
+
+    int status;
+    addr_t ret_addr = 0;
+    if (is32)
+        status = vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&ret_addr);
+    else
+        status = vmi_read_64(drakvuf->vmi, &ctx, &ret_addr);
+
+    if (status != VMI_SUCCESS)
+    {
+        PRINT_DEBUG("Failed to read return address from the stack.\n");
+        return 0;
+    }
+
+    return ret_addr;
 }
 
 bool fill_wow_offsets( drakvuf_t drakvuf, size_t size, const char* names [][2] )
@@ -503,6 +529,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_filename_from_handle = win_get_filename_from_handle;
     drakvuf->osi.is_wow64 = win_is_wow64;
     drakvuf->osi.get_function_argument = win_get_function_argument;
+    drakvuf->osi.get_function_return_address = win_get_function_return_address;
     drakvuf->osi.enumerate_processes = win_enumerate_processes;
     drakvuf->osi.enumerate_processes_with_module = win_enumerate_processes_with_module;
     drakvuf->osi.is_crashreporter = win_is_crashreporter;

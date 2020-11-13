@@ -231,7 +231,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     const syscall_t* sc = NULL;
     addr_t pt_regs = 0;
 
-    addr_t ret = 0, nr = ~0;
+    addr_t nr = ~0;
     if ( VMI_GET_BIT(info->regs->rdi, 47) )
     {
         /*
@@ -249,8 +249,6 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         pt_regs = info->regs->rsi;
     }
 
-    vmi_read_addr_va(vmi, info->regs->rsp, 0, &ret);
-
     if ( nr<NUM_SYSCALLS_LINUX )
     {
         sc = linuxsc::linux_syscalls[nr];
@@ -266,6 +264,8 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if ( s->disable_sysret )
         return 0;
 
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+
     struct wrapper* wr = g_slice_new0(struct wrapper);
     wr->s = s;
     wr->num = nr;
@@ -276,7 +276,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     ret_trap->breakpoint.lookup_type = LOOKUP_DTB;
     ret_trap->breakpoint.dtb = info->regs->cr3;
     ret_trap->breakpoint.addr_type = ADDR_VA;
-    ret_trap->breakpoint.addr = ret;
+    ret_trap->breakpoint.addr = ret_addr;
     ret_trap->breakpoint.module = "linux";
     ret_trap->type = BREAKPOINT;
     ret_trap->cb = linux_ret_cb;

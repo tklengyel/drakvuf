@@ -1144,9 +1144,7 @@ static void createfile_cb_impl(drakvuf_t drakvuf, drakvuf_trap_info_t* info, add
         return;
     }
 
-    vmi_lock_guard vmi_lg(drakvuf);
-    addr_t ret_addr = 0;
-    vmi_read_addr_va(vmi_lg.vmi, info->regs->rsp, 0, &ret_addr);
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
     auto w = new createfile_ret_info;
     w->pid = info->attached_proc_data.pid;

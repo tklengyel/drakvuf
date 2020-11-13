@@ -441,26 +441,24 @@ static event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     PRINT_DEBUG("Filetracer Callback : %s \n", info->trap->name);
     linux_filetracer* f = (linux_filetracer*)info->trap->data;
-    struct linux_wrapper* lw = new linux_wrapper;
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+    if (!ret_addr)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    struct linux_wrapper* lw = new (std::nothrow) linux_wrapper;
     if (!lw)
         return VMI_EVENT_RESPONSE_NONE;
 
     lw->f = f;
     lw->pid = info->proc_data.pid;
     lw->tid = info->proc_data.tid;
-
-    addr_t rsp = 0;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    vmi_read_addr_va(vmi, info->regs->rsp, 0, &rsp);
-    drakvuf_release_vmi(drakvuf);
-
-    lw->rsp = rsp;
+    lw->rsp = ret_addr;
 
     drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
     trap->breakpoint.lookup_type = LOOKUP_PID;
     trap->breakpoint.pid = 0;
     trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = rsp;
+    trap->breakpoint.addr = ret_addr;
     trap->breakpoint.module = "linux";
     trap->type = BREAKPOINT;
     trap->name = info->trap->name;
@@ -469,7 +467,7 @@ static event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     if (!drakvuf_add_trap(drakvuf, trap))
     {
-        printf("Failed to trap return at 0x%lx\n", rsp);
+        printf("Failed to trap return at 0x%lx\n", ret_addr);
         free_gstrings(lw);
         delete lw;
         g_free(trap);
