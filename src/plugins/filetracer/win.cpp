@@ -131,8 +131,6 @@ extern const flags_str_t generic_ar;
 
 using std::string;
 
-string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs, uint32_t handle = 0);
-
 static void print_file_obj_info(drakvuf_t drakvuf,
                                 drakvuf_trap_info_t* info,
                                 char const* file_path,
@@ -189,7 +187,7 @@ static void print_file_obj_info(drakvuf_t drakvuf,
     }
 }
 
-string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs, uint32_t handle)
+static string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs, uint32_t handle = 0)
 {
     if (!attrs) return string();
 
@@ -483,19 +481,7 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 {
     struct wrapper* w = (struct wrapper*)info->trap->data;
 
-    if (info->attached_proc_data.pid != w->pid)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    uint32_t tid = 0;
-    if (!drakvuf_get_current_thread_id(drakvuf, info, &tid) && !tid)
-    {
-        PRINT_DEBUG("filetracer: Failed to get TID");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-    if (tid != w->tid)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    if (w->rsp && info->regs->rsp <= w->rsp)
+    if (!drakvuf_check_return_context(drakvuf, info, w->pid, w->tid, w->rsp))
         return VMI_EVENT_RESPONSE_NONE;
 
     const char* is_success = info->regs->rax ? "FAIL" : "SUCCESS";
@@ -578,10 +564,8 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     if (!w) return 0;
     w->f = f;
     w->rsp = info->regs->rsp;
-
     w->pid = info->attached_proc_data.pid;
-    if (!drakvuf_get_current_thread_id(drakvuf, info, &w->tid) && !w->tid)
-        PRINT_DEBUG("filetracer: Failed to get TID");
+    w->tid = info->attached_proc_data.tid;
 
     w->handle = drakvuf_get_function_argument(drakvuf, info, 1);
     if ( !w->handle )
@@ -604,16 +588,13 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
                 ? parse_flags(access_value, directory_ar, f->format)
                 : parse_flags(access_value, file_ar, f->format);
 
-    addr_t rsp = 0;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    vmi_read_addr_va(vmi, info->regs->rsp, 0, &rsp);
-    drakvuf_release_vmi(drakvuf);
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
     drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
     trap->breakpoint.lookup_type = LOOKUP_PID;
     trap->breakpoint.pid = 4;
     trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = rsp;
+    trap->breakpoint.addr = ret_addr;
     trap->type = BREAKPOINT;
     trap->name = info->trap->name;
     trap->data = w;
@@ -621,7 +602,7 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
     {
-        printf("Failed to trap return at 0x%lx\n", rsp);
+        printf("Failed to trap return at 0x%lx\n", ret_addr);
         delete w;
     }
     else

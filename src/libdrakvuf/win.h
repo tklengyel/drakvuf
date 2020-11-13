@@ -176,6 +176,7 @@ char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 bool win_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t argument_number);
+addr_t win_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
 
@@ -193,5 +194,7 @@ addr_t win_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess
 bool win_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
 bool win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
 bool win_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
+
+bool win_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
 
 #endif

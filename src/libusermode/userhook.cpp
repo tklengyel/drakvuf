@@ -488,7 +488,7 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
     auto plugin = get_trap_plugin<userhook>(info);
     auto params = get_trap_params<map_view_of_section_result_t>(info);
 
-    if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     dll_t* dll_meta = get_pending_dll(drakvuf, info, plugin);
@@ -531,7 +531,7 @@ static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_t
 
     auto params = get_trap_params<map_view_of_section_result_t>(trap);
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info);
 
     // IN HANDLE SectionHandle
     params->section_handle = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -555,9 +555,9 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
 
     auto plugin = get_trap_plugin<userhook>(info);
 
-    uint32_t thread_id;
+    uint32_t thread_id = info->attached_proc_data.tid;
 
-    if (!drakvuf_get_current_thread_id(drakvuf, info, &thread_id))
+    if (!thread_id)
     {
         PRINT_DEBUG("[USERHOOK] Failed to get thread id in system service handler!\n");
         return VMI_EVENT_RESPONSE_NONE;
@@ -586,27 +586,20 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
     }
 
     // emulate `ret` instruction
-    addr_t saved_rip = 0;
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp,
-    };
+    addr_t saved_rip = drakvuf_get_function_return_address(drakvuf, info);
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    bool success = (VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(addr_t), &saved_rip, NULL));
-    drakvuf_release_vmi(drakvuf);
-
-    if (!success)
+    if (!saved_rip)
     {
         PRINT_DEBUG("[USERHOOK] Error while reading the saved RIP in system service handler\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
+    bool is32 = (pm != VMI_PM_IA32E);
+
     constexpr int EXCEPTION_CONTINUE_EXECUTION = 0;
     info->regs->rip = saved_rip;
-    info->regs->rsp += sizeof(addr_t);
+    info->regs->rsp += (is32 ? 4 : 8);
     info->regs->rax = EXCEPTION_CONTINUE_EXECUTION;
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
@@ -629,7 +622,7 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
         {
             if (target.state == HOOK_OK)
             {
-                PRINT_DEBUG("[USERHOOK] Erased trap for pid %d %s\n", info->proc_data.pid,
+                PRINT_DEBUG("[USERHOOK] Erased trap for pid %d %s\n", info->attached_proc_data.pid,
                             target.target_name.c_str());
                 drakvuf_remove_trap(drakvuf, target.trap, NULL);
             }
@@ -645,7 +638,7 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     auto plugin = get_trap_plugin<userhook>(info);
     auto params = get_trap_params<copy_on_write_result_t>(info);
 
-    if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(info->trap);
@@ -737,7 +730,7 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
 
         auto params = get_trap_params<copy_on_write_result_t>(trap);
 
-        params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+        params->set_result_call_params(info);
 
         params->vaddr = vaddr;
         params->pte = pte;
@@ -751,7 +744,7 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
 
 void userhook::request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra)
 {
-    dll_t* p_dll = (dll_t*)const_cast<dll_view_t*>(dll);
+    dll_t* p_dll = reinterpret_cast<dll_t*>(const_cast<dll_view_t*>(dll));
 
     if (target->type == HOOK_BY_NAME)
         p_dll->targets.emplace_back(target->function_name, target->clsid, callback, target->argument_printers, extra);
@@ -854,13 +847,13 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
         const auto log_and_stack = HookActions::empty().set_log().set_stack();
         // if the DLL hook list was not provided, we provide some simple defaults
         std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec1;
-        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("wVersionRequired", print_no_addr)));
-        arg_vec1.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("lpWSAData", print_no_addr)));
+        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("wVersionRequired", print_no_addr));
+        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("lpWSAData", print_no_addr));
         wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", log_and_stack, std::move(arg_vec1));
 
         std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec2;
-        arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("ExitCode", print_no_addr)));
-        arg_vec2.push_back(std::unique_ptr < ArgumentPrinter>(new ArgumentPrinter("Unknown", print_no_addr)));
+        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("ExitCode", print_no_addr));
+        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("Unknown", print_no_addr));
         wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", log_and_stack, std::move(arg_vec2));
         return;
     }

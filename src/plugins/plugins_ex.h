@@ -265,20 +265,8 @@ struct breakpoint_by_dtb_searcher
     {
         if (trap)
         {
-            access_context_t ctx =
-            {
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3,
-                .addr = info->regs->rsp,
-            };
-
-            addr_t ret_addr = 0;
-            vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            size_t ptr_width = drakvuf_is_wow64(drakvuf, info) ? 4 : 8;
-            status_t status = vmi_read(vmi, &ctx, ptr_width, &ret_addr, nullptr);
-            drakvuf_release_vmi(drakvuf);
-
-            if (status != VMI_SUCCESS)
+            addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+            if (!ret_addr)
                 return nullptr;
 
             trap->breakpoint.lookup_type = LOOKUP_DTB;
@@ -303,20 +291,8 @@ struct breakpoint_by_pid_searcher
     {
         if (trap)
         {
-            access_context_t ctx =
-            {
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3,
-                .addr = info->regs->rsp,
-            };
-
-            addr_t ret_addr = 0;
-            vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            size_t ptr_width = drakvuf_is_wow64(drakvuf, info) ? 4 : 8;
-            status_t status = vmi_read(vmi, &ctx, ptr_width, &ret_addr, nullptr);
-            drakvuf_release_vmi(drakvuf);
-
-            if (status != VMI_SUCCESS)
+            addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+            if (!ret_addr)
                 return nullptr;
 
             trap->breakpoint.lookup_type = LOOKUP_PID;
@@ -338,33 +314,26 @@ struct breakpoint_by_pid_searcher
 struct call_result_t
 {
     call_result_t()
-        : target_cr3(), target_thread(), target_rsp()
+        : target_pid(), target_tid(), target_rsp()
     {}
 
     virtual ~call_result_t()
     {};
 
-    void set_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
+    void set_result_call_params(const drakvuf_trap_info_t* info)
     {
-        target_thread = thread;
-        target_cr3 = info->regs->cr3;
+        target_pid = info->attached_proc_data.pid;
+        target_tid = info->attached_proc_data.tid;
         target_rsp = info->regs->rsp;
     }
 
-    bool verify_result_call_params(const drakvuf_trap_info_t* info, addr_t thread)
+    bool verify_result_call_params(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
-        if (info->regs->cr3 != target_cr3 ||
-            !thread || thread != target_thread ||
-            info->regs->rsp <= target_rsp)
-        {
-            return false;
-        }
-
-        return true;
+        return drakvuf_check_return_context(drakvuf, info, target_pid, target_tid, target_rsp);
     }
 
-    reg_t target_cr3;
-    addr_t target_thread;
+    vmi_pid_t target_pid;
+    uint32_t target_tid;
     addr_t target_rsp;
 };
 

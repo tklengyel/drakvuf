@@ -427,6 +427,14 @@ addr_t drakvuf_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     return 0;
 }
 
+addr_t drakvuf_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    if ( drakvuf->osi.get_function_return_address )
+        return drakvuf->osi.get_function_return_address( drakvuf, info );
+
+    return 0;
+}
+
 bool drakvuf_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t process, void* visitor_ctx), void* visitor_ctx)
 {
     if ( drakvuf->osi.enumerate_processes )
@@ -539,4 +547,12 @@ addr_t drakvuf_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t epro
         return drakvuf->osi.get_wow_peb(drakvuf, ctx, eprocess);
 
     return 0;
+}
+
+bool drakvuf_check_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
+{
+    if ( drakvuf->osi.check_return_context )
+        return drakvuf->osi.check_return_context(info, pid, tid, rsp);
+
+    return false;
 }

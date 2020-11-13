@@ -620,7 +620,7 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     wrapper_t* injector = (wrapper_t*)info->trap->data;
     filedelete* f = injector->f;
 
-    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
         return VMI_EVENT_RESPONSE_NONE;
 
     auto response = 0;
@@ -670,7 +670,7 @@ event_response_t unmapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
 
-    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
         return VMI_EVENT_RESPONSE_NONE;
 
     vmi_lock_guard vmi(drakvuf);
@@ -689,10 +689,10 @@ event_response_t mapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     auto response = 0;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
+        return VMI_EVENT_RESPONSE_NONE;
 
-    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
-        goto done;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     if (info->regs->rax)
     {
@@ -763,10 +763,10 @@ event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
     auto response = 0;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
+        return VMI_EVENT_RESPONSE_NONE;
 
-    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
-        goto done;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     if (info->regs->rax)
     {
@@ -817,10 +817,10 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     auto response = 0;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
+        return VMI_EVENT_RESPONSE_NONE;
 
-    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
-        goto done;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     if (info->regs->rax)
     {
@@ -862,7 +862,7 @@ event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
     auto response = 0;
 
-    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
         return VMI_EVENT_RESPONSE_NONE;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -930,8 +930,8 @@ event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     auto response = VMI_EVENT_RESPONSE_NONE;
 
-    if (info->attached_proc_data.pid != injector->target_pid || info->attached_proc_data.tid != injector->target_tid)
-        return response;
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
+        return VMI_EVENT_RESPONSE_NONE;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -1102,10 +1102,7 @@ static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     auto w = (struct createfile_ret_info*)info->trap->data;
 
-    if (info->attached_proc_data.pid != w->pid || info->attached_proc_data.tid != w->tid)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    if (w->rsp && info->regs->rsp <= w->rsp)
+    if (!drakvuf_check_return_context(drakvuf, info, w->pid, w->tid, w->rsp))
         return VMI_EVENT_RESPONSE_NONE;
 
     // Return if NtCreateFile/NtOpenFile failed
@@ -1147,9 +1144,7 @@ static void createfile_cb_impl(drakvuf_t drakvuf, drakvuf_trap_info_t* info, add
         return;
     }
 
-    vmi_lock_guard vmi_lg(drakvuf);
-    addr_t ret_addr = 0;
-    vmi_read_addr_va(vmi_lg.vmi, info->regs->rsp, 0, &ret_addr);
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
     auto w = new createfile_ret_info;
     w->pid = info->attached_proc_data.pid;

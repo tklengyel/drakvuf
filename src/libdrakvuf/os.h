@@ -214,6 +214,9 @@ typedef struct os_interface
     addr_t (*get_function_argument)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg);
 
+    addr_t (*get_function_return_address)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
     bool (*enumerate_processes)
     (drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t process, void* visitor_ctx), void* visitor_ctx);
 
@@ -255,6 +258,9 @@ typedef struct os_interface
 
     addr_t (*get_wow_peb)
     (drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
+
+    bool (*check_return_context)
+    (drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
 
 } os_interface_t;
 

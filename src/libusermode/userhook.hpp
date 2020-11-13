@@ -200,14 +200,18 @@ struct hook_target_entry_t
 struct return_hook_target_entry_t
 {
     vmi_pid_t pid;
+    uint32_t tid;
+    addr_t rsp;
+
     drakvuf_trap_t* trap;
     std::string clsid;
     void* plugin;
     std::vector < uint64_t > arguments;
     const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers;
 
-    return_hook_target_entry_t(vmi_pid_t pid, std::string clsid, void* plugin, const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers) :
-        pid(pid), trap(nullptr), clsid(clsid), plugin(plugin), argument_printers(argument_printers) {}
+    return_hook_target_entry_t(vmi_pid_t pid, uint32_t tid, addr_t rsp,
+                               std::string clsid, void* plugin, const std::vector < std::unique_ptr < ArgumentPrinter > >& argument_printers) :
+        pid(pid), tid(tid), rsp(rsp), trap(nullptr), clsid(clsid), plugin(plugin), argument_printers(argument_printers) {}
 };
 
 struct hook_target_view_t

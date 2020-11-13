@@ -371,7 +371,7 @@ event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!data->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(drakvuf, info->trap);
@@ -438,7 +438,7 @@ event_response_t ExecMethod_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info);
     params->m_object = drakvuf_get_function_argument(drakvuf, info, 2);
     params->m_method = drakvuf_get_function_argument(drakvuf, info, 3);
     params->m_vtable = drakvuf_get_function_argument(drakvuf, info, 6);
@@ -457,7 +457,7 @@ event_response_t GetObject_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!data->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(drakvuf, info->trap);
@@ -513,7 +513,7 @@ event_response_t GetObject_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info);
     params->m_object = drakvuf_get_function_argument(drakvuf, info, 2);
     params->m_vtable = drakvuf_get_function_argument(drakvuf, info, 5);
 
@@ -531,7 +531,7 @@ event_response_t ExecQuery_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!data->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(drakvuf, info->trap);
@@ -587,7 +587,7 @@ event_response_t ExecQuery_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info);
     params->m_command = drakvuf_get_function_argument(drakvuf, info, 3);
     params->m_vtable = drakvuf_get_function_argument(drakvuf, info, 6);
 
@@ -605,7 +605,7 @@ event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_in
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!data->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(drakvuf, info->trap);
@@ -676,7 +676,7 @@ event_response_t ConnectServer_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info);
     params->m_resource = drakvuf_get_function_argument(drakvuf, info, 2);
     params->m_vtable = drakvuf_get_function_argument(drakvuf, info, 9);
 
@@ -695,7 +695,7 @@ event_response_t CoCreateInstanse_return_handler(drakvuf_t drakvuf, drakvuf_trap
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!data->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)) || FAILED(info->regs->rax))
+    if (!data->verify_result_call_params(drakvuf, info) || FAILED(info->regs->rax))
         return VMI_EVENT_RESPONSE_NONE;
 
     plugin->destroy_trap(drakvuf, info->trap);
@@ -765,7 +765,7 @@ event_response_t CoCreateInstanse_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info);
     params->CLSID = drakvuf_get_function_argument(drakvuf, info, 1);
     params->IID = drakvuf_get_function_argument(drakvuf, info, 4);
     params->m_vtable = drakvuf_get_function_argument(drakvuf, info, 5);

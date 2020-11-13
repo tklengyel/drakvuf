@@ -124,8 +124,8 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
      * Multiple syscalls might hit the same return address so make sure we are
      * handling the correct thread's return here.
      */
-    if ( info->proc_data.tid != wr->tid || wr->stack_fingerprint != info->regs->rsp)
-        return 0;
+    if (!drakvuf_check_return_context(drakvuf, info, wr->pid, wr->tid, wr->stack_fingerprint - 1))
+        return VMI_EVENT_RESPONSE_NONE;
 
     struct wrapper* w = (struct wrapper*)wr->w;
     const syscall_t* sc = w->sc;
@@ -208,14 +208,15 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if ( s->disable_sysret )
         return 0;
 
-    addr_t ret = 0;
-    if ( VMI_FAILURE == vmi_read_addr_va(vmi, info->regs->rsp, 0, &ret) )
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+    if ( !ret_addr )
         return 0;
 
     drakvuf_trap_t* ret_trap = g_slice_new0(drakvuf_trap_t);
     struct wrapper* wr = g_slice_new0(struct wrapper);
 
-    wr->tid = info->proc_data.tid;
+    wr->pid = info->attached_proc_data.pid;
+    wr->tid = info->attached_proc_data.tid;
     wr->w = w;
     if ( 4 == s->reg_size )
     {
@@ -234,7 +235,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     ret_trap->breakpoint.lookup_type = LOOKUP_DTB;
     ret_trap->breakpoint.addr_type = ADDR_VA;
-    ret_trap->breakpoint.addr = ret;
+    ret_trap->breakpoint.addr = ret_addr;
     ret_trap->breakpoint.dtb = info->regs->cr3;
     ret_trap->breakpoint.module = w->type;
     ret_trap->type = BREAKPOINT;
