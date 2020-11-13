@@ -180,27 +180,12 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     if (target->pid != info->attached_proc_data.pid)
         return VMI_EVENT_RESPONSE_NONE;
 
-    vmi_lock_guard lg(drakvuf);
-    vmi_v2pcache_flush(lg.vmi, info->regs->cr3);
+    auto vmi = vmi_lock_guard(drakvuf);
+    vmi_v2pcache_flush(vmi, info->regs->cr3);
 
-    bool is_syswow = drakvuf_is_wow64(drakvuf, info);
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp
-    };
-
-    bool success = false;
-    addr_t ret_addr = 0;
-
-    if (is_syswow)
-        success = (vmi_read_32(lg.vmi, &ctx, (uint32_t*)&ret_addr) == VMI_SUCCESS);
-    else
-        success = (vmi_read_64(lg.vmi, &ctx, &ret_addr) == VMI_SUCCESS);
-
-    if (!success)
+    if (!ret_addr)
     {
         PRINT_DEBUG("[APIMON-USER] Failed to read return address from the stack.\n");
         return VMI_EVENT_RESPONSE_NONE;
@@ -233,7 +218,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
 
     addr_t paddr;
 
-    if ( VMI_SUCCESS != vmi_pagetable_lookup(lg.vmi, info->regs->cr3, ret_addr, &paddr) )
+    if ( VMI_SUCCESS != vmi_pagetable_lookup(vmi, info->regs->cr3, ret_addr, &paddr) )
     {
         delete trap;
         delete ret_target;
