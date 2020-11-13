@@ -133,7 +133,7 @@ event_response_t ssl_generate_master_key_ret_cb(drakvuf_t drakvuf, drakvuf_trap_
 {
     auto plugin = get_trap_plugin<tlsmon>(info);
     auto params = get_trap_params<ssl_generate_master_key_result_t>(info);
-    if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     access_context_t ctx =
@@ -260,7 +260,7 @@ event_response_t ssl_generate_master_key_cb(drakvuf_t drakvuf, drakvuf_trap_info
         return VMI_EVENT_RESPONSE_NONE;
 
     auto params = get_trap_params<ssl_generate_master_key_result_t>(trap);
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info);
     params->master_key_handle_addr = drakvuf_get_function_argument(drakvuf, info, 4);
     params->parameter_list_addr = drakvuf_get_function_argument(drakvuf, info, 7);
     return VMI_EVENT_RESPONSE_NONE;
