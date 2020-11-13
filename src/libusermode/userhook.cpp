@@ -555,9 +555,9 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
 
     auto plugin = get_trap_plugin<userhook>(info);
 
-    uint32_t thread_id;
+    uint32_t thread_id = info->attached_proc_data.tid;
 
-    if (!drakvuf_get_current_thread_id(drakvuf, info, &thread_id))
+    if (!thread_id)
     {
         PRINT_DEBUG("[USERHOOK] Failed to get thread id in system service handler!\n");
         return VMI_EVENT_RESPONSE_NONE;
@@ -586,27 +586,20 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
     }
 
     // emulate `ret` instruction
-    addr_t saved_rip = 0;
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp,
-    };
+    addr_t saved_rip = drakvuf_get_function_return_address(drakvuf, info);
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    bool success = (VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(addr_t), &saved_rip, NULL));
-    drakvuf_release_vmi(drakvuf);
-
-    if (!success)
+    if (!saved_rip)
     {
         PRINT_DEBUG("[USERHOOK] Error while reading the saved RIP in system service handler\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
+    bool is32 = (pm != VMI_PM_IA32E);
+
     constexpr int EXCEPTION_CONTINUE_EXECUTION = 0;
     info->regs->rip = saved_rip;
-    info->regs->rsp += sizeof(addr_t);
+    info->regs->rsp += (is32 ? 4 : 8);
     info->regs->rax = EXCEPTION_CONTINUE_EXECUTION;
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
@@ -629,7 +622,7 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
         {
             if (target.state == HOOK_OK)
             {
-                PRINT_DEBUG("[USERHOOK] Erased trap for pid %d %s\n", info->proc_data.pid,
+                PRINT_DEBUG("[USERHOOK] Erased trap for pid %d %s\n", info->attached_proc_data.pid,
                             target.target_name.c_str());
                 drakvuf_remove_trap(drakvuf, target.trap, NULL);
             }

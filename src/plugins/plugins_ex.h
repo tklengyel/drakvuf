@@ -265,20 +265,8 @@ struct breakpoint_by_dtb_searcher
     {
         if (trap)
         {
-            access_context_t ctx =
-            {
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3,
-                .addr = info->regs->rsp,
-            };
-
-            addr_t ret_addr = 0;
-            vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            size_t ptr_width = drakvuf_is_wow64(drakvuf, info) ? 4 : 8;
-            status_t status = vmi_read(vmi, &ctx, ptr_width, &ret_addr, nullptr);
-            drakvuf_release_vmi(drakvuf);
-
-            if (status != VMI_SUCCESS)
+            addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+            if (!ret_addr)
                 return nullptr;
 
             trap->breakpoint.lookup_type = LOOKUP_DTB;
@@ -302,20 +290,8 @@ struct breakpoint_by_pid_searcher
     {
         if (trap)
         {
-            access_context_t ctx =
-            {
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3,
-                .addr = info->regs->rsp,
-            };
-
-            addr_t ret_addr = 0;
-            vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            size_t ptr_width = drakvuf_is_wow64(drakvuf, info) ? 4 : 8;
-            status_t status = vmi_read(vmi, &ctx, ptr_width, &ret_addr, nullptr);
-            drakvuf_release_vmi(drakvuf);
-
-            if (status != VMI_SUCCESS)
+            addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+            if (!ret_addr)
                 return nullptr;
 
             trap->breakpoint.lookup_type = LOOKUP_PID;

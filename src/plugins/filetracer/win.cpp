@@ -588,16 +588,13 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
                 ? parse_flags(access_value, directory_ar, f->format)
                 : parse_flags(access_value, file_ar, f->format);
 
-    addr_t rsp = 0;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    vmi_read_addr_va(vmi, info->regs->rsp, 0, &rsp);
-    drakvuf_release_vmi(drakvuf);
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
     drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
     trap->breakpoint.lookup_type = LOOKUP_PID;
     trap->breakpoint.pid = 4;
     trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = rsp;
+    trap->breakpoint.addr = ret_addr;
     trap->type = BREAKPOINT;
     trap->name = info->trap->name;
     trap->data = w;
@@ -605,7 +602,7 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
     {
-        printf("Failed to trap return at 0x%lx\n", rsp);
+        printf("Failed to trap return at 0x%lx\n", ret_addr);
         delete w;
     }
     else

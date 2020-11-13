@@ -427,10 +427,7 @@ event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     struct wrapper* w = (struct wrapper*)g_try_malloc0(sizeof(struct wrapper));
     w->s = (socketmon*)info->trap->data;
 
-    addr_t rsp = 0;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    vmi_read_addr_va(vmi, info->regs->rsp, 0, &rsp);
-    drakvuf_release_vmi(drakvuf);
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
     w->obj = drakvuf_get_function_argument(drakvuf, info, 1);
 
@@ -444,7 +441,7 @@ event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     trap->breakpoint.lookup_type = LOOKUP_PID;
     trap->breakpoint.pid = 4;
     trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = rsp;
+    trap->breakpoint.addr = ret_addr;
     trap->type = BREAKPOINT;
     trap->data = w;
 
@@ -455,7 +452,7 @@ event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
     {
-        printf("Failed to trap return at 0x%lx\n", rsp);
+        printf("Failed to trap return at 0x%lx\n", ret_addr);
         g_free(w);
     }
 
