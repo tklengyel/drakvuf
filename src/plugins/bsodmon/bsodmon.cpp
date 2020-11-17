@@ -113,53 +113,13 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     bsodmon* f = static_cast<bsodmon*>(info->trap->data);
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    uint64_t code = drakvuf_get_function_argument(drakvuf, info, 1);
+    uint64_t param1 = drakvuf_get_function_argument(drakvuf, info, 2);
+    uint64_t param2 = drakvuf_get_function_argument(drakvuf, info, 3);
+    uint64_t param3 = drakvuf_get_function_argument(drakvuf, info, 4);
+    uint64_t param4 = drakvuf_get_function_argument(drakvuf, info, 5);
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    uint64_t code = 0;
-    uint64_t params[4] = { 0 };
     const char* bugcheck_name = "UNKNOWN_CODE" ;
-
-    bool is32bit = drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E;
-
-    if (is32bit)
-    {
-        ctx.addr = info->regs->rsp + 4;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&code) )
-            goto done;
-
-        ctx.addr = info->regs->rsp + 8;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[0]) )
-            goto done;
-
-        ctx.addr = info->regs->rsp + 0xc;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[1]) )
-            goto done;
-
-        ctx.addr = info->regs->rsp + 0x10;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[2]) )
-            goto done;
-
-        ctx.addr = info->regs->rsp + 0x14;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[3]) )
-            goto done;
-    }
-    else
-    {
-        code = info->regs->rcx;
-        params[0] = info->regs->rdx;
-        params[1] = info->regs->r8;
-        params[2] = info->regs->r9;
-
-        ctx.addr = info->regs->rsp + 0x20;
-        if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, (uint32_t*)&params[3]) )
-            goto done;
-    }
-
     if ( f->bugcheck_map.find( code ) != f->bugcheck_map.end() )
         bugcheck_name = f->bugcheck_map[ code ];
 
@@ -167,10 +127,10 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         auto tuple = std::make_tuple(
                          keyval("BugCheckCode", fmt::Xval(code, false)),
                          keyval("BugCheckName", fmt::Qstr(bugcheck_name)),
-                         keyval("BugCheckParameter1", fmt::Xval(params[0], false)),
-                         keyval("BugCheckParameter2", fmt::Xval(params[1], false)),
-                         keyval("BugCheckParameter3", fmt::Xval(params[2], false)),
-                         keyval("BugCheckParameter4", fmt::Xval(params[3], false))
+                         keyval("BugCheckParameter1", fmt::Xval(param1, false)),
+                         keyval("BugCheckParameter2", fmt::Xval(param2, false)),
+                         keyval("BugCheckParameter3", fmt::Xval(param3, false)),
+                         keyval("BugCheckParameter4", fmt::Xval(param4, false))
                      );
         if (f->format == OUTPUT_JSON)
         {
@@ -185,9 +145,6 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             fmt::print(f->format, "bsodmon", drakvuf, info, tuple);
         }
     }
-
-done:
-    drakvuf_release_vmi(drakvuf);
 
     if ( f->abort_on_bsod )
         drakvuf_interrupt( drakvuf, SIGDRAKVUFERROR);
