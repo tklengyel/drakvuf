@@ -285,6 +285,12 @@ void tlsmon::hook_lsass(drakvuf_t drakvuf)
 tlsmon::tlsmon(drakvuf_t drakvuf, output_format_t output)
     : pluginex(drakvuf, output)
 {
+    if (!drakvuf_are_userhooks_supported(drakvuf))
+    {
+        PRINT_DEBUG("[TLSMON] Usermode hooking not supported.\n");
+        return;
+    }
+
     this->hook_lsass(drakvuf);
 }
 

@@ -244,6 +244,14 @@ struct usermode_cb_registration
     void* extra;
 };
 
+/**
+ * Userhooks are not supported on some windows versions yet, therefore
+ * this function should be called first before using any other function
+ * from libuserhook library.
+ *
+ * @param[in] drakvuf drakvuf context
+ * @return true if userhooks are supported on this system, false otherwise.
+ */
 bool drakvuf_are_userhooks_supported(drakvuf_t drakvuf);
 void drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
 bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
