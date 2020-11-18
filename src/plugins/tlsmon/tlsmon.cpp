@@ -263,6 +263,7 @@ event_response_t ssl_generate_master_key_cb(drakvuf_t drakvuf, drakvuf_trap_info
     params->set_result_call_params(info);
     params->master_key_handle_addr = drakvuf_get_function_argument(drakvuf, info, 4);
     params->parameter_list_addr = drakvuf_get_function_argument(drakvuf, info, 7);
+
     return VMI_EVENT_RESPONSE_NONE;
 }
 

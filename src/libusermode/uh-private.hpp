@@ -183,11 +183,15 @@ public:
     void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
     void request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
     void request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, const std::string& dll_name, const std::string& func_name, callback_t cb, void* extra);
-
+    bool add_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
+    void remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine);
 
 private:
     userhook(drakvuf_t drakvuf); // Force get_instance().
     ~userhook();
+
+    // We need to keep these for memory management purposes.
+    std::vector<drakvuf_trap_t*> running_traps;
 };
 
 #endif

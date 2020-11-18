@@ -163,6 +163,31 @@ struct rh_data_t
 };
 
 
+void userhook::remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
+{
+    auto it = std::find(running_traps.begin(), running_traps.end(), trap);
+    if (it == running_traps.end())
+    {
+        PRINT_DEBUG("[USERHOOK] BUG: attempted to destroy non-existant trap");
+        throw -1;
+    }
+    running_traps.erase(it);
+    drakvuf_remove_trap(drakvuf, trap, free_routine);
+}
+
+void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
+{
+    userhook::get_instance(drakvuf).remove_running_trap(drakvuf, trap, free_routine);
+}
+
+bool userhook::add_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+{
+    if (!drakvuf_add_trap(drakvuf, trap))
+        return false;
+    running_traps.push_back(trap);
+    return true;
+}
+
 /**
  * Searches process's InLoadOrderModuleList for given dll library and
  * sets res_dll_base to its base address. Returns true on success.
@@ -217,9 +242,11 @@ bool get_dll_base(
 
                 if (!strncmp(dll_name.c_str(), (const char*)dll_name_utf8.contents, dll_name.size()))
                 {
+                    g_free(dll_name_utf8.contents);
                     *res_dll_base = dll_base;
                     return true;
                 }
+                g_free(dll_name_utf8.contents);
             }
 
             ctx.addr = act_module;
@@ -381,8 +408,9 @@ event_response_t hook_process_cb(
     trap->breakpoint.lookup_type = LOOKUP_NONE;
     trap->breakpoint.addr_type = ADDR_PA;
     trap->breakpoint.addr = func_pa;
-    if (!drakvuf_add_trap(drakvuf, trap))
+    if (!userhook_plugin->add_running_trap(drakvuf, trap))
         delete trap;
+    
 
     drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
     return VMI_EVENT_RESPONSE_NONE;
