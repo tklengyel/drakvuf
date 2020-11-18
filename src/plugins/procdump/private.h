@@ -126,6 +126,7 @@ struct procdump_ctx
     vmi_pid_t pid;
     vmi_pid_t ppid;
     uint32_t tid;
+    addr_t target_rsp;
     string name;
     procdump* plugin;
     drakvuf_trap_t* bp;

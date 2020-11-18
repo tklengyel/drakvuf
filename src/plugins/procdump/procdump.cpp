@@ -183,13 +183,32 @@ static bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     init_int_argument(&args[1], ctx->POOL_SIZE_IN_PAGES * VMI_PS_4KB);
     init_int_argument(&args[2], 0);
 
-    vmi_lock_guard vmi_lg(drakvuf);
-    if (!setup_stack_locked(drakvuf, vmi_lg.vmi, info->regs, args, 3))
+    auto vmi = vmi_lock_guard(drakvuf);
+    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 3))
         return false;
 
     info->regs->rip = ctx->plugin->malloc_va;
 
     ctx->bp->cb = exallocatepool_cb;
+
+    return true;
+}
+
+static bool inject_copy_memory(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+                               procdump_ctx* ctx, addr_t addr, size_t size)
+{
+    struct argument args[3] = {};
+    init_int_argument(&args[0], ctx->pool);
+    init_int_argument(&args[1], addr);
+    init_int_argument(&args[2], size);
+
+    auto vmi = vmi_lock_guard(drakvuf);
+    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 3))
+        return false;
+
+    info->regs->rip = ctx->plugin->memcpy_va;
+
+    ctx->bp2->cb = rtlcopymemory_cb;
 
     return true;
 }
@@ -335,6 +354,25 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
         ptes_to_dump = ctx->POOL_SIZE_IN_PAGES;
 
     const auto idx = vad->second.idx; // cache it because we will change it
+    if (idx + ptes_to_dump > total_number_of_ptes)
+    {
+        PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Dump %u PTEs from %u / %lu\n",
+                    ctx->pid, ptes_to_dump, idx, total_number_of_ptes);
+        return RTLCOPY_RETRY_WITH_MMAP;
+    }
+
+    addr_t start_addr = vad_start + idx * VMI_PS_4KB;
+    ctx->current_dump_size = ptes_to_dump * VMI_PS_4KB;
+
+    if (!inject_copy_memory(drakvuf, info, ctx, start_addr, ctx->current_dump_size))
+    {
+        PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Failed to inject "
+                    "RtlCopyMemoryNonTemporal\n",
+                    ctx->pid);
+        return RTLCOPY_RETRY_WITH_MMAP;
+    }
+    ctx->target_rsp = info->regs->rsp;
+
     if (idx + ptes_to_dump == total_number_of_ptes)
     {
         ctx->vads.erase(vad_start);
@@ -343,32 +381,6 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     {
         ctx->vads.begin()->second.idx += ptes_to_dump;
     }
-    else
-    {
-        PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Dump %u PTEs from %u / %lu\n",
-                    ctx->pid, ptes_to_dump, idx, total_number_of_ptes);
-        return RTLCOPY_RETRY_WITH_MMAP;
-    }
-
-
-    ctx->current_dump_size = ptes_to_dump * VMI_PS_4KB;
-    struct argument args[3] = {};
-    init_int_argument(&args[0], ctx->pool);
-    init_int_argument(&args[1], vad_start + idx * VMI_PS_4KB);
-    init_int_argument(&args[2], ctx->current_dump_size);
-
-    vmi_lock_guard vmi_lg(drakvuf);
-    if (!setup_stack_locked(drakvuf, vmi_lg.vmi, info->regs, args, 3))
-    {
-        PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Failed to inject "
-                    "RtlCopyMemoryNonTemporal\n",
-                    ctx->pid);
-        return RTLCOPY_RETRY_WITH_MMAP;
-    }
-
-    info->regs->rip = ctx->plugin->memcpy_va;
-
-    ctx->bp2->cb = rtlcopymemory_cb;
 
     return RTLCOPY_INJECT;
 }
@@ -549,8 +561,9 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
 
     auto ctx = static_cast<struct procdump_ctx*>(info->trap->data);
 
-    if (!drakvuf_check_return_context(drakvuf, info, ctx->pid, ctx->tid, 0))
+    if (!drakvuf_check_return_context(drakvuf, info, ctx->pid, ctx->tid, ctx->target_rsp))
         return VMI_EVENT_RESPONSE_NONE;
+    ctx->target_rsp = 0;
 
     // Restore stack pointer
     // This is crucial because lots of injections could exhaust the kernel stack
@@ -585,8 +598,9 @@ static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
 
     auto ctx = static_cast<struct procdump_ctx*>(info->trap->data);
 
-    if (!drakvuf_check_return_context(drakvuf, info, ctx->pid, ctx->tid, 0))
+    if (!drakvuf_check_return_context(drakvuf, info, ctx->pid, ctx->tid, ctx->target_rsp))
         return VMI_EVENT_RESPONSE_NONE;
+    ctx->target_rsp = 0;
 
     // Restore stack pointer
     // This is crucial because lots of injections could exhaust the kernel stack
@@ -928,7 +942,11 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
         if (ctx->pool)
             is_continue = dump_next_vads(drakvuf, info, ctx);
         else
+        {
             is_continue = inject_allocate_pool(drakvuf, info, ctx);
+            if (is_continue)
+                ctx->target_rsp = info->regs->rsp;
+        }
 
         if (is_continue)
             return VMI_EVENT_RESPONSE_SET_REGISTERS;

@@ -410,7 +410,7 @@ event_response_t hook_process_cb(
     trap->breakpoint.addr = func_pa;
     if (!userhook_plugin->add_running_trap(drakvuf, trap))
         delete trap;
-    
+
 
     drakvuf_remove_trap(drakvuf, info->trap, rh_data_t::free_trap);
     return VMI_EVENT_RESPONSE_NONE;
