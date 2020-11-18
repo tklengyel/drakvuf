@@ -155,8 +155,9 @@ addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 
 addr_t linux_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    addr_t ret_addr = 0;
-    vmi_read_addr_va(drakvuf->vmi, info->regs->rsp, 0, &ret_addr);
+    addr_t ret_addr;
+    if (VMI_FAILURE == vmi_read_addr_va(drakvuf->vmi, info->regs->rsp, 0, &ret_addr))
+        return 0;
     return ret_addr;
 }
 
