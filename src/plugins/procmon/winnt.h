@@ -108,17 +108,20 @@
 #include <inttypes.h>
 #include <string>
 
-#define PAGE_NOACCESS          0x01
-#define PAGE_READONLY          0x02
-#define PAGE_READWRITE         0x04
-#define PAGE_WRITECOPY         0x08
-#define PAGE_EXECUTE           0x10
-#define PAGE_EXECUTE_READ      0x20
-#define PAGE_EXECUTE_READWRITE 0x40
-#define PAGE_EXECUTE_WRITECOPY 0x80
-#define PAGE_GUARD            0x100
-#define PAGE_NOCACHE          0x200
-#define PAGE_WRITECOMBINE     0x400
+enum page_access_t
+{
+    PAGE_NOACCESS          = 0x01,
+    PAGE_READONLY          = 0x02,
+    PAGE_READWRITE         = 0x04,
+    PAGE_WRITECOPY         = 0x08,
+    PAGE_EXECUTE           = 0x10,
+    PAGE_EXECUTE_READ      = 0x20,
+    PAGE_EXECUTE_READWRITE = 0x40,
+    PAGE_EXECUTE_WRITECOPY = 0x80,
+    PAGE_GUARD             = 0x100,
+    PAGE_NOCACHE           = 0x200,
+    PAGE_WRITECOMBINE      = 0x400,
+};
 
 std::string stringify_protection_attributes(uint32_t attributes, char sep = ';');
 
