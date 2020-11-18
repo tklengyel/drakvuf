@@ -162,6 +162,9 @@ void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     info->regs->r14 = injector->saved_regs.r14;
     info->regs->r15 = injector->saved_regs.r15;
 
+    info->regs->rip = injector->saved_regs.rip;
+    info->regs->rsp = injector->saved_regs.rsp;
+
     drakvuf_remove_trap(drakvuf, injector->bp, (drakvuf_trap_free_t)free);
     g_free(injector->buffer);
     g_free(injector);

@@ -198,6 +198,8 @@ struct wrapper_t
 
     vmi_pid_t target_pid;
     uint32_t target_tid;
+    addr_t target_rsp;
+
     addr_t eprocess_base;
 
     x86_registers_t saved_regs;
