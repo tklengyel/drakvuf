@@ -109,6 +109,7 @@
 #include <libvmi/peparse.h>
 #include <assert.h>
 #include <libdrakvuf/json-util.h>
+#include <optional>
 
 #include "plugins/output_format.h"
 #include "rpcmon.h"
@@ -159,9 +160,19 @@ struct _MIDL_STUB_DESC
     addr_t RpcInterfaceInformation;
 } __attribute__((packed, aligned(4)));
 
+struct _MIDL_STUB_DESC_32
+{
+    uint32_t RpcInterfaceInformation;
+} __attribute__((packed, aligned(4)));
+
 struct _MIDL_STUBLESS_PROXY_INFO
 {
     addr_t pStubDesc;
+} __attribute__((packed, aligned(4)));
+
+struct _MIDL_STUBLESS_PROXY_INFO_32
+{
+    uint32_t pStubDesc;
 } __attribute__((packed, aligned(4)));
 
 struct rpc_info_t
@@ -170,11 +181,19 @@ struct rpc_info_t
     std::string TransferSyntaxGuid;
 };
 
-static std::optional<rpc_info_t> parse_MIDL_STUB_DESC(drakvuf_t drakvuf, drakvuf_trap_info* info, addr_t arg)
+template<typename T>
+static std::optional<T> read_struct(vmi_instance_t vmi, access_context_t const* ctx)
 {
-    auto vmi = vmi_lock_guard(drakvuf);
-
+    T v;
     size_t bytes_read = 0;
+    if (VMI_SUCCESS == vmi_read(vmi, ctx, sizeof(v), &v, &bytes_read) || bytes_read != sizeof(v))
+        return v;
+    return {};
+}
+
+template<typename T>
+static std::optional<T> read_struct(vmi_instance_t vmi, drakvuf_trap_info* info, addr_t arg)
+{
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -182,37 +201,78 @@ static std::optional<rpc_info_t> parse_MIDL_STUB_DESC(drakvuf_t drakvuf, drakvuf
         .addr = arg,
     };
 
-    struct _MIDL_STUB_DESC stub_desc;
-    if (VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(stub_desc), &stub_desc, &bytes_read) || bytes_read != sizeof(stub_desc))
+    return read_struct<T>(vmi, &ctx);
+}
+
+static addr_t get_rpc_interface_information_addr(drakvuf_t drakvuf, drakvuf_trap_info* info, addr_t arg)
+{
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E) || drakvuf_is_wow64(drakvuf, info);
+
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    if (is32bit)
+    {
+        auto s = read_struct<_MIDL_STUB_DESC_32>(vmi, info, arg);
+        if (s) return s->RpcInterfaceInformation;
+    }
+    else
+    {
+        auto s = read_struct<_MIDL_STUB_DESC>(vmi, info, arg);
+        if (s) return s->RpcInterfaceInformation;
+    }
+
+    return 0;
+}
+
+static addr_t get_rpc_proxy_info_addr(drakvuf_t drakvuf, drakvuf_trap_info* info, addr_t arg)
+{
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E) || drakvuf_is_wow64(drakvuf, info);
+
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    if (is32bit)
+    {
+        auto s = read_struct<_MIDL_STUBLESS_PROXY_INFO_32>(vmi, info, arg);
+        if (s) return s->pStubDesc;
+    }
+    else
+    {
+        auto s = read_struct<_MIDL_STUBLESS_PROXY_INFO>(vmi, info, arg);
+        if (s) return s->pStubDesc;
+    }
+
+    return 0;
+}
+
+static std::optional<rpc_info_t> parse_MIDL_STUB_DESC(drakvuf_t drakvuf, drakvuf_trap_info* info, addr_t arg)
+{
+    addr_t rpc_interface_information_addr = get_rpc_interface_information_addr(drakvuf, info, arg);
+    if (!rpc_interface_information_addr)
         return {};
 
-    ctx.addr = stub_desc.RpcInterfaceInformation;
-    struct _RPC_CLIENT_INTERFACE rpc_iface;
-    if (VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(rpc_iface), &rpc_iface, &bytes_read) || bytes_read != sizeof(rpc_iface))
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = rpc_interface_information_addr,
+    };
+
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    auto rpc_iface = read_struct<_RPC_CLIENT_INTERFACE>(vmi, &ctx);
+    if (!rpc_iface)
         return {};
 
-    return {{rpc_iface.InterfaceId.SyntaxGuid.str(), rpc_iface.TransferSyntax.SyntaxGuid.str()}};
+    return {{rpc_iface->InterfaceId.SyntaxGuid.str(), rpc_iface->TransferSyntax.SyntaxGuid.str()}};
 }
 
 static std::optional<rpc_info_t> parse_MIDL_STUBLESS_PROXY_INFO(drakvuf_t drakvuf, drakvuf_trap_info* info, addr_t arg)
 {
-    struct _MIDL_STUBLESS_PROXY_INFO proxy;
-    {
-        auto vmi = vmi_lock_guard(drakvuf);
+    addr_t rpc_proxy_info_addr = get_rpc_proxy_info_addr(drakvuf, info, arg);
+    if (!rpc_proxy_info_addr)
+        return {};
 
-        size_t bytes_read = 0;
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = arg,
-        };
-
-        if (VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(proxy), &proxy, &bytes_read) || bytes_read != sizeof(proxy))
-            return {};
-    }
-
-    return parse_MIDL_STUB_DESC(drakvuf, info, proxy.pStubDesc);
+    return parse_MIDL_STUB_DESC(drakvuf, info, rpc_proxy_info_addr);
 }
 
 static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
