@@ -620,10 +620,9 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     wrapper_t* injector = (wrapper_t*)info->trap->data;
     filedelete* f = injector->f;
 
-    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, injector->target_rsp))
         return VMI_EVENT_RESPONSE_NONE;
-
-    auto response = 0;
+    injector->target_rsp = 0;
 
     access_context_t ctx =
     {
@@ -632,7 +631,7 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         .addr = injector->pool,
     };
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
 
     if (injector->curr_sequence_number < 0) injector->curr_sequence_number = ++f->sequence_number;
     const int curr_sequence_number = injector->curr_sequence_number;
@@ -657,27 +656,30 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     if (inject_unmapview(drakvuf, info, vmi, injector))
-        response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-    else
-        response = finish_readfile(drakvuf, info, vmi, injector->finish_status);
+    {
+        injector->target_rsp = info->regs->rsp;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
 
-    drakvuf_release_vmi(drakvuf);
-
-    return response;
+    return finish_readfile(drakvuf, info, vmi, injector->finish_status);
 }
 
 event_response_t unmapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
 
-    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, injector->target_rsp))
         return VMI_EVENT_RESPONSE_NONE;
+    injector->target_rsp = 0;
 
-    vmi_lock_guard vmi(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
     if (injector->file_offset < injector->file_size)
     {
         if (inject_mapview(drakvuf, info, vmi, injector))
+        {
+            injector->target_rsp = info->regs->rsp;
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        }
     }
 
     return finish_readfile(drakvuf, info, vmi, injector->finish_status);
@@ -687,12 +689,11 @@ event_response_t mapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
 
-    auto response = 0;
-
-    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, injector->target_rsp))
         return VMI_EVENT_RESPONSE_NONE;
+    injector->target_rsp = 0;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
 
     if (info->regs->rax)
     {
@@ -730,8 +731,8 @@ event_response_t mapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             if (inject_allocate_pool(drakvuf, info, vmi, injector))
             {
-                response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-                goto done;
+                injector->target_rsp = info->regs->rsp;
+                return VMI_EVENT_RESPONSE_SET_REGISTERS;
             }
         }
         else
@@ -739,8 +740,8 @@ event_response_t mapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             injector->pool = pool;
             if (inject_memcpy(drakvuf, info, vmi, injector))
             {
-                response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-                goto done;
+                injector->target_rsp = info->regs->rsp;
+                return VMI_EVENT_RESPONSE_SET_REGISTERS;
             }
         }
     }
@@ -749,24 +750,18 @@ err:
     PRINT_DEBUG("[FILEDELETE2] [ZwMapViewOfSection] Error. Stop processing (PID %d, TID %d).\n",
                 info->attached_proc_data.pid, info->attached_proc_data.tid);
 
-    response = finish_readfile(drakvuf, info, vmi, false);
-
-done:
-    drakvuf_release_vmi(drakvuf);
-
-    return response;
+    return finish_readfile(drakvuf, info, vmi, false);
 }
 
 event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
 
-    auto response = 0;
-
-    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, injector->target_rsp))
         return VMI_EVENT_RESPONSE_NONE;
+    injector->target_rsp = 0;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
 
     if (info->regs->rax)
     {
@@ -793,8 +788,8 @@ event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
         if (inject_mapview(drakvuf, info, vmi, injector))
         {
-            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            goto done;
+            injector->target_rsp = info->regs->rsp;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
     }
 
@@ -802,25 +797,18 @@ err:
     PRINT_DEBUG("[FILEDELETE2] [ZwCreateSection] Error. Stop processing (PID %d, TID %d).\n",
                 info->attached_proc_data.pid, info->attached_proc_data.tid);
 
-    response = finish_readfile(drakvuf, info, vmi, false);
-
-done:
-    drakvuf_release_vmi(drakvuf);
-
-    return response;
+    return finish_readfile(drakvuf, info, vmi, false);
 }
 
 event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-
     wrapper_t* injector = (wrapper_t*)info->trap->data;
 
-    auto response = 0;
-
-    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, injector->target_rsp))
         return VMI_EVENT_RESPONSE_NONE;
+    injector->target_rsp = 0;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
 
     if (info->regs->rax)
     {
@@ -829,8 +817,8 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         injector->pool = info->regs->rax;
         if (inject_memcpy(drakvuf, info, vmi, injector))
         {
-            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            goto done;
+            injector->target_rsp = info->regs->rsp;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         else
         {
@@ -848,24 +836,18 @@ err:
     PRINT_DEBUG("[FILEDELETE2] [ExAllocatePoolWithTag] Error. Stop processing (PID %d, TID %d).\n",
                 info->attached_proc_data.pid, info->attached_proc_data.tid);
 
-    response = finish_readfile(drakvuf, info, vmi, false);
-
-done:
-    drakvuf_release_vmi(drakvuf);
-
-    return response;
+    return finish_readfile(drakvuf, info, vmi, false);
 }
 
 event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
 
-    auto response = 0;
-
-    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, injector->target_rsp))
         return VMI_EVENT_RESPONSE_NONE;
+    injector->target_rsp = 0;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
 
     if (info->regs->rax)
     {
@@ -906,8 +888,8 @@ event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
         injector->readfile.bytes_read = 0UL;
         if (inject_queryinfo(drakvuf, info, vmi, injector))
         {
-            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            goto done;
+            injector->target_rsp = info->regs->rsp;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
     }
 
@@ -916,24 +898,18 @@ err:
                 info->attached_proc_data.pid, info->attached_proc_data.tid);
 
 handled:
-    response = finish_readfile(drakvuf, info, vmi, false);
-
-done:
-    drakvuf_release_vmi(drakvuf);
-
-    return response;
+    return finish_readfile(drakvuf, info, vmi, false);
 }
 
 event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
 
-    auto response = VMI_EVENT_RESPONSE_NONE;
-
-    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, 0))
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, injector->target_rsp))
         return VMI_EVENT_RESPONSE_NONE;
+    injector->target_rsp = 0;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
 
     if (info->regs->rax)
     {
@@ -975,8 +951,8 @@ event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
         if (inject_createsection(drakvuf, info, vmi, injector))
         {
-            response = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            goto done;
+            injector->target_rsp = info->regs->rsp;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
     }
 
@@ -985,12 +961,7 @@ err:
                 info->attached_proc_data.pid, info->attached_proc_data.tid);
 
 handled:
-    response = finish_readfile(drakvuf, info, vmi, false);
-
-done:
-    drakvuf_release_vmi(drakvuf);
-
-    return response;
+    return finish_readfile(drakvuf, info, vmi, false);
 }
 
 typedef enum
@@ -1082,6 +1053,7 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     if (inject_queryvolumeinfo(drakvuf, info, vmi, injector))
     {
+        injector->target_rsp = info->regs->rsp;
         *response = VMI_EVENT_RESPONSE_SET_REGISTERS;
         return START_READFILE_SUCCEED;
     }
