@@ -112,6 +112,7 @@
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
+class userhook; // Forward declaration.
 
 enum offset
 {
@@ -130,6 +131,46 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
 };
 
+/**
+ * Running hook helper data structure.
+ * Used for passing user arguments and additional data between callbacks.
+ */
+struct rh_data_t
+{
+    // Arguments provided by the user.
+    addr_t target_process;
+    std::string dll_name;
+    std::string func_name;
+    callback_t cb;
+    void* extra;
+
+    // Additional data. Stored here for optimalization.
+    target_hook_state state;
+    vmi_pid_t target_process_pid;
+    addr_t target_process_dtb;
+    addr_t func_addr;
+
+    // We need to pass this around as we need offsets.
+    userhook* userhook_plugin;
+
+    rh_data_t(userhook* userhook_plugin, addr_t target_process, vmi_pid_t target_process_pid,
+              std::string dll_name, std::string func_name, callback_t cb, void* extra):
+        target_process(target_process), dll_name(dll_name), func_name(func_name), cb(cb),
+        extra(extra), state(HOOK_FIRST_TRY), target_process_pid(target_process_pid),
+        userhook_plugin(userhook_plugin) {}
+
+
+    static void free_trap(drakvuf_trap_t* trap)
+    {
+        if (!trap)
+            return;
+
+        if (trap->data)
+            delete (rh_data_t*) trap->data;
+
+        delete trap;
+    }
+};
 
 struct dll_t
 {
@@ -183,15 +224,22 @@ public:
     void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
     void request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
     void request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, const std::string& dll_name, const std::string& func_name, callback_t cb, void* extra);
+
     bool add_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
     void remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine);
+    bool add_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
+    void remove_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 
 private:
     userhook(drakvuf_t drakvuf); // Force get_instance().
     ~userhook();
 
     // We need to keep these for memory management purposes.
+    // running_rh_traps are traps with data field set to rh_data_t and are used
+    // internaly inside library.
     std::vector<drakvuf_trap_t*> running_traps;
+    std::vector<drakvuf_trap_t*> running_rh_traps;
 };
+
 
 #endif
