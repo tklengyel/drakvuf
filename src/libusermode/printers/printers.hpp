@@ -112,11 +112,18 @@
 
 class ArgumentPrinter
 {
+public:
+    enum numeric_format_t
+    {
+        DECIMAL,
+        HEX,
+    };
 protected:
     std::string name;
     bool print_no_addr;
+    numeric_format_t numeric_format;
 public:
-    ArgumentPrinter(std::string arg_name, bool print_no_addr);
+    ArgumentPrinter(std::string arg_name, bool print_no_addr, numeric_format_t base = HEX);
 
     std::string get_name() const;
     virtual std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
