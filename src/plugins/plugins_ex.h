@@ -275,7 +275,8 @@ struct breakpoint_by_dtb_searcher
             trap->breakpoint.addr = ret_addr;
             trap->breakpoint.module = info->trap->breakpoint.module;
 
-            trap->name = info->trap->name;
+            if (!trap->name)
+                trap->name = info->trap->name;
 
             if (!drakvuf_add_trap(drakvuf, trap))
                 return nullptr;
@@ -300,7 +301,8 @@ struct breakpoint_by_pid_searcher
             trap->breakpoint.addr = ret_addr;
             trap->breakpoint.module = info->trap->breakpoint.module;
 
-            trap->name = info->trap->name;
+            if (!trap->name)
+                trap->name = info->trap->name;
 
             if (!drakvuf_add_trap(drakvuf, trap))
                 return nullptr;

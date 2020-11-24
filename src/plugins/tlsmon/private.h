@@ -1,3 +1,4 @@
+
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
  * DRAKVUF (C) 2014-2020 Tamas K Lengyel.                                  *
@@ -102,144 +103,79 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_USERHOOK_PRIVATE_H
-#define WIN_USERHOOK_PRIVATE_H
 
-#include <vector>
-#include <memory>
+#ifndef TLSMON_PRIVATE_H
+#define TLSMON_PRIVATE_H
 
-#include <glib.h>
-#include "plugins/private.h"
-#include "plugins/plugins_ex.h"
+#include <sstream>
+#include <iomanip>
 
-class userhook; // Forward declaration.
 
-enum offset
+namespace tlsmon_priv
 {
-    KTHREAD_TRAPFRAME,
-    KTRAP_FRAME_RIP,
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    __OFFSET_MAX
+
+constexpr uint32_t NCRYPT_SSL_KEY_MAGIC_BYTES = 0x44444442;
+constexpr uint32_t MASTER_SECRET_MAGIC_BYTES  = 0x73736c35;
+
+constexpr size_t CLIENT_RANDOM_SZ = 0x20;
+constexpr size_t MASTER_KEY_SZ    = 0x30;
+
+/* Could not find whole structure documentation. We are only interested in
+magic bytes and pointer to master_secret structure. */
+struct ncrypt_ssl_key_t
+{
+    char field0[4];
+    uint32_t magic;
+    char field2[8];
+    void* master_secret;
 };
 
-static const char* offset_names[__OFFSET_MAX][2] =
+struct ssl_master_secret_t
 {
-    [KTHREAD_TRAPFRAME] = { "_KTHREAD", "TrapFrame" },
-    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip"},
-    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
-    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
+    uint32_t cb_struct_length;
+    uint32_t magic;
+    uint32_t protocol_version;
+    char aligment[4];
+    void* cipher_suite_list_entry;
+    uint32_t is_client_cache;
+    unsigned char master_key[MASTER_KEY_SZ];
+    uint32_t field7;
 };
 
-/**
- * Running hook helper data structure.
- * Used for passing user arguments and additional data between callbacks.
- */
-struct rh_data_t
+enum ncrypt_buffer_type_t
 {
-    // Arguments provided by the user.
-    addr_t target_process;
-    std::string dll_name;
-    std::string func_name;
-    callback_t cb;
-    void* extra;
-
-    // Additional data. Stored here for optimalization.
-    target_hook_state state;
-    vmi_pid_t target_process_pid;
-    addr_t target_process_dtb;
-    addr_t func_addr;
-
-    // We need to pass this around as we need offsets.
-    userhook* userhook_plugin;
-
-    rh_data_t(userhook* userhook_plugin, addr_t target_process, vmi_pid_t target_process_pid,
-              std::string dll_name, std::string func_name, callback_t cb, void* extra):
-        target_process(target_process), dll_name(dll_name), func_name(func_name), cb(cb),
-        extra(extra), state(HOOK_FIRST_TRY), target_process_pid(target_process_pid),
-        userhook_plugin(userhook_plugin) {}
-
-
-    static void free_trap(drakvuf_trap_t* trap)
-    {
-        if (!trap)
-            return;
-
-        if (trap->data)
-            delete (rh_data_t*) trap->data;
-
-        delete trap;
-    }
+    NCRYPTBUFFER_SSL_CLIENT_RANDOM = 20,
+    NCRYPTBUFFER_SSL_SERVER_RANDOM = 21,
 };
 
-struct dll_t
+struct ncrypt_buffer_t
 {
-    dll_view_t v;
-
-    // one entry per hooked function
-    std::vector<hook_target_entry_t> targets;
-
-    // internal, for page faults
-    addr_t pf_current_addr;
-    addr_t pf_max_addr;
+    uint32_t cbbuffer;
+    uint32_t buffer_type;
+    void* buffer;
 };
 
-struct map_view_of_section_result_t : public call_result_t
+struct ncrypt_buffer_desc_t
 {
-    map_view_of_section_result_t() : call_result_t(), section_handle(), process_handle(), base_address_ptr() {}
-
-    uint64_t section_handle;
-    uint64_t process_handle;
-    addr_t base_address_ptr;
+    uint32_t ulversion;
+    uint32_t cbuffers;
+    void* buffers;
 };
 
-struct copy_on_write_result_t : public call_result_t
+
+
+std::string byte2str(unsigned char* data, int count)
 {
-    copy_on_write_result_t() : call_result_t(), vaddr(), pte(), old_cow_pa() {}
+    std::stringstream ss;
+    ss << std::hex;
 
-    addr_t vaddr;
-    addr_t pte;
-    addr_t old_cow_pa;
-    std::vector<hook_target_entry_t*> hooks;
-};
+    for (int i = 0; i < count; ++i)
+        ss << std::setw(2) << std::setfill('0') << (int)data[i];
 
-class userhook : public pluginex
-{
-public:
-    userhook(userhook const&) = delete;
+    return ss.str();
+}
 
-    std::array<size_t, __OFFSET_MAX> offsets;
 
-    std::vector<usermode_cb_registration> plugins;
-    // map dtb -> list of hooked dlls
-    std::map<addr_t, std::vector<dll_t>> loaded_dlls;
-
-    static userhook& get_instance(drakvuf_t drakvuf)
-    {
-        static userhook instance(drakvuf);
-        return instance;
-    }
-
-    static bool is_supported(drakvuf_t drakvuf);
-    void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
-    void request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
-    void request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, const std::string& dll_name, const std::string& func_name, callback_t cb, void* extra);
-
-    bool add_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-    void remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine);
-    bool add_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-    void remove_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-
-private:
-    userhook(drakvuf_t drakvuf); // Force get_instance().
-    ~userhook();
-
-    // We need to keep these for memory management purposes.
-    // running_rh_traps are traps with data field set to rh_data_t and are used
-    // internaly inside library.
-    std::vector<drakvuf_trap_t*> running_traps;
-    std::vector<drakvuf_trap_t*> running_rh_traps;
-};
-
+} // namespace tlsmon
 
 #endif

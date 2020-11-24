@@ -102,143 +102,35 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_USERHOOK_PRIVATE_H
-#define WIN_USERHOOK_PRIVATE_H
+/**
+ * General Tlsmon plugin description:
+ * This plugin extracts TLS secrets and logs them in a format:
+ * <CLIENT_RANDOM><MASTER_KEY>
+ * recognizable by wireshark. This format allows the data to be easily loaded
+ * into wireshark and automatically decrypted.
+ *
+ * Currently supported:
+ * - extracting secrets from communication based on Schannel.
+ */
+
+#ifndef TLSMON_H
+#define TLSMON_H
 
 #include <vector>
-#include <memory>
 
-#include <glib.h>
+#include <libusermode/userhook.hpp>
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
-class userhook; // Forward declaration.
 
-enum offset
-{
-    KTHREAD_TRAPFRAME,
-    KTRAP_FRAME_RIP,
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    __OFFSET_MAX
-};
-
-static const char* offset_names[__OFFSET_MAX][2] =
-{
-    [KTHREAD_TRAPFRAME] = { "_KTHREAD", "TrapFrame" },
-    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip"},
-    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
-    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
-};
-
-/**
- * Running hook helper data structure.
- * Used for passing user arguments and additional data between callbacks.
- */
-struct rh_data_t
-{
-    // Arguments provided by the user.
-    addr_t target_process;
-    std::string dll_name;
-    std::string func_name;
-    callback_t cb;
-    void* extra;
-
-    // Additional data. Stored here for optimalization.
-    target_hook_state state;
-    vmi_pid_t target_process_pid;
-    addr_t target_process_dtb;
-    addr_t func_addr;
-
-    // We need to pass this around as we need offsets.
-    userhook* userhook_plugin;
-
-    rh_data_t(userhook* userhook_plugin, addr_t target_process, vmi_pid_t target_process_pid,
-              std::string dll_name, std::string func_name, callback_t cb, void* extra):
-        target_process(target_process), dll_name(dll_name), func_name(func_name), cb(cb),
-        extra(extra), state(HOOK_FIRST_TRY), target_process_pid(target_process_pid),
-        userhook_plugin(userhook_plugin) {}
-
-
-    static void free_trap(drakvuf_trap_t* trap)
-    {
-        if (!trap)
-            return;
-
-        if (trap->data)
-            delete (rh_data_t*) trap->data;
-
-        delete trap;
-    }
-};
-
-struct dll_t
-{
-    dll_view_t v;
-
-    // one entry per hooked function
-    std::vector<hook_target_entry_t> targets;
-
-    // internal, for page faults
-    addr_t pf_current_addr;
-    addr_t pf_max_addr;
-};
-
-struct map_view_of_section_result_t : public call_result_t
-{
-    map_view_of_section_result_t() : call_result_t(), section_handle(), process_handle(), base_address_ptr() {}
-
-    uint64_t section_handle;
-    uint64_t process_handle;
-    addr_t base_address_ptr;
-};
-
-struct copy_on_write_result_t : public call_result_t
-{
-    copy_on_write_result_t() : call_result_t(), vaddr(), pte(), old_cow_pa() {}
-
-    addr_t vaddr;
-    addr_t pte;
-    addr_t old_cow_pa;
-    std::vector<hook_target_entry_t*> hooks;
-};
-
-class userhook : public pluginex
+class tlsmon: public pluginex
 {
 public:
-    userhook(userhook const&) = delete;
-
-    std::array<size_t, __OFFSET_MAX> offsets;
-
-    std::vector<usermode_cb_registration> plugins;
-    // map dtb -> list of hooked dlls
-    std::map<addr_t, std::vector<dll_t>> loaded_dlls;
-
-    static userhook& get_instance(drakvuf_t drakvuf)
-    {
-        static userhook instance(drakvuf);
-        return instance;
-    }
-
-    static bool is_supported(drakvuf_t drakvuf);
-    void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
-    void request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
-    void request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, const std::string& dll_name, const std::string& func_name, callback_t cb, void* extra);
-
-    bool add_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-    void remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine);
-    bool add_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-    void remove_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
+    tlsmon(drakvuf_t drakvuf, output_format_t output);
+    ~tlsmon();
 
 private:
-    userhook(drakvuf_t drakvuf); // Force get_instance().
-    ~userhook();
-
-    // We need to keep these for memory management purposes.
-    // running_rh_traps are traps with data field set to rh_data_t and are used
-    // internaly inside library.
-    std::vector<drakvuf_trap_t*> running_traps;
-    std::vector<drakvuf_trap_t*> running_rh_traps;
+    void hook_lsass(drakvuf_t drakvuf);
 };
 
 

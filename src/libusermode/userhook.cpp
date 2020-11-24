@@ -813,6 +813,14 @@ userhook::~userhook()
             }
         }
     }
+
+    for (auto trap : running_traps)
+        delete trap;
+    running_traps.clear();
+
+    for (auto trap : running_rh_traps)
+        rh_data_t::free_trap(trap);
+    running_rh_traps.clear();
 }
 
 void drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg)

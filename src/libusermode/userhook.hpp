@@ -244,6 +244,14 @@ struct usermode_cb_registration
     void* extra;
 };
 
+/**
+ * Userhooks are not supported on some windows versions yet, therefore
+ * this function should be called first before using any other function
+ * from libuserhook library.
+ *
+ * @param[in] drakvuf drakvuf context
+ * @return true if userhooks are supported on this system, false otherwise.
+ */
 bool drakvuf_are_userhooks_supported(drakvuf_t drakvuf);
 void drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
 bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
@@ -263,4 +271,7 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
  * @param[in] extra Additional data which will be set as trap->data.
  */
 void drakvuf_request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, const std::string& dll_name, const std::string& func_name, callback_t cb, void* extra);
+
+
+void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine);
 #endif
