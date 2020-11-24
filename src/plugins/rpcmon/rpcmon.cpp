@@ -107,12 +107,12 @@
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
-#include <assert.h>
 #include <libdrakvuf/json-util.h>
 #include <optional>
 
 #include "plugins/output_format.h"
 #include "rpcmon.h"
+#include "private.h"
 
 
 static void free_trap(drakvuf_trap_t* trap)
@@ -275,6 +275,33 @@ static std::optional<rpc_info_t> parse_MIDL_STUBLESS_PROXY_INFO(drakvuf_t drakvu
     return parse_MIDL_STUB_DESC(drakvuf, info, rpc_proxy_info_addr);
 }
 
+static std::optional<uint64_t> parse_FORMAT_STRING(drakvuf_t drakvuf, drakvuf_trap_info* info, addr_t arg)
+{
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    uint8_t oi_flags;
+    ctx.addr = arg + Oi_FLAGS_FIELD_OFFSET;
+    if (VMI_SUCCESS != vmi_read_8(vmi, &ctx, &oi_flags))
+        return {};
+
+    int proc_num_field_offset = (oi_flags & Oi_HAS_RPCFLAGS)
+                                ? Oi_PROCNUM_FIELD_OFFSET_WITH_RPCFLAGS
+                                : Oi_PROCNUM_FIELD_OFFSET_WITHOUT_RPCFLAGS;
+
+    uint16_t proc_num;
+    ctx.addr = arg + proc_num_field_offset;
+    if (VMI_SUCCESS != vmi_read_16(vmi, &ctx, &proc_num))
+        return {};
+
+    return proc_num;
+}
+
 static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)info->trap->data;
@@ -285,6 +312,7 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     auto plugin = (rpcmon*)ret_target->plugin;
 
     std::vector<std::pair<std::string, fmt::Rstr<std::string>>> fmt_extra{};
+    std::vector<std::pair<std::string, fmt::Nval<uint64_t>>> fmt_extra_num;
     std::vector<fmt::Rstr<std::string>> fmt_args{};
     {
         const auto& args = ret_target->arguments;
@@ -311,6 +339,13 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
                 fmt_extra.push_back(std::make_pair("InterfaceId", r->InterfaceIdGuid));
                 fmt_extra.push_back(std::make_pair("TransferSyntax", r->TransferSyntaxGuid));
             }
+            else if (std::string("pFormat") == (*printer)->get_name())
+            {
+                auto r = parse_FORMAT_STRING(drakvuf, info, *arg);
+                if (!r) continue;
+
+                fmt_extra_num.push_back(std::make_pair("ProcedureNumber", fmt::Nval(*r)));
+            }
         }
     }
 
@@ -319,7 +354,8 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
                keyval("CalledFrom", fmt::Xval(info->regs->rip)),
                keyval("ReturnValue", fmt::Xval(info->regs->rax)),
                keyval("Arguments", fmt_args),
-               keyval("Extra", fmt_extra)
+               keyval("Extra", fmt_extra),
+               keyval("ExtraNum", fmt_extra_num)
               );
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
@@ -484,6 +520,7 @@ static auto rpc_call3_args()
 {
     std::vector<std::unique_ptr<ArgumentPrinter>> args;
     args.emplace_back(std::make_unique<ArgumentPrinter>("pStubProxy", false));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("ProcedureNumber", false, ArgumentPrinter::DECIMAL));
     return args;
 }
 
