@@ -378,6 +378,16 @@ if test x$plugin_rpcmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_RPCMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_tlsmon],
+  [AS_HELP_STRING([--disable-plugin-tlsmon],
+    [Enable the RPC call tracing plugin @<:@yes@:>@])],
+  [plugin_tlsmon="$enableval"],
+  [plugin_tlsmon="yes"])
+AM_CONDITIONAL([PLUGIN_TLSMON], [test x$plugin_tlsmon = xyes])
+if test x$plugin_tlsmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_TLSMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -652,6 +662,7 @@ MEMDump:      $plugin_memdump
 ProcDump:     $plugin_procdump
 APIMon:       $plugin_apimon
 RPCMon:       $plugin_rpcmon
+TLSMon:       $plugin_tlsmon
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:       $plugin_wmimon

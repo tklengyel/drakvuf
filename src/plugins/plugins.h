@@ -173,6 +173,7 @@ typedef enum drakvuf_plugin
     PLUGIN_APIMON,
     PLUGIN_PROCDUMP,
     PLUGIN_RPCMON,
+    PLUGIN_TLSMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -203,6 +204,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_APIMON] = "apimon",
     [PLUGIN_PROCDUMP] = "procdump",
     [PLUGIN_RPCMON] = "rpcmon",
+    [PLUGIN_TLSMON] = "tlsmon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -232,6 +234,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_APIMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_PROCDUMP]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_RPCMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_TLSMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
 class plugin

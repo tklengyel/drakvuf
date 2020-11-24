@@ -102,144 +102,198 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_USERHOOK_PRIVATE_H
-#define WIN_USERHOOK_PRIVATE_H
-
+#include <inttypes.h>
+#include <libvmi/libvmi.h>
+#include <libvmi/peparse.h>
+#include <assert.h>
+#include <array>
 #include <vector>
-#include <memory>
+#include <libdrakvuf/json-util.h>
 
-#include <glib.h>
-#include "plugins/private.h"
-#include "plugins/plugins_ex.h"
+#include "plugins/output_format.h"
+#include "private.h"
+#include "tlsmon.h"
 
-class userhook; // Forward declaration.
 
-enum offset
+
+struct ssl_generate_master_key_result_t: public call_result_t
 {
-    KTHREAD_TRAPFRAME,
-    KTRAP_FRAME_RIP,
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    __OFFSET_MAX
+    addr_t master_key_handle_addr;
+    addr_t parameter_list_addr;
+    ssl_generate_master_key_result_t(): call_result_t(), master_key_handle_addr(), parameter_list_addr() {}
 };
 
-static const char* offset_names[__OFFSET_MAX][2] =
-{
-    [KTHREAD_TRAPFRAME] = { "_KTHREAD", "TrapFrame" },
-    [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip"},
-    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
-    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
-};
 
 /**
- * Running hook helper data structure.
- * Used for passing user arguments and additional data between callbacks.
+ * Extracts and logs 48-bytes-long master key along with client random which
+ * can be then loaded to wireshark to automatically decrypt the TLS traffic.
  */
-struct rh_data_t
+static
+event_response_t ssl_generate_master_key_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
-    // Arguments provided by the user.
-    addr_t target_process;
-    std::string dll_name;
-    std::string func_name;
-    callback_t cb;
-    void* extra;
+    auto plugin = get_trap_plugin<tlsmon>(info);
+    auto params = get_trap_params<ssl_generate_master_key_result_t>(info);
+    if (!params->verify_result_call_params(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
 
-    // Additional data. Stored here for optimalization.
-    target_hook_state state;
-    vmi_pid_t target_process_pid;
-    addr_t target_process_dtb;
-    addr_t func_addr;
-
-    // We need to pass this around as we need offsets.
-    userhook* userhook_plugin;
-
-    rh_data_t(userhook* userhook_plugin, addr_t target_process, vmi_pid_t target_process_pid,
-              std::string dll_name, std::string func_name, callback_t cb, void* extra):
-        target_process(target_process), dll_name(dll_name), func_name(func_name), cb(cb),
-        extra(extra), state(HOOK_FIRST_TRY), target_process_pid(target_process_pid),
-        userhook_plugin(userhook_plugin) {}
-
-
-    static void free_trap(drakvuf_trap_t* trap)
+    access_context_t ctx =
     {
-        if (!trap)
-            return;
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
 
-        if (trap->data)
-            delete (rh_data_t*) trap->data;
-
-        delete trap;
-    }
-};
-
-struct dll_t
-{
-    dll_view_t v;
-
-    // one entry per hooked function
-    std::vector<hook_target_entry_t> targets;
-
-    // internal, for page faults
-    addr_t pf_current_addr;
-    addr_t pf_max_addr;
-};
-
-struct map_view_of_section_result_t : public call_result_t
-{
-    map_view_of_section_result_t() : call_result_t(), section_handle(), process_handle(), base_address_ptr() {}
-
-    uint64_t section_handle;
-    uint64_t process_handle;
-    addr_t base_address_ptr;
-};
-
-struct copy_on_write_result_t : public call_result_t
-{
-    copy_on_write_result_t() : call_result_t(), vaddr(), pte(), old_cow_pa() {}
-
-    addr_t vaddr;
-    addr_t pte;
-    addr_t old_cow_pa;
-    std::vector<hook_target_entry_t*> hooks;
-};
-
-class userhook : public pluginex
-{
-public:
-    userhook(userhook const&) = delete;
-
-    std::array<size_t, __OFFSET_MAX> offsets;
-
-    std::vector<usermode_cb_registration> plugins;
-    // map dtb -> list of hooked dlls
-    std::map<addr_t, std::vector<dll_t>> loaded_dlls;
-
-    static userhook& get_instance(drakvuf_t drakvuf)
+    tlsmon_priv::ssl_master_secret_t master_secret;
+    std::array<char, tlsmon_priv::CLIENT_RANDOM_SZ> client_random = std::array<char, tlsmon_priv::CLIENT_RANDOM_SZ>();
     {
-        static userhook instance(drakvuf);
-        return instance;
+        // Lock vmi.
+        vmi_lock_guard lg(drakvuf);
+        // We first extract master key by tracing down relevant structures starting
+        // with master_key_handle.
+        addr_t ncrypt_sll_key_addr = 0;
+        ctx.addr = params->master_key_handle_addr;
+        if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &ncrypt_sll_key_addr))
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        // master_key_handle points to NCryptSslKey structure.
+        tlsmon_priv::ncrypt_ssl_key_t ncrypt_ssl_key;
+        ctx.addr = ncrypt_sll_key_addr;
+        if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, sizeof(ncrypt_ssl_key), &ncrypt_ssl_key, nullptr))
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+        // We can validate that we indeed found NCryptSslKey by checking magic
+        // bytes value.
+        if (ncrypt_ssl_key.magic != tlsmon_priv::NCRYPT_SSL_KEY_MAGIC_BYTES)
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        // NCryptSslKey contains a pointer to SslMasterSecret structure.
+        ctx.addr = (addr_t) ncrypt_ssl_key.master_secret;
+        if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, sizeof(master_secret), &master_secret, nullptr))
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+        // Again we can validate that we found SslMasterSecret structure by
+        // checking magic bytes.
+        if (master_secret.magic != tlsmon_priv::MASTER_SECRET_MAGIC_BYTES)
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+
+        // Now retrieve client random value. pParameterList points to an array of
+        // NCryptBuffer buffers which contains at least client and server random
+        // values.
+        ctx.addr = params->parameter_list_addr;
+        tlsmon_priv::ncrypt_buffer_desc_t ncrypt_buffer_desc;
+        if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, sizeof(ncrypt_buffer_desc), &ncrypt_buffer_desc, nullptr))
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        std::vector<tlsmon_priv::ncrypt_buffer_t> ncrypt_buffers = std::vector<tlsmon_priv::ncrypt_buffer_t>(ncrypt_buffer_desc.cbuffers);
+        ctx.addr = (addr_t) ncrypt_buffer_desc.buffers;
+        if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, ncrypt_buffer_desc.cbuffers * sizeof(tlsmon_priv::ncrypt_buffer_t), ncrypt_buffers.data(), nullptr))
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        // Find the buffer containing client random.
+        auto it = std::find_if(ncrypt_buffers.begin(), ncrypt_buffers.end(), [&](const auto& e)
+        {
+            return e.buffer_type == tlsmon_priv::NCRYPTBUFFER_SSL_CLIENT_RANDOM;
+        });
+        if (it == ncrypt_buffers.end())
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        // And finally read it.
+        ctx.addr = (addr_t) it->buffer;
+        if (VMI_SUCCESS != vmi_read(lg.vmi, &ctx, client_random.size(), client_random.data(), nullptr))
+        {
+            plugin->destroy_trap(info->trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+    } // Unlock vmi.
+
+    // Output retrieved data in hex format.
+    std::string master_key_str = tlsmon_priv::byte2str(master_secret.master_key, tlsmon_priv::MASTER_KEY_SZ);
+    std::string client_random_str = tlsmon_priv::byte2str((unsigned char*)client_random.data(), tlsmon_priv::CLIENT_RANDOM_SZ);
+    fmt::print(plugin->m_output_format, "tlsmon", drakvuf, info,
+               keyval("client_random", fmt::Qstr(client_random_str)),
+               keyval("master_key", fmt::Qstr(master_key_str))
+              );
+
+    plugin->destroy_trap(info->trap);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+
+/**
+ * Sets a trap on return from SslGenerateMasterKey function to obtain the
+ * calculated master key.
+ */
+static
+event_response_t ssl_generate_master_key_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
+{
+    tlsmon* plugin = static_cast<tlsmon*>(info->trap->data);
+
+    auto trap = plugin->register_trap<ssl_generate_master_key_result_t>(
+                    info,
+                    ssl_generate_master_key_ret_cb,
+                    breakpoint_by_dtb_searcher(),
+                    "SslGenerateMasterKey"
+                );
+    if (!trap)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    auto params = get_trap_params<ssl_generate_master_key_result_t>(trap);
+    params->set_result_call_params(info);
+    params->master_key_handle_addr = drakvuf_get_function_argument(drakvuf, info, 4);
+    params->parameter_list_addr = drakvuf_get_function_argument(drakvuf, info, 7);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+
+/**
+ * Sets a hook on running lsass process. In Windows, processes that want to
+ * establish TLS connection with Schannel API, do so by using lsass under the
+ * hood. This way, lsass will perform TLS handshake on behalf of the process
+ * initiating the connection and secrets will never leave lsass's memory.
+ */
+void tlsmon::hook_lsass(drakvuf_t drakvuf)
+{
+    addr_t lsass_base = 0;
+    if (!drakvuf_find_process(drakvuf, ~0, "lsass.exe", &lsass_base))
+        return;
+    drakvuf_request_userhook_on_running_process(drakvuf, lsass_base, "ncrypt.dll", "SslGenerateMasterKey", ssl_generate_master_key_cb, this);
+}
+
+
+tlsmon::tlsmon(drakvuf_t drakvuf, output_format_t output)
+    : pluginex(drakvuf, output)
+{
+    if (!drakvuf_are_userhooks_supported(drakvuf))
+    {
+        PRINT_DEBUG("[TLSMON] Usermode hooking not supported.\n");
+        return;
     }
 
-    static bool is_supported(drakvuf_t drakvuf);
-    void register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg);
-    void request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
-    void request_userhook_on_running_process(drakvuf_t drakvuf, addr_t target_process, const std::string& dll_name, const std::string& func_name, callback_t cb, void* extra);
-
-    bool add_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-    void remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine);
-    bool add_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-    void remove_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-
-private:
-    userhook(drakvuf_t drakvuf); // Force get_instance().
-    ~userhook();
-
-    // We need to keep these for memory management purposes.
-    // running_rh_traps are traps with data field set to rh_data_t and are used
-    // internaly inside library.
-    std::vector<drakvuf_trap_t*> running_traps;
-    std::vector<drakvuf_trap_t*> running_rh_traps;
-};
+    this->hook_lsass(drakvuf);
+}
 
 
-#endif
+tlsmon::~tlsmon() {}
