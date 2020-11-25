@@ -205,10 +205,15 @@ static bool is_interrupted(drakvuf_t drakvuf, void*)
     return drakvuf_is_interrupted(drakvuf);
 }
 
+int drakvuf_c::is_interrupted()
+{
+    return drakvuf_is_interrupted(drakvuf);
+}
+
 void drakvuf_c::loop(int duration)
 {
     GThread* timeout_thread = startup_timer(this, duration);
-    drakvuf_loop(drakvuf, is_interrupted, nullptr);
+    drakvuf_loop(drakvuf, ::is_interrupted, nullptr);
     cleanup_timer(this, timeout_thread);
 }
 
