@@ -607,9 +607,8 @@ int main(int argc, char** argv)
         switch (ret)
         {
             case INJECTOR_FAILED_WITH_ERROR_CODE:
-                return drakvuf_exit_code_t::SUCCESS;
             case INJECTOR_FAILED:
-                return drakvuf_exit_code_t::FAIL;
+                return drakvuf_exit_code_t::INJECTION_ERROR;
             case INJECTOR_SUCCEEDED:
                 break;
             case INJECTOR_TIMEOUTED:
