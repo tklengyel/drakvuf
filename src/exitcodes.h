@@ -109,4 +109,5 @@ enum drakvuf_exit_code_t
     SUCCESS = 0,
     FAIL = 1,
     INJECTION_TIMEOUT = 2,
+    INJECTION_ERROR = 3,
 };
