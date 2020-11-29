@@ -147,7 +147,7 @@ static event_response_t hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     if ( f->abort_on_bsod )
-        drakvuf_interrupt( drakvuf, SIGDRAKVUFERROR);
+        drakvuf_interrupt( drakvuf, SIGDRAKVUFKERNELPANIC);
 
     return 0;
 }
