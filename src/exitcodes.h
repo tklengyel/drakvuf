@@ -109,5 +109,9 @@ enum drakvuf_exit_code_t
     SUCCESS = 0,
     FAIL = 1,
     INJECTION_TIMEOUT = 2,
-    INJECTION_ERROR = 3,
+    INJECTION_ERROR = 3, // Injection failed due to implementation error
+    INJECTION_UNSUCCESSFUL = 4, /* Injection has been done correctly, but
+                                 * the sample could not be started
+                                 * (corrupted, arch mismatch and so on) */
+    KERNEL_PANIC = 10,
 };

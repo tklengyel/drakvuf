@@ -133,6 +133,7 @@ extern "C" {
 #define SIGDRAKVUFERROR   -1
 #define SIGDRAKVUFTIMEOUT -2
 #define SIGDRAKVUFCRASH   -3
+#define SIGDRAKVUFKERNELPANIC -4 // drakvuf loop interrupted by BSOD or KERNEL PANIC
 
 typedef enum lookup_type
 {

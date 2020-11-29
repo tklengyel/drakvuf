@@ -607,6 +607,7 @@ int main(int argc, char** argv)
         switch (ret)
         {
             case INJECTOR_FAILED_WITH_ERROR_CODE:
+                return drakvuf_exit_code_t::INJECTION_UNSUCCESSFUL;
             case INJECTOR_FAILED:
                 return drakvuf_exit_code_t::INJECTION_ERROR;
             case INJECTOR_SUCCEEDED:
@@ -626,10 +627,18 @@ int main(int argc, char** argv)
     /* Start the event listener */
     drakvuf->loop(timeout);
 
+    PRINT_DEBUG("Finished DRAKVUF loop\n");
+
+    switch (drakvuf->is_interrupted())
+    {
+        case SIGDRAKVUFKERNELPANIC:
+            return drakvuf_exit_code_t::KERNEL_PANIC;
+        default:
+            break;
+    }
+
     if (terminate && injected_pid)
         drakvuf->terminate(injection_pid, injection_thread, injected_pid, termination_timeout, terminated_processes);
-
-    PRINT_DEBUG("Finished DRAKVUF loop\n");
 
     return drakvuf_exit_code_t::SUCCESS;
 }

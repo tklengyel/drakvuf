@@ -157,6 +157,7 @@ public:
     ~drakvuf_c();
 
     int is_initialized();
+    int is_interrupted();
     void interrupt(int signal);
     void loop(int duration);
     void pause();
