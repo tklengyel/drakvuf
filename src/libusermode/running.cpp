@@ -402,7 +402,8 @@ event_response_t wait_for_target_process_cb(
 {
     rh_data_t* rh_data = static_cast<rh_data_t*>(info->trap->data);
     // Wait for target_process.
-    if (info->proc_data.pid != rh_data->target_process_pid)
+    proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
+    if (proc_data->pid != rh_data->target_process_pid)
         return VMI_EVENT_RESPONSE_NONE;
 
     userhook* userhook_plugin = rh_data->userhook_plugin;
@@ -466,6 +467,13 @@ void userhook::request_userhook_on_running_process(
     callback_t cb,
     void* extra)
 {
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
+    if (pm != VMI_PM_IA32E)
+    {
+        PRINT_DEBUG("[USERHOOK] request_userhook_on_running_process is not yet supported on this architecture/bitness.\n");
+        return;
+    }
+
     // Find target process pid, so we don't have to calculate it every time in
     // the wait_for_target_process_cb.
     vmi_pid_t target_pid;

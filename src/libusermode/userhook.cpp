@@ -759,23 +759,13 @@ void userhook::register_plugin(drakvuf_t drakvuf, usermode_cb_registration reg)
 
 bool userhook::is_supported(drakvuf_t drakvuf)
 {
+    auto vmi = vmi_lock_guard(drakvuf);
+    win_build_info_t build;
+    if (vmi_get_windows_build_info(vmi, &build) &&
+        VMI_OS_WINDOWS_10 == build.version &&
+        15063 >= build.buildnumber)
     {
-        // Lock vmi.
-        vmi_lock_guard vmi(drakvuf);
-        win_build_info_t build;
-        if (vmi_get_windows_build_info(vmi.vmi, &build) &&
-            VMI_OS_WINDOWS_10 == build.version &&
-            15063 >= build.buildnumber)
-        {
-            PRINT_DEBUG("[USERHOOK] Usermode hooking is not yet supported on this operating system.\n");
-            return false;
-        }
-    } // Unlock vmi.
-
-    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-    if (pm != VMI_PM_IA32E)
-    {
-        PRINT_DEBUG("[USERHOOK] Usermode hooking is not yet supported on this architecture/bitness.\n");
+        PRINT_DEBUG("[USERHOOK] Usermode hooking is not yet supported on this operating system.\n");
         return false;
     }
 
@@ -789,10 +779,13 @@ userhook::userhook(drakvuf_t drakvuf): pluginex(drakvuf, OUTPUT_DEFAULT)
 
     drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets.data());
 
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
+    bool is32 = (pm != VMI_PM_IA32E);
+
     breakpoint_in_system_process_searcher bp;
     if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
         !register_trap(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection")) ||
-        !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler")) ||
+        (!is32 && !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler"))) ||
         !register_trap(nullptr, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
         !register_trap(nullptr, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite")))
         throw -1;
