@@ -328,16 +328,9 @@ static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct arg
          * > The stack will always be maintained 16-byte aligned, except within the prolog
          * > (for example, after the return address is pushed), and except where indicated
          * > in Function Types for a certain class of frame functions.
-         *
-         * So place one extra argument to achieve alignment just before CALL instruction.
          */
-        if (nb_args % 2)
-        {
+        if (((addr - nb_args*0x8 - 0x8) & 0xf) != 8)
             addr -= 0x8;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-                goto err;
-        }
 
         // http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
         //
