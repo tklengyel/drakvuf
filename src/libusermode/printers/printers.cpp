@@ -188,13 +188,18 @@ std::string StringPrinterInterface::print(drakvuf_t drakvuf, drakvuf_trap_info* 
 std::string AsciiPrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const
 {
     char* str = vmi_read_str(vmi, ctx);
-    return str ? str : "";
+    std::string ret = str ? str : "";
+    g_free(str);
+    return ret;
 }
 
 std::string WideStringPrinter::getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const
 {
     auto str_obj = drakvuf_read_wchar_string(vmi, ctx);
-    return str_obj == NULL ? "" : (char*)str_obj->contents;
+    std::string ret = str_obj == NULL ? "" : (char*)str_obj->contents;
+    if (str_obj)
+        vmi_free_unicode_str(str_obj);
+    return ret;
 }
 
 std::string Binary16StringPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
@@ -225,15 +230,17 @@ std::string Binary16StringPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* i
 
 std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    bool is32bit = drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E || drakvuf_is_wow64(drakvuf, info);
+
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = argument
+        .addr = argument,
     };
     std::string str;
-    if (drakvuf_is_wow64(drakvuf, info))
+    auto vmi = vmi_lock_guard(drakvuf);
+    if (is32bit)
     {
         struct
         {
@@ -247,14 +254,18 @@ std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, ui
             ctx.addr = us.buffer;
             auto str_obj = drakvuf_read_wchar_string(vmi, &ctx);
             str = str_obj == NULL ? "" : (char*)str_obj->contents;
+            if (str_obj)
+                vmi_free_unicode_str(str_obj);
         }
     }
     else
     {
         auto str_obj = drakvuf_read_unicode_common(vmi, &ctx);
         str = str_obj == NULL ? "" : (char*)str_obj->contents;
+        if (str_obj)
+            vmi_free_unicode_str(str_obj);
     }
-    drakvuf_release_vmi(drakvuf);
+
     std::stringstream stream;
     stream << name << "=";
     if (!print_no_addr)
