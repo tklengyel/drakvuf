@@ -108,6 +108,7 @@
 #include <iomanip>
 #include <libvmi/libvmi.h>
 #include <libdrakvuf/libdrakvuf.h>
+#include "plugins/plugins.h"
 
 std::string escape_str(const std::string& s)
 {
@@ -264,42 +265,43 @@ std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, ui
 
 std::string UlongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
         .addr = argument
     };
-    uint32_t value = 0;
-    vmi_read_32(vmi, &ctx, &value);
-    drakvuf_release_vmi(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
+    uint32_t value;
+    if (vmi_read_32(vmi, &ctx, &value) != VMI_SUCCESS)
+        value = 0;
     return ArgumentPrinter::print(drakvuf, info, value);
 }
 
 std::string PointerToPointerPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
         .addr = argument
     };
+
+    auto vmi = vmi_lock_guard(drakvuf);
     addr_t value = 0;
+    int ret;
     if (drakvuf_is_wow64(drakvuf, info))
-        vmi_read_32(vmi, &ctx, reinterpret_cast<uint32_t*>(&value));
+        ret = vmi_read_32(vmi, &ctx, reinterpret_cast<uint32_t*>(&value));
     else
-        vmi_read_addr(vmi, &ctx, &value);
-    drakvuf_release_vmi(drakvuf);
-    std::stringstream stream;
-    stream << name << "=0x" << std::hex << value;
-    return stream.str();
+        ret = vmi_read_64(vmi, &ctx, &value);
+    if (ret != VMI_SUCCESS)
+        value = 0;
+
+    return ArgumentPrinter::print(drakvuf, info, value);
 }
 
 std::string GuidPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
     access_context_t ctx =
     {
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -314,9 +316,11 @@ std::string GuidPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint6
         uint16_t Data3;
         uint8_t Data4[8];
     } __attribute__((packed, aligned(4))) guid;
-    memset(&guid, 0, sizeof(guid));
-    vmi_read(vmi, &ctx, sizeof(guid), &guid, nullptr);
-    drakvuf_release_vmi(drakvuf);
+
+    auto vmi = vmi_lock_guard(drakvuf);
+    if (vmi_read(vmi, &ctx, sizeof(guid), &guid, nullptr) != VMI_SUCCESS)
+        memset(&guid, 0, sizeof(guid));
+
     const int sz = 64;
     char stream[sz] = {0};
     snprintf(stream, sz, "\"%08X-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX\"",

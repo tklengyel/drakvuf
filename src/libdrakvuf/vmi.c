@@ -367,8 +367,12 @@ static void fill_common_event_trap_info(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 
     addr_t process_base = drakvuf_get_current_process(drakvuf, trap_info);
     addr_t attached_proc = drakvuf_get_current_attached_process(drakvuf, trap_info);
-    uint32_t thread_id = 0;
-    drakvuf_get_current_thread_id(drakvuf, trap_info, &thread_id);
+    uint32_t thread_id;
+    if (!drakvuf_get_current_thread_id(drakvuf, trap_info, &thread_id))
+    {
+        PRINT_DEBUG("[TRAP_INFO] Failed to get TID\n");
+        thread_id = 0;
+    }
 
     drakvuf_get_process_data_priv(drakvuf, process_base, proc_data);
     proc_data->tid = thread_id;

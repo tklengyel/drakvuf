@@ -155,7 +155,7 @@ struct plugin_target_config_entry_t
     std::vector< std::unique_ptr< ArgumentPrinter > > argument_printers;
 
     plugin_target_config_entry_t()
-        : dll_name(), function_name(), offset(), actions(), argument_printers()
+        : dll_name(), type(), function_name(), offset(), actions(), argument_printers()
     {}
 
     plugin_target_config_entry_t(std::string&& dll_name, std::string&& function_name, addr_t offset, HookActions hook_actions, std::vector< std::unique_ptr< ArgumentPrinter > >&& argument_printers)

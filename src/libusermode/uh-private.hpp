@@ -157,7 +157,7 @@ struct rh_data_t
               std::string dll_name, std::string func_name, callback_t cb, void* extra):
         target_process(target_process), dll_name(dll_name), func_name(func_name), cb(cb),
         extra(extra), state(HOOK_FIRST_TRY), target_process_pid(target_process_pid),
-        userhook_plugin(userhook_plugin) {}
+        target_process_dtb(), userhook_plugin(userhook_plugin) {}
 
 
     static void free_trap(drakvuf_trap_t* trap)

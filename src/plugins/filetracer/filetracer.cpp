@@ -113,9 +113,9 @@
 #include "linux.h"
 #include "win.h"
 
-filetracer::filetracer(drakvuf_t drakvuf, output_format_t output)
+filetracer::filetracer(drakvuf_t drakvuf, output_format_t output) :
+    os(drakvuf_get_os_type(drakvuf)), wf(), lf()
 {
-    this->os = drakvuf_get_os_type(drakvuf);
     if (this->os == VMI_OS_WINDOWS)
     {
         this->wf = new win_filetracer(drakvuf, output);
