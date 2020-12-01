@@ -328,8 +328,16 @@ static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct arg
          * > The stack will always be maintained 16-byte aligned, except within the prolog
          * > (for example, after the return address is pushed), and except where indicated
          * > in Function Types for a certain class of frame functions.
+         *
+         * Add padding to be aligned to "16+8" boundary.
+         *
+         * https://www.gamasutra.com/view/news/178446/Indepth_Windows_x64_ABI_Stack_frames.php
+         *
+         * This padding on the stack only exists if the maximum number of parameters passed
+         * to functions is greater than 4 and is an odd number.
          */
-        if (((addr - nb_args*0x8 - 0x8) & 0xf) != 8)
+        int effective_nb_args = nb_args > 4 ? nb_args : 4;
+        if (((addr - effective_nb_args * 0x8 - 0x8) & 0xf) != 8)
             addr -= 0x8;
 
         // http://www.codemachine.com/presentations/GES2010.TRoy.Slides.pdf
