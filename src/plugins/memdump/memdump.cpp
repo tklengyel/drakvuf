@@ -428,7 +428,7 @@ bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* pl
     // read up to 512 bytes of stack, this may fail returning a partial result
     // thus, the following for loop analyzes the buffer only up to the `bytes_read` value
 
-    vmi_read(vmi, &ctx, 512, buf, &bytes_read);
+    (void)vmi_read(vmi, &ctx, 512, buf, &bytes_read);
 
     size_t stack_width = is_32bit ? 4 : 8;
     for (size_t i = 0; i < bytes_read; i += stack_width)

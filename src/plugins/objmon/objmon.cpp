@@ -150,27 +150,20 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
 
     objmon* o = (objmon*)info->trap->data;
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     struct ckey ckey = {};
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
+    addr_t addr = drakvuf_get_function_argument(drakvuf, info, 2);
 
-    if ( o->pm == VMI_PM_IA32E )
+    access_context_t ctx =
     {
-        ctx.addr = info->regs->rdx;
-    }
-    else
-    {
-        ctx.addr = info->regs->rsp + sizeof(uint32_t)*2;
-        vmi_read_32(vmi, &ctx, (uint32_t*)&ctx.addr);
-    }
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = addr + o->key_offset,
+    };
 
-    ctx.addr += o->key_offset;
-
-    vmi_read_32(vmi, &ctx, &ckey.key);
+    auto vmi = vmi_lock_guard(drakvuf);
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &ckey.key))
+        return 0;
 
     auto key = std::string(ckey._key, 4);
 
@@ -191,13 +184,13 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             break;
     }
 
-    drakvuf_release_vmi(drakvuf);
     return 0;
 }
 
 /* ----------------------------------------------------- */
 
-objmon::objmon(drakvuf_t drakvuf, output_format_t output)
+objmon::objmon(drakvuf_t drakvuf, output_format_t output) :
+    format(output)
 {
     if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "ObCreateObject", &this->trap.breakpoint.rva) )
         throw -1;
@@ -205,9 +198,7 @@ objmon::objmon(drakvuf_t drakvuf, output_format_t output)
         throw -1;
 
     this->trap.cb = cb;
-    this->pm = drakvuf_get_page_mode(drakvuf);
 
-    this->format = output;
     if ( !drakvuf_add_trap(drakvuf, &this->trap) )
         throw -1;
 }

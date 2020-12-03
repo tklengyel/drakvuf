@@ -112,7 +112,6 @@ class objmon: public plugin
 {
 public:
     output_format_t format;
-    page_mode_t pm;
     drakvuf_trap_t trap =
     {
         .breakpoint.lookup_type = LOOKUP_PID,
