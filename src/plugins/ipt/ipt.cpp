@@ -277,7 +277,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
     auto plugin = get_trap_plugin<ipt>(info);
     auto params = get_trap_params<access_fault_result_t>(info);
 
-    if (!params->verify_result_call_params(info, drakvuf_get_current_thread(drakvuf, info)))
+    if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
     page_info_t p_info = {};
@@ -338,7 +338,7 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
         return VMI_EVENT_RESPONSE_NONE;
 
     auto params = get_trap_params<access_fault_result_t>(trap);
-    params->set_result_call_params(info, drakvuf_get_current_thread(drakvuf, info));
+    params->set_result_call_params(info);
     params->fault_va = fault_va;
 
     return VMI_EVENT_RESPONSE_NONE;
