@@ -109,6 +109,7 @@
 #include <libvmi/peparse.h>
 #include <assert.h>
 #include <libdrakvuf/json-util.h>
+#include <set>
 
 #include "memdump.h"
 #include "plugins/output_format.h"
@@ -873,6 +874,167 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+struct exec_fault_data
+{
+    memdump* plugin;
+    addr_t rip;
+};
+
+struct access_fault_result_t: public call_result_t
+{
+    access_fault_result_t() : call_result_t(), fault_va() {}
+
+    addr_t fault_va;
+};
+
+static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    struct exec_fault_data* ef_data = (struct exec_fault_data*)info->trap->data;
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    mmvad_info_t mmvad;
+    unicode_string_t* dll_name = nullptr;
+    char* dll_name_str = nullptr;
+    char missing_dll_name[] = "(null)";
+
+    addr_t base_va = 0;
+    addr_t end_va = 0;
+
+    if (drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, ef_data->rip, &mmvad))
+    {
+        dll_name = drakvuf_read_unicode_va(vmi, mmvad.file_name_ptr, 0);
+        dll_name_str = dll_name != nullptr ? (char*)dll_name->contents : nullptr;
+
+        base_va = mmvad.starting_vpn << 12;
+        end_va = ((mmvad.ending_vpn + 1) << 12) - 1;
+
+        std::pair<addr_t, addr_t> p(info->regs->cr3, base_va);
+
+        auto it = ef_data->plugin->known_vads.find(p);
+
+        if (it == ef_data->plugin->known_vads.end())
+        {
+            ef_data->plugin->known_vads.insert(p);
+
+            if (dll_name_str == nullptr)
+            {
+                access_context_t ctx
+                {
+                    .translate_mechanism = VMI_TM_PROCESS_DTB,
+                    .dtb = info->regs->cr3,
+                    .addr = mmvad.starting_vpn * VMI_PS_4KB
+                };
+
+                size_t dump_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
+
+                if (mmvad.ending_vpn - mmvad.starting_vpn + 1 < 1024)
+                {
+                    if (!dump_memory_region(drakvuf, vmi.vmi, info, ef_data->plugin, &ctx, dump_size, "Executing from unlinked/main VAD", nullptr, false))
+                    {
+                        PRINT_DEBUG("[MEMDUMP] Failed to dump memory\n");
+                        return false;
+                    }
+                }
+            }
+        }
+    }
+
+    if (!dll_name_str)
+        dll_name_str = missing_dll_name;
+
+    jsonfmt::print("execframe", drakvuf, info,
+                   keyval("FrameVA", fmt::Xval(ef_data->rip)),
+                   keyval("TrapPA", fmt::Xval(info->trap_pa)),
+                   keyval("CR3", fmt::Xval(info->regs->cr3)),
+                   keyval("VADName", fmt::Qstr(dll_name_str)),
+                   keyval("VADBase", fmt::Xval(base_va)),
+                   keyval("VADEnd", fmt::Xval(end_va))
+                  );
+
+    if (dll_name)
+        vmi_free_unicode_str(dll_name);
+
+    PRINT_DEBUG("[IPT] Caught X on PA 0x%lx, frame VA %llx, CR3 %lx\n", info->trap_pa, (unsigned long long)info->regs->rip, info->regs->cr3);
+
+    ef_data->plugin->traps.erase(info->trap);
+    drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin = get_trap_plugin<memdump>(info);
+    auto params = get_trap_params<access_fault_result_t>(info);
+
+    if (!params->verify_result_call_params(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    page_info_t p_info = {};
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+        if (VMI_SUCCESS != vmi_pagetable_lookup_extended(vmi, info->regs->cr3, params->fault_va, &p_info))
+        {
+            PRINT_DEBUG("[MEMDUMP] failed to lookup page info\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+    }
+
+    jsonfmt::print("pagefault", drakvuf, info,
+                   keyval("CR3", fmt::Xval(info->regs->cr3)),
+                   keyval("VA", fmt::Xval(params->fault_va)),
+                   keyval("PA", fmt::Xval(p_info.paddr))
+                  );
+
+    struct exec_fault_data* ef_data = (struct exec_fault_data*)g_malloc(sizeof(struct exec_fault_data));
+    ef_data->plugin = plugin;
+    ef_data->rip = ((params->fault_va >> 12) << 12);
+    drakvuf_trap_t* exec_trap = (drakvuf_trap_t*)g_malloc(sizeof(drakvuf_trap_t));
+
+    exec_trap->type = MEMACCESS;
+    exec_trap->memaccess.gfn = p_info.paddr >> 12;
+    exec_trap->memaccess.type = PRE;
+    exec_trap->memaccess.access = VMI_MEMACCESS_X;
+    exec_trap->data = ef_data;
+    exec_trap->cb = execute_faulted_cb;
+    exec_trap->name = "execute_faulted_cb";
+
+    drakvuf_add_trap(drakvuf, exec_trap);
+    plugin->traps.emplace(exec_trap);
+    PRINT_DEBUG("[IPT] Trap X on GFN 0x%lx\n", p_info.paddr >> 12);
+
+    plugin->destroy_trap(info->trap);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t fault_va = drakvuf_get_function_argument(drakvuf, info, 2);
+    PRINT_DEBUG("[IPT] MmAccessFault(%d, %lx)\n", info->proc_data.pid, fault_va);
+
+    if (fault_va & (1ULL << 63))
+    {
+        PRINT_DEBUG("[IPT] Don't trap in kernel %d %lx\n", info->proc_data.pid, fault_va);
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    auto plugin = get_trap_plugin<memdump>(info);
+
+    auto trap = plugin->register_trap<access_fault_result_t>(
+                    info,
+                    mm_access_fault_return_hook_cb,
+                    breakpoint_by_pid_searcher());
+    if (!trap)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    auto params = get_trap_params<access_fault_result_t>(trap);
+    params->set_result_call_params(info);
+    params->fault_va = fault_va;
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plugin)
 {
     vmi_lock_guard lg(drakvuf);
@@ -913,7 +1075,7 @@ bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
 memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
     : pluginex(drakvuf, output)
-    , dumps_count()
+    , dumps_count(), dll_base_rva(), dll_base_wow_rva()
 {
     this->memdump_dir = c->memdump_dir;
 
@@ -958,6 +1120,12 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
     {
         throw -1;
     }
+
+    if (c->dump_exec_frames && !register_trap(nullptr, mm_access_fault_hook_cb, bp.for_syscall_name("MmAccessFault")))
+    {
+        throw -1;
+    }
+
     if (json_wow && !register_trap(nullptr, set_information_thread_hook_cb, bp.for_syscall_name("NtSetInformationThread")))
         throw -1;
 
@@ -966,5 +1134,11 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
 
 memdump::~memdump()
 {
+    for (const auto trap: traps)
+    {
+        g_free(trap->data);
+        g_free(trap);
+    }
+
     userhook_destroy();
 }

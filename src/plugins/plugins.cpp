@@ -325,6 +325,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .clr_profile = options->clr_profile,
                         .mscorwks_profile = options->mscorwks_profile,
                         .print_no_addr = options->userhook_no_addr,
+                        .dump_exec_frames = options->dump_exec_frames,
                     };
                     this->plugins[plugin_id] = std::make_unique<memdump>(this->drakvuf, &config, this->output);
                     break;

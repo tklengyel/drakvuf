@@ -107,6 +107,7 @@
 
 #include <vector>
 #include <memory>
+#include <set>
 
 #include <glib.h>
 #include <libusermode/userhook.hpp>
@@ -120,6 +121,7 @@ struct memdump_config
     const char* clr_profile;
     const char* mscorwks_profile;
     const bool print_no_addr;
+    const bool dump_exec_frames;
 };
 
 class memdump: public pluginex
@@ -135,6 +137,9 @@ public:
     size_t wow64context_eax_rva;
 
     std::vector<plugin_target_config_entry_t> wanted_hooks;
+
+    std::set<std::pair<addr_t, addr_t>> known_vads;
+    std::set<drakvuf_trap_t*> traps;
 
     memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
     ~memdump();

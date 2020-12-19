@@ -174,10 +174,10 @@ class memdump;
 // type of a pointer residing on stack
 enum sptr_type_t
 {
-    ERROR,   // problem with stack inspection
-    MAIN,    // pointer to a main module
-    LINKED,  // pointer to some linked DLL module
-    UNLINKED // pointer to some non-legit memory
+    ERROR = 1,   // problem with stack inspection
+    MAIN = 2,    // pointer to a main module
+    LINKED = 3,  // pointer to some linked DLL module
+    UNLINKED = 4 // pointer to some non-legit memory
 };
 
 sptr_type_t check_module_linked_wow(drakvuf_t drakvuf,
