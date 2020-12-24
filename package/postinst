@@ -18,7 +18,9 @@ case "$1" in
     ;;
 esac
 
-update-rc.d xencommons defaults 19 18
+systemctl enable xen-qemu-dom0-disk-backend.service
+systemctl enable xen-init-dom0.service
+systemctl enable xenconsoled.service
 
 EXIT_CODE=0
 grep -q 'xenfs' '/etc/fstab' || EXIT_CODE=$?

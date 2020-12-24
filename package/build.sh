@@ -2,7 +2,7 @@
 
 # run ./package/build.sh
 
-IMAGE="ubuntu:18.04"
+IMAGE="ubuntu:20.04"
 
 if [ ! -z "$1" ]
 then
@@ -19,20 +19,18 @@ mkdir -p package/log
 if [ ! -f "package/cache/xen-intermediate-$IMAGE-$XEN_HASH.tar.gz" ]
 then
     echo Building Xen intermediate $XEN_HASH...
-    DOCKER_CMD="docker build --build-arg 'IMAGE=$IMAGE' -f package/Dockerfile-xen -t xen-intermediate ."
 
-    if [ ! -z "$TRAVIS_JOB_ID" ]; then
-        # suppress Xen build logs when we are in CI
-        sh -c "$DOCKER_CMD 2>&1 >package/log/xen-build.log"
-    else
-        sh -c "$DOCKER_CMD"
-    fi
+    DOCKER_CMD="docker build --build-arg 'IMAGE=$IMAGE' -f package/Dockerfile-xen -t xen-intermediate ."
+    sh -c "$DOCKER_CMD"
 
     if [ $? -ne 0 ]; then echo Xen intermediate image build failed, build log tail below ; tail -n 200 package/log/xen-build.log ; exit 1 ; fi
+
     echo Removing old Xen intermediate image...
     rm -f package/cache/xen-intermediate-*.tar.gz
     echo Saving Xen intermediate...
+
     docker save xen-intermediate | gzip -c > "package/cache/xen-intermediate-$IMAGE-$XEN_HASH.tar.gz"
+
     if [ $? -ne 0 ]; then echo Failed to save Xen intermediate image ; rm package/cache/xen-intermediate-*.tar.gz ; exit 1 ; fi
 else
     echo Loading cached Xen intermediate $IMAGE-$XEN_HASH...

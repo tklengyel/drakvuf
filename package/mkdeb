@@ -28,6 +28,8 @@ fi
 
 arch=amd64
 
+## BUILD XEN DEB
+
 # Prepare the directory to package
 cp -a /dist-xen deb
 
@@ -37,34 +39,23 @@ if test -d deb/usr/lib64 ; then
   rm -rf deb/usr/lib64
 fi
 
+xenversion=$(ls deb/boot/*.config | xargs basename | awk -F'\.c' '{print $1}' | awk -F'-' '{print $2}')
+
 # Fill in the debian boilerplate
 mkdir -p deb/DEBIAN
 cat >deb/DEBIAN/control <<EOF
-Package: drakvuf-bundle
-Source: drakvuf-bundle
-Version: $version
+Package: xen-hypervisor
+Source: xen-hypervisor
+Version: $xenversion
 Architecture: $arch
 Maintainer: Unmaintained snapshot
-Depends: libpixman-1-0, libpng16-16, libnettle6 | libnettle7, libgnutls30, libfdt1, libglib2.0-0, libglib2.0-dev, libjson-c3 | libjson-c4, libyajl2, libaio1
+Depends: libpixman-1-0, libpng16-16, libnettle6 | libnettle7, libgnutls30, libfdt1, libyajl2, libaio1
 Conflicts: xen-hypervisor-4.6-amd64, xen-hypervisor-4.7-amd64, xen-hypervisor-4.8-amd64, xen-hypervisor-4.9-amd64, xen-hypervisor-4.10-amd64, xen-hypervisor-4.11-amd64, xen-hypervisor-4.12-amd64
 Section: admin
 Priority: optional
 Installed-Size: $(du -ks deb | cut -f1)
-Description: Testing build of DRAKVUF, LibVMI and Xen. Not supported. No guarantee.
+Description: Xen Hypervisor built for DRAKVUF
 EOF
-
-# LibVMI
-mkdir -p deb/usr/bin/
-cp -avr /build/usr/bin/* deb/usr/bin/
-
-# dwarf2json
-cp -avr /build/dwarf2json/dwarf2json deb/usr/bin/
-
-mkdir -p deb/usr/lib/
-cp -avr /build/usr/lib/* deb/usr/lib/
-
-mkdir -p deb/usr/include/
-cp -avr /build/usr/include/* deb/usr/include/
 
 mkdir -p deb/etc/default/grub.d/
 mkdir -p deb/etc/modules-load.d/
@@ -79,19 +70,40 @@ cp package/postrm deb/DEBIAN/postrm
 
 # Package it up
 chown -R root:root deb
-dpkg-deb --build -z0 deb "drakvuf-bundle-$version-$distro.deb"
-mv drakvuf-bundle*.deb /out
+dpkg-deb --build -z0 deb "xen-hypervisor-$xenversion-$distro-amd64.deb"
+mv *.deb /out
 rm -rf deb
 
-# Also make source package
-make dist
-mv drakvuf*.tar.gz /out
+## DRAKVUF, LibVMI & tools
 
-# For Travis CI
-if [ -d ".git/" ]
-then
-    git config --local user.name "drakvuf-builds"
-    git config --local user.email "drakvuf-builds@tklsoftware.com"
-    export TRAVIS_TAG=${TRAVIS_TAG:-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)}
-    git tag $TRAVIS_TAG
-fi
+# Fill in the debian boilerplate
+mkdir -p deb/DEBIAN
+cat >deb/DEBIAN/control <<EOF
+Package: drakvuf-bundle
+Source: drakvuf-bundle
+Version: $version
+Architecture: $arch
+Maintainer: Unmaintained snapshot
+Depends: libglib2.0-dev, libjson-c3 | libjson-c4
+Section: admin
+Priority: optional
+Installed-Size: $(du -ks deb | cut -f1)
+Description: DRAKVUF bundle
+EOF
+
+mkdir -p deb/usr/bin/
+cp -avr /build/usr/bin/* deb/usr/bin/
+
+mkdir -p deb/usr/lib/
+cp -avr /build/usr/lib/* deb/usr/lib/
+
+mkdir -p deb/usr/include/
+cp -avr /build/usr/include/* deb/usr/include/
+
+cp -avr /build/dwarf2json/dwarf2json deb/usr/bin/
+
+# Package it up
+chown -R root:root deb
+dpkg-deb --build -z0 deb "drakvuf-bundle-$version-$distro.deb"
+mv *.deb /out
+rm -rf deb
