@@ -15,13 +15,15 @@ COPY package/patch-xen.sh /build-xen
 RUN cd /build-xen && \
     chmod +x patch-xen.sh && \
     ./patch-xen.sh && \
-    echo Building Xen, this may take a few minutes... && \
-    ./configure --prefix=/usr --enable-githttp --disable-pvshim && \
+    echo "Building Xen, this may take a few minutes..." && \
+    ./configure --prefix=/usr --enable-githttp --disable-pvshim --enable-systemd --enable-ovmf && \
+    echo CONFIG_EXPERT=y > xen/.config && \
+    echo CONFIG_MEM_SHARING=y >> xen/.config && \
+    make -C xen olddefconfig && \
     echo "Running Xen's make dist..." && \
     make -j$(nproc) dist && \
-    echo "Running Xen's make install-xen..." && \
+    echo "Install Xen..." && \
     make -j$(nproc) install-xen && \
-    echo "Running Xen's make install-tools..." && \
     make -j$(nproc) install-tools && \
     mv /build-xen/dist/install /dist-xen && \
     rm -rf /build-xen
