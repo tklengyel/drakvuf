@@ -117,14 +117,12 @@ extern bool verbose;
 #else
 #define PRINT_DEBUG(args...) \
     do {} while(0)
-#endif
+#endif /* DRAKVUF_DEBUG */
 
 #define ARRAY_SIZE(arr) sizeof((arr)) / sizeof((arr)[0])
 
 #ifdef __clang_analyzer__
 #define vmi_free_unicode_str g_free
-#endif
-
 #endif
 
 #define UNUSED(x) (void)(x)
@@ -179,3 +177,5 @@ static inline void copy_gprs(registers_t* dst, registers_t* src)
     dst->x86.r14 = src->x86.r14;
     dst->x86.r15 = src->x86.r15;
 }
+
+#endif /* LIBINJECTOR_PRIVATE_H */
