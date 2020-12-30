@@ -1,0 +1,46 @@
+name: container-compile
+on:
+  pull_request:
+    branches: [ master ]
+jobs:
+  compile:
+    strategy:
+      matrix:
+        container:
+          - 'debian:buster-slim'
+          - 'debian:bullseye-slim'
+          - 'ubuntu:rolling'
+
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.container }}
+
+    steps:
+    - name: Install dependencies
+      run: |
+        apt-get update -q
+        apt-get install -y autoconf-archive flex bison libjson-c-dev libxen-dev clang build-essential git libtool autotools-dev libglib2.0-dev
+        apt-get clean
+
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 2
+
+    - name: Install LibVMI
+      run: |
+        git submodule update --init libvmi
+        cd libvmi
+        autoreconf -vif
+        ./configure --disable-kvm --disable-bareflank --disable-file --disable-examples
+        make
+        make install
+        cd ..
+
+    - name: Compile
+      env:
+        CC: clang
+        CXX: clang++
+      run: |
+        autoreconf -vif
+        ./configure --enable-debug
+        make
