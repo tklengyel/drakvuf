@@ -141,6 +141,7 @@ endif
 # Note that -pg is incompatible with HARDENING
 if !DEBUG
 AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
+AM_CXXFLAGS += -Wno-unknown-warning-option
 else
 AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
 AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
