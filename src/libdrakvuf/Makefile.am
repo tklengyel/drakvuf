@@ -144,7 +144,7 @@ AM_CFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
              -Wswitch-enum -Wstrict-prototypes \
              -Wmissing-prototypes -Wredundant-decls \
              -Wfloat-equal -Wundef -Wvla \
-             -Wc++-compat
+             -Wc++-compat -Wformat -Wformat-security
 if !HARDENING
 AM_CFLAGS += -pg
 endif
