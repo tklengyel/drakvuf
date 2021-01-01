@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2020 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2021 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -289,7 +289,7 @@ int main(int argc, char** argv)
 
     eprint_current_time();
 
-    fprintf(stderr, "%s v%s Copyright (C) 2014-2020 Tamas K Lengyel\n",
+    fprintf(stderr, "%s v%s Copyright (C) 2014-2021 Tamas K Lengyel\n",
             PACKAGE_NAME, PACKAGE_VERSION);
 
     if ( __DRAKVUF_PLUGIN_LIST_MAX == 0 )
