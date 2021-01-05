@@ -155,8 +155,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     unsigned int nargs = sc ? sc->num_args : 0;
     std::vector<uint64_t> args(nargs);
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    access_context_t ctx = {};
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
@@ -486,7 +485,7 @@ char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* in
     vmi_lock_guard vmi(drakvuf);
     if ( arg.type == POBJECT_ATTRIBUTES )
     {
-        access_context_t ctx;
+        access_context_t ctx = {};
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
         ctx.dtb = info->regs->cr3;
 

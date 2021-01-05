@@ -194,12 +194,10 @@ static std::optional<T> read_struct(vmi_instance_t vmi, access_context_t const* 
 template<typename T>
 static std::optional<T> read_struct(vmi_instance_t vmi, drakvuf_trap_info* info, addr_t arg)
 {
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = arg,
-    };
+    access_context_t ctx = {};
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+    ctx.addr = arg;
 
     return read_struct<T>(vmi, &ctx);
 }
