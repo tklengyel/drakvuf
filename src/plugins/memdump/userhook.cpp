@@ -118,6 +118,7 @@
 #include <sstream>
 #include <map>
 #include <string>
+#include <iostream>
 
 #include <config.h>
 #include <glib.h>
@@ -186,9 +187,10 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
     {
         drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, &this->wanted_hooks);
     }
-    catch (int e)
+    catch (UserHookException& exc)
     {
-        fprintf(stderr, "Malformed DLL hook configuration for MEMDUMP plugin\n");
+        std::cerr << "Loading DLL hook configuration for MEMDUMP plugin failed" << std::endl
+                  << "Reason: " << exc.what() << std::endl;
         throw -1;
     }
 
