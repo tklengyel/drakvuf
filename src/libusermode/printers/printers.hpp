@@ -110,20 +110,28 @@
 #include <libvmi/libvmi.h>
 #include <libdrakvuf/libdrakvuf.h>
 
-class ArgumentPrinter
+struct PrinterConfig
 {
-public:
-    enum numeric_format_t
+    bool print_no_addr;
+    enum class NumericFormat
     {
         DECIMAL,
         HEX,
-    };
+    } numeric_format;
+
+    PrinterConfig() : print_no_addr{false}, numeric_format{NumericFormat::HEX} {}
+    PrinterConfig(bool print_no_addr, NumericFormat numeric_format)
+        : print_no_addr{print_no_addr}
+        , numeric_format{numeric_format} {}
+};
+
+class ArgumentPrinter
+{
 protected:
+    PrinterConfig config;
     std::string name;
-    bool print_no_addr;
-    numeric_format_t numeric_format;
 public:
-    ArgumentPrinter(std::string arg_name, bool print_no_addr, numeric_format_t base = HEX);
+    ArgumentPrinter(const PrinterConfig& config, std::string arg_name);
 
     std::string get_name() const;
     virtual std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
@@ -202,7 +210,7 @@ class BitMaskPrinter : public ArgumentPrinter
 {
     std::map < uint64_t, std::string > dict;
 public:
-    BitMaskPrinter(std::string arg_name, bool print_no_addr, std::map < uint64_t, std::string > dict);
+    BitMaskPrinter(const PrinterConfig& config, std::string arg_name, std::map < uint64_t, std::string > dict);
     std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 

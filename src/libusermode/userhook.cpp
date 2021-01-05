@@ -850,18 +850,21 @@ std::optional<HookActions> get_hook_actions(const std::string& str)
 
 void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, const bool print_no_addr, std::vector<plugin_target_config_entry_t>* wanted_hooks)
 {
+    PrinterConfig config{};
+    config.print_no_addr = print_no_addr;
+
     if (!dll_hooks_list_path)
     {
         const auto log_and_stack = HookActions::empty().set_log().set_stack();
         // if the DLL hook list was not provided, we provide some simple defaults
-        std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec1;
-        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("wVersionRequired", print_no_addr));
-        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("lpWSAData", print_no_addr));
+        std::vector<std::unique_ptr<ArgumentPrinter>> arg_vec1;
+        arg_vec1.push_back(std::make_unique<ArgumentPrinter>(config, "wVersionRequired"));
+        arg_vec1.push_back(std::make_unique<ArgumentPrinter>(config, "lpWSAData"));
         wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", log_and_stack, std::move(arg_vec1));
 
-        std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec2;
-        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("ExitCode", print_no_addr));
-        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("Unknown", print_no_addr));
+        std::vector<std::unique_ptr<ArgumentPrinter>> arg_vec2;
+        arg_vec2.push_back(std::make_unique<ArgumentPrinter>(config, "ExitCode"));
+        arg_vec2.push_back(std::make_unique<ArgumentPrinter>(config, "Unknown"));
         wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", log_and_stack, std::move(arg_vec2));
         return;
     }
@@ -951,35 +954,35 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
 
             if (arg_type == "lpstr" || arg_type == "lpcstr" || arg_type == "lpctstr")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new AsciiPrinter(arg_name, print_no_addr)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new AsciiPrinter(config, arg_name)));
             }
             else if (arg_type == "lpcwstr" || arg_type == "lpwstr" || arg_type == "bstr")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new WideStringPrinter(arg_name, print_no_addr)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new WideStringPrinter(config, arg_name)));
             }
             else if (arg_type == "punicode_string")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UnicodePrinter(arg_name, print_no_addr)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UnicodePrinter(config, arg_name)));
             }
             else if (arg_type == "pulong")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UlongPrinter(arg_name, print_no_addr)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UlongPrinter(config, arg_name)));
             }
             else if (arg_type == "lpvoid*")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new PointerToPointerPrinter(arg_name, print_no_addr)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new PointerToPointerPrinter(config, arg_name)));
             }
             else if (arg_type == "refclsid" || arg_type == "refiid")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new GuidPrinter(arg_name, print_no_addr)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new GuidPrinter(config, arg_name)));
             }
             else if (arg_type == "binary16")
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new Binary16StringPrinter(arg_name, print_no_addr)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new Binary16StringPrinter(config, arg_name)));
             }
             else
             {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new ArgumentPrinter(arg_name, print_no_addr)));
+                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new ArgumentPrinter(config, arg_name)));
             }
 
             ++arg_idx;
