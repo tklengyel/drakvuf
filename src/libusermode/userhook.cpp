@@ -119,6 +119,7 @@
 #include <map>
 #include <string>
 #include <optional>
+#include <stdexcept>
 
 #include <config.h>
 #include <glib.h>
@@ -866,7 +867,7 @@ std::string parse_token(std::stringstream& ss)
     auto maybe_token = try_parse_token(ss);
     if (!maybe_token)
     {
-        throw UserHookException{"Expected a token"};
+        throw std::runtime_error{"Expected a token"};
     }
     return *maybe_token;
 }
@@ -973,13 +974,13 @@ plugin_target_config_entry_t parse_entry(
         }
         catch (const std::logic_error& exc)
         {
-            throw UserHookException{"Invalid offset"};
+            throw std::runtime_error{"Invalid offset"};
         }
 
         std::string strategy_name = parse_token(ss);
         actions = get_hook_actions(strategy_name);
         if (!actions)
-            throw UserHookException{"Invalid hook action"};
+            throw std::runtime_error{"Invalid hook action"};
     }
 
     entry.actions = *actions;
@@ -1015,7 +1016,7 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
 
     if (!ifs)
     {
-        throw UserHookException{"Cannnot open DLL hook file"};
+        throw std::runtime_error{"Cannnot open DLL hook file"};
     }
 
     std::string line;
@@ -1029,13 +1030,13 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
             std::stringstream ss(line);
             wanted_hooks->push_back(parse_entry(ss, config));
         }
-        catch (const UserHookException& exc)
+        catch (const std::runtime_error& exc)
         {
             std::stringstream ss;
             ss << "Invalid entry on line " << line_no << ": " << exc.what();
 
             // Rethrow exception
-            throw UserHookException{ss.str()};
+            throw std::runtime_error{ss.str()};
         }
     }
 }
