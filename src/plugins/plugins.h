@@ -139,7 +139,7 @@ struct plugins_options
     const char* memdump_dir;            // PLUGIN_MEMDUMP
     const char* dll_hooks_list;         // PLUGIN_MEMDUMP, PLUGIN_APIMON
     bool userhook_no_addr;              // PLUGIN_MEMDUMP, PLUGIN_APIMON
-    bool dump_exec_frames;              // PLUGIN_MEMDUMP
+    bool dump_exec;                     // PLUGIN_MEMDUMP
     const char* procdump_dir;           // PLUGIN_PROCDUMP
     bool compress_procdumps = false;    // PLUGIN_PROCDUMP
     const char* clr_profile;            // PLUGIN_MEMDUMP

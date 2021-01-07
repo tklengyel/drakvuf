@@ -121,7 +121,7 @@ struct memdump_config
     const char* clr_profile;
     const char* mscorwks_profile;
     const bool print_no_addr;
-    const bool dump_exec_frames;
+    const bool dump_exec;
 };
 
 class memdump: public pluginex

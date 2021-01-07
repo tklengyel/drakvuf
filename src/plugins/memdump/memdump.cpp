@@ -1121,7 +1121,7 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
         throw -1;
     }
 
-    if (c->dump_exec_frames && !register_trap(nullptr, mm_access_fault_hook_cb, bp.for_syscall_name("MmAccessFault")))
+    if (c->dump_exec && !register_trap(nullptr, mm_access_fault_hook_cb, bp.for_syscall_name("MmAccessFault")))
     {
         throw -1;
     }

@@ -244,8 +244,8 @@ static void print_usage()
             "\t                           List of DLL functions to be hooked (see wiki)\n"
             "\t --userhook-no-addr\n"
             "\t                           Stop printing addresses of string arguments in apimon and memdump\n"
-            "\t --dump-exec-frames\n"
-            "\t                           (advanced) Dump physical code frames before their first execution\n"
+            "\t --dump-exec\n"
+            "\t                           (advanced) Dump virtual regions upon first execution\n"
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP
             "\t --procdump-dir <directory>\n"
@@ -322,7 +322,7 @@ int main(int argc, char** argv)
         opt_json_mscorwks,
         opt_disable_sysret,
         opt_userhook_no_addr,
-        opt_dump_exec_frames,
+        opt_dump_exec,
         opt_terminate,
         opt_termination_timeout,
     };
@@ -356,7 +356,7 @@ int main(int argc, char** argv)
         {"syscall-hooks-list", required_argument, NULL, 'S'},
         {"disable-sysret", no_argument, NULL, opt_disable_sysret},
         {"userhook-no-addr", no_argument, NULL, opt_userhook_no_addr},
-        {"dump-exec-frames", no_argument, NULL, opt_dump_exec_frames},
+        {"dump-exec", no_argument, NULL, opt_dump_exec},
         {"fast-singlestep", no_argument, NULL, 'F'},
         {NULL, 0, NULL, 0}
     };
