@@ -129,7 +129,8 @@ public:
         .breakpoint.module = "tcpip.sys",
         .type = BREAKPOINT,
         .data = (void*)this,
-        .name = nullptr
+        .name = nullptr,
+        .ttl = LIMITED_TTL
     };
 
     drakvuf_trap_t dnsapi_traps[6] =
@@ -140,7 +141,8 @@ public:
             .breakpoint.module = "dnsapi.dll",
             .type = BREAKPOINT,
             .data = (void*)this,
-            .name = nullptr
+            .name = nullptr,
+            .ttl = LIMITED_TTL
         }
     };
 

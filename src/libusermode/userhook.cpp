@@ -287,6 +287,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
     trap->breakpoint.lookup_type = LOOKUP_NONE;
     trap->breakpoint.addr_type = ADDR_PA;
     trap->breakpoint.addr = pa;
+    trap->ttl = LIMITED_TTL;
 
     if (drakvuf_add_trap(drakvuf, trap))
     {
@@ -790,11 +791,11 @@ userhook::userhook(drakvuf_t drakvuf): pluginex(drakvuf, OUTPUT_DEFAULT)
     drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets.data());
 
     breakpoint_in_system_process_searcher bp;
-    if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
-        !register_trap(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection")) ||
-        !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler")) ||
-        !register_trap(nullptr, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
-        !register_trap(nullptr, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite")))
+    if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory"), nullptr, UNLIMITED_TTL) ||
+        !register_trap(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection"), nullptr, UNLIMITED_TTL) ||
+        !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler"), nullptr, UNLIMITED_TTL) ||
+        !register_trap(nullptr, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess"), nullptr, UNLIMITED_TTL) ||
+        !register_trap(nullptr, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite"), nullptr, UNLIMITED_TTL))
         throw -1;
 }
 

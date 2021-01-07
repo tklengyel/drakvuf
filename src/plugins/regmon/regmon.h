@@ -119,7 +119,8 @@ public:
             .breakpoint.addr_type = ADDR_RVA,
             .breakpoint.module = "ntoskrnl.exe",
             .type = BREAKPOINT,
-            .data = (void*)this
+            .data = (void*)this,
+            .ttl = LIMITED_TTL
         }
     };
 

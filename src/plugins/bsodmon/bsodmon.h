@@ -127,7 +127,8 @@ private:
         .breakpoint.addr_type = ADDR_RVA,
         .breakpoint.module = "ntoskrnl.exe",
         .type = BREAKPOINT,
-        .data = (void*)this
+        .data = (void*)this,
+        .ttl = LIMITED_TTL
     };
 
     void register_trap(drakvuf_t drakvuf, const char* syscall_name,

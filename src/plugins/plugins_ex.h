@@ -372,7 +372,8 @@ public:
     drakvuf_trap_t* register_trap(drakvuf_trap_info_t* info,
                                   hook_cb_t hook_cb,
                                   IB init_breakpoint,
-                                  const char* trap_name = nullptr)
+                                  const char* trap_name = nullptr,
+                                  int64_t ttl = LIMITED_TTL)
     {
         auto trap = new drakvuf_trap_t;
 
@@ -389,6 +390,7 @@ public:
         trap->name = trap_name;
         trap->cb = hook_cb;
         trap->type = BREAKPOINT;
+        trap->ttl = ttl;
 
         if (!init_breakpoint(drakvuf, info, trap))
         {

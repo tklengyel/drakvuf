@@ -202,6 +202,10 @@ typedef struct drakvuf_trap_info
     };
 } drakvuf_trap_info_t;
 
+#define UNLIMITED_TTL -1
+#define LIMITED_TTL 10000
+#define TRAP_TTL_RESET_INTERVAL_SEC 10
+
 struct drakvuf_trap
 {
     trap_type_t type;
@@ -248,6 +252,12 @@ struct drakvuf_trap
 
         register_t reg;
     };
+
+    // How many times trap can be hit in TRAP_TTL_RESET_INTERVAL_SEC interval,
+    // before it gets discarded. Protects against api_hammering.
+    // -1 for infinity.
+    int64_t ttl;
+    time_t last_ttl_rst;
 };
 
 

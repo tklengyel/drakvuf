@@ -444,6 +444,7 @@ event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     trap->breakpoint.addr = ret_addr;
     trap->type = BREAKPOINT;
     trap->data = w;
+    trap->ttl = LIMITED_TTL;
 
     if ( w->s->winver == VMI_OS_WINDOWS_7 || w->s->winver == VMI_OS_WINDOWS_8 )
         trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_x64_ret_cb : udpa_x86_ret_cb;
