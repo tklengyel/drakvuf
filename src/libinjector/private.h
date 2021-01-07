@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2020 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2021 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -117,14 +117,12 @@ extern bool verbose;
 #else
 #define PRINT_DEBUG(args...) \
     do {} while(0)
-#endif
+#endif /* DRAKVUF_DEBUG */
 
 #define ARRAY_SIZE(arr) sizeof((arr)) / sizeof((arr)[0])
 
 #ifdef __clang_analyzer__
 #define vmi_free_unicode_str g_free
-#endif
-
 #endif
 
 #define UNUSED(x) (void)(x)
@@ -179,3 +177,5 @@ static inline void copy_gprs(registers_t* dst, registers_t* src)
     dst->x86.r14 = src->x86.r14;
     dst->x86.r15 = src->x86.r15;
 }
+
+#endif /* LIBINJECTOR_PRIVATE_H */

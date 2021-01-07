@@ -17,7 +17,7 @@ else
     apt-get update
 fi
 
-apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive clang python3-dev gcc-7 g++-7
+apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive clang python3-dev libsystemd-dev nasm bc
 
 wget -O /usr/local/go1.15.3.linux-amd64.tar.gz https://golang.org/dl/go1.15.3.linux-amd64.tar.gz
 tar -C /usr/local -xzf /usr/local/go1.15.3.linux-amd64.tar.gz
@@ -34,7 +34,3 @@ apt-get autoremove -y
 apt-get clean
 
 rm -rf /var/lib/apt/lists* /tmp/* /var/tmp/*
-
-rm /usr/bin/gcc /usr/bin/g++
-ln -s /usr/bin/gcc-7 /usr/bin/gcc
-ln -s /usr/bin/g++-7 /usr/bin/g++

@@ -1,6 +1,6 @@
 #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
 #                                                                         #
-# DRAKVUF (C) 2014-2020 Tamas K Lengyel.                                  #
+# DRAKVUF (C) 2014-2021 Tamas K Lengyel.                                  #
 # Tamas K Lengyel is hereinafter referred to as the author.               #
 # This program is free software; you may redistribute and/or modify it    #
 # under the terms of the GNU General Public License as published by the   #
@@ -144,7 +144,7 @@ AM_CFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
              -Wswitch-enum -Wstrict-prototypes \
              -Wmissing-prototypes -Wredundant-decls \
              -Wfloat-equal -Wundef -Wvla \
-             -Wc++-compat
+             -Wc++-compat -Wformat -Wformat-security
 if !HARDENING
 AM_CFLAGS += -pg
 endif

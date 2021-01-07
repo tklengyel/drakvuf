@@ -1,6 +1,6 @@
 #********************IMPORTANT DRAKVUF LICENSE TERMS**********************#
 #                                                                         #
-# DRAKVUF (C) 2014-2020 Tamas K Lengyel.                                  #
+# DRAKVUF (C) 2014-2021 Tamas K Lengyel.                                  #
 # Tamas K Lengyel is hereinafter referred to as the author.               #
 # This program is free software; you may redistribute and/or modify it    #
 # under the terms of the GNU General Public License as published by the   #
@@ -141,9 +141,11 @@ endif
 # Note that -pg is incompatible with HARDENING
 if !DEBUG
 AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
+AM_CXXFLAGS += -Wno-unknown-warning-option
 else
 AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
 AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
+AM_CXXFLAGS += -Wformat -Wformat-security
 AM_CXXFLAGS += -ferror-limit=0 -Wno-unknown-warning-option
 AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
 if !HARDENING
