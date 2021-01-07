@@ -6,9 +6,10 @@ RUN cd /build/dwarf2json && \
 RUN export INSTALL_PATH="/build/usr" && \
     cd /build/libvmi && \
     autoreconf -vif && \
-    ./configure --prefix=$INSTALL_PATH --disable-kvm --disable-file --disable-bareflank --disable-safety-checks --enable-vmi-debug && \
+    ./configure --prefix=$INSTALL_PATH --disable-static --disable-kvm --disable-file --disable-bareflank --disable-safety-checks --enable-vmi-debug && \
     make -j$(nproc) && \
     make install && \
+    rm /build/usr/lib/libvmi.la && \
     ldconfig
 RUN export INSTALL_PATH="/build/usr" && \
     cd /build && \
