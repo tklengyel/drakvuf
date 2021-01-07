@@ -878,34 +878,34 @@ std::unique_ptr<ArgumentPrinter> make_arg_printer(
 {
     if (type == "lpstr" || type == "lpcstr" || type == "lpctstr")
     {
-        return std::make_unique<AsciiPrinter>(config, name);
+        return std::make_unique<AsciiPrinter>(name, config);
     }
     else if (type == "lpcwstr" || type == "lpwstr" || type == "bstr")
     {
-        return std::make_unique<WideStringPrinter>(config, name);
+        return std::make_unique<WideStringPrinter>(name, config);
     }
     else if (type == "punicode_string")
     {
-        return std::make_unique<UnicodePrinter>(config, name);
+        return std::make_unique<UnicodePrinter>(name, config);
     }
     else if (type == "pulong")
     {
-        return std::make_unique<UlongPrinter>(config, name);
+        return std::make_unique<UlongPrinter>(name, config);
     }
     else if (type == "lpvoid*")
     {
-        return std::make_unique<PointerToPointerPrinter>(config, name);
+        return std::make_unique<PointerToPointerPrinter>(name, config);
     }
     else if (type == "refclsid" || type == "refiid")
     {
-        return std::make_unique<GuidPrinter>(config, name);
+        return std::make_unique<GuidPrinter>(name, config);
     }
     else if (type == "binary16")
     {
-        return std::make_unique<Binary16StringPrinter>(config, name);
+        return std::make_unique<Binary16StringPrinter>(name, config);
     }
 
-    return std::make_unique<ArgumentPrinter>(config, name);
+    return std::make_unique<ArgumentPrinter>(name, config);
 }
 
 
@@ -941,11 +941,12 @@ std::vector<std::unique_ptr<ArgumentPrinter>> parse_arguments(
     return argument_printers;
 }
 
-void parse_entry(
-    plugin_target_config_entry_t& entry,
+plugin_target_config_entry_t parse_entry(
     std::stringstream& ss,
     PrinterConfig& config)
 {
+    plugin_target_config_entry_t entry{};
+
     entry.dll_name = parse_token(ss);
     entry.function_name = parse_token(ss);
     entry.type = HOOK_BY_NAME;
@@ -970,7 +971,7 @@ void parse_entry(
         {
             entry.offset = std::stoull(log_strategy_or_offset, 0, 16);
         }
-        catch (std::logic_error& exc)
+        catch (const std::logic_error& exc)
         {
             throw UserHookException{"Invalid offset"};
         }
@@ -983,6 +984,8 @@ void parse_entry(
 
     entry.actions = *actions;
     entry.argument_printers = parse_arguments(config, ss);
+
+    return entry;
 }
 }
 
@@ -997,13 +1000,13 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
         const auto log_and_stack = HookActions::empty().set_log().set_stack();
         // if the DLL hook list was not provided, we provide some simple defaults
         std::vector<std::unique_ptr<ArgumentPrinter>> arg_vec1;
-        arg_vec1.push_back(std::make_unique<ArgumentPrinter>(config, "wVersionRequired"));
-        arg_vec1.push_back(std::make_unique<ArgumentPrinter>(config, "lpWSAData"));
+        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("wVersionRequired", config));
+        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("lpWSAData", config));
         wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", log_and_stack, std::move(arg_vec1));
 
         std::vector<std::unique_ptr<ArgumentPrinter>> arg_vec2;
-        arg_vec2.push_back(std::make_unique<ArgumentPrinter>(config, "ExitCode"));
-        arg_vec2.push_back(std::make_unique<ArgumentPrinter>(config, "Unknown"));
+        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("ExitCode", config));
+        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("Unknown", config));
         wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", log_and_stack, std::move(arg_vec2));
         return;
     }
@@ -1021,23 +1024,18 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
         if (line.empty() || line[0] == '#')
             continue;
 
-        wanted_hooks->push_back(plugin_target_config_entry_t());
-        plugin_target_config_entry_t& entry = wanted_hooks->back();
-
-
         try
         {
             std::stringstream ss(line);
-            parse_entry(entry, ss, config);
+            wanted_hooks->push_back(parse_entry(ss, config));
         }
-        catch (UserHookException& exc)
+        catch (const UserHookException& exc)
         {
             std::stringstream ss;
-            ss << "Invalid entry on line " << line_no << ": " << exc.msg;
-            exc.msg = ss.str();
+            ss << "Invalid entry on line " << line_no << ": " << exc.what();
 
             // Rethrow exception
-            throw;
+            throw UserHookException{ss.str()};
         }
     }
 }

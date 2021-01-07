@@ -334,10 +334,10 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
     {
         drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, &this->wanted_hooks);
     }
-    catch (UserHookException& exc)
+    catch (const UserHookException& exc)
     {
-        std::cerr << "Loading DLL hook configuration for APIMON plugin failed" << std::endl
-                  << "Reason: " << exc.what() << std::endl;
+        std::cerr << "Loading DLL hook configuration for APIMON plugin failed\n"
+                  << "Reason: " << exc.what() << "\n";
         throw -1;
     }
 

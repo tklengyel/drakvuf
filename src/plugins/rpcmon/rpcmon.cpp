@@ -512,8 +512,8 @@ static auto rpc_call_args()
     config.numeric_format = PrinterConfig::NumericFormat::DECIMAL;
 
     std::vector<std::unique_ptr<ArgumentPrinter>> args;
-    args.emplace_back(std::make_unique<ArgumentPrinter>(config, "pStubDescriptor"));
-    args.emplace_back(std::make_unique<ArgumentPrinter>(config, "pFormat"));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("pStubDescriptor", config));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("pFormat", config));
     return args;
 }
 
@@ -523,8 +523,8 @@ static auto rpc_call3_args()
     config.numeric_format = PrinterConfig::NumericFormat::DECIMAL;
 
     std::vector<std::unique_ptr<ArgumentPrinter>> args;
-    args.emplace_back(std::make_unique<ArgumentPrinter>(config, "pStubProxy"));
-    args.emplace_back(std::make_unique<ArgumentPrinter>(config, "ProcedureNumber"));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("pStubProxy", config));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("ProcedureNumber", config));
     return args;
 }
 

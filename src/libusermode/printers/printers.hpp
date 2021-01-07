@@ -131,7 +131,7 @@ protected:
     PrinterConfig config;
     std::string name;
 public:
-    ArgumentPrinter(const PrinterConfig& config, std::string arg_name);
+    ArgumentPrinter(std::string arg_name, PrinterConfig config = PrinterConfig{});
 
     std::string get_name() const;
     virtual std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
@@ -210,7 +210,7 @@ class BitMaskPrinter : public ArgumentPrinter
 {
     std::map < uint64_t, std::string > dict;
 public:
-    BitMaskPrinter(const PrinterConfig& config, std::string arg_name, std::map < uint64_t, std::string > dict);
+    BitMaskPrinter(std::string arg_name, std::map < uint64_t, std::string > dict, PrinterConfig config = PrinterConfig{});
     std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 

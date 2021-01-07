@@ -143,7 +143,7 @@ std::string escape_str(const std::string& s)
     return os.str();
 }
 
-ArgumentPrinter::ArgumentPrinter(const PrinterConfig& config, std::string arg_name) :
+ArgumentPrinter::ArgumentPrinter(std::string arg_name, PrinterConfig config) :
     config(config), name(arg_name)
 {
     // intentionally empty
@@ -341,8 +341,11 @@ std::string GuidPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint6
     return name + "=" + std::string(stream);
 }
 
-BitMaskPrinter::BitMaskPrinter(const PrinterConfig& config, std::string arg_name, std::map < uint64_t, std::string > dict)
-    : ArgumentPrinter(config, arg_name)
+BitMaskPrinter::BitMaskPrinter(
+    std::string arg_name,
+    std::map < uint64_t, std::string > dict,
+    PrinterConfig config)
+    : ArgumentPrinter(arg_name, config)
     , dict(dict)
 {
     // intentionally empty

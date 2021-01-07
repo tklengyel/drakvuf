@@ -105,7 +105,7 @@
 #ifndef WIN_USERHOOK_H
 #define WIN_USERHOOK_H
 
-#include <exception>
+#include <stdexcept>
 #include <string>
 #include <vector>
 #include <memory>
@@ -115,15 +115,10 @@
 #include "plugins/plugins_ex.h"
 #include "printers/printers.hpp"
 
-class UserHookException : public std::exception
+class UserHookException : public std::runtime_error
 {
-public:
-    UserHookException(std::string&& msg) : msg{msg} {}
-    virtual const char* what() const noexcept
-    {
-        return this->msg.c_str();
-    }
-    std::string msg;
+    // Inherit constructors
+    using std::runtime_error::runtime_error;
 };
 
 typedef event_response_t (*callback_t)(drakvuf_t drakvuf, drakvuf_trap_info* info);
