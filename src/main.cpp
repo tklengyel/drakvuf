@@ -674,7 +674,7 @@ int main(int argc, char** argv)
     {
         PRINT_DEBUG("Beginning wait stop plugins\n");
 
-        drakvuf->wait_stopped(stop_plugin_list);
+        drakvuf->plugin_stop_loop(stop_plugin_list);
 
         PRINT_DEBUG("Finished wait stop plugins\n");
     }

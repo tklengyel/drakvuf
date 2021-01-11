@@ -176,28 +176,35 @@ int drakvuf_c::stop_plugins(const bool* plugin_list)
     return 1;
 }
 
-void drakvuf_c::wait_stopped(const bool* plugin_list)
+struct check_plugins_stopped_data
 {
-    auto is_plugins_stopped = [&] (drakvuf_t drakvuf, void*)
-    {
-        if (drakvuf_is_interrupted(drakvuf))
-            return true;
+    drakvuf_plugins* plugins;
+    const bool* plugin_list;
+};
 
-        for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
-            if (plugin_list[i] && !plugins->is_stopped(static_cast<drakvuf_plugin_t>(i)))
-                return false;
-
+static bool check_all_plugins_stopped(drakvuf_t drakvuf, void* data)
+{
+    auto d = (struct check_plugins_stopped_data*)data;
+    auto plugins = d->plugins;
+    auto plugin_list = d->plugin_list;
+    if (drakvuf_is_interrupted(drakvuf))
         return true;
-    };
 
-    auto thunk = +[] (drakvuf_t drakvuf, void* data)
-    {
-        return (*static_cast<decltype(is_plugins_stopped)*>(data))(drakvuf, nullptr);
-    };
+    for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
+        if (plugin_list[i] && !plugins->is_stopped(static_cast<drakvuf_plugin_t>(i)))
+            return false;
 
-    // TODO Pass duration argument
+    return true;
+};
+
+void drakvuf_c::plugin_stop_loop(const bool* plugin_list)
+{
+    struct check_plugins_stopped_data data;
+    data.plugins = plugins;
+    data.plugin_list = plugin_list;
+
     GThread* timeout_thread = startup_timer(this, 20);
-    drakvuf_loop(drakvuf, thunk, (void*)&is_plugins_stopped);
+    drakvuf_loop(drakvuf, check_all_plugins_stopped, (void*)&data);
     cleanup_timer(this, timeout_thread);
 }
 
