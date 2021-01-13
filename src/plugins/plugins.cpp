@@ -398,9 +398,11 @@ int drakvuf_plugins::stop(const drakvuf_plugin_t plugin_id)
         if ( !this->plugins[plugin_id] || !drakvuf_plugin_os_support[plugin_id][this->os] )
             return 0;
 
+        bool is_stopped = false;
+
         try
         {
-            this->plugins[plugin_id]->stop();
+            is_stopped = this->plugins[plugin_id]->stop();
         }
         catch (int e)
         {
@@ -408,33 +410,17 @@ int drakvuf_plugins::stop(const drakvuf_plugin_t plugin_id)
             return -1;
         }
 
-        PRINT_DEBUG("Stopping plugin %s finished\n", drakvuf_plugin_names[plugin_id]);
-        return 1;
+        if (is_stopped)
+        {
+            PRINT_DEBUG("Stopping plugin %s finished\n", drakvuf_plugin_names[plugin_id]);
+            return 0;
+        }
+        else
+        {
+            PRINT_DEBUG("Stop plugin %s pending\n", drakvuf_plugin_names[plugin_id]);
+            return 1;
+        }
     }
 
     return 0;
-}
-
-bool drakvuf_plugins::is_stopped(const drakvuf_plugin_t plugin_id)
-{
-    if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
-         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
-    {
-        PRINT_DEBUG("Check is plugin %s stopped\n", drakvuf_plugin_names[plugin_id]);
-
-        if ( !this->plugins[plugin_id] || !drakvuf_plugin_os_support[plugin_id][this->os] )
-            return true;
-
-        try
-        {
-            return this->plugins[plugin_id]->is_stopped();
-        }
-        catch (int e)
-        {
-            fprintf(stderr, "Check is plugin %s stopped failed!\n", drakvuf_plugin_names[plugin_id]);
-            return true;
-        }
-    }
-
-    return true;
 }

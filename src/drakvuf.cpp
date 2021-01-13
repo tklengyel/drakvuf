@@ -163,48 +163,52 @@ int drakvuf_c::start_plugins(const bool* plugin_list, const plugins_options* opt
 
 int drakvuf_c::stop_plugins(const bool* plugin_list)
 {
+    bool failed = false;
+    bool pending = false;
+
     for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
     {
         if (plugin_list[i])
         {
             int rc = plugins->stop(static_cast<drakvuf_plugin_t>(i));
             if (rc < 0)
-                return rc;
+                failed = true;
+            else if (rc > 0)
+                pending = true;
         }
     }
 
-    return 1;
+    if (failed)
+        return -1;
+    else if (pending)
+        return 1;
+    else
+        return 0;
 }
 
-struct check_plugins_stopped_data
+struct stop_plugins_data
 {
-    drakvuf_plugins* plugins;
+    drakvuf_c* _drakvuf_c;
     const bool* plugin_list;
 };
 
-static bool check_all_plugins_stopped(drakvuf_t drakvuf, void* data)
+static bool is_stopped(drakvuf_t drakvuf, void* data)
 {
-    auto d = (struct check_plugins_stopped_data*)data;
-    auto plugins = d->plugins;
-    auto plugin_list = d->plugin_list;
-    if (drakvuf_is_interrupted(drakvuf))
-        return true;
+    auto d = (struct stop_plugins_data*)data;
+    auto rc = drakvuf_is_interrupted(drakvuf);
+    if (SIGDRAKVUFTIMEOUT == rc)
+        return rc;
+    else
+        return rc && !d->_drakvuf_c->stop_plugins(d->plugin_list);
+}
 
-    for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
-        if (plugin_list[i] && !plugins->is_stopped(static_cast<drakvuf_plugin_t>(i)))
-            return false;
-
-    return true;
-};
-
-void drakvuf_c::plugin_stop_loop(const bool* plugin_list)
+void drakvuf_c::plugin_stop_loop(int timeout, const bool* plugin_list)
 {
-    struct check_plugins_stopped_data data;
-    data.plugins = plugins;
+    GThread* timeout_thread = startup_timer(this, timeout);
+    struct stop_plugins_data data;
+    data._drakvuf_c = this;
     data.plugin_list = plugin_list;
-
-    GThread* timeout_thread = startup_timer(this, 20);
-    drakvuf_loop(drakvuf, check_all_plugins_stopped, (void*)&data);
+    drakvuf_loop(drakvuf, ::is_stopped, (void*)&data);
     cleanup_timer(this, timeout_thread);
 }
 

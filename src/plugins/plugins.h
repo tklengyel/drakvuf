@@ -242,18 +242,19 @@ class plugin
 public:
     virtual ~plugin() = default;
 
-    virtual void stop()
+    virtual bool stop()
     {
-        _stopped = true;
+        m_is_stopping = true;
+        return true;
     }
 
-    virtual bool is_stopped()
+    virtual bool is_stopping()
     {
-        return _stopped;
+        return m_is_stopping;
     }
 
 protected:
-    bool _stopped = false;
+    bool m_is_stopping = false;
 };
 
 class drakvuf_plugins

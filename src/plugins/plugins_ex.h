@@ -366,11 +366,17 @@ public:
         stop();
     };
 
-    virtual void stop()
+    virtual bool stop()
+    {
+        destroy_all_traps();
+        m_is_stopping = true;
+        return true;
+    }
+
+    virtual void destroy_all_traps()
     {
         while (!traps.empty())
             destroy_trap(traps.front());
-        _stopped = true;
     }
 
     // Params property is optional
