@@ -630,19 +630,23 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     // Iterate over traps updating ttl.
     GSList* update_ttl_loop = s->traps;
     time_t cur_time = time(NULL);
-    while (update_ttl_loop) {
-        drakvuf_trap_t *trap = (drakvuf_trap_t*) update_ttl_loop->data;
-        if (trap->ttl == UNLIMITED_TTL) {
+    while (update_ttl_loop)
+    {
+        drakvuf_trap_t* trap = (drakvuf_trap_t*) update_ttl_loop->data;
+        if (trap->ttl == UNLIMITED_TTL)
+        {
             update_ttl_loop = update_ttl_loop->next;
             continue;
         }
 
-        if (cur_time - trap->last_ttl_rst >= TRAP_TTL_RESET_INTERVAL_SEC) {
+        if (cur_time - trap->last_ttl_rst >= TRAP_TTL_RESET_INTERVAL_SEC)
+        {
             trap->last_ttl_rst = cur_time;
             trap->ttl = LIMITED_TTL;
         }
 
-        if (--trap->ttl == 0) {
+        if (--trap->ttl == 0)
+        {
             // Does not break the loop, as we just schedule traps to get
             // removed later (in_callback == 1).
             drakvuf_remove_trap(drakvuf, trap, NULL);
