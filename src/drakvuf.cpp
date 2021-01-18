@@ -166,7 +166,7 @@ int drakvuf_c::stop_plugins(const bool* plugin_list)
     bool failed = false;
     bool pending = false;
 
-    for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
+    for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX && !failed && !pending; i++)
     {
         if (plugin_list[i])
         {
@@ -197,9 +197,16 @@ static bool is_stopped(drakvuf_t drakvuf, void* data)
     auto d = (struct stop_plugins_data*)data;
     auto rc = drakvuf_is_interrupted(drakvuf);
     if (SIGDRAKVUFTIMEOUT == rc)
-        return rc;
+    {
+        PRINT_DEBUG("[STOP] Timeout\n");
+        return true;
+    }
     else
-        return rc && !d->_drakvuf_c->stop_plugins(d->plugin_list);
+    {
+        rc = rc || !d->_drakvuf_c->stop_plugins(d->plugin_list);
+        PRINT_DEBUG("[STOP] Check plugins %d\n", rc);
+        return rc == 0;
+    }
 }
 
 void drakvuf_c::plugin_stop_loop(int timeout, const bool* plugin_list)

@@ -131,13 +131,6 @@ static inline void disable_plugin(char* optarg, bool* plugin_list)
             plugin_list[i] = false;
 }
 
-static inline void stop_plugin(char* optarg, bool* plugin_list)
-{
-    for (int i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
-        if (!strcmp(optarg, drakvuf_plugin_names[i]))
-            plugin_list[i] = true;
-}
-
 static inline void disable_all_plugins(bool* plugin_list)
 {
     for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
@@ -180,7 +173,6 @@ static void print_usage()
             "\t -t <timeout>              Timeout (in seconds)\n"
             "\t -o <format>               Output format (default, csv, kv, or json)\n"
             "\t -x <plugin>               Don't activate the specified plugin\n"
-            "\t --stop <plugin>           Stop the specified plugin before termination loop\n"
             "\t --wait-stop-plugins <timeout>\n"
             "\t                           Wait for plugins to stop before termination loop\n"
             "\t -a <plugin>               Activate the specified plugin\n"
@@ -284,8 +276,6 @@ int main(int argc, char** argv)
     struct sigaction act;
     output_format_t output = OUTPUT_DEFAULT;
     bool plugin_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 1};
-    bool stop_plugin_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 0};
-    bool is_stop_plugin = false;
     int wait_stop_plugins = 0;
     bool verbose = false;
     bool leave_paused = false;
@@ -335,7 +325,6 @@ int main(int argc, char** argv)
         opt_userhook_no_addr,
         opt_terminate,
         opt_termination_timeout,
-        opt_stop_plugin,
         opt_wait_stop_plugins,
     };
     const option long_opts[] =
@@ -369,7 +358,6 @@ int main(int argc, char** argv)
         {"disable-sysret", no_argument, NULL, opt_disable_sysret},
         {"userhook-no-addr", no_argument, NULL, opt_userhook_no_addr},
         {"fast-singlestep", no_argument, NULL, 'F'},
-        {"stop", required_argument, NULL, opt_stop_plugin},
         {"wait-stop-plugins", required_argument, NULL, opt_wait_stop_plugins},
         {NULL, 0, NULL, 0}
     };
@@ -453,10 +441,6 @@ int main(int argc, char** argv)
                 break;
             case 'x':
                 disable_plugin(optarg, plugin_list);
-                break;
-            case opt_stop_plugin:
-                stop_plugin(optarg, stop_plugin_list);
-                is_stop_plugin = true;
                 break;
             case opt_wait_stop_plugins:
                 wait_stop_plugins = atoi(optarg);
@@ -661,25 +645,22 @@ int main(int argc, char** argv)
             break;
     }
 
+    PRINT_DEBUG("Beginning stop plugins\n");
+
     bool plugins_pending = false;
-    if (is_stop_plugin)
-    {
-        PRINT_DEBUG("Beginning stop plugins\n");
+    int rc = drakvuf->stop_plugins(plugin_list);
+    if (rc < 0)
+        return drakvuf_exit_code_t::FAIL;
+    else if (rc > 0)
+        plugins_pending = true;
 
-        int rc = drakvuf->stop_plugins(stop_plugin_list);
-        if (rc < 0)
-            return drakvuf_exit_code_t::FAIL;
-        else if (rc > 0)
-            plugins_pending = true;
+    PRINT_DEBUG("Finished stop plugins\n");
 
-        PRINT_DEBUG("Finished stop plugins\n");
-    }
-
-    if (is_stop_plugin && plugins_pending && wait_stop_plugins)
+    if (plugins_pending && wait_stop_plugins)
     {
         PRINT_DEBUG("Beginning wait stop plugins\n");
 
-        drakvuf->plugin_stop_loop(wait_stop_plugins, stop_plugin_list);
+        drakvuf->plugin_stop_loop(wait_stop_plugins, plugin_list);
 
         PRINT_DEBUG("Finished wait stop plugins\n");
     }
