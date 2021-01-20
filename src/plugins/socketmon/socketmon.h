@@ -130,7 +130,6 @@ public:
         .type = BREAKPOINT,
         .data = (void*)this,
         .name = nullptr,
-        .ttl = LIMITED_TTL
     };
 
     drakvuf_trap_t dnsapi_traps[6] =
@@ -142,7 +141,6 @@ public:
             .type = BREAKPOINT,
             .data = (void*)this,
             .name = nullptr,
-            .ttl = LIMITED_TTL
         }
     };
 

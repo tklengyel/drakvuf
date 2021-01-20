@@ -642,7 +642,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
         if (cur_time - trap->last_ttl_rst >= TRAP_TTL_RESET_INTERVAL_SEC)
         {
             trap->last_ttl_rst = cur_time;
-            trap->ttl = LIMITED_TTL;
+            trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
         }
 
         if (--trap->ttl == 0)

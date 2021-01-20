@@ -125,7 +125,6 @@ public:
             .breakpoint.module = "linux",
             .type = BREAKPOINT,
             .data = (void*)this,
-            .ttl = LIMITED_TTL
         }
     };
 

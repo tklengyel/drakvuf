@@ -349,7 +349,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
         trap->type = BREAKPOINT;
         trap->cb = syscall_cb;
         trap->data = w;
-        trap->ttl = LIMITED_TTL;
+        trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
 
         if ( drakvuf_add_trap(drakvuf, trap) )
             s->traps = g_slist_prepend(s->traps, trap);

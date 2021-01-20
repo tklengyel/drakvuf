@@ -121,7 +121,6 @@ public:
         .name = "ObCreateObject",
         .type = BREAKPOINT,
         .data = (void*)this,
-        .ttl = LIMITED_TTL
     };
     addr_t key_offset;
 

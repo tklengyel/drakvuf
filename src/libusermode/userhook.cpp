@@ -287,7 +287,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
     trap->breakpoint.lookup_type = LOOKUP_NONE;
     trap->breakpoint.addr_type = ADDR_PA;
     trap->breakpoint.addr = pa;
-    trap->ttl = LIMITED_TTL;
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
 
     if (drakvuf_add_trap(drakvuf, trap))
     {

@@ -133,7 +133,6 @@ public:
             .breakpoint.module = "ntoskrnl.exe",
             .type = BREAKPOINT,
             .data = (void*)this,
-            .ttl = LIMITED_TTL
         }
     };
 

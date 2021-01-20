@@ -372,8 +372,8 @@ public:
     drakvuf_trap_t* register_trap(drakvuf_trap_info_t* info,
                                   hook_cb_t hook_cb,
                                   IB init_breakpoint,
-                                  const char* trap_name = nullptr,
-                                  int64_t ttl = LIMITED_TTL)
+                                  const char* trap_name,
+                                  int64_t ttl)
     {
         auto trap = new drakvuf_trap_t;
 
@@ -401,6 +401,17 @@ public:
 
         traps.push_back(std::move(trap));
         return traps.back();
+    }
+
+    // Params property is optional
+    template<typename Params = void, typename IB>
+    drakvuf_trap_t* register_trap(drakvuf_trap_info_t* info,
+                                  hook_cb_t hook_cb,
+                                  IB init_breakpoint,
+                                  const char* trap_name = nullptr)
+    {
+        int64_t limited_traps_ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+        return register_trap<Params, IB>(info, hook_cb, init_breakpoint, trap_name, limited_traps_ttl);
     }
 
     void destroy_trap(drakvuf_trap_t* target)

@@ -120,7 +120,6 @@ public:
         .name = "KiDispatchException",
         .type = BREAKPOINT,
         .data = (void*)this,
-        .ttl = LIMITED_TTL
     };
     output_format_t format;
     page_mode_t pm;

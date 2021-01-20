@@ -255,6 +255,8 @@ struct drakvuf
     uint64_t event_counter;    // incremental unique trap event ID
 
     ipt_state_t ipt_state[MAX_DRAKVUF_VCPU];
+
+    int64_t limited_traps_ttl;
 };
 
 struct breakpoint
