@@ -387,3 +387,40 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 
     return 0;
 }
+
+int drakvuf_plugins::stop(const drakvuf_plugin_t plugin_id)
+{
+    if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
+         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
+    {
+        PRINT_DEBUG("Stopping plugin %s\n", drakvuf_plugin_names[plugin_id]);
+
+        if ( !this->plugins[plugin_id] || !drakvuf_plugin_os_support[plugin_id][this->os] )
+            return 0;
+
+        bool is_stopped = false;
+
+        try
+        {
+            is_stopped = this->plugins[plugin_id]->stop();
+        }
+        catch (int e)
+        {
+            fprintf(stderr, "Plugin %s stop failed!\n", drakvuf_plugin_names[plugin_id]);
+            return -1;
+        }
+
+        if (is_stopped)
+        {
+            PRINT_DEBUG("Stopping plugin %s finished\n", drakvuf_plugin_names[plugin_id]);
+            return 0;
+        }
+        else
+        {
+            PRINT_DEBUG("Stop plugin %s pending\n", drakvuf_plugin_names[plugin_id]);
+            return 1;
+        }
+    }
+
+    return 0;
+}
