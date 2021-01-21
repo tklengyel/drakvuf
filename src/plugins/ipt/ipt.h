@@ -138,6 +138,9 @@ struct ipt_vcpu
 
     // where IPT data stream is saved
     FILE* fd = nullptr;
+
+    // used to diff between last buffer offset and current offset
+    uint64_t last_offset;
 };
 
 class ipt: public pluginex

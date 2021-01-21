@@ -334,7 +334,7 @@ bool xen_set_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vc
 #ifdef ENABLE_IPT
 int xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state)
 {
-    int rc = xc_vmtrace_pt_set_option(xen->xc, domID, vcpu, XEN_DOMCTL_VMTRACE_PT_DIS_RETC, 1);
+    int rc = xc_vmtrace_set_option(xen->xc, domID, vcpu, MSR_RTIT_CTL, RTIT_CTL_BRANCH_EN | RTIT_CTL_USR | RTIT_CTL_OS);
 
     if (rc)
     {
@@ -342,7 +342,7 @@ int xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_s
         return 0;
     }
 
-    rc = xc_vmtrace_pt_enable(xen->xc, domID, vcpu);
+    rc = xc_vmtrace_enable(xen->xc, domID, vcpu);
 
     if (rc)
     {
@@ -350,7 +350,8 @@ int xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_s
         return 0;
     }
 
-    rc = xc_vmtrace_pt_get_offset(xen->xc, domID, vcpu, NULL, &ipt_state->size);
+    rc = xenforeignmemory_resource_size(
+		  xen->fmem, domID, XENMEM_resource_vmtrace_buf, vcpu, &ipt_state->size);
 
     if (rc)
     {
@@ -380,7 +381,7 @@ int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, i
     uint64_t offset;
     int rc;
 
-    rc = xc_vmtrace_pt_get_offset(xen->xc, domID, vcpu, &offset, NULL);
+    rc = xc_vmtrace_output_position(xen->xc, domID, vcpu, &offset);
 
     if (rc == ENODATA)
     {
@@ -417,7 +418,7 @@ int xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_
         return 0;
     }
 
-    rc = xc_vmtrace_pt_disable(xen->xc, domID, vcpu);
+    rc = xc_vmtrace_disable(xen->xc, domID, vcpu);
 
     if (rc)
     {

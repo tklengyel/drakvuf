@@ -121,22 +121,32 @@
  * Dump current IPT logs to disk and annotate them with custom PTWRITE packets
  */
 static inline
-bool annotate_ipt(drakvuf_t drakvuf, ipt* plugin, unsigned int vcpu_id, uint32_t* payloads, size_t num_payloads)
+bool annotate_ipt(drakvuf_t drakvuf, drakvuf_trap_info_t* info, ipt* plugin, unsigned int vcpu_id, uint32_t* payloads, size_t num_payloads)
 {
-    uint64_t offset;
-    uint64_t last_offset;
-    bool ret = drakvuf_get_ipt_offset(drakvuf, vcpu_id, &offset, &last_offset);
+    uint64_t offset2;
+    uint64_t last_offset2;
+
+    uint64_t offset = info->regs->pt_offset;
+    uint64_t last_offset = plugin->vcpus[vcpu_id].last_offset;
+    bool ret = drakvuf_get_ipt_offset(drakvuf, vcpu_id, &offset2, &last_offset2);
     int fail = 0;
 
     uint8_t* buf = plugin->vcpus[vcpu_id].buf;
     uint64_t size = plugin->vcpus[vcpu_id].size;
     FILE* fd = plugin->vcpus[vcpu_id].fd;
 
-    if (!ret)
+    plugin->vcpus[vcpu_id].last_offset = info->regs->pt_offset;
+
+    if (offset != offset2) {
+	printf("offset %llx %llx\n", (unsigned long long) offset, (unsigned long long) offset2);
+        throw -1;
+    }
+
+    /* if (!ret)
     {
         PRINT_DEBUG("annotate_ipt() failed to get ipt offset for vcpu %d\n", vcpu_id);
         return false;
-    }
+    } */
 
     PRINT_DEBUG("annotate_ipt() vCPU: %d IPT_CUR: %llx IPT_LAST: %llx\n", vcpu_id, (unsigned long long)offset, (unsigned long long)last_offset);
 
@@ -352,7 +362,7 @@ event_response_t ipt_cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         PTW_CURRENT_TID, info->proc_data.tid
     };
 
-    annotate_ipt(drakvuf, (ipt*)info->trap->data, info->vcpu, payloads, 2);
+    annotate_ipt(drakvuf, info, (ipt*)info->trap->data, info->vcpu, payloads, 2);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -363,7 +373,7 @@ event_response_t ipt_catchall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         PTW_EVENT_ID, (uint32_t) info->event_uid
     };
 
-    annotate_ipt(drakvuf, (ipt*)info->trap->data, info->vcpu, payloads, 1);
+    annotate_ipt(drakvuf, info, (ipt*)info->trap->data, info->vcpu, payloads, 1);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
