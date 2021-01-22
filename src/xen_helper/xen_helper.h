@@ -112,6 +112,7 @@
 #define MSR_RTIT_CTL 0x00000570
 #define  RTIT_CTL_OS                        (1 <<  2)
 #define  RTIT_CTL_USR                       (1 <<  3)
+#define  RTIT_CTL_DIS_RETC                  (1 << 11)
 #define  RTIT_CTL_BRANCH_EN                 (1 << 13)
 
 #include <libxl_utils.h>
