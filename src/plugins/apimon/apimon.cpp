@@ -293,26 +293,14 @@ out:
         vmi_free_unicode_str(dll_name);
 }
 
-static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
+static void on_dll_discovered(drakvuf_t drakvuf, const std::string& dll_name, const dll_view_t* dll, void* extra)
 {
     apimon* plugin = (apimon*)extra;
 
-    vmi_lock_guard lg(drakvuf);
-    unicode_string_t* dll_name = drakvuf_read_unicode_va(lg.vmi, dll->mmvad.file_name_ptr, 0);
-
-    if (dll_name && dll_name->contents)
+    plugin->wanted_hooks.visit_hooks_for(dll_name, [&](const auto& e)
     {
-        for (auto const& wanted_hook : plugin->wanted_hooks)
-        {
-            if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
-            {
-                drakvuf_request_usermode_hook(drakvuf, dll, &wanted_hook, usermode_hook_cb, plugin);
-            }
-        }
-    }
-
-    if (dll_name)
-        vmi_free_unicode_str(dll_name);
+        drakvuf_request_usermode_hook(drakvuf, dll, &e, usermode_hook_cb, plugin);
+    });
 }
 
 static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::vector<hook_target_view_t>& targets, void* extra)
@@ -333,7 +321,11 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
 
     try
     {
-        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, &this->wanted_hooks);
+        auto noLog = [](const auto& entry)
+        {
+            return !entry.actions.log;
+        };
+        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, noLog, this->wanted_hooks);
     }
     catch (const std::runtime_error& exc)
     {
@@ -341,15 +333,6 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
                   << "Reason: " << exc.what() << "\n";
         throw -1;
     }
-
-    auto& hooks = this->wanted_hooks;
-    auto noLog = [](const auto& entry)
-    {
-        return !entry.actions.log;
-    };
-    hooks.erase(
-        std::remove_if(std::begin(hooks), std::end(hooks), noLog),
-        std::end(hooks));
 
     if (this->wanted_hooks.empty())
     {
