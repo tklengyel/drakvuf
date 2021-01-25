@@ -626,6 +626,7 @@ AC_CONFIG_FILES([Makefile src/Makefile
                  src/dirwatch/Makefile
                  src/libusermode/Makefile
                  src/librepl/Makefile
+                 src/libhook/Makefile
                ])
 
 AC_OUTPUT
