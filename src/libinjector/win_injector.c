@@ -2005,14 +2005,12 @@ static void print_injection_info(output_format_t format, const char* file, injec
             arguments++;
     }
     else
-    {
         arguments = "";
-    }
 
     if (injector->expanded_target.contents)
-    {
         process_name = (char*)injector->expanded_target.contents;
-    }
+    else
+        process_name = "";
 
     char* escaped_pname = g_strescape(process_name, NULL);
     char* escaped_arguments = g_strescape(arguments, NULL);
