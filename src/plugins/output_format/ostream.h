@@ -122,6 +122,20 @@ inline void unputc(std::ostream& os)
     }
 }
 
+class RestoreFlags
+{
+private:
+    std::ios_base& ios;
+    std::ios_base::fmtflags const flags;
+
+public:
+    explicit RestoreFlags(std::ios_base& ios) : ios{ios}, flags{ios.flags()} {}
+    ~RestoreFlags()
+    {
+        ios.flags(flags);
+    }
+};
+
 extern std::ostream cout;
 
 } // namespace fmt

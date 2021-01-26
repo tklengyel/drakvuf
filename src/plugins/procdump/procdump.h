@@ -139,6 +139,7 @@ public:
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes;
     std::string const procdump_dir;
     bool const use_compression;
+    // FIXME Base class `pluginex` contains member `traps`
     GSList* traps;
     uint64_t procdumps_count;
     pool_map_t pools;
@@ -159,6 +160,8 @@ public:
 
     procdump(drakvuf_t drakvuf, const procdump_config* config, output_format_t output);
     ~procdump();
+
+    bool stop();
 };
 
 #endif

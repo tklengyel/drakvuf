@@ -867,6 +867,8 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
             // TODO Check if this line could be reached (look "detach" function)
             plugin->terminating.erase(info->attached_proc_data.pid);
             plugin->terminated_processes->insert_or_assign(info->attached_proc_data.pid, true);
+            if (plugin->terminating.empty() && plugin->is_stopping())
+                drakvuf_interrupt(drakvuf, 1);
         }
 
         return VMI_EVENT_RESPONSE_NONE;
@@ -1043,4 +1045,11 @@ procdump::~procdump()
     }
 
     g_slist_free(this->traps);
+}
+
+bool procdump::stop()
+{
+    destroy_all_traps();
+    m_is_stopping = true;
+    return terminating.empty();
 }
