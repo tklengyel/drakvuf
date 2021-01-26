@@ -2429,6 +2429,8 @@ SYSCALL(NtUserCallTwoParam, NTSTATUS, 3,
 SYSCALL(NtUserGetAsyncKeyState, SHORT, 1,
         "Key", "", DIR_IN, INT
        );
+SYSCALL(NtUserGetDC, HANDLE, 1,
+        "hWnd", "", DIR_IN, HWND);
 SYSCALL(NtUserGetKeyState, SHORT, 1,
         "VirtKey", "", DIR_IN, INT
        );
@@ -3642,7 +3644,6 @@ SYSCALL(NtUserGetCursor, NTSTATUS, 0);
 SYSCALL(NtUserGetCursorDims, NTSTATUS, 0);
 SYSCALL(NtUserGetCursorFrameInfo, NTSTATUS, 0);
 SYSCALL(NtUserGetCursorInfo, NTSTATUS, 0);
-SYSCALL(NtUserGetDC, NTSTATUS, 0);
 SYSCALL(NtUserGetDCEx, NTSTATUS, 0);
 SYSCALL(NtUserGetDManipHookInitFunction, NTSTATUS, 0);
 SYSCALL(NtUserGetDesktopID, NTSTATUS, 0);
