@@ -165,15 +165,16 @@ void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
 
     if (syscall)
     {
-        std::vector<std::pair<std::string, fmt::Aarg>> fmt_args;
+        s->fmt_args.clear();
+
         if (sc)
             for (size_t i = 0; i < args.size(); ++i)
             {
                 auto str = extract_string(s, drakvuf, info, sc->args[i], args[i]);
                 if ( !str.empty() )
-                    fmt_args.push_back(keyval(sc->args[i].name, fmt::Qstr(str)));
+                    s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Qstr(str)));
                 else
-                    fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(args[i])));
+                    s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(args[i])));
             }
 
         fmt::print(s->format, "syscall", drakvuf, info,
@@ -182,7 +183,7 @@ void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
                    keyval("CR3", fmt::Xval(info->regs->cr3)),
                    keyval("Syscall", fmt::Nval(nr)),
                    keyval("NArgs", fmt::Nval(args.size())),
-                   fmt_args
+                   s->fmt_args
                   );
     }
     else
