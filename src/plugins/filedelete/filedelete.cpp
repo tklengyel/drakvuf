@@ -664,6 +664,18 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return finish_readfile(drakvuf, info, vmi, injector->finish_status);
 }
 
+event_response_t close_handle_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    wrapper_t* injector = (wrapper_t*)info->trap->data;
+
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, injector->target_rsp))
+        return VMI_EVENT_RESPONSE_NONE;
+    injector->target_rsp = 0;
+
+    auto vmi = vmi_lock_guard(drakvuf);
+    return finish_readfile(drakvuf, info, vmi, injector->finish_status);
+}
+
 event_response_t unmapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
@@ -680,6 +692,12 @@ event_response_t unmapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             injector->target_rsp = info->regs->rsp;
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
+    }
+
+    if (inject_close_handle(drakvuf, info, vmi, injector))
+    {
+        injector->target_rsp = info->regs->rsp;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
     return finish_readfile(drakvuf, info, vmi, injector->finish_status);
@@ -1400,6 +1418,7 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
         this->queryvolumeinfo_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryVolumeInformationFile");
         this->queryinfo_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryInformationFile");
         this->createsection_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwCreateSection");
+        this->close_handle_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwClose");
         this->mapview_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwMapViewOfSection");
         this->unmapview_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwUnmapViewOfSection");
         this->readfile_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwReadFile");
