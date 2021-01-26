@@ -108,6 +108,7 @@
 #include <glib.h>
 #include "plugins/plugins.h"
 #include "plugins/private.h"
+#include "plugins/output_format.h"
 
 struct syscalls_config
 {
@@ -135,6 +136,8 @@ public:
 
     addr_t kernel_base;
     addr_t win32k_base;
+
+    std::vector<std::pair<char const*, fmt::Aarg>> fmt_args; // cache
 
     syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     ~syscalls();
