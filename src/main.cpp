@@ -630,12 +630,12 @@ int main(int argc, char** argv)
     if (drakvuf->start_plugins(plugin_list, &options) < 0)
         return drakvuf_exit_code_t::FAIL;
 
-    PRINT_DEBUG("Beginning DRAKVUF loop\n");
+    PRINT_DEBUG("Beginning DRAKVUF main loop\n");
 
     /* Start the event listener */
     drakvuf->loop(timeout);
 
-    PRINT_DEBUG("Finished DRAKVUF loop\n");
+    PRINT_DEBUG("Finished DRAKVUF main loop\n");
 
     switch (drakvuf->is_interrupted())
     {
