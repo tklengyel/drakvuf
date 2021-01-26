@@ -119,6 +119,7 @@
 #include <map>
 #include <string>
 #include <optional>
+#include <stdexcept>
 
 #include <config.h>
 #include <glib.h>
@@ -848,20 +849,165 @@ std::optional<HookActions> get_hook_actions(const std::string& str)
     return std::nullopt;
 }
 
+namespace
+{
+std::optional<std::string> try_parse_token(std::stringstream& ss)
+{
+    const char SEPARATOR = ',';
+    std::string result;
+    if (!std::getline(ss, result, SEPARATOR) || result.empty())
+    {
+        return std::nullopt;
+    }
+    return result;
+}
+
+std::string parse_token(std::stringstream& ss)
+{
+    auto maybe_token = try_parse_token(ss);
+    if (!maybe_token)
+    {
+        throw std::runtime_error{"Expected a token"};
+    }
+    return *maybe_token;
+}
+
+std::unique_ptr<ArgumentPrinter> make_arg_printer(
+    const PrinterConfig& config,
+    const std::string& type,
+    const std::string& name)
+{
+    if (type == "lpstr" || type == "lpcstr" || type == "lpctstr")
+    {
+        return std::make_unique<AsciiPrinter>(name, config);
+    }
+    else if (type == "lpcwstr" || type == "lpwstr" || type == "bstr")
+    {
+        return std::make_unique<WideStringPrinter>(name, config);
+    }
+    else if (type == "punicode_string")
+    {
+        return std::make_unique<UnicodePrinter>(name, config);
+    }
+    else if (type == "pulong")
+    {
+        return std::make_unique<UlongPrinter>(name, config);
+    }
+    else if (type == "lpvoid*")
+    {
+        return std::make_unique<PointerToPointerPrinter>(name, config);
+    }
+    else if (type == "refclsid" || type == "refiid")
+    {
+        return std::make_unique<GuidPrinter>(name, config);
+    }
+    else if (type == "binary16")
+    {
+        return std::make_unique<Binary16StringPrinter>(name, config);
+    }
+
+    return std::make_unique<ArgumentPrinter>(name, config);
+}
+
+
+std::vector<std::unique_ptr<ArgumentPrinter>> parse_arguments(
+            const PrinterConfig& config,
+            std::stringstream& ss)
+{
+    std::vector<std::unique_ptr<ArgumentPrinter>> argument_printers;
+
+    for (size_t arg_idx = 0; ; arg_idx++)
+    {
+        auto maybe_arg = try_parse_token(ss);
+        if (!maybe_arg) break;
+
+        const std::string arg = *maybe_arg;
+        std::string arg_name;
+        std::string arg_type;
+        const auto pos = arg.find_first_of(':');
+
+        if (pos == std::string::npos)
+        {
+            arg_name = std::string("Arg") + std::to_string(arg_idx);
+            arg_type = arg;
+        }
+        else
+        {
+            arg_name = arg.substr(0, pos);
+            arg_type = arg.substr(pos + 1);
+        }
+
+        argument_printers.emplace_back(make_arg_printer(config, arg_type, arg_name));
+    }
+    return argument_printers;
+}
+
+plugin_target_config_entry_t parse_entry(
+    std::stringstream& ss,
+    PrinterConfig& config)
+{
+    plugin_target_config_entry_t entry{};
+
+    entry.dll_name = parse_token(ss);
+    entry.function_name = parse_token(ss);
+    entry.type = HOOK_BY_NAME;
+
+    std::string log_strategy_or_offset;
+    std::string token = parse_token(ss);
+    if (token == "clsid")
+    {
+        entry.clsid = parse_token(ss);
+        log_strategy_or_offset = parse_token(ss);
+    }
+    else
+    {
+        log_strategy_or_offset = token;
+    }
+
+    std::optional<HookActions> actions = get_hook_actions(log_strategy_or_offset);
+    if (!actions)
+    {
+        entry.type = HOOK_BY_OFFSET;
+        try
+        {
+            entry.offset = std::stoull(log_strategy_or_offset, 0, 16);
+        }
+        catch (const std::logic_error& exc)
+        {
+            throw std::runtime_error{"Invalid offset"};
+        }
+
+        std::string strategy_name = parse_token(ss);
+        actions = get_hook_actions(strategy_name);
+        if (!actions)
+            throw std::runtime_error{"Invalid hook action"};
+    }
+
+    entry.actions = *actions;
+    entry.argument_printers = parse_arguments(config, ss);
+
+    return entry;
+}
+}
+
+
 void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, const bool print_no_addr, std::vector<plugin_target_config_entry_t>* wanted_hooks)
 {
+    PrinterConfig config{};
+    config.print_no_addr = print_no_addr;
+
     if (!dll_hooks_list_path)
     {
         const auto log_and_stack = HookActions::empty().set_log().set_stack();
         // if the DLL hook list was not provided, we provide some simple defaults
-        std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec1;
-        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("wVersionRequired", print_no_addr));
-        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("lpWSAData", print_no_addr));
+        std::vector<std::unique_ptr<ArgumentPrinter>> arg_vec1;
+        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("wVersionRequired", config));
+        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("lpWSAData", config));
         wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", log_and_stack, std::move(arg_vec1));
 
-        std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec2;
-        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("ExitCode", print_no_addr));
-        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("Unknown", print_no_addr));
+        std::vector<std::unique_ptr<ArgumentPrinter>> arg_vec2;
+        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("ExitCode", config));
+        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("Unknown", config));
         wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", log_and_stack, std::move(arg_vec2));
         return;
     }
@@ -870,119 +1016,27 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
 
     if (!ifs)
     {
-        throw -1;
+        throw std::runtime_error{"Cannnot open DLL hook file"};
     }
 
     std::string line;
-    while (std::getline(ifs, line))
+    for (size_t line_no = 1; std::getline(ifs, line); line_no++)
     {
         if (line.empty() || line[0] == '#')
             continue;
 
-        std::stringstream ss(line);
-
-        wanted_hooks->push_back(plugin_target_config_entry_t());
-        plugin_target_config_entry_t& e = wanted_hooks->back();
-
-        if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
-            throw -1;
-
-        if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
-            throw -1;
-
-        e.type = HOOK_BY_NAME;
-
-        std::string log_strategy_or_offset;
-        std::string token;
-        if (!std::getline(ss, token, ','))
+        try
         {
-            throw -1;
+            std::stringstream ss(line);
+            wanted_hooks->push_back(parse_entry(ss, config));
         }
-
-        if (token == "clsid")
+        catch (const std::runtime_error& exc)
         {
-            if (!std::getline(ss, e.clsid, ',') || e.clsid.empty())
-                throw -1;
+            std::stringstream ss;
+            ss << "Invalid entry on line " << line_no << ": " << exc.what();
 
-            if (!std::getline(ss, log_strategy_or_offset, ','))
-                throw -1;
-        }
-        else
-            log_strategy_or_offset = token;
-
-        std::optional<HookActions> actions = get_hook_actions(log_strategy_or_offset);
-        if (actions)
-        {
-            e.actions = *actions;
-        }
-        else
-        {
-            e.offset = std::stoull(log_strategy_or_offset, 0, 16);
-            e.type = HOOK_BY_OFFSET;
-
-            std::string strategy_name;
-            if (!std::getline(ss, strategy_name, ',') || strategy_name.empty())
-                throw -1;
-
-            actions = get_hook_actions(strategy_name);
-            if (!actions)
-                throw -1;
-
-            e.actions = *actions;
-        }
-
-        std::string arg;
-        size_t arg_idx = 0;
-        while (std::getline(ss, arg, ',') && !arg.empty())
-        {
-            auto pos = arg.find_first_of(':');
-            std::string arg_name;
-            std::string arg_type;
-            if (pos == std::string::npos)
-            {
-                arg_name = std::string("Arg") + std::to_string(arg_idx);
-                arg_type = arg;
-            }
-            else
-            {
-                arg_name = arg.substr(0, pos);
-                arg_type = arg.substr(pos + 1);
-            }
-
-            if (arg_type == "lpstr" || arg_type == "lpcstr" || arg_type == "lpctstr")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new AsciiPrinter(arg_name, print_no_addr)));
-            }
-            else if (arg_type == "lpcwstr" || arg_type == "lpwstr" || arg_type == "bstr")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new WideStringPrinter(arg_name, print_no_addr)));
-            }
-            else if (arg_type == "punicode_string")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UnicodePrinter(arg_name, print_no_addr)));
-            }
-            else if (arg_type == "pulong")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UlongPrinter(arg_name, print_no_addr)));
-            }
-            else if (arg_type == "lpvoid*")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new PointerToPointerPrinter(arg_name, print_no_addr)));
-            }
-            else if (arg_type == "refclsid" || arg_type == "refiid")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new GuidPrinter(arg_name, print_no_addr)));
-            }
-            else if (arg_type == "binary16")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new Binary16StringPrinter(arg_name, print_no_addr)));
-            }
-            else
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new ArgumentPrinter(arg_name, print_no_addr)));
-            }
-
-            ++arg_idx;
+            // Rethrow exception
+            throw std::runtime_error{ss.str()};
         }
     }
 }
