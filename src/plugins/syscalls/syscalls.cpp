@@ -154,6 +154,16 @@ static std::string extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_i
     return str;
 }
 
+static uint64_t mask_value(const arg_t& arg, uint64_t val)
+{
+    if (arg.type == BYTE || arg.type == BOOLEAN)
+        return val & 0xff;
+    if (arg.type == SHORT || arg.type == USHORT || arg.type == WORD)
+        return val & 0xffff;
+    if (arg.type == DWORD || arg.type == INT || arg.type == UINT || arg.type == LONG || arg.type == ULONG)
+        return val & 0xffffffff;
+    return val;
+}
 void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
                    bool syscall, drakvuf_trap_info_t* info,
                    int nr, std::string module, const syscall_t* sc,
@@ -174,7 +184,7 @@ void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
                 if ( !str.empty() )
                     s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Qstr(str)));
                 else
-                    s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(args[i])));
+                    s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval( mask_value(sc->args[i], args[i]) )));
             }
 
         fmt::print(s->format, "syscall", drakvuf, info,
