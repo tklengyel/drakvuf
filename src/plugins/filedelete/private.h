@@ -293,6 +293,7 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t close_handle_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 event_response_t mapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 event_response_t unmapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
@@ -306,6 +307,7 @@ bool inject_waitobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instanc
 bool inject_queryvolumeinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
 bool inject_queryinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
 bool inject_createsection(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
+bool inject_close_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
 bool inject_mapview(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
 bool inject_unmapview(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
 bool inject_memcpy(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);

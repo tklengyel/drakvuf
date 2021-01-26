@@ -661,8 +661,10 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
 
     if (!drakvuf_is_interrupted(drakvuf))
     {
-        PRINT_DEBUG("Starting injection loop\n");
+        const char* method = injector->method == INJECT_METHOD_TERMINATEPROC ? "termination" : "injection";
+        PRINT_DEBUG("Starting %s loop\n", method);
         drakvuf_loop(drakvuf, is_interrupted, NULL);
+        PRINT_DEBUG("Finished %s loop\n", method);
     }
 
     if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
