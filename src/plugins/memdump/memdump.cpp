@@ -353,7 +353,7 @@ done:
     free(tmp_file_path);
     free(metafile);
     g_free(access_ptrs);
-
+    g_checksum_free(checksum);
     return ret;
 }
 
