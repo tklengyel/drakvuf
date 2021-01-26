@@ -1043,6 +1043,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         if (rc < 0)
         {
             g_slice_free(struct remapped_gfn, remapped_gfn);
+            remapped_gfn = NULL;
             goto err_exit;
         }
 
@@ -1161,8 +1162,9 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 err_exit:
     if ( container->traps )
         g_slist_free(container->traps);
+    if ( remapped_gfn )
+        g_hash_table_remove(drakvuf->remapped_gfns, &remapped_gfn->o);
     g_slice_free(struct wrapper, container);
-    g_hash_table_remove(drakvuf->remapped_gfns, &remapped_gfn->o);
     return 0;
 }
 
