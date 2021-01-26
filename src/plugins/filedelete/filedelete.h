@@ -169,6 +169,7 @@ public:
     addr_t queryvolumeinfo_va = 0;
     addr_t queryinfo_va = 0;
     addr_t createsection_va = 0;
+    addr_t close_handle_va = 0;
     addr_t mapview_va = 0;
     addr_t unmapview_va = 0;
     addr_t readfile_va = 0;
