@@ -238,7 +238,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
          * On older kernels: __visible void do_syscall_64(struct pt_regs *regs)
          */
         pt_regs = info->regs->rdi;
-        vmi_read_addr_va(vmi, pt_regs + s->offsets[PT_REGS_ORIG_RAX], 0, &nr);
+        (void)vmi_read_addr_va(vmi, pt_regs + s->offsets[PT_REGS_ORIG_RAX], 0, &nr);
     }
     else
     {
