@@ -382,7 +382,7 @@ bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
 bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
-        bool ret;
+    bool ret;
 
     if (!trap || !trap->cb)
         return 0;

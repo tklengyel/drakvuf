@@ -258,7 +258,7 @@ struct drakvuf_trap
     int64_t ttl;
     time_t last_ttl_rst;
     // Callback invoked when the trap hits api-hammering limit. If not set (NULL),
-    // the trap will be simply unhooked (not deleted). 
+    // the trap will be simply unhooked (not deleted).
     void(*ah_cb)(drakvuf_t, drakvuf_trap_t*);
 };
 
