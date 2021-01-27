@@ -112,5 +112,5 @@ void free_remapped_gfn(gpointer p)
 
 void free_wrapper(gpointer p)
 {
-    g_slice_free(struct pa_traps_set, p);
+    g_slice_free(struct wrapper, p);
 }

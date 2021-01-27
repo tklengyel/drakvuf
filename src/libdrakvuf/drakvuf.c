@@ -249,7 +249,6 @@ int drakvuf_is_interrupted(drakvuf_t drakvuf)
 
 bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
-
     if (trap->breakpoint.lookup_type == LOOKUP_NONE)
     {
         return inject_trap_pa(drakvuf, trap, trap->breakpoint.addr);
@@ -383,11 +382,13 @@ bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
 bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
-
-    bool ret;
+        bool ret;
 
     if (!trap || !trap->cb)
         return 0;
+
+    if (!trap->ah_cb)
+        trap->ah_cb = drakvuf_unhook_trap;
 
     if (g_hash_table_lookup(drakvuf->remove_traps, &trap))
     {
@@ -452,6 +453,11 @@ void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap,
         if (free_routine)
             free_routine(trap);
     }
+}
+
+void drakvuf_unhook_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+{
+    drakvuf_remove_trap(drakvuf, trap, NULL);
 }
 
 vmi_instance_t drakvuf_lock_and_get_vmi(drakvuf_t drakvuf)

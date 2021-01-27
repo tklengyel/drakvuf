@@ -328,6 +328,7 @@ void setup_linux(drakvuf_t drakvuf, syscalls* s)
     trap->cb = linux_cb;
     trap->data = w;
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    trap->ah_cb = nullptr;
 
     if ( drakvuf_add_trap(drakvuf, trap) )
         s->traps = g_slist_prepend(s->traps, trap);

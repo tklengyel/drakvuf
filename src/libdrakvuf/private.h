@@ -272,7 +272,7 @@ struct memaccess
     vmi_mem_access_t access;
 };
 
-struct pa_traps_set
+struct wrapper
 {
     trap_type_t type;
     drakvuf_t drakvuf;

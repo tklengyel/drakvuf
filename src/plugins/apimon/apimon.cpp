@@ -234,6 +234,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     trap->breakpoint.addr_type = ADDR_VA;
     trap->breakpoint.addr = ret_addr;
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    trap->ah_cb = nullptr;
 
     if (drakvuf_add_trap(drakvuf, trap))
     {

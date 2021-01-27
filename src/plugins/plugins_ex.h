@@ -356,6 +356,7 @@ class pluginex : public plugin
 {
 public:
     typedef event_response_t(*hook_cb_t)(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    typedef void(*ah_cb_t)(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 
     pluginex(drakvuf_t drakvuf, output_format_t output)
         : m_output_format(output), drakvuf(drakvuf)
@@ -373,7 +374,8 @@ public:
                                   hook_cb_t hook_cb,
                                   IB init_breakpoint,
                                   const char* trap_name,
-                                  int64_t ttl)
+                                  int64_t ttl,
+                                  ah_cb_t ah_cb)
     {
         auto trap = new drakvuf_trap_t;
 
@@ -391,6 +393,7 @@ public:
         trap->cb = hook_cb;
         trap->type = BREAKPOINT;
         trap->ttl = ttl;
+        trap->ah_cb = ah_cb;
 
         if (!init_breakpoint(drakvuf, info, trap))
         {
@@ -408,10 +411,21 @@ public:
     drakvuf_trap_t* register_trap(drakvuf_trap_info_t* info,
                                   hook_cb_t hook_cb,
                                   IB init_breakpoint,
+                                  const char* trap_name,
+                                  int64_t tll)
+    {
+        return register_trap<Params, IB>(info, hook_cb, init_breakpoint, trap_name, tll, nullptr);
+    }
+
+    // Params property is optional
+    template<typename Params = void, typename IB>
+    drakvuf_trap_t* register_trap(drakvuf_trap_info_t* info,
+                                  hook_cb_t hook_cb,
+                                  IB init_breakpoint,
                                   const char* trap_name = nullptr)
     {
         int64_t limited_traps_ttl = drakvuf_get_limited_traps_ttl(drakvuf);
-        return register_trap<Params, IB>(info, hook_cb, init_breakpoint, trap_name, limited_traps_ttl);
+        return register_trap<Params, IB>(info, hook_cb, init_breakpoint, trap_name, limited_traps_ttl, nullptr);
     }
 
     void destroy_trap(drakvuf_trap_t* target)

@@ -448,6 +448,7 @@ static bool dump_next_vads(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     ctx->bp2->breakpoint.addr_type = ADDR_VA;
     ctx->bp2->breakpoint.addr = ctx->plugin->clean_process_va;
     ctx->bp2->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    ctx->bp2->ah_cb = nullptr;
     if (drakvuf_add_trap(drakvuf, ctx->bp2))
     {
         ctx->plugin->traps = g_slist_prepend(ctx->plugin->traps, ctx->bp2);
@@ -935,6 +936,7 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     ctx->bp->breakpoint.addr_type = ADDR_VA;
     ctx->bp->breakpoint.addr = info->regs->rip;
     ctx->bp->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    ctx->bp->ah_cb = nullptr;
     if (drakvuf_add_trap(drakvuf, ctx->bp))
     {
         plugin->traps = g_slist_prepend(plugin->traps, ctx->bp);

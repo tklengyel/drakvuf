@@ -253,10 +253,13 @@ struct drakvuf_trap
     };
 
     // How many times trap can be hit in TRAP_TTL_RESET_INTERVAL_SEC interval,
-    // before it gets discarded. Protects against api_hammering.
+    // before it gets discarded. Protects against api-hammering.
     // -1 for infinity.
     int64_t ttl;
     time_t last_ttl_rst;
+    // Callback invoked when the trap hits api-hammering limit. If not set (NULL),
+    // the trap will be simply unhooked (not deleted). 
+    void(*ah_cb)(drakvuf_t, drakvuf_trap_t*);
 };
 
 
@@ -384,6 +387,7 @@ bool drakvuf_add_trap(drakvuf_t drakvuf,
 void drakvuf_remove_trap (drakvuf_t drakvuf,
                           drakvuf_trap_t* trap,
                           drakvuf_trap_free_t free_routine) NOEXCEPT;
+void drakvuf_unhook_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap) NOEXCEPT;
 void drakvuf_loop (drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), void* data) NOEXCEPT;
 void drakvuf_interrupt (drakvuf_t drakvuf,
                         int sig) NOEXCEPT;

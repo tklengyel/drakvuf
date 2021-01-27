@@ -128,6 +128,7 @@ private:
         .breakpoint.module = "ntoskrnl.exe",
         .type = BREAKPOINT,
         .data = (void*)this,
+        .ah_cb = nullptr
     };
 
     void register_trap(drakvuf_t drakvuf, const char* syscall_name,

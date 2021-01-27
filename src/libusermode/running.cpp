@@ -142,6 +142,7 @@ void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvu
 bool userhook::add_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    trap->ah_cb = nullptr;
     if (!drakvuf_add_trap(drakvuf, trap))
         return false;
     running_traps.push_back(trap);

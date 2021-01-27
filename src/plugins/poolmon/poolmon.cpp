@@ -259,6 +259,7 @@ poolmon::poolmon(drakvuf_t drakvuf, output_format_t output)
     this->trap.cb = cb;
     this->trap.data = (void*)this;
     this->trap.ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    this->trap.ah_cb = nullptr;
     this->format = output;
 
     if ( !drakvuf_add_trap(drakvuf, &this->trap) )

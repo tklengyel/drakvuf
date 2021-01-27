@@ -200,7 +200,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
      * The trap may have been removed since in another callback,
      * in which case we have nothing to do.
      */
-    struct pa_traps_set* s = (struct pa_traps_set*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &pass->gfn);
+    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &pass->gfn);
     if (!s)
     {
         PRINT_DEBUG("Post mem cb @ 0x%lx has been cleared\n", pass->gfn);
@@ -287,7 +287,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
 
             addr_t* pa = (addr_t*)loop->data;
             uint8_t test = 0;
-            s = (struct pa_traps_set*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, pa);
+            s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, pa);
 
             if ( VMI_FAILURE == vmi_read_8_pa(drakvuf->vmi, *pa, &test) )
             {
@@ -403,7 +403,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
         return rsp | VMI_EVENT_RESPONSE_EMULATE_NOWRITE;
     }
 
-    struct pa_traps_set* s = (struct pa_traps_set*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &event->mem_event.gfn);
+    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &event->mem_event.gfn);
     if (!s)
     {
         PRINT_DEBUG("Event has been cleared for GFN 0x%lx but we are still in view %u\n",
@@ -448,7 +448,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     /* We need to call breakpoint handlers registered for this physical address */
     if (event->mem_event.out_access & VMI_MEMACCESS_X)
     {
-        struct pa_traps_set* sbp = (struct pa_traps_set*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
+        struct wrapper* sbp = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
 
         if (sbp)
         {
@@ -474,7 +474,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     process_free_requests(drakvuf);
 
     // Check if we have traps still active on this page
-    s = (struct pa_traps_set*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &event->mem_event.gfn);
+    s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &event->mem_event.gfn);
     if (s)
     {
         /*
@@ -566,7 +566,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
                 event->interrupt_event.gla, event->interrupt_event.insn_length);
 #endif
 
-    struct pa_traps_set* s = (struct pa_traps_set*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
+    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
     if (!s)
     {
         /*
@@ -646,11 +646,8 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
         }
 
         if (--trap->ttl == 0)
-        {
-            // Does not break the loop, as we just schedule traps to get
-            // removed later (in_callback == 1).
-            drakvuf_remove_trap(drakvuf, trap, NULL);
-        }
+            trap->ah_cb(drakvuf, trap);
+
         update_ttl_loop = update_ttl_loop->next;
     }
     drakvuf->in_callback = 0;
@@ -804,7 +801,7 @@ void remove_trap(drakvuf_t drakvuf,
     {
         case BREAKPOINT:
         {
-            struct pa_traps_set* container = (struct pa_traps_set*)g_hash_table_lookup(drakvuf->breakpoint_lookup_trap, &trap);
+            struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_trap, &trap);
 
             if ( !container )
                 return;
@@ -861,7 +858,7 @@ void remove_trap(drakvuf_t drakvuf,
         case MEMACCESS:
         {
             status_t ret;
-            struct pa_traps_set* container = (struct pa_traps_set*)g_hash_table_lookup(drakvuf->memaccess_lookup_trap, &trap);
+            struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_trap, &trap);
             if ( !container )
                 return;
 
@@ -948,7 +945,7 @@ void remove_trap(drakvuf_t drakvuf,
 
 bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
 {
-    struct pa_traps_set* s = (struct pa_traps_set*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &trap->memaccess.gfn);
+    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &trap->memaccess.gfn);
 
     // We already have a trap registered on this page
     // check if type matches, if so, add trap to the list
@@ -988,7 +985,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
     }
     else
     {
-        s = (struct pa_traps_set*)g_slice_alloc0(sizeof(struct pa_traps_set));
+        s = (struct wrapper*)g_slice_alloc0(sizeof(struct wrapper));
         s->drakvuf = drakvuf;
         s->traps = g_slist_prepend(s->traps, trap);
         s->memaccess.gfn = trap->memaccess.gfn;
@@ -1006,7 +1003,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
             PRINT_DEBUG("*** FAILED TO SET MEMORY TRAP @ PAGE %lu ***\n",
                         trap->memaccess.gfn);
             g_slist_free(s->traps);
-            g_slice_free(struct pa_traps_set, s);
+            g_slice_free(struct wrapper, s);
             return 0;
         }
 
@@ -1026,7 +1023,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     // check if already marked
     vmi_instance_t vmi = drakvuf->vmi;
     xen_pfn_t current_gfn = pa >> 12;
-    struct pa_traps_set* container = (struct pa_traps_set*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
+    struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
 
     if (container)
     {
@@ -1047,7 +1044,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         return 1;
     }
 
-    container = (struct pa_traps_set*)g_slice_alloc0(sizeof(struct pa_traps_set));
+    container = (struct wrapper*)g_slice_alloc0(sizeof(struct wrapper));
     if ( !container )
         return 0;
 
@@ -1190,7 +1187,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 err_exit:
     if ( container->traps )
         g_slist_free(container->traps);
-    g_slice_free(struct pa_traps_set, container);
+    g_slice_free(struct wrapper, container);
     g_hash_table_remove(drakvuf->remapped_gfns, &remapped_gfn->o);
     return 0;
 }
@@ -1578,7 +1575,7 @@ void close_vmi(drakvuf_t drakvuf)
     {
         GHashTableIter i;
         addr_t* key = NULL;
-        struct pa_traps_set* s = NULL;
+        struct wrapper* s = NULL;
         ghashtable_foreach(drakvuf->memaccess_lookup_gfn, i, key, s)
         {
             g_slist_free(s->traps);
@@ -1605,7 +1602,7 @@ void close_vmi(drakvuf_t drakvuf)
     {
         GHashTableIter i;
         addr_t* key = NULL;
-        struct pa_traps_set* s = NULL;
+        struct wrapper* s = NULL;
         ghashtable_foreach(drakvuf->breakpoint_lookup_pa, i, key, s)
         {
             g_slist_free(s->traps);

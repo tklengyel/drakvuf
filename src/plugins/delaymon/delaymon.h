@@ -19,6 +19,7 @@ public:
         .type = BREAKPOINT,
         .data = (void*)this,
         .name = nullptr,
+        .ah_cb = nullptr
     };
 
     delaymon(drakvuf_t drakvuf, output_format_t output);

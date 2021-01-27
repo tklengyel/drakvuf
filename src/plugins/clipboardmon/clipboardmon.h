@@ -127,7 +127,8 @@ private:
             .breakpoint.lookup_type = LOOKUP_DTB,
             .breakpoint.addr_type = ADDR_VA,
             .type = BREAKPOINT,
-            .data = (void*)this
+            .data = (void*)this,
+            .ah_cb = nullptr
         }
     };
 };
