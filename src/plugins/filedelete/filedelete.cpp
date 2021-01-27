@@ -664,6 +664,18 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return finish_readfile(drakvuf, info, vmi, injector->finish_status);
 }
 
+event_response_t close_handle_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    wrapper_t* injector = (wrapper_t*)info->trap->data;
+
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, injector->target_rsp))
+        return VMI_EVENT_RESPONSE_NONE;
+    injector->target_rsp = 0;
+
+    auto vmi = vmi_lock_guard(drakvuf);
+    return finish_readfile(drakvuf, info, vmi, injector->finish_status);
+}
+
 event_response_t unmapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
@@ -680,6 +692,12 @@ event_response_t unmapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             injector->target_rsp = info->regs->rsp;
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
+    }
+
+    if (inject_close_handle(drakvuf, info, vmi, injector))
+    {
+        injector->target_rsp = info->regs->rsp;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
     return finish_readfile(drakvuf, info, vmi, injector->finish_status);
@@ -1375,7 +1393,8 @@ static addr_t get_function_va(drakvuf_t drakvuf, const char* lib, const char* fu
 }
 
 filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_format_t output)
-    : offsets(new size_t[__OFFSET_MAX])
+    : drakvuf(drakvuf)
+    , offsets(new size_t[__OFFSET_MAX])
     , dump_folder(c->dump_folder)
     , pm(drakvuf_get_page_mode(drakvuf))
     , format(output)
@@ -1401,6 +1420,7 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
         this->queryvolumeinfo_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryVolumeInformationFile");
         this->queryinfo_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryInformationFile");
         this->createsection_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwCreateSection");
+        this->close_handle_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwClose");
         this->mapview_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwMapViewOfSection");
         this->unmapview_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwUnmapViewOfSection");
         this->readfile_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwReadFile");
@@ -1432,5 +1452,15 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
 
 filedelete::~filedelete()
 {
+    if (!m_is_stopping)
+        stop();
     delete[] offsets;
+}
+
+bool filedelete::stop()
+{
+    for (unsigned long i = 0; i < sizeof(traps)/sizeof(traps[0]); ++i)
+        drakvuf_remove_trap(drakvuf, &traps[i], nullptr);
+    m_is_stopping = true;
+    return closing_handles.empty();
 }

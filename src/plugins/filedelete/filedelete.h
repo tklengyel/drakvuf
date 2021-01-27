@@ -147,6 +147,7 @@ public:
             .ah_cb = nullptr
         }
     };
+    drakvuf_t drakvuf = nullptr;
     size_t* offsets;
     size_t control_area_size = 0;
     size_t mmpte_size = 0;
@@ -163,10 +164,13 @@ public:
     filedelete(drakvuf_t drakvuf, const filedelete_config* config, output_format_t output);
     ~filedelete();
 
+    bool stop();
+
     // For `filedelete2`
     addr_t queryvolumeinfo_va = 0;
     addr_t queryinfo_va = 0;
     addr_t createsection_va = 0;
+    addr_t close_handle_va = 0;
     addr_t mapview_va = 0;
     addr_t unmapview_va = 0;
     addr_t readfile_va = 0;

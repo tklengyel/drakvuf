@@ -1069,6 +1069,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         if (rc < 0)
         {
             g_slice_free(struct remapped_gfn, remapped_gfn);
+            remapped_gfn = NULL;
             goto err_exit;
         }
 
@@ -1187,8 +1188,9 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 err_exit:
     if ( container->traps )
         g_slist_free(container->traps);
+    if ( remapped_gfn )
+        g_hash_table_remove(drakvuf->remapped_gfns, &remapped_gfn->o);
     g_slice_free(struct wrapper, container);
-    g_hash_table_remove(drakvuf->remapped_gfns, &remapped_gfn->o);
     return 0;
 }
 
@@ -1344,7 +1346,7 @@ static void drakvuf_poll(drakvuf_t drakvuf, unsigned int timeout)
 void drakvuf_loop(drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), void* data)
 {
 
-    PRINT_DEBUG("Started DRAKVUF loop\n");
+    PRINT_DEBUG("Started DRAKVUF polling loop\n");
 
     drakvuf->interrupted = 0;
     drakvuf_force_resume(drakvuf);
@@ -1357,7 +1359,7 @@ void drakvuf_loop(drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), v
     // Ensures all events are processed from the ring
     drakvuf_poll(drakvuf, 0);
 
-    PRINT_DEBUG("DRAKVUF loop finished\n");
+    PRINT_DEBUG("DRAKVUF polling loop finished\n");
 }
 
 bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)

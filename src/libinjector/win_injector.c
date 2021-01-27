@@ -1915,8 +1915,10 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
 
     if (!drakvuf_is_interrupted(drakvuf))
     {
-        PRINT_DEBUG("Starting injection loop\n");
+        const char* method = injector->method == INJECT_METHOD_TERMINATEPROC ? "termination" : "injection";
+        PRINT_DEBUG("Starting %s loop\n", method);
         drakvuf_loop(drakvuf, is_interrupted, NULL);
+        PRINT_DEBUG("Finished %s loop\n", method);
     }
 
     if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
@@ -2006,14 +2008,12 @@ static void print_injection_info(output_format_t format, const char* file, injec
             arguments++;
     }
     else
-    {
         arguments = "";
-    }
 
     if (injector->expanded_target.contents)
-    {
         process_name = (char*)injector->expanded_target.contents;
-    }
+    else
+        process_name = "";
 
     char* escaped_pname = g_strescape(process_name, NULL);
     char* escaped_arguments = g_strescape(arguments, NULL);

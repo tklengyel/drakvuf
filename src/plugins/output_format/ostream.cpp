@@ -105,8 +105,8 @@
 #include "ostream.h"
 
 #include <sstream>
+#include <cstdio>
 
-#include <stdio.h>
 #include <unistd.h>
 
 namespace fmt
@@ -114,19 +114,41 @@ namespace fmt
 
 class StrBuf : public std::stringbuf
 {
+public:
+    StrBuf() : std::stringbuf(std::ios_base::out) {}
+    ~StrBuf()
+    {
+        sync(0);
+    }
+
 protected:
     int sync() final
+    {
+        return sync(4 * 1024);
+    }
+
+    int sync(int threshold)
+    {
+        if (pptr() - pbase() > threshold)
+            return sync_impl();
+        return 0;
+    }
+
+    int sync_impl()
     {
         // this is required because of printf() logging
         fflush(stdout);
 
-        int size = pptr() - pbase();
-        if (write(STDOUT_FILENO, pbase(), size) == size)
+        for (auto size = pptr() - pbase(); size > 0; )
         {
-            seekpos(0);
-            return 0;
+            auto written = write(STDOUT_FILENO, pbase(), size);
+            if (written < 0)
+                return -1;
+            size -= written;
+            seekoff(written, std::ios_base::cur, std::ios_base::out);
         }
-        return -1;
+        seekpos(0);
+        return 0;
     }
 };
 

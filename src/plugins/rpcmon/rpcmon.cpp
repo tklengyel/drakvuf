@@ -510,17 +510,23 @@ static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::v
 
 static auto rpc_call_args()
 {
+    PrinterConfig config{};
+    config.numeric_format = PrinterConfig::NumericFormat::DECIMAL;
+
     std::vector<std::unique_ptr<ArgumentPrinter>> args;
-    args.emplace_back(std::make_unique<ArgumentPrinter>("pStubDescriptor", false));
-    args.emplace_back(std::make_unique<ArgumentPrinter>("pFormat", false));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("pStubDescriptor", config));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("pFormat", config));
     return args;
 }
 
 static auto rpc_call3_args()
 {
+    PrinterConfig config{};
+    config.numeric_format = PrinterConfig::NumericFormat::DECIMAL;
+
     std::vector<std::unique_ptr<ArgumentPrinter>> args;
-    args.emplace_back(std::make_unique<ArgumentPrinter>("pStubProxy", false));
-    args.emplace_back(std::make_unique<ArgumentPrinter>("ProcedureNumber", false, ArgumentPrinter::DECIMAL));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("pStubProxy", config));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("ProcedureNumber", config));
     return args;
 }
 

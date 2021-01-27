@@ -211,6 +211,24 @@ bool inject_memcpy(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t 
     return true;
 }
 
+bool inject_close_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
+{
+    // Remove stack arguments and home space from previous injection
+    info->regs->rsp = injector->saved_regs.rsp;
+
+    struct argument args[1] = {};
+
+    init_int_argument(&args[0], injector->section_handle);
+
+    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 1))
+        return false;
+
+    info->regs->rip = injector->f->close_handle_va;
+    injector->bp->cb = close_handle_cb;
+
+    return true;
+}
+
 bool inject_unmapview(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector)
 {
     // Remove stack arguments and home space from previous injection

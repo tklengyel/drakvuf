@@ -103,6 +103,8 @@
  ***************************************************************************/
 
 #include <config.h>
+#include <iostream>
+#include <stdexcept>
 #include <glib.h>
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
@@ -335,9 +337,10 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
     {
         drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, &this->wanted_hooks);
     }
-    catch (int e)
+    catch (const std::runtime_error& exc)
     {
-        fprintf(stderr, "Malformed DLL hook configuration for APIMON plugin\n");
+        std::cerr << "Loading DLL hook configuration for APIMON plugin failed\n"
+                  << "Reason: " << exc.what() << "\n";
         throw -1;
     }
 

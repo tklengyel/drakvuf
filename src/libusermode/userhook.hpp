@@ -105,6 +105,7 @@
 #ifndef WIN_USERHOOK_H
 #define WIN_USERHOOK_H
 
+#include <string>
 #include <vector>
 #include <memory>
 

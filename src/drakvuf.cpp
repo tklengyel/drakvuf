@@ -161,6 +161,64 @@ int drakvuf_c::start_plugins(const bool* plugin_list, const plugins_options* opt
     return 1;
 }
 
+int drakvuf_c::stop_plugins(const bool* plugin_list)
+{
+    bool failed = false;
+    bool pending = false;
+
+    for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX && !failed && !pending; i++)
+    {
+        if (plugin_list[i])
+        {
+            int rc = plugins->stop(static_cast<drakvuf_plugin_t>(i));
+            if (rc < 0)
+                failed = true;
+            else if (rc > 0)
+                pending = true;
+        }
+    }
+
+    if (failed)
+        return -1;
+    else if (pending)
+        return 1;
+    else
+        return 0;
+}
+
+struct stop_plugins_data
+{
+    drakvuf_c* _drakvuf_c;
+    const bool* plugin_list;
+};
+
+static bool is_stopped(drakvuf_t drakvuf, void* data)
+{
+    auto d = (struct stop_plugins_data*)data;
+    auto rc = drakvuf_is_interrupted(drakvuf);
+    if (SIGDRAKVUFTIMEOUT == rc)
+    {
+        PRINT_DEBUG("[STOP] Timeout\n");
+        return true;
+    }
+    else
+    {
+        rc = rc || !d->_drakvuf_c->stop_plugins(d->plugin_list);
+        PRINT_DEBUG("[STOP] Check plugins %d\n", rc);
+        return rc == 0;
+    }
+}
+
+void drakvuf_c::plugin_stop_loop(int timeout, const bool* plugin_list)
+{
+    GThread* timeout_thread = startup_timer(this, timeout);
+    struct stop_plugins_data data;
+    data._drakvuf_c = this;
+    data.plugin_list = plugin_list;
+    drakvuf_loop(drakvuf, ::is_stopped, (void*)&data);
+    cleanup_timer(this, timeout_thread);
+}
+
 drakvuf_c::drakvuf_c(const char* domain,
                      const char* json_kernel_path,
                      const char* json_wow_path,
