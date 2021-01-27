@@ -121,7 +121,9 @@ private:
         .type = REGISTER,
         .reg = CR3,
         .data = this,
-        .name = nullptr
+        .name = nullptr,
+        .ttl = UNLIMITED_TTL,
+        .ah_cb = nullptr
     };
 };
 

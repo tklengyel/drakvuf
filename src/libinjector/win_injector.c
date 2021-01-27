@@ -617,6 +617,7 @@ static bool setup_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr
     injector->bp.breakpoint.addr_type = ADDR_VA;
     injector->bp.breakpoint.addr = bp_addr;
     injector->bp.ttl = UNLIMITED_TTL;
+    injector->bp.ah_cb = NULL;
 
     return drakvuf_add_trap(injector->drakvuf, &injector->bp);
 }
@@ -784,6 +785,8 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
                 new_trap->type = MEMACCESS;
                 new_trap->cb = mem_callback;
                 new_trap->data = injector;
+                new_trap->ttl = UNLIMITED_TTL;
+                new_trap->ah_cb = NULL;
                 new_trap->memaccess.access = VMI_MEMACCESS_X;
                 new_trap->memaccess.type = POST;
                 new_trap->memaccess.gfn = page->paddr >> 12;
@@ -996,6 +999,7 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         injector->saved_bp = injector->bp.breakpoint.addr;
         injector->bp.breakpoint.addr = injector->process_notify;
         injector->bp.ttl = UNLIMITED_TTL;
+        injector->bp.ah_cb = NULL;
 
         if ( drakvuf_add_trap(drakvuf, &injector->bp) )
         {
@@ -1899,6 +1903,8 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
         .reg = CR3,
         .cb = wait_for_target_process_cb,
         .data = injector,
+        .ttl = UNLIMITED_TTL,
+        .ah_cb = NULL
     };
     if (!drakvuf_add_trap(drakvuf, &trap))
         return false;
@@ -1909,6 +1915,8 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
         .reg = CR3,
         .cb = wait_for_crash_of_target_process,
         .data = injector,
+        .ttl = UNLIMITED_TTL,
+        .ah_cb = NULL
     };
     if (!drakvuf_add_trap(drakvuf, &trap_crashreporter))
         return false;

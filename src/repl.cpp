@@ -206,7 +206,9 @@ int main(int argc, char** argv)
         .type = REGISTER,
         .reg = CR3,
         .cb = &repl_start,
-        .name = "repl_trap"
+        .name = "repl_trap",
+        .ttl = UNLIMITED_TTL,
+        .ah_cb = nullptr
     };
 
     if (!drakvuf_add_trap(drakvuf, &inject_trap))

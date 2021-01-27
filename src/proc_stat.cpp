@@ -176,6 +176,8 @@ int main(int argc, char** argv)
     trap.type = REGISTER;
     trap.reg = CR3;
     trap.cb = cr3_cb;
+    trap.ttl = UNLIMITED_TTL;
+    trap.ah_cb = nullptr;
 
 
     /* initialize the Drakvuf library */

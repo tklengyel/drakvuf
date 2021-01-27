@@ -278,6 +278,7 @@ static bool setup_linux_int3_trap(injector_t injector, drakvuf_trap_info_t* info
     injector->bp.breakpoint.addr_type = ADDR_VA;
     injector->bp.breakpoint.addr = bp_addr;
     injector->bp.ttl = UNLIMITED_TTL;
+    injector->bp.ah_cb = NULL;
 
     return drakvuf_add_trap(injector->drakvuf, &injector->bp);
 }
@@ -656,6 +657,8 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
         .reg = CR3,
         .cb = wait_for_target_linux_process_cb,
         .data = injector,
+        .ttl = UNLIMITED_TTL,
+        .ah_cb = NULL
     };
 
     if (!drakvuf_add_trap(drakvuf, &trap))
