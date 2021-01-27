@@ -192,6 +192,7 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, output_format_t output)
     this->ssdtwrite.name = nullptr;
     this->ssdtwrite.type = MEMACCESS;
     this->ssdtwrite.ttl = UNLIMITED_TTL;
+    this->ssdtwrite.ah_cb = nullptr;
     this->ssdtwrite.memaccess.gfn = this->kiservicetable >> 12;
     this->ssdtwrite.memaccess.type = PRE;
     this->ssdtwrite.memaccess.access = VMI_MEMACCESS_W;
