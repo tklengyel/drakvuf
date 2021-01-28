@@ -2434,6 +2434,11 @@ SYSCALL(NtUnmapViewOfSection, NTSTATUS, 2,
         "ProcessHandle", "", DIR_IN, HANDLE,
         "BaseAddress", "", DIR_IN, PVOID,
        );
+SYSCALL(NtUnmapViewOfSectionEx, NTSTATUS, 3,
+        "ProcessHandle", "", DIR_IN, HANDLE,
+        "BaseAddress", "", DIR_IN, PVOID,
+        "Flags", "", DIR_IN, ULONG,
+       );
 SYSCALL(NtUserCallTwoParam, NTSTATUS, 3,
         "Param1", "", DIR_IN, DWORD,
         "Param2", "", DIR_IN, DWORD,
@@ -2640,7 +2645,6 @@ SYSCALL(NtSetTimer2, NTSTATUS, 0);
 SYSCALL(NtSetWnfProcessNotificationEvent, NTSTATUS, 0);
 SYSCALL(NtSubscribeWnfStateChange, NTSTATUS, 0);
 SYSCALL(NtTerminateEnclave, NTSTATUS, 0);
-SYSCALL(NtUnmapViewOfSectionEx, NTSTATUS, 0);
 SYSCALL(NtUnsubscribeWnfStateChange, NTSTATUS, 0);
 SYSCALL(NtUpdateWnfStateData, NTSTATUS, 0);
 SYSCALL(NtWaitForAlertByThreadId, NTSTATUS, 0);
