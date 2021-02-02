@@ -109,6 +109,7 @@
 #include <libvmi/peparse.h>
 #include <libdrakvuf/json-util.h>
 #include <optional>
+#include <memory>
 
 #include "plugins/output_format.h"
 #include "rpcmon.h"
@@ -434,75 +435,18 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static void print_addresses(drakvuf_t drakvuf, rpcmon* plugin, const dll_view_t* dll, const std::vector<hook_target_view_t>& targets)
-{
-    unicode_string_t* dll_name;
-    json_object* j_root;
-    json_object* j_rvas;
-    vmi_pid_t pid;
-    vmi_lock_guard lg(drakvuf);
-
-    dll_name = drakvuf_read_unicode_va(lg.vmi, dll->mmvad.file_name_ptr, 0);
-
-    if (plugin->m_output_format != OUTPUT_JSON)
-        return;
-
-    if (!dll_name || !dll_name->contents)
-        goto out;
-
-    vmi_dtb_to_pid(lg.vmi, dll->dtb, &pid);
-
-    j_root = json_object_new_object();
-    j_rvas = json_object_new_object();
-
-    for (auto const& target : targets)
-    {
-        if (target.state == HOOK_OK)
-            json_object_object_add(j_rvas, target.target_name.c_str(), json_object_new_int(target.offset));
-    }
-
-    json_object_object_add(j_root, "Plugin", json_object_new_string("rpcmon"));
-    json_object_object_add(j_root, "Event", json_object_new_string("dll_loaded"));
-    json_object_object_add(j_root, "Rva", j_rvas);
-    json_object_object_add(j_root, "DllBase", json_object_new_string_fmt("0x%lx", dll->real_dll_base));
-    json_object_object_add(j_root, "DllName", json_object_new_string((const char*)dll_name->contents));
-    json_object_object_add(j_root, "PID", json_object_new_int(pid));
-
-    printf("%s\n", json_object_to_json_string(j_root));
-
-    json_object_put(j_root);
-
-out:
-    if (dll_name)
-        vmi_free_unicode_str(dll_name);
-}
-
-static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
+static void on_dll_discovered(drakvuf_t drakvuf, std::string const& dll_name, const dll_view_t* dll, void* extra)
 {
     rpcmon* plugin = (rpcmon*)extra;
 
-    auto vmi = vmi_lock_guard(drakvuf);
-    unicode_string_t* dll_name = drakvuf_read_unicode_va(vmi, dll->mmvad.file_name_ptr, 0);
-
-    if (dll_name && dll_name->contents)
+    plugin->wanted_hooks.visit_hooks_for(dll_name, [&](const auto& e)
     {
-        for (auto const& wanted_hook : plugin->wanted_hooks)
-        {
-            if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
-            {
-                drakvuf_request_usermode_hook(drakvuf, dll, &wanted_hook, usermode_hook_cb, plugin);
-            }
-        }
-    }
-
-    if (dll_name)
-        vmi_free_unicode_str(dll_name);
+        drakvuf_request_usermode_hook(drakvuf, dll, &e, usermode_hook_cb, plugin);
+    });
 }
 
 static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::vector<hook_target_view_t>& targets, void* extra)
 {
-    rpcmon* plugin = (rpcmon*)extra;
-    print_addresses(drakvuf, plugin, dll, targets);
     PRINT_DEBUG("[RPCMON] DLL hooked - done\n");
 }
 
@@ -538,12 +482,12 @@ rpcmon::rpcmon(drakvuf_t drakvuf, output_format_t output)
     }
 
     const auto log = HookActions::empty().set_log();
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrAsyncClientCall", log, rpc_call_args());
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrAsyncClientCall2", log, rpc_call_args());
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall", log, rpc_call_args());
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall2", log, rpc_call_args());
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall3", log, rpc_call3_args());
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall4", log, rpc_call_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "NdrAsyncClientCall", log, rpc_call_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "NdrAsyncClientCall2", log, rpc_call_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "NdrClientCall", log, rpc_call_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "NdrClientCall2", log, rpc_call_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "NdrClientCall3", log, rpc_call3_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "NdrClientCall4", log, rpc_call_args());
 
     usermode_cb_registration reg =
     {

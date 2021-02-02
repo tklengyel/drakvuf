@@ -147,28 +147,14 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
+static void on_dll_discovered(drakvuf_t drakvuf, std::string const& dll_name, const dll_view_t* dll, void* extra)
 {
     memdump* plugin = (memdump*)extra;
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    unicode_string_t* dll_name = drakvuf_read_unicode_va(vmi, dll->mmvad.file_name_ptr, 0);
-
-    if (dll_name && dll_name->contents)
+    plugin->wanted_hooks.visit_hooks_for(dll_name, [&](const auto& e)
     {
-        for (auto const& wanted_hook : plugin->wanted_hooks)
-        {
-            if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
-            {
-                drakvuf_request_usermode_hook(drakvuf, dll, &wanted_hook, usermode_hook_cb, plugin);
-            }
-        }
-    }
-
-    if (dll_name)
-        vmi_free_unicode_str(dll_name);
-
-    drakvuf_release_vmi(drakvuf);
+        drakvuf_request_usermode_hook(drakvuf, dll, &e, usermode_hook_cb, plugin);
+    });
 }
 
 static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::vector<hook_target_view_t>& targets, void* extra)
@@ -186,7 +172,11 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
 
     try
     {
-        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, &this->wanted_hooks);
+        auto noStack = [](const auto& entry)
+        {
+            return !entry.actions.stack;
+        };
+        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, noStack, this->wanted_hooks);
     }
     catch (const std::runtime_error& exc)
     {
@@ -194,15 +184,6 @@ void memdump::userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_f
                   << "Reason: " << exc.what() << "\n";
         throw -1;
     }
-
-    auto& hooks = this->wanted_hooks;
-    auto noStack = [](const auto& entry)
-    {
-        return !entry.actions.stack;
-    };
-    hooks.erase(
-        std::remove_if(std::begin(hooks), std::end(hooks), noStack),
-        std::end(hooks));
 
     if (this->wanted_hooks.empty())
     {
@@ -244,7 +225,7 @@ void memdump::setup_dotnet_hooks(drakvuf_t drakvuf, const char* dll_name, const 
     entry.type = HOOK_BY_OFFSET;
     entry.offset = func_rva;
     entry.actions = HookActions::empty().set_log().set_stack();
-    this->wanted_hooks.push_back(std::move(entry));
+    this->wanted_hooks.add_hook(std::move(entry));
 }
 
 void memdump::userhook_destroy()
