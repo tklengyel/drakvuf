@@ -2008,7 +2008,7 @@ static void print_injection_info(output_format_t format, const char* file, injec
     else
         arguments = "";
 
-    if (injector->expanded_target->contents)
+    if (injector->expanded_target && injector->expanded_target->contents)
         process_name = (char*)injector->expanded_target->contents;
     else
         process_name = "";
