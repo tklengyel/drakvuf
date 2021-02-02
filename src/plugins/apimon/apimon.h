@@ -122,7 +122,7 @@ struct apimon_config
 class apimon: public pluginex
 {
 public:
-    std::vector<plugin_target_config_entry_t> wanted_hooks;
+    wanted_hooks_t wanted_hooks;
 
     apimon(drakvuf_t drakvuf, const apimon_config* config, output_format_t output);
     ~apimon();
