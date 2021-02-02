@@ -105,9 +105,6 @@
 #ifndef RPCMON_H
 #define RPCMON_H
 
-#include <vector>
-#include <memory>
-
 #include <glib.h>
 #include <libusermode/userhook.hpp>
 #include "plugins/private.h"
@@ -116,7 +113,7 @@
 class rpcmon: public pluginex
 {
 public:
-    std::vector<plugin_target_config_entry_t> wanted_hooks;
+    wanted_hooks_t wanted_hooks;
 
     rpcmon(drakvuf_t drakvuf, output_format_t output);
     ~rpcmon();
