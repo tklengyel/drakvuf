@@ -128,7 +128,6 @@ private:
             .breakpoint.addr_type = ADDR_VA,
             .type = BREAKPOINT,
             .data = (void*)this,
-            .ah_cb = nullptr
         }
     };
 };

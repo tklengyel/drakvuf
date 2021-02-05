@@ -115,7 +115,7 @@ bool verbose = 0;
 #endif
 
 
-int64_t drakvuf_get_limited_traps_ttl(drakvuf_t drakvuf)
+uint64_t drakvuf_get_limited_traps_ttl(drakvuf_t drakvuf)
 {
     return drakvuf->limited_traps_ttl;
 }
@@ -162,7 +162,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     g_free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool _verbose, bool libvmi_conf, addr_t kpgd, bool fast_singlestep, int64_t limited_traps_ttl)
+bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool _verbose, bool libvmi_conf, addr_t kpgd, bool fast_singlestep, uint64_t limited_traps_ttl)
 {
 
     if ( !domain || !json_kernel_path )

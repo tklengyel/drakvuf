@@ -228,7 +228,7 @@ drakvuf_c::drakvuf_c(const char* domain,
                      bool libvmi_conf,
                      addr_t kpgd,
                      bool fast_singlestep,
-                     int64_t limited_traps_ttl)
+                     uint64_t limited_traps_ttl)
     : leave_paused{ leave_paused }
 {
     if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, verbose, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl))

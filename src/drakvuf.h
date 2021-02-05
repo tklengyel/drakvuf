@@ -154,7 +154,7 @@ public:
               bool libvmi_conf,
               addr_t kpgd,
               bool fast_singlestep,
-              int64_t limited_traps_ttl);
+              uint64_t limited_traps_ttl);
     ~drakvuf_c();
 
     int is_initialized();

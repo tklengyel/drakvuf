@@ -1904,8 +1904,6 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
         .reg = CR3,
         .cb = wait_for_target_process_cb,
         .data = injector,
-        .ttl = UNLIMITED_TTL,
-        .ah_cb = NULL
     };
     if (!drakvuf_add_trap(drakvuf, &trap))
         return false;
@@ -1916,8 +1914,6 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
         .reg = CR3,
         .cb = wait_for_crash_of_target_process,
         .data = injector,
-        .ttl = UNLIMITED_TTL,
-        .ah_cb = NULL
     };
     if (!drakvuf_add_trap(drakvuf, &trap_crashreporter))
         return false;

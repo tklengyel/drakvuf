@@ -309,7 +309,7 @@ typedef struct symbols
     uint64_t count;
 } symbols_t;
 
-int64_t drakvuf_get_limited_traps_ttl(drakvuf_t drakvuf) NOEXCEPT;
+uint64_t drakvuf_get_limited_traps_ttl(drakvuf_t drakvuf) NOEXCEPT;
 
 const char* drakvuf_get_json_wow_path(drakvuf_t drakvuf) NOEXCEPT;
 json_object* drakvuf_get_json_wow(drakvuf_t drakvuf) NOEXCEPT;
@@ -380,7 +380,7 @@ bool drakvuf_init (drakvuf_t* drakvuf,
                    const bool libvmi_conf,
                    const addr_t kpgd,
                    const bool fast_singlestep,
-                   int64_t limited_traps_ttl) NOEXCEPT;
+                   uint64_t limited_traps_ttl) NOEXCEPT;
 void drakvuf_close (drakvuf_t drakvuf, const bool pause) NOEXCEPT;
 bool drakvuf_add_trap(drakvuf_t drakvuf,
                       drakvuf_trap_t* trap) NOEXCEPT;

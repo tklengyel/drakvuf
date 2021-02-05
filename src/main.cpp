@@ -262,7 +262,7 @@ int main(int argc, char** argv)
 {
     int c;
     int timeout = 0;
-    int64_t limited_traps_ttl = UNLIMITED_TTL;
+    uint64_t limited_traps_ttl = UNLIMITED_TTL;
     char const* inject_file = nullptr;
     char const* inject_cwd = nullptr;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
@@ -497,7 +497,7 @@ int main(int argc, char** argv)
                 fast_singlestep = true;
                 break;
             case opt_traps_ttl:
-                limited_traps_ttl = atoi(optarg);
+                limited_traps_ttl = strtoull(optarg, NULL, 0);
                 break;
             case 'k':
                 kpgd = strtoull(optarg, NULL, 0);
