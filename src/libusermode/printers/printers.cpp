@@ -105,6 +105,7 @@
 #include "printers.hpp"
 #include <array>
 #include <string>
+#include <sstream>
 #include <iomanip>
 #include <libvmi/libvmi.h>
 #include <libdrakvuf/libdrakvuf.h>
