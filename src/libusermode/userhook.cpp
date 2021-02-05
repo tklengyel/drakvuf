@@ -138,6 +138,18 @@ static void wrap_delete(drakvuf_trap_t* trap)
     g_slice_free(drakvuf_trap_t, trap);
 }
 
+static std::string drakvuf_read_unicode(drakvuf_t drakvuf, addr_t addr)
+{
+    std::string str;
+    auto vmi = vmi_lock_guard(drakvuf);
+    unicode_string_t* us = drakvuf_read_unicode_va(vmi, addr, 0);
+    if (us && us->contents)
+        str.assign(reinterpret_cast<const char*>(us->contents));
+    if (us)
+        vmi_free_unicode_str(us);
+    return str;
+}
+
 /**
  * Check if this thread is currently in process of loading a DLL.
  * If so, return a pointer to the associated metadata.
@@ -202,9 +214,14 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
         .v.is_hooked = false
     };
 
-    for (auto& reg : plugin->plugins)
+    std::string dll_name = drakvuf_read_unicode(drakvuf, dll_meta.v.mmvad.file_name_ptr);
+
+    if (!dll_name.empty())
     {
-        reg.pre_cb(drakvuf, (const dll_view_t*)&dll_meta, reg.extra);
+        for (auto& reg : plugin->plugins)
+        {
+            reg.pre_cb(drakvuf, dll_name, (const dll_view_t*)&dll_meta, reg.extra);
+        }
     }
 
     if (dll_meta.targets.empty())
@@ -993,7 +1010,7 @@ plugin_target_config_entry_t parse_entry(
 }
 
 
-void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, const bool print_no_addr, std::vector<plugin_target_config_entry_t>* wanted_hooks)
+void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, bool print_no_addr, const hook_filter_t& hook_filter, wanted_hooks_t& wanted_hooks)
 {
     PrinterConfig config{};
     config.print_no_addr = print_no_addr;
@@ -1005,12 +1022,15 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
         std::vector<std::unique_ptr<ArgumentPrinter>> arg_vec1;
         arg_vec1.push_back(std::make_unique<ArgumentPrinter>("wVersionRequired", config));
         arg_vec1.push_back(std::make_unique<ArgumentPrinter>("lpWSAData", config));
-        wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", log_and_stack, std::move(arg_vec1));
+        plugin_target_config_entry_t e1("ws2_32.dll", "WSAStartup", log_and_stack, std::move(arg_vec1));
 
         std::vector<std::unique_ptr<ArgumentPrinter>> arg_vec2;
         arg_vec2.push_back(std::make_unique<ArgumentPrinter>("ExitCode", config));
         arg_vec2.push_back(std::make_unique<ArgumentPrinter>("Unknown", config));
-        wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", log_and_stack, std::move(arg_vec2));
+        plugin_target_config_entry_t e2("ntdll.dll", "RtlExitUserProcess", log_and_stack, std::move(arg_vec2));
+
+        if (!hook_filter(e1)) wanted_hooks.add_hook(std::move(e1));
+        if (!hook_filter(e2)) wanted_hooks.add_hook(std::move(e2));
         return;
     }
 
@@ -1030,7 +1050,8 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
         try
         {
             std::stringstream ss(line);
-            wanted_hooks->push_back(parse_entry(ss, config));
+            auto e = parse_entry(ss, config);
+            if (!hook_filter(e)) wanted_hooks.add_hook(std::move(e));
         }
         catch (const std::runtime_error& exc)
         {

@@ -134,7 +134,7 @@ public:
     size_t wow64context_eip_rva;
     size_t wow64context_eax_rva;
 
-    std::vector<plugin_target_config_entry_t> wanted_hooks;
+    wanted_hooks_t wanted_hooks;
 
     memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
     ~memdump();
