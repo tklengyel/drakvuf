@@ -289,7 +289,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
 {
     target->pid = info->proc_data.pid;
 
-    drakvuf_trap_t* trap = g_slice_new(drakvuf_trap_t);
+    drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
     trap->type = BREAKPOINT;
     trap->name = target->target_name.c_str();
     trap->cb = target->callback;
@@ -306,7 +306,6 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
     trap->breakpoint.addr_type = ADDR_PA;
     trap->breakpoint.addr = pa;
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
-    trap->ah_cb = nullptr;
 
     if (drakvuf_add_trap(drakvuf, trap))
     {

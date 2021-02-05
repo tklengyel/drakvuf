@@ -656,9 +656,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
         .type = REGISTER,
         .reg = CR3,
         .cb = wait_for_target_linux_process_cb,
-        .data = injector,
-        .ttl = UNLIMITED_TTL,
-        .ah_cb = NULL
+        .data = injector
     };
 
     if (!drakvuf_add_trap(drakvuf, &trap))

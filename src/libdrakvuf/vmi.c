@@ -645,7 +645,8 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
             trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
         }
 
-        if (--trap->ttl == 0) {
+        if (--trap->ttl == 0)
+        {
             trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
             trap->ah_cb(drakvuf, trap);
         }
