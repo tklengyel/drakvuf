@@ -645,8 +645,10 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
             trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
         }
 
-        if (--trap->ttl == 0)
+        if (--trap->ttl == 0) {
+            trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
             trap->ah_cb(drakvuf, trap);
+        }
 
         update_ttl_loop = update_ttl_loop->next;
     }
@@ -1129,14 +1131,10 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     container->breakpoint.guard.memaccess.access = VMI_MEMACCESS_RW;
     container->breakpoint.guard.memaccess.type = PRE;
     container->breakpoint.guard.memaccess.gfn = current_gfn;
-    container->breakpoint.guard.ttl = UNLIMITED_TTL;
-    container->breakpoint.guard.ah_cb = NULL;
     container->breakpoint.guard2.type = MEMACCESS;
     container->breakpoint.guard2.memaccess.access = VMI_MEMACCESS_RWX;
     container->breakpoint.guard2.memaccess.type = PRE;
     container->breakpoint.guard2.memaccess.gfn = remapped_gfn->r;
-    container->breakpoint.guard2.ttl = UNLIMITED_TTL;
-    container->breakpoint.guard2.ah_cb = NULL;
 
     addr_t rpa = (remapped_gfn->r<<12) + (container->breakpoint.pa & VMI_BIT_MASK(0, 11));
     uint8_t test;

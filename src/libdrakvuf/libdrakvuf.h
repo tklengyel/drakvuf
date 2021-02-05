@@ -202,7 +202,7 @@ typedef struct drakvuf_trap_info
     };
 } drakvuf_trap_info_t;
 
-#define UNLIMITED_TTL -1
+#define UNLIMITED_TTL 0
 #define TRAP_TTL_RESET_INTERVAL_SEC 10
 
 struct drakvuf_trap
@@ -254,8 +254,8 @@ struct drakvuf_trap
 
     // How many times trap can be hit in TRAP_TTL_RESET_INTERVAL_SEC interval,
     // before it gets discarded. Protects against api-hammering.
-    // -1 for infinity.
-    int64_t ttl;
+    // 0 for infinity.
+    uint64_t ttl;
     time_t last_ttl_rst;
     // Callback invoked when the trap hits api-hammering limit. If not set (NULL),
     // the trap will be simply unhooked (not deleted).
