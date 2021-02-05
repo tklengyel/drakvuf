@@ -166,7 +166,7 @@ struct injector
     uint32_t status;
     uint32_t file_handle;
     FILE* host_file;
-    unicode_string_t expanded_target;
+    unicode_string_t* expanded_target;
 
     // For process doppelganging shellcode
     addr_t binary, binary_addr, saved_bp;
@@ -221,6 +221,7 @@ static void free_injector(injector_t injector)
 
     vmi_free_unicode_str(injector->target_file_us);
     vmi_free_unicode_str(injector->cwd_us);
+    vmi_free_unicode_str(injector->expanded_target);
 
     g_free((void*)injector->binary);
     g_free((void*)injector->payload);
@@ -1456,18 +1457,18 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         vmi = drakvuf_lock_and_get_vmi(drakvuf);
         vmi_read(vmi, &ctx, regs.x86.rax * 2, buf, NULL);
         drakvuf_release_vmi(drakvuf);
-
         in.contents = buf;
         in.length = regs.x86.rax * 2;
         in.encoding = "UTF-16";
 
-        if (VMI_SUCCESS != vmi_convert_str_encoding(&in, &injector->expanded_target, "UTF-8"))
+        injector->expanded_target = (unicode_string_t*)g_try_malloc0(sizeof(unicode_string_t));
+        if (VMI_SUCCESS != vmi_convert_str_encoding(&in, injector->expanded_target, "UTF-8"))
         {
             PRINT_DEBUG("Failed to convert buffer\n");
             return 0;
         }
 
-        PRINT_DEBUG("Expanded: %s\n", injector->expanded_target.contents);
+        PRINT_DEBUG("Expanded: %s\n", injector->expanded_target->contents);
         PRINT_DEBUG("Opening file...\n");
 
         if (!setup_create_file_stack(injector, &regs.x86))
@@ -2007,8 +2008,8 @@ static void print_injection_info(output_format_t format, const char* file, injec
     else
         arguments = "";
 
-    if (injector->expanded_target.contents)
-        process_name = (char*)injector->expanded_target.contents;
+    if (injector->expanded_target && injector->expanded_target->contents)
+        process_name = (char*)injector->expanded_target->contents;
     else
         process_name = "";
 
