@@ -175,6 +175,8 @@ debugmon::debugmon(drakvuf_t _drakvuf, output_format_t _output)
     this->debug.cb = debug_cb;
     this->debug.data = (void*)this;
     this->debug.type = DEBUG;
+    this->debug.ttl = UNLIMITED_TTL;
+    this->debug.ah_cb = nullptr;
 
     if ( !drakvuf_add_trap(drakvuf, &this->debug) )
     {
