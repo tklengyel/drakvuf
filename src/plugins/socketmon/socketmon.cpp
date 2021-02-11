@@ -444,6 +444,7 @@ event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     trap->breakpoint.addr = ret_addr;
     trap->type = BREAKPOINT;
     trap->data = w;
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
 
     if ( w->s->winver == VMI_OS_WINDOWS_7 || w->s->winver == VMI_OS_WINDOWS_8 )
         trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_x64_ret_cb : udpa_x86_ret_cb;
@@ -644,6 +645,7 @@ static void register_tcpip_trap( drakvuf_t drakvuf, json_object* tcpip_profile_j
 
     trap->name = function_name;
     trap->cb   = hook_cb;
+    trap->ttl  = drakvuf_get_limited_traps_ttl(drakvuf);
 
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }
@@ -722,6 +724,7 @@ static void register_dnsapi_trap( drakvuf_t drakvuf, drakvuf_trap_t* trap,
                                   const char* function_name,
                                   event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     register_module_trap(drakvuf, trap, "dnsapi.dll", function_name, hook_cb);
 }
 

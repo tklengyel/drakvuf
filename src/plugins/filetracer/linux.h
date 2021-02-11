@@ -124,7 +124,7 @@ public:
             .breakpoint.addr_type = ADDR_VA,
             .breakpoint.module = "linux",
             .type = BREAKPOINT,
-            .data = (void*)this
+            .data = (void*)this,
         }
     };
 

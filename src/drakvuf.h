@@ -153,7 +153,8 @@ public:
               bool leave_paused,
               bool libvmi_conf,
               addr_t kpgd,
-              bool fast_singlestep);
+              bool fast_singlestep,
+              uint64_t limited_traps_ttl);
     ~drakvuf_c();
 
     int is_initialized();

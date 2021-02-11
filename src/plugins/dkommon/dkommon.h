@@ -134,7 +134,9 @@ private:
         .type = REGISTER,
         .reg = CR3,
         .data = this,
-        .name = nullptr
+        .name = nullptr,
+        .ttl = UNLIMITED_TTL,
+        .ah_cb = nullptr
     };
 
     drakvuf_trap_t drivers_trap =
@@ -142,7 +144,9 @@ private:
         .type = REGISTER,
         .reg = CR3,
         .data = this,
-        .name = nullptr
+        .name = nullptr,
+        .ttl = UNLIMITED_TTL,
+        .ah_cb = nullptr
     };
 
     drakvuf_trap_t zeropage_trap =
@@ -152,7 +156,9 @@ private:
         .memaccess.type = PRE,
         .memaccess.access = VMI_MEMACCESS_W,
         .data = this,
-        .name = nullptr
+        .name = nullptr,
+        .ttl = UNLIMITED_TTL,
+        .ah_cb = nullptr
     };
 };
 

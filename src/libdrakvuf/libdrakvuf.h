@@ -202,6 +202,9 @@ typedef struct drakvuf_trap_info
     };
 } drakvuf_trap_info_t;
 
+#define UNLIMITED_TTL 0
+#define TRAP_TTL_RESET_INTERVAL_SEC 10
+
 struct drakvuf_trap
 {
     trap_type_t type;
@@ -248,6 +251,15 @@ struct drakvuf_trap
 
         register_t reg;
     };
+
+    // How many times trap can be hit in TRAP_TTL_RESET_INTERVAL_SEC interval,
+    // before it gets discarded. Protects against api-hammering.
+    // 0 for infinity.
+    uint64_t ttl;
+    time_t last_ttl_rst;
+    // Callback invoked when the trap hits api-hammering limit. If not set (NULL),
+    // the trap will be simply unhooked (not deleted).
+    void(*ah_cb)(drakvuf_t, drakvuf_trap_t*);
 };
 
 
@@ -296,6 +308,8 @@ typedef struct symbols
     symbol_t* symbols; // array of size count
     uint64_t count;
 } symbols_t;
+
+uint64_t drakvuf_get_limited_traps_ttl(drakvuf_t drakvuf) NOEXCEPT;
 
 const char* drakvuf_get_json_wow_path(drakvuf_t drakvuf) NOEXCEPT;
 json_object* drakvuf_get_json_wow(drakvuf_t drakvuf) NOEXCEPT;
@@ -365,13 +379,15 @@ bool drakvuf_init (drakvuf_t* drakvuf,
                    const bool verbose,
                    const bool libvmi_conf,
                    const addr_t kpgd,
-                   const bool fast_singlestep) NOEXCEPT;
+                   const bool fast_singlestep,
+                   uint64_t limited_traps_ttl) NOEXCEPT;
 void drakvuf_close (drakvuf_t drakvuf, const bool pause) NOEXCEPT;
 bool drakvuf_add_trap(drakvuf_t drakvuf,
                       drakvuf_trap_t* trap) NOEXCEPT;
 void drakvuf_remove_trap (drakvuf_t drakvuf,
                           drakvuf_trap_t* trap,
                           drakvuf_trap_free_t free_routine) NOEXCEPT;
+void drakvuf_unhook_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap) NOEXCEPT;
 void drakvuf_loop (drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), void* data) NOEXCEPT;
 void drakvuf_interrupt (drakvuf_t drakvuf,
                         int sig) NOEXCEPT;

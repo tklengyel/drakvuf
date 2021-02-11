@@ -178,6 +178,7 @@ static void print_usage()
             "\t -a <plugin>               Activate the specified plugin\n"
             "\t -p                        Leave domain paused after DRAKVUF exits\n"
             "\t -F                        Enable fast singlestepping (requires Xen 4.14+)\n"
+            "\t --traps-ttl <ttl value>   Maximum number of times trap can be triggered in 10sec period. Protects against api hammering.\n"
 #ifdef ENABLE_DOPPELGANGING
             "\t -B <path>                 The host path of the windows binary to inject (requires -m doppelganging)\n"
             "\t -P <target>               The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
@@ -261,6 +262,7 @@ int main(int argc, char** argv)
 {
     int c;
     int timeout = 0;
+    uint64_t limited_traps_ttl = UNLIMITED_TTL;
     char const* inject_file = nullptr;
     char const* inject_cwd = nullptr;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
@@ -325,6 +327,7 @@ int main(int argc, char** argv)
         opt_userhook_no_addr,
         opt_terminate,
         opt_termination_timeout,
+        opt_traps_ttl,
         opt_wait_stop_plugins,
     };
     const option long_opts[] =
@@ -358,6 +361,7 @@ int main(int argc, char** argv)
         {"disable-sysret", no_argument, NULL, opt_disable_sysret},
         {"userhook-no-addr", no_argument, NULL, opt_userhook_no_addr},
         {"fast-singlestep", no_argument, NULL, 'F'},
+        {"traps-ttl", required_argument, NULL, opt_traps_ttl},
         {"wait-stop-plugins", required_argument, NULL, opt_wait_stop_plugins},
         {NULL, 0, NULL, 0}
     };
@@ -492,6 +496,9 @@ int main(int argc, char** argv)
             case 'F':
                 fast_singlestep = true;
                 break;
+            case opt_traps_ttl:
+                limited_traps_ttl = strtoull(optarg, NULL, 0);
+                break;
             case 'k':
                 kpgd = strtoull(optarg, NULL, 0);
                 break;
@@ -588,7 +595,7 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = std::make_unique<drakvuf_c>(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd, fast_singlestep);
+        drakvuf = std::make_unique<drakvuf_c>(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl);
     }
     catch (const std::exception& e)
     {

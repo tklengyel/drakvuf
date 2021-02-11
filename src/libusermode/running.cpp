@@ -141,6 +141,7 @@ void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvu
 
 bool userhook::add_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     if (!drakvuf_add_trap(drakvuf, trap))
         return false;
     running_traps.push_back(trap);
@@ -161,6 +162,7 @@ void userhook::remove_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
 bool userhook::add_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
+    trap->ttl = UNLIMITED_TTL;
     if (!drakvuf_add_trap(drakvuf, trap))
         return false;
     running_rh_traps.push_back(trap);
@@ -387,6 +389,7 @@ event_response_t hook_process_cb(
     trap->breakpoint.lookup_type = LOOKUP_NONE;
     trap->breakpoint.addr_type = ADDR_PA;
     trap->breakpoint.addr = func_pa;
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     if (!userhook_plugin->add_running_trap(drakvuf, trap))
         delete trap;
 

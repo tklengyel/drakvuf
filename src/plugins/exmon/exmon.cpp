@@ -333,6 +333,7 @@ exmon::exmon(drakvuf_t drakvuf, output_format_t output)
         throw -1;
     }
 
+    this->trap.ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     if ( !drakvuf_add_trap(drakvuf, &this->trap) )
     {
         g_free(this->offsets);
