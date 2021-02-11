@@ -140,7 +140,7 @@
 
 
 //Struct to pass the parameters
-struct hyperbee_config {
+struct hyperbee_config_struct {
     //Dir to save extracted frames to
     const char *hyperbee_dump_dir;
     //Executable to filter
@@ -168,12 +168,13 @@ public:
     std::set<drakvuf_trap *> traps;
 
     //Keeps track of monitored pages. Prevents duplicate traps.
-    std::set<std::pair<addr_t, addr_t>> monitoredPages;
+    std::set<std::pair<addr_t, addr_t>> monitored_pages;
 
-    //Keeps track of the data which was already dumped, used to prevent duplicate dump files
-    std::unordered_map<std::string, std::string> hashedDumpedData;
+    //Keeps track of the data which was already dumped, used to prevent duplicate dump files.
+    // Uses the hash as key and the dumped file stem (without extension) as value.
+    std::unordered_map<std::string, std::string> hashed_dumped_data_map;
 
-    hyperbee(drakvuf_t drakvuf, const hyperbee_config *config, output_format_t output);
+    hyperbee(drakvuf_t drakvuf, const hyperbee_config_struct *config, output_format_t output);
 
     ~hyperbee();
 };

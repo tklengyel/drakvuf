@@ -374,7 +374,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #ifdef ENABLE_PLUGIN_HYPERBEE
                 case PLUGIN_HYPERBEE:
                 {
-                    hyperbee_config config =
+                    hyperbee_config_struct config =
                     {
                         .hyperbee_dump_dir = options->hyperbee_dump_dir,
                         .hyperbee_filter_executable = options->hyperbee_filter_executable,

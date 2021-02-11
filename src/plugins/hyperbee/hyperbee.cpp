@@ -143,9 +143,9 @@
  * Saves a pointer to the plugin and the starting virtual address of the frame.
  * This struct is passed between the different traps.
  */
-struct fault_data {
+struct fault_data_struct {
   hyperbee *plugin;
-  addr_t pageVA;
+  addr_t page_va;
 };
 
 /**
@@ -159,10 +159,10 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 /**
  * Creates an execute trap for the given (guest) frame number and passes the given fault data
  * @param gfn the (guest) frame number. If some executable instructions are fetched from this frame, the trap gets active
- * @param faultData information which is required for logging. It is passed between the traps.
+ * @param fault_data information which is required for logging. It is passed between the traps.
  * @return the execute trap that needs to be added to drakvuf
  */
-drakvuf_trap_t *create_execute_trap(addr_t gfn, fault_data *faultData);
+drakvuf_trap_t *create_execute_trap(addr_t gfn, fault_data_struct *fault_data);
 
 /**
  * Saves the metadata received during the monitoring to a logfile
@@ -173,15 +173,15 @@ drakvuf_trap_t *create_execute_trap(addr_t gfn, fault_data *faultData);
  * @param dump_file_name the name of the dump file
  * @param dump_size the size of the dumped file
  * @param dump_id the id of the dump
- * @param pageVA the virtual address of the page where the fetch occurred
+ * @param page_va the virtual address of the page where the fetch occurred
  * @param dll_name_str the name of the regarding dll
  * @param chk_str the hash
- * @param baseVA the base (start) address of the VAD node, containing the dumped page
- * @param endVA the end of the VAD node, containing the dumped page
+ * @param base_va the base (start) address of the VAD node, containing the dumped page
+ * @param end_va the end of the VAD node, containing the dumped page
  */
 static void save_file_metadata(const drakvuf_trap_info_t *info, const char *meta_file_path, drakvuf_t drakvuf,
-                               const char *dump_file_name, size_t dump_size, unsigned int dump_id, addr_t pageVA,
-                               const char *dll_name_str, const gchar *chk_str, addr_t baseVA, addr_t endVA) {
+                               const char *dump_file_name, size_t dump_size, unsigned int dump_id, addr_t page_va,
+                               const char *dll_name_str, const gchar *chk_str, addr_t base_va, addr_t end_va) {
 
     FILE *fp = fopen(meta_file_path, "w");
     if (!fp)
@@ -206,11 +206,11 @@ static void save_file_metadata(const drakvuf_trap_info_t *info, const char *meta
     json_object_object_add(json_object, "CR3", json_object_new_string_fmt("0x%"
                                                                           PRIx64, info->regs->cr3));
     json_object_object_add(json_object, "PageVA", json_object_new_string_fmt("0x%"
-                                                                             PRIx64, pageVA));
+                                                                             PRIx64, page_va));
     json_object_object_add(json_object, "VADBase", json_object_new_string_fmt("0x%"
-                                                                              PRIx64, baseVA));
+                                                                              PRIx64, base_va));
     json_object_object_add(json_object, "VADEnd", json_object_new_string_fmt("0x%"
-                                                                             PRIx64, endVA));
+                                                                             PRIx64, end_va));
     json_object_object_add(json_object, "VADName", json_object_new_string(dll_name_str));
     json_object_object_add(json_object, "DumpSize", json_object_new_string_fmt("0x%"
                                                                                PRIx64, dump_size));
@@ -405,11 +405,11 @@ struct access_fault_result_t : public call_result_t {
  */
 static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info) {
 
-    auto *ef_data = (struct fault_data *) info->trap->data;
+    auto *ef_data = (struct fault_data_struct *) info->trap->data;
 
     if (LOG_ALWAYS) {
         jsonfmt::print("writeframe", drakvuf, info,
-                       keyval("FrameVA", fmt::Xval(ef_data->pageVA)),
+                       keyval("FrameVA", fmt::Xval(ef_data->page_va)),
                        keyval("TrapPA", fmt::Xval(info->trap_pa)),
                        keyval("CR3", fmt::Xval(info->regs->cr3)),
                        keyval("GFN", fmt::Xval(info->trap->memaccess.gfn))
@@ -438,7 +438,7 @@ static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t 
  * @param info
  * @param ef_data
  */
-drakvuf_trap_t *create_write_trap(drakvuf_trap_info_t *info, fault_data *ef_data) {
+drakvuf_trap_t *create_write_trap(drakvuf_trap_info_t *info, fault_data_struct *ef_data) {
 
     auto *write_trap = (drakvuf_trap_t *) g_malloc(sizeof(drakvuf_trap_t));
 
@@ -460,9 +460,9 @@ drakvuf_trap_t *create_write_trap(drakvuf_trap_info_t *info, fault_data *ef_data
  * Creates an execute trap, whose pointer is returned.
  *
  * @param info
- * @param faultData
+ * @param fault_data
  */
-drakvuf_trap_t *create_execute_trap(addr_t gfn, fault_data *faultData) {
+drakvuf_trap_t *create_execute_trap(addr_t gfn, fault_data_struct *fault_data) {
 
     auto *exec_trap = (drakvuf_trap_t *) g_malloc(sizeof(drakvuf_trap_t));
 
@@ -472,7 +472,7 @@ drakvuf_trap_t *create_execute_trap(addr_t gfn, fault_data *faultData) {
     exec_trap->memaccess.gfn = gfn;
     exec_trap->memaccess.type = PRE; //Do something before the access
     exec_trap->memaccess.access = VMI_MEMACCESS_X; //When memory shall be executed
-    exec_trap->data = faultData;
+    exec_trap->data = fault_data;
 
     //Cb is the asynchronous call back https://github.com/tklengyel/drakvuf/issues/1056#issuecomment-713867399
     exec_trap->cb = execute_faulted_cb;
@@ -489,7 +489,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
                 (unsigned long long) info->regs->rip, info->regs->cr3);
 
     //load the trap data
-    auto *ef_data = (struct fault_data *) info->trap->data;
+    auto *ef_data = (struct fault_data_struct *) info->trap->data;
 
     //Verify the program leading to the execution of this trap is the one we are filtering for (if we do).
     //The filtering could limit (and therefore focus) the monitoring and gives a speedup in such possibly uninteresting cases.
@@ -541,8 +541,8 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     //A struct to keep the vad node information
     mmvad_info_t mmvad;
 
-    //Finds the correct mmvad entry by VAD-Table walk and return it within mmvad. proc_data.base_addr is the EPROCESS address and frameVA the address which shall be contained within the vad entry.
-    if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, ef_data->pageVA, &mmvad)) {
+    //Finds the correct mmvad entry by VAD-Table walk and return it within mmvad. proc_data.base_addr is the EPROCESS address and frame va the address which shall be contained within the vad entry.
+    if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, ef_data->page_va, &mmvad)) {
         //If there was an error during vad search, quit but log all information
         PRINT_DEBUG("[HYPERBEE] Could not find vad information\n");
         goto log;
@@ -575,7 +575,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     }
 
     //Set the memory access context
-    access_context_t ctxMemoryDump;
+    access_context_t ctx_memory_dump;
 
     //Option to dump the whole VAD node instead of just a single page
     if (DUMP_VAD) {
@@ -591,7 +591,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         }
 
         //Set the area to dump for vad or page (below-else)
-        ctxMemoryDump =
+        ctx_memory_dump =
             {
                 .translate_mechanism = VMI_TM_PROCESS_DTB,
                 .dtb = info->regs->cr3,
@@ -600,11 +600,11 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
             };
         memory_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
     } else {
-        ctxMemoryDump =
+        ctx_memory_dump =
             {
                 .translate_mechanism = VMI_TM_PROCESS_DTB, /**see Libvmi.h < Translate addr via specified directory table base. */
                 .dtb = info->regs->cr3, //The directory table base
-                .addr = ef_data->pageVA //The address to lookup.
+                .addr = ef_data->page_va //The address to lookup.
             };
         memory_size = VMI_PS_4KB;
     }
@@ -618,16 +618,16 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     //For pages this approach is good.
 
     //get the hash
-    chk_str = get_sha256_memory(vmi, &ctxMemoryDump, memory_size);
+    chk_str = get_sha256_memory(vmi, &ctx_memory_dump, memory_size);
     if (chk_str == nullptr) {
         PRINT_DEBUG("[HYPERBEE] Could not get SHA256 of dumpfile\n");
         goto log;
     }
 
-    memory_hash_identifier = ef_data->plugin->hashedDumpedData.find(chk_str);
+    memory_hash_identifier = ef_data->plugin->hashed_dumped_data_map.find(chk_str);
 
     //If the checksum already exists:
-    if (memory_hash_identifier != ef_data->plugin->hashedDumpedData.end()) {
+    if (memory_hash_identifier != ef_data->plugin->hashed_dumped_data_map.end()) {
 
         if (asprintf(&file_name_prefix, "%s", memory_hash_identifier->second.c_str()) < 0) {
             PRINT_DEBUG("[HYPERBEE] Could not fetch base_file_name from duplicate database\n");
@@ -675,7 +675,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         //   just by looking at the file name which is handy both for humans and automated processing
         // * no other information was included in the file name to make it possible to reference this file in the
         //   future if the identical memory would be dumped again
-        if (asprintf(&file_name_prefix, "%llx_%.16s", (unsigned long long) ctxMemoryDump.addr, chk_str) < 0) {
+        if (asprintf(&file_name_prefix, "%llx_%.16s", (unsigned long long) ctx_memory_dump.addr, chk_str) < 0) {
             PRINT_DEBUG("[HYPERBEE] Could not create the base file path\n");
             goto log;
         }
@@ -698,7 +698,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         }
 
         //If the dump fails
-        if (!dump_memory_region(vmi, ef_data->plugin, &ctxMemoryDump, memory_size, file_path_memory_dump)) {
+        if (!dump_memory_region(vmi, ef_data->plugin, &ctx_memory_dump, memory_size, file_path_memory_dump)) {
             PRINT_DEBUG("[HYPERBEE] Could not dump memory\n");
             file_path_memory_dump = nullptr;
             goto log;
@@ -708,7 +708,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         ++ef_data->plugin->dump_id;
 
         //Add the checksum as key with the file_name_prefix (as data) to the map.
-        ef_data->plugin->hashedDumpedData.insert(std::pair<std::string, std::string>(chk_str, file_name_prefix));
+        ef_data->plugin->hashed_dumped_data_map.insert(std::pair<std::string, std::string>(chk_str, file_name_prefix));
 
         //Create the metadata path
         if (asprintf(&file_path_meta_data, "%s/%s.metafile", ef_data->plugin->hyperbee_dump_dir.c_str(),
@@ -720,47 +720,47 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         //If the dump of the memory was successful write all gathered data to a metadata file
         save_file_metadata(info, file_path_meta_data, drakvuf, file_path_memory_dump, memory_size,
                            ef_data->plugin->dump_id,
-                           ef_data->pageVA, dll_name_str, chk_str, vad_node_base, vad_node_end);
+                           ef_data->page_va, dll_name_str, chk_str, vad_node_base, vad_node_end);
     }
 
     log:
     if (LOG_ALWAYS || malware) { //LOG the retrieved data to the console
 
-        char *actualDumpFilePath;
-        const char *actualChecksum;
-        unsigned int actualDumpID;
-        char *actualMetafile;
+        char *actual_dump_file_path;
+        const char *actual_checksum;
+        unsigned int actual_dump_id;
+        char *actual_metafile;
 
         //If the hash was not generated or the dump file path not set
         if ((chk_str == nullptr) || (file_path_memory_dump == nullptr)) {
-            actualDumpFilePath = missing_data;
-            actualChecksum = missing_data;
-            actualDumpID = 0;
+            actual_dump_file_path = missing_data;
+            actual_checksum = missing_data;
+            actual_dump_id = 0;
             memory_size = 0;
         } else {
-            actualDumpFilePath = file_path_memory_dump;
-            actualChecksum = chk_str;
-            actualDumpID = ef_data->plugin->dump_id;
+            actual_dump_file_path = file_path_memory_dump;
+            actual_checksum = chk_str;
+            actual_dump_id = ef_data->plugin->dump_id;
         }
 
         //If the metadata path was not set
         if (file_path_meta_data == nullptr) {
-            actualMetafile = missing_data;
+            actual_metafile = missing_data;
         } else {
-            actualMetafile = file_path_meta_data;
+            actual_metafile = file_path_meta_data;
         }
 
         //LOg everything to the screen
         jsonfmt::print("execframe", drakvuf, info, keyval("CR3", fmt::Xval(info->regs->cr3)),
-                       keyval("PageVA", fmt::Xval(ef_data->pageVA)),
+                       keyval("PageVA", fmt::Xval(ef_data->page_va)),
                        keyval("VADBase", fmt::Xval(vad_node_base)),
                        keyval("VADEnd", fmt::Xval(vad_node_end)),
                        keyval("VADName", fmt::Qstr(dll_name_str)),
                        keyval("DumpSize", fmt::Nval(memory_size)),
-                       keyval("DumpFile", fmt::Qstr(actualDumpFilePath)),
-                       keyval("SHA256", fmt::Qstr(actualChecksum)),
-                       keyval("DumpID", fmt::Nval(actualDumpID)),
-                       keyval("MetaFile", fmt::Qstr(actualMetafile)),
+                       keyval("DumpFile", fmt::Qstr(actual_dump_file_path)),
+                       keyval("SHA256", fmt::Qstr(actual_checksum)),
+                       keyval("DumpID", fmt::Nval(actual_dump_id)),
+                       keyval("MetaFile", fmt::Qstr(actual_metafile)),
                        keyval("TrapPA", fmt::Xval(info->trap_pa)),
                        keyval("GFN", fmt::Xval(info->trap->memaccess.gfn))
         );
@@ -821,18 +821,18 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
 
 
     //Calculate the frame's starting virtual address from the fault_va by clearing the lower 12 bits.
-    addr_t pageVA = ((params->fault_va >> 12) << 12);
+    addr_t page_va = ((params->fault_va >> 12) << 12);
 
-    //Create an identifier for each monitored memory part. That is a combination of the CR3 register and the pageVA.
+    //Create an identifier for each monitored memory part. That is a combination of the CR3 register and the page_va.
     //As the exec trap will be replaced by a write trap and vice-versa (and not be removed once hit to keep focus on that page) it is required to prevent adding multiple traps for the same memory areas.
-    //Even pageVA and gfn relate the pageVA is used as identifier, since the gfn would require an additional translation from va to pa, which would cost additional time.
-    std::pair<addr_t, addr_t> monitoredPageIdentifier(info->regs->cr3, pageVA);
+    //Even page_va and gfn relate the page_va is used as identifier, since the gfn would require an additional translation from va to pa, which would cost additional time.
+    std::pair<addr_t, addr_t> monitored_page_identifier(info->regs->cr3, page_va);
 
     //Try to find the current trap identifier in the set of existing traps.
-    auto it = plugin->monitoredPages.find(monitoredPageIdentifier);
+    auto it = plugin->monitored_pages.find(monitored_page_identifier);
 
     //If the memory part is not monitored yet: Create a new trap for that.
-    if (it == plugin->monitoredPages.end()) {
+    if (it == plugin->monitored_pages.end()) {
         //page_info_t is a type of type page_info https://stackoverflow.com/a/30370413
         page_info_t p_info = {};
         {
@@ -861,12 +861,12 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
         }
 
         //Create a new struct for exec_fault_data and reserve memory.
-        auto *ef_data = (struct fault_data *) g_malloc(sizeof(struct fault_data));
+        auto *ef_data = (struct fault_data_struct *) g_malloc(sizeof(struct fault_data_struct));
 
         //Reference the plugin there.
         ef_data->plugin = plugin;
 
-        ef_data->pageVA = pageVA;
+        ef_data->page_va = page_va;
 
         drakvuf_trap *exec_trap = create_execute_trap(p_info.paddr >> 12, ef_data);
 
@@ -874,7 +874,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
         drakvuf_add_trap(drakvuf, exec_trap);
         //store the trap to be deleted in the end.
         plugin->traps.emplace(exec_trap);
-        plugin->monitoredPages.insert(monitoredPageIdentifier);
+        plugin->monitored_pages.insert(monitored_page_identifier);
         PRINT_DEBUG("[HYPERBEE] Trap X on GFN 0x%lx\n", info->trap->memaccess.gfn);
     }
 
@@ -970,7 +970,7 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 /**
  * This is the constructor of the plugin.
  */
-hyperbee::hyperbee(drakvuf_t drakvuf, const hyperbee_config *c, output_format_t output)
+hyperbee::hyperbee(drakvuf_t drakvuf, const hyperbee_config_struct *c, output_format_t output)
     : pluginex(drakvuf, output) {
 
     //Check if the dump directory parameter was provided
