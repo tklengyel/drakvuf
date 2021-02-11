@@ -1065,6 +1065,8 @@ static void register_trap(drakvuf_t drakvuf, const char* syscall_name,
     trap->breakpoint.addr += syscall_addr;
     trap->name = syscall_name;
     trap->cb = hook_cb;
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    trap->ah_cb = nullptr;
 
     if (!drakvuf_add_trap(drakvuf, trap))
         throw - 1;

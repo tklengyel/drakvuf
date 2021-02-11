@@ -617,6 +617,8 @@ static bool setup_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr
     injector->bp.breakpoint.dtb = info->regs->cr3;
     injector->bp.breakpoint.addr_type = ADDR_VA;
     injector->bp.breakpoint.addr = bp_addr;
+    injector->bp.ttl = UNLIMITED_TTL;
+    injector->bp.ah_cb = NULL;
 
     return drakvuf_add_trap(injector->drakvuf, &injector->bp);
 }
@@ -784,6 +786,8 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
                 new_trap->type = MEMACCESS;
                 new_trap->cb = mem_callback;
                 new_trap->data = injector;
+                new_trap->ttl = UNLIMITED_TTL;
+                new_trap->ah_cb = NULL;
                 new_trap->memaccess.access = VMI_MEMACCESS_X;
                 new_trap->memaccess.type = POST;
                 new_trap->memaccess.gfn = page->paddr >> 12;
@@ -876,6 +880,7 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
         trap->breakpoint.addr_type = ADDR_RVA;
         trap->breakpoint.module = "ntoskrnl.exe";
         trap->breakpoint.rva = rva;
+        trap->ttl = UNLIMITED_TTL;
 
         if (!drakvuf_add_trap(injector->drakvuf, trap))
         {
@@ -994,6 +999,8 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         // Save breakpoint address to restore it latter
         injector->saved_bp = injector->bp.breakpoint.addr;
         injector->bp.breakpoint.addr = injector->process_notify;
+        injector->bp.ttl = UNLIMITED_TTL;
+        injector->bp.ah_cb = NULL;
 
         if ( drakvuf_add_trap(drakvuf, &injector->bp) )
         {

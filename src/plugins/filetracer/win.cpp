@@ -599,6 +599,8 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     trap->name = info->trap->name;
     trap->data = w;
     trap->cb = create_file_ret_cb;
+    trap->ttl = UNLIMITED_TTL;
+    trap->ah_cb = nullptr;
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
     {
@@ -738,6 +740,7 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
 
     trap->name = syscall_name;
     trap->cb   = hook_cb;
+    trap->ttl  = drakvuf_get_limited_traps_ttl(drakvuf);
 
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }

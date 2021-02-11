@@ -240,6 +240,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     ret_trap->type = BREAKPOINT;
     ret_trap->cb = ret_cb;
     ret_trap->data = (void*)wr;
+    ret_trap->ttl = UNLIMITED_TTL;
 
     if ( drakvuf_add_trap(drakvuf, ret_trap) )
         s->traps = g_slist_prepend(s->traps, ret_trap);
@@ -348,6 +349,8 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
         trap->type = BREAKPOINT;
         trap->cb = syscall_cb;
         trap->data = w;
+        trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+        trap->ah_cb = nullptr;
 
         if ( drakvuf_add_trap(drakvuf, trap) )
             s->traps = g_slist_prepend(s->traps, trap);

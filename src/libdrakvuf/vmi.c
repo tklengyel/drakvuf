@@ -626,6 +626,33 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
             loop = loop->next;
         }
     }
+
+    // Iterate over traps updating ttl.
+    GSList* update_ttl_loop = s->traps;
+    time_t cur_time = time(NULL);
+    while (update_ttl_loop)
+    {
+        drakvuf_trap_t* trap = (drakvuf_trap_t*) update_ttl_loop->data;
+        if (trap->ttl == UNLIMITED_TTL)
+        {
+            update_ttl_loop = update_ttl_loop->next;
+            continue;
+        }
+
+        if (cur_time - trap->last_ttl_rst >= TRAP_TTL_RESET_INTERVAL_SEC)
+        {
+            trap->last_ttl_rst = cur_time;
+            trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+        }
+
+        if (--trap->ttl == 0)
+        {
+            trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+            trap->ah_cb(drakvuf, trap);
+        }
+
+        update_ttl_loop = update_ttl_loop->next;
+    }
     drakvuf->in_callback = 0;
 
     free_proc_data_priv_2(&proc_data, &attached_proc_data);
@@ -994,6 +1021,8 @@ bool inject_trap_pa(drakvuf_t drakvuf,
                     drakvuf_trap_t* trap,
                     addr_t pa)
 {
+    trap->last_ttl_rst = time(NULL);
+
     // check if already marked
     vmi_instance_t vmi = drakvuf->vmi;
     xen_pfn_t current_gfn = pa >> 12;
