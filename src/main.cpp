@@ -253,6 +253,13 @@ static void print_usage()
             "\t --compress-procdumps\n"
             "\t                           Controls compression of processes dumps on disk\n"
 #endif
+#ifdef ENABLE_PLUGIN_HYPERBEE
+            "\t --hyperbee-dump-dir <directory>\n"
+            "\t                           Folder where to store page/vad dumps (path)\n"
+            "\t --hyperbee-filter-executable <filename>\n"
+            "\t                           Limit the output to events regarding this file\n"
+
+#endif
             "\t -h, --help                Show this help\n"
            );
 }
@@ -326,6 +333,8 @@ int main(int argc, char** argv)
         opt_terminate,
         opt_termination_timeout,
         opt_wait_stop_plugins,
+        opt_hyperbee_dump_dir,
+        opt_hyperbee_filter_executable,
     };
     const option long_opts[] =
     {
@@ -359,6 +368,11 @@ int main(int argc, char** argv)
         {"userhook-no-addr", no_argument, NULL, opt_userhook_no_addr},
         {"fast-singlestep", no_argument, NULL, 'F'},
         {"wait-stop-plugins", required_argument, NULL, opt_wait_stop_plugins},
+        {"hyperbee-dump-dir", required_argument, NULL, opt_hyperbee_dump_dir},
+        {"hyperbee-filter-executable", required_argument, NULL, opt_hyperbee_filter_executable},
+
+
+
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF";
@@ -553,6 +567,14 @@ int main(int argc, char** argv)
                 break;
             case opt_compress_procdumps:
                 options.compress_procdumps = true;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_HYPERBEE
+            case opt_hyperbee_dump_dir:
+                options.hyperbee_dump_dir = optarg;
+                break;
+            case opt_hyperbee_filter_executable:
+                options.hyperbee_filter_executable = optarg;
                 break;
 #endif
             case 'h':

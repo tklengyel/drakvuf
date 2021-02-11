@@ -388,6 +388,16 @@ if test x$plugin_tlsmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_TLSMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_hyperbee],
+  [AS_HELP_STRING([--disable-plugin-hyperbee],
+    [Enable the hyperbee plugin @<:@yes@:>@])],
+  [plugin_hyperbee="$enableval"],
+  [plugin_hyperbee="yes"])
+AM_CONDITIONAL([PLUGIN_HYPERBEE], [test x$plugin_hyperbee = xyes])
+if test x$plugin_hyperbee = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_HYPERBEE, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -663,6 +673,7 @@ ProcDump:     $plugin_procdump
 APIMon:       $plugin_apimon
 RPCMon:       $plugin_rpcmon
 TLSMon:       $plugin_tlsmon
+Hyperbee:     $plugin_hyperbee
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:       $plugin_wmimon
