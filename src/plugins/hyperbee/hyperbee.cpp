@@ -527,7 +527,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     //The path to the file containing the metadata
     char *file_path_meta_data = nullptr;
     //The filename of which the memory dump and meta data file paths are built. it is a concatenation of the start address and the hash.
-    char *file_name_prefix = nullptr;
+    char *file_name_stem = nullptr;
     //Is used to find a checksum in the set of already analyzed memory parts
     std::unordered_map<std::string, std::string>::iterator memory_hash_identifier;
 
@@ -629,23 +629,23 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     //If the checksum already exists:
     if (memory_hash_identifier != ef_data->plugin->hashed_dumped_data_map.end()) {
 
-        if (asprintf(&file_name_prefix, "%s", memory_hash_identifier->second.c_str()) < 0) {
+        if (asprintf(&file_name_stem, "%s", memory_hash_identifier->second.c_str()) < 0) {
             PRINT_DEBUG("[HYPERBEE] Could not fetch base_file_name from duplicate database\n");
         }
         //using a suffix as "vad", "page" or (for the metafile) "metadata" helps to quickly select associated files
         if (DUMP_VAD) {
             if (asprintf(&file_path_memory_dump, "%s/%s.vad", ef_data->plugin->hyperbee_dump_dir.c_str(),
-                         file_name_prefix) < 0) {
+                         file_name_stem) < 0) {
                 PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
             }
         } else {
             if (asprintf(&file_path_memory_dump, "%s/%s.page", ef_data->plugin->hyperbee_dump_dir.c_str(),
-                         file_name_prefix) < 0) {
+                         file_name_stem) < 0) {
                 PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
             }
         }
         if (asprintf(&file_path_meta_data, "%s/%s.metafile", ef_data->plugin->hyperbee_dump_dir.c_str(),
-                     file_name_prefix) < 0) {
+                     file_name_stem) < 0) {
             PRINT_DEBUG("[HYPERBEE] Could not create meta file name\n");
         }
 
@@ -675,7 +675,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         //   just by looking at the file name which is handy both for humans and automated processing
         // * no other information was included in the file name to make it possible to reference this file in the
         //   future if the identical memory would be dumped again
-        if (asprintf(&file_name_prefix, "%llx_%.16s", (unsigned long long) ctx_memory_dump.addr, chk_str) < 0) {
+        if (asprintf(&file_name_stem, "%llx_%.16s", (unsigned long long) ctx_memory_dump.addr, chk_str) < 0) {
             PRINT_DEBUG("[HYPERBEE] Could not create the base file path\n");
             goto log;
         }
@@ -684,14 +684,14 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         if (DUMP_VAD) {
             //using a suffix as "vad", "page" or (for the metafile) "metadata" helps to quickly select associated files
             if (asprintf(&file_path_memory_dump, "%s/%s.vad", ef_data->plugin->hyperbee_dump_dir.c_str(),
-                         file_name_prefix) < 0) {
+                         file_name_stem) < 0) {
                 PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
                 goto log;
             }
         } else {
             //using a suffix as "vad", "page" or (for the metafile) "metadata" helps to quickly select associated files
             if (asprintf(&file_path_memory_dump, "%s/%s.page", ef_data->plugin->hyperbee_dump_dir.c_str(),
-                         file_name_prefix) < 0) {
+                         file_name_stem) < 0) {
                 PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
                 goto log;
             }
@@ -708,11 +708,11 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         ++ef_data->plugin->dump_id;
 
         //Add the checksum as key with the file_name_prefix (as data) to the map.
-        ef_data->plugin->hashed_dumped_data_map.insert(std::pair<std::string, std::string>(chk_str, file_name_prefix));
+        ef_data->plugin->hashed_dumped_data_map.insert(std::pair<std::string, std::string>(chk_str, file_name_stem));
 
         //Create the metadata path
         if (asprintf(&file_path_meta_data, "%s/%s.metafile", ef_data->plugin->hyperbee_dump_dir.c_str(),
-                     file_name_prefix) < 0) {
+                     file_name_stem) < 0) {
             PRINT_DEBUG("[HYPERBEE] Could not create meta file name\n");
             goto log;
         }
@@ -781,8 +781,8 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     drakvuf_remove_trap(drakvuf, info->trap, nullptr);
 
     //Frees memory
-    if (file_name_prefix) {
-        free(file_name_prefix);
+    if (file_name_stem) {
+        free(file_name_stem);
     }
     if (file_path_memory_dump) {
         free(file_path_memory_dump);
