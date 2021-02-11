@@ -179,6 +179,8 @@ cpuidmon::cpuidmon(drakvuf_t _drakvuf, bool _stealth, output_format_t _output)
     this->cpuid.data = (void*)this;
     this->cpuid.type = CPUID;
     this->cpuid.name = nullptr;
+    this->cpuid.ttl = UNLIMITED_TTL;
+    this->cpuid.ah_cb = nullptr;
 
     if ( !drakvuf_add_trap(drakvuf, &this->cpuid) )
     {

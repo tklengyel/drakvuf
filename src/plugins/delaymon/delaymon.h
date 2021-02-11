@@ -18,7 +18,8 @@ public:
         .breakpoint.module = "ntoskrnl.exe",
         .type = BREAKPOINT,
         .data = (void*)this,
-        .name = nullptr
+        .name = nullptr,
+        .ah_cb = nullptr
     };
 
     delaymon(drakvuf_t drakvuf, output_format_t output);

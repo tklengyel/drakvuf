@@ -193,6 +193,9 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
     trap->name = function_name;
     trap->cb   = hook_cb;
     trap->breakpoint.addr = ssdt_va - w32pst_rva + func_rva;
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+
+
 
     if ( !drakvuf_add_trap( drakvuf, trap ) )
     {

@@ -119,7 +119,8 @@ public:
         .breakpoint.module = "ntoskrnl.exe",
         .name = "KiDispatchException",
         .type = BREAKPOINT,
-        .data = (void*)this
+        .data = (void*)this,
+        .ah_cb = nullptr
     };
     output_format_t format;
     page_mode_t pm;

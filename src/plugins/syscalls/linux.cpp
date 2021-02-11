@@ -281,6 +281,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     ret_trap->type = BREAKPOINT;
     ret_trap->cb = linux_ret_cb;
     ret_trap->data = wr;
+    ret_trap->ttl = UNLIMITED_TTL;
 
     if ( drakvuf_add_trap(drakvuf, ret_trap) )
         s->traps = g_slist_prepend(s->traps, ret_trap);
@@ -326,6 +327,8 @@ void setup_linux(drakvuf_t drakvuf, syscalls* s)
     trap->type = BREAKPOINT;
     trap->cb = linux_cb;
     trap->data = w;
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    trap->ah_cb = nullptr;
 
     if ( drakvuf_add_trap(drakvuf, trap) )
         s->traps = g_slist_prepend(s->traps, trap);
