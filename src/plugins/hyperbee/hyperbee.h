@@ -107,9 +107,9 @@
 
 #include <vector>
 #include <memory>
-#include <filesystem>
 #include <set>
 #include <glib.h>
+#include <libdrakvuf/filesystem.hpp>
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
