@@ -1,0 +1,28 @@
+name: drakvuf
+version: '0.8'
+summary: DRAKVUF
+description: |
+    DRAKVUF Black-box binary analysis
+
+grade: devel
+confinement: devmode
+
+parts:
+  drakvuf:
+    source: .
+    build-snaps:
+        - libvmi/edge
+    build-packages:
+        - autoconf-archive
+        - libjson-c-dev
+        - libxen-dev
+        - build-essential
+        - pkg-config
+        - libglib2.0-dev
+        - clang
+    stage-snaps:
+        - libvmi/edge
+    stage-packages:
+        - libjson-c-dev
+        - libglib2.0-0
+    plugin: autotools
