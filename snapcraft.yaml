@@ -6,12 +6,15 @@ description: |
 
 grade: devel
 confinement: devmode
+architectures:
+  - build-on: amd64
+base: core20
 
 parts:
   drakvuf:
     source: .
     build-snaps:
-        - libvmi/edge
+        - libvmi/latest/edge
     build-packages:
         - autoconf-archive
         - libjson-c-dev
@@ -21,8 +24,14 @@ parts:
         - libglib2.0-dev
         - clang
     stage-snaps:
-        - libvmi/edge
+        - libvmi/latest/edge
     stage-packages:
         - libjson-c-dev
         - libglib2.0-0
     plugin: autotools
+    override-build: |
+        export CC=clang
+        export CXX=clang++
+        autoreconf -vif
+        ./configure
+        make
