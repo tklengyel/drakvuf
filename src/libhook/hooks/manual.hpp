@@ -107,6 +107,9 @@
 #include <optional>
 #include "base.hpp"
 
+namespace libhook
+{
+
 /**
  * Manual hooking using libdrakvuf traps. Most of the times you probably
  * want to use different hooking methods, but for some edge cases this is
@@ -120,8 +123,9 @@ public:
     /**
      * Factory function to create the trap and perform hooking at the same time.
      */
+    [[nodiscard]]
     static auto create(drakvuf_t, drakvuf_trap_t*, drakvuf_trap_free_t)
-        -> std::optional<manual_hook>;
+        -> std::unique_ptr<manual_hook>;
 
     /**
      * Unhook in dctor
@@ -150,12 +154,16 @@ public:
      */
     manual_hook& operator=(manual_hook&&) noexcept;
 
-    drakvuf_trap_t* trap = nullptr;
-    drakvuf_trap_free_t free_routine = nullptr;
+    drakvuf_trap_t* trap_ = nullptr;
+    drakvuf_trap_free_t free_routine_ = nullptr;
 
 protected:
     /**
      * Hide ctor from users, as we enforce factory function usage.
      */
     explicit manual_hook(drakvuf_t, drakvuf_trap_t*, drakvuf_trap_free_t);
+
+    manual_hook() = default;
 };
+
+};  // namespace libhook

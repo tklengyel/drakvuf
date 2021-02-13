@@ -101,44 +101,30 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#pragma once
+#include "private.h"
+#include "hooks/base.hpp"
+#include <libdrakvuf/libdrakvuf.h>
 
-#ifdef DRAKVUF_DEBUG
-#ifndef PRINT_DEBUG
-
-// This is defined in libdrakvuf
-extern bool verbose;
-
-#define PRINT_DEBUG(...) \
-    do { \
-        if(verbose) { eprint_current_time(); fprintf (stderr, __VA_ARGS__); } \
-    } while (0)
-
-#else
-
-#define PRINT_DEBUG(...) \
-    do {} while(0)
-
-#endif // PRINT_DEBUG
-#endif // DRAKVUF_DEBUG
-
-
-struct call_result_t
+namespace libhook
 {
-    call_result_t()
+
+struct CallResult
+{
+    CallResult()
         : target_pid(), target_tid(), target_rsp()
     {}
 
-    virtual ~call_result_t()
-    {};
+    virtual ~CallResult() = default;
 
-    void set_result_call_params(const drakvuf_trap_info_t* info)
+    void setResultCallParams(const drakvuf_trap_info_t *info)
     {
         target_pid = info->attached_proc_data.pid;
         target_tid = info->attached_proc_data.tid;
         target_rsp = info->regs->rsp;
     }
 
-    bool verify_result_call_params(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    bool verifyResultCallParams(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
     {
         return drakvuf_check_return_context(drakvuf, info, target_pid, target_tid, target_rsp);
     }
@@ -146,4 +132,37 @@ struct call_result_t
     vmi_pid_t target_pid;
     uint32_t target_tid;
     addr_t target_rsp;
+    base_hook* hook_;
 };
+
+template<typename Params = CallResult>
+Params* GetTrapParams(const drakvuf_trap_t* trap)
+{
+    static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
+
+    if (!trap || !trap->data)
+        return nullptr;
+
+    auto params = static_cast<Params*>(trap->data);
+    if (!params)
+    {
+        PRINT_DEBUG("[PLUGINEX] nullptr at get_trap_params, this should never happen");
+        throw -1;
+    }
+    return params;
+}
+
+template<typename Params = CallResult>
+Params* GetTrapParams(const drakvuf_trap_info_t* info)
+{
+    return GetTrapParams<Params>(info->trap);
+}
+
+template<typename Hook>
+Hook* GetTrapHook(const drakvuf_trap_info_t* info)
+{
+    static_assert(std::is_base_of_v<base_hook, Hook>, "Hook must derive from base_hook");
+    return dynamic_cast<Hook*>(GetTrapParams(info)->hook_);
+}
+
+} // namespace libhook

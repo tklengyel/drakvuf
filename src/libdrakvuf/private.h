@@ -123,9 +123,8 @@
 
 #include <sys/poll.h>
 
-
+#ifndef PRINT_DEBUG
 #ifdef DRAKVUF_DEBUG
-
 extern bool verbose;
 
 #define PRINT_DEBUG(...) \
@@ -139,7 +138,9 @@ extern bool verbose;
 #else
 #define PRINT_DEBUG(...) \
     do {} while(0)
-#endif
+
+#endif // DRAKVUF_DEBUG
+#endif // PRINT_DEBUG
 
 #define UNUSED(x) (void)(x)
 

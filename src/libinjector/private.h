@@ -105,8 +105,9 @@
 #ifndef LIBINJECTOR_PRIVATE_H
 #define LIBINJECTOR_PRIVATE_H
 
+#ifndef PRINT_DEBUG
 #ifdef DRAKVUF_DEBUG
-
+// defined in libdrakvuf
 extern bool verbose;
 
 #define PRINT_DEBUG(args...) \
@@ -115,9 +116,12 @@ extern bool verbose;
     } while (0)
 
 #else
+
 #define PRINT_DEBUG(args...) \
     do {} while(0)
+
 #endif /* DRAKVUF_DEBUG */
+#endif /* PRINT_DEBUG */
 
 #define ARRAY_SIZE(arr) sizeof((arr)) / sizeof((arr)[0])
 

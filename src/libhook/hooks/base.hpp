@@ -105,10 +105,15 @@
 #pragma once
 
 #include <libdrakvuf/libdrakvuf.h>
-#include <optional>
+#include <functional>
 #include <memory>
+#include "../private.h"
+
+namespace libhook
+{
 
 using callback_t = event_response_t(*)(drakvuf_t drakvuf, drakvuf_trap_info* info);
+using cb_wrapper_t = std::function<event_response_t(drakvuf_t, drakvuf_trap_info*)>;
 
  /**
   * Base hook class, not to be instantiated manually.
@@ -153,5 +158,7 @@ protected:
      * Since we want to use RAII we have to have dctor without params
      * thus we need to store drakvuf_t instance somewhere.
      */
-    drakvuf_t drakvuf = nullptr;
+    drakvuf_t drakvuf_ = nullptr;
 };
+
+};  // namespace libhook

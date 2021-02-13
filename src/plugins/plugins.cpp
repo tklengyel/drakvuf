@@ -130,6 +130,7 @@
 #include "procdump/procdump.h"
 #include "rpcmon/rpcmon.h"
 #include "tlsmon/tlsmon.h"
+#include "dummy/dummy.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -367,6 +368,13 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 case PLUGIN_TLSMON:
                 {
                     this->plugins[plugin_id] = std::make_unique<tlsmon>(this->drakvuf, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_DUMMY
+                case PLUGIN_DUMMY:
+                {
+                    this->plugins[plugin_id] = std::make_unique<dummy>(this->drakvuf, this->output);
                     break;
                 }
 #endif

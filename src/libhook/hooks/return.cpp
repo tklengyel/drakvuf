@@ -104,121 +104,42 @@
 
 #include "return.hpp"
 
-template<typename Params>
-auto return_hook::create(drakvuf_t, vmi_pid_t pid, std::string module_name, callback_t cb)
-    -> std::optional<return_hook>
-{
-    auto hook = return_hook{drakvuf, pid, std::move(module_name), cb};
-    auto trap = new drakvuf_trap_t;
+using namespace libhook;
 
-    auto ret_addr = drakvuf_get_function_return_address(drakvuf, info);
-    if (!ret_addr)
-    {
-        PRINT_DEBUG("Failed to receive return addr of function by pid %x\n", hook->pid);
-        return std::nullopt;
-    }
-
-    trap->breakpoint.lookup_type = LOOKUP_PID;
-    trap->breakpoint.pid = hook->pid;
-    trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = ret_addr;
-    trap->breakpoint.module = hook->module_name;
-
-    trap->callback = hook->callback;
-    trap->name = "return_hook";
-
-    static_assert(std::is_base_of_v<call_result_t, Params>, "Params must derive from call_result_t");
-    trap->data = static_cast<void*>(new Params());
-
-    if(!drakvuf_add_trap(drakvuf, hook->trap))
-    {
-        delete static_cast<call_result_t*>(trap->data);
-        delete trap;
-        return std::nullopt;
-    }
-    return hook;
-}
-
-template<typename Params>
-auto return_hook::create(drakvuf_t, reg_t cr3, std::string module_name, callback_t cb)
-    -> std::optional<return_hook>
-{
-    auto hook = return_hook{drakvuf, cr3, std::move(module_name), cb};
-    auto trap = new drakvuf_trap_t;
-
-    auto ret_addr = drakvuf_get_function_return_address(drakvuf, info);
-    if (!ret_addr)
-    {
-        PRINT_DEBUG("Failed to receive return addr of function by pid %x\n", hook->pid);
-        delete trap;
-        return std::nullopt;
-    }
-
-    trap->breakpoint.lookup_type = LOOKUP_DTB;
-    trap->breakpoint.dtb = hook->cr3;
-    trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = ret_addr;
-    trap->breakpoint.module = hook->module_name;
-
-    trap->callback = hook->callback;
-
-    trap->name = "return_hook";
-
-    static_assert(std::is_base_of_v<call_result_t, Params>, "Params must derive from call_result_t");
-    trap->data = static_cast<void*>(new Params());
-
-    if(!drakvuf_add_trap(drakvuf, hook->trap))
-    {
-        delete static_cast<call_result_t*>(trap->data);
-        delete trap;
-        return std::nullopt;
-    }
-    return hook;
-}
-
-return_hook::return_hook(drakvuf_t drakvuf, vmi_pid_t pid, std::string module_name, callback_t cb)
+return_hook::return_hook(drakvuf_t drakvuf, cb_wrapper_t cb)
     : base_hook(drakvuf),
-      pid(pid),
-      cr3(),
-      module_name(std::move(module_name)),
-      callback(cb)
-{}
-
-return_hook::return_hook(drakvuf_t drakvuf, reg_t cr3, std::string module_name, callback_t cb)
-    : base_hook(drakvuf),
-      pid(),
-      cr3(cr3),
-      module_name(std::string(module_name)),
-      callback()
+      callback_(cb)
 {}
 
 return_hook::~return_hook()
 {
-    if (this->drakvuf && this->trap)
-        drakvuf_remove_trap(this->drakvuf, this->trap, [](drakvuf_trap_t* trap)
+    if (this->drakvuf_ && this->trap_)
+    {
+        PRINT_DEBUG("[LIBHOOK] destroying return hook...\n");
+        drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
             {
-                delete static_cast<call_result_t*>(trap->data);
+                delete static_cast<CallResult*>(trap->data);
                 delete trap;
             });
-    // otherwise this has been moved from and we don't free the trap
-    // as the ownership has been passed elsewhere, so we do nothing
+    }
+    else
+    {
+        // otherwise this has been moved from and we don't free the trap
+        // as the ownership has been passed elsewhere, so we do nothing
+        PRINT_DEBUG("[LIBHOOK] destruction not needed, as return hook was moved from\n");
+    }
 }
 
-return_hook::return_hook(return_hook&& rhs)
+return_hook::return_hook(return_hook&& rhs) noexcept
+    : base_hook(std::forward<base_hook>(rhs))
 {
-    std::swap(this->pid, rhs.pid);
-    std::swap(this->cr3, rhs.cr3);
-    std::swap(this->module_name, rhs.module_name);
-    std::swap(this->callback, rhs.callback);
-    std::swap(this->trap, rhs.trap);
+    std::swap(this->callback_, rhs.callback_);
+    std::swap(this->trap_, rhs.trap_);
 }
 
-return_hook& return_hook::operator=(return_hook&& rhs)
+return_hook& return_hook::operator=(return_hook&& rhs) noexcept
 {
-    std::swap(this->pid, rhs.pid);
-    std::swap(this->cr3, rhs.cr3);
-    std::swap(this->module_name, rhs.module_name);
-    std::swap(this->callback, rhs.callback);
-    std::swap(this->trap, rhs.trap);
+    std::swap(this->callback_, rhs.callback_);
+    std::swap(this->trap_, rhs.trap_);
     return *this;
 }

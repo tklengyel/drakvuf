@@ -104,70 +104,45 @@
 
 #include "syscall.hpp"
 
-template<typename Params>
-auto syscall_hook::create(drakvuf_t drakvuf, std::string syscall_name, callback_t cb)
-    -> std::optional<syscall_hook>
-{
-    auto hook = syscall_hook{drakvuf, std::move(syscall_name), cb};
-    hook.trap = new drakvuf_trap_t;
-
-    if (!drakvuf_get_kernel_symbol_rva(hook.drakvuf, hook.syscall_name.c_str(), &hook.trap->breakpoint.rva))
-    {
-        PRINT_DEBUG("Failed to receive addr of function %s\n", hook.syscall_name);
-        delete hook.trap;
-        return std::nullopt;
-    }
-
-    hook.trap->breakpoint.lookup_type = LOOKUP_PID;
-    hook.trap->breakpoint.pid = 4;
-    hook.trap->breakpoint.addr_type = ADDR_RVA;
-    hook.trap->breakpoint.module = "ntoskrnl.exe";
-
-    hook.trap->cb = hook.callback;
-    hook.trap->name = hook.syscall_name.c_str();
-
-    static_assert(std::is_base_of_v<call_result_t, Params>, "Params must derive from call_result_t");
-    hook.trap->data = static_cast<void*>(new Params());
-
-    if(!drakvuf_add_trap(drakvuf, hook.trap))
-    {
-        delete static_cast<call_result_t*>(hook.trap->data);
-        delete hook.trap;
-        return std::nullopt;
-    }
-    return hook;
-}
+using namespace libhook;
 
 syscall_hook::~syscall_hook()
 {
-    if (this->drakvuf && this->trap)
-        drakvuf_remove_trap(this->drakvuf, this->trap, [](drakvuf_trap_t* tr)
+    if (this->drakvuf_ && this->trap_)
+    {
+        PRINT_DEBUG("[LIBHOOK] destroying syscall hook...\n");
+        drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
             {
-                delete static_cast<call_result_t*>(tr->data);
-                delete tr;
+                delete static_cast<CallResult*>(trap->data);
+                delete trap;
             });
-    // otherwise this has been moved from and we don't free the trap
-    // as the ownership has been passed elsewhere, so we do nothing
+    }
+    else
+    {
+        // otherwise this has been moved from and we don't free the trap
+        // as the ownership has been passed elsewhere, so we do nothing
+        PRINT_DEBUG("[LIBHOOK] destruction not needed, as return hook was moved from\n");
+    }
 }
 
 syscall_hook::syscall_hook(syscall_hook&& rhs) noexcept
     : base_hook(std::forward<base_hook>(rhs))
 {
-    std::swap(this->trap, rhs.trap);
-    std::swap(this->syscall_name, rhs.syscall_name);
-    std::swap(this->callback, rhs.callback);
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->syscall_name_, rhs.syscall_name_);
+    std::swap(this->callback_, rhs.callback_);
 }
 
 syscall_hook& syscall_hook::operator=(syscall_hook&& rhs) noexcept
 {
-    std::swap(this->trap, rhs.trap);
-    std::swap(this->syscall_name, rhs.syscall_name);
-    std::swap(this->callback, rhs.callback);
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->syscall_name_, rhs.syscall_name_);
+    std::swap(this->callback_, rhs.callback_);
     return *this;
 }
 
-syscall_hook::syscall_hook(drakvuf_t drakvuf, std::string syscall_name, callback_t cb)
+syscall_hook::syscall_hook(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb)
     : base_hook(drakvuf),
-      syscall_name(std::move(syscall_name)),
-      callback(cb)
+      syscall_name_(syscall_name),
+      callback_(cb)
 {}

@@ -105,7 +105,10 @@
 #pragma once
 
 #include "base.hpp"
-#include "../call_result_t.hpp"
+#include "../call_result.hpp"
+
+namespace libhook
+{
 
 class return_hook : public base_hook
 {
@@ -115,11 +118,10 @@ public:
      *
      * Params - ...
      */
-    template<typename Params = void>
-    static auto std::optional<return_hook> create(drakvuf_t, vmi_pid_t pid, callback_t cb);
-
-    template<typename Params = void>
-    static auto std::optional<return_hook> create(drakvuf_t, reg_t cr3, callback_t cb);
+    template<typename Params = CallResult>
+    [[nodiscard]]
+    static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb)
+        -> std::unique_ptr<return_hook>;
 
     /**
      * unhook on dctor
@@ -148,16 +150,64 @@ public:
      */
     return_hook& operator=(return_hook&&) noexcept;
 
-    vmi_pid_t pid;
-    reg_t cr3;
-    std::string module_name;
-    callback_t callback;
-    drakvuf_trap_t* trap = nullptr;
+    cb_wrapper_t callback_;
+    drakvuf_trap_t* trap_ = nullptr;
 
 protected:
     /**
      * Hide ctor from users, as we enforce factory function usage.
      */
-    return_hook(drakvuf_t, vmi_pid_t pid, std::string module_name, callback_t cb);
-    return_hook(drakvuf_t, reg_t cr3, std::string module_name, callback_t cb);
+    return_hook(drakvuf_t, cb_wrapper_t cb);
 };
+
+template<typename Params>
+auto return_hook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb)
+    -> std::unique_ptr<return_hook>
+{
+    PRINT_DEBUG("[LIBHOOK] creating return hook\n");
+
+    auto hook = std::unique_ptr<return_hook>(new return_hook(drakvuf, cb));
+    hook->trap_ = new drakvuf_trap_t;
+
+    auto ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+    if (!ret_addr)
+    {
+        PRINT_DEBUG("[LIBHOOK] Failed to receive return addr of function\n");
+        delete hook->trap_;
+        return std::unique_ptr<return_hook>();
+    }
+
+    hook->trap_->breakpoint.lookup_type = LOOKUP_DTB;
+    // TODO: decide whether to use CR3 or PID
+    hook->trap_->breakpoint.dtb = info->regs->cr3;
+    hook->trap_->breakpoint.addr_type = ADDR_VA;
+    hook->trap_->breakpoint.addr = ret_addr;
+    hook->trap_->breakpoint.module = info->trap->breakpoint.module;
+
+    hook->trap_->type = BREAKPOINT;
+    hook->trap_->name = "return_hook";
+    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
+        return GetTrapHook<return_hook>(info)->callback_(drakvuf, info);
+    };
+
+    static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
+    static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
+    
+    // pupulate backref
+    auto* params = new Params();
+    params->hook_ = hook.get();
+    hook->trap_->data = static_cast<void*>(params);
+
+    if(!drakvuf_add_trap(drakvuf, hook->trap_))
+    {
+        PRINT_DEBUG("[LIBHOOK] failed to create trap for return hook\n");
+        delete static_cast<CallResult*>(hook->trap_->data);
+        delete hook->trap_;
+        return std::unique_ptr<return_hook>();
+    }
+
+    PRINT_DEBUG("[LIBHOOK] return hook OK\n");
+    return hook;
+}
+
+};  // namespace libhook

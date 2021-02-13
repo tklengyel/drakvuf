@@ -103,40 +103,58 @@
  ***************************************************************************/
 #include "manual.hpp"
 
-auto manual_hook::create(drakvuf_t drakvuf, drakvuf_trap_t* trap_, drakvuf_trap_free_t free_routine_)
-    -> std::optional<manual_hook>
+using namespace libhook;
+
+auto manual_hook::create(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
+    -> std::unique_ptr<manual_hook>
 {
     // not calling base_hook::prepare_trap on purpose
     // we expect user to created trap properly on their own
+    PRINT_DEBUG("[LIBHOOK] creating manual hook\n");
 
-    auto hook = manual_hook{drakvuf, trap_, free_routine_};
-    if(drakvuf_add_trap(drakvuf, hook.trap))
-        return std::nullopt;
+    // struct EnableMaker : public manual_hook { using manual_hook::manual_hook; };
+    // auto hook = std::make_unique<EnableMaker>(drakvuf, trap_, free_routine_);
+    
+    auto hook = std::unique_ptr<manual_hook>(new manual_hook(drakvuf, trap, free_routine));
+    if(!drakvuf_add_trap(hook->drakvuf_, hook->trap_))
+    {
+        PRINT_DEBUG("[LIBHOOK] failed to create trap for manual hook\n");
+        return std::unique_ptr<manual_hook>();
+    }
+    
+    PRINT_DEBUG("[LIBHOOK] manual hook OK\n");
     return hook;
 }
 
 manual_hook::manual_hook(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
-    : base_hook(drakvuf), trap(trap), free_routine(free_routine)
+    : base_hook(drakvuf), trap_(trap), free_routine_(free_routine)
 {}
 
 manual_hook::~manual_hook()
 {
-    if(this->drakvuf && this->trap && this->free_routine)
-        drakvuf_remove_trap(this->drakvuf, this->trap, this->free_routine);
-    // otherwise this has been moved from and we don't free the trap
-    // as the ownership has been passed elsewhere, so we do nothing
+    if(this->drakvuf_ && this->trap_)
+    {
+        PRINT_DEBUG("[LIBHOOK] destroying manual hook...\n");
+        drakvuf_remove_trap(this->drakvuf_, this->trap_, this->free_routine_);
+    }
+    else
+    {
+        // otherwise this has been moved from and we don't free the trap
+        // as the ownership has been passed elsewhere, so we do nothing
+        PRINT_DEBUG("[LIBHOOK] destruction not needed, as manual hook was moved from\n");
+    }
 }
 
 manual_hook::manual_hook(manual_hook&& rhs) noexcept
     : base_hook(std::forward<manual_hook>(rhs))
 {
-    std::swap(this->trap, rhs.trap);
-    std::swap(this->free_routine, rhs.free_routine);
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->free_routine_, rhs.free_routine_);
 }
 
 manual_hook& manual_hook::operator=(manual_hook&& rhs) noexcept
 {
-    std::swap(this->trap, rhs.trap);
-    std::swap(this->free_routine, rhs.free_routine);
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->free_routine_, rhs.free_routine_);
     return *this;
 }

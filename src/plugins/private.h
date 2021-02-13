@@ -104,6 +104,7 @@
 
 #ifndef DRAKVUF_PLUGINS_PRIVATE_H
 #define DRAKVUF_PLUGINS_PRIVATE_H
+#include <libvmi/libvmi.h>
 
 static const char* userid[] =
 {
@@ -113,8 +114,8 @@ static const char* userid[] =
 
 #define USERIDSTR(drakvuf) (userid[drakvuf_get_os_type(drakvuf)])
 
+#ifndef PRINT_DEBUG
 #ifdef DRAKVUF_DEBUG
-
 // This is defined in libdrakvuf
 extern bool verbose;
 
@@ -124,8 +125,10 @@ extern bool verbose;
     } while (0)
 
 #else
+
 #define PRINT_DEBUG(...) \
     do {} while(0)
 #endif
 
-#endif
+#endif // DRAKVUF_DEBUG
+#endif // PRINT_DEBUG

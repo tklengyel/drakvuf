@@ -388,6 +388,16 @@ if test x$plugin_tlsmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_TLSMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_dummy],
+  [AS_HELP_STRING([--enable-plugin-dummy],
+    [Enable dummy plugin for development @<:@no@:>@])],
+  [plugin_dummy="$enableval"],
+  [plugin_dummy=""])
+AM_CONDITIONAL([PLUGIN_DUMMY], [test x$plugin_dummy = xyes])
+if test x$plugin_dummy = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_DUMMY, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -664,6 +674,7 @@ ProcDump:     $plugin_procdump
 APIMon:       $plugin_apimon
 RPCMon:       $plugin_rpcmon
 TLSMon:       $plugin_tlsmon
+Dummy:        $plugin_dummy
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:       $plugin_wmimon

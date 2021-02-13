@@ -105,7 +105,10 @@
 sources  = hooks/base.hpp hooks/base.cpp
 sources += hooks/manual.hpp hooks/manual.cpp
 sources += hooks/syscall.hpp hooks/syscall.cpp
+sources += hooks/return.hpp hooks/return.cpp
 sources += call_result.hpp
+sources += libhook.hpp
+sources += private.h
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(CPPFLAGS)

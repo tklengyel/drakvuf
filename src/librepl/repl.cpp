@@ -112,8 +112,9 @@
 #include <librepl/librepl.h>
 #include <Python.h>
 
+#ifndef PRINT_DEBUG
 #ifdef DRAKVUF_DEBUG
-
+// defined in libdrakvuf
 extern bool verbose;
 
 #define PRINT_DEBUG(args...) \
@@ -124,7 +125,9 @@ extern bool verbose;
 #else
 #define PRINT_DEBUG(args...) \
     do {} while(0)
-#endif
+
+#endif // DRAKVUF_DEBUG
+#endif // PRINT_DEBUG
 
 #define Py_REF_DEBUG \
     PyObject* refCount = PyObject_CallObject(PySys_GetObject("gettotalrefcount"), NULL); \
