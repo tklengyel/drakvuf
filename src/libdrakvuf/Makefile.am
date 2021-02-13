@@ -105,7 +105,7 @@
 h_sources = libdrakvuf.h json-profile.h json-util.h os.h private.h vmi.h \
             win.h win-error-codes.h win-exports.h win-handles.h win-offsets.h \
             win-offsets-map.h win-wow-offsets.h win-wow-offsets-map.h \
-            ntstatus.h filesystem.hpp\ 
+            ntstatus.h filesystem.hpp\
             linux.h linux-exports.h linux-offsets.h linux-offsets-map.h
 c_sources = drakvuf.c json-profile.c json-util.c os.c vmi.c helper.c \
             win.c win-exports.c win-handles.c win-processes.c win-registry.c \
