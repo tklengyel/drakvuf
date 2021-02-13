@@ -408,11 +408,12 @@ static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t 
     auto *ef_data = (struct fault_data_struct *) info->trap->data;
 
     if (LOG_ALWAYS) {
-        jsonfmt::print("writeframe", drakvuf, info,
-                       keyval("FrameVA", fmt::Xval(ef_data->page_va)),
-                       keyval("TrapPA", fmt::Xval(info->trap_pa)),
-                       keyval("CR3", fmt::Xval(info->regs->cr3)),
-                       keyval("GFN", fmt::Xval(info->trap->memaccess.gfn))
+        fmt::print(ef_data->plugin->m_output_format, "hyperbee", drakvuf, info,
+                   keyval("EventType", fmt::Qstr("writeframe")),
+                   keyval("FrameVA", fmt::Xval(ef_data->page_va)),
+                   keyval("TrapPA", fmt::Xval(info->trap_pa)),
+                   keyval("CR3", fmt::Xval(info->regs->cr3)),
+                   keyval("GFN", fmt::Xval(info->trap->memaccess.gfn))
         );
     }
 
@@ -751,18 +752,20 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         }
 
         //LOg everything to the screen
-        jsonfmt::print("execframe", drakvuf, info, keyval("CR3", fmt::Xval(info->regs->cr3)),
-                       keyval("PageVA", fmt::Xval(ef_data->page_va)),
-                       keyval("VADBase", fmt::Xval(vad_node_base)),
-                       keyval("VADEnd", fmt::Xval(vad_node_end)),
-                       keyval("VADName", fmt::Qstr(dll_name_str)),
-                       keyval("DumpSize", fmt::Nval(memory_size)),
-                       keyval("DumpFile", fmt::Qstr(actual_dump_file_path)),
-                       keyval("SHA256", fmt::Qstr(actual_checksum)),
-                       keyval("DumpID", fmt::Nval(actual_dump_id)),
-                       keyval("MetaFile", fmt::Qstr(actual_metafile)),
-                       keyval("TrapPA", fmt::Xval(info->trap_pa)),
-                       keyval("GFN", fmt::Xval(info->trap->memaccess.gfn))
+        fmt::print(ef_data->plugin->m_output_format, "hyperbee", drakvuf, info,
+                   keyval("EventType", fmt::Qstr("execframe")),
+                   keyval("CR3", fmt::Xval(info->regs->cr3)),
+                   keyval("PageVA", fmt::Xval(ef_data->page_va)),
+                   keyval("VADBase", fmt::Xval(vad_node_base)),
+                   keyval("VADEnd", fmt::Xval(vad_node_end)),
+                   keyval("VADName", fmt::Qstr(dll_name_str)),
+                   keyval("DumpSize", fmt::Nval(memory_size)),
+                   keyval("DumpFile", fmt::Qstr(actual_dump_file_path)),
+                   keyval("SHA256", fmt::Qstr(actual_checksum)),
+                   keyval("DumpID", fmt::Nval(actual_dump_id)),
+                   keyval("MetaFile", fmt::Qstr(actual_metafile)),
+                   keyval("TrapPA", fmt::Xval(info->trap_pa)),
+                   keyval("GFN", fmt::Xval(info->trap->memaccess.gfn))
         );
     }
 
@@ -853,10 +856,11 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
 
         //Print out all previous gathered information.
         if (LOG_ALWAYS) {
-            jsonfmt::print("pagefault", drakvuf, info,
-                           keyval("CR3", fmt::Xval(info->regs->cr3)),
-                           keyval("VA", fmt::Xval(params->fault_va)),
-                           keyval("PA", fmt::Xval(p_info.paddr))
+            fmt::print(plugin->m_output_format, "hyperbee", drakvuf, info,
+                       keyval("EventType", fmt::Qstr("pagefault")),
+                       keyval("CR3", fmt::Xval(info->regs->cr3)),
+                       keyval("VA", fmt::Xval(params->fault_va)),
+                       keyval("PA", fmt::Xval(p_info.paddr))
             );
         }
 
