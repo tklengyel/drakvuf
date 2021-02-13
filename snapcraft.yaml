@@ -13,8 +13,6 @@ base: core20
 parts:
   drakvuf:
     source: .
-    build-snaps:
-        - libvmi/latest/edge
     build-packages:
         - autoconf-archive
         - libjson-c-dev
@@ -23,13 +21,12 @@ parts:
         - pkg-config
         - libglib2.0-dev
         - clang
-    stage-snaps:
-        - libvmi/latest/edge
     stage-packages:
         - libjson-c-dev
         - libglib2.0-0
     plugin: autotools
     override-build: |
+        snap install --devmode --edge libvmi
         export CC=clang
         export CXX=clang++
         autoreconf -vif
