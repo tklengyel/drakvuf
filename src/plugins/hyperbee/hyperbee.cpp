@@ -813,7 +813,7 @@ log:
             actual_metafile = file_path_meta_data;
         }
 
-        //LOg everything to the screen
+        //Log everything to the screen
         fmt::print(ef_data->plugin->m_output_format, "hyperbee", drakvuf, info,
                    keyval("EventType", fmt::Qstr("execframe")),
                    keyval("CR3", fmt::Xval(info->regs->cr3)),
