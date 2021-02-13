@@ -278,7 +278,8 @@ const gchar* get_sha256_memory(
         {
             g_checksum_update(checksum, (const guchar*) access_ptrs[i] + intra_page_offset, write_length);
             munmap(access_ptrs[i], VMI_PS_4KB);
-        } else
+        }
+        else
         {
             // inaccessible page, pad with zeros to ensure proper alignment of the data
             uint8_t zeros[VMI_PS_4KB] = {};
@@ -366,7 +367,8 @@ dump_memory_region(vmi_instance_t vmi, hyperbee* plugin, access_context_t* ctx, 
         {
             fwrite((char*) access_ptrs[i] + intra_page_offset, write_length, 1, fp);
             munmap(access_ptrs[i], VMI_PS_4KB);
-        } else
+        }
+        else
         {
             // inaccessible page, pad with zeros to ensure proper alignment of the data
             uint8_t zeros[VMI_PS_4KB] = {};
@@ -426,7 +428,7 @@ static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                    keyval("TrapPA", fmt::Xval(info->trap_pa)),
                    keyval("CR3", fmt::Xval(info->regs->cr3)),
                    keyval("GFN", fmt::Xval(info->trap->memaccess.gfn))
-        );
+                  );
     }
 
     drakvuf_trap* exec_Trap = create_execute_trap(info->trap->memaccess.gfn, ef_data);
@@ -593,7 +595,8 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
                 goto changetrap;
             }
         }
-    } else
+    }
+    else
     {
         dll_name_str = alloc_memory;
     }
@@ -625,7 +628,8 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
                 .addr = mmvad.starting_vpn * VMI_PS_4KB
             };
         memory_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
-    } else
+    }
+    else
     {
         ctx_memory_dump =
             {
@@ -670,7 +674,8 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
             {
                 PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
             }
-        } else
+        }
+        else
         {
             if (asprintf(&file_path_memory_dump, "%s/%s.page", ef_data->plugin->hyperbee_dump_dir.c_str(),
                          file_name_stem) < 0)
@@ -728,7 +733,8 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
                 PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
                 goto log;
             }
-        } else
+        }
+        else
         {
             //using a suffix as "vad", "page" or (for the metafile) "metadata" helps to quickly select associated files
             if (asprintf(&file_path_memory_dump, "%s/%s.page", ef_data->plugin->hyperbee_dump_dir.c_str(),
@@ -783,7 +789,8 @@ log:
             actual_checksum = missing_data;
             actual_dump_id = 0;
             memory_size = 0;
-        } else
+        }
+        else
         {
             actual_dump_file_path = file_path_memory_dump;
             actual_checksum = chk_str;
@@ -794,7 +801,8 @@ log:
         if (file_path_meta_data == nullptr)
         {
             actual_metafile = missing_data;
-        } else
+        }
+        else
         {
             actual_metafile = file_path_meta_data;
         }
@@ -814,7 +822,7 @@ log:
                    keyval("MetaFile", fmt::Qstr(actual_metafile)),
                    keyval("TrapPA", fmt::Xval(info->trap_pa)),
                    keyval("GFN", fmt::Xval(info->trap->memaccess.gfn))
-        );
+                  );
     }
 
 
@@ -918,7 +926,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
                        keyval("CR3", fmt::Xval(info->regs->cr3)),
                        keyval("VA", fmt::Xval(params->fault_va)),
                        keyval("PA", fmt::Xval(p_info.paddr))
-            );
+                      );
         }
 
         //Create a new struct for exec_fault_data and reserve memory.
