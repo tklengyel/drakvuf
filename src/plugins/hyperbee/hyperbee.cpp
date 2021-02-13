@@ -160,10 +160,10 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 /**
  * Creates an execute trap for the given (guest) frame number and passes the given fault data
  * @param gfn the (guest) frame number. If some executable instructions are fetched from this frame, the trap gets active
- * @param fault_data information which is required for logging. It is passed between the traps.
+ * @param fault_data_old information which is required for logging. It is passed between the traps.
  * @return the execute trap that needs to be added to drakvuf
  */
-drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data);
+drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data_old);
 
 /**
  * Saves the metadata received during the monitoring to a logfile
@@ -489,9 +489,9 @@ static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
  * Creates a write trap, whose pointer is returned.
  *
  * @param info
- * @param ef_data
+ * @param fault_data_old
  */
-drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* info, fault_data_struct* ef_data)
+drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* info, fault_data_struct* fault_data_old)
 {
 
     //Use g_try_malloc0 to zero the alloced heap memory at first. This prevents any undefined behaviour as fields of the
@@ -501,13 +501,24 @@ drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* info, fault_data_struct* 
     {
         return nullptr;
     }
+
+    //Create a new struct for exec_fault_data and reserve memory.
+    auto* fault_data_new = (struct fault_data_struct*) g_try_malloc0(sizeof(struct fault_data_struct));
+    if (!fault_data_new)
+    {
+        return nullptr;
+    }
+
+    fault_data_new->plugin = fault_data_old->plugin;
+    fault_data_new->page_va = fault_data_old->page_va;
+
     //Set the type of the trap.
     write_trap->type = MEMACCESS;
     //Guest page-frame number to set event (as defined in events.h) (This is the level 1 translation physical address of the guest. The windows used physical address).
     write_trap->memaccess.gfn = info->trap->memaccess.gfn;
     write_trap->memaccess.type = POST; //Do something after sth was written
     write_trap->memaccess.access = VMI_MEMACCESS_W; //When memory shall be written
-    write_trap->data = ef_data; //Reuse the ef_data
+    write_trap->data = fault_data_new; //Use new allocated fault_data_struct to prevent memory leaks and unexpected behaviour in case of memory corruptions
 
     //Cb is the asynchronous call back https://github.com/tklengyel/drakvuf/issues/1056#issuecomment-713867399
     write_trap->cb = write_faulted_cb;
@@ -519,9 +530,9 @@ drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* info, fault_data_struct* 
  * Creates an execute trap, whose pointer is returned.
  *
  * @param info
- * @param fault_data
+ * @param fault_data_old
  */
-drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data)
+drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data_old)
 {
 
     auto* exec_trap = (drakvuf_trap_t*) g_try_malloc0(sizeof(drakvuf_trap_t));
@@ -530,13 +541,23 @@ drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data)
         return nullptr;
     }
 
+    //Create a new struct for exec_fault_data and reserve memory.
+    auto* fault_data_new = (struct fault_data_struct*) g_try_malloc0(sizeof(struct fault_data_struct));
+    if (!fault_data_new)
+    {
+        return nullptr;
+    }
+
+    fault_data_new->plugin = fault_data_old->plugin;
+    fault_data_new->page_va = fault_data_old->page_va;
+
     //Set the type of the trap.
     exec_trap->type = MEMACCESS;
     //Guest page-frame number to set event (as defined in events.h) (This is the level 1 translation physical address of the guest. The windows used physical address).
     exec_trap->memaccess.gfn = gfn;
     exec_trap->memaccess.type = PRE; //Do something before the access
     exec_trap->memaccess.access = VMI_MEMACCESS_X; //When memory shall be executed
-    exec_trap->data = fault_data;
+    exec_trap->data = fault_data_new; //Use new allocated fault_data_struct to prevent memory leaks and unexpected behaviour in case of memory corruptions
 
     //Cb is the asynchronous call back https://github.com/tklengyel/drakvuf/issues/1056#issuecomment-713867399
     exec_trap->cb = execute_faulted_cb;
@@ -1026,7 +1047,8 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
             else
             {
                 PRINT_DEBUG(
-                    "[HYPERBEE] Failed to create execute trap X. Not monitoring GFN 0x%lx\n", info->trap->memaccess.gfn);
+                    "[HYPERBEE] Failed to create execute trap X. Not monitoring GFN 0x%lx\n",
+                    info->trap->memaccess.gfn);
             }
         }
         else
