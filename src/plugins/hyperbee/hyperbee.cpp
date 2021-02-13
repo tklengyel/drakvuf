@@ -566,7 +566,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
             //Removes this trap and frees the memory
             ef_data->plugin->traps.erase(info->trap);
             drakvuf_remove_trap(drakvuf, info->trap, nullptr);
-            PRINT_DEBUG("[HYPERBEE] Deleted outdated trap for PA 0x%lx", info->trap_pa);
+            PRINT_DEBUG("[HYPERBEE] Removed outdated trap for PA 0x%lx", info->trap_pa);
             return VMI_EVENT_RESPONSE_NONE;
         }
     }
@@ -633,12 +633,12 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
             // place DLLs here as well.
             if (strstr(dll_name_str, "System32") != nullptr)
             {
-                PRINT_DEBUG("[HYPERBEE] Ignoring instruction within System32 DLL\n");
+                PRINT_DEBUG("[HYPERBEE] Ignoring instruction fetch within System32 DLL\n");
                 goto changetrap;
             }
             if (strstr(dll_name_str, "SysWOW64") != nullptr)
             {
-                PRINT_DEBUG("[HYPERBEE] Ignoring instruction within SysWOW64 DLL\n");
+                PRINT_DEBUG("[HYPERBEE] Ignoring instruction fetch within SysWOW64 DLL\n");
                 goto changetrap;
             }
         }
@@ -961,7 +961,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
     //Try to find the current trap identifier in the set of existing traps.
     auto it = plugin->monitored_pages.find(monitored_page_identifier);
 
-    //If the memory part is not monitored yet: Create a new trap for that.
+    //If the memory area is not monitored yet: Create a new trap for that.
     if (it == plugin->monitored_pages.end())
     {
         //page_info_t is a type of type page_info https://stackoverflow.com/a/30370413
@@ -1084,7 +1084,7 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     //The first argument is the FaultStatus, and the second (rdx) the VirtualAddress which caused the fault.
     addr_t fault_va = drakvuf_get_function_argument(drakvuf, info, 2);
-    PRINT_DEBUG("[HYPERBEE] MmAccessFault(%d, %lx)\n", info->proc_data.pid, fault_va);
+    PRINT_DEBUG("[HYPERBEE] Caught MmAccessFault(%d, %lx)\n", info->proc_data.pid, fault_va);
 
     //The kernel space starts with 0xFFFF... and higher.  User space is within 0x0000F... and below. If the trap was created by a kernel module we don't mind as we assume the integrity of the kernel.
     //https://www.codemachine.com/article_x64kvas.html: The upper 16 bits of virtual addresses are always set to 0x0 for user mode addresses and to 0xF for kernel mode addresses
@@ -1142,7 +1142,7 @@ hyperbee::hyperbee(drakvuf_t drakvuf, const hyperbee_config_struct* c, output_fo
     //Check if the dump directory parameter was provided
     if (!c->hyperbee_dump_dir)
     {
-        PRINT_DEBUG("[HYPERBEE] Output directory for dumps not provided, not activating HYPERBEE plugin\n");
+        PRINT_DEBUG("[HYPERBEE] Output directory for dumps not provided, not activating hyperbee plugin\n");
         return;
     }
 
@@ -1158,7 +1158,7 @@ hyperbee::hyperbee(drakvuf_t drakvuf, const hyperbee_config_struct* c, output_fo
     //Check if the dump directory exists
     if (!std::filesystem::exists(this->hyperbee_dump_dir))
     {
-        PRINT_DEBUG("[HYPERBEE] The output directory is no valid/existing path, not activating HYPERBEE plugin\n");
+        PRINT_DEBUG("[HYPERBEE] The output directory is no valid/existing path, not activating hyperbee plugin\n");
         return;
     }
 
@@ -1169,7 +1169,7 @@ hyperbee::hyperbee(drakvuf_t drakvuf, const hyperbee_config_struct* c, output_fo
     int res = mkdir(this->hyperbee_dump_dir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     if (res != 0 && errno != EEXIST)
     {
-        PRINT_DEBUG("[HYPERBEE] Failed to create %s\n", this->hyperbee_dump_dir.c_str());
+        PRINT_DEBUG("[HYPERBEE] Failed to create dump directory %s\n", this->hyperbee_dump_dir.c_str());
         return;
     }
 
