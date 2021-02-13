@@ -138,45 +138,46 @@
  */
 #define IGNORE_SYSTEM_DLL 1
 
-
 //Struct to pass the parameters
-struct hyperbee_config_struct {
-    //Dir to save extracted frames to
-    const char *hyperbee_dump_dir;
-    //Executable to filter
-    const char *hyperbee_filter_executable;
+struct hyperbee_config_struct
+{
+  //Dir to save extracted frames to
+  const char* hyperbee_dump_dir;
+  //Executable to filter
+  const char* hyperbee_filter_executable;
 };
 
-class hyperbee : public pluginex {
+class hyperbee : public pluginex
+{
 
-public:
-    //Dir to save extracted frames to
-    std::filesystem::path hyperbee_dump_dir;
+ public:
+  //Dir to save extracted frames to
+  std::filesystem::path hyperbee_dump_dir;
 
-    //Executable to filter for
-    const char *hyperbee_filter_executable = "";
+  //Executable to filter for
+  const char* hyperbee_filter_executable = "";
 
-    /**
-     * a temporary  dump file
-     */
-    char *tmp_file_path = nullptr;
+  /**
+   * a temporary  dump file
+   */
+  char* tmp_file_path = nullptr;
 
-    //Counts how often an actual dump occured
-    unsigned int dump_id = 0;
+  //Counts how often an actual dump occured
+  unsigned int dump_id = 0;
 
-    //Set to store all traps so they can be deleted in the end
-    std::set<drakvuf_trap *> traps;
+  //Set to store all traps so they can be deleted in the end
+  std::set<drakvuf_trap*> traps;
 
-    //Keeps track of monitored pages. Prevents duplicate traps.
-    std::set<std::pair<addr_t, addr_t>> monitored_pages;
+  //Keeps track of monitored pages. Prevents duplicate traps.
+  std::set<std::pair<addr_t, addr_t>> monitored_pages;
 
-    //Keeps track of the data which was already dumped, used to prevent duplicate dump files.
-    // Uses the hash as key and the dumped file stem (without extension) as value.
-    std::unordered_map<std::string, std::string> hashed_dumped_data_map;
+  //Keeps track of the data which was already dumped, used to prevent duplicate dump files.
+  // Uses the hash as key and the dumped file stem (without extension) as value.
+  std::unordered_map<std::string, std::string> hashed_dumped_data_map;
 
-    hyperbee(drakvuf_t drakvuf, const hyperbee_config_struct *config, output_format_t output);
+  hyperbee(drakvuf_t drakvuf, const hyperbee_config_struct* config, output_format_t output);
 
-    ~hyperbee();
+  ~hyperbee();
 };
 
 #endif
