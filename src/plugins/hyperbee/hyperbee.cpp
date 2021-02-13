@@ -187,7 +187,9 @@ static void save_file_metadata(const drakvuf_trap_info_t* info, const char* meta
 
     FILE* fp = fopen(meta_file_path, "w");
     if (!fp)
+    {
         return;
+    }
 
     json_object* json_object = json_object_new_object();
     auto timestamp = TimeVal{UNPACK_TIMEVAL(info->timestamp)};
@@ -272,7 +274,9 @@ const gchar* get_sha256_memory(
         size_t write_length = tmp_len_bytes;
 
         if (write_length > VMI_PS_4KB - intra_page_offset)
+        {
             write_length = VMI_PS_4KB - intra_page_offset;
+        }
 
         if (access_ptrs[i])
         {
@@ -361,7 +365,9 @@ dump_memory_region(vmi_instance_t vmi, hyperbee* plugin, access_context_t* ctx, 
         size_t write_length = tmp_len_bytes;
 
         if (write_length > VMI_PS_4KB - intra_page_offset)
+        {
             write_length = VMI_PS_4KB - intra_page_offset;
+        }
 
         if (access_ptrs[i])
         {
@@ -774,9 +780,9 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     }
 
 log:
+    //LOG the retrieved data to the console
     if (LOG_ALWAYS || malware)
-    { //LOG the retrieved data to the console
-
+    {
         char* actual_dump_file_path;
         const char* actual_checksum;
         unsigned int actual_dump_id;
