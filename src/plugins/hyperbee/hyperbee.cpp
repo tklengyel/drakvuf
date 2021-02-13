@@ -437,18 +437,27 @@ static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                   );
     }
 
-    drakvuf_trap* exec_Trap = create_execute_trap(info->trap->memaccess.gfn, ef_data);
+    drakvuf_trap* exec_trap = create_execute_trap(info->trap->memaccess.gfn, ef_data);
 
-    //Add and activate the trap
-    drakvuf_add_trap(drakvuf, exec_Trap);
-    //store the trap to be deleted in the end.
-    ef_data->plugin->traps.emplace(exec_Trap);
 
-    //Removes this trap and frees the memory
-    ef_data->plugin->traps.erase(info->trap);
-    drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+    //Add and activate the exec trap
+    if (drakvuf_add_trap(drakvuf, exec_trap))
+    {
+        //store the trap that it can be deleted in the end.
+        ef_data->plugin->traps.emplace(exec_trap);
 
-    PRINT_DEBUG("[HYPERBEE] Replaced Write Trap X on GFN 0x%lx with Execute trap\n", info->trap->memaccess.gfn);
+        //Removes this current execute trap and frees the memory
+        ef_data->plugin->traps.erase(info->trap);
+        drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+
+        PRINT_DEBUG("[HYPERBEE] Replaced write trap W on GFN 0x%lx with execute trap X\n", info->trap->memaccess.gfn);
+    }
+    else
+    {
+        //If the trap was not added, keep the current write trap
+        PRINT_DEBUG("[HYPERBEE] Failed to replace write trap W on GFN 0x%lx with execute trap X. Keeping write trap W\n",
+                    info->trap->memaccess.gfn);
+    }
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -837,13 +846,24 @@ changetrap:
     drakvuf_trap* write_trap = create_write_trap(info, ef_data);
 
     //Add and activate the trap
-    drakvuf_add_trap(drakvuf, write_trap);
-    //store the trap that it can be deleted in the end.
-    ef_data->plugin->traps.emplace(write_trap);
+    if (drakvuf_add_trap(drakvuf, write_trap))
+    {
+        //store the trap that it can be deleted in the end.
+        ef_data->plugin->traps.emplace(write_trap);
 
-    //Removes this current execute trap and frees the memory
-    ef_data->plugin->traps.erase(info->trap);
-    drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+        //Removes this current execute trap and frees the memory
+        ef_data->plugin->traps.erase(info->trap);
+        drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+
+        PRINT_DEBUG("[HYPERBEE] Replaced execute trap X on GFN 0x%lx with write trap W\n", info->trap->memaccess.gfn);
+    }
+    else
+    {
+        //If the trap was not added, keep the current exec trap
+        PRINT_DEBUG("[HYPERBEE] Failed to replaced execute trap X on GFN 0x%lx with write trap W. Keeping execute trap X\n",
+                    info->trap->memaccess.gfn);
+    }
+
 
     //Frees memory
     if (file_name_stem)
@@ -863,8 +883,6 @@ changetrap:
         vmi_free_unicode_str(dll_name);
     }
     g_free((gpointer) chk_str);
-
-    PRINT_DEBUG("[HYPERBEE] Replaced Execute Trap X on GFN 0x%lx with Write trap\n", info->trap->memaccess.gfn);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -946,11 +964,19 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
         drakvuf_trap* exec_trap = create_execute_trap(p_info.paddr >> 12, ef_data);
 
         //Add and activate the trap
-        drakvuf_add_trap(drakvuf, exec_trap);
-        //store the trap to be deleted in the end.
-        plugin->traps.emplace(exec_trap);
-        plugin->monitored_pages.insert(monitored_page_identifier);
-        PRINT_DEBUG("[HYPERBEE] Trap X on GFN 0x%lx\n", info->trap->memaccess.gfn);
+        if (drakvuf_add_trap(drakvuf, exec_trap))
+        {
+            //store the trap to be deleted in the end.
+            plugin->traps.emplace(exec_trap);
+            plugin->monitored_pages.insert(monitored_page_identifier);
+            PRINT_DEBUG("[HYPERBEE] Set up execute trap X on GFN 0x%lx\n", info->trap->memaccess.gfn);
+        }
+        else
+        {
+            //If the trap was not added successfully
+            //Can't keep trap since it is specific for the RIP
+            PRINT_DEBUG("[HYPERBEE] Failed to set up execute trap X on GFN 0x%lx\n", info->trap->memaccess.gfn);
+        }
     }
 
     //Destroys this return trap, because it is specific for the RIP and not usable anymore. This was the trap being called when the physical address got computed.
