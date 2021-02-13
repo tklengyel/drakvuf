@@ -129,11 +129,11 @@
 #include <sys/stat.h>
 #include <libvmi/libvmi.h>
 #include <string>
-#include <filesystem>
 #include <vector>
 #include <cstdio>
 #include <cstring>
 
+#include <libdrakvuf/filesystem.hpp>
 #include <libdrakvuf/json-util.h>
 #include "hyperbee.h"
 #include "plugins/output_format.h"
