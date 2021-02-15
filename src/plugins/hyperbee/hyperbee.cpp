@@ -703,22 +703,22 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
         //Set the area to dump for vad or page (below-else)
         ctx_memory_dump =
-            {
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3,
-                //Calculate the dump_size
-                .addr = mmvad.starting_vpn * VMI_PS_4KB
-            };
+        {
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            //Calculate the dump_size
+            .addr = mmvad.starting_vpn * VMI_PS_4KB
+        };
         memory_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
     }
     else
     {
         ctx_memory_dump =
-            {
-                .translate_mechanism = VMI_TM_PROCESS_DTB, /**see Libvmi.h < Translate addr via specified directory table base. */
-                .dtb = info->regs->cr3, //The directory table base
-                .addr = ef_data->page_va //The address to lookup.
-            };
+        {
+            .translate_mechanism = VMI_TM_PROCESS_DTB, /**see Libvmi.h < Translate addr via specified directory table base. */
+            .dtb = info->regs->cr3, //The directory table base
+            .addr = ef_data->page_va //The address to lookup.
+        };
         memory_size = VMI_PS_4KB;
     }
 
@@ -1140,9 +1140,9 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     //Adds a return hook, a hook which will be called after function completes and returns.
     //Each time registers a trap, which is just for the process at the current step -> specific for the RIP
     auto trap = plugin->register_trap<access_fault_result_t>(
-        info,
-        mm_access_fault_return_hook_cb,
-        breakpoint_by_pid_searcher());
+                    info,
+                    mm_access_fault_return_hook_cb,
+                    breakpoint_by_pid_searcher());
 
     //If trap creation failed
     if (!trap)
