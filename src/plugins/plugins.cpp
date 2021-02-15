@@ -376,7 +376,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 {
                     hyperbee_config_struct config =
                     {
-                        .hyperbee_dump_dir = options->hyperbee_dump_dir,
+                        .hyperbee_dump_dir = "/tmp", // options->hyperbee_dump_dir,
                         .hyperbee_filter_executable = options->hyperbee_filter_executable,
                     };
                     this->plugins[plugin_id] = std::make_unique<hyperbee>(this->drakvuf, &config, this->output);
