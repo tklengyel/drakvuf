@@ -1107,7 +1107,7 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     //Checks if a filter was set and applies it:
     //This applies only to the trap set up. If the program dies in the meantime, the trap continues and might rise the
     // callback even if another program is triggering it, since all depends only on the guest frame number.
-    if (plugin->hyperbee_filter_executable[0])
+    if (plugin->hyperbee_filter_executable)
     {
         //Use NULL when calling C functions.
         if (strcasestr(info->proc_data.name, plugin->hyperbee_filter_executable) == NULL)
