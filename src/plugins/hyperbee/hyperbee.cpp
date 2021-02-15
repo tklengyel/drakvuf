@@ -150,6 +150,18 @@ struct fault_data_struct
 };
 
 /**
+ * This code frees memory belonging to a certain trap.
+ * It is called at the time a trap is removed. drakvuf_remove_trap will not remove a trap instantly but sort of schedules the remove.
+ * Thus, if freeing the trap and trap->data instantly after drakvuf_remove_trap was called, this might lead to a use-after-free error.
+ * This is why drakvuf_remove_trap has a callback option (third argument->using this callback) to set what has to be done when the trap is actually removed.
+ */
+static void remove_trap_cb(drakvuf_trap_t* trap)
+{
+    g_free(trap->data);
+    g_free(trap);
+}
+
+/**
  * This is the callback of the execute trap.
  * @param drakvuf the drakvuf plugin
  * @param info information regarding the trap event
@@ -462,7 +474,7 @@ static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
             //Removes this current execute trap and frees the memory
             ef_data->plugin->traps.erase(info->trap);
-            drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+            drakvuf_remove_trap(drakvuf, info->trap, remove_trap_cb);
 
             PRINT_DEBUG("[HYPERBEE] Replaced write trap W on GFN 0x%lx with execute trap X\n",
                         info->trap->memaccess.gfn);
@@ -518,7 +530,8 @@ drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* info, fault_data_struct* 
     write_trap->memaccess.gfn = info->trap->memaccess.gfn;
     write_trap->memaccess.type = POST; //Do something after sth was written
     write_trap->memaccess.access = VMI_MEMACCESS_W; //When memory shall be written
-    write_trap->data = fault_data_new; //Use new allocated fault_data_struct to prevent memory leaks and unexpected behaviour in case of memory corruptions
+    write_trap->data =
+        fault_data_new; //Use new allocated fault_data_struct to prevent memory leaks and unexpected behaviour in case of memory corruptions
 
     //Cb is the asynchronous call back https://github.com/tklengyel/drakvuf/issues/1056#issuecomment-713867399
     write_trap->cb = write_faulted_cb;
@@ -557,7 +570,8 @@ drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data_ol
     exec_trap->memaccess.gfn = gfn;
     exec_trap->memaccess.type = PRE; //Do something before the access
     exec_trap->memaccess.access = VMI_MEMACCESS_X; //When memory shall be executed
-    exec_trap->data = fault_data_new; //Use new allocated fault_data_struct to prevent memory leaks and unexpected behaviour in case of memory corruptions
+    exec_trap->data =
+        fault_data_new; //Use new allocated fault_data_struct to prevent memory leaks and unexpected behaviour in case of memory corruptions
 
     //Cb is the asynchronous call back https://github.com/tklengyel/drakvuf/issues/1056#issuecomment-713867399
     exec_trap->cb = execute_faulted_cb;
@@ -586,7 +600,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         {
             //Removes this trap and frees the memory
             ef_data->plugin->traps.erase(info->trap);
-            drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+            drakvuf_remove_trap(drakvuf, info->trap, remove_trap_cb);
             PRINT_DEBUG("[HYPERBEE] Removed outdated trap for PA 0x%lx", info->trap_pa);
             return VMI_EVENT_RESPONSE_NONE;
         }
@@ -907,7 +921,7 @@ changetrap:
 
             //Removes this current execute trap and frees the memory
             ef_data->plugin->traps.erase(info->trap);
-            drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+            drakvuf_remove_trap(drakvuf, info->trap, remove_trap_cb);
 
             PRINT_DEBUG("[HYPERBEE] Replaced execute trap X on GFN 0x%lx with write trap W\n",
                         info->trap->memaccess.gfn);
