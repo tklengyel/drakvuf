@@ -1059,7 +1059,6 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
                 else
                 {
                     //If the trap was not added successfully
-                    g_free(ef_data);
                     //Can't keep trap since it is specific for the RIP
                     PRINT_DEBUG(
                         "[HYPERBEE] Failed to add execute trap X on GFN 0x%lx. Deleting mmAccessFault Return Trap\n",
@@ -1068,7 +1067,6 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
             }
             else
             {
-                g_free(ef_data);
                 PRINT_DEBUG(
                     "[HYPERBEE] Failed to create execute trap X. Not monitoring GFN 0x%lx\n",
                     info->trap->memaccess.gfn);
