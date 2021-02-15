@@ -518,6 +518,8 @@ drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* info, fault_data_struct* 
     auto* fault_data_new = (struct fault_data_struct*) g_try_malloc0(sizeof(struct fault_data_struct));
     if (!fault_data_new)
     {
+        //If there is a problem with allocation of fault_data_new but write_trap was allocated successfully, free memory of write_trap.
+        g_free(write_trap);
         return nullptr;
     }
 
@@ -558,6 +560,8 @@ drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data_ol
     auto* fault_data_new = (struct fault_data_struct*) g_try_malloc0(sizeof(struct fault_data_struct));
     if (!fault_data_new)
     {
+        //If there is a problem with allocation of fault_data_new but exec_trap was allocated successfully, free memory of write_trap.
+        g_free(exec_trap);
         return nullptr;
     }
 
@@ -1052,6 +1056,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
                 else
                 {
                     //If the trap was not added successfully
+                    g_free(ef_data);
                     //Can't keep trap since it is specific for the RIP
                     PRINT_DEBUG(
                         "[HYPERBEE] Failed to add execute trap X on GFN 0x%lx. Deleting mmAccessFault Return Trap\n",
@@ -1060,6 +1065,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
             }
             else
             {
+                g_free(ef_data);
                 PRINT_DEBUG(
                     "[HYPERBEE] Failed to create execute trap X. Not monitoring GFN 0x%lx\n",
                     info->trap->memaccess.gfn);
