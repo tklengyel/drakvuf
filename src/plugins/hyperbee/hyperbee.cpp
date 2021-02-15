@@ -213,7 +213,6 @@ static void save_file_metadata(const drakvuf_trap_info_t* info, const char* meta
     json_object_object_add(json_object, "PPID", json_object_new_int(info->attached_proc_data.ppid));
     /* Thread Id for Linux & Windows*/
     json_object_object_add(json_object, "TID", json_object_new_int(info->attached_proc_data.tid));
-//    json_object_object_add(json_object, "UserName", json_object_new_string(USERIDSTR(drakvuf)));
     /* Process SessionID/UID */
     json_object_object_add(json_object, "UserID", json_object_new_int(info->attached_proc_data.userid));
     /* Process name */
@@ -1104,15 +1103,6 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     //Load the plugin object.
     auto plugin = get_trap_plugin<hyperbee>(info);
-
-    //Could be used, if we trust the guest systems integrity
-    //Ignore any executables within System32 and SysWOW64
-    //    if (strstr(info->proc_data.name, "System32") != nullptr) {
-    //        return VMI_EVENT_RESPONSE_NONE;
-    //    }
-    //    if (strstr(dll_name_str, "SysWOW64") != nullptr) {
-    //         return VMI_EVENT_RESPONSE_NONE;
-    //    }
 
     //Checks if a filter was set and applies it:
     //This applies only to the trap set up. If the program dies in the meantime, the trap continues and might rise the
