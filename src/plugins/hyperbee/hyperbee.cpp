@@ -1043,6 +1043,9 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
             ef_data->page_va = page_va;
 
             drakvuf_trap* exec_trap = create_execute_trap(p_info.paddr >> 12, ef_data);
+            //Free ef_data as it is not used anymore
+            g_free(ef_data);
+
             if (exec_trap)
             {
                 //Add and activate the trap
