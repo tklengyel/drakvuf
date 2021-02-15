@@ -599,7 +599,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     // If it does not match the filter, delete this trap (and don't replace it)
     if (ef_data->plugin->hyperbee_filter_executable[0])
     {
-        if (strcasestr(info->proc_data.name, ef_data->plugin->hyperbee_filter_executable) == nullptr)
+        if (strcasestr(info->proc_data.name, ef_data->plugin->hyperbee_filter_executable) == NULL)
         {
             //Removes this trap and frees the memory
             ef_data->plugin->traps.erase(info->trap);
@@ -1109,7 +1109,8 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     // callback even if another program is triggering it, since all depends only on the guest frame number.
     if (plugin->hyperbee_filter_executable[0])
     {
-        if (strcasestr(info->proc_data.name, plugin->hyperbee_filter_executable) == nullptr)
+        //Use NULL when calling C functions.
+        if (strcasestr(info->proc_data.name, plugin->hyperbee_filter_executable) == NULL)
         {
             return VMI_EVENT_RESPONSE_NONE;
         }
