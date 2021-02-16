@@ -663,7 +663,7 @@ bool setup_dump_context(mmvad_info_t mmvad,
  * @param dump_metadata storing the vad node name
  * @return if the extraction was successful or not
  */
-bool retrieve_and_filter_vad_name(const vmi_lock_guard &vmi, addr_t file_name_ptr, dump_metadata_struct* dump_metadata)
+bool retrieve_and_filter_vad_name(const vmi_lock_guard& vmi, addr_t file_name_ptr, dump_metadata_struct* dump_metadata)
 {
     //Read the name of the dll/binary this node belongs to
     dump_metadata->vad_name = drakvuf_read_unicode_va(vmi, file_name_ptr, 0);
@@ -703,7 +703,7 @@ bool retrieve_and_filter_vad_name(const vmi_lock_guard &vmi, addr_t file_name_pt
  * @return if malware was detected or not. this is currently a not included feature, but part of future work (or could be implemented by oneself)
  */
 bool analyse_memory(drakvuf_t drakvuf,
-                    const vmi_lock_guard &vmi,
+                    const vmi_lock_guard& vmi,
                     const drakvuf_trap_info_t* trap_info,
                     const fault_data_struct* fault_data,
                     dump_metadata_struct* dump_metadata)
@@ -839,8 +839,8 @@ bool analyse_memory(drakvuf_t drakvuf,
 
         //Add the checksum as key with the file_name_prefix (as data) to the map.
         fault_data->plugin->dumped_memory_map.insert(std::pair<std::string,
-            std::string>(dump_metadata->sha256sum,
-                         dump_metadata->file_stem));
+                std::string>(dump_metadata->sha256sum,
+                             dump_metadata->file_stem));
 
 
         //If the dump of the memory was successful write all gathered data to a metadata file
@@ -1263,9 +1263,9 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     //Adds a return hook, a hook which will be called after function completes and returns.
     //Each time registers a trap, which is just for the process at the current step -> specific for the RIP
     auto trap = plugin->register_trap<access_fault_result_t>(
-        trap_info,
-        mm_access_fault_return_hook_cb,
-        breakpoint_by_pid_searcher());
+                    trap_info,
+                    mm_access_fault_return_hook_cb,
+                    breakpoint_by_pid_searcher());
 
     //If trap creation failed
     if (!trap)
