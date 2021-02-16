@@ -152,10 +152,10 @@ class hyperbee : public pluginex
 
 public:
     //Dir to save extracted frames to
-    std::filesystem::path hyperbee_dump_dir;
+    std::filesystem::path dump_dir;
 
     //Executable to filter for
-    const char* hyperbee_filter_executable = "";
+    const char* filter_executable = "";
 
     /**
      * a temporary  dump file

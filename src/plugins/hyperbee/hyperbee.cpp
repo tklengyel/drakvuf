@@ -717,7 +717,7 @@ bool analyse_memory(drakvuf_t drakvuf,
     }
 
     //Set the metadata and dumpfile path
-    if (!set_dump_paths(fault_data->plugin->hyperbee_dump_dir.c_str(),
+    if (!set_dump_paths(fault_data->plugin->dump_dir.c_str(),
                         dump_metadata))
     {
         //debug message within set_dump_paths
@@ -959,9 +959,9 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     //Verify the program leading to the execution of this trap is the one we are filtering for (if we do).
     //The filtering could limit (and therefore focus) the monitoring and gives a speedup in such possibly uninteresting cases.
     // If it does not match the filter, delete this trap (and don't replace it)
-    if (fault_data->plugin->hyperbee_filter_executable[0])
+    if (fault_data->plugin->filter_executable[0])
     {
-        if (strcasestr(trap_info->proc_data.name, fault_data->plugin->hyperbee_filter_executable) == NULL)
+        if (strcasestr(trap_info->proc_data.name, fault_data->plugin->filter_executable) == NULL)
         {
             //Removes this trap and frees the memory
             fault_data->plugin->traps.erase(trap_info->trap);
@@ -1174,10 +1174,10 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     //Checks if a filter was set and applies it:
     //This applies only to the trap set up. If the program dies in the meantime, the trap continues and might rise the
     // callback even if another program is triggering it, since all depends only on the guest frame number.
-    if (plugin->hyperbee_filter_executable)
+    if (plugin->filter_executable)
     {
         //Use NULL when calling C functions.
-        if (strcasestr(trap_info->proc_data.name, plugin->hyperbee_filter_executable) == NULL)
+        if (strcasestr(trap_info->proc_data.name, plugin->filter_executable) == NULL)
         {
             return VMI_EVENT_RESPONSE_NONE;
         }
@@ -1253,32 +1253,32 @@ hyperbee::hyperbee(drakvuf_t
     //Load the filter if existing
     if (c->hyperbee_filter_executable)
     {
-        this->hyperbee_filter_executable = c->hyperbee_filter_executable;
+        this->filter_executable = c->hyperbee_filter_executable;
     }
 
     //get the output dir from the config arguments
-    this->hyperbee_dump_dir = c->hyperbee_dump_dir;
+    this->dump_dir = c->hyperbee_dump_dir;
 
     //Check if the dump directory exists
-    if (!std::filesystem::exists(this->hyperbee_dump_dir))
+    if (!std::filesystem::exists(this->dump_dir))
     {
         PRINT_DEBUG("[HYPERBEE] The output directory is no valid/existing path, not activating hyperbee plugin\n");
         return;
     }
 
     //Construct the full frame dump directory by appending /dumps/ and create the folder if not yet existing.
-    this->hyperbee_dump_dir /= "dumps";
+    this->dump_dir /= "dumps";
 
     //Creates the dump folder
-    int res = mkdir(this->hyperbee_dump_dir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    int res = mkdir(this->dump_dir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     if (res != 0 && errno != EEXIST)
     {
-        PRINT_DEBUG("[HYPERBEE] Failed to create dump directory %s\n", this->hyperbee_dump_dir.c_str());
+        PRINT_DEBUG("[HYPERBEE] Failed to create dump directory %s\n", this->dump_dir.c_str());
         return;
     }
 
     //Create the default dump file name
-    if (asprintf(&this->tmp_file_path, "%s/dump.tmp", this->hyperbee_dump_dir.c_str()) < 0)
+    if (asprintf(&this->tmp_file_path, "%s/dump.tmp", this->dump_dir.c_str()) < 0)
     {
         PRINT_DEBUG("[HYPERBEE] Failed to build the string containing the temp_file_path\n");
         return;
