@@ -119,7 +119,7 @@
 #define LOG_ALWAYS 0
 
 /**
- * Sets the default option for malware
+ * Sets the default option for malware. If there is no malware classifier, this should be set to 1.
  */
 #define MALWARE_DEFAULT 1
 
@@ -173,7 +173,7 @@ public:
 
     //Keeps track of the data which was already dumped, used to prevent duplicate dump files.
     // Uses the hash as key and the dumped file stem (without extension) as value.
-    std::unordered_map<std::string, std::string> hashed_dumped_data_map;
+    std::unordered_map<std::string, std::string> dumped_memory_map;
 
     hyperbee(drakvuf_t drakvuf, const hyperbee_config_struct* config, output_format_t output);
 

@@ -140,6 +140,19 @@
 #include "private.h"
 
 /**
+ * The default string, for incomplete entries.
+ */
+static char missing_data[] = "(null)";
+/**
+ * The string used for vad nodes, that don't belong to mapped files, but to dynamically allocated memory
+ */
+static char alloc_memory[] = "(no-mapped-file)";
+/**
+ * array with the two different analysis modes as strings
+ */
+static char suffix[][5] = {"page", "vad"};
+
+/**
  * Saves a pointer to the plugin and the starting virtual address of the frame.
  * This struct is passed between the different traps.
  */
@@ -150,37 +163,57 @@ struct fault_data_struct
 };
 
 /**
- * This code frees memory belonging to a certain trap.
- * It is called at the time a trap is removed. drakvuf_remove_trap will not remove a trap instantly but sort of schedules the remove.
- * Thus, if freeing the trap and trap->data instantly after drakvuf_remove_trap was called, this might lead to a use-after-free error.
- * This is why drakvuf_remove_trap has a callback option (third argument->using this callback) to set what has to be done when the trap is actually removed.
+ * This struct contains all the metadata that is gathered through a page analysis
  */
-static void remove_trap_cb(drakvuf_trap_t* trap)
+struct dump_metadata_struct
 {
-    g_free(trap->data);
-    g_free(trap);
-}
+    //The start of the VAD-Node. This is not necessarily the starting va of the page that is analysed.
+    addr_t vad_node_base;
+    //The end address of the VAD-Node. The VAD-Node is not limited to a PAGE_SIZE.
+    addr_t vad_node_end;
+    //The size of current analyzed memory part (the amount of bytes written to disk)
+    size_t dump_size;
+    //THe checksum of the dumped memory
+    const gchar* sha256sum;
+    //The name of the dll
+    unicode_string_t* vad_name;
+    //the stem (basename without suffix) of the file
+    char* file_stem;
+    //The whole path of the dumpfile
+    char* dump_file;
+    //The path to the file containing the metadata
+    char* meta_file;
+};
 
 /**
- * This is the callback of the execute trap.
- * @param drakvuf the drakvuf plugin
- * @param info information regarding the trap event
- * @return VMI_EVENT_RESPONSE_NONE, but this return information is currently not used by drakvuf.
+ * Saves the virtual address where the fault occurred.
  */
-static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+struct access_fault_result_t : public call_result_t
+{
+    access_fault_result_t() : call_result_t(), fault_va()
+    {}
+    addr_t fault_va;
+};
 
 /**
- * Creates an execute trap for the given (guest) frame number and passes the given fault data
- * @param gfn the (guest) frame number. If some executable instructions are fetched from this frame, the trap gets active
- * @param fault_data_old information which is required for logging. It is passed between the traps.
- * @return the execute trap that needs to be added to drakvuf
+ * Creates an execute trap, whose pointer is returned. It gets activated and intercepts before an instruction is fetched from the specified gfn.
+ * @param gfn (guest frame number) which shall be monitored
+ * @param fault_data_old this is passed between traps and saves current state information. e.g. the virtual address of the page.
  */
 drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data_old);
 
 /**
+ * Creates a write trap, whose pointer is returned. It gets active if the
+ *
+ * @param trap_info contains information regarding the current activation of the trap like register values, timestamps, ...
+ * @param fault_data_old this is passed between traps and saves current state information. e.g. the virtual address of the page.
+ */
+drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* trap_info, fault_data_struct* fault_data_old);
+
+/**
  * Saves the metadata received during the monitoring to a logfile
  *
- * @param info the trap information
+ * @param trap_info the trap information
  * @param meta_file_path the path to save the metadata to
  * @param drakvuf
  * @param dump_file_name the name of the dump file
@@ -192,43 +225,63 @@ drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data_ol
  * @param base_va the base (start) address of the VAD node, containing the dumped page
  * @param end_va the end of the VAD node, containing the dumped page
  */
-static void save_file_metadata(const drakvuf_trap_info_t* info, const char* meta_file_path, drakvuf_t drakvuf,
-                               const char* dump_file_name, size_t dump_size, unsigned int dump_id, addr_t page_va,
-                               const char* dll_name_str, const gchar* chk_str, addr_t base_va, addr_t end_va)
+static void save_file_metadata(const drakvuf_trap_info_t* trap_info,
+                               const dump_metadata_struct* dump_metadata,
+                               const fault_data_struct* fault_data)
 {
 
-    FILE* fp = fopen(meta_file_path, "w");
+    //Opens the meta file
+    FILE* fp = fopen(dump_metadata->meta_file, "w");
     if (!fp)
     {
         return;
     }
 
+    //Determines the string that shall be printed as vad_name
+    char* actual_vad_name;
+    if (dump_metadata->vad_name == nullptr)
+    {
+        actual_vad_name = alloc_memory;
+    }
+    else
+    {
+        actual_vad_name = (char*) dump_metadata->vad_name->contents;
+    }
+
     json_object* json_object = json_object_new_object();
-    auto timestamp = TimeVal{UNPACK_TIMEVAL(info->timestamp)};
+    auto timestamp = TimeVal{UNPACK_TIMEVAL(trap_info->timestamp)};
     json_object_object_add(json_object, "TimeStamp",
                            json_object_new_string_fmt("%ld.%ld", timestamp.tv_sec, timestamp.tv_usec));
     /* Process pid */
-    json_object_object_add(json_object, "PID", json_object_new_int(info->attached_proc_data.pid));
+    json_object_object_add(json_object, "PID", json_object_new_int(trap_info->attached_proc_data.pid));
     /* Process parent pid */
-    json_object_object_add(json_object, "PPID", json_object_new_int(info->attached_proc_data.ppid));
+    json_object_object_add(json_object, "PPID", json_object_new_int(trap_info->attached_proc_data.ppid));
     /* Thread Id for Linux & Windows*/
-    json_object_object_add(json_object, "TID", json_object_new_int(info->attached_proc_data.tid));
+    json_object_object_add(json_object, "TID", json_object_new_int(trap_info->attached_proc_data.tid));
     /* Process SessionID/UID */
-    json_object_object_add(json_object, "UserID", json_object_new_int(info->attached_proc_data.userid));
+    json_object_object_add(json_object, "UserID", json_object_new_int(trap_info->attached_proc_data.userid));
     /* Process name */
-    json_object_object_add(json_object, "ProcessName", json_object_new_string(info->attached_proc_data.name));
-    json_object_object_add(json_object, "EventUID", json_object_new_int64(info->event_uid));
-    json_object_object_add(json_object, "CR3", json_object_new_string_fmt("0x%" PRIx64, info->regs->cr3));
-    json_object_object_add(json_object, "PageVA", json_object_new_string_fmt("0x%" PRIx64, page_va));
-    json_object_object_add(json_object, "VADBase", json_object_new_string_fmt("0x%" PRIx64, base_va));
-    json_object_object_add(json_object, "VADEnd", json_object_new_string_fmt("0x%" PRIx64, end_va));
-    json_object_object_add(json_object, "VADName", json_object_new_string(dll_name_str));
-    json_object_object_add(json_object, "DumpSize", json_object_new_string_fmt("0x%" PRIx64, dump_size));
-    json_object_object_add(json_object, "DumpFile", json_object_new_string(dump_file_name));
-    json_object_object_add(json_object, "SHA256", json_object_new_string(chk_str));
-    json_object_object_add(json_object, "DumpID", json_object_new_int(dump_id));
-    json_object_object_add(json_object, "TrapPA", json_object_new_string_fmt("0x%" PRIx64, info->trap_pa));
-    json_object_object_add(json_object, "GFN", json_object_new_string_fmt("0x%" PRIx64, info->trap->memaccess.gfn));
+    json_object_object_add(json_object, "ProcessName", json_object_new_string(trap_info->attached_proc_data.name));
+    json_object_object_add(json_object, "EventUID", json_object_new_int64(trap_info->event_uid));
+    json_object_object_add(json_object, "CR3", json_object_new_string_fmt("0x%" PRIx64, trap_info->regs->cr3));
+    json_object_object_add(json_object, "PageVA", json_object_new_string_fmt("0x%" PRIx64, fault_data->page_va));
+    json_object_object_add(json_object,
+                           "VADBase",
+                           json_object_new_string_fmt("0x%" PRIx64, dump_metadata->vad_node_base));
+    json_object_object_add(json_object,
+                           "VADEnd",
+                           json_object_new_string_fmt("0x%" PRIx64, dump_metadata->vad_node_end));
+    json_object_object_add(json_object, "VADName", json_object_new_string(actual_vad_name));
+    json_object_object_add(json_object,
+                           "DumpSize",
+                           json_object_new_string_fmt("0x%" PRIx64, dump_metadata->dump_size));
+    json_object_object_add(json_object, "DumpFile", json_object_new_string(dump_metadata->dump_file));
+    json_object_object_add(json_object, "SHA256", json_object_new_string(dump_metadata->sha256sum));
+    json_object_object_add(json_object, "DumpID", json_object_new_int(fault_data->plugin->dump_id));
+    json_object_object_add(json_object, "TrapPA", json_object_new_string_fmt("0x%" PRIx64, trap_info->trap_pa));
+    json_object_object_add(json_object,
+                           "GFN",
+                           json_object_new_string_fmt("0x%" PRIx64, trap_info->trap->memaccess.gfn));
     fprintf(fp, "%s\n", json_object_get_string(json_object));
     fclose(fp);
 
@@ -236,12 +289,239 @@ static void save_file_metadata(const drakvuf_trap_info_t* info, const char* meta
 }
 
 /**
- * Method to get the SHA256 hash of a memory area. Similar to the dump_memory_region-code in the memdump plugin.
+ * Prints all information of a dump to the console
+ * @param drakvuf the current drakvuf instance
+ * @param trap_info contains information regarding the current activation of the trap like register values, timestamps, ...
+ * @param dump_metadata the struct containing the dump metadata
+ * @param fault_data the struct with the fault data
  */
-const gchar* get_sha256_memory(
+void log_all_to_console(drakvuf_t drakvuf,
+                        drakvuf_trap_info* trap_info,
+                        dump_metadata_struct* dump_metadata,
+                        fault_data_struct* fault_data)
+{
+
+    unsigned int actual_dump_id;
+    int actual_dump_size;
+    const char* actual_checksum;
+    char* actual_dump_file_path;
+    char* actual_metafile;
+    char* actual_vad_name;
+
+    //If the memory was not dumped some values should be reset as they would not make sense.
+    if (dump_metadata->dump_file == nullptr)
+    {
+        actual_dump_id = 0;
+        actual_dump_size = 0;
+        actual_checksum = missing_data;
+        actual_dump_file_path = missing_data;
+        actual_metafile = missing_data;
+    }
+    else
+    {
+        actual_dump_id = fault_data->plugin->dump_id;
+        actual_dump_size = dump_metadata->dump_size;
+        actual_checksum = dump_metadata->sha256sum;
+        actual_dump_file_path = dump_metadata->dump_file;
+        actual_metafile = dump_metadata->meta_file;
+    }
+
+    //Determines the string that shall be printed as vad_name
+    if (dump_metadata->vad_name == nullptr)
+    {
+        actual_vad_name = alloc_memory;
+    }
+    else
+    {
+        actual_vad_name = (char*) dump_metadata->vad_name->contents;
+    }
+
+    //Log everything to the screen
+    fmt::print(fault_data->plugin->m_output_format, "hyperbee", drakvuf, trap_info,
+               keyval("EventType", fmt::Qstr("execframe")),
+               keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
+               keyval("PageVA", fmt::Xval(fault_data->page_va)),
+               keyval("VADBase", fmt::Xval(dump_metadata->vad_node_base)),
+               keyval("VADEnd", fmt::Xval(dump_metadata->vad_node_end)),
+               keyval("VADName", fmt::Qstr(actual_vad_name)),
+               keyval("DumpSize", fmt::Nval(actual_dump_size)),
+               keyval("DumpFile", fmt::Qstr(actual_dump_file_path)),
+               keyval("SHA256", fmt::Qstr(actual_checksum)),
+               keyval("DumpID", fmt::Nval(actual_dump_id)),
+               keyval("MetaFile", fmt::Qstr(actual_metafile)),
+               keyval("TrapPA", fmt::Xval(trap_info->trap_pa)),
+               keyval("GFN", fmt::Xval(trap_info->trap->memaccess.gfn))
+              );
+}
+
+/**
+ * Frees all elements of the dump_metadata that are stored at the heap.
+ * @param dump_metadata the metadata which elements shall be freed.
+ */
+void free_all(dump_metadata_struct* dump_metadata)
+{
+    if (dump_metadata->file_stem)
+    {
+        free(dump_metadata->file_stem);
+    }
+    if (dump_metadata->dump_file)
+    {
+        free(dump_metadata->dump_file);
+    }
+    if (dump_metadata->meta_file)
+    {
+        free(dump_metadata->meta_file);
+    }
+    if (dump_metadata->vad_name)
+    {
+        vmi_free_unicode_str(dump_metadata->vad_name);
+    }
+    g_free((gpointer) dump_metadata->sha256sum);
+}
+
+/**
+ * Dumps the memory specified by access context, from `ctx->addr` (first byte) to `ctx->addr + len_bytes - 1` (last byte).
+ * Code is based on memdump.cpp
+ *
+ * Similar to the dump_memory_region-code in the memdump plugin.
+ * @param vmi the current vmi instance for accessing the gues
+ * @param plugin
+ * @param ctx the memory access context
+ * @param dump_metadata containing the dump size and the dump file path
+ * @return if the dump was successful or not
+ */
+bool
+dump_memory_region(vmi_instance_t vmi, hyperbee* plugin, access_context_t* ctx, dump_metadata_struct* dump_metadata)
+{
+    bool dump_success = false;
+
+    void** access_ptrs = nullptr;
+    FILE* fp = nullptr;
+
+    addr_t aligned_addr;
+    addr_t intra_page_offset;
+    size_t aligned_len;
+    size_t len_remainder;
+    size_t num_pages;
+    size_t tmp_len_bytes = dump_metadata->dump_size;
+
+    aligned_addr = ctx->addr & ~(VMI_PS_4KB - 1);
+    intra_page_offset = ctx->addr & (VMI_PS_4KB - 1);
+
+    aligned_len = dump_metadata->dump_size & ~(VMI_PS_4KB - 1);
+    len_remainder = dump_metadata->dump_size & (VMI_PS_4KB - 1);
+
+    if (len_remainder)
+    {
+        aligned_len += VMI_PS_4KB;
+    }
+
+    ctx->addr = aligned_addr;
+    num_pages = aligned_len / VMI_PS_4KB;
+
+    access_ptrs = (void**) g_try_malloc0(num_pages * sizeof(void*));
+    if (!access_ptrs)
+    {
+        goto error;
+    }
+
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, access_ptrs))
+    {
+        PRINT_DEBUG("[HYPERBEE] Failed mmap guest\n");
+        goto error;
+    }
+
+    //w just overrides the current file, if there is one.
+    fp = fopen(plugin->tmp_file_path, "w");
+
+    if (!fp)
+    {
+        PRINT_DEBUG("[HYPERBEE] Failed to open dump.tmp file\n");
+        goto error;
+    }
+
+    for (size_t i = 0; i < num_pages; i++)
+    {
+        // sometimes we are supposed to write less than the whole page
+        size_t write_length = tmp_len_bytes;
+
+        if (write_length > VMI_PS_4KB - intra_page_offset)
+        {
+            write_length = VMI_PS_4KB - intra_page_offset;
+        }
+
+        if (access_ptrs[i])
+        {
+            fwrite((char*) access_ptrs[i] + intra_page_offset, write_length, 1, fp);
+            munmap(access_ptrs[i], VMI_PS_4KB);
+        }
+        else
+        {
+            // inaccessible page, pad with zeros to ensure proper alignment of the data
+            uint8_t zeros[VMI_PS_4KB] = {};
+            fwrite(zeros + intra_page_offset, write_length, 1, fp);
+        }
+
+        // this applies only to the first page
+        intra_page_offset = 0;
+        tmp_len_bytes -= write_length;
+    }
+
+    fclose(fp);
+
+    if (rename(plugin->tmp_file_path, dump_metadata->dump_file) != 0)
+    {
+        PRINT_DEBUG("[HYPERBEE] Failed to rename dump file\n");
+        goto error;
+    }
+
+    dump_success = true;
+    goto done;
+
+error:
+    PRINT_DEBUG("[HYPERBEE] Failed to dump memory\n");
+
+done:
+    if (access_ptrs)
+    {
+        g_free(access_ptrs);
+    }
+
+    return dump_success;
+}
+
+/**
+ * Constructs the paths of the dump_file and meta_file
+ * @param dump_dir the directory to save the files to.
+ * @param dump_metadata the struct containing the file_stem
+ * @return if the creation was successful
+ */
+bool set_dump_paths(const char* dump_dir, dump_metadata_struct* dump_metadata)
+{
+    //using a suffix as "vad", "page" or (for the metafile) "metadata" helps to quickly select associated files
+    if (asprintf(&dump_metadata->meta_file, "%s/%s.metafile", dump_dir, dump_metadata->file_stem) < 0)
+    {
+        PRINT_DEBUG("[HYPERBEE] Could not create meta file name\n");
+        return false;
+    }
+    if (asprintf(&dump_metadata->dump_file, "%s/%s.%s", dump_dir, dump_metadata->file_stem, suffix[DUMP_VAD]) < 0)
+    {
+        PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Method to get the sha256 hash of a memory area. Similar to the dump_memory_region-code in the memdump.cpp plugin.
+ * @param vmi the current vmi instance for the guest access
+ * @param ctx the memory access context
+ * @param dump_metadata containing the dump size and the dump file path
+ */
+void get_sha256_memory(
     vmi_instance_t vmi,
     access_context_t* ctx,
-    size_t len_bytes)
+    dump_metadata_struct* dump_metadata)
 {
     void** access_ptrs = nullptr;
 
@@ -253,13 +533,13 @@ const gchar* get_sha256_memory(
     size_t aligned_len;
     size_t len_remainder;
     size_t num_pages;
-    size_t tmp_len_bytes = len_bytes;
+    size_t tmp_len_bytes = dump_metadata->dump_size;
 
     aligned_addr = ctx->addr & ~(VMI_PS_4KB - 1);
     intra_page_offset = ctx->addr & (VMI_PS_4KB - 1);
 
-    aligned_len = len_bytes & ~(VMI_PS_4KB - 1);
-    len_remainder = len_bytes & (VMI_PS_4KB - 1);
+    aligned_len = dump_metadata->dump_size & ~(VMI_PS_4KB - 1);
+    len_remainder = dump_metadata->dump_size & (VMI_PS_4KB - 1);
 
     if (len_remainder)
     {
@@ -322,175 +602,355 @@ done:
         g_free(access_ptrs);
     }
 
-    return chk_str;
+    dump_metadata->sha256sum = chk_str;
 }
 
 /**
- * Dumps the memory specified by access context, from `ctx->addr` (first byte) to `ctx->addr + len_bytes - 1` (last byte).
- * File is stored in file_path
- *
- * Similar to the dump_memory_region-code in the memdump plugin.
+ * This sets up the access_context which is used to dump/access memory of the guest. It can differ between vad and page mode.
+ * @param mmvad the obtained mmvad information
+ * @param cr3 the value of the cr3 register
+ * @param page_va the current used page va
+ * @param dump_metadata required to store the memory dump size
+ * @param ctx_memory_dump the created object used for dumping
+ * @return false, if the context was not generated as the vad node was too big.
  */
-bool
-dump_memory_region(vmi_instance_t vmi, hyperbee* plugin, access_context_t* ctx, size_t len_bytes, char* file_path)
+bool setup_dump_context(mmvad_info_t mmvad,
+                        uint64_t cr3,
+                        addr_t page_va,
+                        dump_metadata_struct* dump_metadata,
+                        access_context_t* ctx_memory_dump)
 {
-    bool dump_success = false;
+    //Translate addr via specified directory table base.
+    ctx_memory_dump->translate_mechanism = VMI_TM_PROCESS_DTB;
+    //The CR3 reg stores the address to the directory table base
+    ctx_memory_dump->dtb = cr3;
+    //Required to be set to "null"
+    ctx_memory_dump->ksym = nullptr;
+    ctx_memory_dump->pid = 0;
 
-    void** access_ptrs = nullptr;
-    FILE* fp = nullptr;
-
-    addr_t aligned_addr;
-    addr_t intra_page_offset;
-    size_t aligned_len;
-    size_t len_remainder;
-    size_t num_pages;
-    size_t tmp_len_bytes = len_bytes;
-
-    aligned_addr = ctx->addr & ~(VMI_PS_4KB - 1);
-    intra_page_offset = ctx->addr & (VMI_PS_4KB - 1);
-
-    aligned_len = len_bytes & ~(VMI_PS_4KB - 1);
-    len_remainder = len_bytes & (VMI_PS_4KB - 1);
-
-    if (len_remainder)
+    //Option to dump the whole VAD node instead of just a single page
+    if (DUMP_VAD)
     {
-        aligned_len += VMI_PS_4KB;
-    }
-
-    ctx->addr = aligned_addr;
-    num_pages = aligned_len / VMI_PS_4KB;
-
-    access_ptrs = (void**) g_try_malloc0(num_pages * sizeof(void*));
-    if (!access_ptrs)
-    {
-        goto error;
-    }
-
-    if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, access_ptrs))
-    {
-        PRINT_DEBUG("[HYPERBEE] Failed mmap guest\n");
-        goto error;
-    }
-
-    //w just overrides the current file, if there is one.
-    fp = fopen(plugin->tmp_file_path, "w");
-
-    if (!fp)
-    {
-        PRINT_DEBUG("[HYPERBEE] Failed to open dump.tmp file\n");
-        goto error;
-    }
-
-    for (size_t i = 0; i < num_pages; i++)
-    {
-        // sometimes we are supposed to write less than the whole page
-        size_t write_length = tmp_len_bytes;
-
-        if (write_length > VMI_PS_4KB - intra_page_offset)
+        //Prevents the dump of very big vad nodes. This might happen if a 32bit program gets executed. SYSWOW64 creates
+        // a large fake vad entry to prevent the memory allocator to allocate addresses above the 32bit boundary.
+        //I was told this workaround shall be corrected in further versions.
+        //TODO FutureWork: Further aspects to consider: This workaround makes the DUMP_VAD mode faster, but discards also too large
+        // DLLs from being dumped. Maybe some heuristics could be set up to handle this. e.g. if vad is memory mapped
+        // file, monitor it at filesystem level and dump first time and later only if changed?
+        if (mmvad.ending_vpn - mmvad.starting_vpn + 1 >= 1024)
         {
-            write_length = VMI_PS_4KB - intra_page_offset;
+            PRINT_DEBUG("[HYPERBEE] Ignoring the dump of too large vad node\n");
+            return false;
         }
 
-        if (access_ptrs[i])
+        //Set the area to dump for vad or page (below-else)
+        ctx_memory_dump->addr = mmvad.starting_vpn * VMI_PS_4KB; //Calculate the dump_size
+        dump_metadata->dump_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
+    }
+    else
+    {
+        ctx_memory_dump->addr = page_va; //The page va to lookup.
+        dump_metadata->dump_size = VMI_PS_4KB;
+    }
+    return true;
+}
+
+/**
+ * Extracts the name of the current analysed vad node.
+ * - Commonly this is some mapped file, like a dll. If no name was extracted leave it as nullptr
+ * @param vmi the current vmi instance for the guest access
+ * @param file_name_ptr the pointer of the filename which is contained in a mmvad struct
+ * @param dump_metadata storing the vad node name
+ * @return if the extraction was successful or not
+ */
+bool retrieve_and_filter_vad_name(const vmi_lock_guard &vmi, addr_t file_name_ptr, dump_metadata_struct* dump_metadata)
+{
+    //Read the name of the dll/binary this node belongs to
+    dump_metadata->vad_name = drakvuf_read_unicode_va(vmi, file_name_ptr, 0);
+
+    if (dump_metadata->vad_name != nullptr)
+    {
+        //If instructions are fetched from a System32 or SysWOW64 DLL
+        if (IGNORE_SYSTEM_DLL)
         {
-            fwrite((char*) access_ptrs[i] + intra_page_offset, write_length, 1, fp);
-            munmap(access_ptrs[i], VMI_PS_4KB);
+            //TODO FutureWork: In general it might be not secure to discard these DLLs since a malware might be able to
+            // place DLLs here as well.
+            if (strstr((char*) dump_metadata->vad_name->contents, "System32") != nullptr)
+            {
+                PRINT_DEBUG("[HYPERBEE] Ignoring instruction fetch within System32 DLL\n");
+                return false;
+            }
+            if (strstr((char*) dump_metadata->vad_name->contents, "SysWOW64") != nullptr)
+            {
+                PRINT_DEBUG("[HYPERBEE] Ignoring instruction fetch within SysWOW64 DLL\n");
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+/**
+ * Uses information from the current trap data to determine which memory area to analyse.
+ * Depending of the settings, this memory is dumped and could be analysed for malware.
+ *
+ * @param drakvuf the current drakvuf instance
+ * @param vmi the current vmi instance for the guest access
+ * @param trap_info contains information regarding the current activation of the trap like register values, timestamps, ...
+ * @param fault_data the struct with the fault data
+ * @param dump_metadata storing all extracted data
+ * @return if malware was detected or not. this is currently a not included feature, but part of future work (or could be implemented by oneself)
+ */
+bool analyse_memory(drakvuf_t drakvuf,
+                    const vmi_lock_guard &vmi,
+                    const drakvuf_trap_info_t* trap_info,
+                    const fault_data_struct* fault_data,
+                    dump_metadata_struct* dump_metadata)
+{
+    //A struct to keep the vad node information
+    mmvad_info_t mmvad;
+
+    //initial value for malware. This can be set by an optional integrated classifier. If this is set to true (or during the execution of this method), the page dump will be stored always.
+    //TODO FutureWork: if the classifier is integrated, set it to false by default, and let this be set by the classifier
+    bool malware = MALWARE_DEFAULT;
+
+    //Finds the correct mmvad entry by VAD-Table walk and return it within mmvad. proc_data.base_addr is the EPROCESS address and frame va the address which shall be contained within the vad entry.
+    if (!drakvuf_find_mmvad(drakvuf, trap_info->proc_data.base_addr, fault_data->page_va, &mmvad))
+    {
+        //If there was an error during vad search, quit but log all information
+        PRINT_DEBUG("[HYPERBEE] Could not find vad information\n");
+        return false;
+    }
+
+    //Derive the vad node start and end virtual address
+    dump_metadata->vad_node_base = mmvad.starting_vpn << 12;
+    dump_metadata->vad_node_end = ((mmvad.ending_vpn + 1) << 12) - 1;
+
+    bool is_interesting_node = retrieve_and_filter_vad_name(vmi, mmvad.file_name_ptr, dump_metadata);
+    if (!is_interesting_node)
+    {
+        //debug message within retrieve_and_filter_vad_name
+        //Don't load further information, but output the already extracted data.
+        return malware;
+    }
+
+    //Set the memory access context
+    access_context_t ctx_memory_dump;
+    bool dump_ctx_valid =
+        setup_dump_context(mmvad, trap_info->regs->cr3, fault_data->page_va, dump_metadata, &ctx_memory_dump);
+
+    if (!dump_ctx_valid)
+    {
+        //debug message within retrieve_and_filter_vad_name
+        return malware;
+    }
+
+    // TODO FutureWork:
+    //  - Hashing of the whole VAD node is a bottleneck since it could be 1000s of pages.
+    //  - Combined with the aspect that a dll is not loaded at once, but partially (when needed) the hashing is not
+    //    useful right now. Maybe drakvuf can somehow trigger that the dll is loaded completely in one step? Or even use
+    //    heuristics to monitor the dll on a filesystem basis?
+
+    //For pages this approach is good.
+
+    //get the hash
+    //    The checksum of the current analyzed memory (vad or page)
+    get_sha256_memory(vmi, &ctx_memory_dump, dump_metadata);
+    if (dump_metadata->sha256sum == nullptr)
+    {
+        PRINT_DEBUG("[HYPERBEE] Could not get SHA256 of dumpfile\n");
+        return malware;
+    }
+
+    //Generate the file stem
+    if (asprintf(&dump_metadata->file_stem,
+                 "%llx_%.16s",
+                 (unsigned long long) ctx_memory_dump.addr,
+                 dump_metadata->sha256sum)
+        < 0)
+    {
+        PRINT_DEBUG("[HYPERBEE] Could not create the file stem\n");
+        return malware;
+    }
+
+    //Set the metadata and dumpfile path
+    if (!set_dump_paths(fault_data->plugin->hyperbee_dump_dir.c_str(),
+                        dump_metadata))
+    {
+        //debug message within set_dump_paths
+        return malware;
+    }
+
+    //Is used to find a checksum in the set of already analyzed memory parts
+    auto memory_hash_identifier = fault_data->plugin->dumped_memory_map.find(dump_metadata->sha256sum);
+
+    //If the checksum already exists:
+    if (memory_hash_identifier != fault_data->plugin->dumped_memory_map.end())
+    {
+        //Make sure the two file stems match
+        if (strcmp(memory_hash_identifier->second.c_str(), dump_metadata->file_stem) == 0)
+        {
+            //Increase the dump counter in this special case
+            ++fault_data->plugin->dump_id;
+            return malware;
         }
         else
         {
-            // inaccessible page, pad with zeros to ensure proper alignment of the data
-            uint8_t zeros[VMI_PS_4KB] = {};
-            fwrite(zeros + intra_page_offset, write_length, 1, fp);
+            //since there were problems with the file stem, continue to dump all data again
+            PRINT_DEBUG("[HYPERBEE] Could not reuse data from previously saved data, dumping again\n");
         }
 
-        // this applies only to the first page
-        intra_page_offset = 0;
-        tmp_len_bytes -= write_length;
+        //If the flow continues here, there was an or with the stored data. Dump the data again.
     }
 
-    fclose(fp);
+    //At this point I use a yet unpublished tool from Politecnico di Milano (IT) to analyse the accessed memory page for API calls. This information is used within a malware classifier.
+    //TODO FutureWork  malware = malware_classifier(...)
 
-    if (rename(plugin->tmp_file_path, file_path) != 0)
+    //If malware was detected or manually switched to always dump
+    if (malware || DUMP_ALWAYS)
     {
-        PRINT_DEBUG("[HYPERBEE] Failed to rename dump file\n");
-        goto error;
+        // Comment from memdump.cpp:
+        // The file name format for the memory dump file is:
+        // <dump base address>_<16 chars of hash>
+        // This was set in order to satisfy the following issue:
+        // * when disassembling, it is required to know the dump's image base, here it could be obtained
+        //   just by looking at the file name which is handy both for humans and automated processing
+        // * no other information was included in the file name to make it possible to reference this file in the
+        //   future if the identical memory would be dumped again
+
+        //If the dump fails
+        if (!dump_memory_region(vmi,
+                                fault_data->plugin,
+                                &ctx_memory_dump,
+                                dump_metadata))
+        {
+            PRINT_DEBUG("[HYPERBEE] Could not dump memory\n");
+            if (dump_metadata->dump_file)
+            {
+                g_free(dump_metadata->dump_file);
+                dump_metadata->dump_file = nullptr;
+            }
+            return malware;
+        }
+
+        //If the dump was successful: increase the dump counter
+        ++fault_data->plugin->dump_id;
+
+        //Add the checksum as key with the file_name_prefix (as data) to the map.
+        fault_data->plugin->dumped_memory_map.insert(std::pair<std::string,
+            std::string>(dump_metadata->sha256sum,
+                         dump_metadata->file_stem));
+
+
+        //If the dump of the memory was successful write all gathered data to a metadata file
+        save_file_metadata(trap_info, dump_metadata, fault_data);
     }
-
-    dump_success = true;
-    goto done;
-
-error:
-    PRINT_DEBUG("[HYPERBEE] Failed to dump memory\n");
-
-done:
-    if (access_ptrs)
-    {
-        g_free(access_ptrs);
-    }
-
-    return dump_success;
+    return malware;
 }
 
 /**
- * Saves the virtual address where the fault occurred.
+ * This code frees memory belonging to a certain trap.
+ * It is called at the time a trap is removed. drakvuf_remove_trap will not remove a trap instantly but sort of schedules the remove.
+ * Thus, if freeing the trap and trap->data instantly after drakvuf_remove_trap was called, this might lead to a use-after-free error.
+ * This is why drakvuf_remove_trap has a callback option (third argument->using this callback) to set what has to be done when the trap is actually removed.
+ *
+ * @param trap the trap which memory shall be freed
  */
-struct access_fault_result_t : public call_result_t
+static void remove_trap_cb(drakvuf_trap_t* trap)
 {
-    access_fault_result_t() : call_result_t(), fault_va()
-    {}
+    g_free(trap->data);
+    g_free(trap);
+}
 
-    addr_t fault_va;
-};
+void swap_traps(drakvuf_t drakvuf,
+                drakvuf_trap_info* trap_info,
+                fault_data_struct* fault_data)
+{
+    drakvuf_trap* write_trap = create_write_trap(trap_info, fault_data);
+    if (write_trap)
+    {
+        //Add and activate the trap
+        if (drakvuf_add_trap(drakvuf, write_trap))
+        {
+            //store the trap that it can be deleted in the end.
+            fault_data->plugin->traps.emplace(write_trap);
+
+            //Removes this current execute trap and frees the memory
+            fault_data->plugin->traps.erase(trap_info->trap);
+            drakvuf_remove_trap(drakvuf, trap_info->trap, remove_trap_cb);
+
+            PRINT_DEBUG("[HYPERBEE] Replaced execute trap X on GFN 0x%lx with write trap W\n",
+                        trap_info->trap->memaccess.gfn);
+        }
+        else
+        {
+            //If the trap was not added, keep the current exec trap
+            PRINT_DEBUG(
+                "[HYPERBEE] Failed to add write trap W on GFN 0x%lx. Keeping execute trap X\n",
+                trap_info->trap->memaccess.gfn);
+        }
+    }
+    else
+    {
+        PRINT_DEBUG(
+            "[HYPERBEE] Failed to create write trap W. Keeping execute trap X on GFN 0x%lx\n",
+            trap_info->trap->memaccess.gfn);
+    }
+}
 
 /**
- * If something was written at a monitored page this will swap the write trap to a exec trap.
- * (right away after committing the page or again after the first time it was executed)
- */
-static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+* This is the callback of the write trap. If an instruction write got detected on a monitored page, this callback is executed
+* @param drakvuf the drakvuf plugin
+* @param trap_info information regarding the trap event
+* @return VMI_EVENT_RESPONSE_NONE, but this return information is currently not used by drakvuf.
+*/
+static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info)
 {
-
-    auto* ef_data = (struct fault_data_struct*) info->trap->data;
+    //load the passed fault data from the trap information
+    auto* fault_data = (struct fault_data_struct*) trap_info->trap->data;
 
     if (LOG_ALWAYS)
     {
-        fmt::print(ef_data->plugin->m_output_format, "hyperbee", drakvuf, info,
+        fmt::print(fault_data->plugin->m_output_format, "hyperbee", drakvuf, trap_info,
                    keyval("EventType", fmt::Qstr("writeframe")),
-                   keyval("FrameVA", fmt::Xval(ef_data->page_va)),
-                   keyval("TrapPA", fmt::Xval(info->trap_pa)),
-                   keyval("CR3", fmt::Xval(info->regs->cr3)),
-                   keyval("GFN", fmt::Xval(info->trap->memaccess.gfn))
+                   keyval("FrameVA", fmt::Xval(fault_data->page_va)),
+                   keyval("TrapPA", fmt::Xval(trap_info->trap_pa)),
+                   keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
+                   keyval("GFN", fmt::Xval(trap_info->trap->memaccess.gfn))
                   );
     }
 
-    drakvuf_trap* exec_trap = create_execute_trap(info->trap->memaccess.gfn, ef_data);
+    //Create the new exec trap
+    drakvuf_trap* exec_trap = create_execute_trap(trap_info->trap->memaccess.gfn, fault_data);
     if (exec_trap)
     {
         //Add and activate the exec trap
         if (drakvuf_add_trap(drakvuf, exec_trap))
         {
             //store the trap that it can be deleted in the end.
-            ef_data->plugin->traps.emplace(exec_trap);
+            fault_data->plugin->traps.emplace(exec_trap);
 
             //Removes this current execute trap and frees the memory
-            ef_data->plugin->traps.erase(info->trap);
-            drakvuf_remove_trap(drakvuf, info->trap, remove_trap_cb);
+            fault_data->plugin->traps.erase(trap_info->trap);
+            drakvuf_remove_trap(drakvuf, trap_info->trap, remove_trap_cb);
 
             PRINT_DEBUG("[HYPERBEE] Replaced write trap W on GFN 0x%lx with execute trap X\n",
-                        info->trap->memaccess.gfn);
+                        trap_info->trap->memaccess.gfn);
         }
         else
         {
             //If the trap was not added, keep the current write trap
             PRINT_DEBUG(
                 "[HYPERBEE] Failed to add execute trap X on GFN 0x%lx. Keeping write trap W\n",
-                info->trap->memaccess.gfn);
+                trap_info->trap->memaccess.gfn);
         }
     }
     else
     {
         PRINT_DEBUG(
             "[HYPERBEE] Failed to create exec trap X. Keeping write trap W on GFN 0x%lx\n",
-            info->trap->memaccess.gfn);
+            trap_info->trap->memaccess.gfn);
     }
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -499,13 +959,13 @@ static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 /**
  * Creates a write trap, whose pointer is returned.
  *
- * @param info
+ * @param trap_info
  * @param fault_data_old
  */
-drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* info, fault_data_struct* fault_data_old)
+drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* trap_info, fault_data_struct* fault_data_old)
 {
 
-    //Use g_try_malloc0 to zero the alloced heap memory at first. This prevents any undefined behaviour as fields of the
+    //Use g_try_malloc0 to zero the allocated heap memory at first. This prevents any undefined behaviour as fields of the
     // drakvuf_trap_t remain uninitialised.
     auto* write_trap = (drakvuf_trap_t*) g_try_malloc0(sizeof(drakvuf_trap_t));
     if (!write_trap)
@@ -528,7 +988,7 @@ drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* info, fault_data_struct* 
     //Set the type of the trap.
     write_trap->type = MEMACCESS;
     //Guest page-frame number to set event (as defined in events.h) (This is the level 1 translation physical address of the guest. The windows used physical address).
-    write_trap->memaccess.gfn = info->trap->memaccess.gfn;
+    write_trap->memaccess.gfn = trap_info->trap->memaccess.gfn;
     write_trap->memaccess.type = POST; //Do something after sth was written
     write_trap->memaccess.access = VMI_MEMACCESS_W; //When memory shall be written
     write_trap->data =
@@ -541,10 +1001,59 @@ drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* info, fault_data_struct* 
 }
 
 /**
- * Creates an execute trap, whose pointer is returned.
- *
- * @param info
- * @param fault_data_old
+* This is the callback of the execute trap. If an instruction fetch got detected on a monitored page, this callback is executed
+* @param drakvuf the drakvuf plugin
+* @param trap_info information regarding the trap event
+* @return VMI_EVENT_RESPONSE_NONE, but this return information is currently not used by drakvuf.
+*/
+static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info)
+{
+    PRINT_DEBUG("[HYPERBEE] Caught X on PA 0x%lx, frame VA %llx, CR3 %lx\n", trap_info->trap_pa,
+                (unsigned long long) trap_info->regs->rip, trap_info->regs->cr3);
+
+    //load the trap data
+    auto* fault_data = (struct fault_data_struct*) trap_info->trap->data;
+
+    //Verify the program leading to the execution of this trap is the one we are filtering for (if we do).
+    //The filtering could limit (and therefore focus) the monitoring and gives a speedup in such possibly uninteresting cases.
+    // If it does not match the filter, delete this trap (and don't replace it)
+    if (fault_data->plugin->hyperbee_filter_executable[0])
+    {
+        if (strcasestr(trap_info->proc_data.name, fault_data->plugin->hyperbee_filter_executable) == NULL)
+        {
+            //Removes this trap and frees the memory
+            fault_data->plugin->traps.erase(trap_info->trap);
+            drakvuf_remove_trap(drakvuf, trap_info->trap, remove_trap_cb);
+            PRINT_DEBUG("[HYPERBEE] Removed filtered trap for PA 0x%lx", trap_info->trap_pa);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+    }
+
+    //Allocate memory on the heap for a struct to store all dump relevant information
+    auto* dump_metadata = (struct dump_metadata_struct*) g_try_malloc0(sizeof(struct dump_metadata_struct));
+
+    //Lock the VM
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    //Dump memory and check for malware
+    bool malware = analyse_memory(drakvuf, vmi, trap_info, fault_data, dump_metadata);
+
+    //Log information if required
+    if (LOG_ALWAYS || malware)
+    {
+        log_all_to_console(drakvuf, trap_info, dump_metadata, fault_data);
+    }
+    swap_traps(drakvuf, trap_info, fault_data);
+    free_all(dump_metadata);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+/**
+ * Creates an execute trap for the given (guest) frame number and passes the given fault data
+ * @param gfn the (guest) frame number. If some executable instructions are fetched from this frame, the trap gets active
+ * @param fault_data_old information which is required for logging. It is passed between the traps.
+ * @return the execute trap that needs to be added to drakvuf
  */
 drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data_old)
 {
@@ -583,405 +1092,21 @@ drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data_ol
 }
 
 /**
- * If an instruction fetch got detected on a monitored page, this callback is executed
- *
- */
-static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    PRINT_DEBUG("[HYPERBEE] Caught X on PA 0x%lx, frame VA %llx, CR3 %lx\n", info->trap_pa,
-                (unsigned long long) info->regs->rip, info->regs->cr3);
-
-    //load the trap data
-    auto* ef_data = (struct fault_data_struct*) info->trap->data;
-
-    //Verify the program leading to the execution of this trap is the one we are filtering for (if we do).
-    //The filtering could limit (and therefore focus) the monitoring and gives a speedup in such possibly uninteresting cases.
-    // If it does not match the filter, delete this trap (and don't replace it)
-    if (ef_data->plugin->hyperbee_filter_executable[0])
-    {
-        if (strcasestr(info->proc_data.name, ef_data->plugin->hyperbee_filter_executable) == NULL)
-        {
-            //Removes this trap and frees the memory
-            ef_data->plugin->traps.erase(info->trap);
-            drakvuf_remove_trap(drakvuf, info->trap, remove_trap_cb);
-            PRINT_DEBUG("[HYPERBEE] Removed outdated trap for PA 0x%lx", info->trap_pa);
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-    }
-
-    //Initialize a lot of data
-    //The start of the VAD-Node. This is not necessarily the starting va of the page that is analysed.
-    addr_t vad_node_base = 0;
-    //The end address of the VAD-Node. The VAD-Node is not limited to a PAGE_SIZE.
-    addr_t vad_node_end = 0;
-    //The name of the dll
-    unicode_string_t* dll_name = nullptr;
-    //default name for the VAD / Dll
-    char missing_data[] = "(null)";
-    //default name, when the vad node represents no memory mapped file.
-    char alloc_memory[] = "(no-mapped-file)";
-    //The name of the application
-    char* dll_name_str = missing_data;
-    //The checksum of the current analyzed memory (vad or page)
-    const gchar* chk_str = nullptr;
-
-    //The size of current analyzed memory part (the amount of bytes written to disk)
-    size_t memory_size = 0;
-    //The whole path of the dumpfile
-    char* file_path_memory_dump = nullptr;
-    //The path to the file containing the metadata
-    char* file_path_meta_data = nullptr;
-    //The filename of which the memory dump and meta data file paths are built. it is a concatenation of the start address and the hash.
-    char* file_name_stem = nullptr;
-    //Is used to find a checksum in the set of already analyzed memory parts
-    std::unordered_map<std::string, std::string>::iterator memory_hash_identifier;
-
-    //initial value for malware. This can be set by an optional integrated classifier. If this is set to true (or during the execution of this method), the page dump will be stored always.
-    //TODO FutureWork: if the classifier is integrated, set it to false by default, and let this be set by the classifier
-    bool malware = MALWARE_DEFAULT;
-
-    //Lock the VM
-    auto vmi = vmi_lock_guard(drakvuf);
-
-    //A struct to keep the vad node information
-    mmvad_info_t mmvad;
-
-    //Finds the correct mmvad entry by VAD-Table walk and return it within mmvad. proc_data.base_addr is the EPROCESS address and frame va the address which shall be contained within the vad entry.
-    if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, ef_data->page_va, &mmvad))
-    {
-        //If there was an error during vad search, quit but log all information
-        PRINT_DEBUG("[HYPERBEE] Could not find vad information\n");
-        goto log;
-    }
-
-    //Derive the vad node start and end virtual address
-    vad_node_base = mmvad.starting_vpn << 12;
-    vad_node_end = ((mmvad.ending_vpn + 1) << 12) - 1;
-
-    //Read the name of the dll/binary this page belongs to
-    dll_name = drakvuf_read_unicode_va(vmi, mmvad.file_name_ptr, 0);
-    if (dll_name != nullptr)
-    {
-        dll_name_str = (char*) dll_name->contents;
-
-        //If instructions are fetched from a System32 or SysWOW64 DLL
-        if (IGNORE_SYSTEM_DLL)
-        {
-            //TODO FutureWork: In general it might be not secure to discard these DLLs since a malware might be able to
-            // place DLLs here as well.
-            if (strstr(dll_name_str, "System32") != nullptr)
-            {
-                PRINT_DEBUG("[HYPERBEE] Ignoring instruction fetch within System32 DLL\n");
-                goto changetrap;
-            }
-            if (strstr(dll_name_str, "SysWOW64") != nullptr)
-            {
-                PRINT_DEBUG("[HYPERBEE] Ignoring instruction fetch within SysWOW64 DLL\n");
-                goto changetrap;
-            }
-        }
-    }
-    else
-    {
-        dll_name_str = alloc_memory;
-    }
-
-    //Set the memory access context
-    access_context_t ctx_memory_dump;
-
-    //Option to dump the whole VAD node instead of just a single page
-    if (DUMP_VAD)
-    {
-        //Prevents the dump of very big vad nodes. This might happen if a 32bit program gets executed. SYSWOW64 creates
-        // a large fake vad entry to prevent the memory allocator to allocate addresses above the 32bit boundary.
-        //I was told this workaround shall be corrected in further versions.
-        //TODO FutureWork: Further aspects to consider: This workaround makes the DUMP_VAD mode faster, but discards also too large
-        // DLLs from being dumped. Maybe some heuristics could be set up to handle this. e.g. if vad is memory mapped
-        // file, monitor it at filesystem level and dump first time and later only if changed?
-        if (mmvad.ending_vpn - mmvad.starting_vpn + 1 >= 1024)
-        {
-            PRINT_DEBUG("[HYPERBEE] Ignoring the dump of too large vad node\n");
-            goto log;
-        }
-
-        //Set the area to dump for vad or page (below-else)
-        ctx_memory_dump =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            //Calculate the dump_size
-            .addr = mmvad.starting_vpn * VMI_PS_4KB
-        };
-        memory_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
-    }
-    else
-    {
-        ctx_memory_dump =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB, /**see Libvmi.h < Translate addr via specified directory table base. */
-            .dtb = info->regs->cr3, //The directory table base
-            .addr = ef_data->page_va //The address to lookup.
-        };
-        memory_size = VMI_PS_4KB;
-    }
-
-// TODO FutureWork:
-//  - Hashing of the whole VAD node is a bottleneck since it could be 1000s of pages.
-//  - Combined with the aspect that a dll is not loaded at once, but partially (when needed) the hashing is not
-//    useful right now. Maybe drakvuf can somehow trigger that the dll is loaded completely in one step? Or even use
-//    heuristics to monitor the dll on a filesystem basis?
-
-    //For pages this approach is good.
-
-    //get the hash
-    chk_str = get_sha256_memory(vmi, &ctx_memory_dump, memory_size);
-    if (chk_str == nullptr)
-    {
-        PRINT_DEBUG("[HYPERBEE] Could not get SHA256 of dumpfile\n");
-        goto log;
-    }
-
-    memory_hash_identifier = ef_data->plugin->hashed_dumped_data_map.find(chk_str);
-
-    //If the checksum already exists:
-    if (memory_hash_identifier != ef_data->plugin->hashed_dumped_data_map.end())
-    {
-
-        if (asprintf(&file_name_stem, "%s", memory_hash_identifier->second.c_str()) < 0)
-        {
-            PRINT_DEBUG("[HYPERBEE] Could not fetch base_file_name from duplicate database\n");
-        }
-        //using a suffix as "vad", "page" or (for the metafile) "metadata" helps to quickly select associated files
-        if (DUMP_VAD)
-        {
-            if (asprintf(&file_path_memory_dump, "%s/%s.vad", ef_data->plugin->hyperbee_dump_dir.c_str(),
-                         file_name_stem) < 0)
-            {
-                PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
-            }
-        }
-        else
-        {
-            if (asprintf(&file_path_memory_dump, "%s/%s.page", ef_data->plugin->hyperbee_dump_dir.c_str(),
-                         file_name_stem) < 0)
-            {
-                PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
-            }
-        }
-        if (asprintf(&file_path_meta_data, "%s/%s.metafile", ef_data->plugin->hyperbee_dump_dir.c_str(),
-                     file_name_stem) < 0)
-        {
-            PRINT_DEBUG("[HYPERBEE] Could not create meta file name\n");
-        }
-
-        //Increase the dump counter in this special case
-        ++ef_data->plugin->dump_id;
-
-        goto log;
-
-    }
-
-    //At this point I use a yet unpublished tool from Politecnico di Milano (IT) to analyse the accessed memory page for API calls. This information is used within a malware classifier.
-    //TODO FutureWork  malware = MalwareClassifier(...)
-
-    //If neither malware was found nor it was forced to dump or log, just change the trap for a write trap and return
-    if (!malware && !DUMP_ALWAYS && !LOG_ALWAYS)
-    {
-        goto changetrap;
-    }
-
-    //If malware was detected or manually switched to always dump
-    if (malware || DUMP_ALWAYS)
-    {
-
-        // Comment from memdump.cpp:
-        // The file name format for the memory dump file is:
-        // <dump base address>_<16 chars of hash>
-        // This was set in order to satisfy the following issue:
-        // * when disassembling, it is required to know the dump's image base, here it could be obtained
-        //   just by looking at the file name which is handy both for humans and automated processing
-        // * no other information was included in the file name to make it possible to reference this file in the
-        //   future if the identical memory would be dumped again
-        if (asprintf(&file_name_stem, "%llx_%.16s", (unsigned long long) ctx_memory_dump.addr, chk_str) < 0)
-        {
-            PRINT_DEBUG("[HYPERBEE] Could not create the base file path\n");
-            goto log;
-        }
-
-        //dump bytes either the whole VAD or just the PAGE
-        if (DUMP_VAD)
-        {
-            //using a suffix as "vad", "page" or (for the metafile) "metadata" helps to quickly select associated files
-            if (asprintf(&file_path_memory_dump, "%s/%s.vad", ef_data->plugin->hyperbee_dump_dir.c_str(),
-                         file_name_stem) < 0)
-            {
-                PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
-                goto log;
-            }
-        }
-        else
-        {
-            //using a suffix as "vad", "page" or (for the metafile) "metadata" helps to quickly select associated files
-            if (asprintf(&file_path_memory_dump, "%s/%s.page", ef_data->plugin->hyperbee_dump_dir.c_str(),
-                         file_name_stem) < 0)
-            {
-                PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
-                goto log;
-            }
-        }
-
-        //If the dump fails
-        if (!dump_memory_region(vmi, ef_data->plugin, &ctx_memory_dump, memory_size, file_path_memory_dump))
-        {
-            PRINT_DEBUG("[HYPERBEE] Could not dump memory\n");
-            file_path_memory_dump = nullptr;
-            goto log;
-        }
-
-        //If the dump was successful: increase the dump counter
-        ++ef_data->plugin->dump_id;
-
-        //Add the checksum as key with the file_name_prefix (as data) to the map.
-        ef_data->plugin->hashed_dumped_data_map.insert(std::pair<std::string, std::string>(chk_str, file_name_stem));
-
-        //Create the metadata path
-        if (asprintf(&file_path_meta_data, "%s/%s.metafile", ef_data->plugin->hyperbee_dump_dir.c_str(),
-                     file_name_stem) < 0)
-        {
-            PRINT_DEBUG("[HYPERBEE] Could not create meta file name\n");
-            goto log;
-        }
-
-        //If the dump of the memory was successful write all gathered data to a metadata file
-        save_file_metadata(info, file_path_meta_data, drakvuf, file_path_memory_dump, memory_size,
-                           ef_data->plugin->dump_id,
-                           ef_data->page_va, dll_name_str, chk_str, vad_node_base, vad_node_end);
-    }
-
-log:
-    //LOG the retrieved data to the console
-    if (LOG_ALWAYS || malware)
-    {
-        char* actual_dump_file_path;
-        const char* actual_checksum;
-        unsigned int actual_dump_id;
-        char* actual_metafile;
-
-        //If the hash was not generated or the dump file path not set
-        if ((chk_str == nullptr) || (file_path_memory_dump == nullptr))
-        {
-            actual_dump_file_path = missing_data;
-            actual_checksum = missing_data;
-            actual_dump_id = 0;
-            memory_size = 0;
-        }
-        else
-        {
-            actual_dump_file_path = file_path_memory_dump;
-            actual_checksum = chk_str;
-            actual_dump_id = ef_data->plugin->dump_id;
-        }
-
-        //If the metadata path was not set
-        if (file_path_meta_data == nullptr)
-        {
-            actual_metafile = missing_data;
-        }
-        else
-        {
-            actual_metafile = file_path_meta_data;
-        }
-
-        //Log everything to the screen
-        fmt::print(ef_data->plugin->m_output_format, "hyperbee", drakvuf, info,
-                   keyval("EventType", fmt::Qstr("execframe")),
-                   keyval("CR3", fmt::Xval(info->regs->cr3)),
-                   keyval("PageVA", fmt::Xval(ef_data->page_va)),
-                   keyval("VADBase", fmt::Xval(vad_node_base)),
-                   keyval("VADEnd", fmt::Xval(vad_node_end)),
-                   keyval("VADName", fmt::Qstr(dll_name_str)),
-                   keyval("DumpSize", fmt::Nval(memory_size)),
-                   keyval("DumpFile", fmt::Qstr(actual_dump_file_path)),
-                   keyval("SHA256", fmt::Qstr(actual_checksum)),
-                   keyval("DumpID", fmt::Nval(actual_dump_id)),
-                   keyval("MetaFile", fmt::Qstr(actual_metafile)),
-                   keyval("TrapPA", fmt::Xval(info->trap_pa)),
-                   keyval("GFN", fmt::Xval(info->trap->memaccess.gfn))
-                  );
-    }
-
-
-    //Swap the execute for a write trap
-changetrap:
-    drakvuf_trap* write_trap = create_write_trap(info, ef_data);
-    if (write_trap)
-    {
-        //Add and activate the trap
-        if (drakvuf_add_trap(drakvuf, write_trap))
-        {
-            //store the trap that it can be deleted in the end.
-            ef_data->plugin->traps.emplace(write_trap);
-
-            //Removes this current execute trap and frees the memory
-            ef_data->plugin->traps.erase(info->trap);
-            drakvuf_remove_trap(drakvuf, info->trap, remove_trap_cb);
-
-            PRINT_DEBUG("[HYPERBEE] Replaced execute trap X on GFN 0x%lx with write trap W\n",
-                        info->trap->memaccess.gfn);
-        }
-        else
-        {
-            //If the trap was not added, keep the current exec trap
-            PRINT_DEBUG(
-                "[HYPERBEE] Failed to add write trap W on GFN 0x%lx. Keeping execute trap X\n",
-                info->trap->memaccess.gfn);
-        }
-    }
-    else
-    {
-        PRINT_DEBUG(
-            "[HYPERBEE] Failed to create write trap W. Keeping execute trap X on GFN 0x%lx\n",
-            info->trap->memaccess.gfn);
-    }
-
-    //Frees memory
-    if (file_name_stem)
-    {
-        free(file_name_stem);
-    }
-    if (file_path_memory_dump)
-    {
-        free(file_path_memory_dump);
-    }
-    if (file_path_meta_data)
-    {
-        free(file_path_meta_data);
-    }
-    if (dll_name)
-    {
-        vmi_free_unicode_str(dll_name);
-    }
-    g_free((gpointer) chk_str);
-
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-/**
  * This method is called when the mmAccessFault handler returns, right before the actual code execution continues.
  * It is used to grab the physical address, that got assigned to the virtual
  * This method is based on the code of the IPT plugin
  */
-static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info)
 {
     //Loads a pointer to the plugin, which is responsible for the trap (in this case -> hyperbee2)
-    auto plugin = get_trap_plugin<hyperbee>(info);
+    auto plugin = get_trap_plugin<hyperbee>(trap_info);
 
     //get_trap_params reinterprets the pointer of info->trap->data as a pointer to access_fault_result_t
-    auto params = get_trap_params<access_fault_result_t>(info);
+    auto params = get_trap_params<access_fault_result_t>(trap_info);
 
     //Verifies that the params we got above (preset by the previous trap) match the trap_information this cb got called with.
     //This is used, if the trap (e.g. a shared dll) is risen by another process which fetches accidentally instructions from this page as well
-    if (!params->verify_result_call_params(drakvuf, info))
+    if (!params->verify_result_call_params(drakvuf, trap_info))
     {
         PRINT_DEBUG("[HYPERBEE] info & thread parameters did not match\n");
         return VMI_EVENT_RESPONSE_NONE;
@@ -994,7 +1119,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
     //Create an identifier for each monitored memory part. That is a combination of the CR3 register and the page_va.
     //As the exec trap will be replaced by a write trap and vice-versa (and not be removed once hit to keep focus on that page) it is required to prevent adding multiple traps for the same memory areas.
     //Even page_va and gfn relate the page_va is used as identifier, since the gfn would require an additional translation from va to pa, which would cost additional time.
-    std::pair<addr_t, addr_t> monitored_page_identifier(info->regs->cr3, page_va);
+    std::pair<addr_t, addr_t> monitored_page_identifier(trap_info->regs->cr3, page_va);
 
     //Try to find the current trap identifier in the set of existing traps.
     auto it = plugin->monitored_pages.find(monitored_page_identifier);
@@ -1013,10 +1138,10 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
             //fault_va is the virtual address to translate to a physical one via dtb
             //&p_info is the address of a struct to save the information to.
             //Page info has a vaddr, that is taken from the param. the dtb equals the cr3 and the paddr is grabbed, as it is now assigned.
-            if (VMI_SUCCESS != vmi_pagetable_lookup_extended(vmi, info->regs->cr3, params->fault_va, &p_info))
+            if (VMI_SUCCESS != vmi_pagetable_lookup_extended(vmi, trap_info->regs->cr3, params->fault_va, &p_info))
             {
                 PRINT_DEBUG("[HYPERBEE] failed to lookup page info\n");
-                plugin->destroy_trap(info->trap);
+                plugin->destroy_trap(trap_info->trap);
                 return VMI_EVENT_RESPONSE_NONE;
             }
         }
@@ -1024,9 +1149,9 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
         //Print out all previous gathered information.
         if (LOG_ALWAYS)
         {
-            fmt::print(plugin->m_output_format, "hyperbee", drakvuf, info,
+            fmt::print(plugin->m_output_format, "hyperbee", drakvuf, trap_info,
                        keyval("EventType", fmt::Qstr("pagefault")),
-                       keyval("CR3", fmt::Xval(info->regs->cr3)),
+                       keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
                        keyval("VA", fmt::Xval(params->fault_va)),
                        keyval("PA", fmt::Xval(p_info.paddr))
                       );
@@ -1053,7 +1178,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
                     //store the trap to be deleted in the end.
                     plugin->traps.emplace(exec_trap);
                     plugin->monitored_pages.insert(monitored_page_identifier);
-                    PRINT_DEBUG("[HYPERBEE] Set up execute trap X on GFN 0x%lx\n", info->trap->memaccess.gfn);
+                    PRINT_DEBUG("[HYPERBEE] Set up execute trap X on GFN 0x%lx\n", trap_info->trap->memaccess.gfn);
                 }
                 else
                 {
@@ -1061,21 +1186,21 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
                     //Can't keep trap since it is specific for the RIP
                     PRINT_DEBUG(
                         "[HYPERBEE] Failed to add execute trap X on GFN 0x%lx. Deleting mmAccessFault Return Trap\n",
-                        info->trap->memaccess.gfn);
+                        trap_info->trap->memaccess.gfn);
                 }
             }
             else
             {
                 PRINT_DEBUG(
                     "[HYPERBEE] Failed to create execute trap X. Not monitoring GFN 0x%lx\n",
-                    info->trap->memaccess.gfn);
+                    trap_info->trap->memaccess.gfn);
             }
         }
         else
         {
             PRINT_DEBUG(
                 "[HYPERBEE] Failed to allocate memory for fault_data. Not monitoring GFN 0x%lx\n",
-                info->trap->memaccess.gfn);
+                trap_info->trap->memaccess.gfn);
         }
 
     }
@@ -1083,7 +1208,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
     //Destroys this return trap, because it is specific for the RIP and not usable anymore. This was the trap being called when the physical address got computed.
     //Deletes this trap from the list of existing traps traps
     //Additionally removes the trap and frees the memory
-    plugin->destroy_trap(info->trap);
+    plugin->destroy_trap(trap_info->trap);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -1098,11 +1223,11 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
  * This method is based on some ideas of the IPT plugin
 
  */
-static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info)
 {
 
     //Load the plugin object.
-    auto plugin = get_trap_plugin<hyperbee>(info);
+    auto plugin = get_trap_plugin<hyperbee>(trap_info);
 
     //Checks if a filter was set and applies it:
     //This applies only to the trap set up. If the program dies in the meantime, the trap continues and might rise the
@@ -1110,22 +1235,22 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     if (plugin->hyperbee_filter_executable)
     {
         //Use NULL when calling C functions.
-        if (strcasestr(info->proc_data.name, plugin->hyperbee_filter_executable) == NULL)
+        if (strcasestr(trap_info->proc_data.name, plugin->hyperbee_filter_executable) == NULL)
         {
             return VMI_EVENT_RESPONSE_NONE;
         }
     }
 
     //The first argument is the FaultStatus, and the second (rdx) the VirtualAddress which caused the fault.
-    addr_t fault_va = drakvuf_get_function_argument(drakvuf, info, 2);
-    PRINT_DEBUG("[HYPERBEE] Caught MmAccessFault(%d, %lx)\n", info->proc_data.pid, fault_va);
+    addr_t fault_va = drakvuf_get_function_argument(drakvuf, trap_info, 2);
+    PRINT_DEBUG("[HYPERBEE] Caught MmAccessFault(%d, %lx)\n", trap_info->proc_data.pid, fault_va);
 
     //The kernel space starts with 0xFFFF... and higher.  User space is within 0x0000F... and below. If the trap was created by a kernel module we don't mind as we assume the integrity of the kernel.
     //https://www.codemachine.com/article_x64kvas.html: The upper 16 bits of virtual addresses are always set to 0x0 for user mode addresses and to 0xF for kernel mode addresses
     //Checks if the highest bit (bit 64) = 1000...000 is one or not. If it is one, this must be part of the kernel, since it would has to be 0 for the user mode.
     if (fault_va & (1ULL << 63))
     {
-        PRINT_DEBUG("[HYPERBEE] Don't trap in kernel %d %lx\n", info->proc_data.pid, fault_va);
+        PRINT_DEBUG("[HYPERBEE] Don't trap in kernel %d %lx\n", trap_info->proc_data.pid, fault_va);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1138,9 +1263,9 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     //Adds a return hook, a hook which will be called after function completes and returns.
     //Each time registers a trap, which is just for the process at the current step -> specific for the RIP
     auto trap = plugin->register_trap<access_fault_result_t>(
-                    info,
-                    mm_access_fault_return_hook_cb,
-                    breakpoint_by_pid_searcher());
+        trap_info,
+        mm_access_fault_return_hook_cb,
+        breakpoint_by_pid_searcher());
 
     //If trap creation failed
     if (!trap)
@@ -1158,7 +1283,7 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     auto params = get_trap_params<access_fault_result_t>(trap);
 
     //Save the address of the target thread, address of the rsp (this was the rip-address, which we used for construction) and the value of the CR3 register to the params.
-    params->set_result_call_params(info);
+    params->set_result_call_params(trap_info);
 
     //enrich the params of the new/next trap with the information which fault virtual address resulted in the fault. This information is used later.
     params->fault_va = fault_va;
@@ -1169,7 +1294,10 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 /**
  * This is the constructor of the plugin.
  */
-hyperbee::hyperbee(drakvuf_t drakvuf, const hyperbee_config_struct* c, output_format_t output)
+hyperbee::hyperbee(drakvuf_t
+                   drakvuf,
+                   const hyperbee_config_struct* c, output_format_t
+                   output)
     : pluginex(drakvuf, output)
 {
 
