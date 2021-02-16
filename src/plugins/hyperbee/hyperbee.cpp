@@ -153,64 +153,6 @@ static char alloc_memory[] = "(no-mapped-file)";
 static char suffix[][5] = {"page", "vad"};
 
 /**
- * Saves a pointer to the plugin and the starting virtual address of the frame.
- * This struct is passed between the different traps.
- */
-struct fault_data_struct
-{
-    hyperbee* plugin;
-    addr_t page_va;
-};
-
-/**
- * This struct contains all the metadata that is gathered through a page analysis
- */
-struct dump_metadata_struct
-{
-    //The start of the VAD-Node. This is not necessarily the starting va of the page that is analysed.
-    addr_t vad_node_base;
-    //The end address of the VAD-Node. The VAD-Node is not limited to a PAGE_SIZE.
-    addr_t vad_node_end;
-    //The size of current analyzed memory part (the amount of bytes written to disk)
-    size_t dump_size;
-    //THe checksum of the dumped memory
-    const gchar* sha256sum;
-    //The name of the dll
-    unicode_string_t* vad_name;
-    //the stem (basename without suffix) of the file
-    char* file_stem;
-    //The whole path of the dumpfile
-    char* dump_file;
-    //The path to the file containing the metadata
-    char* meta_file;
-};
-
-/**
- * Saves the virtual address where the fault occurred.
- */
-struct access_fault_result_t : public call_result_t
-{
-    access_fault_result_t() : call_result_t(), fault_va()
-    {}
-    addr_t fault_va;
-};
-
-/**
- * Creates an execute trap, whose pointer is returned. It gets activated and intercepts before an instruction is fetched from the specified gfn.
- * @param gfn (guest frame number) which shall be monitored
- * @param fault_data_old this is passed between traps and saves current state information. e.g. the virtual address of the page.
- */
-drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data_old);
-
-/**
- * Creates a write trap, whose pointer is returned. It gets active if the
- *
- * @param trap_info contains information regarding the current activation of the trap like register values, timestamps, ...
- * @param fault_data_old this is passed between traps and saves current state information. e.g. the virtual address of the page.
- */
-drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* trap_info, fault_data_struct* fault_data_old);
-
-/**
  * Saves the metadata received during the monitoring to a logfile
  *
  * @param trap_info the trap information
