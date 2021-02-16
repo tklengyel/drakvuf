@@ -150,7 +150,13 @@ static char alloc_memory[] = "(no-mapped-file)";
 /**
  * array with the two different analysis modes as strings
  */
-static char suffix[][5] = {"page", "vad"};
+static char file_extensions[][5] = {"page", "vad"};
+
+//See hyperbee.h -> hyperbee_config_struct
+static bool log_everything = false;
+static bool dump_vad = false;
+static bool analyse_system_dll_vad = false;
+static bool default_benign = false;
 
 /**
  * Saves the metadata received during the monitoring to a logfile
@@ -326,7 +332,7 @@ void free_all(dump_metadata_struct* dump_metadata)
  * Code is based on memdump.cpp
  *
  * Similar to the dump_memory_region-code in the memdump plugin.
- * @param vmi the current vmi instance for accessing the gues
+ * @param vmi the current vmi instance for accessing the guest
  * @param plugin
  * @param ctx the memory access context
  * @param dump_metadata containing the dump size and the dump file path
@@ -446,7 +452,7 @@ bool set_dump_paths(const char* dump_dir, dump_metadata_struct* dump_metadata)
         PRINT_DEBUG("[HYPERBEE] Could not create meta file name\n");
         return false;
     }
-    if (asprintf(&dump_metadata->dump_file, "%s/%s.%s", dump_dir, dump_metadata->file_stem, suffix[DUMP_VAD]) < 0)
+    if (asprintf(&dump_metadata->dump_file, "%s/%s.%s", dump_dir, dump_metadata->file_stem, file_extensions[dump_vad]) < 0)
     {
         PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
         return false;
@@ -571,7 +577,7 @@ bool setup_dump_context(mmvad_info_t mmvad,
     ctx_memory_dump->pid = 0;
 
     //Option to dump the whole VAD node instead of just a single page
-    if (DUMP_VAD)
+    if (dump_vad)
     {
         //Prevents the dump of very big vad nodes. This might happen if a 32bit program gets executed. SYSWOW64 creates
         // a large fake vad entry to prevent the memory allocator to allocate addresses above the 32bit boundary.
@@ -612,9 +618,11 @@ bool retrieve_and_filter_vad_name(const vmi_lock_guard& vmi, addr_t file_name_pt
 
     if (dump_metadata->vad_name != nullptr)
     {
-        //If instructions are fetched from a System32 or SysWOW64 DLL
-        if (IGNORE_SYSTEM_DLL)
+        //If we don't want to analyse the vad belonging to system files:
+        if (!analyse_system_dll_vad)
         {
+            //Exclude current memory area from analysis, if instructions are fetched from a System32 or SysWOW64 DLL
+
             //TODO FutureWork: In general it might be not secure to discard these DLLs since a malware might be able to
             // place DLLs here as well.
             if (strstr((char*) dump_metadata->vad_name->contents, "System32") != nullptr)
@@ -655,7 +663,7 @@ bool analyse_memory(drakvuf_t drakvuf,
 
     //initial value for malware. This can be set by an optional integrated classifier. If this is set to true (or during the execution of this method), the page dump will be stored always.
     //TODO FutureWork: if the classifier is integrated, set it to false by default, and let this be set by the classifier
-    bool malware = MALWARE_DEFAULT;
+    bool malware = !default_benign;
 
     //Finds the correct mmvad entry by VAD-Table walk and return it within mmvad. proc_data.base_addr is the EPROCESS address and frame va the address which shall be contained within the vad entry.
     if (!drakvuf_find_mmvad(drakvuf, trap_info->proc_data.base_addr, fault_data->page_va, &mmvad))
@@ -750,7 +758,7 @@ bool analyse_memory(drakvuf_t drakvuf,
     //TODO FutureWork  malware = malware_classifier(...)
 
     //If malware was detected or manually switched to always dump
-    if (malware || DUMP_ALWAYS)
+    if (malware)
     {
         // Comment from memdump.cpp:
         // The file name format for the memory dump file is:
@@ -852,10 +860,10 @@ static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     //load the passed fault data from the trap information
     auto* fault_data = (struct fault_data_struct*) trap_info->trap->data;
 
-    if (LOG_ALWAYS)
+    if (log_everything)
     {
         fmt::print(fault_data->plugin->m_output_format, "hyperbee", drakvuf, trap_info,
-                   keyval("EventType", fmt::Qstr("writeframe")),
+                   keyval("EventType", fmt::Qstr("writefault")),
                    keyval("FrameVA", fmt::Xval(fault_data->page_va)),
                    keyval("TrapPA", fmt::Xval(trap_info->trap_pa)),
                    keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
@@ -981,7 +989,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     bool malware = analyse_memory(drakvuf, vmi, trap_info, fault_data, dump_metadata);
 
     //Log information if required
-    if (LOG_ALWAYS || malware)
+    if (log_everything || malware)
     {
         log_all_to_console(drakvuf, trap_info, dump_metadata, fault_data);
     }
@@ -1089,7 +1097,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
         }
 
         //Print out all previous gathered information.
-        if (LOG_ALWAYS)
+        if (log_everything)
         {
             fmt::print(plugin->m_output_format, "hyperbee", drakvuf, trap_info,
                        keyval("EventType", fmt::Qstr("pagefault")),
@@ -1283,6 +1291,12 @@ hyperbee::hyperbee(drakvuf_t
         PRINT_DEBUG("[HYPERBEE] Failed to build the string containing the temp_file_path\n");
         return;
     }
+
+    //Load argument settings
+    log_everything = c->hyperbee_log_everything;
+    dump_vad = c->hyperbee_dump_vad;
+    analyse_system_dll_vad = c->hyperbee_analyse_system_dll_vad;
+    default_benign = c->hyperbee_default_benign;
 
     //Looks up the relative virtual address of a syscall method
     breakpoint_in_system_process_searcher bp;

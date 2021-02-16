@@ -146,6 +146,11 @@ struct plugins_options
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes; // PLUGIN_PROCDUMP
     const char* hyperbee_dump_dir;      // PLUGIN_HYPERBEE
     const char* hyperbee_filter_executable;  // PLUGIN_HYPERBEE
+    bool hyperbee_log_everything;       // PLUGIN_HYPERBEE
+    bool hyperbee_dump_vad;             // PLUGIN_HYPERBEE
+    bool hyperbee_analyse_system_dll_vad;    // PLUGIN_HYPERBEE
+    bool hyperbee_default_benign;       // PLUGIN_HYPERBEE
+
 };
 
 typedef enum drakvuf_plugin

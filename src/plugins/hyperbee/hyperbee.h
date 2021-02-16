@@ -113,31 +113,6 @@
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
-/**
- *This flag can be used to discard any command line logs except for malware detections (or those, the malware flag is true).
- */
-#define LOG_ALWAYS 0
-
-/**
- * Sets the default option for malware. If there is no malware classifier, this should be set to 1.
- */
-#define MALWARE_DEFAULT 1
-
-/**
- * Dumps VAD or Pages
- */
-#define DUMP_VAD 0
-
-/**
- * A special flag to activate the permanent dumping manually
- */
-#define DUMP_ALWAYS 1
-
-/**
- * Ignores dlls / exes that are within System32 or SysWOW64
- */
-#define IGNORE_SYSTEM_DLL 1
-
 //Struct to pass the parameters
 struct hyperbee_config_struct
 {
@@ -145,21 +120,25 @@ struct hyperbee_config_struct
     const char* hyperbee_dump_dir;
     //Executable to filter
     const char* hyperbee_filter_executable;
+    //Enables logging (to shell) of pagefaults and writefaults. Additionally, logs of analysed pages can be printed regardless if malware was detected or not.
+    bool hyperbee_log_everything;
+    //By default only page sized areas are dumped. By setting this flag whole VAD nodes can be dumped instead.
+    bool hyperbee_dump_vad;
+    //Can be utilised to enforce the analysis of vads, which names (paths of mapped dlls / exes) contain System32 or SysWOW64
+    bool hyperbee_analyse_system_dll_vad;
+    //By default we assume everything to be malware. If this flag is enabled we assume all analysed memory areas to be goodware instead. This flag should be just set if a classifier is integrated.
+    bool hyperbee_default_benign;
 };
 
 class hyperbee : public pluginex
 {
 
 public:
-    //Dir to save extracted frames to
+    //See hyperbee_config_struct
     std::filesystem::path dump_dir;
-
-    //Executable to filter for
     const char* filter_executable = "";
 
-    /**
-     * a temporary  dump file
-     */
+    //a temporary  dump file
     char* tmp_file_path = nullptr;
 
     //Counts how often an actual dump occured
