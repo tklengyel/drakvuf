@@ -325,6 +325,7 @@ void free_all(dump_metadata_struct* dump_metadata)
         vmi_free_unicode_str(dump_metadata->vad_name);
     }
     g_free((gpointer) dump_metadata->sha256sum);
+    g_free(dump_metadata);
 }
 
 /**
@@ -452,7 +453,8 @@ bool set_dump_paths(const char* dump_dir, dump_metadata_struct* dump_metadata)
         PRINT_DEBUG("[HYPERBEE] Could not create meta file name\n");
         return false;
     }
-    if (asprintf(&dump_metadata->dump_file, "%s/%s.%s", dump_dir, dump_metadata->file_stem, file_extensions[dump_vad]) < 0)
+    if (asprintf(&dump_metadata->dump_file, "%s/%s.%s", dump_dir, dump_metadata->file_stem, file_extensions[dump_vad])
+        < 0)
     {
         PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
         return false;
@@ -981,20 +983,22 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
     //Allocate memory on the heap for a struct to store all dump relevant information
     auto* dump_metadata = (struct dump_metadata_struct*) g_try_malloc0(sizeof(struct dump_metadata_struct));
-
-    //Lock the VM
-    auto vmi = vmi_lock_guard(drakvuf);
-
-    //Dump memory and check for malware
-    bool malware = analyse_memory(drakvuf, vmi, trap_info, fault_data, dump_metadata);
-
-    //Log information if required
-    if (log_everything || malware)
+    if (dump_metadata)
     {
-        log_all_to_console(drakvuf, trap_info, dump_metadata, fault_data);
+        //Lock the VM
+        auto vmi = vmi_lock_guard(drakvuf);
+
+        //Dump memory and check for malware
+        bool malware = analyse_memory(drakvuf, vmi, trap_info, fault_data, dump_metadata);
+
+        //Log information if required
+        if (log_everything || malware)
+        {
+            log_all_to_console(drakvuf, trap_info, dump_metadata, fault_data);
+        }
+        swap_traps(drakvuf, trap_info, fault_data);
+        free_all(dump_metadata);
     }
-    swap_traps(drakvuf, trap_info, fault_data);
-    free_all(dump_metadata);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
