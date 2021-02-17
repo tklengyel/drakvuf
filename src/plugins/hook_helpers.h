@@ -56,7 +56,7 @@ public:
     std::unique_ptr<libhook::return_hook> createReturnHook(drakvuf_trap_info* info, callback_t cb)
     {
         static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
-        auto hook = libhook::return_hook::create(this->drakvuf_, info, cb);
+        auto hook = libhook::return_hook::create<Params>(this->drakvuf_, info, cb);
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
         return hook;
     }
@@ -66,7 +66,7 @@ public:
     std::unique_ptr<libhook::return_hook> createReturnHook(drakvuf_trap_info* info, Callback cb)
     {
         static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
-        auto hook = libhook::return_hook::create(this->drakvuf_, info, [=](auto&& ...args) -> event_response_t
+        auto hook = libhook::return_hook::create<Params>(this->drakvuf_, info, [=](auto&& ...args) -> event_response_t
         {
             return std::invoke(cb, (typename subject_type<Callback>::type*)this, args...);
         });
@@ -79,7 +79,7 @@ public:
     std::unique_ptr<libhook::syscall_hook> createSyscallHook(const std::string& syscall_name, callback_t cb)
     {
         static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
-        auto hook = libhook::syscall_hook::create(this->drakvuf_, syscall_name, cb);
+        auto hook = libhook::syscall_hook::create<Params>(this->drakvuf_, syscall_name, cb);
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
         return hook;
     }
@@ -89,7 +89,7 @@ public:
     std::unique_ptr<libhook::syscall_hook> createSyscallHook(const std::string& syscall_name, Callback cb)
     {
         static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
-        auto hook = libhook::syscall_hook::create(this->drakvuf_, syscall_name, [=](auto&& ...args) -> event_response_t
+        auto hook = libhook::syscall_hook::create<Params>(this->drakvuf_, syscall_name, [=](auto&& ...args) -> event_response_t
         {
             return std::invoke(cb, (typename subject_type<Callback>::type*)this, args...);
         });
