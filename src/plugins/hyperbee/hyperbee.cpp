@@ -553,10 +553,9 @@ done:
     dump_metadata->sha256sum = g_strdup(sha256sum);
 
     g_checksum_free(checksum);
-    
+
     //If the gpointer is null, it just returns.
     g_free(access_ptrs);
-
 }
 
 /**
