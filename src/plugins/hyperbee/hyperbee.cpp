@@ -475,7 +475,7 @@ void get_sha256_memory(
 {
     void** access_ptrs = nullptr;
 
-    const gchar* chk_str = nullptr;
+    const gchar* sha256sum = nullptr;
     GChecksum* checksum = nullptr;
 
     addr_t aligned_addr;
@@ -540,19 +540,23 @@ void get_sha256_memory(
         tmp_len_bytes -= write_length;
     }
 
-    chk_str = g_checksum_get_string(checksum);
+    //The returned string is owned by the checksum and should not be modified or freed. (glib-Data-Checksums @ gnome.org)
+    sha256sum = g_checksum_get_string(checksum);
     goto done;
 
 error:
     PRINT_DEBUG("[HYPERBEE] Failed to calculate checksum\n");
 
 done:
-    if (access_ptrs)
-    {
-        g_free(access_ptrs);
-    }
+    //The returned string should be freed with g_free() when no longer needed.(glib-String-Utility-Functions @ gnome.org)
+    //If chk_str is null, it also returns null
+    dump_metadata->sha256sum = g_strdup(sha256sum);
 
-    dump_metadata->sha256sum = chk_str;
+    g_checksum_free(checksum);
+    
+    //If the gpointer is null, it just returns.
+    g_free(access_ptrs);
+
 }
 
 /**
