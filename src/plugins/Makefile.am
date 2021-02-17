@@ -279,6 +279,7 @@ endif
 if PLUGIN_HYPERBEE
 sources += hyperbee/hyperbee.cpp
 sources += hyperbee/hyperbee.h
+sources += hyperbee/private.h
 sources += filesystem.hpp
 endif
 
