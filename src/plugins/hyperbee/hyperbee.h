@@ -109,7 +109,7 @@
 #include <memory>
 #include <set>
 #include <glib.h>
-#include <libdrakvuf/filesystem.hpp>
+#include <plugins/filesystem.hpp>
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 

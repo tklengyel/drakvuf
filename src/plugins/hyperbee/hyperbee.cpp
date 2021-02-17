@@ -133,7 +133,7 @@
 #include <cstdio>
 #include <cstring>
 
-#include <libdrakvuf/filesystem.hpp>
+#include <plugins/filesystem.hpp>
 #include <libdrakvuf/json-util.h>
 #include "hyperbee.h"
 #include "plugins/output_format.h"
