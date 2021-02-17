@@ -104,6 +104,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "base.hpp"
 #include "../call_result.hpp"
 

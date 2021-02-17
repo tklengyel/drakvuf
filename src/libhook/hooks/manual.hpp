@@ -133,6 +133,11 @@ public:
     ~manual_hook() override;
 
     /**
+     * delete default ctor, enforce creation though factory functions
+     */
+    manual_hook() = delete;
+
+    /**
      * delete copy ctor, as this class has ownership via RAII
      */
     manual_hook(const manual_hook&) = delete;
@@ -163,7 +168,6 @@ protected:
      */
     explicit manual_hook(drakvuf_t, drakvuf_trap_t*, drakvuf_trap_free_t);
 
-    manual_hook() = default;
 };
 
 };  // namespace libhook
