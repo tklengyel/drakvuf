@@ -115,9 +115,9 @@ namespace libhook
 using callback_t = event_response_t(*)(drakvuf_t drakvuf, drakvuf_trap_info* info);
 using cb_wrapper_t = std::function<event_response_t(drakvuf_t, drakvuf_trap_info*)>;
 
- /**
-  * Base hook class, not to be instantiated manually.
-  */
+/**
+ * Base hook class, not to be instantiated manually.
+ */
 class base_hook
 {
 public:

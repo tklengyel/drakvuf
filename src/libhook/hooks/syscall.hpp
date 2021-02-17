@@ -121,7 +121,7 @@ public:
     template<typename Params = CallResult>
     [[nodiscard]]
     static auto create(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb)
-        -> std::unique_ptr<syscall_hook>;
+    -> std::unique_ptr<syscall_hook>;
 
     /**
      * unhook on dctor
@@ -163,7 +163,7 @@ protected:
 
 template<typename Params>
 auto syscall_hook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb)
-    -> std::unique_ptr<syscall_hook>
+-> std::unique_ptr<syscall_hook>
 {
     PRINT_DEBUG("[LIBHOOK] creating syscall hook\n");
 
@@ -184,7 +184,8 @@ auto syscall_hook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb
 
     hook->trap_->name = hook->syscall_name_.c_str();
     hook->trap_->type = BREAKPOINT;
-    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
+    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    {
         return GetTrapHook<syscall_hook>(info)->callback_(drakvuf, info);
     };
 
@@ -196,7 +197,7 @@ auto syscall_hook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb
     params->hook_ = hook.get();
     hook->trap_->data = static_cast<void*>(params);
 
-    if(!drakvuf_add_trap(drakvuf, hook->trap_))
+    if (!drakvuf_add_trap(drakvuf, hook->trap_))
     {
         PRINT_DEBUG("[LIBHOOK] failed to create trap for syscall hook\n");
         delete static_cast<CallResult*>(hook->trap_->data);

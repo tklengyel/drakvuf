@@ -117,14 +117,14 @@ struct CallResult
 
     virtual ~CallResult() = default;
 
-    void setResultCallParams(const drakvuf_trap_info_t *info)
+    void setResultCallParams(const drakvuf_trap_info_t* info)
     {
         target_pid = info->attached_proc_data.pid;
         target_tid = info->attached_proc_data.tid;
         target_rsp = info->regs->rsp;
     }
 
-    bool verifyResultCallParams(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+    bool verifyResultCallParams(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         return drakvuf_check_return_context(drakvuf, info, target_pid, target_tid, target_rsp);
     }

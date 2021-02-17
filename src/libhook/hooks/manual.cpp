@@ -106,7 +106,7 @@
 using namespace libhook;
 
 auto manual_hook::create(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
-    -> std::unique_ptr<manual_hook>
+-> std::unique_ptr<manual_hook>
 {
     // not calling base_hook::prepare_trap on purpose
     // we expect user to created trap properly on their own
@@ -114,14 +114,14 @@ auto manual_hook::create(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_f
 
     // struct EnableMaker : public manual_hook { using manual_hook::manual_hook; };
     // auto hook = std::make_unique<EnableMaker>(drakvuf, trap_, free_routine_);
-    
+
     auto hook = std::unique_ptr<manual_hook>(new manual_hook(drakvuf, trap, free_routine));
-    if(!drakvuf_add_trap(hook->drakvuf_, hook->trap_))
+    if (!drakvuf_add_trap(hook->drakvuf_, hook->trap_))
     {
         PRINT_DEBUG("[LIBHOOK] failed to create trap for manual hook\n");
         return std::unique_ptr<manual_hook>();
     }
-    
+
     PRINT_DEBUG("[LIBHOOK] manual hook OK\n");
     return hook;
 }
@@ -132,7 +132,7 @@ manual_hook::manual_hook(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_f
 
 manual_hook::~manual_hook()
 {
-    if(this->drakvuf_ && this->trap_)
+    if (this->drakvuf_ && this->trap_)
     {
         PRINT_DEBUG("[LIBHOOK] destroying manual hook...\n");
         drakvuf_remove_trap(this->drakvuf_, this->trap_, this->free_routine_);

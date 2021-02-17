@@ -125,7 +125,7 @@ public:
      */
     [[nodiscard]]
     static auto create(drakvuf_t, drakvuf_trap_t*, drakvuf_trap_free_t)
-        -> std::unique_ptr<manual_hook>;
+    -> std::unique_ptr<manual_hook>;
 
     /**
      * Unhook in dctor

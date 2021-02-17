@@ -117,10 +117,10 @@ return_hook::~return_hook()
     {
         PRINT_DEBUG("[LIBHOOK] destroying return hook...\n");
         drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
-            {
-                delete static_cast<CallResult*>(trap->data);
-                delete trap;
-            });
+        {
+            delete static_cast<CallResult*>(trap->data);
+            delete trap;
+        });
     }
     else
     {

@@ -12,12 +12,15 @@ template <typename T>
 struct subject_type;
 
 template <typename T, typename R, typename... Args>
-struct subject_type<R (T::*)(Args...)> { using type = T; };
+struct subject_type<R (T::*)(Args...)>
+{
+    using type = T;
+};
 
 /**
  * This class is only needed for better backwards compatibility.
  * It "works" as a GetTrapPlugin from pluginex interface.
- * 
+ *
  * The new hooking interface prefers to use member-functions as callbacks
  * which provides `this`.
  */
@@ -42,7 +45,7 @@ public:
           output_format_(output)
     {};
 
-#pragma region ManualHook
+    #pragma region ManualHook
 
     [[nodiscard]]
     std::unique_ptr<libhook::manual_hook> createManualHook(drakvuf_trap_t* info, drakvuf_trap_free_t free_routine)
@@ -50,9 +53,9 @@ public:
         return libhook::manual_hook::create(this->drakvuf_, info, free_routine);
     }
 
-#pragma endregion ManualHook
+    #pragma endregion ManualHook
 
-#pragma region ReturnHook
+    #pragma region ReturnHook
 
     template<typename Params = PluginResult>
     [[nodiscard]]
@@ -69,16 +72,17 @@ public:
     std::unique_ptr<libhook::return_hook> createReturnHook(drakvuf_trap_info* info, Callback cb)
     {
         static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
-        auto hook = libhook::return_hook::create(this->drakvuf_, info, [=](auto&& ...args) -> event_response_t {
+        auto hook = libhook::return_hook::create(this->drakvuf_, info, [=](auto&& ...args) -> event_response_t
+        {
             return std::invoke(cb, (typename subject_type<Callback>::type*)this, args...);
         });
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
         return hook;
     }
 
-#pragma endregion ReturnHook
+    #pragma endregion ReturnHook
 
-#pragma region SyscallHook
+    #pragma region SyscallHook
 
     template<typename Params = PluginResult>
     [[nodiscard]]
@@ -95,14 +99,15 @@ public:
     std::unique_ptr<libhook::syscall_hook> createSyscallHook(const std::string& syscall_name, Callback cb)
     {
         static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
-        auto hook = libhook::syscall_hook::create(this->drakvuf_, syscall_name, [=](auto&& ...args) -> event_response_t {
+        auto hook = libhook::syscall_hook::create(this->drakvuf_, syscall_name, [=](auto&& ...args) -> event_response_t
+        {
             return std::invoke(cb, (typename subject_type<Callback>::type*)this, args...);
         });
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
         return hook;
     }
 
-#pragma endregion SyscallHook
+    #pragma endregion SyscallHook
 
 protected:
     drakvuf_t drakvuf_;

@@ -121,7 +121,7 @@ public:
     template<typename Params = CallResult>
     [[nodiscard]]
     static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb)
-        -> std::unique_ptr<return_hook>;
+    -> std::unique_ptr<return_hook>;
 
     /**
      * unhook on dctor
@@ -162,7 +162,7 @@ protected:
 
 template<typename Params>
 auto return_hook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb)
-    -> std::unique_ptr<return_hook>
+-> std::unique_ptr<return_hook>
 {
     PRINT_DEBUG("[LIBHOOK] creating return hook\n");
 
@@ -186,19 +186,20 @@ auto return_hook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_
 
     hook->trap_->type = BREAKPOINT;
     hook->trap_->name = "return_hook";
-    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info) {
+    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    {
         return GetTrapHook<return_hook>(info)->callback_(drakvuf, info);
     };
 
     static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
     static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
-    
+
     // pupulate backref
     auto* params = new Params();
     params->hook_ = hook.get();
     hook->trap_->data = static_cast<void*>(params);
 
-    if(!drakvuf_add_trap(drakvuf, hook->trap_))
+    if (!drakvuf_add_trap(drakvuf, hook->trap_))
     {
         PRINT_DEBUG("[LIBHOOK] failed to create trap for return hook\n");
         delete static_cast<CallResult*>(hook->trap_->data);
