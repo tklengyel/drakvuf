@@ -45,17 +45,11 @@ public:
           output_format_(output)
     {};
 
-    #pragma region ManualHook
-
     [[nodiscard]]
     std::unique_ptr<libhook::manual_hook> createManualHook(drakvuf_trap_t* info, drakvuf_trap_free_t free_routine)
     {
         return libhook::manual_hook::create(this->drakvuf_, info, free_routine);
     }
-
-    #pragma endregion ManualHook
-
-    #pragma region ReturnHook
 
     template<typename Params = PluginResult>
     [[nodiscard]]
@@ -80,10 +74,6 @@ public:
         return hook;
     }
 
-    #pragma endregion ReturnHook
-
-    #pragma region SyscallHook
-
     template<typename Params = PluginResult>
     [[nodiscard]]
     std::unique_ptr<libhook::syscall_hook> createSyscallHook(const std::string& syscall_name, callback_t cb)
@@ -106,8 +96,6 @@ public:
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
         return hook;
     }
-
-    #pragma endregion SyscallHook
 
 protected:
     drakvuf_t drakvuf_;
