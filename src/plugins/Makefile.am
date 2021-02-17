@@ -279,6 +279,7 @@ endif
 if PLUGIN_HYPERBEE
 sources += hyperbee/hyperbee.cpp
 sources += hyperbee/hyperbee.h
+sources += filesystem.hpp
 endif
 
 ###############################################################################
