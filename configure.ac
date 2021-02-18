@@ -141,7 +141,7 @@ AC_LINK_IFELSE(
     ])], [],
     [STDCPPFSLIB="-lstdc++fs"]
 )
-AC_SUBST([STCPPFSLIB])
+AC_SUBST([STDCPPFSLIB])
 #end requirement check
 
 AC_LANG_POP([C++])
