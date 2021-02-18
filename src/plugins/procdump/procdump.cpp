@@ -528,11 +528,13 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     {
         ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
         drakvuf_remove_trap(drakvuf, ctx->bp, (drakvuf_trap_free_t)free_trap);
+        ctx->bp = nullptr;
     }
     if (ctx->bp2)
     {
         ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp2);
         drakvuf_remove_trap(drakvuf, ctx->bp2, (drakvuf_trap_free_t)free_trap);
+        ctx->bp2 = nullptr;
     }
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
