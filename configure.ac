@@ -126,7 +126,8 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [[bool test[2] = { [1] = 1, [0] = 0 };]])
     [AC_ERROR(Your C++ compiler ($CXX) is not supported. Please use clang++ (clang-9 or clang-10)!)])
 
 #Check requirement of lstdc++fs
-AC_CHECK_HEADER([filesystem])
+STDCPPFSLIB=""
+AC_CHECK_HEADERS([filesystem])
 AC_LINK_IFELSE(
     [AC_LANG_SOURCE([
         #if HAVE_FILESYSTEM
@@ -137,15 +138,10 @@ AC_LINK_IFELSE(
             std::error_code ec;
             std::filesystem::create_directory("/dev/null", &ec);
         }
-    ])],
-    [ac_cv_fs_stdlib=no],
-    [ac_cv_fs_stdlib=yes]
+    ])], [],
+    [STDCPPFSLIB="-lstdc++fs"]
 )
-
-if test x$ac_cv_fs_stdlib = xyes; then
-    AM_LDFLAGS="$AM_LDFLAGS -lstdc++fs"
-    AC_MSG_NOTICE([Added lstdc++fs])
-fi
+AC_SUBST([STCPPFSLIB])
 #end requirement check
 
 AC_LANG_POP([C++])
