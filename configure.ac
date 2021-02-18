@@ -124,6 +124,30 @@ CXXFLAGS="-std=gnu++17"
 AC_LANG_PUSH([C++])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [[bool test[2] = { [1] = 1, [0] = 0 };]])], [],
     [AC_ERROR(Your C++ compiler ($CXX) is not supported. Please use clang++ (clang-9 or clang-10)!)])
+
+#Check requirement of lstdc++fs
+AC_CHECK_HEADER([filesystem])
+AC_LINK_IFELSE(
+    [AC_LANG_SOURCE([
+        #if HAVE_FILESYSTEM
+        #include <filesystem>
+        #endif
+
+        int main() {
+            std::error_code ec;
+            std::filesystem::create_directory("/dev/null", &ec);
+        }
+    ])],
+    [ac_cv_fs_stdlib=no],
+    [ac_cv_fs_stdlib=yes]
+)
+
+if test x$ac_cv_fs_stdlib = xyes; then
+    AM_LDFLAGS="$AM_LDFLAGS -lstdc++fs"
+    AC_MSG_NOTICE([Added lstdc++fs])
+fi
+#end requirement check
+
 AC_LANG_POP([C++])
 
 ######################################################
