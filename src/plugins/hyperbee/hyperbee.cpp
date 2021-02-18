@@ -147,10 +147,6 @@ static char missing_data[] = "(null)";
  * The string used for vad nodes, that don't belong to mapped files, but to dynamically allocated memory
  */
 static char alloc_memory[] = "(no-mapped-file)";
-/**
- * array with the two different analysis modes as strings
- */
-static char file_extensions[][5] = {"page", "vad"};
 
 //See hyperbee.h -> hyperbee_config_struct
 static bool log_everything = false;
@@ -445,7 +441,8 @@ bool set_dump_paths(const char* dump_dir, dump_metadata_struct* dump_metadata)
         PRINT_DEBUG("[HYPERBEE] Could not create meta file name\n");
         return false;
     }
-    if (asprintf(&dump_metadata->dump_file, "%s/%s.%s", dump_dir, dump_metadata->file_stem, file_extensions[dump_vad])
+    auto file_extension = dump_vad ? "vad" : "page";
+    if (asprintf(&dump_metadata->dump_file, "%s/%s.%s", dump_dir, dump_metadata->file_stem, file_extension)
         < 0)
     {
         PRINT_DEBUG("[HYPERBEE] Could not create memory dump file name\n");
