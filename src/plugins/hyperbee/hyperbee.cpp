@@ -162,16 +162,8 @@ static bool default_benign = false;
  * Saves the metadata received during the monitoring to a logfile
  *
  * @param trap_info the trap information
- * @param meta_file_path the path to save the metadata to
- * @param drakvuf
- * @param dump_file_name the name of the dump file
- * @param dump_size the size of the dumped file
- * @param dump_id the id of the dump
- * @param page_va the virtual address of the page where the fetch occurred
- * @param dll_name_str the name of the regarding dll
- * @param chk_str the hash
- * @param base_va the base (start) address of the VAD node, containing the dumped page
- * @param end_va the end of the VAD node, containing the dumped page
+ * @param dump_metadata data to be logged gathered during the analysis
+ * @param fault_data the struct with the fault data
  */
 static void save_file_metadata(const drakvuf_trap_info_t* trap_info,
                                const dump_metadata_struct* dump_metadata,
