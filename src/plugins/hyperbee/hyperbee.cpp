@@ -783,7 +783,7 @@ bool analyse_memory(drakvuf_t drakvuf,
 
         //Add the checksum as key with the file_name_prefix (as data) to the map.
         fault_data->plugin->dumped_memory_map.insert(std::make_pair(dump_metadata->sha256sum,
-                                                                    dump_metadata->file_stem));
+                dump_metadata->file_stem));
 
 
         //If the dump of the memory was successful write all gathered data to a metadata file
