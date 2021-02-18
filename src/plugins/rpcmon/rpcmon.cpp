@@ -301,6 +301,39 @@ static std::optional<uint64_t> parse_FORMAT_STRING(drakvuf_t drakvuf, drakvuf_tr
     return proc_num;
 }
 
+struct rpc_message_t
+{
+    uint64_t ProcNum;
+    std::string InterfaceIdGuid;
+};
+
+static std::optional<rpc_message_t> parse_RPC_MESSAGE(drakvuf_t drakvuf, drakvuf_trap_info* info, addr_t arg)
+{
+    struct rpc_message_t r;
+
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    uint32_t proc_num;
+    ctx.addr = arg + RPC_MESSAGE_PROCNUM_OFFSET;
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &proc_num))
+        return {};
+    r.ProcNum = proc_num;
+
+    ctx.addr = arg + RPC_MESSAGE_RPCINTERFACEINFO_OFFSET;
+    auto rpc_iface = read_struct<_RPC_CLIENT_INTERFACE>(vmi, &ctx);
+    if (!rpc_iface)
+        return {};
+    r.InterfaceIdGuid = rpc_iface->InterfaceId.SyntaxGuid.str();
+
+    return r;
+}
+
 static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)info->trap->data;
@@ -345,6 +378,14 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 
                 fmt_extra_num.push_back(std::make_pair("ProcedureNumber", fmt::Nval(*r)));
             }
+            else if (std::string("RpcMessage") == (*printer)->get_name())
+            {
+                auto r = parse_RPC_MESSAGE(drakvuf, info, *arg);
+                if (!r) continue;
+
+                fmt_extra_num.push_back(std::make_pair("ProcNum", fmt::Nval(r->ProcNum)));
+                fmt_extra.push_back(std::make_pair("InterfaceId", r->InterfaceIdGuid));
+            }
         }
     }
 
@@ -364,9 +405,6 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     hook_target_entry_t* target = (hook_target_entry_t*)info->trap->data;
-
-    if (target->pid != info->attached_proc_data.pid)
-        return VMI_EVENT_RESPONSE_NONE;
 
     auto vmi = vmi_lock_guard(drakvuf);
     vmi_v2pcache_flush(vmi, info->regs->cr3);
@@ -474,6 +512,16 @@ static auto rpc_call3_args()
     return args;
 }
 
+static auto i_rpc_args()
+{
+    PrinterConfig config{};
+    config.numeric_format = PrinterConfig::NumericFormat::DECIMAL;
+
+    std::vector<std::unique_ptr<ArgumentPrinter>> args;
+    args.emplace_back(std::make_unique<ArgumentPrinter>("RpcMessage", config));
+    return args;
+}
+
 rpcmon::rpcmon(drakvuf_t drakvuf, output_format_t output)
     : pluginex(drakvuf, output)
 {
@@ -490,6 +538,9 @@ rpcmon::rpcmon(drakvuf_t drakvuf, output_format_t output)
     wanted_hooks.add_hook("rpcrt4.dll", "NdrClientCall2", log, rpc_call_args());
     wanted_hooks.add_hook("rpcrt4.dll", "NdrClientCall3", log, rpc_call3_args());
     wanted_hooks.add_hook("rpcrt4.dll", "NdrClientCall4", log, rpc_call_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "I_RpcReceive", log, i_rpc_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "I_RpcSend", log, i_rpc_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "I_RpcSendReceive", log, i_rpc_args());
 
     usermode_cb_registration reg =
     {
