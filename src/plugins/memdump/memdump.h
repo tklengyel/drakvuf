@@ -120,6 +120,12 @@ struct memdump_config
     const char* clr_profile;
     const char* mscorwks_profile;
     const bool print_no_addr;
+    const bool memdump_disable_free_vm;
+    const bool memdump_disable_protect_vm;
+    const bool memdump_disable_write_vm;
+    const bool memdump_disable_terminate_proc;
+    const bool memdump_disable_create_thread;
+    const bool memdump_disable_set_thread;
 };
 
 class memdump: public pluginex

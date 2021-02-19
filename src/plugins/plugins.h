@@ -137,6 +137,12 @@ struct plugins_options
     const char* wow_ole32_profile;      // PLUGIN_WMIMON
     const char* combase_profile;        // PLUGIN_WMIMON
     const char* memdump_dir;            // PLUGIN_MEMDUMP
+    bool memdump_disable_free_vm;       // PLUGIN_MEMDUMP
+    bool memdump_disable_protect_vm;    // PLUGIN_MEMDUMP
+    bool memdump_disable_write_vm;      // PLUGIN_MEMDUMP
+    bool memdump_disable_terminate_proc;// PLUGIN_MEMDUMP
+    bool memdump_disable_create_thread; // PLUGIN_MEMDUMP
+    bool memdump_disable_set_thread;    // PLUGIN_MEMDUMP
     const char* dll_hooks_list;         // PLUGIN_MEMDUMP, PLUGIN_APIMON
     bool userhook_no_addr;              // PLUGIN_MEMDUMP, PLUGIN_APIMON
     const char* procdump_dir;           // PLUGIN_PROCDUMP

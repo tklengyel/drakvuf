@@ -785,8 +785,8 @@ static event_response_t create_remote_thread_hook_cb(drakvuf_t drakvuf, drakvuf_
     }
     // IN PVOID StartRoutine
     addr_t start_routine = drakvuf_get_function_argument(drakvuf, info, 5);
-    vmi_lock_guard lg(drakvuf);
-    dump_if_points_to_executable_memory(drakvuf, info, lg.vmi, target_process, start_routine, "CreateRemoteThread heuristic", nullptr);
+    auto vmi = vmi_lock_guard(drakvuf);
+    dump_if_points_to_executable_memory(drakvuf, info, vmi, target_process, start_routine, "CreateRemoteThread heuristic", nullptr);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -825,8 +825,8 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
 
     // We are only interested in suspicious actions when NtSetInformationThread has been invoked on remote thread.
     addr_t resumed_eprocess;
-    vmi_lock_guard lg(drakvuf);
-    if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, resumed_ethread + plugin->kthread_process_rva, 0, &resumed_eprocess))
+    auto vmi = vmi_lock_guard(drakvuf);
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, resumed_ethread + plugin->kthread_process_rva, 0, &resumed_eprocess))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to retrieve resumed process\n");
         return VMI_EVENT_RESPONSE_NONE;
@@ -853,29 +853,29 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
         .addr = wow64_context + plugin->wow64context_eax_rva
     };
     addr_t eax = 0;
-    if (VMI_SUCCESS != vmi_read_32(lg.vmi, &ctx, (uint32_t*)&eax))
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&eax))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to read eax field from wow64_context\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
     addr_t eip = 0;
     ctx.addr = wow64_context + plugin->wow64context_eip_rva;
-    if (VMI_SUCCESS != vmi_read_32(lg.vmi, &ctx, (uint32_t*)&eip))
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&eip))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to read eip field from wow64_context\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    dump_if_points_to_executable_memory(drakvuf, info, lg.vmi, resumed_eprocess, eax, "SetThreadContext heuristic", nullptr);
-    dump_if_points_to_executable_memory(drakvuf, info,  lg.vmi, resumed_eprocess, eip, "SetThreadContext heuristic", nullptr);
+    dump_if_points_to_executable_memory(drakvuf, info, vmi, resumed_eprocess, eax, "SetThreadContext heuristic", nullptr);
+    dump_if_points_to_executable_memory(drakvuf, info,  vmi, resumed_eprocess, eip, "SetThreadContext heuristic", nullptr);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
 
 bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plugin)
 {
-    vmi_lock_guard lg(drakvuf);
-    vmi_v2pcache_flush(lg.vmi, info->regs->cr3);
+    auto vmi = vmi_lock_guard(drakvuf);
+    vmi_v2pcache_flush(vmi, info->regs->cr3);
 
     bool is_syswow = drakvuf_is_wow64(drakvuf, info);
 
@@ -891,7 +891,7 @@ bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     const auto ptr_size = is_syswow ? sizeof(uint32_t) : sizeof(addr_t);
     ctx.addr += ptr_size;
 
-    if (vmi_read(lg.vmi, &ctx, ptr_size, &data_size, nullptr) != VMI_SUCCESS)
+    if (vmi_read(vmi, &ctx, ptr_size, &data_size, nullptr) != VMI_SUCCESS)
     {
         PRINT_DEBUG("[MEMDUMP.NET] failed to read size of dump from memory.");
         return false;
@@ -901,7 +901,7 @@ bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     ctx.addr += ptr_size;
 
-    if (!dump_memory_region(drakvuf, lg.vmi, info, plugin, &ctx, data_size, ".NET AssemblyNative::LoadImage", nullptr, false))
+    if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, data_size, ".NET AssemblyNative::LoadImage", nullptr, false))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
         return false;
@@ -949,16 +949,24 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
         PRINT_DEBUG("mscorwks.dll profile not found, memdump will procede without .NET hooks\n");
 
     breakpoint_in_system_process_searcher bp;
-    if (!register_trap(nullptr, free_virtual_memory_hook_cb,    bp.for_syscall_name("NtFreeVirtualMemory")) ||
-        !register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
-        !register_trap(nullptr, terminate_process_hook_cb,      bp.for_syscall_name("NtTerminateProcess")) ||
-        !register_trap(nullptr, write_virtual_memory_hook_cb,   bp.for_syscall_name("NtWriteVirtualMemory")) ||
-        !register_trap(nullptr, create_remote_thread_hook_cb,   bp.for_syscall_name("NtCreateThreadEx")))
-    {
-        throw -1;
-    }
-    if (json_wow && !register_trap(nullptr, set_information_thread_hook_cb, bp.for_syscall_name("NtSetInformationThread")))
-        throw -1;
+    if (!c->memdump_disable_free_vm)
+        if (!register_trap(nullptr, free_virtual_memory_hook_cb,    bp.for_syscall_name("NtFreeVirtualMemory")))
+            throw -1;
+    if (!c->memdump_disable_protect_vm)
+        if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")))
+            throw -1;
+    if (!c->memdump_disable_terminate_proc)
+        if (!register_trap(nullptr, terminate_process_hook_cb,      bp.for_syscall_name("NtTerminateProcess")))
+            throw -1;
+    if (!c->memdump_disable_write_vm)
+        if (!register_trap(nullptr, write_virtual_memory_hook_cb,   bp.for_syscall_name("NtWriteVirtualMemory")))
+            throw -1;
+    if (!c->memdump_disable_create_thread)
+        if (!register_trap(nullptr, create_remote_thread_hook_cb,   bp.for_syscall_name("NtCreateThreadEx")))
+            throw -1;
+    if (!c->memdump_disable_set_thread)
+        if (json_wow && !register_trap(nullptr, set_information_thread_hook_cb, bp.for_syscall_name("NtSetInformationThread")))
+            throw -1;
 
     this->userhook_init(drakvuf, c, output);
 }
