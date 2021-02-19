@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be acquired from the author.         *
+ * software, alternative licenses can be aquired from the author.          *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -102,232 +102,61 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DRAKVUF_PLUGINS_H
-#define DRAKVUF_PLUGINS_H
+#ifndef HYPERBEE_H
+#define HYPERBEE_H
 
-#include <config.h>
-#include <array>
+#include <vector>
 #include <memory>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <sys/time.h>
-#include <libdrakvuf/libdrakvuf.h>
+#include <set>
+#include <glib.h>
+#include <plugins/filesystem.hpp>
+#include "plugins/private.h"
+#include "plugins/plugins_ex.h"
 
-#include <unordered_map>
-
-struct plugins_options
+//Struct to pass the parameters
+struct hyperbee_config_struct
 {
-    const char* dump_folder;            // PLUGIN_FILEDELETE
-    bool dump_modified_files;           // PLUGIN_FILEDELETE
-    bool filedelete_use_injector;       // PLUGIN_FILEDELETE
-    bool cpuid_stealth;                 // PLUGIN_CPUIDMON
-    const char* tcpip_profile;          // PLUGIN_SOCKETMON
-    const char* win32k_profile;         // PLUGIN_CLIPBOARDMON, PLUGIN_WINDOWMON, PLUGIN_SYSCALLS
-    const char* sspicli_profile;        // PLUGIN_ENVMON
-    const char* kernel32_profile;       // PLUGIN_ENVMON
-    const char* kernelbase_profile;     // PLUGIN_ENVMON
-    const char* wow_kernel32_profile;   // PLUGIN_ENVMON
-    const char* iphlpapi_profile;       // PLUGIN_ENVMON
-    const char* mpr_profile;            // PLUGIN_ENVMON
-    const char* syscalls_filter_file;   // PLUGIN_SYSCALLS
-    bool disable_sysret;                // PLUGIN_SYSCALLS
-    bool abort_on_bsod;                 // PLUGIN_BSODMON
-    const char* ntdll_profile;          // PLUGIN_LIBRARYMON
-    const char* ole32_profile;          // PLUGIN_WMIMON
-    const char* wow_ole32_profile;      // PLUGIN_WMIMON
-    const char* combase_profile;        // PLUGIN_WMIMON
-    const char* memdump_dir;            // PLUGIN_MEMDUMP
-    const char* dll_hooks_list;         // PLUGIN_MEMDUMP, PLUGIN_APIMON
-    bool userhook_no_addr;              // PLUGIN_MEMDUMP, PLUGIN_APIMON
-    const char* procdump_dir;           // PLUGIN_PROCDUMP
-    bool compress_procdumps = false;    // PLUGIN_PROCDUMP
-    const char* clr_profile;            // PLUGIN_MEMDUMP
-    const char* mscorwks_profile;       // PLUGIN_MEMDUMP
-    std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes; // PLUGIN_PROCDUMP
-    const char* hyperbee_dump_dir;      // PLUGIN_HYPERBEE
-    const char* hyperbee_filter_executable;  // PLUGIN_HYPERBEE
-    bool hyperbee_log_everything;       // PLUGIN_HYPERBEE
-    bool hyperbee_dump_vad;             // PLUGIN_HYPERBEE
-    bool hyperbee_analyse_system_dll_vad;    // PLUGIN_HYPERBEE
-    bool hyperbee_default_benign;       // PLUGIN_HYPERBEE
-
+    //Dir to save extracted frames to
+    const char* hyperbee_dump_dir;
+    //Executable to filter
+    const char* hyperbee_filter_executable;
+    //Enables logging (to shell) of pagefaults and writefaults. Additionally, logs of analysed pages can be printed regardless if malware was detected or not.
+    bool hyperbee_log_everything;
+    //By default only page sized areas are dumped. By setting this flag whole VAD nodes can be dumped instead.
+    bool hyperbee_dump_vad;
+    //Can be utilised to enforce the analysis of vads, which names (paths of mapped dlls / exes) contain System32 or SysWOW64
+    bool hyperbee_analyse_system_dll_vad;
+    //By default we assume everything to be malware. If this flag is enabled we assume all analysed memory areas to be goodware instead. This flag should be just set if a classifier is integrated.
+    bool hyperbee_default_benign;
 };
 
-typedef enum drakvuf_plugin
+class hyperbee : public pluginex
 {
-    PLUGIN_SYSCALLS,
-    PLUGIN_POOLMON,
-    PLUGIN_FILETRACER,
-    PLUGIN_FILEDELETE,
-    PLUGIN_OBJMON,
-    PLUGIN_EXMON,
-    PLUGIN_SSDTMON,
-    PLUGIN_DEBUGMON,
-    PLUGIN_DELAYMON,
-    PLUGIN_CPUIDMON,
-    PLUGIN_SOCKETMON,
-    PLUGIN_REGMON,
-    PLUGIN_PROCMON,
-    PLUGIN_BSODMON,
-    PLUGIN_ENVMON,
-    PLUGIN_CRASHMON,
-    PLUGIN_CLIPBOARDMON,
-    PLUGIN_WINDOWMON,
-    PLUGIN_LIBRARYMON,
-    PLUGIN_DKOMMON,
-    PLUGIN_WMIMON,
-    PLUGIN_MEMDUMP,
-    PLUGIN_APIMON,
-    PLUGIN_PROCDUMP,
-    PLUGIN_RPCMON,
-    PLUGIN_TLSMON,
-    PLUGIN_HYPERBEE,
-    __DRAKVUF_PLUGIN_LIST_MAX
-} drakvuf_plugin_t;
-
-static const char* drakvuf_plugin_names[] =
-{
-    [PLUGIN_SYSCALLS] = "syscalls",
-    [PLUGIN_POOLMON] = "poolmon",
-    [PLUGIN_FILETRACER] = "filetracer",
-    [PLUGIN_FILEDELETE] = "filedelete",
-    [PLUGIN_OBJMON] = "objmon",
-    [PLUGIN_EXMON] = "exmon",
-    [PLUGIN_SSDTMON] = "ssdtmon",
-    [PLUGIN_DEBUGMON] = "debugmon",
-    [PLUGIN_DELAYMON] = "delaymon",
-    [PLUGIN_CPUIDMON] = "cpuidmon",
-    [PLUGIN_SOCKETMON] = "socketmon",
-    [PLUGIN_REGMON] = "regmon",
-    [PLUGIN_PROCMON] = "procmon",
-    [PLUGIN_BSODMON] = "bsodmon",
-    [PLUGIN_ENVMON] = "envmon",
-    [PLUGIN_CRASHMON] = "crashmon",
-    [PLUGIN_CLIPBOARDMON] = "clipboardmon",
-    [PLUGIN_WINDOWMON] = "windowmon",
-    [PLUGIN_LIBRARYMON] = "librarymon",
-    [PLUGIN_DKOMMON] = "dkommon",
-    [PLUGIN_WMIMON] = "wmimon",
-    [PLUGIN_MEMDUMP] = "memdump",
-    [PLUGIN_APIMON] = "apimon",
-    [PLUGIN_PROCDUMP] = "procdump",
-    [PLUGIN_RPCMON] = "rpcmon",
-    [PLUGIN_TLSMON] = "tlsmon",
-    [PLUGIN_HYPERBEE] = "hyperbee",
-};
-
-static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
-{
-    [PLUGIN_SYSCALLS]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_POOLMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_FILETRACER]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_FILEDELETE]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_OBJMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_EXMON]        = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_SSDTMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_DEBUGMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_DELAYMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_CPUIDMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
-    [PLUGIN_SOCKETMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_REGMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_PROCMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_BSODMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_ENVMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_CRASHMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_CLIPBOARDMON] = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_WINDOWMON]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_LIBRARYMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_DKOMMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_WMIMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_MEMDUMP]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_APIMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_PROCDUMP]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_RPCMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_TLSMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_HYPERBEE]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-};
-
-class plugin
-{
-public:
-    virtual ~plugin() = default;
-
-    virtual bool stop()
-    {
-        m_is_stopping = true;
-        return true;
-    }
-
-    virtual bool is_stopping()
-    {
-        return m_is_stopping;
-    }
-
-protected:
-    bool m_is_stopping = false;
-};
-
-class drakvuf_plugins
-{
-private:
-    drakvuf_t drakvuf;
-    output_format_t output;
-    os_t os;
-    std::array<std::unique_ptr<plugin>, __DRAKVUF_PLUGIN_LIST_MAX> plugins;
 
 public:
-    drakvuf_plugins(drakvuf_t drakvuf, output_format_t output, os_t os);
-    int start(drakvuf_plugin_t plugin, const plugins_options* config);
-    int stop(drakvuf_plugin_t plugin);
-    bool is_stopped(drakvuf_plugin_t plugin);
-};
+    //See hyperbee_config_struct
+    std::filesystem::path dump_dir;
+    const char* filter_executable = "";
 
-/***************************************************************************/
+    //a temporary  dump file
+    char* tmp_file_path = nullptr;
 
-struct vmi_lock_guard
-{
-    vmi_lock_guard(drakvuf_t drakvuf_) : drakvuf(drakvuf_), vmi()
-    {
-        lock();
-    }
+    //Counts how often an actual dump occured
+    unsigned int dump_id = 0;
 
-    vmi_instance_t lock()
-    {
-        if (!vmi)
-            vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    //Set to store all traps so they can be deleted in the end
+    std::set<drakvuf_trap*> traps;
 
-        return vmi;
-    }
+    //Keeps track of monitored pages. Prevents duplicate traps.
+    std::set<std::pair<addr_t, addr_t>> monitored_pages;
 
-    bool unlock()
-    {
-        if (vmi)
-        {
-            drakvuf_release_vmi(drakvuf);
-            vmi = nullptr;
-            return true;
-        }
-        return false;
+    //Keeps track of the data which was already dumped, used to prevent duplicate dump files.
+    // Uses the hash as key and the dumped file stem (without extension) as value.
+    std::unordered_map<std::string, std::string> dumped_memory_map;
 
-    }
+    hyperbee(drakvuf_t drakvuf, const hyperbee_config_struct* config, output_format_t output);
 
-    bool is_lock() const
-    {
-        return vmi == nullptr ? true : false;
-    }
-
-    operator vmi_instance_t() const
-    {
-        return vmi;
-    }
-
-    ~vmi_lock_guard()
-    {
-        unlock();
-    }
-
-    drakvuf_t drakvuf;
-    vmi_instance_t vmi;
+    ~hyperbee();
 };
 
 #endif
