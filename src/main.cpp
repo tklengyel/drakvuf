@@ -124,18 +124,18 @@ void close_handler(int signal)
     drakvuf->interrupt(signal);
 }
 
-static inline int disable_plugin(char* optarg, bool* plugin_list)
+static inline bool disable_plugin(char* optarg, bool* plugin_list)
 {
     for (int i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
     {
         if (!strcmp(optarg, drakvuf_plugin_names[i]))
         {
             plugin_list[i] = false;
-            return 0;
+            return true;
         }
     }
 
-    return -1;
+    return false;
 }
 
 static inline void disable_all_plugins(bool* plugin_list)
@@ -144,7 +144,7 @@ static inline void disable_all_plugins(bool* plugin_list)
         plugin_list[i] = false;
 }
 
-static inline int enable_plugin(char* optarg, bool* plugin_list, bool* disabled_all)
+static inline bool enable_plugin(char* optarg, bool* plugin_list, bool* disabled_all)
 {
     if (!*disabled_all)
     {
@@ -156,10 +156,10 @@ static inline int enable_plugin(char* optarg, bool* plugin_list, bool* disabled_
         if (!strcmp(optarg, drakvuf_plugin_names[i]))
         {
             plugin_list[i] = true;
-            return 0;
+            return true;
         }
     }
-    return -1;
+    return false;
 }
 
 static void print_usage()
@@ -457,7 +457,7 @@ int main(int argc, char** argv)
                     output = OUTPUT_JSON;
                 break;
             case 'x':
-                if (disable_plugin(optarg, plugin_list) != 0)
+                if (!disable_plugin(optarg, plugin_list))
                 {
                     fprintf(stderr, "Unknown plugin: %s\n", optarg);
                     return drakvuf_exit_code_t::FAIL;
@@ -467,7 +467,7 @@ int main(int argc, char** argv)
                 wait_stop_plugins = atoi(optarg);
                 break;
             case 'a':
-                if (enable_plugin(optarg, plugin_list, &disabled_all) != 0)
+                if (!enable_plugin(optarg, plugin_list, &disabled_all))
                 {
                     fprintf(stderr, "Unknown plugin: %s\n", optarg);
                     return drakvuf_exit_code_t::FAIL;
