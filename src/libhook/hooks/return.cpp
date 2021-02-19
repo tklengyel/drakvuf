@@ -108,7 +108,8 @@ using namespace libhook;
 
 return_hook::return_hook(drakvuf_t drakvuf, cb_wrapper_t cb)
     : base_hook(drakvuf),
-      callback_(cb)
+      callback_(cb),
+      trap_(new drakvuf_trap_t)
 {}
 
 return_hook::~return_hook()

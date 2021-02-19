@@ -167,13 +167,11 @@ auto return_hook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_
     PRINT_DEBUG("[LIBHOOK] creating return hook\n");
 
     auto hook = std::unique_ptr<return_hook>(new return_hook(drakvuf, cb));
-    hook->trap_ = new drakvuf_trap_t;
 
     auto ret_addr = drakvuf_get_function_return_address(drakvuf, info);
     if (!ret_addr)
     {
         PRINT_DEBUG("[LIBHOOK] Failed to receive return addr of function\n");
-        delete hook->trap_;
         return std::unique_ptr<return_hook>();
     }
 
@@ -202,8 +200,10 @@ auto return_hook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_
     if (!drakvuf_add_trap(drakvuf, hook->trap_))
     {
         PRINT_DEBUG("[LIBHOOK] failed to create trap for return hook\n");
-        delete static_cast<CallResult*>(hook->trap_->data);
-        delete hook->trap_;
+
+        hook->trap_->data = nullptr;
+        delete params;
+
         return std::unique_ptr<return_hook>();
     }
 
