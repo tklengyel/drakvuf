@@ -124,6 +124,26 @@ CXXFLAGS="-std=gnu++17"
 AC_LANG_PUSH([C++])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [[bool test[2] = { [1] = 1, [0] = 0 };]])], [],
     [AC_ERROR(Your C++ compiler ($CXX) is not supported. Please use clang++ (clang-9 or clang-10)!)])
+
+#Check requirement of lstdc++fs
+STDCPPFSLIB=""
+AC_CHECK_HEADERS([filesystem])
+AC_LINK_IFELSE(
+    [AC_LANG_SOURCE([
+        #if HAVE_FILESYSTEM
+        #include <filesystem>
+        #endif
+
+        int main() {
+            std::error_code ec;
+            std::filesystem::create_directory("/dev/null", &ec);
+        }
+    ])], [],
+    [STDCPPFSLIB="-lstdc++fs"]
+)
+AC_SUBST([STDCPPFSLIB])
+#end requirement check
+
 AC_LANG_POP([C++])
 
 ######################################################
@@ -386,6 +406,16 @@ AC_ARG_ENABLE([plugin_tlsmon],
 AM_CONDITIONAL([PLUGIN_TLSMON], [test x$plugin_tlsmon = xyes])
 if test x$plugin_tlsmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_TLSMON, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_hyperbee],
+  [AS_HELP_STRING([--disable-plugin-hyperbee],
+    [Enable the hyperbee plugin @<:@yes@:>@])],
+  [plugin_hyperbee="$enableval"],
+  [plugin_hyperbee="yes"])
+AM_CONDITIONAL([PLUGIN_HYPERBEE], [test x$plugin_hyperbee = xyes])
+if test x$plugin_hyperbee = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_HYPERBEE, 1, "")
 fi
 
 #####################################################
@@ -663,6 +693,7 @@ ProcDump:     $plugin_procdump
 APIMon:       $plugin_apimon
 RPCMon:       $plugin_rpcmon
 TLSMon:       $plugin_tlsmon
+Hyperbee:     $plugin_hyperbee
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:       $plugin_wmimon
