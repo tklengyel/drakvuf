@@ -143,6 +143,7 @@ struct plugins_options
     bool memdump_disable_terminate_proc;// PLUGIN_MEMDUMP
     bool memdump_disable_create_thread; // PLUGIN_MEMDUMP
     bool memdump_disable_set_thread;    // PLUGIN_MEMDUMP
+    bool memdump_disable_mmaccessfault; // PLUGIN_MEMDUMP
     const char* dll_hooks_list;         // PLUGIN_MEMDUMP, PLUGIN_APIMON
     bool userhook_no_addr;              // PLUGIN_MEMDUMP, PLUGIN_APIMON
     const char* procdump_dir;           // PLUGIN_PROCDUMP

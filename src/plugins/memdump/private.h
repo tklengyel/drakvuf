@@ -192,6 +192,19 @@ sptr_type_t check_module_linked(drakvuf_t drakvuf,
                                 drakvuf_trap_info_t* info,
                                 addr_t dll_base);
 
+struct page_fault_call_result_t : call_result_t
+{
+    page_fault_call_result_t() : call_result_t(), vaddr() {}
+    addr_t vaddr;
+};
+
+typedef struct exec_fault_data_t
+{
+    memdump* plugin;
+    addr_t   vaddr;
+    addr_t   oep;
+} exec_fault_data;
+
 bool dump_memory_region(
     drakvuf_t drakvuf,
     vmi_instance_t vmi,

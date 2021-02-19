@@ -910,6 +910,133 @@ bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     return true;
 }
 
+// https://www.triplefault.io/2017/08/exploring-windows-virtual-memory.html
+static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto data = static_cast<exec_fault_data_t*>(info->trap->data);
+    auto vmi = vmi_lock_guard(drakvuf);
+    mmvad_info_t mmvad;
+    if (drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, data->vaddr, &mmvad))
+    {
+        uint64_t width(0);
+        auto dll_name = drakvuf_read_unicode_va(vmi, mmvad.file_name_ptr, 0);
+        auto vad_commit_charge = drakvuf_mmvad_commit_charge(drakvuf, &mmvad, &width);
+        page_info_t p_info = {};
+        if (VMI_SUCCESS != vmi_pagetable_lookup_extended(vmi, info->regs->cr3, data->vaddr, &p_info))
+            return false;
+
+        auto page_valid   = (p_info.x86_ia32e.pte_value & (1UL << 0)) != 0;
+        auto page_execute = (p_info.x86_ia32e.pte_value & (1UL << 63)) == 0;
+        if (dll_name == nullptr && vad_commit_charge && page_valid && page_execute)
+        {
+            /**
+            * The range of addresses supported by a given VAD entry are stored as
+            * virtual page numbers - similar to a PFN, but simply in virtual memory.
+            * This means that an entry representing a starting VPN of 0x7f
+            * and an ending VPN of 0x8f would actually be representing virtual memory
+            * from address 0x00000000`0007f000 to 0x00000000`0008ffff.
+            */
+            addr_t start_va  = mmvad.starting_vpn * VMI_PS_4KB;
+            addr_t end_va    = (mmvad.ending_vpn + 1) * VMI_PS_4KB;
+            size_t dump_size = end_va - start_va;
+            // Dump everything that less than 32 MB
+            if (dump_size < VMI_PS_4KB * VMI_PS_4KB * 2)
+            {
+                auto p = std::make_pair(info->regs->cr3, start_va);
+                // Already dumped?
+                if (data->plugin->dumped_va.find(p) == data->plugin->dumped_va.end())
+                {
+                    data->plugin->dumped_va.emplace(p);
+                    access_context_t ctx
+                    {
+                        .translate_mechanism = VMI_TM_PROCESS_DTB,
+                        .dtb = info->regs->cr3,
+                        .addr = start_va
+                    };
+                    PRINT_DEBUG("[MEMDUMP] Dumping 0x%lx bytes starting at 0x%08lx OEP: 0x%lx\n", dump_size, start_va, data->oep);
+                    dump_memory_region(drakvuf, vmi, info, data->plugin, &ctx, dump_size, "Executing anonymous VAD", nullptr, false);
+                }
+            }
+        }
+        else
+            vmi_free_unicode_str(dll_name);
+    }
+    drakvuf_remove_trap(drakvuf, info->trap, [] (drakvuf_trap_t* trap)
+    {
+        delete static_cast<exec_fault_data_t*>(trap->data);
+    });
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t page_fault_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin = get_trap_plugin<memdump>(info);
+    auto params = get_trap_params<page_fault_call_result_t>(info);
+    if (!plugin || !params->verify_result_call_params(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+    page_info_t page = {};
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+        if (VMI_SUCCESS != vmi_pagetable_lookup_extended(vmi, info->regs->cr3, params->vaddr, &page))
+            return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    auto trap = new drakvuf_trap_t;
+    auto data = new exec_fault_data_t;
+    if (!trap || !data)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    data->plugin = plugin;
+    data->vaddr  = (params->vaddr >> 12) << 12;
+    data->oep    = params->vaddr;
+
+    trap->type = MEMACCESS;
+    trap->memaccess.gfn = page.paddr >> 12;
+    trap->memaccess.type = PRE;
+    trap->memaccess.access = VMI_MEMACCESS_X;
+    trap->data = static_cast<void*>(data);
+    trap->cb = execute_faulted_cb;
+    trap->name = "MmAccessFault";
+
+    if (!drakvuf_add_trap(drakvuf, trap))
+        delete trap;
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t page_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    /*
+        NTSTATUS
+        MmAccessFault(
+        IN  ULONG_PTR FaultStatus,
+        IN  PVOID VirtualAddress,
+        IN  KPROCESSOR_MODE PreviousMode,
+        IN  PVOID TrapInformation
+        );
+    */
+    addr_t vaddr = drakvuf_get_function_argument(drakvuf, info, 2);
+    // Upper bits -> kernel memory (not interested)
+    if (vaddr & (1UL << 63))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    auto plugin = get_trap_plugin<memdump>(info);
+
+    auto trap = plugin->register_trap<page_fault_call_result_t>(
+                    info,
+                    page_fault_return_hook_cb,
+                    breakpoint_by_pid_searcher());
+
+    if (!trap)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    auto params = get_trap_params<page_fault_call_result_t>(trap);
+    params->set_result_call_params(info);
+    params->vaddr = vaddr;
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t output)
     : pluginex(drakvuf, output)
     , dumps_count()
@@ -963,6 +1090,9 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
             throw -1;
     if (!c->memdump_disable_create_thread)
         if (!register_trap(nullptr, create_remote_thread_hook_cb,   bp.for_syscall_name("NtCreateThreadEx")))
+            throw -1;
+    if (!c->memdump_disable_mmaccessfault)
+        if (!register_trap(nullptr, page_fault_hook_cb,             bp.for_syscall_name("MmAccessFault")))
             throw -1;
     if (!c->memdump_disable_set_thread)
         if (json_wow && !register_trap(nullptr, set_information_thread_hook_cb, bp.for_syscall_name("NtSetInformationThread")))
