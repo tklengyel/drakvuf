@@ -123,22 +123,22 @@ using vads_t = std::map<addr_t, vad_info_t>;
 
 struct procdump_ctx
 {
-    vmi_pid_t pid;
-    vmi_pid_t ppid;
-    uint32_t tid;
-    addr_t target_rsp;
+    vmi_pid_t pid = 0;
+    vmi_pid_t ppid = 0;
+    uint32_t tid = 0;
+    addr_t target_rsp = 0;
     string name;
-    procdump* plugin;
-    drakvuf_trap_t* bp;
-    drakvuf_trap_t* bp2;
+    procdump* plugin = nullptr;
+    drakvuf_trap_t* bp = nullptr;
+    drakvuf_trap_t* bp2 = nullptr;
     vads_t vads;
     vads_t dlls;
     x86_registers_t saved_regs;
-    uint64_t idx;
-    addr_t pool;
+    uint64_t idx = 0;
+    addr_t pool = 0;
     const uint64_t POOL_SIZE_IN_PAGES = 0x400;
-    size_t size;
-    size_t current_dump_size;
+    size_t size = 0;
+    size_t current_dump_size = 0;
     string data_file_name;
     std::unique_ptr<ProcdumpWriter> writer;
 };
