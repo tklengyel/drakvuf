@@ -241,6 +241,18 @@ static void print_usage()
             "\t                           The JSON profile for clr.dll\n"
             "\t --json-mscorwks <path to json>\n"
             "\t                           The JSON profile for mscorewks.dll\n"
+            "\t --memdump-disable-free-vm\n"
+            "\t                           Disable hook on NtFreeVirtualMemory\n"
+            "\t --memdump-disable-protect-vm\n"
+            "\t                           Disable hook on NtProtectVirtualMemory\n"
+            "\t --memdump-disable-write-vm\n"
+            "\t                           Disable hook on NtWriteVirtualMemory\n"
+            "\t --memdump-disable-terminate-proc\n"
+            "\t                           Disable hook on NtTerminateProcess\n"
+            "\t --memdump-disable-create-thread\n"
+            "\t                           Disable hook on NtCreateThreadEx\n"
+            "\t --memdump-disable-set-thread\n"
+            "\t                           Disable hook on NtSetInformationThread\n"
 #endif
 #if defined(ENABLE_PLUGIN_MEMDUMP) || defined(ENABLE_PLUGIN_APIMON)
             "\t --dll-hooks-list <file>\n"
@@ -333,6 +345,12 @@ int main(int argc, char** argv)
         opt_json_wow_ole32,
         opt_json_combase,
         opt_memdump_dir,
+        opt_memdump_disable_free_vm,
+        opt_memdump_disable_protect_vm,
+        opt_memdump_disable_write_vm,
+        opt_memdump_disable_terminate_proc,
+        opt_memdump_disable_create_thread,
+        opt_memdump_disable_set_thread,
         opt_dll_hooks_list,
         opt_procdump_dir,
         opt_compress_procdumps,
@@ -373,6 +391,12 @@ int main(int argc, char** argv)
         {"json-wow-ole32", required_argument, NULL, opt_json_wow_ole32},
         {"json-combase", required_argument, NULL, opt_json_combase},
         {"memdump-dir", required_argument, NULL, opt_memdump_dir},
+        {"memdump-disable-free-vm", no_argument, NULL, opt_memdump_disable_free_vm},
+        {"memdump-disable-protect-vm", no_argument, NULL, opt_memdump_disable_protect_vm},
+        {"memdump-disable-write-vm", no_argument, NULL, opt_memdump_disable_write_vm},
+        {"memdump-disable-terminate-proc", no_argument, NULL, opt_memdump_disable_terminate_proc},
+        {"memdump-disable-create-thread", no_argument, NULL, opt_memdump_disable_create_thread},
+        {"memdump-disable-set-thread", no_argument, NULL, opt_memdump_disable_set_thread},
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
@@ -582,6 +606,24 @@ int main(int argc, char** argv)
                 break;
             case opt_json_mscorwks:
                 options.mscorwks_profile = optarg;
+                break;
+            case opt_memdump_disable_free_vm:
+                options.memdump_disable_free_vm = true;
+                break;
+            case opt_memdump_disable_protect_vm:
+                options.memdump_disable_protect_vm = true;
+                break;
+            case opt_memdump_disable_write_vm:
+                options.memdump_disable_write_vm = true;
+                break;
+            case opt_memdump_disable_terminate_proc:
+                options.memdump_disable_terminate_proc = true;
+                break;
+            case opt_memdump_disable_create_thread:
+                options.memdump_disable_create_thread = true;
+                break;
+            case opt_memdump_disable_set_thread:
+                options.memdump_disable_set_thread = true;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP

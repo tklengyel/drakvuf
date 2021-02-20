@@ -322,6 +322,12 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     memdump_config config =
                     {
                         .memdump_dir = options->memdump_dir,
+                        .memdump_disable_free_vm = options->memdump_disable_free_vm,
+                        .memdump_disable_protect_vm = options->memdump_disable_protect_vm,
+                        .memdump_disable_write_vm = options->memdump_disable_write_vm,
+                        .memdump_disable_terminate_proc = options->memdump_disable_terminate_proc,
+                        .memdump_disable_create_thread = options->memdump_disable_create_thread,
+                        .memdump_disable_set_thread = options->memdump_disable_set_thread,
                         .dll_hooks_list = options->dll_hooks_list,
                         .clr_profile = options->clr_profile,
                         .mscorwks_profile = options->mscorwks_profile,
