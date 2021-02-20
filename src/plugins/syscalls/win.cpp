@@ -266,7 +266,10 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
 
     int32_t* table = (int32_t*)g_try_malloc0(sst[1] * sizeof(int32_t));
     if ( !table )
+    {
+        drakvuf_free_symbols(symbols);
         return ret;
+    }
 
     access_context_t ctx = {};
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -274,6 +277,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
     ctx.addr = sst[0];
     if ( VMI_FAILURE == vmi_read(vmi, &ctx, sst[1] * sizeof(uint32_t), table, NULL) )
     {
+        drakvuf_free_symbols(symbols);
         g_free(table);
         return ret;
     }
