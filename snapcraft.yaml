@@ -5,7 +5,7 @@ description: |
     DRAKVUF Black-box binary analysis
 
 grade: devel
-confinement: classic
+confinement: devmode
 architectures: [amd64]
 base: core20
 
