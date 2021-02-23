@@ -129,7 +129,7 @@ typedef struct xen_interface
 typedef struct ipt_state
 {
     uint8_t* buf;
-    uint64_t size;
+    size_t size;
 
     uint64_t offset;
     uint64_t last_offset;
