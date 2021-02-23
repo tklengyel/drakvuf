@@ -334,7 +334,7 @@ bool xen_set_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vc
 #ifdef ENABLE_IPT
 int xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state)
 {
-    int rc = xc_vmtrace_pt_enable(xen->xc, domID, vcpu);
+    int rc = xc_vmtrace_reset_and_enable(xen->xc, domID, vcpu);
 
     if (rc)
     {
@@ -342,8 +342,8 @@ int xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_s
         return 0;
     }
 
-    rc = xc_vmtrace_pt_get_offset(xen->xc, domID, vcpu, NULL, &ipt_state->size);
-
+    rc = xenforeignmemory_resource_size(
+             xen->fmem, domID, XENMEM_resource_vmtrace_buf, vcpu, &ipt_state->size);
     if (rc)
     {
         fprintf(stderr, "Failed to get trace buffer size\n");
@@ -372,7 +372,7 @@ int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, i
     uint64_t offset;
     int rc;
 
-    rc = xc_vmtrace_pt_get_offset(xen->xc, domID, vcpu, &offset, NULL);
+    rc = xc_vmtrace_output_position(xen->xc, domID, vcpu, &offset);
 
     if (rc == ENODATA)
     {
@@ -388,6 +388,24 @@ int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, i
 
     ipt_state->last_offset = ipt_state->offset;
     ipt_state->offset = offset;
+    return 1;
+}
+
+int xen_set_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t value)
+{
+    if (xc_vmtrace_set_option(xen->xc, domID, vcpu, key, value))
+    {
+        return 0;
+    }
+    return 1;
+}
+
+int xen_get_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t* value)
+{
+    if (xc_vmtrace_get_option(xen->xc, domID, vcpu, key, value))
+    {
+        return 0;
+    }
     return 1;
 }
 
@@ -409,7 +427,7 @@ int xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_
         return 0;
     }
 
-    rc = xc_vmtrace_pt_disable(xen->xc, domID, vcpu);
+    rc = xc_vmtrace_disable(xen->xc, domID, vcpu);
 
     if (rc)
     {
@@ -435,6 +453,26 @@ int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, i
     UNUSED(domID);
     UNUSED(vcpu);
     UNUSED(ipt_state);
+    return 0;
+}
+
+int xen_get_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t value)
+{
+    UNUSED(xen);
+    UNUSED(domID);
+    UNUSED(vcpu);
+    UNUSED(key);
+    UNUSED(value);
+    return 0;
+}
+
+int xen_get_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t* value)
+{
+    UNUSED(xen);
+    UNUSED(domID);
+    UNUSED(vcpu);
+    UNUSED(key);
+    UNUSED(value);
     return 0;
 }
 
