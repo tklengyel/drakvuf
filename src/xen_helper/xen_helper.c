@@ -456,7 +456,7 @@ int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, i
     return 0;
 }
 
-int xen_get_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t value)
+int xen_set_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t value)
 {
     UNUSED(xen);
     UNUSED(domID);
