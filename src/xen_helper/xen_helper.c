@@ -382,13 +382,13 @@ bool xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, 
 
     if (rc == ENODATA)
     {
-        fprintf(stderr, "xc_vmtrace_pt_get_offset returned ENODATA\n");
+        fprintf(stderr, "xc_vmtrace_output_position returned ENODATA\n");
         ipt_state->last_offset = ipt_state->offset;
         return true;
     }
     else if (rc)
     {
-        fprintf(stderr, "Failed to call xc_vmtrace_pt_get_offset: %d\n", rc);
+        fprintf(stderr, "xc_vmtrace_output_position failed: %d\n", rc);
         return false;
     }
 
@@ -421,7 +421,7 @@ bool xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt
 
     if (rc)
     {
-        fprintf(stderr, "Failed to close fmem\n");
+        fprintf(stderr, "Failed to close foreign memory\n");
         return false;
     }
 
@@ -429,7 +429,7 @@ bool xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt
 
     if (rc)
     {
-        fprintf(stderr, "Failed to call xc_vmtrace_pt_disable\n");
+        fprintf(stderr, "Failed to disable tracing\n");
         return false;
     }
 
