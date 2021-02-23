@@ -109,6 +109,7 @@
 #define XC_WANT_COMPAT_EVTCHN_API 1
 #define XC_WANT_COMPAT_MAP_FOREIGN_API 1
 
+#include <stdbool.h>
 #include <libxl_utils.h>
 #include <xenctrl.h>
 #include <xenforeignmemory.h>
@@ -154,9 +155,9 @@ int xen_version(void);
 bool xen_get_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* regs);
 bool xen_set_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* regs);
 
-int xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
-int xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
-int xen_set_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t value);
-int xen_get_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t* value);
-int xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
+bool xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
+bool xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
+bool xen_set_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t value);
+bool xen_get_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t* value);
+bool xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
 #endif
