@@ -728,8 +728,10 @@ static void print_injection_info(output_format_t format, const char* file, injec
 
     for (int i=0; i<injector->args_count; i++)
     {
-        arguments = g_strconcat(arguments, injector->args[i], NULL);
-        arguments = g_strconcat(arguments, " ", NULL);
+        char* tmp = g_strconcat(arguments, injector->args[i], " ", NULL);
+        arguments = i ? arguments : NULL;
+        g_free(arguments);
+        arguments = tmp;
     }
 
     switch (injector->result)
