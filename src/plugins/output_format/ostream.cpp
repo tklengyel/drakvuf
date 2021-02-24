@@ -115,7 +115,7 @@ namespace fmt
 class StrBuf : public std::stringbuf
 {
 public:
-    StrBuf() : std::stringbuf(std::ios_base::out) {}
+    StrBuf() : std::stringbuf(std::ios_base::out), stdout_is_tty_(isatty(STDOUT_FILENO)) {}
     ~StrBuf()
     {
         sync(0);
@@ -124,7 +124,9 @@ public:
 protected:
     int sync() final
     {
-        return sync(4 * 1024);
+        // Disable buffering when printing on tty
+        const int threshold = stdout_is_tty_ ? 0 : 4 * 1024;
+        return sync(threshold);
     }
 
     int sync(int threshold)
@@ -150,6 +152,8 @@ protected:
         seekpos(0);
         return 0;
     }
+
+    bool stdout_is_tty_;
 };
 
 static StrBuf outbuf;
