@@ -417,14 +417,6 @@ bool xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt
         return false;
     }
 
-    rc = xenforeignmemory_close(xen->fmem);
-
-    if (rc)
-    {
-        fprintf(stderr, "Failed to close foreign memory\n");
-        return false;
-    }
-
     rc = xc_vmtrace_disable(xen->xc, domID, vcpu);
 
     if (rc)
