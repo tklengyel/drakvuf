@@ -1240,9 +1240,9 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
  * This is the constructor of the plugin.
  */
 hypermonitor::hypermonitor(drakvuf_t
-                   drakvuf,
-                   const hypermonitor_config_struct* c, output_format_t
-                   output)
+                           drakvuf,
+                           const hypermonitor_config_struct* c, output_format_t
+                           output)
     : pluginex(drakvuf, output)
 {
 
