@@ -276,10 +276,10 @@ sources += tlsmon/tlsmon.h
 sources += tlsmon/private.h
 endif
 
-if PLUGIN_HYPERBEE
-sources += hyperbee/hyperbee.cpp
-sources += hyperbee/hyperbee.h
-sources += hyperbee/private.h
+if PLUGIN_HYPERMONITOR
+sources += hypermonitor/hypermonitor.cpp
+sources += hypermonitor/hypermonitor.h
+sources += hypermonitor/private.h
 endif
 
 ###############################################################################

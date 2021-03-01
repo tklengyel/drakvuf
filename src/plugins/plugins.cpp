@@ -130,7 +130,7 @@
 #include "procdump/procdump.h"
 #include "rpcmon/rpcmon.h"
 #include "tlsmon/tlsmon.h"
-#include "hyperbee/hyperbee.h"
+#include "hypermonitor/hypermonitor.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -377,19 +377,19 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     break;
                 }
 #endif
-#ifdef ENABLE_PLUGIN_HYPERBEE
-                case PLUGIN_HYPERBEE:
+#ifdef ENABLE_PLUGIN_HYPERMONITOR
+                case PLUGIN_HYPERMONITOR:
                 {
-                    hyperbee_config_struct config =
+                    hypermonitor_config_struct config =
                     {
-                        .hyperbee_dump_dir = options->hyperbee_dump_dir,
-                        .hyperbee_filter_executable = options->hyperbee_filter_executable,
-                        .hyperbee_log_everything = options->hyperbee_log_everything,
-                        .hyperbee_dump_vad = options->hyperbee_dump_vad,
-                        .hyperbee_analyse_system_dll_vad = options->hyperbee_analyse_system_dll_vad,
-                        .hyperbee_default_benign = options->hyperbee_default_benign,
+                        .hypermonitor_dump_dir = options->hypermonitor_dump_dir,
+                        .hypermonitor_filter_executable = options->hypermonitor_filter_executable,
+                        .hypermonitor_log_everything = options->hypermonitor_log_everything,
+                        .hypermonitor_dump_vad = options->hypermonitor_dump_vad,
+                        .hypermonitor_analyse_system_dll_vad = options->hypermonitor_analyse_system_dll_vad,
+                        .hypermonitor_default_benign = options->hypermonitor_default_benign,
                     };
-                    this->plugins[plugin_id] = std::make_unique<hyperbee>(this->drakvuf, &config, this->output);
+                    this->plugins[plugin_id] = std::make_unique<hypermonitor>(this->drakvuf, &config, this->output);
                 }
 #endif
                 case __DRAKVUF_PLUGIN_LIST_MAX: /* fall-through */

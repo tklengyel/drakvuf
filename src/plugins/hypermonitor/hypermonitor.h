@@ -102,8 +102,8 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef HYPERBEE_H
-#define HYPERBEE_H
+#ifndef HYPERMONITOR_H
+#define HYPERMONITOR_H
 
 #include <vector>
 #include <memory>
@@ -114,27 +114,27 @@
 #include "plugins/plugins_ex.h"
 
 //Struct to pass the parameters
-struct hyperbee_config_struct
+struct hypermonitor_config_struct
 {
     //Dir to save extracted frames to
-    const char* hyperbee_dump_dir;
+    const char* hypermonitor_dump_dir;
     //Executable to filter
-    const char* hyperbee_filter_executable;
+    const char* hypermonitor_filter_executable;
     //Enables logging (to shell) of pagefaults and writefaults. Additionally, logs of analysed pages can be printed regardless if malware was detected or not.
-    bool hyperbee_log_everything;
+    bool hypermonitor_log_everything;
     //By default only page sized areas are dumped. By setting this flag whole VAD nodes can be dumped instead.
-    bool hyperbee_dump_vad;
+    bool hypermonitor_dump_vad;
     //Can be utilised to enforce the analysis of vads, which names (paths of mapped dlls / exes) contain System32 or SysWOW64
-    bool hyperbee_analyse_system_dll_vad;
+    bool hypermonitor_analyse_system_dll_vad;
     //By default we assume everything to be malware. If this flag is enabled we assume all analysed memory areas to be goodware instead. This flag should be just set if a classifier is integrated.
-    bool hyperbee_default_benign;
+    bool hypermonitor_default_benign;
 };
 
-class hyperbee : public pluginex
+class hypermonitor : public pluginex
 {
 
 public:
-    //See hyperbee_config_struct
+    //See hypermonitor_config_struct
     std::filesystem::path dump_dir;
     const char* filter_executable = "";
 
@@ -154,9 +154,9 @@ public:
     // Uses the hash as key and the dumped file stem (without extension) as value.
     std::unordered_map<std::string, std::string> dumped_memory_map;
 
-    hyperbee(drakvuf_t drakvuf, const hyperbee_config_struct* config, output_format_t output);
+    hypermonitor(drakvuf_t drakvuf, const hypermonitor_config_struct* config, output_format_t output);
 
-    ~hyperbee();
+    ~hypermonitor();
 };
 
 #endif

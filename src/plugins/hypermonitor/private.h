@@ -102,8 +102,8 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef SRC_PLUGINS_HYPERBEE_PRIVATE_H_
-#define SRC_PLUGINS_HYPERBEE_PRIVATE_H_
+#ifndef SRC_PLUGINS_HYPERMONITOR_PRIVATE_H_
+#define SRC_PLUGINS_HYPERMONITOR_PRIVATE_H_
 
 /**
  * Saves a pointer to the plugin and the starting virtual address of the frame.
@@ -111,7 +111,7 @@
  */
 struct fault_data_struct
 {
-    hyperbee* plugin;
+    hypermonitor* plugin;
     addr_t page_va;
 };
 
@@ -163,4 +163,4 @@ drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data_ol
  */
 drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* trap_info, fault_data_struct* fault_data_old);
 
-#endif //SRC_PLUGINS_HYPERBEE_PRIVATE_H_
+#endif //SRC_PLUGINS_HYPERMONITOR_PRIVATE_H_
