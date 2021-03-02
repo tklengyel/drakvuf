@@ -130,7 +130,7 @@
 #include "procdump/procdump.h"
 #include "rpcmon/rpcmon.h"
 #include "tlsmon/tlsmon.h"
-#include "hypermonitor/hypermonitor.h"
+#include "codemon/codemon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -377,19 +377,19 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     break;
                 }
 #endif
-#ifdef ENABLE_PLUGIN_HYPERMONITOR
-                case PLUGIN_HYPERMONITOR:
+#ifdef ENABLE_PLUGIN_CODEMON
+                case PLUGIN_CODEMON:
                 {
-                    hypermonitor_config_struct config =
+                    codemon_config_struct config =
                     {
-                        .hypermonitor_dump_dir = options->hypermonitor_dump_dir,
-                        .hypermonitor_filter_executable = options->hypermonitor_filter_executable,
-                        .hypermonitor_log_everything = options->hypermonitor_log_everything,
-                        .hypermonitor_dump_vad = options->hypermonitor_dump_vad,
-                        .hypermonitor_analyse_system_dll_vad = options->hypermonitor_analyse_system_dll_vad,
-                        .hypermonitor_default_benign = options->hypermonitor_default_benign,
+                        .codemon_dump_dir = options->codemon_dump_dir,
+                        .codemon_filter_executable = options->codemon_filter_executable,
+                        .codemon_log_everything = options->codemon_log_everything,
+                        .codemon_dump_vad = options->codemon_dump_vad,
+                        .codemon_analyse_system_dll_vad = options->codemon_analyse_system_dll_vad,
+                        .codemon_default_benign = options->codemon_default_benign,
                     };
-                    this->plugins[plugin_id] = std::make_unique<hypermonitor>(this->drakvuf, &config, this->output);
+                    this->plugins[plugin_id] = std::make_unique<codemon>(this->drakvuf, &config, this->output);
                 }
 #endif
                 case __DRAKVUF_PLUGIN_LIST_MAX: /* fall-through */

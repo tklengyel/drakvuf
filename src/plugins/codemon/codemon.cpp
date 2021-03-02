@@ -104,9 +104,11 @@
  * This plugin is part of the master's thesis of Klaus-Günther Schmidt,    *
  * student of FAU Erlangen-Nürnberg (DE) in cooperation with Politecnico   *
  * di Milano (IT) during 2020/2021.                                        *
- * The main goal of this plugin is to efficiently dump executable pages    *
- * which afterwards could be processed by analysis tools to detect         *
- * malware. The goal is reached by installing several traps:               *
+ * The main goal of this plugin is to efficiently monitor machine code,    *
+ * resulting in the name [Machine] Code Mon[itor]. Following the rules     *
+ * below it dumps executable pages which afterwards could be processed by  *
+ * analysis tools to detect malware. The goal is reached by installing     *
+ * several traps:                                                          *
  * 1. mmAccessFaultTrap: Whenever a MmAccessFault is called (to commit     *
  *    virtual memory) the regarding virtual address is saved. Additionally *
  *    the second trap is set up:                                           *
@@ -135,7 +137,7 @@
 
 #include <plugins/filesystem.hpp>
 #include <libdrakvuf/json-util.h>
-#include "hypermonitor.h"
+#include "codemon.h"
 #include "plugins/output_format.h"
 #include "private.h"
 
@@ -148,7 +150,7 @@ static char missing_data[] = "(null)";
  */
 static char alloc_memory[] = "(no-mapped-file)";
 
-//See hypermonitor.h -> hypermonitor_config_struct
+//See codemon.h -> codemon_config_struct
 static bool log_everything = false;
 static bool dump_vad = false;
 static bool analyse_system_dll_vad = false;
@@ -273,7 +275,7 @@ void log_all_to_console(drakvuf_t drakvuf,
     }
 
     //Log everything to the screen
-    fmt::print(fault_data->plugin->m_output_format, "hypermonitor", drakvuf, trap_info,
+    fmt::print(fault_data->plugin->m_output_format, "codemon", drakvuf, trap_info,
                keyval("EventType", fmt::Qstr("execframe")),
                keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
                keyval("PageVA", fmt::Xval(fault_data->page_va)),
@@ -328,7 +330,7 @@ void free_all(dump_metadata_struct* dump_metadata)
  * @return if the dump was successful or not
  */
 bool
-dump_memory_region(vmi_instance_t vmi, hypermonitor* plugin, access_context_t* ctx, dump_metadata_struct* dump_metadata)
+dump_memory_region(vmi_instance_t vmi, codemon* plugin, access_context_t* ctx, dump_metadata_struct* dump_metadata)
 {
     bool dump_success = false;
 
@@ -364,7 +366,7 @@ dump_memory_region(vmi_instance_t vmi, hypermonitor* plugin, access_context_t* c
 
     if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, access_ptrs))
     {
-        PRINT_DEBUG("[HYPERMONITOR] Failed mmap guest\n");
+        PRINT_DEBUG("[CODEMON] Failed mmap guest\n");
         goto error;
     }
 
@@ -373,7 +375,7 @@ dump_memory_region(vmi_instance_t vmi, hypermonitor* plugin, access_context_t* c
 
     if (!fp)
     {
-        PRINT_DEBUG("[HYPERMONITOR] Failed to open dump.tmp file\n");
+        PRINT_DEBUG("[CODEMON] Failed to open dump.tmp file\n");
         goto error;
     }
 
@@ -408,7 +410,7 @@ dump_memory_region(vmi_instance_t vmi, hypermonitor* plugin, access_context_t* c
 
     if (rename(plugin->tmp_file_path, dump_metadata->dump_file) != 0)
     {
-        PRINT_DEBUG("[HYPERMONITOR] Failed to rename dump file\n");
+        PRINT_DEBUG("[CODEMON] Failed to rename dump file\n");
         goto error;
     }
 
@@ -416,7 +418,7 @@ dump_memory_region(vmi_instance_t vmi, hypermonitor* plugin, access_context_t* c
     goto done;
 
 error:
-    PRINT_DEBUG("[HYPERMONITOR] Failed to dump memory\n");
+    PRINT_DEBUG("[CODEMON] Failed to dump memory\n");
 
 done:
     if (access_ptrs)
@@ -438,14 +440,14 @@ bool set_dump_paths(const char* dump_dir, dump_metadata_struct* dump_metadata)
     //using a suffix as "vad", "page" or (for the metafile) "metadata" helps to quickly select associated files
     if (asprintf(&dump_metadata->meta_file, "%s/%s.metafile", dump_dir, dump_metadata->file_stem) < 0)
     {
-        PRINT_DEBUG("[HYPERMONITOR] Could not create meta file name\n");
+        PRINT_DEBUG("[CODEMON] Could not create meta file name\n");
         return false;
     }
     auto file_extension = dump_vad ? "vad" : "page";
     if (asprintf(&dump_metadata->dump_file, "%s/%s.%s", dump_dir, dump_metadata->file_stem, file_extension)
         < 0)
     {
-        PRINT_DEBUG("[HYPERMONITOR] Could not create memory dump file name\n");
+        PRINT_DEBUG("[CODEMON] Could not create memory dump file name\n");
         return false;
     }
     return true;
@@ -496,7 +498,7 @@ void get_sha256_memory(
 
     if (VMI_SUCCESS != vmi_mmap_guest(vmi, ctx, num_pages, access_ptrs))
     {
-        PRINT_DEBUG("[HYPERMONITOR] Failed mmap guest\n");
+        PRINT_DEBUG("[CODEMON] Failed mmap guest\n");
         goto error;
     }
 
@@ -534,7 +536,7 @@ void get_sha256_memory(
     goto done;
 
 error:
-    PRINT_DEBUG("[HYPERMONITOR] Failed to calculate checksum\n");
+    PRINT_DEBUG("[CODEMON] Failed to calculate checksum\n");
 
 done:
     //The returned string should be freed with g_free() when no longer needed.(glib-String-Utility-Functions @ gnome.org)
@@ -581,7 +583,7 @@ bool setup_dump_context(mmvad_info_t mmvad,
         // file, monitor it at filesystem level and dump first time and later only if changed?
         if (mmvad.ending_vpn - mmvad.starting_vpn + 1 >= 1024)
         {
-            PRINT_DEBUG("[HYPERMONITOR] Ignoring the dump of too large vad node\n");
+            PRINT_DEBUG("[CODEMON] Ignoring the dump of too large vad node\n");
             return false;
         }
 
@@ -621,12 +623,12 @@ bool retrieve_and_filter_vad_name(const vmi_lock_guard& vmi, addr_t file_name_pt
             // place DLLs here as well.
             if (strstr((char*) dump_metadata->vad_name->contents, "System32") != nullptr)
             {
-                PRINT_DEBUG("[HYPERMONITOR] Ignoring instruction fetch within System32 DLL\n");
+                PRINT_DEBUG("[CODEMON] Ignoring instruction fetch within System32 DLL\n");
                 return false;
             }
             if (strstr((char*) dump_metadata->vad_name->contents, "SysWOW64") != nullptr)
             {
-                PRINT_DEBUG("[HYPERMONITOR] Ignoring instruction fetch within SysWOW64 DLL\n");
+                PRINT_DEBUG("[CODEMON] Ignoring instruction fetch within SysWOW64 DLL\n");
                 return false;
             }
         }
@@ -663,7 +665,7 @@ bool analyse_memory(drakvuf_t drakvuf,
     if (!drakvuf_find_mmvad(drakvuf, trap_info->proc_data.base_addr, fault_data->page_va, &mmvad))
     {
         //If there was an error during vad search, quit but log all information
-        PRINT_DEBUG("[HYPERMONITOR] Could not find vad information\n");
+        PRINT_DEBUG("[CODEMON] Could not find vad information\n");
         return false;
     }
 
@@ -703,7 +705,7 @@ bool analyse_memory(drakvuf_t drakvuf,
     get_sha256_memory(vmi, &ctx_memory_dump, dump_metadata);
     if (dump_metadata->sha256sum == nullptr)
     {
-        PRINT_DEBUG("[HYPERMONITOR] Could not get SHA256 of dumpfile\n");
+        PRINT_DEBUG("[CODEMON] Could not get SHA256 of dumpfile\n");
         return malware;
     }
 
@@ -714,7 +716,7 @@ bool analyse_memory(drakvuf_t drakvuf,
                  dump_metadata->sha256sum)
         < 0)
     {
-        PRINT_DEBUG("[HYPERMONITOR] Could not create the file stem\n");
+        PRINT_DEBUG("[CODEMON] Could not create the file stem\n");
         return malware;
     }
 
@@ -742,7 +744,7 @@ bool analyse_memory(drakvuf_t drakvuf,
         else
         {
             //since there were problems with the file stem, continue to dump all data again
-            PRINT_DEBUG("[HYPERMONITOR] Could not reuse data from previously saved data, dumping again\n");
+            PRINT_DEBUG("[CODEMON] Could not reuse data from previously saved data, dumping again\n");
         }
 
         //If the flow continues here, there was an or with the stored data. Dump the data again.
@@ -769,7 +771,7 @@ bool analyse_memory(drakvuf_t drakvuf,
                                 &ctx_memory_dump,
                                 dump_metadata))
         {
-            PRINT_DEBUG("[HYPERMONITOR] Could not dump memory\n");
+            PRINT_DEBUG("[CODEMON] Could not dump memory\n");
             if (dump_metadata->dump_file)
             {
                 g_free(dump_metadata->dump_file);
@@ -823,21 +825,21 @@ void swap_traps(drakvuf_t drakvuf,
             fault_data->plugin->traps.erase(trap_info->trap);
             drakvuf_remove_trap(drakvuf, trap_info->trap, remove_trap_cb);
 
-            PRINT_DEBUG("[HYPERMONITOR] Replaced execute trap X on GFN 0x%lx with write trap W\n",
+            PRINT_DEBUG("[CODEMON] Replaced execute trap X on GFN 0x%lx with write trap W\n",
                         trap_info->trap->memaccess.gfn);
         }
         else
         {
             //If the trap was not added, keep the current exec trap
             PRINT_DEBUG(
-                "[HYPERMONITOR] Failed to add write trap W on GFN 0x%lx. Keeping execute trap X\n",
+                "[CODEMON] Failed to add write trap W on GFN 0x%lx. Keeping execute trap X\n",
                 trap_info->trap->memaccess.gfn);
         }
     }
     else
     {
         PRINT_DEBUG(
-            "[HYPERMONITOR] Failed to create write trap W. Keeping execute trap X on GFN 0x%lx\n",
+            "[CODEMON] Failed to create write trap W. Keeping execute trap X on GFN 0x%lx\n",
             trap_info->trap->memaccess.gfn);
     }
 }
@@ -855,7 +857,7 @@ static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
     if (log_everything)
     {
-        fmt::print(fault_data->plugin->m_output_format, "hypermonitor", drakvuf, trap_info,
+        fmt::print(fault_data->plugin->m_output_format, "codemon", drakvuf, trap_info,
                    keyval("EventType", fmt::Qstr("writefault")),
                    keyval("FrameVA", fmt::Xval(fault_data->page_va)),
                    keyval("TrapPA", fmt::Xval(trap_info->trap_pa)),
@@ -878,21 +880,21 @@ static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             fault_data->plugin->traps.erase(trap_info->trap);
             drakvuf_remove_trap(drakvuf, trap_info->trap, remove_trap_cb);
 
-            PRINT_DEBUG("[HYPERMONITOR] Replaced write trap W on GFN 0x%lx with execute trap X\n",
+            PRINT_DEBUG("[CODEMON] Replaced write trap W on GFN 0x%lx with execute trap X\n",
                         trap_info->trap->memaccess.gfn);
         }
         else
         {
             //If the trap was not added, keep the current write trap
             PRINT_DEBUG(
-                "[HYPERMONITOR] Failed to add execute trap X on GFN 0x%lx. Keeping write trap W\n",
+                "[CODEMON] Failed to add execute trap X on GFN 0x%lx. Keeping write trap W\n",
                 trap_info->trap->memaccess.gfn);
         }
     }
     else
     {
         PRINT_DEBUG(
-            "[HYPERMONITOR] Failed to create exec trap X. Keeping write trap W on GFN 0x%lx\n",
+            "[CODEMON] Failed to create exec trap X. Keeping write trap W on GFN 0x%lx\n",
             trap_info->trap->memaccess.gfn);
     }
 
@@ -951,7 +953,7 @@ drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* trap_info, fault_data_str
 */
 static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info)
 {
-    PRINT_DEBUG("[HYPERMONITOR] Caught X on PA 0x%lx, frame VA %llx, CR3 %lx\n", trap_info->trap_pa,
+    PRINT_DEBUG("[CODEMON] Caught X on PA 0x%lx, frame VA %llx, CR3 %lx\n", trap_info->trap_pa,
                 (unsigned long long) trap_info->regs->rip, trap_info->regs->cr3);
 
     //load the trap data
@@ -967,7 +969,7 @@ static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_
             //Removes this trap and frees the memory
             fault_data->plugin->traps.erase(trap_info->trap);
             drakvuf_remove_trap(drakvuf, trap_info->trap, remove_trap_cb);
-            PRINT_DEBUG("[HYPERMONITOR] Removed filtered trap for PA 0x%lx", trap_info->trap_pa);
+            PRINT_DEBUG("[CODEMON] Removed filtered trap for PA 0x%lx", trap_info->trap_pa);
             return VMI_EVENT_RESPONSE_NONE;
         }
     }
@@ -1043,8 +1045,8 @@ drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data_ol
  */
 static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info)
 {
-    //Loads a pointer to the plugin, which is responsible for the trap (in this case -> hypermonitor2)
-    auto plugin = get_trap_plugin<hypermonitor>(trap_info);
+    //Loads a pointer to the plugin, which is responsible for the trap (in this case -> codemon2)
+    auto plugin = get_trap_plugin<codemon>(trap_info);
 
     //get_trap_params reinterprets the pointer of info->trap->data as a pointer to access_fault_result_t
     auto params = get_trap_params<access_fault_result_t>(trap_info);
@@ -1053,7 +1055,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
     //This is used, if the trap (e.g. a shared dll) is risen by another process which fetches accidentally instructions from this page as well
     if (!params->verify_result_call_params(drakvuf, trap_info))
     {
-        PRINT_DEBUG("[HYPERMONITOR] info & thread parameters did not match\n");
+        PRINT_DEBUG("[CODEMON] info & thread parameters did not match\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1085,7 +1087,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
             //Page info has a vaddr, that is taken from the param. the dtb equals the cr3 and the paddr is grabbed, as it is now assigned.
             if (VMI_SUCCESS != vmi_pagetable_lookup_extended(vmi, trap_info->regs->cr3, params->fault_va, &p_info))
             {
-                PRINT_DEBUG("[HYPERMONITOR] failed to lookup page info\n");
+                PRINT_DEBUG("[CODEMON] failed to lookup page info\n");
                 plugin->destroy_trap(trap_info->trap);
                 return VMI_EVENT_RESPONSE_NONE;
             }
@@ -1094,7 +1096,7 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
         //Print out all previous gathered information.
         if (log_everything)
         {
-            fmt::print(plugin->m_output_format, "hypermonitor", drakvuf, trap_info,
+            fmt::print(plugin->m_output_format, "codemon", drakvuf, trap_info,
                        keyval("EventType", fmt::Qstr("pagefault")),
                        keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
                        keyval("VA", fmt::Xval(params->fault_va)),
@@ -1123,28 +1125,28 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
                     //store the trap to be deleted in the end.
                     plugin->traps.emplace(exec_trap);
                     plugin->monitored_pages.insert(monitored_page_identifier);
-                    PRINT_DEBUG("[HYPERMONITOR] Set up execute trap X on GFN 0x%lx\n", trap_info->trap->memaccess.gfn);
+                    PRINT_DEBUG("[CODEMON] Set up execute trap X on GFN 0x%lx\n", trap_info->trap->memaccess.gfn);
                 }
                 else
                 {
                     //If the trap was not added successfully
                     //Can't keep trap since it is specific for the RIP
                     PRINT_DEBUG(
-                        "[HYPERMONITOR] Failed to add execute trap X on GFN 0x%lx. Deleting mmAccessFault Return Trap\n",
+                        "[CODEMON] Failed to add execute trap X on GFN 0x%lx. Deleting mmAccessFault Return Trap\n",
                         trap_info->trap->memaccess.gfn);
                 }
             }
             else
             {
                 PRINT_DEBUG(
-                    "[HYPERMONITOR] Failed to create execute trap X. Not monitoring GFN 0x%lx\n",
+                    "[CODEMON] Failed to create execute trap X. Not monitoring GFN 0x%lx\n",
                     trap_info->trap->memaccess.gfn);
             }
         }
         else
         {
             PRINT_DEBUG(
-                "[HYPERMONITOR] Failed to allocate memory for fault_data. Not monitoring GFN 0x%lx\n",
+                "[CODEMON] Failed to allocate memory for fault_data. Not monitoring GFN 0x%lx\n",
                 trap_info->trap->memaccess.gfn);
         }
 
@@ -1172,7 +1174,7 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 {
 
     //Load the plugin object.
-    auto plugin = get_trap_plugin<hypermonitor>(trap_info);
+    auto plugin = get_trap_plugin<codemon>(trap_info);
 
     //Checks if a filter was set and applies it:
     //This applies only to the trap set up. If the program dies in the meantime, the trap continues and might rise the
@@ -1188,14 +1190,14 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     //The first argument is the FaultStatus, and the second (rdx) the VirtualAddress which caused the fault.
     addr_t fault_va = drakvuf_get_function_argument(drakvuf, trap_info, 2);
-    PRINT_DEBUG("[HYPERMONITOR] Caught MmAccessFault(%d, %lx)\n", trap_info->proc_data.pid, fault_va);
+    PRINT_DEBUG("[CODEMON] Caught MmAccessFault(%d, %lx)\n", trap_info->proc_data.pid, fault_va);
 
     //The kernel space starts with 0xFFFF... and higher.  User space is within 0x0000F... and below. If the trap was created by a kernel module we don't mind as we assume the integrity of the kernel.
     //https://www.codemachine.com/article_x64kvas.html: The upper 16 bits of virtual addresses are always set to 0x0 for user mode addresses and to 0xF for kernel mode addresses
     //Checks if the highest bit (bit 64) = 1000...000 is one or not. If it is one, this must be part of the kernel, since it would has to be 0 for the user mode.
     if (fault_va & (1ULL << 63))
     {
-        PRINT_DEBUG("[HYPERMONITOR] Don't trap in kernel %d %lx\n", trap_info->proc_data.pid, fault_va);
+        PRINT_DEBUG("[CODEMON] Don't trap in kernel %d %lx\n", trap_info->proc_data.pid, fault_va);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1215,7 +1217,7 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     //If trap creation failed
     if (!trap)
     {
-        PRINT_DEBUG("[HYPERMONITOR] Could not create accessFaultReturnTrap\n");
+        PRINT_DEBUG("[CODEMON] Could not create accessFaultReturnTrap\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1239,33 +1241,33 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 /**
  * This is the constructor of the plugin.
  */
-hypermonitor::hypermonitor(drakvuf_t
+codemon::codemon(drakvuf_t
                            drakvuf,
-                           const hypermonitor_config_struct* c, output_format_t
+                           const codemon_config_struct* c, output_format_t
                            output)
     : pluginex(drakvuf, output)
 {
 
     //Check if the dump directory parameter was provided
-    if (!c->hypermonitor_dump_dir)
+    if (!c->codemon_dump_dir)
     {
-        PRINT_DEBUG("[HYPERMONITOR] Output directory for dumps not provided, not activating hypermonitor plugin\n");
+        PRINT_DEBUG("[CODEMON] Output directory for dumps not provided, not activating codemon plugin\n");
         return;
     }
 
     //Load the filter if existing
-    if (c->hypermonitor_filter_executable)
+    if (c->codemon_filter_executable)
     {
-        this->filter_executable = c->hypermonitor_filter_executable;
+        this->filter_executable = c->codemon_filter_executable;
     }
 
     //get the output dir from the config arguments
-    this->dump_dir = c->hypermonitor_dump_dir;
+    this->dump_dir = c->codemon_dump_dir;
 
     //Check if the dump directory exists
     if (!std::filesystem::exists(this->dump_dir))
     {
-        PRINT_DEBUG("[HYPERMONITOR] The output directory is no valid/existing path, not activating hypermonitor plugin\n");
+        PRINT_DEBUG("[CODEMON] The output directory is no valid/existing path, not activating codemon plugin\n");
         return;
     }
 
@@ -1276,22 +1278,22 @@ hypermonitor::hypermonitor(drakvuf_t
     int res = mkdir(this->dump_dir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     if (res != 0 && errno != EEXIST)
     {
-        PRINT_DEBUG("[HYPERMONITOR] Failed to create dump directory %s\n", this->dump_dir.c_str());
+        PRINT_DEBUG("[CODEMON] Failed to create dump directory %s\n", this->dump_dir.c_str());
         return;
     }
 
     //Create the default dump file name
     if (asprintf(&this->tmp_file_path, "%s/dump.tmp", this->dump_dir.c_str()) < 0)
     {
-        PRINT_DEBUG("[HYPERMONITOR] Failed to build the string containing the temp_file_path\n");
+        PRINT_DEBUG("[CODEMON] Failed to build the string containing the temp_file_path\n");
         return;
     }
 
     //Load argument settings
-    log_everything = c->hypermonitor_log_everything;
-    dump_vad = c->hypermonitor_dump_vad;
-    analyse_system_dll_vad = c->hypermonitor_analyse_system_dll_vad;
-    default_benign = c->hypermonitor_default_benign;
+    log_everything = c->codemon_log_everything;
+    dump_vad = c->codemon_dump_vad;
+    analyse_system_dll_vad = c->codemon_analyse_system_dll_vad;
+    default_benign = c->codemon_default_benign;
 
     //Looks up the relative virtual address of a syscall method
     breakpoint_in_system_process_searcher bp;
@@ -1306,7 +1308,7 @@ hypermonitor::hypermonitor(drakvuf_t
 }
 
 //Is called after shutting down.
-hypermonitor::~hypermonitor()
+codemon::~codemon()
 {
     for (const auto trap: traps)
     {

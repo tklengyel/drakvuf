@@ -102,61 +102,65 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef HYPERMONITOR_H
-#define HYPERMONITOR_H
+#ifndef SRC_PLUGINS_CODEMON_PRIVATE_H_
+#define SRC_PLUGINS_CODEMON_PRIVATE_H_
 
-#include <vector>
-#include <memory>
-#include <set>
-#include <glib.h>
-#include <plugins/filesystem.hpp>
-#include "plugins/private.h"
-#include "plugins/plugins_ex.h"
-
-//Struct to pass the parameters
-struct hypermonitor_config_struct
+/**
+ * Saves a pointer to the plugin and the starting virtual address of the frame.
+ * This struct is passed between the different traps.
+ */
+struct fault_data_struct
 {
-    //Dir to save extracted frames to
-    const char* hypermonitor_dump_dir;
-    //Executable to filter
-    const char* hypermonitor_filter_executable;
-    //Enables logging (to shell) of pagefaults and writefaults. Additionally, logs of analysed pages can be printed regardless if malware was detected or not.
-    bool hypermonitor_log_everything;
-    //By default only page sized areas are dumped. By setting this flag whole VAD nodes can be dumped instead.
-    bool hypermonitor_dump_vad;
-    //Can be utilised to enforce the analysis of vads, which names (paths of mapped dlls / exes) contain System32 or SysWOW64
-    bool hypermonitor_analyse_system_dll_vad;
-    //By default we assume everything to be malware. If this flag is enabled we assume all analysed memory areas to be goodware instead. This flag should be just set if a classifier is integrated.
-    bool hypermonitor_default_benign;
+    codemon* plugin;
+    addr_t page_va;
 };
 
-class hypermonitor : public pluginex
+/**
+ * This struct contains all the metadata that is gathered through a page analysis
+ */
+struct dump_metadata_struct
 {
-
-public:
-    //See hypermonitor_config_struct
-    std::filesystem::path dump_dir;
-    const char* filter_executable = "";
-
-    //a temporary  dump file
-    char* tmp_file_path = nullptr;
-
-    //Counts how often an actual dump occured
-    unsigned int dump_id = 0;
-
-    //Set to store all traps so they can be deleted in the end
-    std::set<drakvuf_trap*> traps;
-
-    //Keeps track of monitored pages. Prevents duplicate traps.
-    std::set<std::pair<addr_t, addr_t>> monitored_pages;
-
-    //Keeps track of the data which was already dumped, used to prevent duplicate dump files.
-    // Uses the hash as key and the dumped file stem (without extension) as value.
-    std::unordered_map<std::string, std::string> dumped_memory_map;
-
-    hypermonitor(drakvuf_t drakvuf, const hypermonitor_config_struct* config, output_format_t output);
-
-    ~hypermonitor();
+    //The start of the VAD-Node. This is not necessarily the starting va of the page that is analysed.
+    addr_t vad_node_base;
+    //The end address of the VAD-Node. The VAD-Node is not limited to a PAGE_SIZE.
+    addr_t vad_node_end;
+    //The size of current analyzed memory part (the amount of bytes written to disk)
+    size_t dump_size;
+    //THe checksum of the dumped memory
+    const gchar* sha256sum;
+    //The name of the dll
+    unicode_string_t* vad_name;
+    //the stem (basename without suffix) of the file
+    char* file_stem;
+    //The whole path of the dumpfile
+    char* dump_file;
+    //The path to the file containing the metadata
+    char* meta_file;
 };
 
-#endif
+/**
+ * Saves the virtual address where the fault occurred.
+ */
+struct access_fault_result_t : public call_result_t
+{
+    access_fault_result_t() : call_result_t(), fault_va()
+    {}
+    addr_t fault_va;
+};
+
+/**
+ * Creates an execute trap, whose pointer is returned. It gets activated and intercepts before an instruction is fetched from the specified gfn.
+ * @param gfn (guest frame number) which shall be monitored
+ * @param fault_data_old this is passed between traps and saves current state information. e.g. the virtual address of the page.
+ */
+drakvuf_trap_t* create_execute_trap(addr_t gfn, fault_data_struct* fault_data_old);
+
+/**
+ * Creates a write trap, whose pointer is returned. It gets active if the
+ *
+ * @param trap_info contains information regarding the current activation of the trap like register values, timestamps, ...
+ * @param fault_data_old this is passed between traps and saves current state information. e.g. the virtual address of the page.
+ */
+drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* trap_info, fault_data_struct* fault_data_old);
+
+#endif //SRC_PLUGINS_CODEMON_PRIVATE_H_

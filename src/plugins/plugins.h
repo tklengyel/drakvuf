@@ -150,12 +150,12 @@ struct plugins_options
     const char* clr_profile;            // PLUGIN_MEMDUMP
     const char* mscorwks_profile;       // PLUGIN_MEMDUMP
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes; // PLUGIN_PROCDUMP
-    const char* hypermonitor_dump_dir;      // PLUGIN_HYPERMONITOR
-    const char* hypermonitor_filter_executable;  // PLUGIN_HYPERMONITOR
-    bool hypermonitor_log_everything;       // PLUGIN_HYPERMONITOR
-    bool hypermonitor_dump_vad;             // PLUGIN_HYPERMONITOR
-    bool hypermonitor_analyse_system_dll_vad;    // PLUGIN_HYPERMONITOR
-    bool hypermonitor_default_benign;       // PLUGIN_HYPERMONITOR
+    const char* codemon_dump_dir;      // PLUGIN_CODEMON
+    const char* codemon_filter_executable;  // PLUGIN_CODEMON
+    bool codemon_log_everything;       // PLUGIN_CODEMON
+    bool codemon_dump_vad;             // PLUGIN_CODEMON
+    bool codemon_analyse_system_dll_vad;    // PLUGIN_CODEMON
+    bool codemon_default_benign;       // PLUGIN_CODEMON
 
 };
 
@@ -187,7 +187,7 @@ typedef enum drakvuf_plugin
     PLUGIN_PROCDUMP,
     PLUGIN_RPCMON,
     PLUGIN_TLSMON,
-    PLUGIN_HYPERMONITOR,
+    PLUGIN_CODEMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -219,7 +219,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_PROCDUMP] = "procdump",
     [PLUGIN_RPCMON] = "rpcmon",
     [PLUGIN_TLSMON] = "tlsmon",
-    [PLUGIN_HYPERMONITOR] = "hypermonitor",
+    [PLUGIN_CODEMON] = "codemon",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -250,7 +250,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_PROCDUMP]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_RPCMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_TLSMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_HYPERMONITOR]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_CODEMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
 class plugin

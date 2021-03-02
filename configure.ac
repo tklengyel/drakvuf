@@ -408,14 +408,14 @@ if test x$plugin_tlsmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_TLSMON, 1, "")
 fi
 
-AC_ARG_ENABLE([plugin_hypermonitor],
-  [AS_HELP_STRING([--disable-plugin-hypermonitor],
-    [Enable the hypermonitor plugin @<:@yes@:>@])],
-  [plugin_hypermonitor="$enableval"],
-  [plugin_hypermonitor="yes"])
-AM_CONDITIONAL([PLUGIN_HYPERMONITOR], [test x$plugin_hypermonitor = xyes])
-if test x$plugin_hypermonitor = xyes; then
-  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_HYPERMONITOR, 1, "")
+AC_ARG_ENABLE([plugin_codemon],
+  [AS_HELP_STRING([--disable-plugin-codemon],
+    [Enable the codemon plugin @<:@yes@:>@])],
+  [plugin_codemon="$enableval"],
+  [plugin_codemon="yes"])
+AM_CONDITIONAL([PLUGIN_CODEMON], [test x$plugin_codemon = xyes])
+if test x$plugin_codemon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_CODEMON, 1, "")
 fi
 
 #####################################################
@@ -693,7 +693,7 @@ ProcDump:     $plugin_procdump
 APIMon:       $plugin_apimon
 RPCMon:       $plugin_rpcmon
 TLSMon:       $plugin_tlsmon
-Hypermonitor:     $plugin_hypermonitor
+Codemon:      $plugin_codemon
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:       $plugin_wmimon

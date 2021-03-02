@@ -279,19 +279,19 @@ static void print_usage()
             "\t --compress-procdumps\n"
             "\t                           Controls compression of processes dumps on disk\n"
 #endif
-#ifdef ENABLE_PLUGIN_HYPERMONITOR
-            "\t --hypermonitor-dump-dir <directory>\n"
+#ifdef ENABLE_PLUGIN_CODEMON
+            "\t --codemon-dump-dir <directory>\n"
             "\t                           Folder where to store page/vad dumps (path)\n"
-            "\t --hypermonitor-filter-executable <filename>\n"
+            "\t --codemon-filter-executable <filename>\n"
             "\t                           Limit the output to events regarding this file\n"
 
-            "\t --hypermonitor-log-everything\n"
+            "\t --codemon-log-everything\n"
             "\t                           Enables logging (to shell) of pagefaults and writefaults. Additionally, logs of analysed pages can be printed regardless if malware was detected or not\n"
-            "\t --hypermonitor-dump-vad\n"
+            "\t --codemon-dump-vad\n"
             "\t                           By default only page sized memory areas are dumped. By setting this flag whole VAD nodes can be dumped instead\n"
-            "\t --hypermonitor-analyse-system-dll-vad\n"
+            "\t --codemon-analyse-system-dll-vad\n"
             "\t                           Enforces the analysis of vads, which names (paths of mapped dlls / exes) contain System32 or SysWOW64\n"
-            "\t --hypermonitor-default-benign\n"
+            "\t --codemon-default-benign\n"
             "\t                           By default we assume everything to be malware. If this flag is enabled we assume all analysed memory areas to be goodware instead. This flag should be just set if a classifier is integrated\n"
 #endif
             "\t -h, --help                Show this help\n"
@@ -375,12 +375,12 @@ int main(int argc, char** argv)
         opt_termination_timeout,
         opt_traps_ttl,
         opt_wait_stop_plugins,
-        opt_hypermonitor_dump_dir,
-        opt_hypermonitor_filter_executable,
-        opt_hypermonitor_log_everything,
-        opt_hypermonitor_dump_vad,
-        opt_hypermonitor_analyse_system_dll_vad,
-        opt_hypermonitor_default_benign,
+        opt_codemon_dump_dir,
+        opt_codemon_filter_executable,
+        opt_codemon_log_everything,
+        opt_codemon_dump_vad,
+        opt_codemon_analyse_system_dll_vad,
+        opt_codemon_default_benign,
     };
     const option long_opts[] =
     {
@@ -421,12 +421,12 @@ int main(int argc, char** argv)
         {"fast-singlestep", no_argument, NULL, 'F'},
         {"traps-ttl", required_argument, NULL, opt_traps_ttl},
         {"wait-stop-plugins", required_argument, NULL, opt_wait_stop_plugins},
-        {"hypermonitor-dump-dir", required_argument, NULL, opt_hypermonitor_dump_dir},
-        {"hypermonitor-filter-executable", required_argument, NULL, opt_hypermonitor_filter_executable},
-        {"hypermonitor-log-everything", no_argument, NULL, opt_hypermonitor_log_everything},
-        {"hypermonitor-dump-vad", no_argument, NULL, opt_hypermonitor_dump_vad},
-        {"hypermonitor-analyse-system-dll-vad", no_argument, NULL, opt_hypermonitor_analyse_system_dll_vad},
-        {"hypermonitor-default-benign", no_argument, NULL, opt_hypermonitor_default_benign},
+        {"codemon-dump-dir", required_argument, NULL, opt_codemon_dump_dir},
+        {"codemon-filter-executable", required_argument, NULL, opt_codemon_filter_executable},
+        {"codemon-log-everything", no_argument, NULL, opt_codemon_log_everything},
+        {"codemon-dump-vad", no_argument, NULL, opt_codemon_dump_vad},
+        {"codemon-analyse-system-dll-vad", no_argument, NULL, opt_codemon_analyse_system_dll_vad},
+        {"codemon-default-benign", no_argument, NULL, opt_codemon_default_benign},
 
 
 
@@ -655,24 +655,24 @@ int main(int argc, char** argv)
                 options.compress_procdumps = true;
                 break;
 #endif
-#ifdef ENABLE_PLUGIN_HYPERMONITOR
-            case opt_hypermonitor_dump_dir:
-                options.hypermonitor_dump_dir = optarg;
+#ifdef ENABLE_PLUGIN_CODEMON
+            case opt_codemon_dump_dir:
+                options.codemon_dump_dir = optarg;
                 break;
-            case opt_hypermonitor_filter_executable:
-                options.hypermonitor_filter_executable = optarg;
+            case opt_codemon_filter_executable:
+                options.codemon_filter_executable = optarg;
                 break;
-            case opt_hypermonitor_log_everything:
-                options.hypermonitor_log_everything = true;
+            case opt_codemon_log_everything:
+                options.codemon_log_everything = true;
                 break;
-            case opt_hypermonitor_dump_vad:
-                options.hypermonitor_dump_vad = true;
+            case opt_codemon_dump_vad:
+                options.codemon_dump_vad = true;
                 break;
-            case opt_hypermonitor_analyse_system_dll_vad:
-                options.hypermonitor_analyse_system_dll_vad = true;
+            case opt_codemon_analyse_system_dll_vad:
+                options.codemon_analyse_system_dll_vad = true;
                 break;
-            case opt_hypermonitor_default_benign:
-                options.hypermonitor_default_benign = true;
+            case opt_codemon_default_benign:
+                options.codemon_default_benign = true;
                 break;
 #endif
             case 'h':
