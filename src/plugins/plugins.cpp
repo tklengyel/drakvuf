@@ -130,7 +130,7 @@
 #include "procdump/procdump.h"
 #include "rpcmon/rpcmon.h"
 #include "tlsmon/tlsmon.h"
-#include "hyperbee/hyperbee.h"
+#include "codemon/codemon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -377,19 +377,19 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     break;
                 }
 #endif
-#ifdef ENABLE_PLUGIN_HYPERBEE
-                case PLUGIN_HYPERBEE:
+#ifdef ENABLE_PLUGIN_CODEMON
+                case PLUGIN_CODEMON:
                 {
-                    hyperbee_config_struct config =
+                    codemon_config_struct config =
                     {
-                        .hyperbee_dump_dir = options->hyperbee_dump_dir,
-                        .hyperbee_filter_executable = options->hyperbee_filter_executable,
-                        .hyperbee_log_everything = options->hyperbee_log_everything,
-                        .hyperbee_dump_vad = options->hyperbee_dump_vad,
-                        .hyperbee_analyse_system_dll_vad = options->hyperbee_analyse_system_dll_vad,
-                        .hyperbee_default_benign = options->hyperbee_default_benign,
+                        .codemon_dump_dir = options->codemon_dump_dir,
+                        .codemon_filter_executable = options->codemon_filter_executable,
+                        .codemon_log_everything = options->codemon_log_everything,
+                        .codemon_dump_vad = options->codemon_dump_vad,
+                        .codemon_analyse_system_dll_vad = options->codemon_analyse_system_dll_vad,
+                        .codemon_default_benign = options->codemon_default_benign,
                     };
-                    this->plugins[plugin_id] = std::make_unique<hyperbee>(this->drakvuf, &config, this->output);
+                    this->plugins[plugin_id] = std::make_unique<codemon>(this->drakvuf, &config, this->output);
                 }
 #endif
                 case __DRAKVUF_PLUGIN_LIST_MAX: /* fall-through */

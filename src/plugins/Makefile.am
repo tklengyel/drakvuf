@@ -276,10 +276,10 @@ sources += tlsmon/tlsmon.h
 sources += tlsmon/private.h
 endif
 
-if PLUGIN_HYPERBEE
-sources += hyperbee/hyperbee.cpp
-sources += hyperbee/hyperbee.h
-sources += hyperbee/private.h
+if PLUGIN_CODEMON
+sources += codemon/codemon.cpp
+sources += codemon/codemon.h
+sources += codemon/private.h
 endif
 
 ###############################################################################
