@@ -1116,7 +1116,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             goto err_exit;
         }
         if (VMI_FAILURE == vmi_slat_change_gfn(
-                drakvuf->vmi, drakvuf->altp2m_idx, remapped_gfn->r, drakvuf->sink_page_gfn))
+                drakvuf->vmi, drakvuf->altp2m_idr, remapped_gfn->r, drakvuf->sink_page_gfn))
         {
             PRINT_DEBUG("%s: Failed to change gfn on view %u\n", __FUNCTION__, drakvuf->altp2m_idr);
             goto err_exit;
