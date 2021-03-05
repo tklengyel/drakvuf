@@ -19,12 +19,38 @@ jobs:
     - name: Install dependencies
       run: |
         apt-get update -q
-        apt-get install -y autoconf-archive flex bison libjson-c-dev libxen-dev clang build-essential git libtool autotools-dev libglib2.0-dev
+        apt-get install -y autoconf-archive flex bison libjson-c-dev clang build-essential git libtool autotools-dev libglib2.0-dev libyajl-dev
         apt-get clean
 
     - uses: actions/checkout@v2
       with:
         fetch-depth: 2
+
+    - name: Get Xen version
+      id: get-xen-hash
+      run: |
+        echo ::set-output name=XEN_HASH::$(git submodule | grep xen | awk '{ print $1 }')
+
+    - name: Cache Xen debball
+      id: cache-xen
+      uses: actions/cache@v2
+      with:
+        path: xen/dist
+        key: ${{ steps.get-xen-hash.outputs.XEN_HASH }}
+
+    - name: Create Xen debball
+      if: steps.cache-xen.outputs.cache-hit != 'true'
+      run: |
+        apt-get install -y wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev bzip2 libpci-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool libjson-c-dev libfuse-dev liblzma-dev autoconf-archive kpartx python3-dev python3-pip golang python-dev libsystemd-dev
+        git submodule update --init xen
+        cd xen
+        ./configure --enable-githttp --disable-pvshim
+        make -j4 debball
+        cd ..
+
+    - name: Install Xen debball
+      run: |
+        dpkg -i xen/dist/xen-*.deb
 
     - name: Install LibVMI
       run: |

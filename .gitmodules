@@ -1,6 +1,6 @@
 [submodule "xen"]
 	path = xen
-	url = https://github.com/tklengyel/xen
+	url = https://github.com/xen-project/xen
 	ignore = dirty
 [submodule "libvmi"]
 	path = libvmi

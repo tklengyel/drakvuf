@@ -307,6 +307,14 @@ static void print_usage()
         "\t --exploitmon-kernel2user-detect\n"
         "\t                           Detect kernel thread execution in user mode. This degrades performance.\n"
 #endif
+#ifdef ENABLE_PLUGIN_IPT
+        "\t --ipt-dir <directory>\n"
+        "\t                           Where to store data recorded with Intel Processor Trace\n"
+        "\t --ipt-trace-os\n"
+        "\t                           Enable IPT tracing in ring 0"
+        "\t --ipt-trace-user\n"
+        "\t                           Enable IPT tracing in ring > 0"
+#endif
         "\t -h, --help                Show this help\n"
     );
 }
@@ -398,6 +406,9 @@ int main(int argc, char** argv)
         opt_codemon_default_benign,
         opt_context_interception_processes,
         opt_exploitmon_kernel2user_detect,
+        opt_ipt_dir,
+        opt_ipt_trace_os,
+        opt_ipt_trace_user,
     };
     const option long_opts[] =
     {
@@ -448,9 +459,9 @@ int main(int argc, char** argv)
         {"context-based-interception", no_argument, NULL, 'C'},
         {"context-process", required_argument, NULL, opt_context_interception_processes},
         {"exploitmon-kernel2user-detect", no_argument, NULL, opt_exploitmon_kernel2user_detect},
-
-
-
+        {"ipt-dir", required_argument, NULL, opt_ipt_dir},
+        {"ipt-trace-os", no_argument, NULL, opt_ipt_trace_os},
+        {"ipt-trace-user", no_argument, NULL, opt_ipt_trace_user},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF:C";
@@ -703,6 +714,16 @@ int main(int argc, char** argv)
                 break;
             case opt_codemon_default_benign:
                 options.codemon_default_benign = true;
+#endif
+#ifdef ENABLE_PLUGIN_IPT
+            case opt_ipt_dir:
+                options.ipt_dir = optarg;
+                break;
+            case opt_ipt_trace_os:
+                options.ipt_trace_os = true;
+                break;
+            case opt_ipt_trace_user:
+                options.ipt_trace_user = true;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_EXPLOITMON

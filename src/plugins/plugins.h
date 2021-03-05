@@ -158,6 +158,9 @@ struct plugins_options
     bool codemon_analyse_system_dll_vad;    // PLUGIN_CODEMON
     bool codemon_default_benign;        // PLUGIN_CODEMON
     bool exploitmon_kernel2user_detect; // PLUGIN_EXPLOITMON
+    const char* ipt_dir;                // PLUGIN_IPT
+    bool ipt_trace_os;                  // PLUGIN_IPT
+    bool ipt_trace_user;                // PLUGIN_IPT
 };
 
 typedef enum drakvuf_plugin
@@ -191,6 +194,7 @@ typedef enum drakvuf_plugin
     PLUGIN_CODEMON,
     PLUGIN_LIBHOOKTEST,
     PLUGIN_EXPLOITMON,
+    PLUGIN_IPT,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -225,6 +229,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_CODEMON] = "codemon",
     [PLUGIN_LIBHOOKTEST] = "libhooktest",
     [PLUGIN_EXPLOITMON] = "exploitmon",
+    [PLUGIN_IPT] = "ipt",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -258,6 +263,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_CODEMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_LIBHOOKTEST]  = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
     [PLUGIN_EXPLOITMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_IPT]          = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
 };
 
 class plugin
