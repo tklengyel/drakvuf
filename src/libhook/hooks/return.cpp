@@ -117,6 +117,11 @@ return_hook::~return_hook()
     if (this->drakvuf_ && this->trap_)
     {
         PRINT_DEBUG("[LIBHOOK] destroying return hook...\n");
+        // read in libhook.hpp why this happens
+        this->trap_->cb = [](drakvuf_t, drakvuf_trap_info_t*) -> event_response_t {
+            PRINT_DEBUG("[LIBHOOK] drakvuf caled deleted hook, replaced by nullstub\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        };
         drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
         {
             delete static_cast<CallResult*>(trap->data);
