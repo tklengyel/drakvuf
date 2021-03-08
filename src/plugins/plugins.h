@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -137,6 +137,12 @@ struct plugins_options
     const char* wow_ole32_profile;      // PLUGIN_WMIMON
     const char* combase_profile;        // PLUGIN_WMIMON
     const char* memdump_dir;            // PLUGIN_MEMDUMP
+    bool memdump_disable_free_vm;       // PLUGIN_MEMDUMP
+    bool memdump_disable_protect_vm;    // PLUGIN_MEMDUMP
+    bool memdump_disable_write_vm;      // PLUGIN_MEMDUMP
+    bool memdump_disable_terminate_proc;// PLUGIN_MEMDUMP
+    bool memdump_disable_create_thread; // PLUGIN_MEMDUMP
+    bool memdump_disable_set_thread;    // PLUGIN_MEMDUMP
     const char* dll_hooks_list;         // PLUGIN_MEMDUMP, PLUGIN_APIMON
     bool userhook_no_addr;              // PLUGIN_MEMDUMP, PLUGIN_APIMON
     const char* procdump_dir;           // PLUGIN_PROCDUMP
@@ -144,6 +150,13 @@ struct plugins_options
     const char* clr_profile;            // PLUGIN_MEMDUMP
     const char* mscorwks_profile;       // PLUGIN_MEMDUMP
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes; // PLUGIN_PROCDUMP
+    const char* codemon_dump_dir;       // PLUGIN_CODEMON
+    const char* codemon_filter_executable;  // PLUGIN_CODEMON
+    bool codemon_log_everything;        // PLUGIN_CODEMON
+    bool codemon_dump_vad;              // PLUGIN_CODEMON
+    bool codemon_analyse_system_dll_vad;    // PLUGIN_CODEMON
+    bool codemon_default_benign;        // PLUGIN_CODEMON
+
 };
 
 typedef enum drakvuf_plugin
@@ -174,6 +187,7 @@ typedef enum drakvuf_plugin
     PLUGIN_PROCDUMP,
     PLUGIN_RPCMON,
     PLUGIN_TLSMON,
+    PLUGIN_CODEMON,
     PLUGIN_DUMMY,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
@@ -206,6 +220,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_PROCDUMP] = "procdump",
     [PLUGIN_RPCMON] = "rpcmon",
     [PLUGIN_TLSMON] = "tlsmon",
+    [PLUGIN_CODEMON] = "codemon",
     [PLUGIN_DUMMY] = "dummy",
 };
 
@@ -237,6 +252,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_PROCDUMP]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_RPCMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_TLSMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_CODEMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_DUMMY]        = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
 };
 

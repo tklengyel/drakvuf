@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -447,6 +447,8 @@ static bool dump_next_vads(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     ctx->bp2->breakpoint.dtb = info->regs->cr3;
     ctx->bp2->breakpoint.addr_type = ADDR_VA;
     ctx->bp2->breakpoint.addr = ctx->plugin->clean_process_va;
+    ctx->bp2->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    ctx->bp2->ah_cb = nullptr;
     if (drakvuf_add_trap(drakvuf, ctx->bp2))
     {
         ctx->plugin->traps = g_slist_prepend(ctx->plugin->traps, ctx->bp2);
@@ -526,11 +528,13 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     {
         ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
         drakvuf_remove_trap(drakvuf, ctx->bp, (drakvuf_trap_free_t)free_trap);
+        ctx->bp = nullptr;
     }
     if (ctx->bp2)
     {
         ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp2);
         drakvuf_remove_trap(drakvuf, ctx->bp2, (drakvuf_trap_free_t)free_trap);
+        ctx->bp2 = nullptr;
     }
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -935,6 +939,8 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     ctx->bp->breakpoint.dtb = info->regs->cr3;
     ctx->bp->breakpoint.addr_type = ADDR_VA;
     ctx->bp->breakpoint.addr = info->regs->rip;
+    ctx->bp->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    ctx->bp->ah_cb = nullptr;
     if (drakvuf_add_trap(drakvuf, ctx->bp))
     {
         plugin->traps = g_slist_prepend(plugin->traps, ctx->bp);

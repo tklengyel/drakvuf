@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -131,7 +131,7 @@ private:
         .breakpoint.addr_type = ADDR_RVA,
         .breakpoint.module = "ntoskrnl.exe",
         .type = BREAKPOINT,
-        .data = (void*)this
+        .data = (void*)this,
     };
 
     void register_trap(drakvuf_t drakvuf, const char* syscall_name,

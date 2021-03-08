@@ -8,7 +8,7 @@
 * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
 * right to use, modify, and redistribute this software under certain      *
 * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
-* software, alternative licenses can be aquired from the author.          *
+* software, alternative licenses can be acquired from the author.         *
 *                                                                         *
 * Note that the GPL places important restrictions on "derivative works",  *
 * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -605,11 +605,15 @@ static event_response_t finish_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
     filedelete* f = injector->f;
+    auto thread = std::make_pair(info->attached_proc_data.pid, info->attached_proc_data.tid);
+
     auto filename = f->files[ {info->attached_proc_data.pid, injector->handle}].first;
     auto reason = f->files[ {info->attached_proc_data.pid, injector->handle}].second;
 
     if (!is_success)
         grab_file_by_handle(f, drakvuf, vmi, info, injector->handle, reason);
+
+    f->closing_handles[thread] = true;
 
     free_resources(drakvuf, info);
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -644,7 +648,7 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             auto filename = f->files[ {info->attached_proc_data.pid, injector->handle}].first;
             auto reason = f->files[ {info->attached_proc_data.pid, injector->handle}].second;
-            save_file_metadata(f, drakvuf, info, curr_sequence_number, 0, filename.c_str(), reason, injector->bytes_to_read, injector->fo_flags);
+            save_file_metadata(f, drakvuf, info, curr_sequence_number, 0, filename.c_str(), reason, injector->file_offset, injector->fo_flags);
 
             injector->finish_status = true;
         }
@@ -664,6 +668,18 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return finish_readfile(drakvuf, info, vmi, injector->finish_status);
 }
 
+event_response_t close_handle_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    wrapper_t* injector = (wrapper_t*)info->trap->data;
+
+    if (!drakvuf_check_return_context(drakvuf, info, injector->target_pid, injector->target_tid, injector->target_rsp))
+        return VMI_EVENT_RESPONSE_NONE;
+    injector->target_rsp = 0;
+
+    auto vmi = vmi_lock_guard(drakvuf);
+    return finish_readfile(drakvuf, info, vmi, injector->finish_status);
+}
+
 event_response_t unmapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     wrapper_t* injector = (wrapper_t*)info->trap->data;
@@ -680,6 +696,12 @@ event_response_t unmapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             injector->target_rsp = info->regs->rsp;
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
+    }
+
+    if (inject_close_handle(drakvuf, info, vmi, injector))
+    {
+        injector->target_rsp = info->regs->rsp;
+        return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
     return finish_readfile(drakvuf, info, vmi, injector->finish_status);
@@ -815,7 +837,7 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         injector->f->pools[info->regs->rax] = true;
 
         injector->pool = info->regs->rax;
-        if (inject_memcpy(drakvuf, info, vmi, injector))
+        if (inject_unmapview(drakvuf, info, vmi, injector))
         {
             injector->target_rsp = info->regs->rsp;
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -1007,6 +1029,10 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     }
     else
     {
+        // do not start dumping new file
+        if (f->is_stopping())
+            return START_READFILE_SUCCEED;
+
         if (!get_file_object_flags(drakvuf, info, vmi, f, handle, &fo_flags))
             return START_READFILE_ERROR;
 
@@ -1134,6 +1160,7 @@ static void createfile_cb_impl(drakvuf_t drakvuf, drakvuf_trap_info_t* info, add
     trap->name = info->trap->name;
     trap->data = w;
     trap->cb = createfile_ret_cb;
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
     {
@@ -1190,6 +1217,11 @@ static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     }
 
     filedelete* f = (filedelete*)info->trap->data;
+
+    if (f->is_stopping())
+        return VMI_EVENT_RESPONSE_NONE;
+
+
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -1234,6 +1266,10 @@ static event_response_t writefile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     }
 
     filedelete* f = (filedelete*)info->trap->data;
+
+    if (f->is_stopping())
+        return VMI_EVENT_RESPONSE_NONE;
+
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
@@ -1297,6 +1333,9 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if (f->files.erase({info->attached_proc_data.pid, handle}) > 0)
     {
+        if (f->is_stopping())
+            return VMI_EVENT_RESPONSE_NONE;
+
         // We detect the fact of closing of the previously modified file.
         grab_file_by_handle(f, drakvuf, vmi.vmi, info, handle, reason);
     }
@@ -1316,6 +1355,10 @@ static event_response_t createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     }
 
     filedelete* f = (filedelete*)info->trap->data;
+
+    if (f->is_stopping())
+        return VMI_EVENT_RESPONSE_NONE;
+
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     handle_t handle = drakvuf_get_function_argument(drakvuf, info, 7);
@@ -1349,6 +1392,7 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
 
     trap->name = syscall_name;
     trap->cb   = hook_cb;
+    trap->ttl  = drakvuf_get_limited_traps_ttl(drakvuf);
 
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }
@@ -1400,6 +1444,7 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
         this->queryvolumeinfo_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryVolumeInformationFile");
         this->queryinfo_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryInformationFile");
         this->createsection_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwCreateSection");
+        this->close_handle_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwClose");
         this->mapview_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwMapViewOfSection");
         this->unmapview_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwUnmapViewOfSection");
         this->readfile_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwReadFile");

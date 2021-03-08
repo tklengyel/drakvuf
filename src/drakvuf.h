@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -156,7 +156,8 @@ public:
               bool leave_paused,
               bool libvmi_conf,
               addr_t kpgd,
-              bool fast_singlestep);
+              bool fast_singlestep,
+              uint64_t limited_traps_ttl);
     ~drakvuf_c();
 
     int is_initialized();

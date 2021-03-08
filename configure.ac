@@ -124,6 +124,26 @@ CXXFLAGS="-std=gnu++17"
 AC_LANG_PUSH([C++])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [[bool test[2] = { [1] = 1, [0] = 0 };]])], [],
     [AC_ERROR(Your C++ compiler ($CXX) is not supported. Please use clang++ (clang-9 or clang-10)!)])
+
+#Check requirement of lstdc++fs
+STDCPPFSLIB=""
+AC_CHECK_HEADERS([filesystem])
+AC_LINK_IFELSE(
+    [AC_LANG_SOURCE([
+        #if HAVE_FILESYSTEM
+        #include <filesystem>
+        #endif
+
+        int main() {
+            std::error_code ec;
+            std::filesystem::create_directory("/dev/null", &ec);
+        }
+    ])], [],
+    [STDCPPFSLIB="-lstdc++fs"]
+)
+AC_SUBST([STDCPPFSLIB])
+#end requirement check
+
 AC_LANG_POP([C++])
 
 ######################################################
@@ -386,6 +406,16 @@ AC_ARG_ENABLE([plugin_tlsmon],
 AM_CONDITIONAL([PLUGIN_TLSMON], [test x$plugin_tlsmon = xyes])
 if test x$plugin_tlsmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_TLSMON, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_codemon],
+  [AS_HELP_STRING([--disable-plugin-codemon],
+    [Enable the codemon plugin @<:@yes@:>@])],
+  [plugin_codemon="$enableval"],
+  [plugin_codemon="yes"])
+AM_CONDITIONAL([PLUGIN_CODEMON], [test x$plugin_codemon = xyes])
+if test x$plugin_codemon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_CODEMON, 1, "")
 fi
 
 AC_ARG_ENABLE([plugin_dummy],
@@ -674,6 +704,7 @@ ProcDump:     $plugin_procdump
 APIMon:       $plugin_apimon
 RPCMon:       $plugin_rpcmon
 TLSMon:       $plugin_tlsmon
+Codemon:      $plugin_codemon
 Dummy:        $plugin_dummy
 -------------------------------------------------------------------------------
 Deprecated Plugins

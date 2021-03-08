@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -109,6 +109,7 @@
 #include <libvmi/peparse.h>
 #include <libdrakvuf/json-util.h>
 #include <optional>
+#include <memory>
 
 #include "plugins/output_format.h"
 #include "rpcmon.h"
@@ -300,6 +301,39 @@ static std::optional<uint64_t> parse_FORMAT_STRING(drakvuf_t drakvuf, drakvuf_tr
     return proc_num;
 }
 
+struct rpc_message_t
+{
+    uint64_t ProcNum;
+    std::string InterfaceIdGuid;
+};
+
+static std::optional<rpc_message_t> parse_RPC_MESSAGE(drakvuf_t drakvuf, drakvuf_trap_info* info, addr_t arg)
+{
+    struct rpc_message_t r;
+
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    };
+
+    uint32_t proc_num;
+    ctx.addr = arg + RPC_MESSAGE_PROCNUM_OFFSET;
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &proc_num))
+        return {};
+    r.ProcNum = proc_num;
+
+    ctx.addr = arg + RPC_MESSAGE_RPCINTERFACEINFO_OFFSET;
+    auto rpc_iface = read_struct<_RPC_CLIENT_INTERFACE>(vmi, &ctx);
+    if (!rpc_iface)
+        return {};
+    r.InterfaceIdGuid = rpc_iface->InterfaceId.SyntaxGuid.str();
+
+    return r;
+}
+
 static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     return_hook_target_entry_t* ret_target = (return_hook_target_entry_t*)info->trap->data;
@@ -344,6 +378,14 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 
                 fmt_extra_num.push_back(std::make_pair("ProcedureNumber", fmt::Nval(*r)));
             }
+            else if (std::string("RpcMessage") == (*printer)->get_name())
+            {
+                auto r = parse_RPC_MESSAGE(drakvuf, info, *arg);
+                if (!r) continue;
+
+                fmt_extra_num.push_back(std::make_pair("ProcNum", fmt::Nval(r->ProcNum)));
+                fmt_extra.push_back(std::make_pair("InterfaceId", r->InterfaceIdGuid));
+            }
         }
     }
 
@@ -363,9 +405,6 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
 static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 {
     hook_target_entry_t* target = (hook_target_entry_t*)info->trap->data;
-
-    if (target->pid != info->attached_proc_data.pid)
-        return VMI_EVENT_RESPONSE_NONE;
 
     auto vmi = vmi_lock_guard(drakvuf);
     vmi_v2pcache_flush(vmi, info->regs->cr3);
@@ -419,6 +458,8 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     trap->breakpoint.dtb = info->regs->cr3;
     trap->breakpoint.addr_type = ADDR_VA;
     trap->breakpoint.addr = ret_addr;
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    trap->ah_cb = nullptr;
 
     if (drakvuf_add_trap(drakvuf, trap))
     {
@@ -434,91 +475,50 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static void print_addresses(drakvuf_t drakvuf, rpcmon* plugin, const dll_view_t* dll, const std::vector<hook_target_view_t>& targets)
-{
-    unicode_string_t* dll_name;
-    json_object* j_root;
-    json_object* j_rvas;
-    vmi_pid_t pid;
-    vmi_lock_guard lg(drakvuf);
-
-    dll_name = drakvuf_read_unicode_va(lg.vmi, dll->mmvad.file_name_ptr, 0);
-
-    if (plugin->m_output_format != OUTPUT_JSON)
-        return;
-
-    if (!dll_name || !dll_name->contents)
-        goto out;
-
-    vmi_dtb_to_pid(lg.vmi, dll->dtb, &pid);
-
-    j_root = json_object_new_object();
-    j_rvas = json_object_new_object();
-
-    for (auto const& target : targets)
-    {
-        if (target.state == HOOK_OK)
-            json_object_object_add(j_rvas, target.target_name.c_str(), json_object_new_int(target.offset));
-    }
-
-    json_object_object_add(j_root, "Plugin", json_object_new_string("rpcmon"));
-    json_object_object_add(j_root, "Event", json_object_new_string("dll_loaded"));
-    json_object_object_add(j_root, "Rva", j_rvas);
-    json_object_object_add(j_root, "DllBase", json_object_new_string_fmt("0x%lx", dll->real_dll_base));
-    json_object_object_add(j_root, "DllName", json_object_new_string((const char*)dll_name->contents));
-    json_object_object_add(j_root, "PID", json_object_new_int(pid));
-
-    printf("%s\n", json_object_to_json_string(j_root));
-
-    json_object_put(j_root);
-
-out:
-    if (dll_name)
-        vmi_free_unicode_str(dll_name);
-}
-
-static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
+static void on_dll_discovered(drakvuf_t drakvuf, std::string const& dll_name, const dll_view_t* dll, void* extra)
 {
     rpcmon* plugin = (rpcmon*)extra;
 
-    auto vmi = vmi_lock_guard(drakvuf);
-    unicode_string_t* dll_name = drakvuf_read_unicode_va(vmi, dll->mmvad.file_name_ptr, 0);
-
-    if (dll_name && dll_name->contents)
+    plugin->wanted_hooks.visit_hooks_for(dll_name, [&](const auto& e)
     {
-        for (auto const& wanted_hook : plugin->wanted_hooks)
-        {
-            if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
-            {
-                drakvuf_request_usermode_hook(drakvuf, dll, &wanted_hook, usermode_hook_cb, plugin);
-            }
-        }
-    }
-
-    if (dll_name)
-        vmi_free_unicode_str(dll_name);
+        drakvuf_request_usermode_hook(drakvuf, dll, &e, usermode_hook_cb, plugin);
+    });
 }
 
 static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::vector<hook_target_view_t>& targets, void* extra)
 {
-    rpcmon* plugin = (rpcmon*)extra;
-    print_addresses(drakvuf, plugin, dll, targets);
     PRINT_DEBUG("[RPCMON] DLL hooked - done\n");
 }
 
 static auto rpc_call_args()
 {
+    PrinterConfig config{};
+    config.numeric_format = PrinterConfig::NumericFormat::DECIMAL;
+
     std::vector<std::unique_ptr<ArgumentPrinter>> args;
-    args.emplace_back(std::make_unique<ArgumentPrinter>("pStubDescriptor", false));
-    args.emplace_back(std::make_unique<ArgumentPrinter>("pFormat", false));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("pStubDescriptor", config));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("pFormat", config));
     return args;
 }
 
 static auto rpc_call3_args()
 {
+    PrinterConfig config{};
+    config.numeric_format = PrinterConfig::NumericFormat::DECIMAL;
+
     std::vector<std::unique_ptr<ArgumentPrinter>> args;
-    args.emplace_back(std::make_unique<ArgumentPrinter>("pStubProxy", false));
-    args.emplace_back(std::make_unique<ArgumentPrinter>("ProcedureNumber", false, ArgumentPrinter::DECIMAL));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("pStubProxy", config));
+    args.emplace_back(std::make_unique<ArgumentPrinter>("ProcedureNumber", config));
+    return args;
+}
+
+static auto i_rpc_args()
+{
+    PrinterConfig config{};
+    config.numeric_format = PrinterConfig::NumericFormat::DECIMAL;
+
+    std::vector<std::unique_ptr<ArgumentPrinter>> args;
+    args.emplace_back(std::make_unique<ArgumentPrinter>("RpcMessage", config));
     return args;
 }
 
@@ -532,12 +532,15 @@ rpcmon::rpcmon(drakvuf_t drakvuf, output_format_t output)
     }
 
     const auto log = HookActions::empty().set_log();
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrAsyncClientCall", log, rpc_call_args());
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrAsyncClientCall2", log, rpc_call_args());
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall", log, rpc_call_args());
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall2", log, rpc_call_args());
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall3", log, rpc_call3_args());
-    wanted_hooks.emplace_back("rpcrt4.dll", "NdrClientCall4", log, rpc_call_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "NdrAsyncClientCall", log, rpc_call_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "NdrAsyncClientCall2", log, rpc_call_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "NdrClientCall", log, rpc_call_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "NdrClientCall2", log, rpc_call_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "NdrClientCall3", log, rpc_call3_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "NdrClientCall4", log, rpc_call_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "I_RpcReceive", log, i_rpc_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "I_RpcSend", log, i_rpc_args());
+    wanted_hooks.add_hook("rpcrt4.dll", "I_RpcSendReceive", log, i_rpc_args());
 
     usermode_cb_registration reg =
     {

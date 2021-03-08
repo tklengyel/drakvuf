@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -105,9 +105,6 @@
 #ifndef RPCMON_H
 #define RPCMON_H
 
-#include <vector>
-#include <memory>
-
 #include <glib.h>
 #include <libusermode/userhook.hpp>
 #include "plugins/private.h"
@@ -116,7 +113,7 @@
 class rpcmon: public pluginex
 {
 public:
-    std::vector<plugin_target_config_entry_t> wanted_hooks;
+    wanted_hooks_t wanted_hooks;
 
     rpcmon(drakvuf_t drakvuf, output_format_t output);
     ~rpcmon();

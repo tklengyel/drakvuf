@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -130,6 +130,7 @@
 #include "procdump/procdump.h"
 #include "rpcmon/rpcmon.h"
 #include "tlsmon/tlsmon.h"
+#include "codemon/codemon.h"
 #include "dummy/dummy.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
@@ -322,6 +323,12 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     memdump_config config =
                     {
                         .memdump_dir = options->memdump_dir,
+                        .memdump_disable_free_vm = options->memdump_disable_free_vm,
+                        .memdump_disable_protect_vm = options->memdump_disable_protect_vm,
+                        .memdump_disable_write_vm = options->memdump_disable_write_vm,
+                        .memdump_disable_terminate_proc = options->memdump_disable_terminate_proc,
+                        .memdump_disable_create_thread = options->memdump_disable_create_thread,
+                        .memdump_disable_set_thread = options->memdump_disable_set_thread,
                         .dll_hooks_list = options->dll_hooks_list,
                         .clr_profile = options->clr_profile,
                         .mscorwks_profile = options->mscorwks_profile,
@@ -369,6 +376,21 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 {
                     this->plugins[plugin_id] = std::make_unique<tlsmon>(this->drakvuf, this->output);
                     break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_CODEMON
+                case PLUGIN_CODEMON:
+                {
+                    codemon_config_struct config =
+                    {
+                        .codemon_dump_dir = options->codemon_dump_dir,
+                        .codemon_filter_executable = options->codemon_filter_executable,
+                        .codemon_log_everything = options->codemon_log_everything,
+                        .codemon_dump_vad = options->codemon_dump_vad,
+                        .codemon_analyse_system_dll_vad = options->codemon_analyse_system_dll_vad,
+                        .codemon_default_benign = options->codemon_default_benign,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<codemon>(this->drakvuf, &config, this->output);
                 }
 #endif
 #ifdef ENABLE_PLUGIN_DUMMY

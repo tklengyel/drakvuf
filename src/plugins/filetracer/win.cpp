@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -599,6 +599,8 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     trap->name = info->trap->name;
     trap->data = w;
     trap->cb = create_file_ret_cb;
+    trap->ttl = UNLIMITED_TTL;
+    trap->ah_cb = nullptr;
 
     if ( !drakvuf_add_trap(drakvuf, trap) )
     {
@@ -738,6 +740,7 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
 
     trap->name = syscall_name;
     trap->cb   = hook_cb;
+    trap->ttl  = drakvuf_get_limited_traps_ttl(drakvuf);
 
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }

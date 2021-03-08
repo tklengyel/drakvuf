@@ -8,7 +8,7 @@
 * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
 * right to use, modify, and redistribute this software under certain      *
 * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
-* software, alternative licenses can be aquired from the author.          *
+* software, alternative licenses can be acquired from the author.         *
 *                                                                         *
 * Note that the GPL places important restrictions on "derivative works",  *
 * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -105,8 +105,8 @@
 #include "ostream.h"
 
 #include <sstream>
+#include <cstdio>
 
-#include <stdio.h>
 #include <unistd.h>
 
 namespace fmt
@@ -114,20 +114,46 @@ namespace fmt
 
 class StrBuf : public std::stringbuf
 {
+public:
+    StrBuf() : std::stringbuf(std::ios_base::out), stdout_is_tty_(isatty(STDOUT_FILENO)) {}
+    ~StrBuf()
+    {
+        sync(0);
+    }
+
 protected:
     int sync() final
+    {
+        // Disable buffering when printing on tty
+        const int threshold = stdout_is_tty_ ? 0 : 4 * 1024;
+        return sync(threshold);
+    }
+
+    int sync(int threshold)
+    {
+        if (pptr() - pbase() > threshold)
+            return sync_impl();
+        return 0;
+    }
+
+    int sync_impl()
     {
         // this is required because of printf() logging
         fflush(stdout);
 
-        int size = pptr() - pbase();
-        if (write(STDOUT_FILENO, pbase(), size) == size)
+        for (auto size = pptr() - pbase(); size > 0; )
         {
-            seekpos(0);
-            return 0;
+            auto written = write(STDOUT_FILENO, pbase(), size);
+            if (written < 0)
+                return -1;
+            size -= written;
+            seekoff(written, std::ios_base::cur, std::ios_base::out);
         }
-        return -1;
+        seekpos(0);
+        return 0;
     }
+
+    bool stdout_is_tty_;
 };
 
 static StrBuf outbuf;

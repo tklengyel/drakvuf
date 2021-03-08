@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -103,6 +103,8 @@
  ***************************************************************************/
 
 #include <config.h>
+#include <iostream>
+#include <stdexcept>
 #include <glib.h>
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
@@ -233,6 +235,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
     trap->breakpoint.dtb = info->regs->cr3;
     trap->breakpoint.addr_type = ADDR_VA;
     trap->breakpoint.addr = ret_addr;
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
 
     if (drakvuf_add_trap(drakvuf, trap))
     {
@@ -291,26 +294,14 @@ out:
         vmi_free_unicode_str(dll_name);
 }
 
-static void on_dll_discovered(drakvuf_t drakvuf, const dll_view_t* dll, void* extra)
+static void on_dll_discovered(drakvuf_t drakvuf, const std::string& dll_name, const dll_view_t* dll, void* extra)
 {
     apimon* plugin = (apimon*)extra;
 
-    vmi_lock_guard lg(drakvuf);
-    unicode_string_t* dll_name = drakvuf_read_unicode_va(lg.vmi, dll->mmvad.file_name_ptr, 0);
-
-    if (dll_name && dll_name->contents)
+    plugin->wanted_hooks.visit_hooks_for(dll_name, [&](const auto& e)
     {
-        for (auto const& wanted_hook : plugin->wanted_hooks)
-        {
-            if (strstr((const char*)dll_name->contents, wanted_hook.dll_name.c_str()) != 0)
-            {
-                drakvuf_request_usermode_hook(drakvuf, dll, &wanted_hook, usermode_hook_cb, plugin);
-            }
-        }
-    }
-
-    if (dll_name)
-        vmi_free_unicode_str(dll_name);
+        drakvuf_request_usermode_hook(drakvuf, dll, &e, usermode_hook_cb, plugin);
+    });
 }
 
 static void on_dll_hooked(drakvuf_t drakvuf, const dll_view_t* dll, const std::vector<hook_target_view_t>& targets, void* extra)
@@ -331,22 +322,18 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
 
     try
     {
-        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, &this->wanted_hooks);
+        auto noLog = [](const auto& entry)
+        {
+            return !entry.actions.log;
+        };
+        drakvuf_load_dll_hook_config(drakvuf, c->dll_hooks_list, c->print_no_addr, noLog, this->wanted_hooks);
     }
-    catch (int e)
+    catch (const std::runtime_error& exc)
     {
-        fprintf(stderr, "Malformed DLL hook configuration for APIMON plugin\n");
+        std::cerr << "Loading DLL hook configuration for APIMON plugin failed\n"
+                  << "Reason: " << exc.what() << "\n";
         throw -1;
     }
-
-    auto& hooks = this->wanted_hooks;
-    auto noLog = [](const auto& entry)
-    {
-        return !entry.actions.log;
-    };
-    hooks.erase(
-        std::remove_if(std::begin(hooks), std::end(hooks), noLog),
-        std::end(hooks));
 
     if (this->wanted_hooks.empty())
     {

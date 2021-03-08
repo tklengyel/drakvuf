@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -119,6 +119,7 @@
 #include <map>
 #include <string>
 #include <optional>
+#include <stdexcept>
 
 #include <config.h>
 #include <glib.h>
@@ -135,6 +136,18 @@
 static void wrap_delete(drakvuf_trap_t* trap)
 {
     g_slice_free(drakvuf_trap_t, trap);
+}
+
+static std::string drakvuf_read_unicode(drakvuf_t drakvuf, addr_t addr)
+{
+    std::string str;
+    auto vmi = vmi_lock_guard(drakvuf);
+    unicode_string_t* us = drakvuf_read_unicode_va(vmi, addr, 0);
+    if (us && us->contents)
+        str.assign(reinterpret_cast<const char*>(us->contents));
+    if (us)
+        vmi_free_unicode_str(us);
+    return str;
 }
 
 /**
@@ -201,9 +214,14 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
         .v.is_hooked = false
     };
 
-    for (auto& reg : plugin->plugins)
+    std::string dll_name = drakvuf_read_unicode(drakvuf, dll_meta.v.mmvad.file_name_ptr);
+
+    if (!dll_name.empty())
     {
-        reg.pre_cb(drakvuf, (const dll_view_t*)&dll_meta, reg.extra);
+        for (auto& reg : plugin->plugins)
+        {
+            reg.pre_cb(drakvuf, dll_name, (const dll_view_t*)&dll_meta, reg.extra);
+        }
     }
 
     if (dll_meta.targets.empty())
@@ -271,7 +289,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
 {
     target->pid = info->proc_data.pid;
 
-    drakvuf_trap_t* trap = g_slice_new(drakvuf_trap_t);
+    drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
     trap->type = BREAKPOINT;
     trap->name = target->target_name.c_str();
     trap->cb = target->callback;
@@ -287,6 +305,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
     trap->breakpoint.lookup_type = LOOKUP_NONE;
     trap->breakpoint.addr_type = ADDR_PA;
     trap->breakpoint.addr = pa;
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
 
     if (drakvuf_add_trap(drakvuf, trap))
     {
@@ -790,11 +809,11 @@ userhook::userhook(drakvuf_t drakvuf): pluginex(drakvuf, OUTPUT_DEFAULT)
     drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets.data());
 
     breakpoint_in_system_process_searcher bp;
-    if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
-        !register_trap(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection")) ||
-        !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler")) ||
-        !register_trap(nullptr, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
-        !register_trap(nullptr, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite")))
+    if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory"), nullptr, UNLIMITED_TTL) ||
+        !register_trap(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection"), nullptr, UNLIMITED_TTL) ||
+        !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler"), nullptr, UNLIMITED_TTL) ||
+        !register_trap(nullptr, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess"), nullptr, UNLIMITED_TTL) ||
+        !register_trap(nullptr, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite"), nullptr, UNLIMITED_TTL))
         throw -1;
 }
 
@@ -848,21 +867,169 @@ std::optional<HookActions> get_hook_actions(const std::string& str)
     return std::nullopt;
 }
 
-void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, const bool print_no_addr, std::vector<plugin_target_config_entry_t>* wanted_hooks)
+namespace
 {
+std::optional<std::string> try_parse_token(std::stringstream& ss)
+{
+    const char SEPARATOR = ',';
+    std::string result;
+    if (!std::getline(ss, result, SEPARATOR) || result.empty())
+    {
+        return std::nullopt;
+    }
+    return result;
+}
+
+std::string parse_token(std::stringstream& ss)
+{
+    auto maybe_token = try_parse_token(ss);
+    if (!maybe_token)
+    {
+        throw std::runtime_error{"Expected a token"};
+    }
+    return *maybe_token;
+}
+
+std::unique_ptr<ArgumentPrinter> make_arg_printer(
+    const PrinterConfig& config,
+    const std::string& type,
+    const std::string& name)
+{
+    if (type == "lpstr" || type == "lpcstr" || type == "lpctstr")
+    {
+        return std::make_unique<AsciiPrinter>(name, config);
+    }
+    else if (type == "lpcwstr" || type == "lpwstr" || type == "bstr")
+    {
+        return std::make_unique<WideStringPrinter>(name, config);
+    }
+    else if (type == "punicode_string")
+    {
+        return std::make_unique<UnicodePrinter>(name, config);
+    }
+    else if (type == "pulong")
+    {
+        return std::make_unique<UlongPrinter>(name, config);
+    }
+    else if (type == "lpvoid*")
+    {
+        return std::make_unique<PointerToPointerPrinter>(name, config);
+    }
+    else if (type == "refclsid" || type == "refiid")
+    {
+        return std::make_unique<GuidPrinter>(name, config);
+    }
+    else if (type == "binary16")
+    {
+        return std::make_unique<Binary16StringPrinter>(name, config);
+    }
+
+    return std::make_unique<ArgumentPrinter>(name, config);
+}
+
+
+std::vector<std::unique_ptr<ArgumentPrinter>> parse_arguments(
+            const PrinterConfig& config,
+            std::stringstream& ss)
+{
+    std::vector<std::unique_ptr<ArgumentPrinter>> argument_printers;
+
+    for (size_t arg_idx = 0; ; arg_idx++)
+    {
+        auto maybe_arg = try_parse_token(ss);
+        if (!maybe_arg) break;
+
+        const std::string arg = *maybe_arg;
+        std::string arg_name;
+        std::string arg_type;
+        const auto pos = arg.find_first_of(':');
+
+        if (pos == std::string::npos)
+        {
+            arg_name = std::string("Arg") + std::to_string(arg_idx);
+            arg_type = arg;
+        }
+        else
+        {
+            arg_name = arg.substr(0, pos);
+            arg_type = arg.substr(pos + 1);
+        }
+
+        argument_printers.emplace_back(make_arg_printer(config, arg_type, arg_name));
+    }
+    return argument_printers;
+}
+
+plugin_target_config_entry_t parse_entry(
+    std::stringstream& ss,
+    PrinterConfig& config)
+{
+    plugin_target_config_entry_t entry{};
+
+    entry.dll_name = parse_token(ss);
+    entry.function_name = parse_token(ss);
+    entry.type = HOOK_BY_NAME;
+
+    std::string log_strategy_or_offset;
+    std::string token = parse_token(ss);
+    if (token == "clsid")
+    {
+        entry.clsid = parse_token(ss);
+        log_strategy_or_offset = parse_token(ss);
+    }
+    else
+    {
+        log_strategy_or_offset = token;
+    }
+
+    std::optional<HookActions> actions = get_hook_actions(log_strategy_or_offset);
+    if (!actions)
+    {
+        entry.type = HOOK_BY_OFFSET;
+        try
+        {
+            entry.offset = std::stoull(log_strategy_or_offset, 0, 16);
+        }
+        catch (const std::logic_error& exc)
+        {
+            throw std::runtime_error{"Invalid offset"};
+        }
+
+        std::string strategy_name = parse_token(ss);
+        actions = get_hook_actions(strategy_name);
+        if (!actions)
+            throw std::runtime_error{"Invalid hook action"};
+    }
+
+    entry.actions = *actions;
+    entry.argument_printers = parse_arguments(config, ss);
+
+    return entry;
+}
+}
+
+
+void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, bool print_no_addr, const hook_filter_t& hook_filter, wanted_hooks_t& wanted_hooks)
+{
+    PrinterConfig config{};
+    config.print_no_addr = print_no_addr;
+
     if (!dll_hooks_list_path)
     {
         const auto log_and_stack = HookActions::empty().set_log().set_stack();
         // if the DLL hook list was not provided, we provide some simple defaults
-        std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec1;
-        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("wVersionRequired", print_no_addr));
-        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("lpWSAData", print_no_addr));
-        wanted_hooks->emplace_back("ws2_32.dll", "WSAStartup", log_and_stack, std::move(arg_vec1));
+        std::vector<std::unique_ptr<ArgumentPrinter>> arg_vec1;
+        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("wVersionRequired", config));
+        arg_vec1.push_back(std::make_unique<ArgumentPrinter>("lpWSAData", config));
+        plugin_target_config_entry_t e1("ws2_32.dll", "WSAStartup", log_and_stack, std::move(arg_vec1));
 
-        std::vector< std::unique_ptr < ArgumentPrinter > > arg_vec2;
-        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("ExitCode", print_no_addr));
-        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("Unknown", print_no_addr));
-        wanted_hooks->emplace_back("ntdll.dll", "RtlExitUserProcess", log_and_stack, std::move(arg_vec2));
+        std::vector<std::unique_ptr<ArgumentPrinter>> arg_vec2;
+        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("ExitCode", config));
+        arg_vec2.push_back(std::make_unique<ArgumentPrinter>("Unknown", config));
+        plugin_target_config_entry_t e2("ntdll.dll", "RtlExitUserProcess", log_and_stack, std::move(arg_vec2));
+
+        if (!hook_filter(e1)) wanted_hooks.add_hook(std::move(e1));
+        if (!hook_filter(e2)) wanted_hooks.add_hook(std::move(e2));
         return;
     }
 
@@ -870,119 +1037,28 @@ void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_
 
     if (!ifs)
     {
-        throw -1;
+        throw std::runtime_error{"Cannnot open DLL hook file"};
     }
 
     std::string line;
-    while (std::getline(ifs, line))
+    for (size_t line_no = 1; std::getline(ifs, line); line_no++)
     {
         if (line.empty() || line[0] == '#')
             continue;
 
-        std::stringstream ss(line);
-
-        wanted_hooks->push_back(plugin_target_config_entry_t());
-        plugin_target_config_entry_t& e = wanted_hooks->back();
-
-        if (!std::getline(ss, e.dll_name, ',') || e.dll_name.empty())
-            throw -1;
-
-        if (!std::getline(ss, e.function_name, ',') || e.function_name.empty())
-            throw -1;
-
-        e.type = HOOK_BY_NAME;
-
-        std::string log_strategy_or_offset;
-        std::string token;
-        if (!std::getline(ss, token, ','))
+        try
         {
-            throw -1;
+            std::stringstream ss(line);
+            auto e = parse_entry(ss, config);
+            if (!hook_filter(e)) wanted_hooks.add_hook(std::move(e));
         }
-
-        if (token == "clsid")
+        catch (const std::runtime_error& exc)
         {
-            if (!std::getline(ss, e.clsid, ',') || e.clsid.empty())
-                throw -1;
+            std::stringstream ss;
+            ss << "Invalid entry on line " << line_no << ": " << exc.what();
 
-            if (!std::getline(ss, log_strategy_or_offset, ','))
-                throw -1;
-        }
-        else
-            log_strategy_or_offset = token;
-
-        std::optional<HookActions> actions = get_hook_actions(log_strategy_or_offset);
-        if (actions)
-        {
-            e.actions = *actions;
-        }
-        else
-        {
-            e.offset = std::stoull(log_strategy_or_offset, 0, 16);
-            e.type = HOOK_BY_OFFSET;
-
-            std::string strategy_name;
-            if (!std::getline(ss, strategy_name, ',') || strategy_name.empty())
-                throw -1;
-
-            actions = get_hook_actions(strategy_name);
-            if (!actions)
-                throw -1;
-
-            e.actions = *actions;
-        }
-
-        std::string arg;
-        size_t arg_idx = 0;
-        while (std::getline(ss, arg, ',') && !arg.empty())
-        {
-            auto pos = arg.find_first_of(':');
-            std::string arg_name;
-            std::string arg_type;
-            if (pos == std::string::npos)
-            {
-                arg_name = std::string("Arg") + std::to_string(arg_idx);
-                arg_type = arg;
-            }
-            else
-            {
-                arg_name = arg.substr(0, pos);
-                arg_type = arg.substr(pos + 1);
-            }
-
-            if (arg_type == "lpstr" || arg_type == "lpcstr" || arg_type == "lpctstr")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new AsciiPrinter(arg_name, print_no_addr)));
-            }
-            else if (arg_type == "lpcwstr" || arg_type == "lpwstr" || arg_type == "bstr")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new WideStringPrinter(arg_name, print_no_addr)));
-            }
-            else if (arg_type == "punicode_string")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UnicodePrinter(arg_name, print_no_addr)));
-            }
-            else if (arg_type == "pulong")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new UlongPrinter(arg_name, print_no_addr)));
-            }
-            else if (arg_type == "lpvoid*")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new PointerToPointerPrinter(arg_name, print_no_addr)));
-            }
-            else if (arg_type == "refclsid" || arg_type == "refiid")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new GuidPrinter(arg_name, print_no_addr)));
-            }
-            else if (arg_type == "binary16")
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new Binary16StringPrinter(arg_name, print_no_addr)));
-            }
-            else
-            {
-                e.argument_printers.push_back(std::unique_ptr< ArgumentPrinter>(new ArgumentPrinter(arg_name, print_no_addr)));
-            }
-
-            ++arg_idx;
+            // Rethrow exception
+            throw std::runtime_error{ss.str()};
         }
     }
 }

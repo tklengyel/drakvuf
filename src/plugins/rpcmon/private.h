@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -111,3 +111,6 @@
 #define Oi_FLAGS_FIELD_OFFSET 0x1
 #define Oi_PROCNUM_FIELD_OFFSET_WITH_RPCFLAGS 0x6
 #define Oi_PROCNUM_FIELD_OFFSET_WITHOUT_RPCFLAGS 0x2
+
+#define RPC_MESSAGE_PROCNUM_OFFSET 0x1c
+#define RPC_MESSAGE_RPCINTERFACEINFO_OFFSET 0x28

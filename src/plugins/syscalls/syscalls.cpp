@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -154,6 +154,16 @@ static std::string extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_i
     return str;
 }
 
+static uint64_t mask_value(const arg_t& arg, uint64_t val)
+{
+    if (arg.type == BYTE || arg.type == BOOLEAN)
+        return val & 0xff;
+    if (arg.type == SHORT || arg.type == USHORT || arg.type == WORD)
+        return val & 0xffff;
+    if (arg.type == DWORD || arg.type == INT || arg.type == UINT || arg.type == LONG || arg.type == ULONG)
+        return val & 0xffffffff;
+    return val;
+}
 void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
                    bool syscall, drakvuf_trap_info_t* info,
                    int nr, std::string module, const syscall_t* sc,
@@ -165,15 +175,16 @@ void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
 
     if (syscall)
     {
-        std::vector<std::pair<std::string, fmt::Aarg>> fmt_args;
+        s->fmt_args.clear();
+
         if (sc)
             for (size_t i = 0; i < args.size(); ++i)
             {
                 auto str = extract_string(s, drakvuf, info, sc->args[i], args[i]);
                 if ( !str.empty() )
-                    fmt_args.push_back(keyval(sc->args[i].name, fmt::Qstr(str)));
+                    s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Qstr(str)));
                 else
-                    fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(args[i])));
+                    s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval( mask_value(sc->args[i], args[i]) )));
             }
 
         fmt::print(s->format, "syscall", drakvuf, info,
@@ -182,7 +193,7 @@ void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
                    keyval("CR3", fmt::Xval(info->regs->cr3)),
                    keyval("Syscall", fmt::Nval(nr)),
                    keyval("NArgs", fmt::Nval(args.size())),
-                   fmt_args
+                   s->fmt_args
                   );
     }
     else

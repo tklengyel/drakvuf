@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -134,9 +134,11 @@ typedef enum
     APPHELPCOMMAND,
     ATOM_INFORMATION_CLASS,
     AUDIT_EVENT_TYPE,
+    BYTE,
     BOOLEAN,
     DEBUGOBJECTINFOCLASS,
     DEVICE_POWER_STATE,
+    WORD,
     DWORD,
     ENLISTMENT_INFORMATION_CLASS,
     EVENT_INFORMATION_CLASS,
@@ -289,9 +291,11 @@ static const char* type_names[]
     [APPHELPCOMMAND] = "APPHELPCOMMAND",
     [ATOM_INFORMATION_CLASS] = "ATOM_INFORMATION_CLASS",
     [AUDIT_EVENT_TYPE] = "AUDIT_EVENT_TYPE",
+    [BYTE] = "BYTE",
     [BOOLEAN] = "BOOLEAN",
     [DEBUGOBJECTINFOCLASS] = "DEBUGOBJECTINFOCLASS",
     [DEVICE_POWER_STATE] = "DEVICE_POWER_STATE",
+    [WORD] = "WORD",
     [DWORD] = "DWORD",
     [ENLISTMENT_INFORMATION_CLASS] = "ENLISTMENT_INFORMATION_CLASS",
     [EVENT_INFORMATION_CLASS] = "EVENT_INFORMATION_CLASS",

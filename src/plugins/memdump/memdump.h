@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -120,6 +120,12 @@ struct memdump_config
     const char* clr_profile;
     const char* mscorwks_profile;
     const bool print_no_addr;
+    const bool memdump_disable_free_vm;
+    const bool memdump_disable_protect_vm;
+    const bool memdump_disable_write_vm;
+    const bool memdump_disable_terminate_proc;
+    const bool memdump_disable_create_thread;
+    const bool memdump_disable_set_thread;
 };
 
 class memdump: public pluginex
@@ -134,7 +140,7 @@ public:
     size_t wow64context_eip_rva;
     size_t wow64context_eax_rva;
 
-    std::vector<plugin_target_config_entry_t> wanted_hooks;
+    wanted_hooks_t wanted_hooks;
 
     memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
     ~memdump();

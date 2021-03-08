@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -124,11 +124,18 @@ void close_handler(int signal)
     drakvuf->interrupt(signal);
 }
 
-static inline void disable_plugin(char* optarg, bool* plugin_list)
+static inline bool disable_plugin(char* optarg, bool* plugin_list)
 {
     for (int i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
+    {
         if (!strcmp(optarg, drakvuf_plugin_names[i]))
+        {
             plugin_list[i] = false;
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static inline void disable_all_plugins(bool* plugin_list)
@@ -137,7 +144,7 @@ static inline void disable_all_plugins(bool* plugin_list)
         plugin_list[i] = false;
 }
 
-static inline void enable_plugin(char* optarg, bool* plugin_list, bool* disabled_all)
+static inline bool enable_plugin(char* optarg, bool* plugin_list, bool* disabled_all)
 {
     if (!*disabled_all)
     {
@@ -145,8 +152,14 @@ static inline void enable_plugin(char* optarg, bool* plugin_list, bool* disabled
         *disabled_all = true;
     }
     for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
+    {
         if (!strcmp(optarg, drakvuf_plugin_names[i]))
+        {
             plugin_list[i] = true;
+            return true;
+        }
+    }
+    return false;
 }
 
 static void print_usage()
@@ -178,6 +191,7 @@ static void print_usage()
             "\t -a <plugin>               Activate the specified plugin\n"
             "\t -p                        Leave domain paused after DRAKVUF exits\n"
             "\t -F                        Enable fast singlestepping (requires Xen 4.14+)\n"
+            "\t --traps-ttl <ttl value>   Maximum number of times trap can be triggered in 10sec period. Protects against api hammering.\n"
 #ifdef ENABLE_DOPPELGANGING
             "\t -B <path>                 The host path of the windows binary to inject (requires -m doppelganging)\n"
             "\t -P <target>               The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
@@ -240,6 +254,18 @@ static void print_usage()
             "\t                           The JSON profile for clr.dll\n"
             "\t --json-mscorwks <path to json>\n"
             "\t                           The JSON profile for mscorewks.dll\n"
+            "\t --memdump-disable-free-vm\n"
+            "\t                           Disable hook on NtFreeVirtualMemory\n"
+            "\t --memdump-disable-protect-vm\n"
+            "\t                           Disable hook on NtProtectVirtualMemory\n"
+            "\t --memdump-disable-write-vm\n"
+            "\t                           Disable hook on NtWriteVirtualMemory\n"
+            "\t --memdump-disable-terminate-proc\n"
+            "\t                           Disable hook on NtTerminateProcess\n"
+            "\t --memdump-disable-create-thread\n"
+            "\t                           Disable hook on NtCreateThreadEx\n"
+            "\t --memdump-disable-set-thread\n"
+            "\t                           Disable hook on NtSetInformationThread\n"
 #endif
 #if defined(ENABLE_PLUGIN_MEMDUMP) || defined(ENABLE_PLUGIN_APIMON)
             "\t --dll-hooks-list <file>\n"
@@ -253,6 +279,21 @@ static void print_usage()
             "\t --compress-procdumps\n"
             "\t                           Controls compression of processes dumps on disk\n"
 #endif
+#ifdef ENABLE_PLUGIN_CODEMON
+            "\t --codemon-dump-dir <directory>\n"
+            "\t                           Folder where to store page/vad dumps (path)\n"
+            "\t --codemon-filter-executable <filename>\n"
+            "\t                           Limit the output to events regarding this file\n"
+
+            "\t --codemon-log-everything\n"
+            "\t                           Enables logging (to shell) of pagefaults and writefaults. Additionally, logs of analysed pages can be printed regardless if malware was detected or not\n"
+            "\t --codemon-dump-vad\n"
+            "\t                           By default only page sized memory areas are dumped. By setting this flag whole VAD nodes can be dumped instead\n"
+            "\t --codemon-analyse-system-dll-vad\n"
+            "\t                           Enforces the analysis of vads, which names (paths of mapped dlls / exes) contain System32 or SysWOW64\n"
+            "\t --codemon-default-benign\n"
+            "\t                           By default we assume everything to be malware. If this flag is enabled we assume all analysed memory areas to be goodware instead. This flag should be just set if a classifier is integrated\n"
+#endif
             "\t -h, --help                Show this help\n"
            );
 }
@@ -261,6 +302,7 @@ int main(int argc, char** argv)
 {
     int c;
     int timeout = 0;
+    uint64_t limited_traps_ttl = UNLIMITED_TTL;
     char const* inject_file = nullptr;
     char const* inject_cwd = nullptr;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
@@ -316,6 +358,12 @@ int main(int argc, char** argv)
         opt_json_wow_ole32,
         opt_json_combase,
         opt_memdump_dir,
+        opt_memdump_disable_free_vm,
+        opt_memdump_disable_protect_vm,
+        opt_memdump_disable_write_vm,
+        opt_memdump_disable_terminate_proc,
+        opt_memdump_disable_create_thread,
+        opt_memdump_disable_set_thread,
         opt_dll_hooks_list,
         opt_procdump_dir,
         opt_compress_procdumps,
@@ -325,7 +373,14 @@ int main(int argc, char** argv)
         opt_userhook_no_addr,
         opt_terminate,
         opt_termination_timeout,
+        opt_traps_ttl,
         opt_wait_stop_plugins,
+        opt_codemon_dump_dir,
+        opt_codemon_filter_executable,
+        opt_codemon_log_everything,
+        opt_codemon_dump_vad,
+        opt_codemon_analyse_system_dll_vad,
+        opt_codemon_default_benign,
     };
     const option long_opts[] =
     {
@@ -349,6 +404,12 @@ int main(int argc, char** argv)
         {"json-wow-ole32", required_argument, NULL, opt_json_wow_ole32},
         {"json-combase", required_argument, NULL, opt_json_combase},
         {"memdump-dir", required_argument, NULL, opt_memdump_dir},
+        {"memdump-disable-free-vm", no_argument, NULL, opt_memdump_disable_free_vm},
+        {"memdump-disable-protect-vm", no_argument, NULL, opt_memdump_disable_protect_vm},
+        {"memdump-disable-write-vm", no_argument, NULL, opt_memdump_disable_write_vm},
+        {"memdump-disable-terminate-proc", no_argument, NULL, opt_memdump_disable_terminate_proc},
+        {"memdump-disable-create-thread", no_argument, NULL, opt_memdump_disable_create_thread},
+        {"memdump-disable-set-thread", no_argument, NULL, opt_memdump_disable_set_thread},
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
@@ -358,7 +419,17 @@ int main(int argc, char** argv)
         {"disable-sysret", no_argument, NULL, opt_disable_sysret},
         {"userhook-no-addr", no_argument, NULL, opt_userhook_no_addr},
         {"fast-singlestep", no_argument, NULL, 'F'},
+        {"traps-ttl", required_argument, NULL, opt_traps_ttl},
         {"wait-stop-plugins", required_argument, NULL, opt_wait_stop_plugins},
+        {"codemon-dump-dir", required_argument, NULL, opt_codemon_dump_dir},
+        {"codemon-filter-executable", required_argument, NULL, opt_codemon_filter_executable},
+        {"codemon-log-everything", no_argument, NULL, opt_codemon_log_everything},
+        {"codemon-dump-vad", no_argument, NULL, opt_codemon_dump_vad},
+        {"codemon-analyse-system-dll-vad", no_argument, NULL, opt_codemon_analyse_system_dll_vad},
+        {"codemon-default-benign", no_argument, NULL, opt_codemon_default_benign},
+
+
+
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF";
@@ -440,13 +511,21 @@ int main(int argc, char** argv)
                     output = OUTPUT_JSON;
                 break;
             case 'x':
-                disable_plugin(optarg, plugin_list);
+                if (!disable_plugin(optarg, plugin_list))
+                {
+                    fprintf(stderr, "Unknown plugin: %s\n", optarg);
+                    return drakvuf_exit_code_t::FAIL;
+                }
                 break;
             case opt_wait_stop_plugins:
                 wait_stop_plugins = atoi(optarg);
                 break;
             case 'a':
-                enable_plugin(optarg, plugin_list, &disabled_all);
+                if (!enable_plugin(optarg, plugin_list, &disabled_all))
+                {
+                    fprintf(stderr, "Unknown plugin: %s\n", optarg);
+                    return drakvuf_exit_code_t::FAIL;
+                }
                 break;
             case 'f':
                 args[args_count] = optarg;
@@ -491,6 +570,9 @@ int main(int argc, char** argv)
                 break;
             case 'F':
                 fast_singlestep = true;
+                break;
+            case opt_traps_ttl:
+                limited_traps_ttl = strtoull(optarg, NULL, 0);
                 break;
             case 'k':
                 kpgd = strtoull(optarg, NULL, 0);
@@ -546,6 +628,24 @@ int main(int argc, char** argv)
             case opt_json_mscorwks:
                 options.mscorwks_profile = optarg;
                 break;
+            case opt_memdump_disable_free_vm:
+                options.memdump_disable_free_vm = true;
+                break;
+            case opt_memdump_disable_protect_vm:
+                options.memdump_disable_protect_vm = true;
+                break;
+            case opt_memdump_disable_write_vm:
+                options.memdump_disable_write_vm = true;
+                break;
+            case opt_memdump_disable_terminate_proc:
+                options.memdump_disable_terminate_proc = true;
+                break;
+            case opt_memdump_disable_create_thread:
+                options.memdump_disable_create_thread = true;
+                break;
+            case opt_memdump_disable_set_thread:
+                options.memdump_disable_set_thread = true;
+                break;
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP
             case opt_procdump_dir:
@@ -553,6 +653,26 @@ int main(int argc, char** argv)
                 break;
             case opt_compress_procdumps:
                 options.compress_procdumps = true;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_CODEMON
+            case opt_codemon_dump_dir:
+                options.codemon_dump_dir = optarg;
+                break;
+            case opt_codemon_filter_executable:
+                options.codemon_filter_executable = optarg;
+                break;
+            case opt_codemon_log_everything:
+                options.codemon_log_everything = true;
+                break;
+            case opt_codemon_dump_vad:
+                options.codemon_dump_vad = true;
+                break;
+            case opt_codemon_analyse_system_dll_vad:
+                options.codemon_analyse_system_dll_vad = true;
+                break;
+            case opt_codemon_default_benign:
+                options.codemon_default_benign = true;
                 break;
 #endif
             case 'h':
@@ -588,7 +708,7 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = std::make_unique<drakvuf_c>(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd, fast_singlestep);
+        drakvuf = std::make_unique<drakvuf_c>(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl);
     }
     catch (const std::exception& e)
     {
@@ -630,12 +750,12 @@ int main(int argc, char** argv)
     if (drakvuf->start_plugins(plugin_list, &options) < 0)
         return drakvuf_exit_code_t::FAIL;
 
-    PRINT_DEBUG("Beginning DRAKVUF loop\n");
+    PRINT_DEBUG("Beginning DRAKVUF main loop\n");
 
     /* Start the event listener */
     drakvuf->loop(timeout);
 
-    PRINT_DEBUG("Finished DRAKVUF loop\n");
+    PRINT_DEBUG("Finished DRAKVUF main loop\n");
 
     switch (drakvuf->is_interrupted())
     {

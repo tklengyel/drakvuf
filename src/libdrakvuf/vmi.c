@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -626,6 +626,33 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
             loop = loop->next;
         }
     }
+
+    // Iterate over traps updating ttl.
+    GSList* update_ttl_loop = s->traps;
+    time_t cur_time = time(NULL);
+    while (update_ttl_loop)
+    {
+        drakvuf_trap_t* trap = (drakvuf_trap_t*) update_ttl_loop->data;
+        if (trap->ttl == UNLIMITED_TTL)
+        {
+            update_ttl_loop = update_ttl_loop->next;
+            continue;
+        }
+
+        if (cur_time - trap->last_ttl_rst >= TRAP_TTL_RESET_INTERVAL_SEC)
+        {
+            trap->last_ttl_rst = cur_time;
+            trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+        }
+
+        if (--trap->ttl == 0)
+        {
+            trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+            trap->ah_cb(drakvuf, trap);
+        }
+
+        update_ttl_loop = update_ttl_loop->next;
+    }
     drakvuf->in_callback = 0;
 
     free_proc_data_priv_2(&proc_data, &attached_proc_data);
@@ -994,6 +1021,8 @@ bool inject_trap_pa(drakvuf_t drakvuf,
                     drakvuf_trap_t* trap,
                     addr_t pa)
 {
+    trap->last_ttl_rst = time(NULL);
+
     // check if already marked
     vmi_instance_t vmi = drakvuf->vmi;
     xen_pfn_t current_gfn = pa >> 12;
@@ -1043,6 +1072,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         if (rc < 0)
         {
             g_slice_free(struct remapped_gfn, remapped_gfn);
+            remapped_gfn = NULL;
             goto err_exit;
         }
 
@@ -1086,7 +1116,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             goto err_exit;
         }
         if (VMI_FAILURE == vmi_slat_change_gfn(
-                drakvuf->vmi, drakvuf->altp2m_idx, remapped_gfn->r, drakvuf->sink_page_gfn))
+                drakvuf->vmi, drakvuf->altp2m_idr, remapped_gfn->r, drakvuf->sink_page_gfn))
         {
             PRINT_DEBUG("%s: Failed to change gfn on view %u\n", __FUNCTION__, drakvuf->altp2m_idr);
             goto err_exit;
@@ -1161,8 +1191,9 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 err_exit:
     if ( container->traps )
         g_slist_free(container->traps);
+    if ( remapped_gfn )
+        g_hash_table_remove(drakvuf->remapped_gfns, &remapped_gfn->o);
     g_slice_free(struct wrapper, container);
-    g_hash_table_remove(drakvuf->remapped_gfns, &remapped_gfn->o);
     return 0;
 }
 
@@ -1318,7 +1349,7 @@ static void drakvuf_poll(drakvuf_t drakvuf, unsigned int timeout)
 void drakvuf_loop(drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), void* data)
 {
 
-    PRINT_DEBUG("Started DRAKVUF loop\n");
+    PRINT_DEBUG("Started DRAKVUF polling loop\n");
 
     drakvuf->interrupted = 0;
     drakvuf_force_resume(drakvuf);
@@ -1331,7 +1362,7 @@ void drakvuf_loop(drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), v
     // Ensures all events are processed from the ring
     drakvuf_poll(drakvuf, 0);
 
-    PRINT_DEBUG("DRAKVUF loop finished\n");
+    PRINT_DEBUG("DRAKVUF polling loop finished\n");
 }
 
 bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)

@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -179,6 +179,8 @@ cpuidmon::cpuidmon(drakvuf_t _drakvuf, bool _stealth, output_format_t _output)
     this->cpuid.data = (void*)this;
     this->cpuid.type = CPUID;
     this->cpuid.name = nullptr;
+    this->cpuid.ttl = UNLIMITED_TTL;
+    this->cpuid.ah_cb = nullptr;
 
     if ( !drakvuf_add_trap(drakvuf, &this->cpuid) )
     {

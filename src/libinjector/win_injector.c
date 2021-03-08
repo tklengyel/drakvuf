@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -166,7 +166,7 @@ struct injector
     uint32_t status;
     uint32_t file_handle;
     FILE* host_file;
-    unicode_string_t expanded_target;
+    unicode_string_t* expanded_target;
 
     // For process doppelganging shellcode
     addr_t binary, binary_addr, saved_bp;
@@ -221,6 +221,7 @@ static void free_injector(injector_t injector)
 
     vmi_free_unicode_str(injector->target_file_us);
     vmi_free_unicode_str(injector->cwd_us);
+    vmi_free_unicode_str(injector->expanded_target);
 
     g_free((void*)injector->binary);
     g_free((void*)injector->payload);
@@ -616,6 +617,8 @@ static bool setup_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr
     injector->bp.breakpoint.dtb = info->regs->cr3;
     injector->bp.breakpoint.addr_type = ADDR_VA;
     injector->bp.breakpoint.addr = bp_addr;
+    injector->bp.ttl = UNLIMITED_TTL;
+    injector->bp.ah_cb = NULL;
 
     return drakvuf_add_trap(injector->drakvuf, &injector->bp);
 }
@@ -783,6 +786,8 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
                 new_trap->type = MEMACCESS;
                 new_trap->cb = mem_callback;
                 new_trap->data = injector;
+                new_trap->ttl = UNLIMITED_TTL;
+                new_trap->ah_cb = NULL;
                 new_trap->memaccess.access = VMI_MEMACCESS_X;
                 new_trap->memaccess.type = POST;
                 new_trap->memaccess.gfn = page->paddr >> 12;
@@ -875,6 +880,7 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
         trap->breakpoint.addr_type = ADDR_RVA;
         trap->breakpoint.module = "ntoskrnl.exe";
         trap->breakpoint.rva = rva;
+        trap->ttl = UNLIMITED_TTL;
 
         if (!drakvuf_add_trap(injector->drakvuf, trap))
         {
@@ -993,6 +999,8 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         // Save breakpoint address to restore it latter
         injector->saved_bp = injector->bp.breakpoint.addr;
         injector->bp.breakpoint.addr = injector->process_notify;
+        injector->bp.ttl = UNLIMITED_TTL;
+        injector->bp.ah_cb = NULL;
 
         if ( drakvuf_add_trap(drakvuf, &injector->bp) )
         {
@@ -1456,18 +1464,18 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         vmi = drakvuf_lock_and_get_vmi(drakvuf);
         vmi_read(vmi, &ctx, regs.x86.rax * 2, buf, NULL);
         drakvuf_release_vmi(drakvuf);
-
         in.contents = buf;
         in.length = regs.x86.rax * 2;
         in.encoding = "UTF-16";
 
-        if (VMI_SUCCESS != vmi_convert_str_encoding(&in, &injector->expanded_target, "UTF-8"))
+        injector->expanded_target = (unicode_string_t*)g_try_malloc0(sizeof(unicode_string_t));
+        if (VMI_SUCCESS != vmi_convert_str_encoding(&in, injector->expanded_target, "UTF-8"))
         {
             PRINT_DEBUG("Failed to convert buffer\n");
             return 0;
         }
 
-        PRINT_DEBUG("Expanded: %s\n", injector->expanded_target.contents);
+        PRINT_DEBUG("Expanded: %s\n", injector->expanded_target->contents);
         PRINT_DEBUG("Opening file...\n");
 
         if (!setup_create_file_stack(injector, &regs.x86))
@@ -1912,8 +1920,10 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
 
     if (!drakvuf_is_interrupted(drakvuf))
     {
-        PRINT_DEBUG("Starting injection loop\n");
+        const char* method = injector->method == INJECT_METHOD_TERMINATEPROC ? "termination" : "injection";
+        PRINT_DEBUG("Starting %s loop\n", method);
         drakvuf_loop(drakvuf, is_interrupted, NULL);
+        PRINT_DEBUG("Finished %s loop\n", method);
     }
 
     if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
@@ -2003,14 +2013,12 @@ static void print_injection_info(output_format_t format, const char* file, injec
             arguments++;
     }
     else
-    {
         arguments = "";
-    }
 
-    if (injector->expanded_target.contents)
-    {
-        process_name = (char*)injector->expanded_target.contents;
-    }
+    if (injector->expanded_target && injector->expanded_target->contents)
+        process_name = (char*)injector->expanded_target->contents;
+    else
+        process_name = "";
 
     char* escaped_pname = g_strescape(process_name, NULL);
     char* escaped_arguments = g_strescape(arguments, NULL);

@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -195,7 +195,7 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, verbose, libvmi_conf, kpgd, false))
+    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, verbose, libvmi_conf, kpgd, false, UNLIMITED_TTL))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
         return 1;
@@ -206,7 +206,7 @@ int main(int argc, char** argv)
         .type = REGISTER,
         .reg = CR3,
         .cb = &repl_start,
-        .name = "repl_trap"
+        .name = "repl_trap",
     };
 
     if (!drakvuf_add_trap(drakvuf, &inject_trap))

@@ -8,7 +8,7 @@
 * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
 * right to use, modify, and redistribute this software under certain      *
 * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
-* software, alternative licenses can be aquired from the author.          *
+* software, alternative licenses can be acquired from the author.         *
 *                                                                         *
 * Note that the GPL places important restrictions on "derivative works",  *
 * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -121,6 +121,20 @@ inline void unputc(std::ostream& os)
         os.seekp(pos - char_size);
     }
 }
+
+class RestoreFlags
+{
+private:
+    std::ios_base& ios;
+    std::ios_base::fmtflags const flags;
+
+public:
+    explicit RestoreFlags(std::ios_base& ios) : ios{ios}, flags{ios.flags()} {}
+    ~RestoreFlags()
+    {
+        ios.flags(flags);
+    }
+};
 
 extern std::ostream cout;
 

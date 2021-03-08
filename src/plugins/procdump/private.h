@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -123,22 +123,22 @@ using vads_t = std::map<addr_t, vad_info_t>;
 
 struct procdump_ctx
 {
-    vmi_pid_t pid;
-    vmi_pid_t ppid;
-    uint32_t tid;
-    addr_t target_rsp;
+    vmi_pid_t pid = 0;
+    vmi_pid_t ppid = 0;
+    uint32_t tid = 0;
+    addr_t target_rsp = 0;
     string name;
-    procdump* plugin;
-    drakvuf_trap_t* bp;
-    drakvuf_trap_t* bp2;
+    procdump* plugin = nullptr;
+    drakvuf_trap_t* bp = nullptr;
+    drakvuf_trap_t* bp2 = nullptr;
     vads_t vads;
     vads_t dlls;
     x86_registers_t saved_regs;
-    uint64_t idx;
-    addr_t pool;
+    uint64_t idx = 0;
+    addr_t pool = 0;
     const uint64_t POOL_SIZE_IN_PAGES = 0x400;
-    size_t size;
-    size_t current_dump_size;
+    size_t size = 0;
+    size_t current_dump_size = 0;
     string data_file_name;
     std::unique_ptr<ProcdumpWriter> writer;
 };
@@ -164,9 +164,15 @@ static bool IS_MMPTE_VALID(uint64_t mmpte)
 }
 
 // Assume that MM_GUARD_PAGE shoulbe reset to page been accessible
-static bool IS_MMPTE_ACCESSIBLE(uint64_t protection)
+// Note that `protection` contains all high order bits starting from protection
+// This allows to check that those bits are not cleared
+// NOTE `mmpte` is used for debug only
+static bool IS_MMPTE_ACCESSIBLE(uint64_t mmpte, uint64_t protection)
 {
-    return (protection & MM_RWX_MASK) && !(protection & MM_GUARD_PAGE);
+    auto is_accessible = protection && !(protection & MM_GUARD_PAGE);
+    if (is_accessible && !(protection & MM_RWX_MASK))
+        PRINT_DEBUG("[PROCDUMP] [WARNING] MMPTE for MM_ZERO_ACCESS page: %#lx\n", mmpte);
+    return is_accessible;
 }
 
 /*
@@ -185,21 +191,22 @@ static bool IS_MMPTE_TRANSITION(uint64_t mmpte)
 
 static bool IS_MMPTE_PROTOTYPE_ACCESSIBLE(uint64_t mmpte)
 {
-    auto is_accessible = IS_MMPTE_ACCESSIBLE((mmpte >> MM_PROTOTYPE_PROTECTION_OFFSET));
+    // NOTE It have been noticed that MMPTE with clear first byte is not accessible
+    auto is_accessible = IS_MMPTE_ACCESSIBLE(mmpte, (mmpte >> MM_PROTOTYPE_PROTECTION_OFFSET)) && (mmpte & 0xff);
     return VMI_GET_BIT(mmpte, 10) &&
            is_accessible;
 }
 
 static bool IS_MMPTE_TRANSITION_ACCESSIBLE(uint64_t mmpte)
 {
-    auto is_accessible = IS_MMPTE_ACCESSIBLE((mmpte >> MM_SOFTWARE_PROTECTION_OFFSET));
+    auto is_accessible = IS_MMPTE_ACCESSIBLE(mmpte, (mmpte >> MM_SOFTWARE_PROTECTION_OFFSET));
     return VMI_GET_BIT(mmpte, 11) &&
            is_accessible;
 }
 
 static bool IS_MMPTE_SOFTWARE_ACCESSIBLE(uint64_t mmpte)
 {
-    auto is_accessible = IS_MMPTE_ACCESSIBLE((mmpte >> MM_SOFTWARE_PROTECTION_OFFSET));
+    auto is_accessible = IS_MMPTE_ACCESSIBLE(mmpte, (mmpte >> MM_SOFTWARE_PROTECTION_OFFSET));
     return !IS_MMPTE_VALID(mmpte) &&
            !IS_MMPTE_PROTOTYPE(mmpte) &&
            !IS_MMPTE_TRANSITION(mmpte) &&

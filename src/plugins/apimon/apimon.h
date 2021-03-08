@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -122,7 +122,7 @@ struct apimon_config
 class apimon: public pluginex
 {
 public:
-    std::vector<plugin_target_config_entry_t> wanted_hooks;
+    wanted_hooks_t wanted_hooks;
 
     apimon(drakvuf_t drakvuf, const apimon_config* config, output_format_t output);
     ~apimon();

@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -176,10 +176,12 @@ int main(int argc, char** argv)
     trap.type = REGISTER;
     trap.reg = CR3;
     trap.cb = cr3_cb;
+    trap.ttl = UNLIMITED_TTL;
+    trap.ah_cb = nullptr;
 
 
     /* initialize the Drakvuf library */
-    if (!drakvuf_init(&drakvuf, domain, profile, NULL, false, false, 0, false))
+    if (!drakvuf_init(&drakvuf, domain, profile, NULL, false, false, 0, false, UNLIMITED_TTL))
     {
         printf("Failed to initialize Drakvuf\n");
         goto done;

@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -129,7 +129,8 @@ public:
         .breakpoint.module = "tcpip.sys",
         .type = BREAKPOINT,
         .data = (void*)this,
-        .name = nullptr
+        .name = nullptr,
+        .ah_cb = nullptr
     };
 
     drakvuf_trap_t dnsapi_traps[6] =
@@ -140,7 +141,8 @@ public:
             .breakpoint.module = "dnsapi.dll",
             .type = BREAKPOINT,
             .data = (void*)this,
-            .name = nullptr
+            .name = nullptr,
+            .ah_cb = nullptr
         }
     };
 

@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -108,6 +108,7 @@
 #include <glib.h>
 #include "plugins/plugins.h"
 #include "plugins/private.h"
+#include "plugins/output_format.h"
 
 struct syscalls_config
 {
@@ -135,6 +136,8 @@ public:
 
     addr_t kernel_base;
     addr_t win32k_base;
+
+    std::vector<std::pair<char const*, fmt::Aarg>> fmt_args; // cache
 
     syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     ~syscalls();

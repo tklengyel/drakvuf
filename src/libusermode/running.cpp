@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -141,6 +141,7 @@ void drakvuf_remove_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvu
 
 bool userhook::add_running_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     if (!drakvuf_add_trap(drakvuf, trap))
         return false;
     running_traps.push_back(trap);
@@ -161,6 +162,7 @@ void userhook::remove_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
 bool userhook::add_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
+    trap->ttl = UNLIMITED_TTL;
     if (!drakvuf_add_trap(drakvuf, trap))
         return false;
     running_rh_traps.push_back(trap);
@@ -387,6 +389,7 @@ event_response_t hook_process_cb(
     trap->breakpoint.lookup_type = LOOKUP_NONE;
     trap->breakpoint.addr_type = ADDR_PA;
     trap->breakpoint.addr = func_pa;
+    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     if (!userhook_plugin->add_running_trap(drakvuf, trap))
         delete trap;
 

@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -105,8 +105,11 @@
 #ifndef WIN_USERHOOK_H
 #define WIN_USERHOOK_H
 
+#include <string>
 #include <vector>
+#include <map>
 #include <memory>
+#include <functional>
 
 #include <glib.h>
 #include "plugins/private.h"
@@ -234,7 +237,7 @@ struct dll_view_t
     bool is_hooked;
 };
 
-typedef void (*dll_pre_hook_cb)(drakvuf_t, const dll_view_t*, void*);
+typedef void (*dll_pre_hook_cb)(drakvuf_t, const std::string&, const dll_view_t*, void*);
 typedef void (*dll_post_hook_cb)(drakvuf_t, const dll_view_t*, const std::vector<hook_target_view_t>& targets, void*);
 
 struct usermode_cb_registration
@@ -243,6 +246,43 @@ struct usermode_cb_registration
     dll_post_hook_cb post_cb;
     void* extra;
 };
+
+class wanted_hooks_t
+{
+public:
+    void add_hook(plugin_target_config_entry_t&& e)
+    {
+        hooks[e.dll_name].emplace_back(std::move(e));
+    }
+
+    template<typename... Args>
+    void add_hook(Args&& ... args)
+    {
+        auto e = plugin_target_config_entry_t(std::forward<Args>(args)...);
+        add_hook(std::move(e));
+    }
+
+    bool empty() const noexcept
+    {
+        return hooks.empty();
+    }
+
+    void visit_hooks_for(const std::string& dll_name, std::function<void(const plugin_target_config_entry_t&)>&& visitor) const
+    {
+        for (const auto& [pattern, wanted_hooks] : hooks)
+        {
+            if (dll_name.find(pattern) != std::string::npos)
+            {
+                std::for_each(std::begin(wanted_hooks), std::end(wanted_hooks), visitor);
+            }
+        }
+    }
+
+private:
+    std::map<std::string, std::vector<plugin_target_config_entry_t>> hooks;
+};
+
+using hook_filter_t = std::function<bool(const plugin_target_config_entry_t&)>;
 
 /**
  * Userhooks are not supported on some windows versions yet, therefore
@@ -255,7 +295,7 @@ struct usermode_cb_registration
 bool drakvuf_are_userhooks_supported(drakvuf_t drakvuf);
 void drakvuf_register_usermode_callback(drakvuf_t drakvuf, usermode_cb_registration* reg);
 bool drakvuf_request_usermode_hook(drakvuf_t drakvuf, const dll_view_t* dll, const plugin_target_config_entry_t* target, callback_t callback, void* extra);
-void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, const bool print_no_addr, std::vector<plugin_target_config_entry_t>* wanted_hooks);
+void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, const bool print_no_addr, const hook_filter_t& hook_filter, wanted_hooks_t& wanted_hooks);
 
 
 /**

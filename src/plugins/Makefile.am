@@ -8,7 +8,7 @@
 # CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   #
 # right to use, modify, and redistribute this software under certain      #
 # conditions.  If you wish to embed DRAKVUF technology into proprietary   #
-# software, alternative licenses can be aquired from the author.          #
+# software, alternative licenses can be acquired from the author.         #
 #                                                                         #
 # Note that the GPL places important restrictions on "derivative works",  #
 # yet it does not provide a detailed definition of that term.  To avoid   #
@@ -276,13 +276,19 @@ sources += tlsmon/tlsmon.h
 sources += tlsmon/private.h
 endif
 
+if PLUGIN_CODEMON
+sources += codemon/codemon.cpp
+sources += codemon/codemon.h
+sources += codemon/private.h
+endif
+
 if PLUGIN_DUMMY
 sources += dummy/dummy.h
 sources += dummy/dummy.cpp
 endif
 
 ###############################################################################
-sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h type_traits_helpers.h hook_helpers.h
+sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h type_traits_helpers.h filesystem.hpp hook_helpers.h
 sources += output_format.h output_format/common.h output_format/csvfmt.h output_format/deffmt.h output_format/jsonfmt.h output_format/kvfmt.h
 sources += output_format/xfmt.h output_format/ostream.h output_format/ostream.cpp
 
@@ -296,6 +302,7 @@ AM_LDFLAGS =  $(LDFLAGS)
 AM_LDFLAGS += $(GLIB_LIBS)
 AM_LDFLAGS += $(VMI_LIBS)
 AM_LDFLAGS += $(JSONC_LIBS)
+AM_LDFLAGS += $(STDCPPFSLIB)
 
 AM_CXXFLAGS = $(CXXFLAGS)
 

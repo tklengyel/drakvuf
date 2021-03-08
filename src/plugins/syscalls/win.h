@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be aquired from the author.          *
+ * software, alternative licenses can be acquired from the author.         *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -325,8 +325,8 @@ SYSCALL(NtAllocateVirtualMemory, NTSTATUS, 6,
         "*BaseAddress", "", DIR_INOUT, PVOID,
         "ZeroBits", "", DIR_IN, ULONG_PTR,
         "RegionSize", "", DIR_INOUT, PSIZE_T,
-        "AllocationType", "", DIR_IN, ULONG,
-        "Protect", "", DIR_IN, ULONG,
+        "AllocationType", "", DIR_IN, DWORD,
+        "Protect", "", DIR_IN, DWORD,
        );
 SYSCALL(NtAlpcAcceptConnectPort, NTSTATUS, 9,
         "PortHandle", "", DIR_OUT, PHANDLE,
@@ -1043,6 +1043,18 @@ SYSCALL(NtFsControlFile, NTSTATUS, 10,
         "OutputBuffer", "bcount_opt(OutputBufferLength)", DIR_OUT, PVOID,
         "OutputBufferLength", "", DIR_IN, ULONG,
        );
+SYSCALL(NtGdiBitBlt, INT, 11,
+        "hdcDst", "", DIR_IN, HANDLE,
+        "x", "", DIR_IN, INT,
+        "y", "", DIR_IN, INT,
+        "cx", "", DIR_IN, INT,
+        "cy", "", DIR_IN, INT,
+        "hdcSrc", "", DIR_IN, HANDLE,
+        "xSrc", "", DIR_IN, INT,
+        "ySrc", "", DIR_IN, INT,
+        "rop4", "", DIR_IN, DWORD,
+        "crBackColor", "", DIR_IN, DWORD,
+        "fl", "", DIR_IN, ULONG);
 SYSCALL(NtGetContextThread, NTSTATUS, 2,
         "ThreadHandle", "", DIR_IN, HANDLE,
         "ThreadContext", "", DIR_INOUT, PCONTEXT,
@@ -2422,15 +2434,45 @@ SYSCALL(NtUnmapViewOfSection, NTSTATUS, 2,
         "ProcessHandle", "", DIR_IN, HANDLE,
         "BaseAddress", "", DIR_IN, PVOID,
        );
+SYSCALL(NtUnmapViewOfSectionEx, NTSTATUS, 3,
+        "ProcessHandle", "", DIR_IN, HANDLE,
+        "BaseAddress", "", DIR_IN, PVOID,
+        "Flags", "", DIR_IN, ULONG,
+       );
 SYSCALL(NtUserCallTwoParam, NTSTATUS, 3,
         "Param1", "", DIR_IN, DWORD,
         "Param2", "", DIR_IN, DWORD,
         "Routine", "", DIR_IN, DWORD);
+SYSCALL(NtUserCreateDesktop, NTSTATUS, 6,
+        "ObjectAttributes", "", DIR_IN, POBJECT_ATTRIBUTES,
+        "lpszDevice", "", DIR_IN, PUNICODE_STRING,
+        "devmode", "", DIR_IN, PVOID,
+        "dwflags", "", DIR_IN, DWORD,
+        "access", "", DIR_IN, ACCESS_MASK,
+        "heapsize", "", DIR_IN, DWORD);
+SYSCALL(NtUserCreateDesktopEx, NTSTATUS, 6,
+        "ObjectAttributes", "", DIR_IN, POBJECT_ATTRIBUTES,
+        "lpszDevice", "", DIR_IN, PUNICODE_STRING,
+        "devmode", "", DIR_IN, PVOID,
+        "dwflags", "", DIR_IN, DWORD,
+        "access", "", DIR_IN, ACCESS_MASK,
+        "heapsize", "", DIR_IN, DWORD);
 SYSCALL(NtUserGetAsyncKeyState, SHORT, 1,
         "Key", "", DIR_IN, INT
        );
+SYSCALL(NtUserGetDC, HANDLE, 1,
+        "hWnd", "", DIR_IN, HWND);
 SYSCALL(NtUserGetKeyState, SHORT, 1,
         "VirtKey", "", DIR_IN, INT
+       );
+SYSCALL(NtUserLoadKeyboardLayoutEx, NTSTATUS, 7,
+        "Handle", "", DIR_IN, HANDLE,
+        "offTable", "", DIR_IN, DWORD,
+        "puszKeyboardName", "", DIR_IN, PUNICODE_STRING,
+        "hKL", "", DIR_IN, HANDLE,
+        "puszKLID", "", DIR_IN, PUNICODE_STRING,
+        "dwKLID", "", DIR_IN, DWORD,
+        "Flags", "", DIR_IN, UINT
        );
 SYSCALL(NtUserMessageCall, NTSTATUS, 7,
         "hWnd", "", DIR_IN, HWND,
@@ -2452,6 +2494,10 @@ SYSCALL(NtUserSetWindowsHookEx, HHOOK, 6,
         "HookId", "", DIR_IN, INT,
         "HookProc", "", DIR_IN, HOOKPROC,
         "Ansi", "", DIR_IN, BOOLEAN,
+       );
+SYSCALL(NtUserShowWindow, NTSTATUS, 2,
+        "hWnd", "", DIR_IN, HWND,
+        "nCmdShow", "", DIR_IN, LONG
        );
 SYSCALL(NtVdmControl, NTSTATUS, 2,
         "Service", "", DIR_IN, VDMSERVICECLASS,
@@ -2612,7 +2658,6 @@ SYSCALL(NtSetTimer2, NTSTATUS, 0);
 SYSCALL(NtSetWnfProcessNotificationEvent, NTSTATUS, 0);
 SYSCALL(NtSubscribeWnfStateChange, NTSTATUS, 0);
 SYSCALL(NtTerminateEnclave, NTSTATUS, 0);
-SYSCALL(NtUnmapViewOfSectionEx, NTSTATUS, 0);
 SYSCALL(NtUnsubscribeWnfStateChange, NTSTATUS, 0);
 SYSCALL(NtUpdateWnfStateData, NTSTATUS, 0);
 SYSCALL(NtWaitForAlertByThreadId, NTSTATUS, 0);
@@ -2775,7 +2820,6 @@ SYSCALL(NtGdiBRUSHOBJ_pvGetRbrush, NTSTATUS, 0);
 SYSCALL(NtGdiBRUSHOBJ_ulGetBrushColor, NTSTATUS, 0);
 SYSCALL(NtGdiBeginGdiRendering, NTSTATUS, 0);
 SYSCALL(NtGdiBeginPath, NTSTATUS, 0);
-SYSCALL(NtGdiBitBlt, NTSTATUS, 0);
 SYSCALL(NtGdiCLIPOBJ_bEnum, NTSTATUS, 0);
 SYSCALL(NtGdiCLIPOBJ_cEnumStart, NTSTATUS, 0);
 SYSCALL(NtGdiCLIPOBJ_ppoGetPath, NTSTATUS, 0);
@@ -3529,8 +3573,6 @@ SYSCALL(NtUserCreateAcceleratorTable, NTSTATUS, 0);
 SYSCALL(NtUserCreateActivationObject, NTSTATUS, 0);
 SYSCALL(NtUserCreateCaret, NTSTATUS, 0);
 SYSCALL(NtUserCreateDCompositionHwndTarget, NTSTATUS, 0);
-SYSCALL(NtUserCreateDesktop, NTSTATUS, 0);
-SYSCALL(NtUserCreateDesktopEx, NTSTATUS, 0);
 SYSCALL(NtUserCreateEmptyCursorObject, NTSTATUS, 0);
 SYSCALL(NtUserCreateInputContext, NTSTATUS, 0);
 SYSCALL(NtUserCreateLocalMemHandle, NTSTATUS, 0);
@@ -3642,7 +3684,6 @@ SYSCALL(NtUserGetCursor, NTSTATUS, 0);
 SYSCALL(NtUserGetCursorDims, NTSTATUS, 0);
 SYSCALL(NtUserGetCursorFrameInfo, NTSTATUS, 0);
 SYSCALL(NtUserGetCursorInfo, NTSTATUS, 0);
-SYSCALL(NtUserGetDC, NTSTATUS, 0);
 SYSCALL(NtUserGetDCEx, NTSTATUS, 0);
 SYSCALL(NtUserGetDManipHookInitFunction, NTSTATUS, 0);
 SYSCALL(NtUserGetDesktopID, NTSTATUS, 0);
@@ -3791,7 +3832,6 @@ SYSCALL(NtUserIsWindowGDIScaledDpiMessageEnabled, NTSTATUS, 0);
 SYSCALL(NtUserKillTimer, NTSTATUS, 0);
 SYSCALL(NtUserLayoutCompleted, NTSTATUS, 0);
 SYSCALL(NtUserLinkDpiCursor, NTSTATUS, 0);
-SYSCALL(NtUserLoadKeyboardLayoutEx, NTSTATUS, 0);
 SYSCALL(NtUserLockCursor, NTSTATUS, 0);
 SYSCALL(NtUserLockWindowStation, NTSTATUS, 0);
 SYSCALL(NtUserLockWindowUpdate, NTSTATUS, 0);
@@ -4000,7 +4040,6 @@ SYSCALL(NtUserShowCaret, NTSTATUS, 0);
 SYSCALL(NtUserShowCursor, NTSTATUS, 0);
 SYSCALL(NtUserShowScrollBar, NTSTATUS, 0);
 SYSCALL(NtUserShowSystemCursor, NTSTATUS, 0);
-SYSCALL(NtUserShowWindow, NTSTATUS, 0);
 SYSCALL(NtUserShowWindowAsync, NTSTATUS, 0);
 SYSCALL(NtUserShutdownBlockReasonCreate, NTSTATUS, 0);
 SYSCALL(NtUserShutdownBlockReasonQuery, NTSTATUS, 0);

@@ -8,7 +8,7 @@
 * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
 * right to use, modify, and redistribute this software under certain      *
 * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
-* software, alternative licenses can be aquired from the author.          *
+* software, alternative licenses can be acquired from the author.         *
 *                                                                         *
 * Note that the GPL places important restrictions on "derivative works",  *
 * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -122,12 +122,10 @@ class DataPrinter
 public:
     static bool print(std::ostream& os, const TimeVal& t, char)
     {
+        auto restore_flags = fmt::RestoreFlags(os);
         os << '"';
-        os << t.tv_sec << ".";
-
-        auto c = os.fill('0');
-        auto w = os.width(6);
-        os << t.tv_usec << std::setfill(c) << std::setw(w);
+        os << t.tv_sec << '.' << std::setfill('0')
+           << std::setw(6) << t.tv_usec;
         os << '"';
         return true;
     }
@@ -142,16 +140,16 @@ public:
     template <class Tv = T>
     static bool print(std::ostream& os, const fmt::Xval<Tv>& data, char)
     {
-        os << "\"0x" << std::hex << data.value << "\"" << std::dec;
+        auto restore_flags = fmt::RestoreFlags(os);
+        os << "\"0x" << std::hex << data.value << "\"";
         return true;
     }
 
     template <class Tv = T>
     static bool print(std::ostream& os, const fmt::Fval<Tv>& data, char)
     {
-        auto ff = os.flags();
+        auto restore_flags = fmt::RestoreFlags(os);
         os << std::fixed << data.value;
-        os.flags(ff);
         return true;
     }
 
@@ -174,10 +172,10 @@ public:
     template <class Tv = T>
     static bool print(std::ostream& os, const std::function<bool(std::ostream&)>& printer, char)
     {
-        std::ostringstream ss;
-        bool printed = printer(ss);
-        if (printed)
-            os << ss.str();
+        auto pos = os.tellp();
+        bool printed = printer(os);
+        if (!printed)
+            os.seekp(pos);
         return printed;
     }
 
@@ -435,8 +433,7 @@ void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info
     else
         print_data(fmt::cout, sep, plugin, args...);
 
-    fmt::cout << "\n";
-    fmt::cout.flush();
+    fmt::cout << std::endl;
 }
 
 inline void print_running_process(const char* plugin_name, drakvuf_t drakvuf, gint64 timestamp, proc_data_t const& proc_data)

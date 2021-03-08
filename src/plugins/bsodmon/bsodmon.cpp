@@ -8,7 +8,7 @@
 * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
 * right to use, modify, and redistribute this software under certain      *
 * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
-* software, alternative licenses can be aquired from the author.          *
+* software, alternative licenses can be acquired from the author.         *
 *                                                                         *
 * Note that the GPL places important restrictions on "derivative works",  *
 * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -160,6 +160,7 @@ bsodmon::bsodmon(drakvuf_t drakvuf, bool _abort_on_bsod, output_format_t output)
     init_bugcheck_map( this, drakvuf );
     trap.name = "KeBugCheck2";
     trap.cb   = hook_cb;
+    trap.ttl  = drakvuf_get_limited_traps_ttl(drakvuf);
     if ( !drakvuf_get_kernel_symbol_rva( drakvuf, "KeBugCheck2", &trap.breakpoint.rva) ) throw -1;
     if ( ! drakvuf_add_trap( drakvuf, &trap ) ) throw -1;
 }
