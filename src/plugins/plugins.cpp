@@ -390,6 +390,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .codemon_default_benign = options->codemon_default_benign,
                     };
                     this->plugins[plugin_id] = std::make_unique<codemon>(this->drakvuf, &config, this->output);
+                    break;
                 }
 #endif
                 case __DRAKVUF_PLUGIN_LIST_MAX: /* fall-through */
