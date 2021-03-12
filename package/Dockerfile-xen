@@ -27,5 +27,4 @@ RUN cd /build-xen && \
     make -j$(nproc) install-xen && \
     make -j$(nproc) install-tools && \
     mv /build-xen/dist/install /dist-xen && \
-    rm -rf /build-xen && \
-    find /dist-xen
+    rm -rf /build-xen
