@@ -21,7 +21,8 @@ RUN cd /build-xen && \
     echo CONFIG_MEM_SHARING=y >> xen/.config && \
     make -C xen olddefconfig && \
     echo "Running Xen's make dist..." && \
-    make -j$(nproc) dist && \
+    make -j$(nproc) dist-xen && \
+    make -j$(nproc) dist-tools && \
     echo "Install Xen..." && \
     make -j$(nproc) install-xen && \
     make -j$(nproc) install-tools && \
