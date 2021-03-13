@@ -724,12 +724,11 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 static void print_injection_info(output_format_t format, const char* file, injector_t injector)
 {
     gint64 t = g_get_real_time();
-    char* arguments = "";
+    char* arguments = (char*)g_malloc0(1);
 
     for (int i=0; i<injector->args_count; i++)
     {
         char* tmp = g_strconcat(arguments, injector->args[i], " ", NULL);
-        arguments = i ? arguments : NULL;
         g_free(arguments);
         arguments = tmp;
     }
@@ -884,6 +883,8 @@ static void print_injection_info(output_format_t format, const char* file, injec
             }
             break;
     }
+
+    g_free(arguments);
 }
 
 static bool initialize_linux_injector_functions(injector_t injector)
