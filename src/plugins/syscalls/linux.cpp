@@ -152,11 +152,10 @@ static std::vector<uint64_t> linux_build_argbuf(vmi_instance_t vmi,
         {
             // The syscall args are passed via a struct pt_regs *, which is in %rdi upon entry
             size_t pt_regs[__PT_REGS_MAX] = {0};
-            access_context_t ctx =
-            {
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3
-            };
+            ACCESS_CONTEXT(ctx,
+                           .translate_mechanism = VMI_TM_PROCESS_DTB,
+                           .dtb = info->regs->cr3
+                          );
 
             for ( int i=0; i<__PT_REGS_MAX; i++)
             {

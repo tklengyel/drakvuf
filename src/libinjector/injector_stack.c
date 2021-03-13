@@ -148,12 +148,11 @@ static addr_t place_string_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs
     // this string has to be aligned as well!
     addr -= len + string_align - (len % string_align);
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-        .addr = addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3,
+                   .addr = addr
+                  );
 
     if (VMI_FAILURE == vmi_write(vmi, &ctx, len, (void*) str, NULL))
         return 0;
@@ -177,12 +176,11 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
     if (!buf) return 0;
     memcpy(buf, str, str_len);
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-        .addr = addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3,
+                   .addr = addr
+                  );
 
     status_t status = vmi_write(vmi, &ctx, buf_len, buf, NULL);
     g_free(buf);
@@ -197,12 +195,11 @@ static addr_t place_struct_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs
     addr -= size;
     addr -= addr % stack_align;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-        .addr = addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3,
+                   .addr = addr
+                  );
 
     status_t status = vmi_write(vmi, &ctx, size, data, NULL);
 
@@ -218,12 +215,11 @@ static addr_t place_struct_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
     addr -= size;
     addr &= ~0xf; // Align stack
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-        .addr = addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3,
+                   .addr = addr,
+                  );
 
     status_t status = vmi_write(vmi, &ctx, size, data, NULL);
 
@@ -257,11 +253,10 @@ static bool setup_stack_32(vmi_instance_t vmi, x86_registers_t* regs, struct arg
         }
     }
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3
+                  );
 
     // write parameters into guest's stack
     for (int i = nb_args-1; i >= 0; i--)
@@ -291,11 +286,10 @@ static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct arg
 {
     uint64_t nul64 = 0;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3
+                  );
 
     addr_t addr = regs->rsp;
 
@@ -419,12 +413,11 @@ static addr_t place_string_on_linux_stack(vmi_instance_t vmi, x86_registers_t* r
     if (!buf) return 0;
     memcpy(buf, str, str_len);
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-        .addr = addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3,
+                   .addr = addr
+                  );
 
     status_t status = vmi_write(vmi, &ctx, buf_len, buf, NULL);
     g_free(buf);
@@ -436,11 +429,10 @@ bool setup_linux_stack(vmi_instance_t vmi, x86_registers_t* regs, struct argumen
 {
     uint64_t nul64 = 0;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = regs->cr3
+                  );
 
     addr_t addr = regs->rsp;
 

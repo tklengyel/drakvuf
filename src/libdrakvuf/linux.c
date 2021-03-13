@@ -138,14 +138,11 @@ addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
             return info->regs->r9;
     }
 
-
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp + narg * 8,
-    };
-
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = info->regs->rsp + narg * 8
+                  );
 
     uint64_t ret;
     if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))

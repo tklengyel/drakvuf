@@ -175,8 +175,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return 0;
     }
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 

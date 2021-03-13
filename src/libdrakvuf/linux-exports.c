@@ -137,12 +137,11 @@ addr_t linux_eprocess_sym2va(drakvuf_t drakvuf, addr_t eprocess_base, const char
         return -1;
 
     addr_t mm_struct_address;
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .addr = eprocess_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT],
-        .pid = pid
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .addr = eprocess_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT],
+                   .pid = pid
+                  );
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mm_struct_address) || !mm_struct_address)
     {
         ctx.addr = eprocess_base + drakvuf->offsets[TASK_STRUCT_ACTIVE_MMSTRUCT];
@@ -385,12 +384,11 @@ addr_t get_lib_address(drakvuf_t drakvuf, addr_t eprocess_base, const char* lib)
         return -1;
 
     addr_t mm_struct_address;
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .addr = eprocess_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT],
-        .pid = pid
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .addr = eprocess_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT],
+                   .pid = pid
+                  );
 
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &mm_struct_address))
         return -1;

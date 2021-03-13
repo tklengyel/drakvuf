@@ -233,12 +233,11 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
     addr_t vad_start = mmvad.starting_vpn << 12;
     size_t vad_length = (mmvad.ending_vpn - mmvad.starting_vpn + 1) << 12;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = vad_start
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = vad_start
+                  );
 
     addr_t export_header_rva = 0;
     size_t export_header_size = 0;
@@ -362,12 +361,11 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
 
             if (target.type == HOOK_BY_NAME)
             {
-                access_context_t ctx =
-                {
-                    .translate_mechanism = VMI_TM_PROCESS_DTB,
-                    .dtb = info->regs->cr3,
-                    .addr = dll_meta->v.real_dll_base
-                };
+                ACCESS_CONTEXT(ctx,
+                               .translate_mechanism = VMI_TM_PROCESS_DTB,
+                               .dtb = info->regs->cr3,
+                               .addr = dll_meta->v.real_dll_base
+                              );
 
                 if (vmi_translate_sym2v(lg.vmi, &ctx, target.target_name.c_str(), &exec_func) != VMI_SUCCESS)
                 {
@@ -475,12 +473,11 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
     {
         addr_t base_address;
 
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = base_address_ptr
-        };
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = info->regs->cr3,
+                       .addr = base_address_ptr
+                      );
 
         vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
         bool success = (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &base_address));
@@ -516,12 +513,11 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
     {
         addr_t base_address;
 
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = params->base_address_ptr
-        };
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = info->regs->cr3,
+                       .addr = params->base_address_ptr
+                      );
 
         vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
         bool success = (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &base_address));

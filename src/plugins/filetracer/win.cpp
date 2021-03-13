@@ -195,11 +195,10 @@ static string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t 
 
     vmi_lock_guard vmi_lg(drakvuf);
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     //==========================
     // Read security descriptor
@@ -366,7 +365,7 @@ static void print_basic_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf
     win_filetracer* f = (win_filetracer*)info->trap->data;
     const char* operation_name = "FileBasicInformation";
 
-    access_context_t ctx;
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
@@ -418,7 +417,7 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     win_filetracer* f = (win_filetracer*)info->trap->data;
     const char* operation_name = "FileRenameInformation";
 
-    access_context_t ctx;
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
@@ -487,12 +486,11 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     const char* is_success = info->regs->rax ? "FAIL" : "SUCCESS";
 
     uint32_t handle = 0;
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = w->handle,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = w->handle
+                  );
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &handle))
         PRINT_DEBUG("filetracer: Failed to read pHandle at 0x%lx (PID %d, TID %d)\n", w->handle, w->pid, w->tid);

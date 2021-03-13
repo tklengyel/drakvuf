@@ -424,12 +424,11 @@ static event_response_t inject_payload_linux(drakvuf_t drakvuf, drakvuf_trap_inf
     injector_t injector = info->trap->data;
 
     // Write payload into guest's memory
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = injector->payload_addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = injector->payload_addr
+                  );
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     bool success = ( VMI_SUCCESS == vmi_write(vmi, &ctx, injector->payload_size, (void*)injector->payload, NULL) );
     drakvuf_release_vmi(drakvuf);

@@ -174,12 +174,11 @@ struct process_visitor_ctx
 static char* read_cmd_line(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t addr)
 {
     char* cmd = NULL;
-    access_context_t ctx2 =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = addr,
-    };
+    ACCESS_CONTEXT(ctx2,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = addr
+                  );
     addr_t cmdline_addr = ctx2.addr;
     uint16_t cmd_len = 0;
     if (VMI_SUCCESS == vmi_read_16(vmi, &ctx2, &cmd_len))
@@ -229,12 +228,11 @@ static void print_process_creation_result(
 
     vmi_lock_guard vmi_lg(drakvuf);
     char* cmd = read_cmd_line(vmi_lg.vmi, info, cmdline_addr);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = curdir_handle_addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = curdir_handle_addr
+                  );
     addr_t curdir_handle = 0;
     char* curdir = nullptr;
 
@@ -296,12 +294,11 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
     addr_t new_process_handle_addr = params->new_process_handle_addr;
     reg_t status = info->regs->rax;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = new_process_handle_addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = new_process_handle_addr,
+                  );
 
     addr_t new_process_handle;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -339,12 +336,11 @@ static event_response_t process_create_ex_return_hook(drakvuf_t drakvuf, drakvuf
     addr_t process_handle_addr = params->process_handle_addr;
     reg_t status = info->regs->rax;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = process_handle_addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = process_handle_addr,
+                  );
 
     addr_t process_handle;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -494,12 +490,11 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
     if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = params->process_handle_addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = params->process_handle_addr,
+                  );
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -552,7 +547,10 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
     params->object_attributes_addr = drakvuf_get_function_argument(drakvuf, info, 3);
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB, .dtb = info->regs->cr3 };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     // PCLIENT_ID ClientId
     params->client_id = 0;
@@ -575,12 +573,11 @@ static event_response_t open_thread_return_hook_cb(drakvuf_t drakvuf, drakvuf_tr
     if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = params->thread_handle_addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = params->thread_handle_addr,
+                  );
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -633,7 +630,10 @@ static event_response_t open_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info
     params->object_attributes_addr = drakvuf_get_function_argument(drakvuf, info, 3);
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB, .dtb = info->regs->cr3 };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     // PCLIENT_ID ClientId
     params->client_id = 0;
@@ -686,12 +686,11 @@ static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_tr
     {
         auto vmi = vmi_lock_guard(drakvuf);
 
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = newstate_va,
-        };
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = info->regs->cr3,
+                       .addr = newstate_va
+                      );
 
         newstate = (struct TOKEN_PRIVILEGES*)g_malloc0(sizeof(struct TOKEN_PRIVILEGES));
         if (!newstate ||

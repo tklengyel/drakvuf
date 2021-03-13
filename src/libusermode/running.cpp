@@ -185,11 +185,10 @@ bool get_dll_base(
     if (!drakvuf_get_process_dtb(drakvuf, process_base, &process_dtb))
         return false;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = process_dtb
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = process_dtb
+                  );
 
     {
         // Lock vmi.
@@ -343,11 +342,10 @@ event_response_t hook_process_cb(
             return VMI_EVENT_RESPONSE_NONE;
         }
 
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = rh_data->target_process_dtb
-        };
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = rh_data->target_process_dtb
+                      );
         if (!get_func_addr(drakvuf, ctx, dll_base, rh_data->func_name, &rh_data->func_addr))
         {
             userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);

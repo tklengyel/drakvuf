@@ -682,7 +682,7 @@ bool analyse_memory(drakvuf_t drakvuf,
     }
 
     //Set the memory access context
-    access_context_t ctx_memory_dump;
+    ACCESS_CONTEXT(ctx_memory_dump);
     bool dump_ctx_valid =
         setup_dump_context(mmvad, trap_info->regs->cr3, fault_data->page_va, dump_metadata, &ctx_memory_dump);
 

@@ -246,7 +246,7 @@ static bool read_vm(drakvuf_t drakvuf, addr_t dtb, addr_t start, size_t size,
 
     vmi_lock_guard vmi(drakvuf);
 
-    access_context_t vmi_ctx;
+    ACCESS_CONTEXT(vmi_ctx);
     vmi_ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     vmi_ctx.dtb = dtb;
     vmi_ctx.addr = start;

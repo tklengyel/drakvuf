@@ -170,12 +170,11 @@ ArgumentPrinter::~ArgumentPrinter() {}
 std::string StringPrinterInterface::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
     auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = argument
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = argument
+                  );
     std::string str = getBuffer(vmi, &ctx);
     drakvuf_release_vmi(drakvuf);
     std::stringstream stream;
@@ -206,12 +205,11 @@ std::string WideStringPrinter::getBuffer(vmi_instance_t vmi, const access_contex
 std::string Binary16StringPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
     auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = argument
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = argument
+                  );
     std::stringstream stream;
     stream << name << "=";
     if (!config.print_no_addr)
@@ -233,12 +231,11 @@ std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, ui
 {
     bool is32bit = drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E || drakvuf_is_wow64(drakvuf, info);
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = argument,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = argument,
+                  );
     std::string str;
     auto vmi = vmi_lock_guard(drakvuf);
     if (is32bit)
@@ -277,12 +274,11 @@ std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, ui
 
 std::string UlongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = argument
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = argument
+                  );
     auto vmi = vmi_lock_guard(drakvuf);
     uint32_t value;
     if (vmi_read_32(vmi, &ctx, &value) != VMI_SUCCESS)
@@ -292,12 +288,11 @@ std::string UlongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint
 
 std::string PointerToPointerPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = argument
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = argument
+                  );
 
     auto vmi = vmi_lock_guard(drakvuf);
     addr_t value = 0;
@@ -314,12 +309,11 @@ std::string PointerToPointerPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info*
 
 std::string GuidPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = argument
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = argument
+                  );
 
     struct
     {

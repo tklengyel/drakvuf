@@ -227,12 +227,11 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
         return false;
     }
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .addr = ssdt_ptr_va,
-        .dtb = trap->breakpoint.dtb,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .addr = ssdt_ptr_va,
+                   .dtb = trap->breakpoint.dtb
+                  );
     addr_t ssdt_va = 0;
     if (VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &ssdt_va))
     {

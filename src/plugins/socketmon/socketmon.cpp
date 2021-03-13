@@ -257,8 +257,7 @@ static event_response_t udpa_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     struct wrapper* w = (struct wrapper*)info->trap->data;
     socketmon* s = w->s;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
@@ -336,8 +335,7 @@ static event_response_t tcpe_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     addr_t p1 = 0;
     char* lip = NULL;
     char* rip = NULL;
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
@@ -475,8 +473,7 @@ static event_response_t trap_DnsQuery_A_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
     addr_t domain_name_addr = drakvuf_get_function_argument(drakvuf, info, 1);
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
     ctx.addr = domain_name_addr;
@@ -500,8 +497,7 @@ static event_response_t trap_DnsQuery_W_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     addr_t domain_name_addr = drakvuf_get_function_argument(drakvuf, info, 1);
     unicode_string_t* domain_name_us = nullptr;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
     ctx.addr = domain_name_addr;
@@ -536,8 +532,7 @@ static event_response_t trap_DnsQueryExW_cb(drakvuf_t drakvuf, drakvuf_trap_info
         dns_query_ex_w_string_t function_specific_string;
         uint32_t struct_size = sizeof(function_specific_string);
 
-        access_context_t ctx;
-        memset(&ctx, 0, sizeof(access_context_t));
+        ACCESS_CONTEXT(ctx);
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
         ctx.dtb = info->regs->cr3;
         ctx.addr = domain_name_addr;
@@ -576,8 +571,7 @@ static event_response_t trap_DnsQueryExA_cb(drakvuf_t drakvuf, drakvuf_trap_info
 
     addr_t domain_name_addr = drakvuf_get_function_argument(drakvuf, info, 1);
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
     ctx.addr = domain_name_addr;
@@ -604,8 +598,7 @@ static event_response_t trap_DnsQueryEx_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     addr_t query_request_addr = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t query_name_addr = 0;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
     ctx.addr = query_request_addr + drakvuf_get_address_width(drakvuf);
@@ -669,12 +662,11 @@ static bool module_trap_visitor(drakvuf_t drakvuf, const module_info_t* module_i
     status_t ret ;
     vmi_instance_t vmi;
     addr_t exec_func ;
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb                 = module_info->dtb,
-        .addr                = module_info->base_addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb                 = module_info->dtb,
+                   .addr                = module_info->base_addr
+                  );
 
     PRINT_DEBUG("[SOCKETMON] trap_visitor: CR3[0x%lX] pid[0x%X %d] is_wow_process[%d]  is_wow_module[%d] base_name[%s] load_address[0x%lX] full_name[%s]\n",
                 module_info->dtb, module_info->pid, module_info->pid, module_info->is_wow_process, module_info->is_wow, module_info->base_name->contents, module_info->base_addr, module_info->full_name->contents );

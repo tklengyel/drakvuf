@@ -213,12 +213,11 @@ static event_response_t trap_DefineDosDeviceW_cb(drakvuf_t drakvuf, drakvuf_trap
     addr_t device_name_va = drakvuf_get_function_argument(drakvuf, info, 2);
     addr_t target_path_va = drakvuf_get_function_argument(drakvuf, info, 3);
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = device_name_va
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = device_name_va
+                  );
 
     vmi_lock_guard wmi_lock(drakvuf);
 

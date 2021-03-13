@@ -228,11 +228,10 @@ static char* get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
     vmi_lock_guard vmi_lg(drakvuf);
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     addr_t key_handle;
     ctx.addr = attr + reg->objattr_root;
@@ -277,12 +276,11 @@ static event_response_t log_reg_objattr(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
         uint32_t type, addr_t data_addr, size_t data_size )
 {
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = data_addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = data_addr,
+                  );
 
     vmi_lock_guard vmi_lg(drakvuf);
 
@@ -386,12 +384,11 @@ static event_response_t log_reg_key_value_entries( drakvuf_t drakvuf, drakvuf_tr
     {
         vmi_lock_guard vmi_lg(drakvuf);
 
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = value_entries_addr + i * KEY_VALUE_ENTRY_sizeof,
-        };
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = info->regs->cr3,
+                       .addr = value_entries_addr + i * KEY_VALUE_ENTRY_sizeof
+                      );
 
         addr_t value_name_addr;
         if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &value_name_addr) )

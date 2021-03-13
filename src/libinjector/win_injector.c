@@ -568,7 +568,7 @@ static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info
 
 static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info)
 {
-    access_context_t ctx = {0};
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
     ctx.addr = injector->process_info;
@@ -933,7 +933,7 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
         injector->binary_addr = injector->payload_addr + injector->payload_size;
 
-        access_context_t ctx = {0};
+        ACCESS_CONTEXT(ctx);
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
         ctx.dtb = regs->x86.cr3;
         ctx.addr = injector->binary_addr;
@@ -965,7 +965,7 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 #endif
 
     // Write payload into guest's memory
-    access_context_t ctx = {0};
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = regs->x86.cr3;
     ctx.addr = injector->payload_addr;
@@ -1450,7 +1450,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         uint8_t buf[FILE_BUF_SIZE];
         unicode_string_t in;
 
-        access_context_t ctx = { 0 };
+        ACCESS_CONTEXT(ctx);
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
         ctx.dtb = regs.x86.cr3;
         ctx.addr = injector->payload_addr;
@@ -1581,12 +1581,11 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             return 0;
         }
 
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = regs.x86.cr3,
-            .addr = injector->payload_addr + FILE_BUF_RESERVED,
-        };
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = regs.x86.cr3,
+                       .addr = injector->payload_addr + FILE_BUF_RESERVED
+                      );
 
         vmi = drakvuf_lock_and_get_vmi(drakvuf);
         bool success = (VMI_SUCCESS == vmi_write(vmi, &ctx, amount, buf + FILE_BUF_RESERVED, NULL));
@@ -1673,12 +1672,11 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             return 0;
         }
 
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = regs.x86.cr3,
-            .addr = injector->payload_addr,
-        };
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = regs.x86.cr3,
+                       .addr = injector->payload_addr
+                      );
 
         vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
         bool success = (VMI_SUCCESS == vmi_read(vmi, &ctx, FILE_BUF_SIZE, buf, NULL));
@@ -1784,7 +1782,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         addr_t saved_rip = 0;
 
         // Get saved RIP from the stack
-        access_context_t ctx = {0};
+        ACCESS_CONTEXT(ctx);
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
         ctx.dtb = info->regs->cr3;
         ctx.addr = info->regs->rsp;
@@ -2211,7 +2209,7 @@ static addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char cons
     if (global_search)
     {
         // First get modules load address to search for other process with same address
-        access_context_t ctx = {0};
+        ACCESS_CONTEXT(ctx);
         ctx.translate_mechanism = VMI_TM_PROCESS_PID;
 
         addr_t module_list_head;

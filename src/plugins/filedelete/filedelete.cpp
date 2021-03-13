@@ -188,8 +188,7 @@ static bool get_file_object_handle_count(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
     addr_t handles = obj + f->offsets[OBJECT_HEADER_HANDLE_COUNT];
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.addr = handles;
     ctx.dtb = info->regs->cr3;
@@ -216,8 +215,7 @@ static bool get_file_object_flags(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
     addr_t file = obj + f->offsets[OBJECT_HEADER_BODY];
     addr_t fileflags = file + f->offsets[FILE_OBJECT_FLAGS];
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.addr = fileflags;
     ctx.dtb = info->regs->cr3;
@@ -253,8 +251,7 @@ static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_
     if (out_filetype)
         *out_filetype = filetype;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.addr = filetype;
     ctx.dtb = info->regs->cr3;
@@ -574,12 +571,11 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
 
     if (f->dump_folder)
     {
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .addr = filetype,
-            .dtb = info->regs->cr3,
-        };
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .addr = filetype,
+                       .dtb = info->regs->cr3,
+                      );
         extract_file(f, drakvuf, info, vmi, file, &ctx, filename.c_str(), fo_flags, reason);
     }
 }
@@ -628,12 +624,11 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return VMI_EVENT_RESPONSE_NONE;
     injector->target_rsp = 0;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = injector->pool,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = injector->pool
+                  );
 
     auto vmi = vmi_lock_guard(drakvuf);
 
@@ -727,12 +722,11 @@ event_response_t mapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     else
     {
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = injector->mapview.base,
-        };
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = info->regs->cr3,
+                       .addr = injector->mapview.base
+                      );
 
         if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(injector->view_base), &injector->view_base, NULL)))
         {
@@ -795,12 +789,11 @@ event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     }
     else
     {
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = injector->createsection.handle,
-        };
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = info->regs->cr3,
+                       .addr = injector->createsection.handle,
+                      );
 
         if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(injector->section_handle), &injector->section_handle, NULL)))
         {
@@ -883,12 +876,11 @@ event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     }
     else
     {
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = injector->queryvolumeinfo.out,
-        };
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = info->regs->cr3,
+                       .addr = injector->queryvolumeinfo.out,
+                      );
 
         struct FILE_FS_DEVICE_INFORMATION dev_info = {};
         if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct FILE_FS_DEVICE_INFORMATION), &dev_info, NULL)))
@@ -945,12 +937,11 @@ event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     else
     {
-        access_context_t ctx =
-        {
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = injector->queryvolumeinfo.out,
-        };
+        ACCESS_CONTEXT(ctx,
+                       .translate_mechanism = VMI_TM_PROCESS_DTB,
+                       .dtb = info->regs->cr3,
+                       .addr = injector->queryvolumeinfo.out
+                      );
 
         struct FILE_STANDARD_INFORMATION dev_info = {};
         if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(dev_info), &dev_info, NULL)))
@@ -1108,12 +1099,12 @@ static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
 
     uint32_t handle = 0;
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = w->handle,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = w->handle
+                  );
+
     vmi_lock_guard vmi_lg(drakvuf);
     if (VMI_SUCCESS != vmi_read_32(vmi_lg.vmi, &ctx, &handle))
         PRINT_DEBUG("[FILEDELETE2] Failed to read pHandle at 0x%lx (PID %d, TID %d)\n", w->handle, w->pid, w->tid);
@@ -1232,8 +1223,7 @@ static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     if (fileinfoclass == FILE_DISPOSITION_INFORMATION)
     {
         uint8_t del = 0;
-        access_context_t ctx;
-        memset(&ctx, 0, sizeof(access_context_t));
+        ACCESS_CONTEXT(ctx);
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
         ctx.dtb = info->regs->cr3;
         ctx.addr = fileinfo;

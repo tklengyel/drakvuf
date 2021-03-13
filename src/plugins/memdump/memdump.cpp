@@ -397,12 +397,11 @@ static bool dump_if_points_to_executable_memory(
         return false;
     }
 
-    access_context_t ctx
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = dtb,
-        .addr = mmvad.starting_vpn * VMI_PS_4KB
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = dtb,
+                   .addr = mmvad.starting_vpn * VMI_PS_4KB
+                  );
     size_t dump_size = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
     if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, dump_size, reason, extras, extras != nullptr))
     {
@@ -415,12 +414,11 @@ static bool dump_if_points_to_executable_memory(
 bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plugin, bool is_32bit, addr_t stack_ptr)
 {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = stack_ptr
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = stack_ptr
+                  );
 
     size_t bytes_read = 0;
     uint8_t buf[512];
@@ -555,12 +553,11 @@ static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_t
     auto plugin = get_trap_plugin<memdump>(info);
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = mem_base_address_ptr
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = mem_base_address_ptr
+                  );
 
     addr_t mem_base_address;
 
@@ -642,12 +639,11 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
     auto plugin = get_trap_plugin<memdump>(info);
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = mem_base_address_ptr
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = mem_base_address_ptr
+                  );
 
     addr_t mem_base_address;
 
@@ -714,12 +710,11 @@ static event_response_t write_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_
     auto plugin = get_trap_plugin<memdump>(info);
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = buffer_ptr
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = buffer_ptr
+                  );
 
     vmi_pid_t target_pid;
     addr_t process_addr = 0;
@@ -846,12 +841,11 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
     // whereas in standard process hollowing entry point is changed by modifying eax register.
     // Both registers are passed in _WOW64_CONTEXT structure from within caller address space.
     addr_t wow64_context = drakvuf_get_function_argument(drakvuf, info, 3);
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = wow64_context + plugin->wow64context_eax_rva
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = wow64_context + plugin->wow64context_eax_rva
+                  );
     addr_t eax = 0;
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&eax))
     {
@@ -881,12 +875,11 @@ bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     addr_t data_size = 0;
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rcx
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = info->regs->rcx
+                  );
 
     const auto ptr_size = is_syswow ? sizeof(uint32_t) : sizeof(addr_t);
     ctx.addr += ptr_size;

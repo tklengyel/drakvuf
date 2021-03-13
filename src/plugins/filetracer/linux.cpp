@@ -257,11 +257,10 @@ void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_wrapper* lw)
 
 GString* get_filepath(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, addr_t dentry_addr)
 {
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     linux_filetracer* f = (linux_filetracer*)info->trap->data;
 
@@ -317,11 +316,10 @@ int get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_wrapper* l
 
     vmi_lock_guard vmi_lg(drakvuf);
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     addr_t dentry_addr = 0;
     if (struct_name == "file")
@@ -390,12 +388,11 @@ char* read_filename(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t fileadd
 {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = fileaddr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = fileaddr
+                  );
 
     char* filename = vmi_read_str(vmi, &ctx);
     drakvuf_release_vmi(drakvuf);

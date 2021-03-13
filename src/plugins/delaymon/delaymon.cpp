@@ -13,8 +13,7 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
     int64_t delay = 0; // in hundreds of nanoseconds
 
     {
-        access_context_t ctx;
-        memset(&ctx, 0, sizeof(access_context_t));
+        ACCESS_CONTEXT(ctx);
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
         ctx.dtb = info->regs->cr3;
         ctx.addr = delay_addr;

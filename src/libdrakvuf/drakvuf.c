@@ -554,12 +554,11 @@ bool drakvuf_get_process_data(drakvuf_t drakvuf, addr_t process_base, proc_data_
 
 char* drakvuf_read_ascii_str(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
 {
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = addr,
+                  );
 
     return vmi_read_str(drakvuf->vmi, &ctx);
 }
@@ -594,24 +593,22 @@ unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         return NULL;
 
     vmi_instance_t vmi = drakvuf->vmi;
-    access_context_t ctx =
-    {
-        .addr = addr,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .addr = addr,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                  );
 
     return drakvuf_read_unicode_common(vmi, &ctx);
 }
 
 unicode_string_t* drakvuf_read_unicode_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid)
 {
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .addr = vaddr,
-        .pid = pid
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .addr = vaddr,
+                   .pid = pid
+                  );
 
     return drakvuf_read_unicode_common(vmi, &ctx);
 }
@@ -646,24 +643,22 @@ unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t*
         return NULL;
 
     vmi_instance_t vmi = drakvuf->vmi;
-    access_context_t ctx =
-    {
-        .addr = addr,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .addr = addr,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                  );
 
     return drakvuf_read_unicode32_common(vmi, &ctx);
 }
 
 unicode_string_t* drakvuf_read_unicode32_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid)
 {
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .addr = vaddr,
-        .pid = pid
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_PID,
+                   .addr = vaddr,
+                   .pid = pid
+                  );
 
     return drakvuf_read_unicode32_common(vmi, &ctx);
 }

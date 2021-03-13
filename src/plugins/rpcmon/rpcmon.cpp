@@ -195,7 +195,7 @@ static std::optional<T> read_struct(vmi_instance_t vmi, access_context_t const* 
 template<typename T>
 static std::optional<T> read_struct(vmi_instance_t vmi, drakvuf_trap_info* info, addr_t arg)
 {
-    access_context_t ctx = {};
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
     ctx.addr = arg;
@@ -249,12 +249,11 @@ static std::optional<rpc_info_t> parse_MIDL_STUB_DESC(drakvuf_t drakvuf, drakvuf
     if (!rpc_interface_information_addr)
         return {};
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = rpc_interface_information_addr,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3,
+                   .addr = rpc_interface_information_addr
+                  );
 
     auto vmi = vmi_lock_guard(drakvuf);
 
@@ -278,11 +277,10 @@ static std::optional<uint64_t> parse_FORMAT_STRING(drakvuf_t drakvuf, drakvuf_tr
 {
     auto vmi = vmi_lock_guard(drakvuf);
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     uint8_t oi_flags;
     ctx.addr = arg + Oi_FLAGS_FIELD_OFFSET;
@@ -313,11 +311,10 @@ static std::optional<rpc_message_t> parse_RPC_MESSAGE(drakvuf_t drakvuf, drakvuf
 
     auto vmi = vmi_lock_guard(drakvuf);
 
-    access_context_t ctx =
-    {
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-    };
+    ACCESS_CONTEXT(ctx,
+                   .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3
+                  );
 
     uint32_t proc_num;
     ctx.addr = arg + RPC_MESSAGE_PROCNUM_OFFSET;
