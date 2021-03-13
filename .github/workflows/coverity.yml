@@ -1,0 +1,80 @@
+name: coverity-scan
+on:
+  schedule:
+    - cron: '0 18 * * *' # Daily at 18:00 UTC
+  push:
+    branches: master
+
+jobs:
+  latest:
+    runs-on: ubuntu-20.04
+    env:
+      CC: clang
+      CXX: clang++
+      TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get remove -y clang
+          sudo apt-get install -y clang-10 autoconf-archive flex bison libjson-c-dev libxen-dev
+
+      - name: Install LibVMI
+        run: |
+          git submodule update --init libvmi
+          cd libvmi
+          autoreconf -vif
+          ./configure --disable-kvm --disable-file --disable-bareflank --disable-examples --disable-vmifs
+          make -j2
+          sudo make install
+          sudo ldconfig
+          cd ..
+
+      - name: Download Coverity hash
+        id: hash
+        run: |
+          wget -q https://scan.coverity.com/download/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf&md5=1" -O coverity_tool.md5
+          hash=$(cat coverity_tool.md5)
+          echo ::set-output name=hash::$hash
+
+      - uses: actions/cache@v2
+        id: cache-coverity
+        with:
+          path: coverity
+          key: ${{ steps.hash.outputs.hash }}
+
+      - name: Download Coverity Build Tool
+        if: steps.cache-coverity.outputs.cache-hit != 'true'
+        run: |
+          wget -q https://scan.coverity.com/download/linux64 --post-data "token=$TOKEN&project=tklengyel%2Fdrakvuf" -O coverity_tool.tgz
+          mkdir -p coverity
+          tar xzf coverity_tool.tgz --strip 1 -C coverity
+
+      - name: Fixed world writable dirs
+        run: |
+          chmod go-w $HOME
+          sudo chmod -R go-w /usr/share
+
+      - name: Run autoreconf
+        run: autoreconf -vif
+
+      - name: Configure
+        run: ./configure --enable-debug
+
+      - name: Build with cov-build
+        run: |
+          export PATH=`pwd`/coverity/bin:$PATH
+          cov-build --dir cov-int make
+
+      - name: Submit the result to Coverity Scan
+        run: |
+          tar czvf drakvuf.tgz cov-int
+          curl \
+            --form token=$TOKEN \
+            --form email=tamas.k.lengyel@gmail.com \
+            --form file=@drakvuf.tgz \
+            --form version=master \
+            --form description="`git describe --always`" \
+            https://scan.coverity.com/builds?project=tklengyel%2Fdrakvuf
