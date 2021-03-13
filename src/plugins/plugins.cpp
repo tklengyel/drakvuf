@@ -393,7 +393,11 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     break;
                 }
 #endif
-                case __DRAKVUF_PLUGIN_LIST_MAX: /* fall-through */
+                case __DRAKVUF_PLUGIN_LIST_MAX:
+                    /* Should never reach here */
+                    fprintf(stderr, "Plugin start falls-through to default switch case!\n");
+                    throw -1;
+
                 default:
                     break;
             }
