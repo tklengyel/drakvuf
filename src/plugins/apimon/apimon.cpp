@@ -203,7 +203,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    drakvuf_trap_t* trap = new (std::nothrow) drakvuf_trap_t;
+    drakvuf_trap_t* trap = new (std::nothrow) drakvuf_trap_t();
 
     if (!trap)
     {
