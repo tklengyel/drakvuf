@@ -1002,7 +1002,7 @@ plugin_target_config_entry_t parse_entry(
 
     return entry;
 }
-}
+} // namespace
 
 
 void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, bool print_no_addr, const hook_filter_t& hook_filter, wanted_hooks_t& wanted_hooks)

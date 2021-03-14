@@ -1,0 +1,24 @@
+name: cpplint
+on:
+  pull_request:
+    branches: [ master ]
+jobs:
+  cpplint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: install dependencies
+        run: |
+          pip3 install cpplint
+
+      - name: cpplint
+        run: |
+          export PATH=$PATH:~/.local/bin
+          cpplint \
+            --filter=-whitespace,-legal,-runtime/int,-runtime/explicit,-build/header_guard,-build/include_subdir,-build/include_what_you_use,-build/include_order \
+            --recursive \
+            --verbose=5 \
+            src/plugins/plugins.cpp \
+            src/plugins/plugins_ex.cpp \
+            src/plugins/output_format/* \
+            src/libusermode/*
