@@ -147,16 +147,16 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (c->format == OUTPUT_JSON)
     {
         jsonfmt::print("windowmon", drakvuf, info,
-                       keyval("Class", fmt::Qstr(window_class)),
-                       keyval("Name", fmt::Qstr(window_name))
-                      );
+            keyval("Class", fmt::Qstr(window_class)),
+            keyval("Name", fmt::Qstr(window_name))
+        );
     }
     else
     {
         fmt::print(c->format, "windowmon", drakvuf, info,
-                   keyval("Class", fmt::Rstr(window_class)),
-                   keyval("Name", fmt::Rstr(window_name))
-                  );
+            keyval("Class", fmt::Rstr(window_class)),
+            keyval("Name", fmt::Rstr(window_name))
+        );
     }
 
     vmi_free_unicode_str(class_us);
@@ -168,8 +168,8 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 }
 
 static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const char* function_name,
-                           drakvuf_trap_t* trap,
-                           event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
+    drakvuf_trap_t* trap,
+    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
     addr_t func_rva = 0;
     if ( !json_get_symbol_rva(drakvuf, profile_json, function_name, &func_rva) )
@@ -228,10 +228,10 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json, const c
     }
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .addr = ssdt_ptr_va,
-                   .dtb = trap->breakpoint.dtb
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .addr = ssdt_ptr_va,
+        .dtb = trap->breakpoint.dtb
+    );
     addr_t ssdt_va = 0;
     if (VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &ssdt_va))
     {

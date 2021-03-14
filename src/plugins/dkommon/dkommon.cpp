@@ -133,8 +133,8 @@ static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_inf
     dkommon* d = static_cast<dkommon*>(info->trap->data);
 
     fmt::print(d->format, "dkommon", drakvuf, info,
-               keyval("Message", fmt::Qstr("Hidden Process"))
-              );
+        keyval("Message", fmt::Qstr("Hidden Process"))
+    );
 }
 
 static event_response_t check_hidden_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -143,9 +143,9 @@ static event_response_t check_hidden_process(drakvuf_t drakvuf, drakvuf_trap_inf
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
 
     addr_t list_entry_va = info->attached_proc_data.base_addr + d->offsets[EPROCESS_ACTIVEPROCESSLINKS];
     addr_t flink = 0;
@@ -184,8 +184,8 @@ static event_response_t notify_zero_page_write(drakvuf_t drakvuf, drakvuf_trap_i
     dkommon* d = static_cast<dkommon*>(info->trap->data);
 
     fmt::print(d->format, "dkommon", drakvuf, info,
-               keyval("Message", fmt::Qstr("Zero Page Write"))
-              );
+        keyval("Message", fmt::Qstr("Zero Page Write"))
+    );
 
     return 0;
 }
@@ -193,9 +193,9 @@ static event_response_t notify_zero_page_write(drakvuf_t drakvuf, drakvuf_trap_i
 static void print_driver(drakvuf_t drakvuf, drakvuf_trap_info_t* info, output_format_t format, const char* message, const char* name)
 {
     fmt::print(format, "dkommon", drakvuf, info,
-               keyval("Message", fmt::Qstr(message)),
-               keyval("DriverName", fmt::Qstr(name))
-              );
+        keyval("Message", fmt::Qstr(message)),
+        keyval("DriverName", fmt::Qstr(name))
+    );
 }
 
 static std::vector<std::string> enumerate_drivers(dkommon* d, drakvuf_t drakvuf)
@@ -205,8 +205,8 @@ static std::vector<std::string> enumerate_drivers(dkommon* d, drakvuf_t drakvuf)
     vmi_lock_guard vmi(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB
+    );
 
     if (VMI_SUCCESS != vmi_pid_to_dtb(vmi.vmi, 4, &ctx.dtb))
     {

@@ -154,7 +154,7 @@ struct rh_data_t
     userhook* userhook_plugin;
 
     rh_data_t(userhook* userhook_plugin, addr_t target_process, vmi_pid_t target_process_pid,
-              std::string dll_name, std::string func_name, callback_t cb, void* extra):
+        std::string dll_name, std::string func_name, callback_t cb, void* extra):
         target_process(target_process), dll_name(dll_name), func_name(func_name), cb(cb),
         extra(extra), state(HOOK_FIRST_TRY), target_process_pid(target_process_pid),
         target_process_dtb(), userhook_plugin(userhook_plugin) {}

@@ -150,26 +150,26 @@ static void print_registry_call_info(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     if (reg->format == OUTPUT_DEFAULT)
     {
         deffmt::print("regmon", drakvuf, info,
-                      keyval("EPROCESS", fmt::Xval(info->proc_data.base_addr)),
-                      keyval("Key", fmt::Rstr(key_name)),
-                      keyval("ValueName", value_name_opt),
-                      keyval("Value", value_opt)
-                     );
+            keyval("EPROCESS", fmt::Xval(info->proc_data.base_addr)),
+            keyval("Key", fmt::Rstr(key_name)),
+            keyval("ValueName", value_name_opt),
+            keyval("Value", value_opt)
+        );
     }
     else
     {
         fmt::print(reg->format, "regmon", drakvuf, info,
-                   keyval("Key", fmt::Qstr(key_name)),
-                   keyval("ValueName", value_name_opt),
-                   keyval("Value", value_opt)
-                  );
+            keyval("Key", fmt::Qstr(key_name)),
+            keyval("ValueName", value_name_opt),
+            keyval("Value", value_opt)
+        );
     }
 }
 
 static event_response_t log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                                      uint64_t key_handle,
-                                      char const* value_name,
-                                      char const* data )
+    uint64_t key_handle,
+    char const* value_name,
+    char const* data )
 {
     if (!key_handle) return 0;
 
@@ -189,9 +189,9 @@ static char const* get_value_name(unicode_string_t* us)
 }
 
 static event_response_t log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                                      uint64_t key_handle,
-                                      addr_t value_name_addr, bool with_value_name,
-                                      char const* data )
+    uint64_t key_handle,
+    addr_t value_name_addr, bool with_value_name,
+    char const* data )
 {
     unicode_string_t* value_name_us = nullptr;
     char const* value_name = nullptr;
@@ -209,13 +209,13 @@ static event_response_t log_reg_impl( drakvuf_t drakvuf, drakvuf_trap_info_t* in
 }
 
 static event_response_t log_reg_key( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                                     uint64_t key_handle)
+    uint64_t key_handle)
 {
     return log_reg_impl(drakvuf, info, key_handle, 0L, false, nullptr);
 }
 
 static event_response_t log_reg_key_value( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-        uint64_t key_handle, addr_t value_name_addr )
+    uint64_t key_handle, addr_t value_name_addr )
 {
     return log_reg_impl(drakvuf, info, key_handle, value_name_addr, true, nullptr);
 }
@@ -229,9 +229,9 @@ static char* get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     vmi_lock_guard vmi_lg(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
 
     addr_t key_handle;
     ctx.addr = attr + reg->objattr_root;
@@ -252,9 +252,9 @@ static char* get_key_path_from_attr(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     }
 
     char* key_path = g_strdup_printf("%s%s%s",
-                                     key_root_p ?: "",
-                                     key_root_p ? "\\" : "",
-                                     (const char*)us->contents ?: "");
+            key_root_p ?: "",
+            key_root_p ? "\\" : "",
+            (const char*)us->contents ?: "");
     g_free(key_root_p);
     vmi_free_unicode_str(us);
 
@@ -274,13 +274,13 @@ static event_response_t log_reg_objattr(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 }
 
 static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-        uint32_t type, addr_t data_addr, size_t data_size )
+    uint32_t type, addr_t data_addr, size_t data_size )
 {
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = data_addr,
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = data_addr,
+    );
 
     vmi_lock_guard vmi_lg(drakvuf);
 
@@ -347,8 +347,8 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
 }
 
 static event_response_t log_reg_key_value_data( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-        uint64_t key_handle, addr_t value_name_addr,
-        uint32_t type, addr_t data_addr, size_t data_size )
+    uint64_t key_handle, addr_t value_name_addr,
+    uint32_t type, addr_t data_addr, size_t data_size )
 {
     unicode_string_t* data_us = get_data_as_string(drakvuf, info, type, data_addr, data_size);
 
@@ -365,7 +365,7 @@ static event_response_t log_reg_key_value_data( drakvuf_t drakvuf, drakvuf_trap_
 }
 
 static event_response_t log_reg_key_value_entries( drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-        uint64_t key_handle, addr_t value_entries_addr, size_t value_entries_count )
+    uint64_t key_handle, addr_t value_entries_addr, size_t value_entries_count )
 {
     /*
     typedef struct _KEY_VALUE_ENTRY {
@@ -385,10 +385,10 @@ static event_response_t log_reg_key_value_entries( drakvuf_t drakvuf, drakvuf_tr
         vmi_lock_guard vmi_lg(drakvuf);
 
         ACCESS_CONTEXT(ctx,
-                       .translate_mechanism = VMI_TM_PROCESS_DTB,
-                       .dtb = info->regs->cr3,
-                       .addr = value_entries_addr + i * KEY_VALUE_ENTRY_sizeof
-                      );
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = value_entries_addr + i * KEY_VALUE_ENTRY_sizeof
+        );
 
         addr_t value_name_addr;
         if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &value_name_addr) )
@@ -623,8 +623,8 @@ static event_response_t query_value_key_cb( drakvuf_t drakvuf, drakvuf_trap_info
 }
 
 static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
-                           drakvuf_trap_t* trap,
-                           event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
+    drakvuf_trap_t* trap,
+    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
     if ( !drakvuf_get_kernel_symbol_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
 

@@ -109,7 +109,7 @@
 #include "libdrakvuf.h"
 
 addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
-                                 uint64_t vcpu_id,
-                                 uint64_t handle);
+    uint64_t vcpu_id,
+    uint64_t handle);
 
 #endif

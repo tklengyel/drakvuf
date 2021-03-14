@@ -227,21 +227,21 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             proc_name_opt = fmt::Qstr(info->attached_proc_data.base_addr ? info->attached_proc_data.name : "NOPROC");
 
         fmt::print(e->format, "exmon", drakvuf, info,
-                   keyval("RSP", fmt::Xval(info->regs->rsp, false)),
-                   keyval("ExceptionRecord", fmt::Xval(exception_record)),
-                   keyval("ExceptionCode", fmt::Xval(exception_code)),
-                   keyval("FirstChance", fmt::Nval(first_chance)),
-                   keyval("EIP", fmt::Xval(eip, false)),
-                   keyval("EAX", fmt::Xval(eax, false)),
-                   keyval("EBX", fmt::Xval(ebx, false)),
-                   keyval("ECX", fmt::Xval(ecx, false)),
-                   keyval("EDX", fmt::Xval(edx, false)),
-                   keyval("EDI", fmt::Xval(edi, false)),
-                   keyval("ESI", fmt::Xval(esi, false)),
-                   keyval("EBP", fmt::Xval(ebp, false)),
-                   keyval("ESP", fmt::Xval(hwesp, false)),
-                   keyval("Name", proc_name_opt)
-                  );
+            keyval("RSP", fmt::Xval(info->regs->rsp, false)),
+            keyval("ExceptionRecord", fmt::Xval(exception_record)),
+            keyval("ExceptionCode", fmt::Xval(exception_code)),
+            keyval("FirstChance", fmt::Nval(first_chance)),
+            keyval("EIP", fmt::Xval(eip, false)),
+            keyval("EAX", fmt::Xval(eax, false)),
+            keyval("EBX", fmt::Xval(ebx, false)),
+            keyval("ECX", fmt::Xval(ecx, false)),
+            keyval("EDX", fmt::Xval(edx, false)),
+            keyval("EDI", fmt::Xval(edi, false)),
+            keyval("ESI", fmt::Xval(esi, false)),
+            keyval("EBP", fmt::Xval(ebp, false)),
+            keyval("ESP", fmt::Xval(hwesp, false)),
+            keyval("Name", proc_name_opt)
+        );
     }
     else
     {
@@ -283,25 +283,25 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         exception_record = info->regs->rcx;
 
         fmt::print(e->format, "exmon", drakvuf, info,
-                   keyval("RSP", fmt::Nval(info->regs->rsp)),
-                   keyval("ExceptionRecord", fmt::Xval(exception_record)),
-                   keyval("ExceptionCode", fmt::Xval(exception_code)),
-                   keyval("FirstChance", fmt::Nval(first_chance & 1)),
-                   keyval("RIP", fmt::Xval(rip, false)),
-                   keyval("RAX", fmt::Xval(rax, false)),
-                   keyval("RBX", fmt::Xval(rbx, false)),
-                   keyval("RCX", fmt::Xval(rcx, false)),
-                   keyval("RDX", fmt::Xval(rdx, false)),
-                   keyval("RDI", fmt::Xval(rdi, false)),
-                   keyval("RSI", fmt::Xval(rsi, false)),
-                   keyval("RBP", fmt::Xval(rbp, false)),
-                   keyval("RSP", fmt::Xval(rsp, false)),
-                   keyval("R8", fmt::Xval(r8, false)),
-                   keyval("R9", fmt::Xval(r9, false)),
-                   keyval("R10", fmt::Xval(r10, false)),
-                   keyval("R11", fmt::Xval(r11, false)),
-                   keyval("Name", proc_name_opt)
-                  );
+            keyval("RSP", fmt::Nval(info->regs->rsp)),
+            keyval("ExceptionRecord", fmt::Xval(exception_record)),
+            keyval("ExceptionCode", fmt::Xval(exception_code)),
+            keyval("FirstChance", fmt::Nval(first_chance & 1)),
+            keyval("RIP", fmt::Xval(rip, false)),
+            keyval("RAX", fmt::Xval(rax, false)),
+            keyval("RBX", fmt::Xval(rbx, false)),
+            keyval("RCX", fmt::Xval(rcx, false)),
+            keyval("RDX", fmt::Xval(rdx, false)),
+            keyval("RDI", fmt::Xval(rdi, false)),
+            keyval("RSI", fmt::Xval(rsi, false)),
+            keyval("RBP", fmt::Xval(rbp, false)),
+            keyval("RSP", fmt::Xval(rsp, false)),
+            keyval("R8", fmt::Xval(r8, false)),
+            keyval("R9", fmt::Xval(r9, false)),
+            keyval("R10", fmt::Xval(r10, false)),
+            keyval("R11", fmt::Xval(r11, false)),
+            keyval("Name", proc_name_opt)
+        );
     }
 
 done:

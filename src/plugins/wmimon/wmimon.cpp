@@ -403,9 +403,9 @@ event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_
     wmi_lock.unlock();
 
     fmt::print(plugin->m_output_format, "wmimon", drakvuf, info,
-               keyval("Object", fmt::Qstr(reinterpret_cast<const char*>(object->contents))),
-               keyval("Function", fmt::Qstr(reinterpret_cast<const char*>(method->contents)))
-              );
+        keyval("Object", fmt::Qstr(reinterpret_cast<const char*>(object->contents))),
+        keyval("Function", fmt::Qstr(reinterpret_cast<const char*>(method->contents)))
+    );
 
     vmi_free_unicode_str(object);
     vmi_free_unicode_str(method);
@@ -424,9 +424,9 @@ event_response_t ExecMethod_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     }
 
     auto trap = plugin->register_trap<ExecMethodParams>(
-                    info,
-                    ExecMethod_return_handler,
-                    breakpoint_by_dtb_searcher());
+            info,
+            ExecMethod_return_handler,
+            breakpoint_by_dtb_searcher());
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
@@ -480,8 +480,8 @@ event_response_t GetObject_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
     }
 
     fmt::print(plugin->m_output_format, "wmimon", drakvuf, info,
-               keyval("Object", fmt::Qstr(reinterpret_cast<const char*>(object->contents)))
-              );
+        keyval("Object", fmt::Qstr(reinterpret_cast<const char*>(object->contents)))
+    );
 
     vmi_free_unicode_str(object);
     return VMI_EVENT_RESPONSE_NONE;
@@ -499,9 +499,9 @@ event_response_t GetObject_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     auto trap = plugin->register_trap<ExecMethodParams>(
-                    info,
-                    GetObject_return_handler,
-                    breakpoint_by_dtb_searcher());
+            info,
+            GetObject_return_handler,
+            breakpoint_by_dtb_searcher());
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
@@ -554,8 +554,8 @@ event_response_t ExecQuery_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
     }
 
     fmt::print(plugin->m_output_format, "wmimon", drakvuf, info,
-               keyval("Command", fmt::Qstr(reinterpret_cast<const char*>(command->contents)))
-              );
+        keyval("Command", fmt::Qstr(reinterpret_cast<const char*>(command->contents)))
+    );
 
     vmi_free_unicode_str(command);
     return VMI_EVENT_RESPONSE_NONE;
@@ -573,9 +573,9 @@ event_response_t ExecQuery_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     auto trap = plugin->register_trap<ExecQueryParams>(
-                    info,
-                    ExecQuery_return_handler,
-                    breakpoint_by_dtb_searcher());
+            info,
+            ExecQuery_return_handler,
+            breakpoint_by_dtb_searcher());
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
@@ -628,8 +628,8 @@ event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_in
     }
 
     fmt::print(plugin->m_output_format, "wmimon", drakvuf, info,
-               keyval("Resource", fmt::Qstr(reinterpret_cast<const char*>(resource->contents)))
-              );
+        keyval("Resource", fmt::Qstr(reinterpret_cast<const char*>(resource->contents)))
+    );
 
     vmi_free_unicode_str(resource);
 
@@ -662,9 +662,9 @@ event_response_t ConnectServer_handler(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     }
 
     auto trap = plugin->register_trap<ConnectServerParams>(
-                    info,
-                    ConnectServer_return_handler,
-                    breakpoint_by_dtb_searcher());
+            info,
+            ConnectServer_return_handler,
+            breakpoint_by_dtb_searcher());
 
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;

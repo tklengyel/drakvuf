@@ -155,10 +155,10 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     addr_t addr = drakvuf_get_function_argument(drakvuf, info, 2);
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = addr + o->key_offset
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = addr + o->key_offset
+    );
 
     auto vmi = vmi_lock_guard(drakvuf);
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &ckey.key))
@@ -171,15 +171,15 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         case OUTPUT_CSV:
         case OUTPUT_DEFAULT:
             fmt::print(o->format, "objmon", drakvuf, info,
-                       keyval("Key", fmt::Rstr(key))
-                      );
+                keyval("Key", fmt::Rstr(key))
+            );
             break;
 
         case OUTPUT_KV:
         case OUTPUT_JSON:
             fmt::print(o->format, "objmon", drakvuf, info,
-                       keyval("Key", fmt::Qstr(key))
-                      );
+                keyval("Key", fmt::Qstr(key))
+            );
             break;
     }
 

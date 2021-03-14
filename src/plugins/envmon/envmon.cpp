@@ -199,9 +199,9 @@ static event_response_t trap_SspipGetUserName_cb(drakvuf_t drakvuf, drakvuf_trap
 
 
     fmt::print(p->m_output_format, "envmon", drakvuf, info,
-               keyval("ExtendedNameFormat", fmt::Nval(ex_name_fmt)),
-               keyval("ExtendedNameFormatStr", fmt::Qstr(ex_name_fmt_str))
-              );
+        keyval("ExtendedNameFormat", fmt::Nval(ex_name_fmt)),
+        keyval("ExtendedNameFormatStr", fmt::Qstr(ex_name_fmt_str))
+    );
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -214,31 +214,31 @@ static event_response_t trap_DefineDosDeviceW_cb(drakvuf_t drakvuf, drakvuf_trap
     addr_t target_path_va = drakvuf_get_function_argument(drakvuf, info, 3);
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = device_name_va
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = device_name_va
+    );
 
     vmi_lock_guard wmi_lock(drakvuf);
 
     auto device_name_us = drakvuf_read_wchar_string(wmi_lock, &ctx);
     const char* device_name = device_name_us ?
-                              reinterpret_cast<char*>(device_name_us->contents) :
-                              "<UNKNOWN>";
+        reinterpret_cast<char*>(device_name_us->contents) :
+        "<UNKNOWN>";
 
     ctx.addr = target_path_va;
     auto target_path_us = drakvuf_read_wchar_string(wmi_lock, &ctx);
     const char* target_path = target_path_us ?
-                              reinterpret_cast<char*>(target_path_us->contents) :
-                              "<UNKNOWN>";
+        reinterpret_cast<char*>(target_path_us->contents) :
+        "<UNKNOWN>";
 
     wmi_lock.unlock();
 
     fmt::print(p->m_output_format, "envmon", drakvuf, info,
-               keyval("Flags", fmt::Qstr(flags)),
-               keyval("DeviceName", fmt::Qstr(device_name)),
-               keyval("TargetPath", fmt::Qstr(target_path))
-              );
+        keyval("Flags", fmt::Qstr(flags)),
+        keyval("DeviceName", fmt::Qstr(device_name)),
+        keyval("TargetPath", fmt::Qstr(target_path))
+    );
 
     vmi_free_unicode_str(device_name_us);
     vmi_free_unicode_str(target_path_us);
@@ -274,9 +274,9 @@ static event_response_t trap_GetComputerNameExW_cb(drakvuf_t drakvuf, drakvuf_tr
         name_type_str = computer_name_formats[name_type];
 
     fmt::print(p->m_output_format, "envmon", drakvuf, info,
-               keyval("NameType", fmt::Nval(name_type)),
-               keyval("NameTypeStr", fmt::Qstr(name_type_str))
-              );
+        keyval("NameType", fmt::Nval(name_type)),
+        keyval("NameTypeStr", fmt::Qstr(name_type_str))
+    );
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -293,15 +293,15 @@ static event_response_t trap_GetAdaptersAddresses_cb(drakvuf_t drakvuf, drakvuf_
         case OUTPUT_JSON:
         case OUTPUT_DEFAULT:
             fmt::print(p->m_output_format, "envmon", drakvuf, info,
-                       keyval("Family", fmt::Qstr(family)),
-                       keyval("Flags", fmt::Qstr(flags))
-                      );
+                keyval("Family", fmt::Qstr(family)),
+                keyval("Flags", fmt::Qstr(flags))
+            );
             break;
         case OUTPUT_KV:
             kvfmt::print("envmon", drakvuf, info,
-                         keyval("Family", fmt::Rstr(family)),
-                         fmt::Rstr(flags)
-                        );
+                keyval("Family", fmt::Rstr(family)),
+                fmt::Rstr(flags)
+            );
             break;
     }
     return VMI_EVENT_RESPONSE_NONE;
@@ -313,8 +313,8 @@ static event_response_t trap_WNetGetProviderNameW_cb(drakvuf_t drakvuf, drakvuf_
 
     const auto net_type = drakvuf_get_function_argument(drakvuf, info, 1);
     fmt::print(p->m_output_format, "envmon", drakvuf, info,
-               keyval("NetType", fmt::Nval(net_type))
-              );
+        keyval("NetType", fmt::Nval(net_type))
+    );
     return VMI_EVENT_RESPONSE_NONE;
 }
 

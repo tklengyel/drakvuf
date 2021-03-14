@@ -151,8 +151,8 @@ addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t process = 0;
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+    );
 
     if (info->regs->cs_sel & 3)
     {
@@ -194,10 +194,10 @@ char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpa
 {
     UNUSED(fullpath);
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_PID,
-                   .pid = 0,
-                   .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]
+    );
 
     return vmi_read_str(drakvuf->vmi, &ctx);
 }
@@ -209,10 +209,10 @@ bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pi
      * what getpid() would return. Because THAT makes sense.
      */
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_PID,
-                   .pid = 0,
-                   .addr = process_base + drakvuf->offsets[TASK_STRUCT_TGID]
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_TGID]
+    );
 
     if ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)pid) )
         return true;
@@ -226,10 +226,10 @@ bool linux_get_process_tid(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid
      * On Linux PID is actually the thread ID....... ... ...
      */
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_PID,
-                   .pid = 0,
-                   .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]
+    );
 
     if ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, tid))
         return true;
@@ -245,10 +245,10 @@ char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         return NULL;
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]
+    );
 
     return vmi_read_str(drakvuf->vmi, &ctx);
 }
@@ -256,10 +256,10 @@ char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 int64_t linux_get_process_userid(drakvuf_t drakvuf, addr_t process_base)
 {
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_PID,
-                   .pid = 0,
-                   .addr = process_base + drakvuf->offsets[TASK_STRUCT_CRED]
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_CRED]
+    );
 
     addr_t cred;
     if ( VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &cred) )
@@ -280,10 +280,10 @@ int64_t linux_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t*
         return -1;
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = process_base + drakvuf->offsets[TASK_STRUCT_CRED]
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_CRED]
+    );
 
     addr_t cred;
     if ( VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &cred) )
@@ -307,10 +307,10 @@ bool linux_get_current_thread_id( drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
         return false;
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]
+    );
     uint32_t _thread_id;
 
     if ( VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &_thread_id) )
@@ -326,10 +326,10 @@ bool linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* 
     status_t status;
     addr_t parent_proc_base = 0;
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_PID,
-                   .pid = 0,
-                   .addr = process_base + drakvuf->offsets[TASK_STRUCT_REALPARENT]
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_REALPARENT]
+    );
 
     status = vmi_read_addr( drakvuf->vmi, &ctx, &parent_proc_base );
 

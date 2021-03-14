@@ -137,9 +137,9 @@ event_response_t ssl_generate_master_key_ret_cb(drakvuf_t drakvuf, drakvuf_trap_
         return VMI_EVENT_RESPONSE_NONE;
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
 
     tlsmon_priv::ssl_master_secret_t master_secret;
     std::array<char, tlsmon_priv::CLIENT_RANDOM_SZ> client_random = std::array<char, tlsmon_priv::CLIENT_RANDOM_SZ>();
@@ -231,9 +231,9 @@ event_response_t ssl_generate_master_key_ret_cb(drakvuf_t drakvuf, drakvuf_trap_
     std::string master_key_str = tlsmon_priv::byte2str(master_secret.master_key, tlsmon_priv::MASTER_KEY_SZ);
     std::string client_random_str = tlsmon_priv::byte2str((unsigned char*)client_random.data(), tlsmon_priv::CLIENT_RANDOM_SZ);
     fmt::print(plugin->m_output_format, "tlsmon", drakvuf, info,
-               keyval("client_random", fmt::Qstr(client_random_str)),
-               keyval("master_key", fmt::Qstr(master_key_str))
-              );
+        keyval("client_random", fmt::Qstr(client_random_str)),
+        keyval("master_key", fmt::Qstr(master_key_str))
+    );
 
     plugin->destroy_trap(info->trap);
     return VMI_EVENT_RESPONSE_NONE;
@@ -250,11 +250,11 @@ event_response_t ssl_generate_master_key_cb(drakvuf_t drakvuf, drakvuf_trap_info
     tlsmon* plugin = static_cast<tlsmon*>(info->trap->data);
 
     auto trap = plugin->register_trap<ssl_generate_master_key_result_t>(
-                    info,
-                    ssl_generate_master_key_ret_cb,
-                    breakpoint_by_dtb_searcher(),
-                    "SslGenerateMasterKey"
-                );
+            info,
+            ssl_generate_master_key_ret_cb,
+            breakpoint_by_dtb_searcher(),
+            "SslGenerateMasterKey"
+        );
     if (!trap)
         return VMI_EVENT_RESPONSE_NONE;
 

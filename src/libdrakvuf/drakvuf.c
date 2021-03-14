@@ -429,7 +429,7 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 }
 
 void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap,
-                         drakvuf_trap_free_t free_routine)
+    drakvuf_trap_free_t free_routine)
 {
     if ( drakvuf->in_callback)
     {
@@ -441,8 +441,8 @@ void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap,
             free_wrapper->free_routine = free_routine;
             free_wrapper->trap = trap;
             g_hash_table_insert(drakvuf->remove_traps,
-                                g_memdup(&trap, sizeof(void*)),
-                                free_wrapper);
+                g_memdup(&trap, sizeof(void*)),
+                free_wrapper);
         }
 
         free_wrapper->counter++;
@@ -494,12 +494,12 @@ bool json_get_struct_members_array_rva(
     addr_t* rva)
 {
     return json_lookup_array(
-               drakvuf,
-               json,
-               struct_name_symbol_array,
-               array_size,
-               rva,
-               NULL);
+            drakvuf,
+            json,
+            struct_name_symbol_array,
+            array_size,
+            rva,
+            NULL);
 }
 
 const char* drakvuf_get_json_wow_path(drakvuf_t drakvuf)
@@ -555,10 +555,10 @@ bool drakvuf_get_process_data(drakvuf_t drakvuf, addr_t process_base, proc_data_
 char* drakvuf_read_ascii_str(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
 {
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = addr,
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = addr,
+    );
 
     return vmi_read_str(drakvuf->vmi, &ctx);
 }
@@ -594,10 +594,10 @@ unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
     vmi_instance_t vmi = drakvuf->vmi;
     ACCESS_CONTEXT(ctx,
-                   .addr = addr,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                  );
+        .addr = addr,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    );
 
     return drakvuf_read_unicode_common(vmi, &ctx);
 }
@@ -605,10 +605,10 @@ unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 unicode_string_t* drakvuf_read_unicode_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid)
 {
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_PID,
-                   .addr = vaddr,
-                   .pid = pid
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .addr = vaddr,
+        .pid = pid
+    );
 
     return drakvuf_read_unicode_common(vmi, &ctx);
 }
@@ -644,10 +644,10 @@ unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
     vmi_instance_t vmi = drakvuf->vmi;
     ACCESS_CONTEXT(ctx,
-                   .addr = addr,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                  );
+        .addr = addr,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+    );
 
     return drakvuf_read_unicode32_common(vmi, &ctx);
 }
@@ -655,10 +655,10 @@ unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t*
 unicode_string_t* drakvuf_read_unicode32_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid)
 {
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_PID,
-                   .addr = vaddr,
-                   .pid = pid
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .addr = vaddr,
+        .pid = pid
+    );
 
     return drakvuf_read_unicode32_common(vmi, &ctx);
 }
@@ -788,10 +788,10 @@ static void drakvuf_event_fd_generate(drakvuf_t drakvuf)
 
     /* allocate and populate new pollfd array and new fd_info_lookup array */
     drakvuf->event_fds = (struct pollfd*) g_try_malloc0(sizeof(struct pollfd) * \
-                         (g_slist_length(drakvuf->event_fd_info)));
+            (g_slist_length(drakvuf->event_fd_info)));
 
     drakvuf->fd_info_lookup = (fd_info_t) g_try_malloc0(sizeof(struct fd_info) * \
-                              (g_slist_length(drakvuf->event_fd_info)));
+            (g_slist_length(drakvuf->event_fd_info)));
 
     int i = 0;
     GSList* loop = drakvuf->event_fd_info;

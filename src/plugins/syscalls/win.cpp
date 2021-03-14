@@ -254,7 +254,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 }
 
 static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, syscalls* s,
-                                       addr_t cr3, bool ntos, addr_t base, addr_t* sst)
+    addr_t cr3, bool ntos, addr_t base, addr_t* sst)
 {
     bool ret = false;
     unsigned int syscall_count = ntos ? NUM_SYSCALLS_NT : NUM_SYSCALLS_WIN32K;
@@ -519,9 +519,9 @@ char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* in
         }
 
         char* file_path = g_strdup_printf("%s%s%s",
-                                          file_root ?: "",
-                                          file_root ? "\\" : "",
-                                          file_name_us->contents);
+                file_root ?: "",
+                file_root ? "\\" : "",
+                file_name_us->contents);
 
         vmi_free_unicode_str(file_name_us);
         g_free(file_root);

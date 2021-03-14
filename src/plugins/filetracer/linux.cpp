@@ -150,7 +150,7 @@ void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_wrapper* lw)
     {
         case OUTPUT_CSV:
             printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->name, lw->filename->str);
+                UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->name, lw->filename->str);
             if (lw->modes->len)
                 printf(",\"%s\"", lw->modes->str);
             if (lw->flags->len)
@@ -169,8 +169,8 @@ void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_wrapper* lw)
 
         case OUTPUT_KV:
             printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\"",
-                   UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                   info->trap->name, lw->filename->str);
+                UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
+                info->trap->name, lw->filename->str);
             if (lw->modes->len)
                 printf(",Modes=%s", lw->modes->str);
             if (lw->flags->len)
@@ -192,22 +192,22 @@ void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_wrapper* lw)
             escaped_pname = drakvuf_escape_str(info->proc_data.name);
 
             printf("{"
-                   "\"Plugin\" : \"filetracer\","
-                   "\"TimeStamp\" :"
-                   "\"" FORMAT_TIMEVAL "\","
-                   "\"ProcessName\": %s,"
-                   "\"UserName\": \"%s\","
-                   "\"UserId\": %" PRIu64 ","
-                   "\"PID\" : %d,"
-                   "\"PPID\": %d,"
-                   "\"TID\": %d,"
-                   "\"Method\": \"%s\","
-                   "\"FileName\": \"%s\",",
-                   UNPACK_TIMEVAL(info->timestamp),
-                   escaped_pname,
-                   USERIDSTR(drakvuf), info->proc_data.userid,
-                   info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
-                   info->trap->name, escaped_fname);
+                "\"Plugin\" : \"filetracer\","
+                "\"TimeStamp\" :"
+                "\"" FORMAT_TIMEVAL "\","
+                "\"ProcessName\": %s,"
+                "\"UserName\": \"%s\","
+                "\"UserId\": %" PRIu64 ","
+                "\"PID\" : %d,"
+                "\"PPID\": %d,"
+                "\"TID\": %d,"
+                "\"Method\": \"%s\","
+                "\"FileName\": \"%s\",",
+                UNPACK_TIMEVAL(info->timestamp),
+                escaped_pname,
+                USERIDSTR(drakvuf), info->proc_data.userid,
+                info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
+                info->trap->name, escaped_fname);
             if (lw->permissions)
                 printf("\"Permissions\": %o,", lw->permissions);
             if (lw->modes->len)
@@ -232,8 +232,8 @@ void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_wrapper* lw)
         default:
         case OUTPUT_DEFAULT:
             printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s",
-                   UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                   USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, lw->filename->str);
+                UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
+                USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, lw->filename->str);
 
             if (lw->permissions)
                 printf(",\"Permissions:%o\"", lw->permissions);
@@ -258,9 +258,9 @@ void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_wrapper* lw)
 GString* get_filepath(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, addr_t dentry_addr)
 {
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
 
     linux_filetracer* f = (linux_filetracer*)info->trap->data;
 
@@ -317,9 +317,9 @@ int get_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_wrapper* l
     vmi_lock_guard vmi_lg(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
 
     addr_t dentry_addr = 0;
     if (struct_name == "file")
@@ -389,10 +389,10 @@ char* read_filename(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t fileadd
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = fileaddr
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = fileaddr
+    );
 
     char* filename = vmi_read_str(vmi, &ctx);
     drakvuf_release_vmi(drakvuf);
@@ -1052,8 +1052,8 @@ static event_response_t read_link_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 /* ----------------------------------------------------- */
 
 static void register_trap(drakvuf_t drakvuf, const char* syscall_name,
-                          drakvuf_trap_t* trap,
-                          event_response_t (*hook_cb)(drakvuf_t drakvuf, drakvuf_trap_info_t* info))
+    drakvuf_trap_t* trap,
+    event_response_t (*hook_cb)(drakvuf_t drakvuf, drakvuf_trap_info_t* info))
 {
     addr_t syscall_addr;
     if (!drakvuf_get_kernel_symbol_rva(drakvuf, syscall_name, &syscall_addr))

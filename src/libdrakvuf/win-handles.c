@@ -155,7 +155,7 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
             j = handle / ((low_count * HANDLE_MULTIPLIER) / psize);
 
             if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + j, 0, &table) ||
-                 VMI_FAILURE == vmi_read_addr_va(vmi, table + i * (drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER), 0, &obj) )
+                VMI_FAILURE == vmi_read_addr_va(vmi, table + i * (drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER), 0, &obj) )
                 return 0;
 
             break;
@@ -177,8 +177,8 @@ static addr_t drakvuf_get_obj_by_handle_impl(drakvuf_t drakvuf, addr_t process, 
             j = (j-k)/mid_count;
 
             if ( VMI_FAILURE == vmi_read_addr_va(vmi, table_base + j, 0, &table) ||
-                 VMI_FAILURE == vmi_read_addr_va(vmi, table + k, 0, &table2) ||
-                 VMI_FAILURE == vmi_read_addr_va(vmi, table2 + i * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj) )
+                VMI_FAILURE == vmi_read_addr_va(vmi, table + k, 0, &table2) ||
+                VMI_FAILURE == vmi_read_addr_va(vmi, table2 + i * drakvuf->sizes[HANDLE_TABLE_ENTRY] / HANDLE_MULTIPLIER, 0, &obj) )
                 return 0;
 
             break;
@@ -230,7 +230,7 @@ addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf, addr_t process, uint64_t han
 
 
 bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t current_eprocess,
-                                addr_t handle, object_manager_object_t obj_type_arg, addr_t* obj_body_addr )
+    addr_t handle, object_manager_object_t obj_type_arg, addr_t* obj_body_addr )
 {
     bool ret        = false ;
     addr_t obj_addr = 0 ;
@@ -241,9 +241,9 @@ bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t* info, ad
     {
         uint8_t object_type ;
         ACCESS_CONTEXT(ctx,
-                       .translate_mechanism = VMI_TM_PROCESS_DTB,
-                       .dtb = info->regs->cr3,
-                      );
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+        );
 
         // Get TypeIndex from _OBJ_HEADER...
         ctx.addr = obj_addr + drakvuf->offsets[ OBJECT_HEADER_TYPEINDEX ] ;

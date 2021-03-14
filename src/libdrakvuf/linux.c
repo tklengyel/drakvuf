@@ -139,10 +139,10 @@ addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     }
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = info->regs->rsp + narg * 8
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = info->regs->rsp + narg * 8
+    );
 
     uint64_t ret;
     if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
@@ -161,8 +161,8 @@ addr_t linux_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t*
 bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
 {
     return (info->proc_data.pid == pid)
-           && (info->proc_data.tid == tid)
-           && (!rsp || info->regs->rip == rsp);
+        && (info->proc_data.tid == tid)
+        && (!rsp || info->regs->rip == rsp);
 }
 
 static bool find_kernbase(drakvuf_t drakvuf)

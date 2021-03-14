@@ -175,10 +175,10 @@ static char* read_cmd_line(vmi_instance_t vmi, drakvuf_trap_info_t* info, addr_t
 {
     char* cmd = NULL;
     ACCESS_CONTEXT(ctx2,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = addr
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = addr
+    );
     addr_t cmdline_addr = ctx2.addr;
     uint16_t cmd_len = 0;
     if (VMI_SUCCESS == vmi_read_16(vmi, &ctx2, &cmd_len))
@@ -229,10 +229,10 @@ static void print_process_creation_result(
     vmi_lock_guard vmi_lg(drakvuf);
     char* cmd = read_cmd_line(vmi_lg.vmi, info, cmdline_addr);
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = curdir_handle_addr
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = curdir_handle_addr
+    );
     addr_t curdir_handle = 0;
     char* curdir = nullptr;
 
@@ -257,16 +257,16 @@ static void print_process_creation_result(
     char const* dllpath = dllpath_us ? reinterpret_cast<char const*>(dllpath_us->contents) : "";
 
     fmt::print(f->m_output_format, "procmon", drakvuf, info,
-               keyval("Status", fmt::Xval(status)),
-               keyval("NewProcessHandle", fmt::Xval(new_process_handle)),
-               keyval("NewPid", fmt::Nval(new_pid)),
-               keyval("NewThreadHandle", fmt::Xval(new_thread_handle)),
-               keyval("NewTid", fmt::Nval(new_tid)),
-               keyval("CommandLine", fmt::Qstr(cmdline)),
-               keyval("ImagePathName", fmt::Qstr(imagepath)),
-               keyval("DllPath", fmt::Qstr(dllpath)),
-               keyval("CWD", fmt::Qstr(curdir))
-              );
+        keyval("Status", fmt::Xval(status)),
+        keyval("NewProcessHandle", fmt::Xval(new_process_handle)),
+        keyval("NewPid", fmt::Nval(new_pid)),
+        keyval("NewThreadHandle", fmt::Xval(new_thread_handle)),
+        keyval("NewTid", fmt::Nval(new_tid)),
+        keyval("CommandLine", fmt::Qstr(cmdline)),
+        keyval("ImagePathName", fmt::Qstr(imagepath)),
+        keyval("DllPath", fmt::Qstr(dllpath)),
+        keyval("CWD", fmt::Qstr(curdir))
+    );
 
     g_free(cmdline);
     g_free(curdir);
@@ -295,10 +295,10 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
     reg_t status = info->regs->rax;
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = new_process_handle_addr,
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = new_process_handle_addr,
+    );
 
     addr_t new_process_handle;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -337,10 +337,10 @@ static event_response_t process_create_ex_return_hook(drakvuf_t drakvuf, drakvuf
     reg_t status = info->regs->rax;
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = process_handle_addr,
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = process_handle_addr,
+    );
 
     addr_t process_handle;
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -354,18 +354,18 @@ static event_response_t process_create_ex_return_hook(drakvuf_t drakvuf, drakvuf
         new_pid = 0;
 
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
-               keyval("Status", fmt::Xval(status)),
-               keyval("ProcessHandle", fmt::Xval(process_handle)),
-               keyval("DesiredAccess", fmt::Xval(params->desired_access)),
-               keyval("ObjectAttributes", fmt::Xval(params->object_attributes_addr)),
-               keyval("ParentProcess", fmt::Xval(params->parent_process)),
-               keyval("Flags", fmt::Xval(params->flags)),
-               keyval("SectionHandle", fmt::Xval(params->section_handle)),
-               keyval("DebugPort", fmt::Xval(params->debug_port)),
-               keyval("ExceptionPort", fmt::Xval(params->exception_port)),
-               keyval("JobMemberLevel", fmt::Nval(params->job_member_level)),
-               keyval("NewPid", fmt::Nval(new_pid))
-              );
+        keyval("Status", fmt::Xval(status)),
+        keyval("ProcessHandle", fmt::Xval(process_handle)),
+        keyval("DesiredAccess", fmt::Xval(params->desired_access)),
+        keyval("ObjectAttributes", fmt::Xval(params->object_attributes_addr)),
+        keyval("ParentProcess", fmt::Xval(params->parent_process)),
+        keyval("Flags", fmt::Xval(params->flags)),
+        keyval("SectionHandle", fmt::Xval(params->section_handle)),
+        keyval("DebugPort", fmt::Xval(params->debug_port)),
+        keyval("ExceptionPort", fmt::Xval(params->exception_port)),
+        keyval("JobMemberLevel", fmt::Nval(params->job_member_level)),
+        keyval("NewPid", fmt::Nval(new_pid))
+    );
 
     plugin->destroy_trap(info->trap);
     return VMI_EVENT_RESPONSE_NONE;
@@ -379,9 +379,9 @@ static event_response_t create_user_process_hook(
 {
     auto plugin = get_trap_plugin<procmon>(info);
     auto trap = plugin->register_trap<process_creation_result_t>(
-                    info,
-                    process_creation_return_hook,
-                    breakpoint_by_pid_searcher());
+            info,
+            process_creation_return_hook,
+            breakpoint_by_pid_searcher());
 
     auto params = get_trap_params<process_creation_result_t>(trap);
     params->set_result_call_params(info);
@@ -405,9 +405,9 @@ static event_response_t create_process_ex_hook(
 {
     auto plugin = get_trap_plugin<procmon>(info);
     auto trap = plugin->register_trap<process_create_ex_result_t>(
-                    info,
-                    process_create_ex_return_hook,
-                    breakpoint_by_pid_searcher());
+            info,
+            process_create_ex_return_hook,
+            breakpoint_by_pid_searcher());
 
     auto params = get_trap_params<process_create_ex_result_t>(trap);
 
@@ -440,10 +440,10 @@ static event_response_t terminate_process_hook(
         exit_status_str = ntstatus_format_string(ntstatus_t(exit_status), exit_status_buf, sizeof(exit_status_buf));
 
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
-               keyval("ExitPid", fmt::Nval(exit_pid)),
-               keyval("ExitStatus", fmt::Xval(exit_status)),
-               keyval("ExitStatusStr", fmt::Qstr(exit_status_str))
-              );
+        keyval("ExitPid", fmt::Nval(exit_pid)),
+        keyval("ExitStatus", fmt::Xval(exit_status)),
+        keyval("ExitStatusStr", fmt::Qstr(exit_status_str))
+    );
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -491,10 +491,10 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
         return VMI_EVENT_RESPONSE_NONE;
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = params->process_handle_addr,
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = params->process_handle_addr,
+    );
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -513,12 +513,12 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
         name = g_strdup("<UNKNOWN>");
 
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
-               keyval("ProcessHandle", fmt::Xval(process_handle)),
-               keyval("DesiredAccess", fmt::Xval(params->desired_access)),
-               keyval("ObjectAttributes", fmt::Xval(params->object_attributes_addr)),
-               keyval("ClientID", fmt::Nval(params->client_id)),
-               keyval("ClientName", fmt::Qstr(name))
-              );
+        keyval("ProcessHandle", fmt::Xval(process_handle)),
+        keyval("DesiredAccess", fmt::Xval(params->desired_access)),
+        keyval("ObjectAttributes", fmt::Xval(params->object_attributes_addr)),
+        keyval("ClientID", fmt::Nval(params->client_id)),
+        keyval("ClientName", fmt::Qstr(name))
+    );
 
     g_free(name);
     plugin->destroy_trap(info->trap);
@@ -529,9 +529,9 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 {
     auto plugin = get_trap_plugin<procmon>(info);
     auto trap = plugin->register_trap<open_process_result_t>(
-                    info,
-                    open_process_return_hook_cb,
-                    breakpoint_by_pid_searcher());
+            info,
+            open_process_return_hook_cb,
+            breakpoint_by_pid_searcher());
 
     auto params = get_trap_params<open_process_result_t>(trap);
 
@@ -548,9 +548,9 @@ static event_response_t open_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
 
     // PCLIENT_ID ClientId
     params->client_id = 0;
@@ -574,10 +574,10 @@ static event_response_t open_thread_return_hook_cb(drakvuf_t drakvuf, drakvuf_tr
         return VMI_EVENT_RESPONSE_NONE;
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = params->thread_handle_addr,
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = params->thread_handle_addr,
+    );
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -596,13 +596,13 @@ static event_response_t open_thread_return_hook_cb(drakvuf_t drakvuf, drakvuf_tr
         name = g_strdup("<UNKNOWN>");
 
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
-               keyval("ThreadHandle", fmt::Xval(thread_handle)),
-               keyval("DesiredAccess", fmt::Xval(params->desired_access)),
-               keyval("ObjectAttributes", fmt::Xval(params->object_attributes_addr)),
-               keyval("ClientID", fmt::Nval(params->client_id)),
-               keyval("ClientName", fmt::Qstr(name)),
-               keyval("UniqueThread", fmt::Nval(params->unique_thread))
-              );
+        keyval("ThreadHandle", fmt::Xval(thread_handle)),
+        keyval("DesiredAccess", fmt::Xval(params->desired_access)),
+        keyval("ObjectAttributes", fmt::Xval(params->object_attributes_addr)),
+        keyval("ClientID", fmt::Nval(params->client_id)),
+        keyval("ClientName", fmt::Qstr(name)),
+        keyval("UniqueThread", fmt::Nval(params->unique_thread))
+    );
     g_free(name);
     plugin->destroy_trap(info->trap);
     return VMI_EVENT_RESPONSE_NONE;
@@ -612,9 +612,9 @@ static event_response_t open_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info
 {
     auto plugin = get_trap_plugin<procmon>(info);
     auto trap = plugin->register_trap<open_thread_result_t>(
-                    info,
-                    open_thread_return_hook_cb,
-                    breakpoint_by_pid_searcher());
+            info,
+            open_thread_return_hook_cb,
+            breakpoint_by_pid_searcher());
 
     auto params = get_trap_params<open_thread_result_t>(trap);
 
@@ -631,9 +631,9 @@ static event_response_t open_thread_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3
-                  );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
 
     // PCLIENT_ID ClientId
     params->client_id = 0;
@@ -662,9 +662,9 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
     auto plugin = get_trap_plugin<procmon>(info);
 
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
-               keyval("ProcessHandle", fmt::Xval(process_handle)),
-               keyval("NewProtectWin32", fmt::Qstr(stringify_protection_attributes(new_protect)))
-              );
+        keyval("ProcessHandle", fmt::Xval(process_handle)),
+        keyval("NewProtectWin32", fmt::Qstr(stringify_protection_attributes(new_protect)))
+    );
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -687,10 +687,10 @@ static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_tr
         auto vmi = vmi_lock_guard(drakvuf);
 
         ACCESS_CONTEXT(ctx,
-                       .translate_mechanism = VMI_TM_PROCESS_DTB,
-                       .dtb = info->regs->cr3,
-                       .addr = newstate_va
-                      );
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = newstate_va
+        );
 
         newstate = (struct TOKEN_PRIVILEGES*)g_malloc0(sizeof(struct TOKEN_PRIVILEGES));
         if (!newstate ||
@@ -714,9 +714,9 @@ static event_response_t adjust_privileges_token_cb(drakvuf_t drakvuf, drakvuf_tr
     }
 
     fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
-               keyval("ProcessHandle", fmt::Nval(token_handle)),
-               keyval("NewState", privileges)
-              );
+        keyval("ProcessHandle", fmt::Nval(token_handle)),
+        keyval("NewState", privileges)
+    );
 
 done:
     if (newstate)

@@ -125,7 +125,7 @@ public:
         auto restore_flags = fmt::RestoreFlags(os);
         os << '"';
         os << t.tv_sec << '.' << std::setfill('0')
-           << std::setw(6) << t.tv_usec;
+            << std::setw(6) << t.tv_usec;
         os << '"';
         return true;
     }
@@ -410,16 +410,16 @@ inline auto get_common_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
     return std::make_tuple(
-               keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-               keyval("PID", fmt::Nval(proc_data->pid)),
-               keyval("PPID", fmt::Nval(proc_data->ppid)),
-               keyval("TID", fmt::Nval(proc_data->tid)),
-               keyval("UserName", fmt::Qstr(USERIDSTR(drakvuf))),
-               keyval("UserId", fmt::Nval(info->proc_data.userid)),
-               keyval("ProcessName", fmt::Qstr(proc_data->name)),
-               keyval("Method", method),
-               keyval("EventUID", fmt::Xval(info->event_uid))
-           );
+            keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
+            keyval("PID", fmt::Nval(proc_data->pid)),
+            keyval("PPID", fmt::Nval(proc_data->ppid)),
+            keyval("TID", fmt::Nval(proc_data->tid)),
+            keyval("UserName", fmt::Qstr(USERIDSTR(drakvuf))),
+            keyval("UserId", fmt::Nval(info->proc_data.userid)),
+            keyval("ProcessName", fmt::Qstr(proc_data->name)),
+            keyval("Method", method),
+            keyval("EventUID", fmt::Xval(info->event_uid))
+        );
 }
 
 template<class... Args>
@@ -439,11 +439,11 @@ void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info
 inline void print_running_process(const char* plugin_name, drakvuf_t drakvuf, gint64 timestamp, proc_data_t const& proc_data)
 {
     print(plugin_name, drakvuf, nullptr,
-          keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(timestamp)}),
-          keyval("PID", fmt::Nval(proc_data.pid)),
-          keyval("PPID", fmt::Nval(proc_data.ppid)),
-          keyval("RunningProcess", fmt::Qstr(proc_data.name))
-         );
+        keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(timestamp)}),
+        keyval("PID", fmt::Nval(proc_data.pid)),
+        keyval("PPID", fmt::Nval(proc_data.ppid)),
+        keyval("RunningProcess", fmt::Qstr(proc_data.name))
+    );
 }
 
 } // namespace jsonfmt
