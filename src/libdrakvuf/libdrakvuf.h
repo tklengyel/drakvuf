@@ -318,34 +318,34 @@ symbols_t* json_get_symbols(json_object* json_profile) NOEXCEPT;
 void drakvuf_free_symbols(symbols_t* symbols) NOEXCEPT;
 
 bool drakvuf_get_kernel_symbol_rva(drakvuf_t drakvuf,
-                                   const char* function,
-                                   addr_t* rva) NOEXCEPT;
+    const char* function,
+    addr_t* rva) NOEXCEPT;
 bool drakvuf_get_kernel_struct_size(drakvuf_t drakvuf,
-                                    const char* struct_name,
-                                    size_t* size) NOEXCEPT;
+    const char* struct_name,
+    size_t* size) NOEXCEPT;
 bool drakvuf_get_kernel_struct_member_rva(drakvuf_t drakvuf,
-        const char* struct_name,
-        const char* symbol,
-        addr_t* rva) NOEXCEPT;
+    const char* struct_name,
+    const char* symbol,
+    addr_t* rva) NOEXCEPT;
 bool drakvuf_get_bitfield_offset_and_size(drakvuf_t drakvuf,
-        const char* struct_name,
-        const char* struct_member,
-        addr_t* offset,
-        size_t* start_bit,
-        size_t* end_bit) NOEXCEPT;
+    const char* struct_name,
+    const char* struct_member,
+    addr_t* offset,
+    size_t* start_bit,
+    size_t* end_bit) NOEXCEPT;
 bool json_get_symbol_rva(drakvuf_t drakvuf,
-                         json_object* json,
-                         const char* function,
-                         addr_t* rva) NOEXCEPT;
+    json_object* json,
+    const char* function,
+    addr_t* rva) NOEXCEPT;
 bool json_get_struct_size(drakvuf_t drakvuf,
-                          json_object* json,
-                          const char* struct_name,
-                          size_t* size) NOEXCEPT;
+    json_object* json,
+    const char* struct_name,
+    size_t* size) NOEXCEPT;
 bool json_get_struct_member_rva(drakvuf_t drakvuf,
-                                json_object* json,
-                                const char* struct_name,
-                                const char* symbol,
-                                addr_t* rva) NOEXCEPT;
+    json_object* json,
+    const char* struct_name,
+    const char* symbol,
+    addr_t* rva) NOEXCEPT;
 
 bool json_get_struct_members_array_rva(
     drakvuf_t drakvuf,
@@ -373,31 +373,31 @@ typedef void (*drakvuf_trap_free_t)(drakvuf_trap_t* trap);
 typedef void (*event_cb_t) (int fd, void* data);
 
 bool drakvuf_init (drakvuf_t* drakvuf,
-                   const char* domain,
-                   const char* json_profile,
-                   const char* json_wow_profile,
-                   const bool verbose,
-                   const bool libvmi_conf,
-                   const addr_t kpgd,
-                   const bool fast_singlestep,
-                   uint64_t limited_traps_ttl) NOEXCEPT;
+    const char* domain,
+    const char* json_profile,
+    const char* json_wow_profile,
+    const bool verbose,
+    const bool libvmi_conf,
+    const addr_t kpgd,
+    const bool fast_singlestep,
+    uint64_t limited_traps_ttl) NOEXCEPT;
 void drakvuf_close (drakvuf_t drakvuf, const bool pause) NOEXCEPT;
 bool drakvuf_add_trap(drakvuf_t drakvuf,
-                      drakvuf_trap_t* trap) NOEXCEPT;
+    drakvuf_trap_t* trap) NOEXCEPT;
 void drakvuf_remove_trap (drakvuf_t drakvuf,
-                          drakvuf_trap_t* trap,
-                          drakvuf_trap_free_t free_routine) NOEXCEPT;
+    drakvuf_trap_t* trap,
+    drakvuf_trap_free_t free_routine) NOEXCEPT;
 void drakvuf_unhook_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap) NOEXCEPT;
 void drakvuf_loop (drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), void* data) NOEXCEPT;
 void drakvuf_interrupt (drakvuf_t drakvuf,
-                        int sig) NOEXCEPT;
+    int sig) NOEXCEPT;
 int drakvuf_is_interrupted(drakvuf_t drakvuf) NOEXCEPT;
 void drakvuf_pause (drakvuf_t drakvuf) NOEXCEPT;
 void drakvuf_resume (drakvuf_t drakvuf) NOEXCEPT;
 
 addr_t drakvuf_get_obj_by_handle(drakvuf_t drakvuf,
-                                 addr_t process,
-                                 uint64_t handle) NOEXCEPT;
+    addr_t process,
+    uint64_t handle) NOEXCEPT;
 
 os_t drakvuf_get_os_type(drakvuf_t drakvuf) NOEXCEPT;
 page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf) NOEXCEPT;
@@ -406,57 +406,57 @@ int drakvuf_get_address_width(drakvuf_t drakvuf) NOEXCEPT;
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf) NOEXCEPT;
 
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
-                                   drakvuf_trap_info_t* info) NOEXCEPT;
+    drakvuf_trap_info_t* info) NOEXCEPT;
 
 addr_t drakvuf_get_current_attached_process(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info) NOEXCEPT;
+    drakvuf_trap_info_t* info) NOEXCEPT;
 
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
-                                  drakvuf_trap_info_t* info) NOEXCEPT;
+    drakvuf_trap_info_t* info) NOEXCEPT;
 
 addr_t drakvuf_get_current_thread_teb(drakvuf_t drakvuf,
-                                      drakvuf_trap_info_t* info) NOEXCEPT;
+    drakvuf_trap_info_t* info) NOEXCEPT;
 
 addr_t drakvuf_get_current_thread_stackbase(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info) NOEXCEPT;
+    drakvuf_trap_info_t* info) NOEXCEPT;
 
 bool drakvuf_get_last_error(drakvuf_t drakvuf,
-                            drakvuf_trap_info_t* info,
-                            uint32_t* err,
-                            const char** err_str) NOEXCEPT;
+    drakvuf_trap_info_t* info,
+    uint32_t* err,
+    const char** err_str) NOEXCEPT;
 
 /* Caller must free the returned string */
 char* drakvuf_get_process_name(drakvuf_t drakvuf,
-                               addr_t process_base,
-                               bool fullpath) NOEXCEPT;
+    addr_t process_base,
+    bool fullpath) NOEXCEPT;
 
 /* Caller must free the returned string */
 char* drakvuf_get_process_commandline(drakvuf_t drakvuf,
-                                      drakvuf_trap_info_t* info,
-                                      addr_t process_base) NOEXCEPT;
+    drakvuf_trap_info_t* info,
+    addr_t process_base) NOEXCEPT;
 
 bool drakvuf_get_process_pid(drakvuf_t drakvuf,
-                             addr_t process_base,
-                             vmi_pid_t* pid) NOEXCEPT;
+    addr_t process_base,
+    vmi_pid_t* pid) NOEXCEPT;
 
 bool drakvuf_get_process_thread_id( drakvuf_t drakvuf,
-                                    addr_t process_base,
-                                    uint32_t* pid) NOEXCEPT;
+    addr_t process_base,
+    uint32_t* pid) NOEXCEPT;
 
 bool drakvuf_get_process_dtb(drakvuf_t drakvuf,
-                             addr_t process_base,
-                             addr_t* dtb) NOEXCEPT;
+    addr_t process_base,
+    addr_t* dtb) NOEXCEPT;
 
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
-                                   addr_t process_base) NOEXCEPT;
+    addr_t process_base) NOEXCEPT;
 
 unicode_string_t* drakvuf_get_process_csdversion(drakvuf_t drakvuf,
-        addr_t process_base) NOEXCEPT;
+    addr_t process_base) NOEXCEPT;
 
 bool drakvuf_get_process_data(drakvuf_t drakvuf,
-                              addr_t process_base,
-                              proc_data_t* proc_data) NOEXCEPT;
+    addr_t process_base,
+    proc_data_t* proc_data) NOEXCEPT;
 
 typedef struct _mmvad_info
 {
@@ -486,8 +486,8 @@ bool drakvuf_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr
 bool drakvuf_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr) NOEXCEPT;
 
 bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
-                                   drakvuf_trap_info_t* info,
-                                   uint32_t* thread_id) NOEXCEPT;
+    drakvuf_trap_info_t* info,
+    uint32_t* thread_id) NOEXCEPT;
 
 /*
  * To catch the moment of exiting the currently executing function,
@@ -502,40 +502,40 @@ bool drakvuf_get_current_thread_id(drakvuf_t drakvuf,
  * function call we need.
  */
 bool drakvuf_check_return_context(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                                  vmi_pid_t target_pid, uint32_t target_tid,
-                                  addr_t target_rsp) NOEXCEPT;
+    vmi_pid_t target_pid, uint32_t target_tid,
+    addr_t target_rsp) NOEXCEPT;
 
 addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf,
-                                const vmi_pid_t pid, const char* proc_name,
-                                const char* mod_name, addr_t rva) NOEXCEPT;
+    const vmi_pid_t pid, const char* proc_name,
+    const char* mod_name, addr_t rva) NOEXCEPT;
 
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
-                               const char* module, const char* sym) NOEXCEPT;
+    const char* module, const char* sym) NOEXCEPT;
 
 addr_t drakvuf_export_lib_address(drakvuf_t drakvuf, addr_t process_addr, const char* lib) NOEXCEPT;
 
 // Microsoft PreviousMode KTHREAD explanation:
 // https://msdn.microsoft.com/en-us/library/windows/hardware/ff559860(v=vs.85).aspx
 bool drakvuf_get_current_thread_previous_mode(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info,
-        privilege_mode_t* previous_mode) NOEXCEPT;
+    drakvuf_trap_info_t* info,
+    privilege_mode_t* previous_mode) NOEXCEPT;
 
 bool drakvuf_get_thread_previous_mode(drakvuf_t drakvuf,
-                                      addr_t kthread,
-                                      privilege_mode_t* previous_mode) NOEXCEPT;
+    addr_t kthread,
+    privilege_mode_t* previous_mode) NOEXCEPT;
 
 bool drakvuf_is_thread(drakvuf_t drakvuf,
-                       addr_t dtb,
-                       addr_t thread_addr) NOEXCEPT;
+    addr_t dtb,
+    addr_t thread_addr) NOEXCEPT;
 
 bool drakvuf_is_process(drakvuf_t drakvuf,
-                        addr_t dtb,
-                        addr_t process_addr) NOEXCEPT;
+    addr_t dtb,
+    addr_t process_addr) NOEXCEPT;
 
 bool drakvuf_find_process(drakvuf_t drakvuf,
-                          vmi_pid_t find_pid,
-                          const char* find_procname,
-                          addr_t* process_addr) NOEXCEPT;
+    vmi_pid_t find_pid,
+    const char* find_procname,
+    addr_t* process_addr) NOEXCEPT;
 
 typedef struct _module_info
 {
@@ -550,34 +550,34 @@ typedef struct _module_info
 } module_info_t ;
 
 bool drakvuf_enumerate_processes(drakvuf_t drakvuf,
-                                 void (*visitor_func)(drakvuf_t drakvuf, addr_t process, void* visitor_ctx),
-                                 void* visitor_ctx) NOEXCEPT;
+    void (*visitor_func)(drakvuf_t drakvuf, addr_t process, void* visitor_ctx),
+    void* visitor_ctx) NOEXCEPT;
 
 bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf,
-        const char* module_name,
-        bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
-        void* visitor_ctx) NOEXCEPT;
+    const char* module_name,
+    bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
+    void* visitor_ctx) NOEXCEPT;
 
 bool drakvuf_is_crashreporter(drakvuf_t drakvuf,
-                              drakvuf_trap_info_t* info,
-                              vmi_pid_t* pid) NOEXCEPT;
+    drakvuf_trap_info_t* info,
+    vmi_pid_t* pid) NOEXCEPT;
 
 bool drakvuf_get_module_list(drakvuf_t drakvuf,
-                             addr_t process_base,
-                             addr_t* module_list) NOEXCEPT;
+    addr_t process_base,
+    addr_t* module_list) NOEXCEPT;
 
 bool drakvuf_get_module_list_wow(drakvuf_t drakvuf,
-                                 access_context_t* ctx,
-                                 addr_t wow_peb,
-                                 addr_t* module_list) NOEXCEPT;
+    access_context_t* ctx,
+    addr_t wow_peb,
+    addr_t* module_list) NOEXCEPT;
 
 // ObReferenceObjectByHandle
 bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
-                               drakvuf_trap_info_t* info,
-                               addr_t current_process,
-                               addr_t handle,
-                               object_manager_object_t obj_type_arg,
-                               addr_t* obj_body_addr) NOEXCEPT;
+    drakvuf_trap_info_t* info,
+    addr_t current_process,
+    addr_t handle,
+    object_manager_object_t obj_type_arg,
+    addr_t* obj_body_addr) NOEXCEPT;
 
 
 char* drakvuf_read_ascii_str(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr) NOEXCEPT;
@@ -595,27 +595,27 @@ unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t*
 unicode_string_t* drakvuf_read_unicode32_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid) NOEXCEPT;
 
 bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
-                                   addr_t module_list_head,
-                                   const char* module_name,
-                                   addr_t* base_addr ) NOEXCEPT;
+    addr_t module_list_head,
+    const char* module_name,
+    addr_t* base_addr ) NOEXCEPT;
 
 bool drakvuf_get_module_base_addr_ctx( drakvuf_t drakvuf,
-                                       addr_t module_list_head,
-                                       access_context_t* ctx,
-                                       const char* module_name,
-                                       addr_t* base_addr_out ) NOEXCEPT;
+    addr_t module_list_head,
+    access_context_t* ctx,
+    const char* module_name,
+    addr_t* base_addr_out ) NOEXCEPT;
 
 bool drakvuf_get_process_ppid(drakvuf_t drakvuf,
-                              addr_t process_base,
-                              vmi_pid_t* ppid ) NOEXCEPT;
+    addr_t process_base,
+    vmi_pid_t* ppid ) NOEXCEPT;
 
 gchar* drakvuf_reg_keyhandle_path(drakvuf_t drakvuf,
-                                  drakvuf_trap_info_t* info,
-                                  uint64_t key_handle) NOEXCEPT;
+    drakvuf_trap_info_t* info,
+    uint64_t key_handle) NOEXCEPT;
 
 char* drakvuf_get_filename_from_handle( drakvuf_t drakvuf,
-                                        drakvuf_trap_info_t* info,
-                                        addr_t handle ) NOEXCEPT;
+    drakvuf_trap_info_t* info,
+    addr_t handle ) NOEXCEPT;
 
 // Reads 'length' characters from array of UTF_16 charachters into unicode_string_t object with UTF_8 encoding
 unicode_string_t* drakvuf_read_wchar_array(vmi_instance_t vmi, const access_context_t* ctx, size_t length) NOEXCEPT;
@@ -633,8 +633,8 @@ gchar* drakvuf_escape_str(const char* input) NOEXCEPT;
 bool drakvuf_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info) NOEXCEPT;
 
 addr_t drakvuf_get_function_argument(drakvuf_t drakvuf,
-                                     drakvuf_trap_info_t* info,
-                                     int argument_number) NOEXCEPT;
+    drakvuf_trap_info_t* info,
+    int argument_number) NOEXCEPT;
 addr_t drakvuf_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info) NOEXCEPT;
 
 bool drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid) NOEXCEPT;
@@ -651,12 +651,12 @@ bool drakvuf_disable_ipt(drakvuf_t drakvuf, unsigned int vcpu);
  */
 
 int drakvuf_event_fd_add(drakvuf_t drakvuf,
-                         int fd,
-                         event_cb_t event_cb,
-                         void* data) NOEXCEPT;
+    int fd,
+    event_cb_t event_cb,
+    void* data) NOEXCEPT;
 
 int drakvuf_event_fd_remove(drakvuf_t drakvuf,
-                            int fd) NOEXCEPT;
+    int fd) NOEXCEPT;
 
 /*---------------------------------------------------------
  * Output helpers

@@ -289,8 +289,8 @@ bool drakvuf_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privil
 }
 
 bool drakvuf_get_current_thread_previous_mode( drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info,
-        privilege_mode_t* previous_mode )
+    drakvuf_trap_info_t* info,
+    privilege_mode_t* previous_mode )
 {
     if ( drakvuf->osi.get_current_thread_previous_mode )
         return drakvuf->osi.get_current_thread_previous_mode(drakvuf, info, previous_mode);
@@ -363,7 +363,7 @@ bool drakvuf_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head
 }
 
 addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf, const vmi_pid_t pid, const char* proc_name,
-                                const char* mod_name, addr_t rva)
+    const char* mod_name, addr_t rva)
 {
     if ( drakvuf->osi.exportksym_to_va )
         return drakvuf->osi.exportksym_to_va(drakvuf, pid, proc_name, mod_name, rva);
@@ -372,7 +372,7 @@ addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf, const vmi_pid_t pid, const ch
 }
 
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
-                               const char* module, const char* sym)
+    const char* module, const char* sym)
 {
     if ( drakvuf->osi.exportsym_to_va )
         return drakvuf->osi.exportsym_to_va(drakvuf, process_addr, module, sym);

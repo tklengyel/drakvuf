@@ -503,7 +503,7 @@ std::string read_sid(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets)
     ctx->addr = psid;
     size_t bytes_read = 0;
     if ( VMI_SUCCESS != vmi_read(vmi, ctx, sid_size, buffer.get(), &bytes_read) ||
-         sid_size != bytes_read)
+        sid_size != bytes_read)
         return string();
 
     return parse_sid(buffer.get(), sid_size);
@@ -532,7 +532,7 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
     ctx->addr = pacl + ACL_SIZE;
     size_t bytes_read = 0;
     if ( VMI_SUCCESS != vmi_read(vmi, ctx, aces_size, ace_ptr, &bytes_read) ||
-         aces_size != bytes_read)
+        aces_size != bytes_read)
         return string();
 
     switch (format)

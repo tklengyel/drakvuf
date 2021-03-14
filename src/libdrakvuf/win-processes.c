@@ -155,8 +155,8 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         prcb = drakvuf->offsets[KPCR_PRCB];
         kpcr = cpl ? info->regs->shadow_gs :
-               /* if we are in kernel mode we might trap before swapgs */
-               VMI_GET_BIT(info->regs->gs_base, 47) ? info->regs->gs_base : info->regs->shadow_gs;
+            /* if we are in kernel mode we might trap before swapgs */
+            VMI_GET_BIT(info->regs->gs_base, 47) ? info->regs->gs_base : info->regs->shadow_gs;
     }
     else
     {
@@ -278,11 +278,11 @@ bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* 
     if (VMI_SUCCESS != vmi_read_addr_va(vmi, kthread + drakvuf->offsets[KTHREAD_TEB], 0, &teb))
         return false;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = cr3;
-    ctx.addr = teb + drakvuf->offsets[TEB_LASTERRORVALUE];
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = cr3,
+        .addr = teb + drakvuf->offsets[TEB_LASTERRORVALUE]
+    );
 
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, err))
         return false;
@@ -300,15 +300,15 @@ static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t epr
 {
     addr_t image_file_name_addr;
     if ( vmi_read_addr_va(drakvuf->vmi,
-                          eprocess_base + drakvuf->offsets[EPROCESS_PROCCREATIONINFO] + drakvuf->offsets[PROCCREATIONINFO_IMAGEFILENAME],
-                          0, &image_file_name_addr) != VMI_SUCCESS )
+            eprocess_base + drakvuf->offsets[EPROCESS_PROCCREATIONINFO] + drakvuf->offsets[PROCCREATIONINFO_IMAGEFILENAME],
+            0, &image_file_name_addr) != VMI_SUCCESS )
     {
         PRINT_DEBUG("in win_get_process_full_name(...) couldn't read IMAGEFILENAME address\n");
         return NULL;
     }
 
     return drakvuf_read_unicode_va(drakvuf->vmi,
-                                   image_file_name_addr + drakvuf->offsets[OBJECTNAMEINFORMATION_NAME], 0);
+            image_file_name_addr + drakvuf->offsets[OBJECTNAMEINFORMATION_NAME], 0);
 }
 
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath)
@@ -337,10 +337,10 @@ char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
 {
     vmi_instance_t vmi = drakvuf->vmi;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
 
     addr_t peb = 0;
     ctx.addr = eprocess_base + drakvuf->offsets[EPROCESS_PEB];
@@ -382,9 +382,9 @@ int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base)
     addr_t peb;
     addr_t userid;
     vmi_instance_t vmi = drakvuf->vmi;
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB
+    );
 
     if (!eprocess_base)
         return -1;
@@ -410,9 +410,9 @@ unicode_string_t* win_get_process_csdversion(drakvuf_t drakvuf, addr_t eprocess_
 {
     addr_t peb;
     vmi_instance_t vmi = drakvuf->vmi;
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB
+    );
 
     if (!eprocess_base)
         return NULL;
@@ -454,8 +454,8 @@ bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uin
     if ( ethread )
     {
         if ( vmi_read_addr_va( drakvuf->vmi, ethread + drakvuf->offsets[ ETHREAD_CID ] + drakvuf->offsets[ CLIENT_ID_UNIQUETHREAD ],
-                               0,
-                               &p_tid ) == VMI_SUCCESS )
+                0,
+                &p_tid ) == VMI_SUCCESS )
         {
             *thread_id = p_tid;
 
@@ -470,8 +470,8 @@ static bool win_get_thread_id(drakvuf_t drakvuf, addr_t ethread, uint32_t* threa
 {
     addr_t p_tid ;
     if ( vmi_read_addr_va( drakvuf->vmi, ethread + drakvuf->offsets[ ETHREAD_CID ] + drakvuf->offsets[ CLIENT_ID_UNIQUETHREAD ],
-                           0,
-                           &p_tid ) == VMI_SUCCESS )
+            0,
+            &p_tid ) == VMI_SUCCESS )
     {
         *thread_id = p_tid;
 
@@ -492,7 +492,7 @@ bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_
     if ( kthread )
     {
         if ( vmi_read_8_va( drakvuf->vmi, kthread + drakvuf->offsets[ KTHREAD_PREVIOUSMODE ], 0,
-                            (uint8_t*)previous_mode ) == VMI_SUCCESS )
+                (uint8_t*)previous_mode ) == VMI_SUCCESS )
         {
             if ( ( *previous_mode == KERNEL_MODE ) || ( *previous_mode == USER_MODE ) )
                 return true ;
@@ -503,8 +503,8 @@ bool win_get_thread_previous_mode( drakvuf_t drakvuf, addr_t kthread, privilege_
 }
 
 bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info,
-        privilege_mode_t* previous_mode )
+    drakvuf_trap_info_t* info,
+    privilege_mode_t* previous_mode )
 {
     addr_t kthread = win_get_current_thread(drakvuf, info);
 
@@ -518,13 +518,13 @@ bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
 bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 {
     dispatcher_object_t dispatcher_type = __DISPATCHER_INVALID_OBJECT;
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = dtb;
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = dtb
+    );
 
     ctx.addr = ethread_addr + drakvuf->offsets[ ETHREAD_TCB ] + drakvuf->offsets[ KTHREAD_HEADER ]
-               + drakvuf->offsets[ DISPATCHER_TYPE ] ;
+        + drakvuf->offsets[ DISPATCHER_TYPE ] ;
 
     if ( vmi_read_8( drakvuf->vmi, &ctx, (uint8_t*)&dispatcher_type ) == VMI_SUCCESS )
     {
@@ -542,12 +542,12 @@ bool win_is_ethread( drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr )
 bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
 {
     dispatcher_object_t dispatcher_type = __DISPATCHER_INVALID_OBJECT;
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = dtb;
-    ctx.addr = eprocess_addr + drakvuf->offsets[ EPROCESS_PCB ] + drakvuf->offsets[ KPROCESS_HEADER ]
-               + drakvuf->offsets[ DISPATCHER_TYPE ] ;
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = dtb,
+        .addr = eprocess_addr + drakvuf->offsets[ EPROCESS_PCB ] + drakvuf->offsets[ KPROCESS_HEADER ]
+            + drakvuf->offsets[ DISPATCHER_TYPE ]
+    );
 
     if ( vmi_read_8( drakvuf->vmi, &ctx, (uint8_t*)&dispatcher_type ) == VMI_SUCCESS )
     {
@@ -565,9 +565,9 @@ bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module
     addr_t ldr=0;
     addr_t modlist=0;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB
+    );
 
     if (!eprocess_base)
         return false;
@@ -700,13 +700,13 @@ bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_p
 }
 
 bool win_search_modules( drakvuf_t drakvuf,
-                         const char* module_name,
-                         bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
-                         void* visitor_ctx,
-                         addr_t eprocess_addr,
-                         addr_t wow_process,
-                         vmi_pid_t pid,
-                         access_context_t* ctx )
+    const char* module_name,
+    bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
+    void* visitor_ctx,
+    addr_t eprocess_addr,
+    addr_t wow_process,
+    vmi_pid_t pid,
+    access_context_t* ctx )
 {
     bool ret = false ;
     addr_t module_list_head;
@@ -736,13 +736,13 @@ bool win_search_modules( drakvuf_t drakvuf,
 }
 
 bool win_search_modules_wow( drakvuf_t drakvuf,
-                             const char* module_name,
-                             bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
-                             void* visitor_ctx,
-                             addr_t eprocess_addr,
-                             addr_t wow_peb,
-                             vmi_pid_t pid,
-                             access_context_t* ctx )
+    const char* module_name,
+    bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
+    void* visitor_ctx,
+    addr_t eprocess_addr,
+    addr_t wow_peb,
+    vmi_pid_t pid,
+    access_context_t* ctx )
 {
     bool ret = false ;
     addr_t module_list_head ;
@@ -809,10 +809,10 @@ bool win_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx)
 {
     addr_t teb_ptr;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_PID;
-    ctx.addr = ethread + drakvuf->offsets[KTHREAD_TEB];
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .addr = ethread + drakvuf->offsets[KTHREAD_TEB]
+    );
 
     if (vmi_read_addr(drakvuf->vmi, &ctx, &teb_ptr) != VMI_SUCCESS)
         return false;
@@ -869,10 +869,10 @@ bool win_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* 
     addr_t ptrap_frame;
     uint64_t rsp;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_PID;
-    ctx.addr = win_get_current_thread(drakvuf, info) + drakvuf->offsets[KTHREAD_TRAPFRAME];
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .addr = win_get_current_thread(drakvuf, info) + drakvuf->offsets[KTHREAD_TRAPFRAME]
+    );
 
     if (vmi_read_addr(drakvuf->vmi, &ctx, &ptrap_frame) != VMI_SUCCESS)
         return false;
@@ -899,11 +899,11 @@ bool win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* 
     if (!win_get_wow_context(drakvuf, win_get_current_thread(drakvuf, info), &wow_ctx))
         return false;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-    ctx.addr = wow_ctx + drakvuf->wow_offsets[WOW_CONTEXT_ESP];
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = wow_ctx + drakvuf->wow_offsets[WOW_CONTEXT_ESP]
+    );
 
     if (vmi_read_32(drakvuf->vmi, &ctx, &esp) != VMI_SUCCESS)
         return false;
@@ -972,21 +972,23 @@ bool win_enumerate_processes_with_module( drakvuf_t drakvuf, const char* module_
 
         if ( win_get_process_pid( drakvuf, current_process, &pid) )
         {
-            access_context_t ctx = { .translate_mechanism = VMI_TM_PROCESS_DTB };
+            ACCESS_CONTEXT(ctx,
+                .translate_mechanism = VMI_TM_PROCESS_DTB
+            );
 
             if ( vmi_pid_to_dtb( drakvuf->vmi, pid, &ctx.dtb ) == VMI_SUCCESS )
             {
                 addr_t wow_peb = win_get_wow_peb( drakvuf, &ctx, current_process ) ;
 
                 if ( win_search_modules( drakvuf, module_name, visitor_func, visitor_ctx, current_process,
-                                         wow_peb, pid, &ctx ) )
+                        wow_peb, pid, &ctx ) )
                     return true ;
 
                 // List WoW64 modules...
                 if ( wow_peb )
                 {
                     if ( win_search_modules_wow( drakvuf, module_name, visitor_func, visitor_ctx, current_process,
-                                                 wow_peb, pid, &ctx ) )
+                            wow_peb, pid, &ctx ) )
                         return true ;
                 }
             }
@@ -1077,10 +1079,10 @@ static bool win_parse_mmvad(drakvuf_t drakvuf, addr_t node_addr, addr_t* left_ch
     bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
     bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_PID;
-    ctx.pid = 4;
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4
+    );
 
     uint32_t starting_vpn_low;
     uint32_t ending_vpn_low;
@@ -1197,10 +1199,10 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
     bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
     bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_PID;
-    ctx.pid = 4;
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4
+    );
 
     addr_t node_addr;
 
@@ -1361,10 +1363,10 @@ static bool win_traverse_mmvad_node(drakvuf_t drakvuf, addr_t node_addr, mmvad_c
     bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
     bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_PID;
-    ctx.pid = 4;
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4
+    );
 
     addr_t left_child;
     addr_t right_child;
@@ -1494,10 +1496,10 @@ bool win_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callb
 {
     bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
-    ctx.translate_mechanism = VMI_TM_PROCESS_PID;
-    ctx.pid = 4;
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4
+    );
 
     addr_t node_addr = 0;
 

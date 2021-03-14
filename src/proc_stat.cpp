@@ -138,7 +138,7 @@ static bool is_interrupted(drakvuf_t drakvuf, void*)
 int main(int argc, char** argv)
 {
     fprintf(stderr, "%s %s v%s Copyright (C) 2014-2021 Tamas K Lengyel\n",
-            PACKAGE_NAME, argv[0], PACKAGE_VERSION);
+        PACKAGE_NAME, argv[0], PACKAGE_VERSION);
 
     /* this is the VM that we are looking at */
     if (argc != 5)

@@ -146,17 +146,17 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     debugmon* s = (debugmon*)info->trap->data;
 
     auto tuple = std::make_tuple(
-                     keyval("RIP", fmt::Xval(info->regs->rip)),
-                     keyval("DebugType", fmt::Nval(info->debug->type)),
-                     keyval("DebugTypeStr", fmt::Qstr(debug_type[info->debug->type]))
-                 );
+            keyval("RIP", fmt::Xval(info->regs->rip)),
+            keyval("DebugType", fmt::Nval(info->debug->type)),
+            keyval("DebugTypeStr", fmt::Qstr(debug_type[info->debug->type]))
+        );
     if (s->format == OUTPUT_JSON)
     {
         jsonfmt::print("debugmon", drakvuf, info,
-                       keyval("VCPU", fmt::Nval(info->vcpu)),
-                       keyval("CR3", fmt::Nval(info->regs->cr3)),
-                       tuple
-                      );
+            keyval("VCPU", fmt::Nval(info->vcpu)),
+            keyval("CR3", fmt::Nval(info->regs->cr3)),
+            tuple
+        );
     }
     else
     {

@@ -131,7 +131,7 @@ bool xen_init_interface(xen_interface_t** xen)
     /* We don't need this at the moment, but just in case */
     //xen->xsh=xs_open(XS_OPEN_READONLY);
     (*xen)->xl_logger = (xentoollog_logger*) xtl_createlogger_stdiostream(
-                            stderr, XTL_PROGRESS, 0);
+            stderr, XTL_PROGRESS, 0);
 
     if (!(*xen)->xl_logger)
     {
@@ -139,7 +139,7 @@ bool xen_init_interface(xen_interface_t** xen)
     }
 
     if (libxl_ctx_alloc(&(*xen)->xl_ctx, LIBXL_VERSION, 0,
-                        (*xen)->xl_logger))
+            (*xen)->xl_logger))
     {
         fprintf(stderr, "libxl_ctx_alloc() failed!\n");
         goto err;
@@ -185,7 +185,7 @@ void xen_free_interface(xen_interface_t* xen)
 }
 
 int get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
-                 char** name)
+    char** name)
 {
     uint32_t _domID;
     char* _name = NULL;
@@ -218,7 +218,7 @@ int get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
         xc_dominfo_t info = { 0 };
 
         if ( 1 == xc_domain_getinfo(xen->xc, _domID, 1, &info)
-             && info.domid == _domID)
+            && info.domid == _domID)
         {
             _name = libxl_domid_to_name(xen->xl_ctx, _domID);
         }
@@ -337,7 +337,7 @@ bool xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_
     int rc;
 
     rc = xenforeignmemory_resource_size(
-             xen->fmem, domID, XENMEM_resource_vmtrace_buf, vcpu, &ipt_state->size);
+            xen->fmem, domID, XENMEM_resource_vmtrace_buf, vcpu, &ipt_state->size);
     if (rc)
     {
         fprintf(stderr, "Failed to get trace buffer size\n");
@@ -345,12 +345,12 @@ bool xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_
     }
 
     ipt_state->fres = xenforeignmemory_map_resource(
-                          xen->fmem, domID, XENMEM_resource_vmtrace_buf,
-                          /* vcpu: */ vcpu,
-                          /* frame: */ 0,
-                          /* num_frames: */ ipt_state->size >> XC_PAGE_SHIFT,
-                          (void**)&ipt_state->buf,
-                          PROT_READ, 0);
+            xen->fmem, domID, XENMEM_resource_vmtrace_buf,
+            /* vcpu: */ vcpu,
+            /* frame: */ 0,
+            /* num_frames: */ ipt_state->size >> XC_PAGE_SHIFT,
+            (void**)&ipt_state->buf,
+            PROT_READ, 0);
 
     if (!ipt_state->buf)
     {

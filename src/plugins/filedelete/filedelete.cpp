@@ -188,8 +188,7 @@ static bool get_file_object_handle_count(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
     addr_t handles = obj + f->offsets[OBJECT_HEADER_HANDLE_COUNT];
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.addr = handles;
     ctx.dtb = info->regs->cr3;
@@ -216,8 +215,7 @@ static bool get_file_object_flags(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
     addr_t file = obj + f->offsets[OBJECT_HEADER_BODY];
     addr_t fileflags = file + f->offsets[FILE_OBJECT_FLAGS];
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.addr = fileflags;
     ctx.dtb = info->regs->cr3;
@@ -229,9 +227,9 @@ static bool get_file_object_flags(drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
 }
 
 static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_t vmi,
-                                 drakvuf_trap_info_t* info,
-                                 addr_t handle,
-                                 addr_t* out_file, addr_t* out_filetype)
+    drakvuf_trap_info_t* info,
+    addr_t handle,
+    addr_t* out_file, addr_t* out_filetype)
 {
     // TODO: verify that the dtb in the _EPROCESS is the same as the cr3?
 
@@ -253,8 +251,7 @@ static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_
     if (out_filetype)
         *out_filetype = filetype;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.addr = filetype;
     ctx.dtb = info->regs->cr3;
@@ -274,11 +271,11 @@ static std::string get_file_name(filedelete* f, drakvuf_t drakvuf, vmi_instance_
 }
 
 static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info,
-        const char* filename,
-        file_extraction_reason_t reason,
-        size_t bytes_read, uint64_t fo_flags,
-        int seq_number)
+    drakvuf_trap_info_t* info,
+    const char* filename,
+    file_extraction_reason_t reason,
+    size_t bytes_read, uint64_t fo_flags,
+    int seq_number)
 {
     std::string flags = parse_flags(fo_flags, fo_flags_map, f->format);
     std::string r;
@@ -299,35 +296,35 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf,
     {
         case OUTPUT_KV:
             kvfmt::print("fileextractor", drakvuf, info,
-                         keyval("FileName", fmt::Qstr(filename)),
-                         keyval("Size", fmt::Nval(bytes_read)),
-                         keyval("Flags", fmt::Xval(fo_flags)),
-                         fmt::Rstr(flags),
-                         keyval("SN", fmt::Nval(seq_number)),
-                         keyval("Reason", fmt::Qstr(r))
-                        );
+                keyval("FileName", fmt::Qstr(filename)),
+                keyval("Size", fmt::Nval(bytes_read)),
+                keyval("Flags", fmt::Xval(fo_flags)),
+                fmt::Rstr(flags),
+                keyval("SN", fmt::Nval(seq_number)),
+                keyval("Reason", fmt::Qstr(r))
+            );
             break;
         case OUTPUT_JSON:
             jsonfmt::print("fileextractor", drakvuf, info,
-                           keyval("FileName", fmt::Qstr(filename)),
-                           keyval("Size", fmt::Nval(bytes_read)),
-                           keyval("Flags", fmt::Xval(fo_flags)),
-                           keyval("FlagsExpanded", fmt::Qstr(flags)),
-                           keyval("SeqNum", fmt::Nval(seq_number)),
-                           keyval("Reason", fmt::Qstr(r))
-                          );
+                keyval("FileName", fmt::Qstr(filename)),
+                keyval("Size", fmt::Nval(bytes_read)),
+                keyval("Flags", fmt::Xval(fo_flags)),
+                keyval("FlagsExpanded", fmt::Qstr(flags)),
+                keyval("SeqNum", fmt::Nval(seq_number)),
+                keyval("Reason", fmt::Qstr(r))
+            );
             break;
         default:
         case OUTPUT_CSV:
         case OUTPUT_DEFAULT:
             fmt::print(f->format, "fileextractor", drakvuf, info,
-                       keyval("FILE", fmt::Qstr(filename)),
-                       keyval("SIZE", fmt::Nval(bytes_read)),
-                       keyval("FO_FLAGS", fmt::Xval(fo_flags)),
-                       keyval("FLAGS", fmt::Qstr(flags)),
-                       keyval("SN", fmt::Nval(seq_number)),
-                       keyval("REASON", fmt::Qstr(r))
-                      );
+                keyval("FILE", fmt::Qstr(filename)),
+                keyval("SIZE", fmt::Nval(bytes_read)),
+                keyval("FO_FLAGS", fmt::Xval(fo_flags)),
+                keyval("FLAGS", fmt::Qstr(flags)),
+                keyval("SN", fmt::Nval(seq_number)),
+                keyval("REASON", fmt::Qstr(r))
+            );
             break;
     }
 }
@@ -335,21 +332,21 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf,
 static void print_extraction_failure(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const string& filename, const string& message)
 {
     fmt::print(f->format, "fileextractor_fail", drakvuf, info,
-               keyval("FileName", fmt::Qstr(filename)),
-               keyval("Message", fmt::Qstr(message))
-              );
+        keyval("FileName", fmt::Qstr(filename)),
+        keyval("Message", fmt::Qstr(message))
+    );
 }
 
 static void save_file_metadata(filedelete* f,
-                               drakvuf_t drakvuf,
-                               drakvuf_trap_info_t* info,
-                               int sequence_number,
-                               addr_t control_area,
-                               const char* filename,
-                               file_extraction_reason_t reason,
-                               size_t file_size,
-                               uint64_t fo_flags,
-                               uint32_t ntstatus = 0)
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    int sequence_number,
+    addr_t control_area,
+    const char* filename,
+    file_extraction_reason_t reason,
+    size_t file_size,
+    uint64_t fo_flags,
+    uint32_t ntstatus = 0)
 {
     char* file = NULL;
     if ( asprintf(&file, "%s/file.%06d.metadata", f->dump_folder, sequence_number) < 0 )
@@ -393,18 +390,18 @@ static void save_file_metadata(filedelete* f,
 
     json_object_put(jobj);
     print_filedelete_information(f, drakvuf, info, filename, reason,
-                                 file_size, fo_flags, sequence_number);
+        file_size, fo_flags, sequence_number);
 }
 
 static void extract_ca_file(filedelete* f,
-                            drakvuf_t drakvuf,
-                            drakvuf_trap_info_t* info,
-                            vmi_instance_t vmi,
-                            addr_t control_area,
-                            access_context_t* ctx,
-                            const char* filename,
-                            uint64_t fo_flags,
-                            file_extraction_reason_t reason)
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    vmi_instance_t vmi,
+    addr_t control_area,
+    access_context_t* ctx,
+    const char* filename,
+    uint64_t fo_flags,
+    file_extraction_reason_t reason)
 {
     addr_t subsection = control_area + f->control_area_size;
     addr_t segment = 0;
@@ -508,14 +505,14 @@ static void extract_ca_file(filedelete* f,
 }
 
 static void extract_file(filedelete* f,
-                         drakvuf_t drakvuf,
-                         drakvuf_trap_info_t* info,
-                         vmi_instance_t vmi,
-                         addr_t file_pa,
-                         access_context_t* ctx,
-                         const char* filename,
-                         uint64_t fo_flags,
-                         file_extraction_reason_t reason)
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    vmi_instance_t vmi,
+    addr_t file_pa,
+    access_context_t* ctx,
+    const char* filename,
+    uint64_t fo_flags,
+    file_extraction_reason_t reason)
 {
     addr_t sop = 0;
     addr_t datasection = 0;
@@ -560,9 +557,9 @@ static void extract_file(filedelete* f,
  * Also see: http://www.csee.umbc.edu/~stephens/SECURITY/491M/HiddenProcesses.ppt
  */
 static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
-                                vmi_instance_t vmi,
-                                drakvuf_trap_info_t* info, addr_t handle,
-                                file_extraction_reason_t reason)
+    vmi_instance_t vmi,
+    drakvuf_trap_info_t* info, addr_t handle,
+    file_extraction_reason_t reason)
 {
     addr_t file = 0;
     addr_t filetype = 0;
@@ -574,12 +571,11 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
 
     if (f->dump_folder)
     {
-        access_context_t ctx =
-        {
+        ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .addr = filetype,
             .dtb = info->regs->cr3,
-        };
+        );
         extract_file(f, drakvuf, info, vmi, file, &ctx, filename.c_str(), fo_flags, reason);
     }
 }
@@ -628,12 +624,11 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return VMI_EVENT_RESPONSE_NONE;
     injector->target_rsp = 0;
 
-    access_context_t ctx =
-    {
+    ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = injector->pool,
-    };
+        .addr = injector->pool
+    );
 
     auto vmi = vmi_lock_guard(drakvuf);
 
@@ -656,7 +651,7 @@ event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     else
     {
         PRINT_DEBUG("[FILEDELETE2] [RtlCopyMemory] Error. Stop processing (PID %d, TID %d, FileName '%s', status 0x%lx).\n",
-                    info->attached_proc_data.pid, info->attached_proc_data.tid, f->files[ {info->attached_proc_data.pid, injector->handle}].first.c_str(), info->regs->rax);
+            info->attached_proc_data.pid, info->attached_proc_data.tid, f->files[ {info->attached_proc_data.pid, injector->handle}].first.c_str(), info->regs->rax);
     }
 
     if (inject_unmapview(drakvuf, info, vmi, injector))
@@ -723,16 +718,15 @@ event_response_t mapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         ostringstream msg;
         msg << "ZwMapViewOfSection failed with status 0x" << std::hex << info->regs->rax;
         print_extraction_failure(injector->f, drakvuf, info, filename,
-                                 msg.str());
+            msg.str());
     }
     else
     {
-        access_context_t ctx =
-        {
+        ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
-            .addr = injector->mapview.base,
-        };
+            .addr = injector->mapview.base
+        );
 
         if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(injector->view_base), &injector->view_base, NULL)))
         {
@@ -770,7 +764,7 @@ event_response_t mapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 err:
     PRINT_DEBUG("[FILEDELETE2] [ZwMapViewOfSection] Error. Stop processing (PID %d, TID %d).\n",
-                info->attached_proc_data.pid, info->attached_proc_data.tid);
+        info->attached_proc_data.pid, info->attached_proc_data.tid);
 
     return finish_readfile(drakvuf, info, vmi, false);
 }
@@ -791,16 +785,15 @@ event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         ostringstream msg;
         msg << "ZwCreateSection failed with status 0x" << std::hex << info->regs->rax;
         print_extraction_failure(injector->f, drakvuf, info, filename,
-                                 msg.str());
+            msg.str());
     }
     else
     {
-        access_context_t ctx =
-        {
+        ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
             .addr = injector->createsection.handle,
-        };
+        );
 
         if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(injector->section_handle), &injector->section_handle, NULL)))
         {
@@ -817,7 +810,7 @@ event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
 err:
     PRINT_DEBUG("[FILEDELETE2] [ZwCreateSection] Error. Stop processing (PID %d, TID %d).\n",
-                info->attached_proc_data.pid, info->attached_proc_data.tid);
+        info->attached_proc_data.pid, info->attached_proc_data.tid);
 
     return finish_readfile(drakvuf, info, vmi, false);
 }
@@ -851,12 +844,12 @@ event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         auto filename = injector->f->files[ {info->attached_proc_data.pid, injector->handle}].first;
         print_extraction_failure(injector->f, drakvuf, info, filename,
-                                 "ExAllocatePoolWithTag failed to allocate pool");
+            "ExAllocatePoolWithTag failed to allocate pool");
     }
 
 err:
     PRINT_DEBUG("[FILEDELETE2] [ExAllocatePoolWithTag] Error. Stop processing (PID %d, TID %d).\n",
-                info->attached_proc_data.pid, info->attached_proc_data.tid);
+        info->attached_proc_data.pid, info->attached_proc_data.tid);
 
     return finish_readfile(drakvuf, info, vmi, false);
 }
@@ -883,12 +876,11 @@ event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
     }
     else
     {
-        access_context_t ctx =
-        {
+        ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
             .addr = injector->queryvolumeinfo.out,
-        };
+        );
 
         struct FILE_FS_DEVICE_INFORMATION dev_info = {};
         if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(struct FILE_FS_DEVICE_INFORMATION), &dev_info, NULL)))
@@ -917,7 +909,7 @@ event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
 
 err:
     PRINT_DEBUG("[FILEDELETE2] [ZwQueryVolumeInformationFile] Error. Stop processing (PID %d, TID %d).\n",
-                info->attached_proc_data.pid, info->attached_proc_data.tid);
+        info->attached_proc_data.pid, info->attached_proc_data.tid);
 
 handled:
     return finish_readfile(drakvuf, info, vmi, false);
@@ -945,12 +937,11 @@ event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     else
     {
-        access_context_t ctx =
-        {
+        ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
-            .addr = injector->queryvolumeinfo.out,
-        };
+            .addr = injector->queryvolumeinfo.out
+        );
 
         struct FILE_STANDARD_INFORMATION dev_info = {};
         if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(dev_info), &dev_info, NULL)))
@@ -980,7 +971,7 @@ event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 err:
     PRINT_DEBUG("[FILEDELETE2] [ZwQueryInformationFile] Error. Stop processing (PID %d, TID %d).\n",
-                info->attached_proc_data.pid, info->attached_proc_data.tid);
+        info->attached_proc_data.pid, info->attached_proc_data.tid);
 
 handled:
     return finish_readfile(drakvuf, info, vmi, false);
@@ -1005,7 +996,7 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     if ( 0 == info->attached_proc_data.base_addr )
     {
         PRINT_DEBUG("[FILEDELETE2] Failed to get process base on vCPU 0x%d\n",
-                    info->vcpu);
+            info->vcpu);
         return START_READFILE_ERROR;
     }
 
@@ -1093,8 +1084,8 @@ static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
-                    "attached process\n",
-                    info->attached_proc_data.pid, info->attached_proc_data.tid);
+            "attached process\n",
+            info->attached_proc_data.pid, info->attached_proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1108,12 +1099,12 @@ static event_response_t createfile_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
 
     uint32_t handle = 0;
-    access_context_t ctx =
-    {
+    ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = w->handle,
-    };
+        .addr = w->handle
+    );
+
     vmi_lock_guard vmi_lg(drakvuf);
     if (VMI_SUCCESS != vmi_read_32(vmi_lg.vmi, &ctx, &handle))
         PRINT_DEBUG("[FILEDELETE2] Failed to read pHandle at 0x%lx (PID %d, TID %d)\n", w->handle, w->pid, w->tid);
@@ -1137,8 +1128,8 @@ static void createfile_cb_impl(drakvuf_t drakvuf, drakvuf_trap_info_t* info, add
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
-                    "attached process\n",
-                    info->attached_proc_data.pid, info->attached_proc_data.tid);
+            "attached process\n",
+            info->attached_proc_data.pid, info->attached_proc_data.tid);
         return;
     }
 
@@ -1211,8 +1202,8 @@ static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
-                    "attached process\n",
-                    info->attached_proc_data.pid, info->attached_proc_data.tid);
+            "attached process\n",
+            info->attached_proc_data.pid, info->attached_proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1232,8 +1223,7 @@ static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     if (fileinfoclass == FILE_DISPOSITION_INFORMATION)
     {
         uint8_t del = 0;
-        access_context_t ctx;
-        memset(&ctx, 0, sizeof(access_context_t));
+        ACCESS_CONTEXT(ctx);
         ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
         ctx.dtb = info->regs->cr3;
         ctx.addr = fileinfo;
@@ -1260,8 +1250,8 @@ static event_response_t writefile_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
-                    "attached process\n",
-                    info->attached_proc_data.pid, info->attached_proc_data.tid);
+            "attached process\n",
+            info->attached_proc_data.pid, info->attached_proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1295,8 +1285,8 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
-                    "attached process\n",
-                    info->attached_proc_data.pid, info->attached_proc_data.tid);
+            "attached process\n",
+            info->attached_proc_data.pid, info->attached_proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1349,8 +1339,8 @@ static event_response_t createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[FILEDELETE2] [PID:%d] [TID:%d] Error: Failed to get "
-                    "attached process\n",
-                    info->attached_proc_data.pid, info->attached_proc_data.tid);
+            "attached process\n",
+            info->attached_proc_data.pid, info->attached_proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -1385,8 +1375,8 @@ done:
 
 
 static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
-                           drakvuf_trap_t* trap,
-                           event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
+    drakvuf_trap_t* trap,
+    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
 {
     if ( !drakvuf_get_kernel_symbol_rva( drakvuf, syscall_name, &trap->breakpoint.rva) ) throw -1;
 
