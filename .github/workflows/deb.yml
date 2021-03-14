@@ -5,8 +5,8 @@ on:
   pull_request:
     branches: [ master ]
 jobs:
-  release:
-    runs-on: ubuntu-18.04
+  drakvuf-builds:
+    runs-on: ubuntu-latest
     steps:
     - name: Generate variables
       id: gen_vars
@@ -37,9 +37,19 @@ jobs:
       with:
         name: release-url
         path: release-url.txt
+    - name: Delete old release
+      if: github.event_name == 'push'
+      uses: dev-drprasad/delete-older-releases@v0.1.0
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        repo: tklengyel/drakvuf-builds
+        keep_latest: 5
+        delete_tags: true
+
   deb:
-    needs: [release]
-    runs-on: ubuntu-18.04
+    needs: [drakvuf-builds]
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
