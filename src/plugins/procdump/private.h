@@ -194,23 +194,23 @@ static bool IS_MMPTE_PROTOTYPE_ACCESSIBLE(uint64_t mmpte)
     // NOTE It have been noticed that MMPTE with clear first byte is not accessible
     auto is_accessible = IS_MMPTE_ACCESSIBLE(mmpte, (mmpte >> MM_PROTOTYPE_PROTECTION_OFFSET)) && (mmpte & 0xff);
     return VMI_GET_BIT(mmpte, 10) &&
-           is_accessible;
+        is_accessible;
 }
 
 static bool IS_MMPTE_TRANSITION_ACCESSIBLE(uint64_t mmpte)
 {
     auto is_accessible = IS_MMPTE_ACCESSIBLE(mmpte, (mmpte >> MM_SOFTWARE_PROTECTION_OFFSET));
     return VMI_GET_BIT(mmpte, 11) &&
-           is_accessible;
+        is_accessible;
 }
 
 static bool IS_MMPTE_SOFTWARE_ACCESSIBLE(uint64_t mmpte)
 {
     auto is_accessible = IS_MMPTE_ACCESSIBLE(mmpte, (mmpte >> MM_SOFTWARE_PROTECTION_OFFSET));
     return !IS_MMPTE_VALID(mmpte) &&
-           !IS_MMPTE_PROTOTYPE(mmpte) &&
-           !IS_MMPTE_TRANSITION(mmpte) &&
-           is_accessible;
+        !IS_MMPTE_PROTOTYPE(mmpte) &&
+        !IS_MMPTE_TRANSITION(mmpte) &&
+        is_accessible;
 }
 
 // TODO Move into win-processes.c
@@ -218,9 +218,9 @@ static bool IS_MMPTE_SOFTWARE_ACCESSIBLE(uint64_t mmpte)
 static bool IS_MMPTE_DUMPABLE(uint64_t mmpte)
 {
     return IS_MMPTE_VALID(mmpte) ||
-           IS_MMPTE_SOFTWARE_ACCESSIBLE(mmpte) ||
-           IS_MMPTE_TRANSITION_ACCESSIBLE(mmpte) ||
-           IS_MMPTE_PROTOTYPE_ACCESSIBLE(mmpte);
+        IS_MMPTE_SOFTWARE_ACCESSIBLE(mmpte) ||
+        IS_MMPTE_TRANSITION_ACCESSIBLE(mmpte) ||
+        IS_MMPTE_PROTOTYPE_ACCESSIBLE(mmpte);
 }
 
 #endif

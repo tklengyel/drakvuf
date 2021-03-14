@@ -143,8 +143,8 @@ bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uin
 bool win_get_thread_previous_mode(drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
 
 bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info,
-        privilege_mode_t* previous_mode);
+    drakvuf_trap_info_t* info,
+    privilege_mode_t* previous_mode);
 
 bool win_is_ethread(drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
 

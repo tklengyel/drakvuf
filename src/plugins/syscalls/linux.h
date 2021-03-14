@@ -184,29 +184,29 @@ namespace linuxsc
 #pragma clang diagnostic ignored "-Wmissing-braces"
 
 SYSCALL(read, LONG, 3,
-        "fd",    "", DIR_IN,    LONG,
-        "buf",   "", DIR_IN,    PVOID,
-        "count", "", DIR_OUT,   ULONG
-       );
+    "fd",    "", DIR_IN,    LONG,
+    "buf",   "", DIR_IN,    PVOID,
+    "count", "", DIR_OUT,   ULONG
+);
 SYSCALL(write, LONG, 3,
-        "fd",    "", DIR_IN,    LONG,
-        "buf",   "", DIR_OUT,   PVOID,
-        "count", "", DIR_OUT,   ULONG
-       );
+    "fd",    "", DIR_IN,    LONG,
+    "buf",   "", DIR_OUT,   PVOID,
+    "count", "", DIR_OUT,   ULONG
+);
 SYSCALL(open, LONG, 3,
-        "pathname", "", DIR_IN, PCHAR,
-        "flags",    "", DIR_IN, ULONG,
-        "mode",     "", DIR_IN, ULONG
-       );
+    "pathname", "", DIR_IN, PCHAR,
+    "flags",    "", DIR_IN, ULONG,
+    "mode",     "", DIR_IN, ULONG
+);
 SYSCALL(close, LONG, 1,
-        "fd", "", DIR_IN, LONG,
-       );
+    "fd", "", DIR_IN, LONG,
+);
 SYSCALL(openat, LONG, 4,
-        "dirfd",    "", DIR_IN, LONG,
-        "pathname", "", DIR_IN, PCHAR,
-        "flags",    "", DIR_IN, ULONG,
-        "mode",     "", DIR_IN, ULONG,
-       );
+    "dirfd",    "", DIR_IN, LONG,
+    "pathname", "", DIR_IN, PCHAR,
+    "flags",    "", DIR_IN, ULONG,
+    "mode",     "", DIR_IN, ULONG,
+);
 
 // TODO: fill in missing ret & argument info
 SYSCALL(stat, VOID, 0);

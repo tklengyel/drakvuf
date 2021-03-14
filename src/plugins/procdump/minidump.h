@@ -573,7 +573,7 @@ struct __attribute__ ((packed, aligned(4))) mdmp_memory_list
 
         if (ranges.size() > MDMP_MAX_MEMORY_RANGES)
             PRINT_DEBUG("[PROCDUMP] Warning: Number of memory ranges exceeds "
-                        "defined maximum - not all ranges would be described");
+                "defined maximum - not all ranges would be described");
     }
 
     uint32_t size()
@@ -609,9 +609,9 @@ struct __attribute__ ((packed, aligned(4))) mdmp_thread_list
     array<union thread_context, MDMP_MAX_THREADS> contexts;
 
     mdmp_thread_list(rva64_t rva, bool is32bit,
-                     vector<struct mdmp_thread> threads_,
-                     vector<union thread_context> contexts_,
-                     mdmp_memory_list& memory)
+        vector<struct mdmp_thread> threads_,
+        vector<union thread_context> contexts_,
+        mdmp_memory_list& memory)
         : number_of_threads(MDMP_MAX_THREADS)
         , threads()
         , contexts()
@@ -650,19 +650,19 @@ struct __attribute__ ((packed, aligned(4))) minidump
     struct mdmp_thread_list thread_list;
 
     minidump(uint32_t time_date_stamp,
-             bool is32bit,
-             uint8_t number_of_cpus,
-             uint32_t major,
-             uint32_t minor,
-             uint32_t build,
-             array<uint32_t, MDMP_VENDOR_ID_SIZE> cpu_vendor,
-             uint32_t cpu_version,
-             uint32_t cpu_features,
-             uint32_t cpu_ext_features,
-             wstring service_pack,
-             vector<struct mdmp_memory_descriptor64> memory_ranges,
-             vector<struct mdmp_thread> threads,
-             vector<union thread_context> contexts)
+        bool is32bit,
+        uint8_t number_of_cpus,
+        uint32_t major,
+        uint32_t minor,
+        uint32_t build,
+        array<uint32_t, MDMP_VENDOR_ID_SIZE> cpu_vendor,
+        uint32_t cpu_version,
+        uint32_t cpu_features,
+        uint32_t cpu_ext_features,
+        wstring service_pack,
+        vector<struct mdmp_memory_descriptor64> memory_ranges,
+        vector<struct mdmp_thread> threads,
+        vector<union thread_context> contexts)
         : header(MDMP_NUMBER_OF_STREAMS, time_date_stamp)
         , directories()
         , csd_version(service_pack)

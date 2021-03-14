@@ -128,9 +128,9 @@ using flags_str_t = std::map<uint64_t, std::string>;
  * Return a string of all known set flags. Return empty otherwise.
  */
 std::string parse_flags(uint64_t flags,
-                        const flags_str_t& flags_map,
-                        output_format_t format = OUTPUT_DEFAULT,
-                        std::string empty = std::string());
+    const flags_str_t& flags_map,
+    output_format_t format = OUTPUT_DEFAULT,
+    std::string empty = std::string());
 
 /* Dump buffer from VA to stdout.
  *
@@ -145,11 +145,11 @@ std::string parse_flags(uint64_t flags,
  * footer Closing message
  */
 void dump_va(vmi_instance_t vmi,
-             access_context_t* ctx,
-             const size_t count,
-             const size_t columns = 16,
-             std::string header = std::string(),
-             std::string footer = std::string());
+    access_context_t* ctx,
+    const size_t count,
+    const size_t columns = 16,
+    std::string header = std::string(),
+    std::string footer = std::string());
 
 /* Dump buffer to stdout.
  *
@@ -161,11 +161,11 @@ void dump_va(vmi_instance_t vmi,
  * footer Closing message
  */
 void dump_buffer(const uint8_t buffer[],
-                 const size_t count,
-                 const size_t columns,
-                 addr_t base_addr,
-                 std::string header = std::string(),
-                 std::string footer = std::string());
+    const size_t count,
+    const size_t columns,
+    addr_t base_addr,
+    std::string header = std::string(),
+    std::string footer = std::string());
 
 /* Dump register to stdout
  *
@@ -174,7 +174,7 @@ void dump_buffer(const uint8_t buffer[],
  * footer Closing message
  */
 void dump_registers(const x86_registers_t* regs,
-                    std::string header = std::string(),
-                    std::string footer = std::string());
+    std::string header = std::string(),
+    std::string footer = std::string());
 
 #endif

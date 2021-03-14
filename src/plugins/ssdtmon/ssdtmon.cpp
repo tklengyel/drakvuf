@@ -131,8 +131,8 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         int64_t table_index = (info->trap_pa - s->kiservicetable) / sizeof(uint32_t);
         fmt::print(s->format, "ssdtmon", drakvuf, info,
-                   keyval("TableIndex", fmt::Nval(table_index))
-                  );
+            keyval("TableIndex", fmt::Nval(table_index))
+        );
     }
     return 0;
 }
@@ -183,9 +183,9 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, output_format_t output)
     }
 
     PRINT_DEBUG("SSDT is at 0x%lx. Number of syscalls: %u. Size: %lu\n",
-                this->kiservicetable,
-                this->kiservicelimit,
-                sizeof(uint32_t)*this->kiservicelimit);
+        this->kiservicetable,
+        this->kiservicelimit,
+        sizeof(uint32_t)*this->kiservicelimit);
 
     this->ssdtwrite.cb = write_cb;
     this->ssdtwrite.data = (void*)this;

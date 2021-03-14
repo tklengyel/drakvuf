@@ -193,8 +193,8 @@ event_response_t repl_start(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     repl_init(drakvuf);
 
     std::cout << "=================================================================\n"
-              << "REPL STARTING...\n"
-              << "=================================================================\n";
+        << "REPL STARTING...\n"
+        << "=================================================================\n";
 
     {
         std::stringstream ss;

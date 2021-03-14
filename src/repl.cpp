@@ -123,14 +123,14 @@ static void close_handler(int sig)
 static inline void print_help(void)
 {
     fprintf(stderr, "Required input:\n"
-            "\t -r <path to json>         The OS kernel's JSON\n"
-            "\t -d <domain ID or name>    The domain's ID or name\n"
+        "\t -r <path to json>         The OS kernel's JSON\n"
+        "\t -d <domain ID or name>    The domain's ID or name\n"
 #ifdef DRAKVUF_DEBUG
-            "\t -v                        Turn on verbose (debug) output\n"
+        "\t -v                        Turn on verbose (debug) output\n"
 #endif
-            "\t -l                        Use libvmi.conf\n"
-            "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
-           );
+        "\t -l                        Use libvmi.conf\n"
+        "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
+    );
 }
 
 static bool is_interrupted(drakvuf_t drakvuf, void*)

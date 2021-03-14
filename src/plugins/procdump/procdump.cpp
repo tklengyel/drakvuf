@@ -161,22 +161,22 @@ static addr_t find_pool(pool_map_t& pools)
 }
 
 static bool dump_next_vads(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                           procdump_ctx* ctx);
+    procdump_ctx* ctx);
 
 static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info);
+    drakvuf_trap_info_t* info);
 
 static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info);
+    drakvuf_trap_info_t* info);
 
 static event_response_t complete_stage1(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                                        procdump_ctx* ctx);
+    procdump_ctx* ctx);
 
 static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info);
+    drakvuf_trap_info_t* info);
 
 static bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                                 procdump_ctx* ctx)
+    procdump_ctx* ctx)
 {
     struct argument args[3] = {};
     init_int_argument(&args[0], 0); // NonPagedPool
@@ -195,7 +195,7 @@ static bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 }
 
 static bool inject_copy_memory(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                               procdump_ctx* ctx, addr_t addr, size_t size)
+    procdump_ctx* ctx, addr_t addr, size_t size)
 {
     struct argument args[3] = {};
     init_int_argument(&args[0], ctx->pool);
@@ -215,8 +215,8 @@ static bool inject_copy_memory(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 
 // Returns true if next count pages is mapped and false otherwise.
 static bool max_contigious_range(const std::vector<uint64_t>& prototype_ptes,
-                                 uint32_t total_number_of_ptes, uint32_t idx,
-                                 uint32_t& count, uint64_t max_pages)
+    uint32_t total_number_of_ptes, uint32_t idx,
+    uint32_t& count, uint64_t max_pages)
 {
     // No check for null pointer for purpose
     count = 0;
@@ -235,7 +235,7 @@ static bool max_contigious_range(const std::vector<uint64_t>& prototype_ptes,
 }
 
 static bool read_vm(drakvuf_t drakvuf, addr_t dtb, addr_t start, size_t size,
-                    struct procdump_ctx* procdump_ctx)
+    struct procdump_ctx* procdump_ctx)
 {
     if (!procdump_ctx || !procdump_ctx->writer)
     {
@@ -246,7 +246,7 @@ static bool read_vm(drakvuf_t drakvuf, addr_t dtb, addr_t start, size_t size,
 
     vmi_lock_guard vmi(drakvuf);
 
-    access_context_t vmi_ctx;
+    ACCESS_CONTEXT(vmi_ctx);
     vmi_ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     vmi_ctx.dtb = dtb;
     vmi_ctx.addr = start;
@@ -282,7 +282,7 @@ static bool read_vm(drakvuf_t drakvuf, addr_t dtb, addr_t start, size_t size,
 }
 
 static void dump_with_mmap(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                           procdump_ctx* ctx)
+    procdump_ctx* ctx)
 {
     // Try to mmap private or shared virtual address space area
     auto vad = ctx->vads.begin();
@@ -292,10 +292,10 @@ static void dump_with_mmap(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     if ( !read_vm(drakvuf, info->regs->cr3, start, size, ctx) )
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to copy VAD "
-                    "(start 0x%lx, size 0x%lx) into file "
-                    "(size 0x%lx) with mmap\n",
-                    ctx->pid, ctx->tid, ctx->vads.begin()->first,
-                    size, ctx->size);
+            "(start 0x%lx, size 0x%lx) into file "
+            "(size 0x%lx) with mmap\n",
+            ctx->pid, ctx->tid, ctx->vads.begin()->first,
+            size, ctx->size);
     }
 
     ctx->vads.erase(start);
@@ -309,8 +309,8 @@ enum rtlcopy_status
 };
 
 static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info,
-        procdump_ctx* ctx)
+    drakvuf_trap_info_t* info,
+    procdump_ctx* ctx)
 {
     auto vad = ctx->vads.begin();
 
@@ -323,12 +323,12 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     auto total_number_of_ptes = vad->second.total_number_of_ptes;
     uint32_t ptes_to_dump = 0;
     auto skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
-                                     vad->second.idx, ptes_to_dump, ctx->POOL_SIZE_IN_PAGES);
+            vad->second.idx, ptes_to_dump, ctx->POOL_SIZE_IN_PAGES);
 
     if (!ptes_to_dump)
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Dump %u PTEs from %u / %lu\n",
-                    ctx->pid, ptes_to_dump, vad->second.idx, total_number_of_ptes);
+            ctx->pid, ptes_to_dump, vad->second.idx, total_number_of_ptes);
         return RTLCOPY_RETRY_WITH_MMAP;
     }
 
@@ -341,7 +341,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
 
         vad->second.idx += ptes_to_dump;
         skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
-                                    vad->second.idx, ptes_to_dump, ctx->POOL_SIZE_IN_PAGES);
+                vad->second.idx, ptes_to_dump, ctx->POOL_SIZE_IN_PAGES);
 
         if (0 == ptes_to_dump)
         {
@@ -357,7 +357,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     if (idx + ptes_to_dump > total_number_of_ptes)
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Dump %u PTEs from %u / %lu\n",
-                    ctx->pid, ptes_to_dump, idx, total_number_of_ptes);
+            ctx->pid, ptes_to_dump, idx, total_number_of_ptes);
         return RTLCOPY_RETRY_WITH_MMAP;
     }
 
@@ -367,8 +367,8 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     if (!inject_copy_memory(drakvuf, info, ctx, start_addr, ctx->current_dump_size))
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Failed to inject "
-                    "RtlCopyMemoryNonTemporal\n",
-                    ctx->pid);
+            "RtlCopyMemoryNonTemporal\n",
+            ctx->pid);
         return RTLCOPY_RETRY_WITH_MMAP;
     }
     ctx->target_rsp = info->regs->rsp;
@@ -386,7 +386,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
 }
 
 static bool dump_next_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                           procdump_ctx* ctx)
+    procdump_ctx* ctx)
 {
     while (!ctx->vads.empty())
     {
@@ -420,7 +420,7 @@ static bool dump_next_dlls(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 #define VAD_TYPE_DLL 2
 
 static bool dump_next_vads(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                           procdump_ctx* ctx)
+    procdump_ctx* ctx)
 {
     while (!ctx->vads.empty())
     {
@@ -457,8 +457,8 @@ static bool dump_next_vads(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
     else
     {
         PRINT_DEBUG("[PROCDUMP] Failed to trap return location of injected "
-                    "function call @ 0x%lx!\n",
-                    ctx->bp2->breakpoint.addr);
+            "function call @ 0x%lx!\n",
+            ctx->bp2->breakpoint.addr);
     }
     return false;
 }
@@ -476,7 +476,7 @@ static void free_trap(gpointer p)
 }
 
 static void restore_registers(drakvuf_trap_info_t* info,
-                              procdump_ctx* ctx)
+    procdump_ctx* ctx)
 {
     // One could not restore all registers at once like this:
     //     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t)),
@@ -504,7 +504,7 @@ static void restore_registers(drakvuf_trap_info_t* info,
 }
 
 static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                               procdump_ctx* ctx)
+    procdump_ctx* ctx)
 {
     ctx->writer->finish();
 
@@ -513,10 +513,10 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
         // If there is no VADs left than the file have been processed
         save_file_metadata(ctx, &info->proc_data);
         fmt::print(ctx->plugin->m_output_format, "procdump", drakvuf, info,
-                   keyval("DumpReason", fmt::Qstr("TerminateProcess")),
-                   keyval("DumpSize", fmt::Nval(ctx->size)),
-                   keyval("SN", fmt::Nval(ctx->idx))
-                  );
+            keyval("DumpReason", fmt::Qstr("TerminateProcess")),
+            keyval("DumpSize", fmt::Nval(ctx->size)),
+            keyval("SN", fmt::Nval(ctx->idx))
+        );
     }
 
     restore_registers(info, ctx);
@@ -541,7 +541,7 @@ static event_response_t detach(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 }
 
 static event_response_t complete_stage1(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
-                                        procdump_ctx* ctx)
+    procdump_ctx* ctx)
 {
     restore_registers(info, ctx);
     ctx->plugin->traps = g_slist_remove(ctx->plugin->traps, ctx->bp);
@@ -553,13 +553,13 @@ static event_response_t complete_stage1(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 }
 
 static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info)
+    drakvuf_trap_info_t* info)
 {
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to get "
-                    "attached process\n",
-                    info->proc_data.pid, info->proc_data.tid);
+            "attached process\n",
+            info->proc_data.pid, info->proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -574,13 +574,13 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
     info->regs->rsp = ctx->saved_regs.rsp;
 
     if (!read_vm(drakvuf, info->regs->cr3, ctx->pool, ctx->current_dump_size,
-                 ctx))
+            ctx))
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to copy VAD "
-                    "(start 0x%lx, size 0x%lx) into file "
-                    "(size 0x%lx) with injection\n",
-                    ctx->pid, ctx->tid, ctx->vads.begin()->first,
-                    ctx->current_dump_size, ctx->size);
+            "(start 0x%lx, size 0x%lx) into file "
+            "(size 0x%lx) with injection\n",
+            ctx->pid, ctx->tid, ctx->vads.begin()->first,
+            ctx->current_dump_size, ctx->size);
     }
 
     if (dump_next_dlls(drakvuf, info, ctx))
@@ -590,13 +590,13 @@ static event_response_t rtlcopymemory_cb(drakvuf_t drakvuf,
 }
 
 static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info)
+    drakvuf_trap_info_t* info)
 {
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to get "
-                    "attached process\n",
-                    info->proc_data.pid, info->proc_data.tid);
+            "attached process\n",
+            info->proc_data.pid, info->proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -620,13 +620,13 @@ static event_response_t exallocatepool_cb(drakvuf_t drakvuf,
     }
     else
         PRINT_DEBUG("[PROCDUMP] [PID:%d] Failed to allocate pool\n",
-                    info->attached_proc_data.pid);
+            info->attached_proc_data.pid);
 
     return detach(drakvuf, info, ctx);
 }
 
 static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
-                       void* callback_data)
+    void* callback_data)
 {
     uint32_t vad_type = drakvuf_mmvad_type(drakvuf, mmvad);
     uint64_t width = 0;
@@ -684,8 +684,8 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
             size_t bytes_read = 0;
             vmi_lock_guard vmi_lg(drakvuf);
             if (VMI_SUCCESS != vmi_read_va(vmi_lg.vmi, mmvad->prototype_pte, 0,
-                                           sizeof(addr_t) * ptes, buf,
-                                           &bytes_read) ||
+                    sizeof(addr_t) * ptes, buf,
+                    &bytes_read) ||
                 bytes_read != sizeof(addr_t) * ptes)
             {
                 PRINT_DEBUG(
@@ -705,10 +705,10 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
     }
 
     PRINT_DEBUG("[PID:%d] [%s] MMVAD 0x%13lx, 0x%13lx (%5lu PTEs, "
-                "%10zu bytes), MemCommit %d, VadType %d, CommitCharge 0x%lx\n",
-                ctx->pid, ctx->name.data(), mmvad->starting_vpn,
-                mmvad->ending_vpn, len_pages, len_bytes, vad_commit, vad_type,
-                vad_commit_charge);
+        "%10zu bytes), MemCommit %d, VadType %d, CommitCharge 0x%lx\n",
+        ctx->pid, ctx->name.data(), mmvad->starting_vpn,
+        mmvad->ending_vpn, len_pages, len_bytes, vad_commit, vad_type,
+        vad_commit_charge);
 
     ctx->vads[vad_start] = {vad_type, len_pages, prototype_pte, 0, false};
     ctx->size += len_bytes;
@@ -735,7 +735,7 @@ static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pr
         if (VAD_TYPE_DLL != vad.second.type)
         {
             struct mdmp_memory_descriptor64 range(vad.first,
-                                                  vad.second.total_number_of_ptes * VMI_PS_4KB);
+                vad.second.total_number_of_ptes * VMI_PS_4KB);
             memory_ranges.push_back(range);
         }
     }
@@ -744,7 +744,7 @@ static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pr
         if (VAD_TYPE_DLL == vad.second.type)
         {
             struct mdmp_memory_descriptor64 range(vad.first,
-                                                  vad.second.total_number_of_ptes * VMI_PS_4KB);
+                vad.second.total_number_of_ptes * VMI_PS_4KB);
             memory_ranges.push_back(range);
         }
     }
@@ -760,17 +760,17 @@ static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pr
     thread_ctx.set(is32bit, info->regs);
 
     auto mdmp = minidump(time_stamp,
-                         is32bit,
-                         plugin->num_cpus,
-                         plugin->win_major,
-                         plugin->win_minor,
-                         plugin->win_build_number,
-                         plugin->vendor,
-                         plugin->version_information,
-                         plugin->feature_information,
-                         plugin->amd_extended_cpu_features,
-                         csdversion,
-                         memory_ranges,
+            is32bit,
+            plugin->num_cpus,
+            plugin->win_major,
+            plugin->win_minor,
+            plugin->win_build_number,
+            plugin->vendor,
+            plugin->version_information,
+            plugin->feature_information,
+            plugin->amd_extended_cpu_features,
+            csdversion,
+            memory_ranges,
     {thread},
     {thread_ctx});
 
@@ -784,13 +784,13 @@ static bool prepare_mdmp_header(drakvuf_t drakvuf, drakvuf_trap_info_t* info, pr
 }
 
 static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info)
+    drakvuf_trap_info_t* info)
 {
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to get "
-                    "attached process\n",
-                    info->proc_data.pid, info->proc_data.tid);
+            "attached process\n",
+            info->proc_data.pid, info->proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -811,7 +811,7 @@ static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
 
     // Get virtual address space map of the process
     drakvuf_traverse_mmvad(drakvuf, info->attached_proc_data.base_addr, dump_mmvad,
-                           ctx);
+        ctx);
     if (ctx->vads.empty())
         return detach(drakvuf, info, ctx);
     else
@@ -824,7 +824,7 @@ static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
                 vad->second.prototype_ptes.size() != dll->second.prototype_ptes.size())
             {
                 PRINT_DEBUG("[PROCDUMP] DLL at %#lx of %ld PTEs disappered\n",
-                            dll->first, dll->second.total_number_of_ptes);
+                    dll->first, dll->second.total_number_of_ptes);
                 dll->second.zero_fill = true;
             }
         }
@@ -842,13 +842,13 @@ static event_response_t terminate_process_cb2(drakvuf_t drakvuf,
 }
 
 static event_response_t terminate_process_cb(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info)
+    drakvuf_trap_info_t* info)
 {
     if (!info->attached_proc_data.pid)
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] [TID:%d] Error: Failed to get "
-                    "attached process\n",
-                    info->proc_data.pid, info->proc_data.tid);
+            "attached process\n",
+            info->proc_data.pid, info->proc_data.tid);
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -894,7 +894,7 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     ctx->size = 0;
     // Get virtual address space map of the process
     drakvuf_traverse_mmvad(drakvuf, info->attached_proc_data.base_addr, dump_mmvad,
-                           ctx);
+        ctx);
     if (ctx->vads.empty())
     {
         // nothing to do
@@ -903,10 +903,10 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     }
     {
         PRINT_DEBUG("[PROCDUMP] [\"%s\":%4d] [PID:%4d] [TID:%4d] [\"%s\"] "
-                    "Dump 0x%lx (%ld MiB, %lu VADs) SN=%lu\n",
-                    __FUNCTION__, __LINE__, info->attached_proc_data.pid,
-                    info->attached_proc_data.tid, info->attached_proc_data.name, ctx->size,
-                    ctx->size / 1024 / 1024, ctx->vads.size(), ctx->idx);
+            "Dump 0x%lx (%ld MiB, %lu VADs) SN=%lu\n",
+            __FUNCTION__, __LINE__, info->attached_proc_data.pid,
+            info->attached_proc_data.tid, info->attached_proc_data.name, ctx->size,
+            ctx->size / 1024 / 1024, ctx->vads.size(), ctx->idx);
     }
 
     try
@@ -962,15 +962,15 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     else
     {
         PRINT_DEBUG("[PROCDUMP] Failed to trap return location of injected "
-                    "function call @ 0x%lx!\n",
-                    ctx->bp->breakpoint.addr);
+            "function call @ 0x%lx!\n",
+            ctx->bp->breakpoint.addr);
     }
 
     return detach(drakvuf, info, ctx);
 }
 
 static addr_t get_function_va(drakvuf_t drakvuf, const char* lib,
-                              const char* func_name)
+    const char* func_name)
 {
     addr_t rva;
     if (!drakvuf_get_kernel_symbol_rva(drakvuf, func_name, &rva))
@@ -990,7 +990,7 @@ static addr_t get_function_va(drakvuf_t drakvuf, const char* lib,
 }
 
 procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
-                   output_format_t output)
+    output_format_t output)
     : pluginex(drakvuf, output)
     , terminated_processes(config->terminated_processes)
     , procdump_dir{config->procdump_dir ?: ""}
