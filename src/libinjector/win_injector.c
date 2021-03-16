@@ -2127,10 +2127,10 @@ static void print_injection_info(output_format_t format, const char* file, injec
 
                 case OUTPUT_JSON:
                     printf( "{"
-                            "\"Plugin\": \"inject\", "
-                            "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
-                            "\"Status\": \"InitFail\""
-                            "}\n", UNPACK_TIMEVAL(t));
+                        "\"Plugin\": \"inject\", "
+                        "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                        "\"Status\": \"InitFail\""
+                        "}\n", UNPACK_TIMEVAL(t));
                     break;
 
                 default:
