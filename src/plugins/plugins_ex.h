@@ -338,8 +338,6 @@ struct call_result_t
     addr_t target_rsp;
 };
 
-
-
 struct plugin_data
 {
     class pluginex* plugin;

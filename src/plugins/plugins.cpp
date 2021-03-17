@@ -405,6 +405,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     /* Should never reach here */
                     fprintf(stderr, "Plugin start falls-through to default switch case!\n");
                     throw -1;
+
                 default:
                     break;
             }
