@@ -106,13 +106,13 @@
 
 using namespace libhook;
 
-return_hook::return_hook(drakvuf_t drakvuf, cb_wrapper_t cb)
-    : base_hook(drakvuf),
+ReturnHook::ReturnHook(drakvuf_t drakvuf, cb_wrapper_t cb)
+    : BaseHook(drakvuf),
       callback_(cb),
       trap_(new drakvuf_trap_t)
 {}
 
-return_hook::~return_hook()
+ReturnHook::~ReturnHook()
 {
     if (this->drakvuf_ && this->trap_)
     {
@@ -137,14 +137,14 @@ return_hook::~return_hook()
     }
 }
 
-return_hook::return_hook(return_hook&& rhs) noexcept
-    : base_hook(std::forward<base_hook>(rhs))
+ReturnHook::ReturnHook(ReturnHook&& rhs) noexcept
+    : BaseHook(std::forward<BaseHook>(rhs))
 {
     std::swap(this->callback_, rhs.callback_);
     std::swap(this->trap_, rhs.trap_);
 }
 
-return_hook& return_hook::operator=(return_hook&& rhs) noexcept
+ReturnHook& ReturnHook::operator=(ReturnHook&& rhs) noexcept
 {
     std::swap(this->callback_, rhs.callback_);
     std::swap(this->trap_, rhs.trap_);

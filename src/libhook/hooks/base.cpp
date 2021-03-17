@@ -106,21 +106,21 @@
 
 using namespace libhook;
 
-base_hook::base_hook(drakvuf_t drakvuf)
+BaseHook::BaseHook(drakvuf_t drakvuf)
     : drakvuf_(drakvuf)
 {};
 
-base_hook::base_hook(base_hook&& rhs) noexcept
+BaseHook::BaseHook(BaseHook&& rhs) noexcept
 {
     std::swap(this->drakvuf_, rhs.drakvuf_);
 }
 
-base_hook& base_hook::operator=(base_hook&& rhs) noexcept
+BaseHook& BaseHook::operator=(BaseHook&& rhs) noexcept
 {
     std::swap(this->drakvuf_, rhs.drakvuf_);
     return *this;
 }
 
 // don't ask me why C++ has "pure virtual dctors with default implementation"
-base_hook::~base_hook()
+BaseHook::~BaseHook()
 {}

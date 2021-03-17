@@ -115,6 +115,7 @@
 
 #include "private.h"
 #include "plugins.h"
+#include "hook_helpers.h"
 
 
 // Errors
@@ -337,6 +338,8 @@ struct call_result_t
     addr_t target_rsp;
 };
 
+
+
 struct plugin_data
 {
     class pluginex* plugin;
@@ -358,27 +361,70 @@ public:
     typedef event_response_t(*hook_cb_t)(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
     typedef void(*ah_cb_t)(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 
-    pluginex(drakvuf_t drakvuf, output_format_t output)
-        : m_output_format(output), drakvuf(drakvuf)
-    {};
+    pluginex(drakvuf_t drakvuf, output_format_t output);
+    virtual ~pluginex();
+    virtual bool stop();
+    void destroy_all_traps();
 
-    virtual ~pluginex()
-    {
-        stop();
-    };
+    /**********************************
+     *        Libhook RAII API        *
+     **********************************/
 
-    virtual bool stop()
+    [[nodiscard]]
+    std::unique_ptr<libhook::ManualHook> createManualHook(drakvuf_trap_t* info, drakvuf_trap_free_t free_routine)
     {
-        destroy_all_traps();
-        m_is_stopping = true;
-        return true;
+        return libhook::ManualHook::create(this->drakvuf, info, free_routine);
     }
 
-    virtual void destroy_all_traps()
+    template<typename Params = PluginResult>
+    [[nodiscard]]
+    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, hook_cb_t cb)
     {
-        while (!traps.empty())
-            destroy_trap(traps.front());
+        static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
+        auto hook = libhook::ReturnHook::create<Params>(this->drakvuf, info, cb);
+        static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+        return hook;
     }
+
+    template<typename Params = PluginResult, typename Callback>
+    [[nodiscard]]
+    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, Callback cb)
+    {
+        static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
+        auto hook = libhook::ReturnHook::create<Params>(this->drakvuf, info, [=](auto&& ...args) -> event_response_t
+        {
+            return std::invoke(cb, (typename class_type<Callback>::type*)this, args...);
+        });
+        static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+        return hook;
+    }
+
+    template<typename Params = PluginResult>
+    [[nodiscard]]
+    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, hook_cb_t cb)
+    {
+        static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
+        auto hook = libhook::SyscallHook::create<Params>(this->drakvuf, syscall_name, cb);
+        static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+        return hook;
+    }
+
+    template<typename Params = PluginResult, typename Callback>
+    [[nodiscard]]
+    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, Callback cb)
+    {
+        static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
+        auto hook = libhook::SyscallHook::create<Params>(this->drakvuf, syscall_name, [=](auto&& ...args) -> event_response_t
+        {
+            return std::invoke(cb, (typename class_type<Callback>::type*)this, args...);
+        });
+        static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+        return hook;
+    }
+
+    /************************************
+     *        Legacy hooking API        *
+     ************************************/
 
     // Params property is optional
     template<typename Params = void, typename IB>

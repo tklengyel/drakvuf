@@ -117,7 +117,7 @@ namespace libhook
  *
  * This class serves as a RAII wrapper around libdrakvuf traps.
  */
-class manual_hook : public base_hook
+class ManualHook : public BaseHook
 {
 public:
     /**
@@ -125,39 +125,39 @@ public:
      */
     [[nodiscard]]
     static auto create(drakvuf_t, drakvuf_trap_t*, drakvuf_trap_free_t)
-    -> std::unique_ptr<manual_hook>;
+    -> std::unique_ptr<ManualHook>;
 
     /**
      * Unhook in dctor
      */
-    ~manual_hook() override;
+    ~ManualHook() override;
 
     /**
      * delete default ctor, enforce creation though factory functions
      */
-    manual_hook() = delete;
+    ManualHook() = delete;
 
     /**
      * delete copy ctor, as this class has ownership via RAII
      */
-    manual_hook(const manual_hook&) = delete;
+    ManualHook(const ManualHook&) = delete;
 
     /**
      * move ctor, required for move semantics to work properly
      * important to be noexcept, otherwise bad things will happen
      */
-    manual_hook(manual_hook&&) noexcept;
+    ManualHook(ManualHook&&) noexcept;
 
     /**
      * delete copy assignment operator, as this class has ownership via RAII
      */
-    manual_hook& operator=(const manual_hook&) = delete;
+    ManualHook& operator=(const ManualHook&) = delete;
 
     /**
      * move assignment operator, required for move semantics to work properly
      * important to be noexcept, otherwise bad things will happen
      */
-    manual_hook& operator=(manual_hook&&) noexcept;
+    ManualHook& operator=(ManualHook&&) noexcept;
 
     drakvuf_trap_t* trap_ = nullptr;
     drakvuf_trap_free_t free_routine_ = nullptr;
@@ -166,7 +166,7 @@ protected:
     /**
      * Hide ctor from users, as we enforce factory function usage.
      */
-    explicit manual_hook(drakvuf_t, drakvuf_trap_t*, drakvuf_trap_free_t);
+    explicit ManualHook(drakvuf_t, drakvuf_trap_t*, drakvuf_trap_free_t);
 
 };
 

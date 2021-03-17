@@ -112,7 +112,7 @@
 namespace libhook
 {
 
-class syscall_hook : public base_hook
+class SyscallHook : public BaseHook
 {
 public:
     /**
@@ -121,34 +121,34 @@ public:
     template<typename Params = CallResult>
     [[nodiscard]]
     static auto create(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb)
-    -> std::unique_ptr<syscall_hook>;
+    -> std::unique_ptr<SyscallHook>;
 
     /**
      * unhook on dctor
      */
-    ~syscall_hook() override;
+    ~SyscallHook() override;
 
     /**
      * delete copy ctor, as this class has ownership via RAII
      */
-    syscall_hook(const syscall_hook&) = delete;
+    SyscallHook(const SyscallHook&) = delete;
 
     /**
      * move ctor, required for move semantics to work properly
      * important to be noexcept, otherwise bad things will happen
      */
-    syscall_hook(syscall_hook&&) noexcept;
+    SyscallHook(SyscallHook&&) noexcept;
 
     /**
      * delete copy assignment operator, as this class has ownership via RAII
      */
-    syscall_hook& operator=(const syscall_hook&) = delete;
+    SyscallHook& operator=(const SyscallHook&) = delete;
 
     /**
      * move assignment operator, required for move semantics to work properly
      * important to be noexcept, otherwise bad things will happen
      */
-    syscall_hook& operator=(syscall_hook&&) noexcept;
+    SyscallHook& operator=(SyscallHook&&) noexcept;
 
     std::string syscall_name_;
     cb_wrapper_t callback_;
@@ -158,23 +158,23 @@ protected:
     /**
      * Hide ctor from users, as we enforce factory function usage.
      */
-    syscall_hook(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb);
+    SyscallHook(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb);
 };
 
 template<typename Params>
-auto syscall_hook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb)
--> std::unique_ptr<syscall_hook>
+auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb)
+-> std::unique_ptr<SyscallHook>
 {
     PRINT_DEBUG("[LIBHOOK] creating syscall hook\n");
 
-    auto hook = std::unique_ptr<syscall_hook>(new syscall_hook(drakvuf, syscall_name, cb));
+    auto hook = std::unique_ptr<SyscallHook>(new SyscallHook(drakvuf, syscall_name, cb));
     hook->trap_ = new drakvuf_trap_t;
 
     if (!drakvuf_get_kernel_symbol_rva(hook->drakvuf_, hook->syscall_name_.c_str(), &hook->trap_->breakpoint.rva))
     {
         PRINT_DEBUG("[LIBHOOK] Failed to receive addr of function %s\n", hook->syscall_name_.c_str());
         delete hook->trap_;
-        return std::unique_ptr<syscall_hook>();
+        return std::unique_ptr<SyscallHook>();
     }
 
     hook->trap_->breakpoint.lookup_type = LOOKUP_PID;
@@ -186,7 +186,7 @@ auto syscall_hook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb
     hook->trap_->type = BREAKPOINT;
     hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
-        return GetTrapHook<syscall_hook>(info)->callback_(drakvuf, info);
+        return GetTrapHook<SyscallHook>(info)->callback_(drakvuf, info);
     };
 
     static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
@@ -202,7 +202,7 @@ auto syscall_hook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb
         PRINT_DEBUG("[LIBHOOK] failed to create trap for syscall hook\n");
         delete static_cast<CallResult*>(hook->trap_->data);
         delete hook->trap_;
-        return std::unique_ptr<syscall_hook>();
+        return std::unique_ptr<SyscallHook>();
     }
 
     PRINT_DEBUG("[LIBHOOK] return hook OK\n");

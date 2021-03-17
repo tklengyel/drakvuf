@@ -1,11 +1,11 @@
 #pragma once
 
 #include <vector>
-#include "plugins/hook_helpers.h"
+#include "plugins/plugins_ex.h"
 
 event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-class dummy : public BetterPlugin
+class dummy : public pluginex
 {
 public:
     dummy(drakvuf_t drakvuf, output_format_t output);
@@ -22,7 +22,7 @@ public:
         .data = this,
     };
 
-    std::unique_ptr<libhook::manual_hook> cr3_hook;
-    std::unique_ptr<libhook::syscall_hook> sys_hook;
-    std::vector<std::unique_ptr<libhook::return_hook>> ret_hooks;
+    std::unique_ptr<libhook::ManualHook> cr3_hook;
+    std::unique_ptr<libhook::SyscallHook> sys_hook;
+    std::vector<std::unique_ptr<libhook::ReturnHook>> ret_hooks;
 };

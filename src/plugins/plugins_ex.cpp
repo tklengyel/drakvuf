@@ -121,3 +121,25 @@ std::string FieldToString(const std::map<uint64_t, std::string>& maps, uint64_t 
 
 // Errors
 char ERROR_MSG_ADDING_TRAP[] = "Failed to add a trap";
+
+pluginex::pluginex(drakvuf_t drakvuf, output_format_t output)
+    : m_output_format(output), drakvuf(drakvuf)
+{};
+
+pluginex::~pluginex()
+{
+    stop();
+};
+
+bool pluginex::stop()
+{
+    destroy_all_traps();
+    m_is_stopping = true;
+    return true;
+}
+
+void pluginex::destroy_all_traps()
+{
+    while (!traps.empty())
+        destroy_trap(traps.front());
+}

@@ -106,7 +106,7 @@
 
 using namespace libhook;
 
-syscall_hook::~syscall_hook()
+SyscallHook::~SyscallHook()
 {
     if (this->drakvuf_ && this->trap_)
     {
@@ -131,15 +131,15 @@ syscall_hook::~syscall_hook()
     }
 }
 
-syscall_hook::syscall_hook(syscall_hook&& rhs) noexcept
-    : base_hook(std::forward<base_hook>(rhs))
+SyscallHook::SyscallHook(SyscallHook&& rhs) noexcept
+    : BaseHook(std::forward<BaseHook>(rhs))
 {
     std::swap(this->trap_, rhs.trap_);
     std::swap(this->syscall_name_, rhs.syscall_name_);
     std::swap(this->callback_, rhs.callback_);
 }
 
-syscall_hook& syscall_hook::operator=(syscall_hook&& rhs) noexcept
+SyscallHook& SyscallHook::operator=(SyscallHook&& rhs) noexcept
 {
     std::swap(this->trap_, rhs.trap_);
     std::swap(this->syscall_name_, rhs.syscall_name_);
@@ -147,8 +147,8 @@ syscall_hook& syscall_hook::operator=(syscall_hook&& rhs) noexcept
     return *this;
 }
 
-syscall_hook::syscall_hook(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb)
-    : base_hook(drakvuf),
+SyscallHook::SyscallHook(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb)
+    : BaseHook(drakvuf),
       syscall_name_(syscall_name),
       callback_(cb)
 {}

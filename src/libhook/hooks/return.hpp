@@ -110,7 +110,7 @@
 namespace libhook
 {
 
-class return_hook : public base_hook
+class ReturnHook : public BaseHook
 {
 public:
     /**
@@ -121,34 +121,34 @@ public:
     template<typename Params = CallResult>
     [[nodiscard]]
     static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb)
-    -> std::unique_ptr<return_hook>;
+    -> std::unique_ptr<ReturnHook>;
 
     /**
      * unhook on dctor
      */
-    ~return_hook() override;
+    ~ReturnHook() override;
 
     /**
      * delete copy ctor, as this class has ownership via RAII
      */
-    return_hook(const return_hook&) = delete;
+    ReturnHook(const ReturnHook&) = delete;
 
     /**
      * move ctor, required for move semantics to work properly
      * important to be noexcept, otherwise bad things will happen
      */
-    return_hook(return_hook&&) noexcept;
+    ReturnHook(ReturnHook&&) noexcept;
 
     /**
      * delete copy assignment operator, as this class has ownership via RAII
      */
-    return_hook& operator=(const return_hook&) = delete;
+    ReturnHook& operator=(const ReturnHook&) = delete;
 
     /**
      * move assignment operator, required for move semantics to work properly
      * important to be noexcept, otherwise bad things will happen
      */
-    return_hook& operator=(return_hook&&) noexcept;
+    ReturnHook& operator=(ReturnHook&&) noexcept;
 
     cb_wrapper_t callback_;
     drakvuf_trap_t* trap_ = nullptr;
@@ -157,22 +157,22 @@ protected:
     /**
      * Hide ctor from users, as we enforce factory function usage.
      */
-    return_hook(drakvuf_t, cb_wrapper_t cb);
+    ReturnHook(drakvuf_t, cb_wrapper_t cb);
 };
 
 template<typename Params>
-auto return_hook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb)
--> std::unique_ptr<return_hook>
+auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t cb)
+-> std::unique_ptr<ReturnHook>
 {
     PRINT_DEBUG("[LIBHOOK] creating return hook\n");
 
-    auto hook = std::unique_ptr<return_hook>(new return_hook(drakvuf, cb));
+    auto hook = std::unique_ptr<ReturnHook>(new ReturnHook(drakvuf, cb));
 
     auto ret_addr = drakvuf_get_function_return_address(drakvuf, info);
     if (!ret_addr)
     {
         PRINT_DEBUG("[LIBHOOK] Failed to receive return addr of function\n");
-        return std::unique_ptr<return_hook>();
+        return std::unique_ptr<ReturnHook>();
     }
 
     hook->trap_->breakpoint.lookup_type = LOOKUP_DTB;
@@ -183,10 +183,10 @@ auto return_hook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_
     hook->trap_->breakpoint.module = info->trap->breakpoint.module;
 
     hook->trap_->type = BREAKPOINT;
-    hook->trap_->name = "return_hook";
+    hook->trap_->name = "ReturnHook";
     hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
-        return GetTrapHook<return_hook>(info)->callback_(drakvuf, info);
+        return GetTrapHook<ReturnHook>(info)->callback_(drakvuf, info);
     };
 
     static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
@@ -204,7 +204,7 @@ auto return_hook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_
         hook->trap_->data = nullptr;
         delete params;
 
-        return std::unique_ptr<return_hook>();
+        return std::unique_ptr<ReturnHook>();
     }
 
     PRINT_DEBUG("[LIBHOOK] return hook OK\n");

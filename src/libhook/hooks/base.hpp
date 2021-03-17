@@ -118,41 +118,41 @@ using cb_wrapper_t = std::function<event_response_t(drakvuf_t, drakvuf_trap_info
 /**
  * Base hook class, not to be instantiated manually.
  */
-class base_hook
+class BaseHook
 {
 public:
     /**
      * virtual dctor since we use inheritance
      */
-    virtual ~base_hook() = 0;
+    virtual ~BaseHook() = 0;
 
     /**
      * delete copy ctor, as this class has ownership via RAII
      */
-    base_hook(const base_hook&) = delete;
+    BaseHook(const BaseHook&) = delete;
 
     /**
      * move ctor, required for move semantics to work properly
      * important to be noexcept, otherwise bad things will happen
      */
-    base_hook(base_hook&&) noexcept;
+    BaseHook(BaseHook&&) noexcept;
 
     /**
      * delete copy assignment operator, as this class has ownership via RAII
      */
-    base_hook& operator=(const base_hook&) = delete;
+    BaseHook& operator=(const BaseHook&) = delete;
 
     /**
      * move assignment operator, required for move semantics to work properly
      * important to be noexcept, otherwise bad things will happen
      */
-    base_hook& operator=(base_hook&&) noexcept;
+    BaseHook& operator=(BaseHook&&) noexcept;
 
 protected:
     /*
      * protected ctor only for usage by other traps
      */
-    explicit base_hook(drakvuf_t);
+    explicit BaseHook(drakvuf_t);
 
     /**
      * Since we want to use RAII we have to have dctor without params

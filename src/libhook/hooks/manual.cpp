@@ -105,32 +105,30 @@
 
 using namespace libhook;
 
-auto manual_hook::create(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
--> std::unique_ptr<manual_hook>
+auto ManualHook::create(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
+-> std::unique_ptr<ManualHook>
 {
-    // not calling base_hook::prepare_trap on purpose
-    // we expect user to created trap properly on their own
     PRINT_DEBUG("[LIBHOOK] creating manual hook\n");
 
     // struct EnableMaker : public manual_hook { using manual_hook::manual_hook; };
     // auto hook = std::make_unique<EnableMaker>(drakvuf, trap_, free_routine_);
 
-    auto hook = std::unique_ptr<manual_hook>(new manual_hook(drakvuf, trap, free_routine));
+    auto hook = std::unique_ptr<ManualHook>(new ManualHook(drakvuf, trap, free_routine));
     if (!drakvuf_add_trap(hook->drakvuf_, hook->trap_))
     {
         PRINT_DEBUG("[LIBHOOK] failed to create trap for manual hook\n");
-        return std::unique_ptr<manual_hook>();
+        return std::unique_ptr<ManualHook>();
     }
 
     PRINT_DEBUG("[LIBHOOK] manual hook OK\n");
     return hook;
 }
 
-manual_hook::manual_hook(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
-    : base_hook(drakvuf), trap_(trap), free_routine_(free_routine)
+ManualHook::ManualHook(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
+    : BaseHook(drakvuf), trap_(trap), free_routine_(free_routine)
 {}
 
-manual_hook::~manual_hook()
+ManualHook::~ManualHook()
 {
     if (this->drakvuf_ && this->trap_)
     {
@@ -145,14 +143,14 @@ manual_hook::~manual_hook()
     }
 }
 
-manual_hook::manual_hook(manual_hook&& rhs) noexcept
-    : base_hook(std::forward<manual_hook>(rhs))
+ManualHook::ManualHook(ManualHook&& rhs) noexcept
+    : BaseHook(std::forward<ManualHook>(rhs))
 {
     std::swap(this->trap_, rhs.trap_);
     std::swap(this->free_routine_, rhs.free_routine_);
 }
 
-manual_hook& manual_hook::operator=(manual_hook&& rhs) noexcept
+ManualHook& ManualHook::operator=(ManualHook&& rhs) noexcept
 {
     std::swap(this->trap_, rhs.trap_);
     std::swap(this->free_routine_, rhs.free_routine_);

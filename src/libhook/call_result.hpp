@@ -132,7 +132,7 @@ struct CallResult
     vmi_pid_t target_pid;
     uint32_t target_tid;
     addr_t target_rsp;
-    base_hook* hook_;
+    BaseHook* hook_;
 };
 
 template<typename Params = CallResult>
@@ -161,7 +161,7 @@ Params* GetTrapParams(const drakvuf_trap_info_t* info)
 template<typename Hook>
 Hook* GetTrapHook(const drakvuf_trap_info_t* info)
 {
-    static_assert(std::is_base_of_v<base_hook, Hook>, "Hook must derive from base_hook");
+    static_assert(std::is_base_of_v<BaseHook, Hook>, "Hook must derive from BaseHook");
     return dynamic_cast<Hook*>(GetTrapParams(info)->hook_);
 }
 
