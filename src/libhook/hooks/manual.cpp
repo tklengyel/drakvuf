@@ -103,7 +103,8 @@
  ***************************************************************************/
 #include "manual.hpp"
 
-using namespace libhook;
+namespace libhook
+{
 
 auto ManualHook::create(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
 -> std::unique_ptr<ManualHook>
@@ -156,3 +157,5 @@ ManualHook& ManualHook::operator=(ManualHook&& rhs) noexcept
     std::swap(this->free_routine_, rhs.free_routine_);
     return *this;
 }
+
+} // namespace libhook

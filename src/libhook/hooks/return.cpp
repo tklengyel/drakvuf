@@ -104,7 +104,8 @@
 
 #include "return.hpp"
 
-using namespace libhook;
+namespace libhook
+{
 
 ReturnHook::ReturnHook(drakvuf_t drakvuf, cb_wrapper_t cb)
     : BaseHook(drakvuf),
@@ -150,3 +151,5 @@ ReturnHook& ReturnHook::operator=(ReturnHook&& rhs) noexcept
     std::swap(this->trap_, rhs.trap_);
     return *this;
 }
+
+} // namespace libhook

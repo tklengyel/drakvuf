@@ -21,4 +21,5 @@ jobs:
             src/plugins/plugins.cpp \
             src/plugins/plugins_ex.cpp \
             src/plugins/output_format/* \
-            src/libusermode/*
+            src/libusermode/* \
+            src/libhook/*

@@ -104,7 +104,8 @@
 
 #include "base.hpp"
 
-using namespace libhook;
+namespace libhook
+{
 
 BaseHook::BaseHook(drakvuf_t drakvuf)
     : drakvuf_(drakvuf)
@@ -124,3 +125,5 @@ BaseHook& BaseHook::operator=(BaseHook&& rhs) noexcept
 // don't ask me why C++ has "pure virtual dctors with default implementation"
 BaseHook::~BaseHook()
 {}
+
+} // namespace libhook

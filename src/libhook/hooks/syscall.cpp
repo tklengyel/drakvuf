@@ -104,7 +104,8 @@
 
 #include "syscall.hpp"
 
-using namespace libhook;
+namespace libhook
+{
 
 SyscallHook::~SyscallHook()
 {
@@ -152,3 +153,5 @@ SyscallHook::SyscallHook(drakvuf_t drakvuf, const std::string& syscall_name, cb_
       syscall_name_(syscall_name),
       callback_(cb)
 {}
+
+} // namespace libhook
