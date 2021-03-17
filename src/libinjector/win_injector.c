@@ -130,6 +130,7 @@ typedef enum
     INJECT_RESULT_CRASH,
     INJECT_RESULT_PREMATURE,
     INJECT_RESULT_ERROR_CODE,
+    INJECT_RESULT_INIT_FAIL
 } inject_result_t;
 
 struct injector
@@ -161,7 +162,7 @@ struct injector
     // For shellcode execution
     addr_t payload, payload_addr, memset;
     // For readfile/writefile
-    addr_t create_file, read_file, write_file, close_handle, expand_env, get_last_error;
+    addr_t create_file, read_file, write_file, close_handle, expand_env;
     size_t binary_size, payload_size;
     uint32_t status;
     uint32_t file_handle;
@@ -543,11 +544,6 @@ static bool setup_close_handle_stack(injector_t injector, x86_registers_t* regs)
     init_int_argument(&args[0], injector->file_handle);
 
     return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
-}
-
-static bool setup_get_last_error_stack(injector_t injector, x86_registers_t* regs)
-{
-    return setup_stack(injector->drakvuf, regs, NULL, 0);
 }
 
 static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info)
@@ -1506,18 +1502,13 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             if (regs.x86.rax == (~0ULL) || !regs.x86.rax)
             {
                 PRINT_DEBUG("Failed to open guest file\n");
+                injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+                injector->error_code.valid = true;
+                drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
 
-                if (!setup_get_last_error_stack(injector, &regs.x86))
-                {
-                    PRINT_DEBUG("Failed to setup stack for get last error\n");
-                    return 0;
-                }
-
-                regs.x86.rip = injector->get_last_error;
-
-                injector->status = STATUS_GET_LAST_ERROR;
-                drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
-
+                drakvuf_remove_trap(drakvuf, info->trap, NULL);
+                drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+                drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
                 return 0;
             }
 
@@ -1527,6 +1518,14 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             if (!injector->host_file)
             {
                 PRINT_DEBUG("Failed to open host file\n");
+                injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+                injector->error_code.code = errno;
+                injector->error_code.string = "HOST_FAILED_FOPEN";
+                injector->error_code.valid = true;
+
+                drakvuf_remove_trap(drakvuf, info->trap, NULL);
+                drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+                drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
                 return 0;
             }
         }
@@ -1535,18 +1534,13 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             if (!regs.x86.rax)
             {
                 PRINT_DEBUG("Failed to write to the guest file\n");
+                injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+                injector->error_code.valid = true;
+                drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
 
-                if (!setup_get_last_error_stack(injector, &regs.x86))
-                {
-                    PRINT_DEBUG("Failed to setup stack for get last error\n");
-                    return 0;
-                }
-
-                regs.x86.rip = injector->get_last_error;
-
-                injector->status = STATUS_GET_LAST_ERROR;
-                drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
-
+                drakvuf_remove_trap(drakvuf, info->trap, NULL);
+                drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+                drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
                 return 0;
             }
         }
@@ -1614,23 +1608,32 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         if (regs.x86.rax == (~0ULL) || !regs.x86.rax)
         {
             PRINT_DEBUG("Failed to open guest file\n");
+            injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+            injector->error_code.valid = true;
+            drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
 
-            if (!setup_get_last_error_stack(injector, &regs.x86))
-            {
-                PRINT_DEBUG("Failed to setup stack for get last error\n");
-                return 0;
-            }
-
-            regs.x86.rip = injector->get_last_error;
-
-            injector->status = STATUS_GET_LAST_ERROR;
-            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
-
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
             return 0;
         }
 
         injector->file_handle = regs.x86.rax;
         injector->host_file = fopen(injector->binary_path, "wb");
+
+        if (!injector->host_file)
+        {
+            PRINT_DEBUG("Failed to open host file\n");
+            injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+            injector->error_code.code = errno;
+            injector->error_code.string = "HOST_FAILED_FOPEN";
+            injector->error_code.valid = true;
+
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
+            return 0;
+        }
 
         PRINT_DEBUG("Reading file...\n");
 
@@ -1657,18 +1660,13 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         if (!regs.x86.rax)
         {
             PRINT_DEBUG("Failed to read the guest file\n");
+            injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+            injector->error_code.valid = true;
+            drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
 
-            if (!setup_get_last_error_stack(injector, &regs.x86))
-            {
-                PRINT_DEBUG("Failed to setup stack for get last error\n");
-                return 0;
-            }
-
-            regs.x86.rip = injector->get_last_error;
-
-            injector->status = STATUS_GET_LAST_ERROR;
-            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
-
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
             return 0;
         }
 
@@ -1728,20 +1726,6 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         return 0;
     }
 
-    if ( !injector->is32bit && STATUS_GET_LAST_ERROR == injector->status )
-    {
-        PRINT_DEBUG("Last error: 0x%lx\n", regs.x86.rax);
-
-        drakvuf_remove_trap(drakvuf, info->trap, NULL);
-        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
-
-        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
-
-        injector->rc = INJECTOR_FAILED;
-
-        return 0;
-    }
-
     if ( !injector->is32bit && STATUS_CLOSE_FILE_OK == injector->status )
     {
         PRINT_DEBUG("Close handle RAX: 0x%lx\n", regs.x86.rax);
@@ -1749,16 +1733,13 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
         if (regs.x86.rax == ~0ULL || !regs.x86.rax)
         {
-            if (!setup_get_last_error_stack(injector, &regs.x86))
-            {
-                PRINT_DEBUG("Failed to setup stack for get last error\n");
-                return 0;
-            }
+            injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+            injector->error_code.valid = true;
+            drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
 
-            injector->status = STATUS_GET_LAST_ERROR;
-            regs.x86.rip = injector->get_last_error;
-
-            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
 
             return 0;
         }
@@ -2131,6 +2112,31 @@ static void print_injection_info(output_format_t format, const char* file, injec
                     break;
             }
             break;
+        case INJECT_RESULT_INIT_FAIL:
+            switch (format)
+            {
+                case OUTPUT_CSV:
+                    printf("inject," FORMAT_TIMEVAL ",InitFail\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                case OUTPUT_KV:
+                    printf("inject Time=" FORMAT_TIMEVAL ",Status=InitFail\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                case OUTPUT_JSON:
+                    printf( "{"
+                        "\"Plugin\": \"inject\", "
+                        "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                        "\"Status\": \"InitFail\""
+                        "}\n", UNPACK_TIMEVAL(t));
+                    break;
+
+                default:
+                case OUTPUT_DEFAULT:
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:InitFail\n", UNPACK_TIMEVAL(t));
+                    break;
+            }
+            break;
         case INJECT_RESULT_ERROR_CODE:
             switch (format)
             {
@@ -2302,8 +2308,6 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
 
         injector->close_handle = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CloseHandle", injector->global_search);
         if (!injector->close_handle) return false;
-        injector->get_last_error = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "GetLastError", injector->global_search);
-        if (!injector->get_last_error) return false;
         injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc", injector->global_search);
     }
 
@@ -2376,6 +2380,8 @@ injector_status_t injector_start_app_on_win(
     if (!initialize_injector_functions(drakvuf, injector, file, binary_path))
     {
         PRINT_DEBUG("Unable to initialize injector functions\n");
+        injector->result = INJECT_RESULT_INIT_FAIL;
+        print_injection_info(format, file, injector);
         free_injector(injector);
         return 0;
     }
