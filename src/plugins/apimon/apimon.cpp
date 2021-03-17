@@ -149,8 +149,8 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
         const auto& args = ret_target->arguments;
         const auto& printers = ret_target->argument_printers;
         for (auto [arg, printer] = std::tuple(std::cbegin(args), std::cbegin(printers));
-             arg != std::cend(args) && printer != std::cend(printers);
-             ++arg, ++printer)
+            arg != std::cend(args) && printer != std::cend(printers);
+            ++arg, ++printer)
         {
             fmt_args.push_back(fmt::Rstr((*printer)->print(drakvuf, info, *arg)));
         }
@@ -163,13 +163,13 @@ static event_response_t usermode_return_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     }
 
     fmt::print(plugin->m_output_format, "apimon", drakvuf, info,
-               keyval("Event", fmt::Qstr("api_called")),
-               keyval("CLSID", clsid),
-               keyval("CalledFrom", fmt::Xval(info->regs->rip)),
-               keyval("ReturnValue", fmt::Xval(info->regs->rax)),
-               keyval("Arguments", fmt_args),
-               keyval("Extra", fmt_extra)
-              );
+        keyval("Event", fmt::Qstr("api_called")),
+        keyval("CLSID", clsid),
+        keyval("CalledFrom", fmt::Xval(info->regs->rip)),
+        keyval("ReturnValue", fmt::Xval(info->regs->rax)),
+        keyval("Arguments", fmt_args),
+        keyval("Extra", fmt_extra)
+    );
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
     return VMI_EVENT_RESPONSE_NONE;
@@ -203,7 +203,7 @@ static event_response_t usermode_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info* i
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    drakvuf_trap_t* trap = new (std::nothrow) drakvuf_trap_t;
+    drakvuf_trap_t* trap = new (std::nothrow) drakvuf_trap_t();
 
     if (!trap)
     {
@@ -262,7 +262,7 @@ static void print_addresses(drakvuf_t drakvuf, apimon* plugin, const dll_view_t*
     dll_name = drakvuf_read_unicode_va(lg.vmi, dll->mmvad.file_name_ptr, 0);
 
     if (plugin->m_output_format != OUTPUT_JSON)
-        return;
+        goto out;
 
     if (!dll_name || !dll_name->contents)
         goto out;
@@ -331,7 +331,7 @@ apimon::apimon(drakvuf_t drakvuf, const apimon_config* c, output_format_t output
     catch (const std::runtime_error& exc)
     {
         std::cerr << "Loading DLL hook configuration for APIMON plugin failed\n"
-                  << "Reason: " << exc.what() << "\n";
+            << "Reason: " << exc.what() << "\n";
         throw -1;
     }
 

@@ -478,10 +478,10 @@ struct wrapper
    }
 
 void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
-                   bool syscall, drakvuf_trap_info_t* info,
-                   int nr, std::string module, const syscall_t* sc,
-                   const std::vector<uint64_t>& args,
-                   uint64_t ret, const char* extra_info);
+    bool syscall, drakvuf_trap_info_t* info,
+    int nr, std::string module, const syscall_t* sc,
+    const std::vector<uint64_t>& args,
+    uint64_t ret, const char* extra_info);
 void free_trap(gpointer p);
 
 #endif // commoncsproto_h

@@ -135,8 +135,8 @@ private:
     };
 
     void register_trap(drakvuf_t drakvuf, const char* syscall_name,
-                       drakvuf_trap_t* trap,
-                       event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ));
+        drakvuf_trap_t* trap,
+        event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ));
 };
 
 #endif // BSODMON_H

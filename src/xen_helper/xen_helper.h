@@ -143,7 +143,7 @@ bool xen_init_interface(xen_interface_t** xen);
 void xen_free_interface(xen_interface_t* xen);
 
 int get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
-                 char** name);
+    char** name);
 
 uint64_t xen_get_maxmemkb(xen_interface_t* xen, domid_t domID);
 

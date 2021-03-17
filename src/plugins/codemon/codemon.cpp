@@ -164,8 +164,8 @@ static bool default_benign = false;
  * @param fault_data the struct with the fault data
  */
 static void save_file_metadata(const drakvuf_trap_info_t* trap_info,
-                               const dump_metadata_struct* dump_metadata,
-                               const fault_data_struct* fault_data)
+    const dump_metadata_struct* dump_metadata,
+    const fault_data_struct* fault_data)
 {
 
     //Opens the meta file
@@ -189,7 +189,7 @@ static void save_file_metadata(const drakvuf_trap_info_t* trap_info,
     json_object* json_object = json_object_new_object();
     auto timestamp = TimeVal{UNPACK_TIMEVAL(trap_info->timestamp)};
     json_object_object_add(json_object, "TimeStamp",
-                           json_object_new_string_fmt("%ld.%ld", timestamp.tv_sec, timestamp.tv_usec));
+        json_object_new_string_fmt("%ld.%ld", timestamp.tv_sec, timestamp.tv_usec));
     /* Process pid */
     json_object_object_add(json_object, "PID", json_object_new_int(trap_info->attached_proc_data.pid));
     /* Process parent pid */
@@ -204,22 +204,22 @@ static void save_file_metadata(const drakvuf_trap_info_t* trap_info,
     json_object_object_add(json_object, "CR3", json_object_new_string_fmt("0x%" PRIx64, trap_info->regs->cr3));
     json_object_object_add(json_object, "PageVA", json_object_new_string_fmt("0x%" PRIx64, fault_data->page_va));
     json_object_object_add(json_object,
-                           "VADBase",
-                           json_object_new_string_fmt("0x%" PRIx64, dump_metadata->vad_node_base));
+        "VADBase",
+        json_object_new_string_fmt("0x%" PRIx64, dump_metadata->vad_node_base));
     json_object_object_add(json_object,
-                           "VADEnd",
-                           json_object_new_string_fmt("0x%" PRIx64, dump_metadata->vad_node_end));
+        "VADEnd",
+        json_object_new_string_fmt("0x%" PRIx64, dump_metadata->vad_node_end));
     json_object_object_add(json_object, "VADName", json_object_new_string(actual_vad_name));
     json_object_object_add(json_object,
-                           "DumpSize",
-                           json_object_new_string_fmt("0x%" PRIx64, dump_metadata->dump_size));
+        "DumpSize",
+        json_object_new_string_fmt("0x%" PRIx64, dump_metadata->dump_size));
     json_object_object_add(json_object, "DumpFile", json_object_new_string(dump_metadata->dump_file));
     json_object_object_add(json_object, "SHA256", json_object_new_string(dump_metadata->sha256sum));
     json_object_object_add(json_object, "DumpID", json_object_new_int(fault_data->plugin->dump_id));
     json_object_object_add(json_object, "TrapPA", json_object_new_string_fmt("0x%" PRIx64, trap_info->trap_pa));
     json_object_object_add(json_object,
-                           "GFN",
-                           json_object_new_string_fmt("0x%" PRIx64, trap_info->trap->memaccess.gfn));
+        "GFN",
+        json_object_new_string_fmt("0x%" PRIx64, trap_info->trap->memaccess.gfn));
     fprintf(fp, "%s\n", json_object_get_string(json_object));
     fclose(fp);
 
@@ -234,9 +234,9 @@ static void save_file_metadata(const drakvuf_trap_info_t* trap_info,
  * @param fault_data the struct with the fault data
  */
 void log_all_to_console(drakvuf_t drakvuf,
-                        drakvuf_trap_info* trap_info,
-                        dump_metadata_struct* dump_metadata,
-                        fault_data_struct* fault_data)
+    drakvuf_trap_info* trap_info,
+    dump_metadata_struct* dump_metadata,
+    fault_data_struct* fault_data)
 {
 
     unsigned int actual_dump_id;
@@ -276,20 +276,20 @@ void log_all_to_console(drakvuf_t drakvuf,
 
     //Log everything to the screen
     fmt::print(fault_data->plugin->m_output_format, "codemon", drakvuf, trap_info,
-               keyval("EventType", fmt::Qstr("execframe")),
-               keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
-               keyval("PageVA", fmt::Xval(fault_data->page_va)),
-               keyval("VADBase", fmt::Xval(dump_metadata->vad_node_base)),
-               keyval("VADEnd", fmt::Xval(dump_metadata->vad_node_end)),
-               keyval("VADName", fmt::Qstr(actual_vad_name)),
-               keyval("DumpSize", fmt::Nval(actual_dump_size)),
-               keyval("DumpFile", fmt::Qstr(actual_dump_file_path)),
-               keyval("SHA256", fmt::Qstr(actual_checksum)),
-               keyval("DumpID", fmt::Nval(actual_dump_id)),
-               keyval("MetaFile", fmt::Qstr(actual_metafile)),
-               keyval("TrapPA", fmt::Xval(trap_info->trap_pa)),
-               keyval("GFN", fmt::Xval(trap_info->trap->memaccess.gfn))
-              );
+        keyval("EventType", fmt::Qstr("execframe")),
+        keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
+        keyval("PageVA", fmt::Xval(fault_data->page_va)),
+        keyval("VADBase", fmt::Xval(dump_metadata->vad_node_base)),
+        keyval("VADEnd", fmt::Xval(dump_metadata->vad_node_end)),
+        keyval("VADName", fmt::Qstr(actual_vad_name)),
+        keyval("DumpSize", fmt::Nval(actual_dump_size)),
+        keyval("DumpFile", fmt::Qstr(actual_dump_file_path)),
+        keyval("SHA256", fmt::Qstr(actual_checksum)),
+        keyval("DumpID", fmt::Nval(actual_dump_id)),
+        keyval("MetaFile", fmt::Qstr(actual_metafile)),
+        keyval("TrapPA", fmt::Xval(trap_info->trap_pa)),
+        keyval("GFN", fmt::Xval(trap_info->trap->memaccess.gfn))
+    );
 }
 
 /**
@@ -559,10 +559,10 @@ done:
  * @return false, if the context was not generated as the vad node was too big.
  */
 bool setup_dump_context(mmvad_info_t mmvad,
-                        uint64_t cr3,
-                        addr_t page_va,
-                        dump_metadata_struct* dump_metadata,
-                        access_context_t* ctx_memory_dump)
+    uint64_t cr3,
+    addr_t page_va,
+    dump_metadata_struct* dump_metadata,
+    access_context_t* ctx_memory_dump)
 {
     //Translate addr via specified directory table base.
     ctx_memory_dump->translate_mechanism = VMI_TM_PROCESS_DTB;
@@ -649,10 +649,10 @@ bool retrieve_and_filter_vad_name(const vmi_lock_guard& vmi, addr_t file_name_pt
  * @return if malware was detected or not. this is currently a not included feature, but part of future work (or could be implemented by oneself)
  */
 bool analyse_memory(drakvuf_t drakvuf,
-                    const vmi_lock_guard& vmi,
-                    const drakvuf_trap_info_t* trap_info,
-                    const fault_data_struct* fault_data,
-                    dump_metadata_struct* dump_metadata)
+    const vmi_lock_guard& vmi,
+    const drakvuf_trap_info_t* trap_info,
+    const fault_data_struct* fault_data,
+    dump_metadata_struct* dump_metadata)
 {
     //A struct to keep the vad node information
     mmvad_info_t mmvad;
@@ -682,7 +682,7 @@ bool analyse_memory(drakvuf_t drakvuf,
     }
 
     //Set the memory access context
-    access_context_t ctx_memory_dump;
+    ACCESS_CONTEXT(ctx_memory_dump);
     bool dump_ctx_valid =
         setup_dump_context(mmvad, trap_info->regs->cr3, fault_data->page_va, dump_metadata, &ctx_memory_dump);
 
@@ -711,9 +711,9 @@ bool analyse_memory(drakvuf_t drakvuf,
 
     //Generate the file stem
     if (asprintf(&dump_metadata->file_stem,
-                 "%llx_%.16s",
-                 (unsigned long long) ctx_memory_dump.addr,
-                 dump_metadata->sha256sum)
+            "%llx_%.16s",
+            (unsigned long long) ctx_memory_dump.addr,
+            dump_metadata->sha256sum)
         < 0)
     {
         PRINT_DEBUG("[CODEMON] Could not create the file stem\n");
@@ -722,7 +722,7 @@ bool analyse_memory(drakvuf_t drakvuf,
 
     //Set the metadata and dumpfile path
     if (!set_dump_paths(fault_data->plugin->dump_dir.c_str(),
-                        dump_metadata))
+            dump_metadata))
     {
         //debug message within set_dump_paths
         return malware;
@@ -767,9 +767,9 @@ bool analyse_memory(drakvuf_t drakvuf,
 
         //If the dump fails
         if (!dump_memory_region(vmi,
-                                fault_data->plugin,
-                                &ctx_memory_dump,
-                                dump_metadata))
+                fault_data->plugin,
+                &ctx_memory_dump,
+                dump_metadata))
         {
             PRINT_DEBUG("[CODEMON] Could not dump memory\n");
             if (dump_metadata->dump_file)
@@ -809,8 +809,8 @@ static void remove_trap_cb(drakvuf_trap_t* trap)
 }
 
 void swap_traps(drakvuf_t drakvuf,
-                drakvuf_trap_info* trap_info,
-                fault_data_struct* fault_data)
+    drakvuf_trap_info* trap_info,
+    fault_data_struct* fault_data)
 {
     drakvuf_trap* write_trap = create_write_trap(trap_info, fault_data);
     if (write_trap)
@@ -826,7 +826,7 @@ void swap_traps(drakvuf_t drakvuf,
             drakvuf_remove_trap(drakvuf, trap_info->trap, remove_trap_cb);
 
             PRINT_DEBUG("[CODEMON] Replaced execute trap X on GFN 0x%lx with write trap W\n",
-                        trap_info->trap->memaccess.gfn);
+                trap_info->trap->memaccess.gfn);
         }
         else
         {
@@ -858,12 +858,12 @@ static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     if (log_everything)
     {
         fmt::print(fault_data->plugin->m_output_format, "codemon", drakvuf, trap_info,
-                   keyval("EventType", fmt::Qstr("writefault")),
-                   keyval("FrameVA", fmt::Xval(fault_data->page_va)),
-                   keyval("TrapPA", fmt::Xval(trap_info->trap_pa)),
-                   keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
-                   keyval("GFN", fmt::Xval(trap_info->trap->memaccess.gfn))
-                  );
+            keyval("EventType", fmt::Qstr("writefault")),
+            keyval("FrameVA", fmt::Xval(fault_data->page_va)),
+            keyval("TrapPA", fmt::Xval(trap_info->trap_pa)),
+            keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
+            keyval("GFN", fmt::Xval(trap_info->trap->memaccess.gfn))
+        );
     }
 
     //Create the new exec trap
@@ -881,7 +881,7 @@ static event_response_t write_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             drakvuf_remove_trap(drakvuf, trap_info->trap, remove_trap_cb);
 
             PRINT_DEBUG("[CODEMON] Replaced write trap W on GFN 0x%lx with execute trap X\n",
-                        trap_info->trap->memaccess.gfn);
+                trap_info->trap->memaccess.gfn);
         }
         else
         {
@@ -954,7 +954,7 @@ drakvuf_trap_t* create_write_trap(drakvuf_trap_info_t* trap_info, fault_data_str
 static event_response_t execute_faulted_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info)
 {
     PRINT_DEBUG("[CODEMON] Caught X on PA 0x%lx, frame VA %llx, CR3 %lx\n", trap_info->trap_pa,
-                (unsigned long long) trap_info->regs->rip, trap_info->regs->cr3);
+        (unsigned long long) trap_info->regs->rip, trap_info->regs->cr3);
 
     //load the trap data
     auto* fault_data = (struct fault_data_struct*) trap_info->trap->data;
@@ -1097,11 +1097,11 @@ static event_response_t mm_access_fault_return_hook_cb(drakvuf_t drakvuf, drakvu
         if (log_everything)
         {
             fmt::print(plugin->m_output_format, "codemon", drakvuf, trap_info,
-                       keyval("EventType", fmt::Qstr("pagefault")),
-                       keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
-                       keyval("VA", fmt::Xval(params->fault_va)),
-                       keyval("PA", fmt::Xval(p_info.paddr))
-                      );
+                keyval("EventType", fmt::Qstr("pagefault")),
+                keyval("CR3", fmt::Xval(trap_info->regs->cr3)),
+                keyval("VA", fmt::Xval(params->fault_va)),
+                keyval("PA", fmt::Xval(p_info.paddr))
+            );
         }
 
         //Create a new struct for exec_fault_data and reserve memory.
@@ -1210,9 +1210,9 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
     //Adds a return hook, a hook which will be called after function completes and returns.
     //Each time registers a trap, which is just for the process at the current step -> specific for the RIP
     auto trap = plugin->register_trap<access_fault_result_t>(
-                    trap_info,
-                    mm_access_fault_return_hook_cb,
-                    breakpoint_by_pid_searcher());
+            trap_info,
+            mm_access_fault_return_hook_cb,
+            breakpoint_by_pid_searcher());
 
     //If trap creation failed
     if (!trap)
@@ -1242,9 +1242,9 @@ static event_response_t mm_access_fault_hook_cb(drakvuf_t drakvuf, drakvuf_trap_
  * This is the constructor of the plugin.
  */
 codemon::codemon(drakvuf_t
-                 drakvuf,
-                 const codemon_config_struct* c, output_format_t
-                 output)
+    drakvuf,
+    const codemon_config_struct* c, output_format_t
+    output)
     : pluginex(drakvuf, output)
 {
 
@@ -1301,7 +1301,7 @@ codemon::codemon(drakvuf_t
     //This code adds a trap to mmAccessFault: whenever MmAccessFault is called, it calls back to mm_access_fault_hook_cb.
     //This trap is general for MmAccessFault and is just created one time and used over and over again.
     if (!register_trap(nullptr, mm_access_fault_hook_cb, bp.for_syscall_name("MmAccessFault"),
-                       "mmAccessFaultTrap"))
+            "mmAccessFaultTrap"))
     {
         throw -1;
     }

@@ -132,7 +132,7 @@ static GTree* pooltag_build_tree()
     for (; i < TAG_COUNT; i++)
     {
         g_tree_insert(pooltags, (gpointer) tags[i].tag,
-                      (gpointer) &tags[i]);
+            (gpointer) &tags[i]);
     }
 
     return pooltags;
@@ -148,8 +148,7 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     struct pooltag* s = NULL;
     const char* pool_type_str;
 
-    access_context_t ctx;
-    memset(&ctx, 0, sizeof(access_context_t));
+    ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
 
@@ -193,12 +192,12 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     auto tuple = std::make_tuple(
-                     keyval("Tag", fmt::Rstr((const char*)tag)),
-                     keyval("Type", fmt::Rstr(pool_type_str)),
-                     keyval("Size", fmt::Nval(size)),
-                     keyval("Source", source),
-                     keyval("Description", description)
-                 );
+            keyval("Tag", fmt::Rstr((const char*)tag)),
+            keyval("Type", fmt::Rstr(pool_type_str)),
+            keyval("Size", fmt::Nval(size)),
+            keyval("Source", source),
+            keyval("Description", description)
+        );
     if (p->format == OUTPUT_JSON)
     {
         // Remove non-ascii characters from tag
@@ -209,14 +208,14 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
 
         jsonfmt::print("poolmon", drakvuf, info,
-                       keyval("VCPU", fmt::Nval(info->vcpu)),
-                       keyval("CR3", fmt::Nval(info->regs->cr3)),
-                       keyval("Tag", fmt::Qstr(tag)),
-                       keyval("Type", fmt::Qstr(pool_type_str)),
-                       keyval("Size", fmt::Nval(size)),
-                       keyval("Source", source),
-                       keyval("Description", description)
-                      );
+            keyval("VCPU", fmt::Nval(info->vcpu)),
+            keyval("CR3", fmt::Nval(info->regs->cr3)),
+            keyval("Tag", fmt::Qstr(tag)),
+            keyval("Type", fmt::Qstr(pool_type_str)),
+            keyval("Size", fmt::Nval(size)),
+            keyval("Source", source),
+            keyval("Description", description)
+        );
     }
     else
     {

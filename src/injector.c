@@ -124,33 +124,33 @@ static void close_handler(int sig)
 static inline void print_help(void)
 {
     fprintf(stderr, "Required input:\n"
-            "\t -r <path to json>         The OS kernel's JSON\n"
-            "\t -d <domain ID or name>    The domain's ID or name\n"
-            "\t -i <injection pid>        The PID(WIN) | TGID(LINUX) of the process to hijack for injection\n"
-            "\t -e <inject_file>          File to be injected:\n"
-            "\t                             for -m createproc/shellexec/shellcode/doppelganging: the executable to start with injection\n"
-            "\t                             for -m readfile/writefile: the guest path of the file to be read/written\n"
-            "Optional inputs:\n"
-            "\t -l                        Use libvmi.conf\n"
-            "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
-            "\t -m <inject_method>        The injection method [WIN] (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
-            "\t                           [WIN] special file operation methods:\n"
-            "\t                             readfile - pull a file (specified by guest path -e) from the VM and store it on host path specified by -B\n"
-            "\t                             writefile - push a file (specified by host path -B) to the VM and store it on guest path specified by -e\n"
-            "\t -f <args for exec>        [LINUX] - Arguments specified for exec to include (requires -m execproc)\n"
-            "\t                           [LINUX] (execproc -> int execlp(const char *file, const char *arg0, ..., const char *argn, (char *)0); for Linux kernel 4.18+, 64bit only) (Maximum 10 args)\n"
-            "\t [-B] <path>               The host path of the Windows binary:\n"
-            "\t                             for -m doppelganging: to inject into the guest VM\n"
-            "\t                             for -m readfile: where to store the file read out from VM\n"
-            "\t                             for -m writefile: to write into the guest VM\n"
-            "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
-            "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i) (LINUX: Injects to TGID Thread if ThreadID not specified)\n"
-            "\t -c <current_working_dir>  The current working directory for injected executable\n"
-            "\t -w                        Inject process and wait untill it terminates (requires -m createproc)\n"
+        "\t -r <path to json>         The OS kernel's JSON\n"
+        "\t -d <domain ID or name>    The domain's ID or name\n"
+        "\t -i <injection pid>        The PID(WIN) | TGID(LINUX) of the process to hijack for injection\n"
+        "\t -e <inject_file>          File to be injected:\n"
+        "\t                             for -m createproc/shellexec/shellcode/doppelganging: the executable to start with injection\n"
+        "\t                             for -m readfile/writefile: the guest path of the file to be read/written\n"
+        "Optional inputs:\n"
+        "\t -l                        Use libvmi.conf\n"
+        "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
+        "\t -m <inject_method>        The injection method [WIN] (createproc (32 and 64-bit), shellexec, shellcode or doppelganging (Win10) for Windows amd64 only)\n"
+        "\t                           [WIN] special file operation methods:\n"
+        "\t                             readfile - pull a file (specified by guest path -e) from the VM and store it on host path specified by -B\n"
+        "\t                             writefile - push a file (specified by host path -B) to the VM and store it on guest path specified by -e\n"
+        "\t -f <args for exec>        [LINUX] - Arguments specified for exec to include (requires -m execproc)\n"
+        "\t                           [LINUX] (execproc -> int execlp(const char *file, const char *arg0, ..., const char *argn, (char *)0); for Linux kernel 4.18+, 64bit only) (Maximum 10 args)\n"
+        "\t [-B] <path>               The host path of the Windows binary:\n"
+        "\t                             for -m doppelganging: to inject into the guest VM\n"
+        "\t                             for -m readfile: where to store the file read out from VM\n"
+        "\t                             for -m writefile: to write into the guest VM\n"
+        "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
+        "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i) (LINUX: Injects to TGID Thread if ThreadID not specified)\n"
+        "\t -c <current_working_dir>  The current working directory for injected executable\n"
+        "\t -w                        Inject process and wait untill it terminates (requires -m createproc)\n"
 #ifdef DRAKVUF_DEBUG
-            "\t -v                        Turn on verbose (debug) output\n"
+        "\t -v                        Turn on verbose (debug) output\n"
 #endif
-           );
+    );
 }
 
 int main(int argc, char** argv)
@@ -177,7 +177,7 @@ int main(int argc, char** argv)
     vmi_pid_t injected_pid = 0;
 
     fprintf(stderr, "%s %s v%s Copyright (C) 2014-2021 Tamas K Lengyel\n",
-            PACKAGE_NAME, argv[0], PACKAGE_VERSION);
+        PACKAGE_NAME, argv[0], PACKAGE_VERSION);
 
     if (argc < 4)
     {
@@ -316,22 +316,22 @@ int main(int argc, char** argv)
         printf("Injector starting %s through PID %u TID: %u\n", inject_file, injection_pid, injection_thread);
 
     int injection_result = injector_start_app(
-                               drakvuf,
-                               injection_pid,
-                               injection_thread,
-                               inject_file,
-                               inject_cwd,
-                               injection_method,
-                               output,
-                               binary_path,
-                               target_process,
-                               false,
-                               NULL,
-                               injection_global_search,
-                               wait_for_exit,
-                               args_count,
-                               args,
-                               &injected_pid);
+            drakvuf,
+            injection_pid,
+            injection_thread,
+            inject_file,
+            inject_cwd,
+            injection_method,
+            output,
+            binary_path,
+            target_process,
+            false,
+            NULL,
+            injection_global_search,
+            wait_for_exit,
+            args_count,
+            args,
+            &injected_pid);
 
     if (injection_result)
     {

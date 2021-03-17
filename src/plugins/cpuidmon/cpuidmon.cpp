@@ -129,20 +129,20 @@ event_response_t cpuid_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     cpuidmon* s = (cpuidmon*)info->trap->data;
 
     auto tuple = std::make_tuple(
-                     keyval("Leaf", fmt::Xval(info->cpuid->leaf)),
-                     keyval("Subleaf", fmt::Xval(info->cpuid->subleaf)),
-                     keyval("RAX", fmt::Xval(info->regs->rax)),
-                     keyval("RBX", fmt::Xval(info->regs->rbx)),
-                     keyval("RCX", fmt::Xval(info->regs->rcx)),
-                     keyval("RDX", fmt::Xval(info->regs->rdx))
-                 );
+            keyval("Leaf", fmt::Xval(info->cpuid->leaf)),
+            keyval("Subleaf", fmt::Xval(info->cpuid->subleaf)),
+            keyval("RAX", fmt::Xval(info->regs->rax)),
+            keyval("RBX", fmt::Xval(info->regs->rbx)),
+            keyval("RCX", fmt::Xval(info->regs->rcx)),
+            keyval("RDX", fmt::Xval(info->regs->rdx))
+        );
     if (s->format == OUTPUT_JSON)
     {
         jsonfmt::print("cpuidmon", drakvuf, info,
-                       keyval("VCPU", fmt::Nval(info->vcpu)),
-                       keyval("CR3", fmt::Nval(info->regs->cr3)),
-                       tuple
-                      );
+            keyval("VCPU", fmt::Nval(info->vcpu)),
+            keyval("CR3", fmt::Nval(info->regs->cr3)),
+            tuple
+        );
     }
     else
     {

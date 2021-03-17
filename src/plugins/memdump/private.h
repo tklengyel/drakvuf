@@ -181,16 +181,16 @@ enum sptr_type_t
 };
 
 sptr_type_t check_module_linked_wow(drakvuf_t drakvuf,
-                                    vmi_instance_t vmi,
-                                    memdump* plugin,
-                                    drakvuf_trap_info_t* info,
-                                    addr_t dll_base);
+    vmi_instance_t vmi,
+    memdump* plugin,
+    drakvuf_trap_info_t* info,
+    addr_t dll_base);
 
 sptr_type_t check_module_linked(drakvuf_t drakvuf,
-                                vmi_instance_t vmi,
-                                memdump* plugin,
-                                drakvuf_trap_info_t* info,
-                                addr_t dll_base);
+    vmi_instance_t vmi,
+    memdump* plugin,
+    drakvuf_trap_info_t* info,
+    addr_t dll_base);
 
 bool dump_memory_region(
     drakvuf_t drakvuf,

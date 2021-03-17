@@ -220,15 +220,15 @@ void drakvuf_c::plugin_stop_loop(int timeout, const bool* plugin_list)
 }
 
 drakvuf_c::drakvuf_c(const char* domain,
-                     const char* json_kernel_path,
-                     const char* json_wow_path,
-                     output_format_t output,
-                     bool verbose,
-                     bool leave_paused,
-                     bool libvmi_conf,
-                     addr_t kpgd,
-                     bool fast_singlestep,
-                     uint64_t limited_traps_ttl)
+    const char* json_kernel_path,
+    const char* json_wow_path,
+    output_format_t output,
+    bool verbose,
+    bool leave_paused,
+    bool libvmi_conf,
+    addr_t kpgd,
+    bool fast_singlestep,
+    uint64_t limited_traps_ttl)
     : leave_paused{ leave_paused }
 {
     if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, verbose, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl))
@@ -287,37 +287,37 @@ void drakvuf_c::resume()
 }
 
 injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
-                                        uint32_t injection_tid,
-                                        const char* inject_cmd,
-                                        const char* cwd,
-                                        injection_method_t method,
-                                        output_format_t format,
-                                        const char* binary_path,
-                                        const char* target_process,
-                                        int timeout,
-                                        bool global_search,
-                                        int args_count,
-                                        const char* args[],
-                                        vmi_pid_t* injected_pid)
+    uint32_t injection_tid,
+    const char* inject_cmd,
+    const char* cwd,
+    injection_method_t method,
+    output_format_t format,
+    const char* binary_path,
+    const char* target_process,
+    int timeout,
+    bool global_search,
+    int args_count,
+    const char* args[],
+    vmi_pid_t* injected_pid)
 {
     GThread* timeout_thread = startup_timer(this, timeout);
 
     auto rc = injector_start_app(drakvuf,
-                                 injection_pid,
-                                 injection_tid,
-                                 inject_cmd,
-                                 cwd,
-                                 method,
-                                 format,
-                                 binary_path,
-                                 target_process,
-                                 true,
-                                 &injector_to_be_freed,
-                                 global_search,
-                                 false,
-                                 args_count,
-                                 args,
-                                 injected_pid);
+            injection_pid,
+            injection_tid,
+            inject_cmd,
+            cwd,
+            method,
+            format,
+            binary_path,
+            target_process,
+            true,
+            &injector_to_be_freed,
+            global_search,
+            false,
+            args_count,
+            args,
+            injected_pid);
 
 
     if (INJECTOR_SUCCEEDED != rc)
@@ -341,15 +341,15 @@ static bool is_terminated(drakvuf_t drakvuf, void* data)
 {
     auto info = (struct termination_info*)data;
     return drakvuf_is_interrupted(drakvuf) ||
-           (info->proc->find(info->pid) != info->proc->end() &&
+        (info->proc->find(info->pid) != info->proc->end() &&
             info->proc->at(info->pid));
 };
 
 void drakvuf_c::terminate(vmi_pid_t injection_pid,
-                          uint32_t injection_tid,
-                          vmi_pid_t pid,
-                          int termination_timeout,
-                          std::shared_ptr<const std::unordered_map<vmi_pid_t, bool>> terminated_processes)
+    uint32_t injection_tid,
+    vmi_pid_t pid,
+    int termination_timeout,
+    std::shared_ptr<const std::unordered_map<vmi_pid_t, bool>> terminated_processes)
 {
     if (terminated_processes->find(pid) != terminated_processes->end())
     {

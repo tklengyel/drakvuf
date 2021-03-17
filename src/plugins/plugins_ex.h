@@ -194,8 +194,8 @@ struct breakpoint_in_system_process_searcher
 struct breakpoint_in_dll_module_searcher
 {
     breakpoint_in_dll_module_searcher(json_object* json,
-                                      const char* module,
-                                      bool wow = false)
+        const char* module,
+        bool wow = false)
         : m_is_wow(wow), m_json(json), m_module_name(module), m_syscall_name()
     {}
 
@@ -429,11 +429,11 @@ public:
     // Params property is optional
     template<typename Params = void, typename IB>
     drakvuf_trap_t* register_trap(drakvuf_trap_info_t* info,
-                                  hook_cb_t hook_cb,
-                                  IB init_breakpoint,
-                                  const char* trap_name,
-                                  int64_t ttl,
-                                  ah_cb_t ah_cb)
+        hook_cb_t hook_cb,
+        IB init_breakpoint,
+        const char* trap_name,
+        int64_t ttl,
+        ah_cb_t ah_cb)
     {
         auto trap = new drakvuf_trap_t;
 
@@ -467,10 +467,10 @@ public:
     // Params property is optional
     template<typename Params = void, typename IB>
     drakvuf_trap_t* register_trap(drakvuf_trap_info_t* info,
-                                  hook_cb_t hook_cb,
-                                  IB init_breakpoint,
-                                  const char* trap_name,
-                                  int64_t tll)
+        hook_cb_t hook_cb,
+        IB init_breakpoint,
+        const char* trap_name,
+        int64_t tll)
     {
         return register_trap<Params, IB>(info, hook_cb, init_breakpoint, trap_name, tll, nullptr);
     }
@@ -478,9 +478,9 @@ public:
     // Params property is optional
     template<typename Params = void, typename IB>
     drakvuf_trap_t* register_trap(drakvuf_trap_info_t* info,
-                                  hook_cb_t hook_cb,
-                                  IB init_breakpoint,
-                                  const char* trap_name = nullptr)
+        hook_cb_t hook_cb,
+        IB init_breakpoint,
+        const char* trap_name = nullptr)
     {
         int64_t limited_traps_ttl = drakvuf_get_limited_traps_ttl(drakvuf);
         return register_trap<Params, IB>(info, hook_cb, init_breakpoint, trap_name, limited_traps_ttl, nullptr);
