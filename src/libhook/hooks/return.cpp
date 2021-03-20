@@ -120,7 +120,7 @@ ReturnHook::~ReturnHook()
         // read in libhook.hpp why this happens
         this->trap_->cb = [](drakvuf_t, drakvuf_trap_info_t*) -> event_response_t
         {
-            PRINT_DEBUG("[LIBHOOK] drakvuf caled deleted hook, replaced by nullstub\n");
+            PRINT_DEBUG("[LIBHOOK] drakvuf called deleted hook, replaced by nullstub\n");
             return VMI_EVENT_RESPONSE_NONE;
         };
         drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
