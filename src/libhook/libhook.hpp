@@ -145,6 +145,6 @@
  * lambda as trap's callback.
  *
  * The lambda has to:
- *  - get hook from traop
+ *  - get hook from trap
  *  - call callback stored in hook
  */

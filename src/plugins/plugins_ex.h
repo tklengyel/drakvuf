@@ -391,7 +391,7 @@ public:
         static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
         auto hook = libhook::ReturnHook::create<Params>(this->drakvuf, info, [=](auto&& ...args) -> event_response_t
         {
-            return std::invoke(cb, (typename class_type<Callback>::type*)this, args...);
+            return std::invoke(cb, reinterpret_cast<typename class_type<Callback>::type*>(this), args...);
         });
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
         return hook;
@@ -414,7 +414,7 @@ public:
         static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
         auto hook = libhook::SyscallHook::create<Params>(this->drakvuf, syscall_name, [=](auto&& ...args) -> event_response_t
         {
-            return std::invoke(cb, (typename class_type<Callback>::type*)this, args...);
+            return std::invoke(cb, reinterpret_cast<typename class_type<Callback>::type*>(this), args...);
         });
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
         return hook;
