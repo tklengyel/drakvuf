@@ -188,7 +188,7 @@ typedef enum drakvuf_plugin
     PLUGIN_RPCMON,
     PLUGIN_TLSMON,
     PLUGIN_CODEMON,
-    PLUGIN_DUMMY,
+    PLUGIN_LIBHOOKTEST,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
 
@@ -221,7 +221,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_RPCMON] = "rpcmon",
     [PLUGIN_TLSMON] = "tlsmon",
     [PLUGIN_CODEMON] = "codemon",
-    [PLUGIN_DUMMY] = "dummy",
+    [PLUGIN_LIBHOOKTEST] = "libhooktest",
 };
 
 static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WINDOWS+1] =
@@ -253,7 +253,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_RPCMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_TLSMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_CODEMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_DUMMY]        = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
+    [PLUGIN_LIBHOOKTEST]  = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
 };
 
 class plugin

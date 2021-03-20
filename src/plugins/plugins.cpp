@@ -131,7 +131,7 @@
 #include "rpcmon/rpcmon.h"
 #include "tlsmon/tlsmon.h"
 #include "codemon/codemon.h"
-#include "dummy/dummy.h"
+#include "libhooktest/libhooktest.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -394,10 +394,10 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     break;
                 }
 #endif
-#ifdef ENABLE_PLUGIN_DUMMY
-                case PLUGIN_DUMMY:
+#ifdef ENABLE_PLUGIN_LIBHOOKTEST
+                case PLUGIN_LIBHOOKTEST:
                 {
-                    this->plugins[plugin_id] = std::make_unique<dummy>(this->drakvuf, this->output);
+                    this->plugins[plugin_id] = std::make_unique<libhooktest>(this->drakvuf, this->output);
                     break;
                 }
 #endif

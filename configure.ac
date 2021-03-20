@@ -418,14 +418,14 @@ if test x$plugin_codemon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_CODEMON, 1, "")
 fi
 
-AC_ARG_ENABLE([plugin_dummy],
-  [AS_HELP_STRING([--enable-plugin-dummy],
-    [Enable dummy plugin for development @<:@no@:>@])],
-  [plugin_dummy="$enableval"],
-  [plugin_dummy=""])
-AM_CONDITIONAL([PLUGIN_DUMMY], [test x$plugin_dummy = xyes])
-if test x$plugin_dummy = xyes; then
-  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_DUMMY, 1, "")
+AC_ARG_ENABLE([plugin_libhooktest],
+  [AS_HELP_STRING([--enable-plugin-libhooktest],
+    [Enable libhooktest plugin for testing @<:@no@:>@])],
+  [plugin_libhooktest="$enableval"],
+  [plugin_libhooktest=""])
+AM_CONDITIONAL([PLUGIN_LIBHOOKTEST], [test x$plugin_libhooktest = xyes])
+if test x$plugin_libhooktest = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_LIBHOOKTEST, 1, "")
 fi
 
 #####################################################
@@ -705,7 +705,7 @@ APIMon:       $plugin_apimon
 RPCMon:       $plugin_rpcmon
 TLSMon:       $plugin_tlsmon
 Codemon:      $plugin_codemon
-Dummy:        $plugin_dummy
+LibHookTest:  $plugin_libhooktest
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:       $plugin_wmimon

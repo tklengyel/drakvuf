@@ -135,8 +135,8 @@
  *
  * but our `this` reference has signature of `BetterPlugin*`. Problem is solved
  * by clever use of `subject_type` SFINAE (shoutout to @dekrain and @KrzaQ for helping).
- * It obtains class type (in this case `Dummy`) from member-function-pointer and casts `this`
- * to it. Then we just need a standard `std::invoke`.
+ * It obtains class type (in this case `Dummy`, which needs to inherit from `pluginex`)
+ * from member-function-pointer and casts `this` to it. Then we just need a standard `std::invoke`.
  *
  * 3b) Since we capture `this` in a lambda, we can at most store it in `std::function`
  * while libdrakvuf traps only contain plain C function pointer.

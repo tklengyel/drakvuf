@@ -282,9 +282,9 @@ sources += codemon/codemon.h
 sources += codemon/private.h
 endif
 
-if PLUGIN_DUMMY
-sources += dummy/dummy.h
-sources += dummy/dummy.cpp
+if PLUGIN_LIBHOOKTEST
+sources += libhooktest/libhooktest.h
+sources += libhooktest/libhooktest.cpp
 endif
 
 ###############################################################################
