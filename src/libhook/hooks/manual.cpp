@@ -111,9 +111,7 @@ auto ManualHook::create(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_fr
 {
     PRINT_DEBUG("[LIBHOOK] creating manual hook\n");
 
-    // struct EnableMaker : public manual_hook { using manual_hook::manual_hook; };
-    // auto hook = std::make_unique<EnableMaker>(drakvuf, trap_, free_routine_);
-
+    // not using std::make_unique because ctor is private
     auto hook = std::unique_ptr<ManualHook>(new ManualHook(drakvuf, trap, free_routine));
     if (!drakvuf_add_trap(hook->drakvuf_, hook->trap_))
     {

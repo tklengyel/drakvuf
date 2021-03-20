@@ -165,6 +165,7 @@ auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_
 {
     PRINT_DEBUG("[LIBHOOK] creating syscall hook\n");
 
+    // not using std::make_unique because ctor is private
     auto hook = std::unique_ptr<SyscallHook>(new SyscallHook(drakvuf, syscall_name, cb));
     hook->trap_ = new drakvuf_trap_t;
 
