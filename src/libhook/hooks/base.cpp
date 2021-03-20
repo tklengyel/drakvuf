@@ -101,7 +101,7 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-#include "base.hpp"
+#include <libhook/hooks/base.hpp>
 
 namespace libhook
 {

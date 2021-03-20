@@ -103,11 +103,11 @@
  ***************************************************************************/
 #pragma once
 
-#include "call_result.hpp"
-#include "hooks/base.hpp"
-#include "hooks/manual.hpp"
-#include "hooks/return.hpp"
-#include "hooks/syscall.hpp"
+#include <libhook/call_result.hpp>
+#include <libhook/hooks/base.hpp>
+#include <libhook/hooks/manual.hpp>
+#include <libhook/hooks/return.hpp>
+#include <libhook/hooks/syscall.hpp>
 
 /**
  * A brief information about caveats of libhook.

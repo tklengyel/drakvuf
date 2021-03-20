@@ -106,7 +106,7 @@
 #include <libdrakvuf/libdrakvuf.h>
 #include <functional>
 #include <memory>
-#include "../private.h"
+#include <libhook/private.h>
 
 namespace libhook
 {

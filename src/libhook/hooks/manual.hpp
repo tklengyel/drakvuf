@@ -104,7 +104,7 @@
 #pragma once
 
 #include <optional>
-#include "base.hpp"
+#include <libhook/hooks/base.hpp>
 
 namespace libhook
 {

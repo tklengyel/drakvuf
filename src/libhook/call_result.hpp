@@ -103,9 +103,9 @@
  ***************************************************************************/
 #pragma once
 
-#include "private.h"
-#include "hooks/base.hpp"
 #include <libdrakvuf/libdrakvuf.h>
+#include <libhook/hooks/base.hpp>
+#include <libhook/private.h>
 
 namespace libhook
 {

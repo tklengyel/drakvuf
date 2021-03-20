@@ -103,8 +103,8 @@
  ***************************************************************************/
 #pragma once
 
-#include "base.hpp"
-#include "../call_result.hpp"
+#include <libhook/hooks/base.hpp>
+#include <libhook/call_result.hpp>
 
 namespace libhook
 {

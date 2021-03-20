@@ -101,7 +101,7 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-#include "return.hpp"
+#include <libhook/hooks/return.hpp>
 
 namespace libhook
 {

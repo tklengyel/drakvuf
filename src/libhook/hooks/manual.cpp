@@ -101,7 +101,7 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-#include "manual.hpp"
+#include <libhook/hooks/manual.hpp>
 
 namespace libhook
 {
