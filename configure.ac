@@ -418,6 +418,16 @@ if test x$plugin_codemon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_CODEMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_libhooktest],
+  [AS_HELP_STRING([--enable-plugin-libhooktest],
+    [Enable libhooktest plugin for testing @<:@no@:>@])],
+  [plugin_libhooktest="$enableval"],
+  [plugin_libhooktest=""])
+AM_CONDITIONAL([PLUGIN_LIBHOOKTEST], [test x$plugin_libhooktest = xyes])
+if test x$plugin_libhooktest = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_LIBHOOKTEST, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -656,6 +666,7 @@ AC_CONFIG_FILES([Makefile src/Makefile
                  src/dirwatch/Makefile
                  src/libusermode/Makefile
                  src/librepl/Makefile
+                 src/libhook/Makefile
                ])
 
 AC_OUTPUT
@@ -694,6 +705,7 @@ APIMon:       $plugin_apimon
 RPCMon:       $plugin_rpcmon
 TLSMon:       $plugin_tlsmon
 Codemon:      $plugin_codemon
+LibHookTest:  $plugin_libhooktest
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:       $plugin_wmimon

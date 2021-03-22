@@ -101,258 +101,63 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#pragma once
 
-#ifndef STRUCTURES_H
-#define STRUCTURES_H
+#include <libdrakvuf/libdrakvuf.h>
+#include <functional>
+#include <memory>
+#include <libhook/private.h>
 
-/******************************************/
+namespace libhook
+{
 
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <glib.h>
-#include <libvmi/libvmi.h>
-#include <libvmi/events.h>
+using callback_t = event_response_t(*)(drakvuf_t drakvuf, drakvuf_trap_info* info);
+using cb_wrapper_t = std::function<event_response_t(drakvuf_t, drakvuf_trap_info*)>;
 
-#include "libdrakvuf.h"
-#include "vmi.h"
-#include "os.h"
-#include "json-profile.h"
-#include "../xen_helper/xen_helper.h"
-
-#include <sys/poll.h>
-
-#ifndef PRINT_DEBUG
-#ifdef DRAKVUF_DEBUG
-extern bool verbose;
-
-#define PRINT_DEBUG(...) \
-    do { \
-        if(verbose) { \
-            eprint_current_time(); \
-            fprintf (stderr, __VA_ARGS__); \
-        }\
-    } while (0)
-
-#else
-#define PRINT_DEBUG(...) \
-    do {} while(0)
-
-#endif // DRAKVUF_DEBUG
-#endif // PRINT_DEBUG
-
-#define UNUSED(x) (void)(x)
-
-/*
- * How often should the VMI caches be flushed?
- *
- * TODO: develop intelligent cache-flush system that
- *       catches the events that actually make flushes
- *       necessary.
+/**
+ * Base hook class, not to be instantiated manually.
  */
-#define VMI_FLUSH_RATE 100
-
-/*
- * How many vCPUs are supported per single DomU
- * this value could be increased if needed
- */
-#define MAX_DRAKVUF_VCPU 16
-
-struct fd_info
+class BaseHook
 {
-    int fd;
-    event_cb_t event_cb;
-    void* data;
-};
-typedef struct fd_info* fd_info_t;
+public:
+    /**
+     * virtual dctor since we use inheritance
+     */
+    virtual ~BaseHook() = 0;
 
+    /**
+     * delete copy ctor, as this class has ownership via RAII
+     */
+    BaseHook(const BaseHook&) = delete;
 
-struct bitfield
-{
-    size_t offset;
-    size_t start_bit;
-    size_t end_bit;
-};
-typedef struct bitfield* bitfield_t;
+    /**
+     * move ctor, required for move semantics to work properly
+     * important to be noexcept, otherwise bad things will happen
+     */
+    BaseHook(BaseHook&&) noexcept;
 
-struct drakvuf
-{
-    char* dom_name;
-    domid_t domID;
-    os_t os;
+    /**
+     * delete copy assignment operator, as this class has ownership via RAII
+     */
+    BaseHook& operator=(const BaseHook&) = delete;
 
-    char* json_kernel_path;
-    char* json_wow_path;
-    json_object* json_wow;
+    /**
+     * move assignment operator, required for move semantics to work properly
+     * important to be noexcept, otherwise bad things will happen
+     */
+    BaseHook& operator=(BaseHook&&) noexcept;
 
-    xen_interface_t* xen;
-    os_interface_t osi;
-    uint16_t altp2m_idx, altp2m_idr;
+protected:
+    /*
+     * protected ctor only for usage by other traps
+     */
+    explicit BaseHook(drakvuf_t);
 
-    xen_pfn_t sink_page_gfn;
-
-    event_response_t int3_response_flags;
-
-    // VMI
-    unsigned long flush_counter;
-    GMutex vmi_lock;
-    vmi_instance_t vmi;
-
-    vmi_event_t cr3_event;
-    vmi_event_t interrupt_event;
-    vmi_event_t mem_event;
-    vmi_event_t debug_event;
-    vmi_event_t cpuid_event;
-    vmi_event_t* step_event[MAX_DRAKVUF_VCPU];
-
-    size_t* offsets;
-    size_t* sizes;
-    bitfield_t bitfields;
-
-    size_t* wow_offsets;
-
-    // Processing trap removals in trap callbacks
-    // is problematic so we save all such requests
-    // in a list to be processed after all callbacks
-    // are finished.
-    bool in_callback;
-    GHashTable* remove_traps;
-
-    int interrupted;
-    page_mode_t pm;
-    unsigned int vcpus;
-    uint64_t init_memsize;
-    xen_pfn_t max_gpfn;
-    addr_t kernbase;
-    addr_t kdtb;
-    addr_t kpgd;
-
-    int address_width;
-
-    GHashTable* remapped_gfns; // Key: gfn
-    // val: remapped gfn
-
-    GHashTable* breakpoint_lookup_pa;   // key: PA of trap
-    // val: struct breakpoint
-    GHashTable* breakpoint_lookup_gfn;  // key: gfn (size uint64_t)
-    // val: GSList of addr_t* for trap locations
-    GHashTable* breakpoint_lookup_trap; // key: trap pointer
-    // val: struct breakpoint
-
-    GHashTable* memaccess_lookup_gfn;  // key: gfn of trap
-    // val: struct memaccess
-    GHashTable* memaccess_lookup_trap; // key: trap pointer
-    // val: struct memaccess
-
-    GSList* cr0, *cr3, *cr4, *debug, *cpuid, *catchall_breakpoint;
-
-    GSList* event_fd_info;     // the list of registered event FDs
-    struct pollfd* event_fds;  // auto-generated pollfd for poll()
-    int event_fd_cnt;          // auto-generated for poll()
-    fd_info_t fd_info_lookup;  // auto-generated for fast drakvuf_loop lookups
-    int poll_rc;
-
-    uint64_t event_counter;    // incremental unique trap event ID
-
-    ipt_state_t ipt_state[MAX_DRAKVUF_VCPU];
-
-    int64_t limited_traps_ttl;
+    /**
+     * Since we want to use RAII we have to have dctor without params
+     * thus we need to store drakvuf_t instance somewhere.
+     */
+    drakvuf_t drakvuf_ = nullptr;
 };
 
-struct breakpoint
-{
-    addr_t pa;
-    drakvuf_trap_t guard, guard2;
-    bool doubletrap;
-};
-struct memaccess
-{
-    addr_t gfn;
-    bool guard2;
-    vmi_mem_access_t access;
-};
-
-struct wrapper
-{
-    trap_type_t type;
-    drakvuf_t drakvuf;
-    GSList* traps; /* List of DRAKVUF traps registered for this event */
-    union
-    {
-        struct memaccess memaccess;
-        struct breakpoint breakpoint;
-    };
-};
-
-void free_wrapper(gpointer p);
-
-struct free_trap_wrapper
-{
-    unsigned int counter;
-    drakvuf_trap_t* trap;
-    drakvuf_trap_free_t free_routine;
-};
-
-struct remapped_gfn
-{
-    xen_pfn_t o;
-    xen_pfn_t r;
-    bool active;
-};
-
-void free_remapped_gfn(gpointer p);
-
-typedef struct process_data_priv
-{
-    char* name;         /* Process name */
-    vmi_pid_t pid ;     /* Process pid | tgid in linux*/
-    vmi_pid_t ppid ;    /* Process parent pid */
-    addr_t base_addr ;  /* Process base address */
-    int64_t userid ;    /* Process SessionID/UID */
-    uint32_t tid;      /* Thread id for Linux*/
-} proc_data_priv_t ;
-
-struct memcb_pass
-{
-    drakvuf_t drakvuf;
-    uint64_t gfn;
-    addr_t pa;
-    proc_data_priv_t proc_data ;
-    proc_data_priv_t attached_proc_data ;
-    struct remapped_gfn* remapped_gfn;
-    vmi_mem_access_t access;
-    GSList* traps;
-};
-
-void drakvuf_force_resume (drakvuf_t drakvuf);
-
-bool drakvuf_get_current_process_data(drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    proc_data_priv_t* proc_data);
-
-bool drakvuf_get_process_data_priv(drakvuf_t drakvuf,
-    addr_t process_base,
-    proc_data_priv_t* proc_data);
-
-char* drakvuf_get_current_process_name(drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    bool fullpath);
-
-int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info);
-
-bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-bool inject_trap_catchall_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap);
-
-event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event);
-event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event);
-event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event);
-event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event);
-event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event);
-event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event);
-
-#endif
+};  // namespace libhook
