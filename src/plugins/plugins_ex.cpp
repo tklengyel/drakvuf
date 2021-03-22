@@ -121,3 +121,56 @@ std::string FieldToString(const std::map<uint64_t, std::string>& maps, uint64_t 
 
 // Errors
 char ERROR_MSG_ADDING_TRAP[] = "Failed to add a trap";
+
+pluginex::pluginex(drakvuf_t drakvuf, output_format_t output)
+    : m_output_format(output), drakvuf(drakvuf)
+{};
+
+pluginex::~pluginex()
+{
+    stop();
+};
+
+bool pluginex::stop()
+{
+    destroy_all_traps();
+    m_is_stopping = true;
+    return true;
+}
+
+void pluginex::destroy_all_traps()
+{
+    while (!traps.empty())
+        destroy_trap(traps.front());
+}
+
+std::unique_ptr<libhook::ManualHook> pluginex::createManualHook(drakvuf_trap_t* info, drakvuf_trap_free_t free_routine)
+{
+    return libhook::ManualHook::create(this->drakvuf, info, free_routine);
+}
+
+
+void pluginex::destroy_trap(drakvuf_trap_t* target)
+{
+    auto it = std::find(traps.begin(), traps.end(), target);
+    if (it == traps.end())
+    {
+        PRINT_DEBUG("[PLUGINEX] BUG: attempted to destroy non-existant trap");
+        throw -1;
+    }
+    traps.erase(it);
+    delete_trap(target);
+}
+
+void pluginex::delete_trap(drakvuf_trap_t* target)
+{
+    drakvuf_remove_trap(drakvuf, target, [](drakvuf_trap_t* trap)
+    {
+        auto data = static_cast<plugin_data*>(trap->data);
+
+        delete data;
+        trap->data = nullptr;
+
+        delete trap;
+    });
+}
