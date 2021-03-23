@@ -312,7 +312,7 @@ static std::optional<rpc_message_t> parse_RPC_MESSAGE(drakvuf_t drakvuf, drakvuf
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx, .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3);
+        .dtb = info->regs->cr3);
     bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E) || drakvuf_is_wow64(drakvuf, info);
 
     uint32_t proc_num;
