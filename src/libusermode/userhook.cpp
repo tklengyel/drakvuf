@@ -286,7 +286,7 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
 
 static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func)
 {
-    target->pid = info->proc_data.pid;
+    target->pid = info->attached_proc_data.pid;
 
     drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
     trap->type = BREAKPOINT;
@@ -529,11 +529,12 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
         dll_meta = create_dll_meta(drakvuf, info, plugin, base_address);
     }
 
+    event_response_t ret = VMI_EVENT_RESPONSE_NONE;
     if (dll_meta)
-        return perform_hooking(drakvuf, info, plugin, dll_meta);
+        ret = perform_hooking(drakvuf, info, plugin, dll_meta);
 
     plugin->destroy_trap(info->trap);
-    return VMI_EVENT_RESPONSE_NONE;
+    return ret;
 }
 
 static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -542,7 +543,8 @@ static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_t
     auto trap = plugin->register_trap<map_view_of_section_result_t>(
             info,
             map_view_of_section_ret_cb,
-            breakpoint_by_pid_searcher());
+            breakpoint_by_pid_searcher(),
+            "NtMapViewOfSection ret");
 
     auto params = get_trap_params<map_view_of_section_result_t>(trap);
 
