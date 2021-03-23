@@ -311,18 +311,23 @@ static std::optional<rpc_message_t> parse_RPC_MESSAGE(drakvuf_t drakvuf, drakvuf
 
     auto vmi = vmi_lock_guard(drakvuf);
 
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    );
+    ACCESS_CONTEXT(ctx, .translate_mechanism = VMI_TM_PROCESS_DTB,
+                   .dtb = info->regs->cr3);
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E) || drakvuf_is_wow64(drakvuf, info);
 
     uint32_t proc_num;
-    ctx.addr = arg + RPC_MESSAGE_PROCNUM_OFFSET;
+    if (is32bit)
+        ctx.addr = arg + RPC_MESSAGE_PROCNUM_OFFSET_X86;
+    else
+        ctx.addr = arg + RPC_MESSAGE_PROCNUM_OFFSET_X64;
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &proc_num))
         return {};
     r.ProcNum = proc_num;
 
-    ctx.addr = arg + RPC_MESSAGE_RPCINTERFACEINFO_OFFSET;
+    if (is32bit)
+        ctx.addr = arg + RPC_MESSAGE_RPCINTERFACEINFO_OFFSET_X86;
+    else
+        ctx.addr = arg + RPC_MESSAGE_RPCINTERFACEINFO_OFFSET_X64;
     auto rpc_iface = read_struct<_RPC_CLIENT_INTERFACE>(vmi, &ctx);
     if (!rpc_iface)
         return {};
