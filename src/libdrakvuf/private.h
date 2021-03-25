@@ -123,9 +123,8 @@
 
 #include <sys/poll.h>
 
-
+#ifndef PRINT_DEBUG
 #ifdef DRAKVUF_DEBUG
-
 extern bool verbose;
 
 #define PRINT_DEBUG(...) \
@@ -139,7 +138,9 @@ extern bool verbose;
 #else
 #define PRINT_DEBUG(...) \
     do {} while(0)
-#endif
+
+#endif // DRAKVUF_DEBUG
+#endif // PRINT_DEBUG
 
 #define UNUSED(x) (void)(x)
 
@@ -327,19 +328,19 @@ struct memcb_pass
 void drakvuf_force_resume (drakvuf_t drakvuf);
 
 bool drakvuf_get_current_process_data(drakvuf_t drakvuf,
-                                      drakvuf_trap_info_t* info,
-                                      proc_data_priv_t* proc_data);
+    drakvuf_trap_info_t* info,
+    proc_data_priv_t* proc_data);
 
 bool drakvuf_get_process_data_priv(drakvuf_t drakvuf,
-                                   addr_t process_base,
-                                   proc_data_priv_t* proc_data);
+    addr_t process_base,
+    proc_data_priv_t* proc_data);
 
 char* drakvuf_get_current_process_name(drakvuf_t drakvuf,
-                                       drakvuf_trap_info_t* info,
-                                       bool fullpath);
+    drakvuf_trap_info_t* info,
+    bool fullpath);
 
 int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf,
-        drakvuf_trap_info_t* info);
+    drakvuf_trap_info_t* info);
 
 bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap);

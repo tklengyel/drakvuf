@@ -109,20 +109,19 @@
 #include "private.h"
 
 sptr_type_t check_module_linked_wow(drakvuf_t drakvuf,
-                                    vmi_instance_t vmi,
-                                    memdump* plugin,
-                                    drakvuf_trap_info_t* info,
-                                    addr_t dll_base)
+    vmi_instance_t vmi,
+    memdump* plugin,
+    drakvuf_trap_info_t* info,
+    addr_t dll_base)
 {
     // WOW64 NTDLL profile not provided
     if (!plugin->dll_base_wow_rva)
         return ERROR;
 
-    access_context_t ctx =
-    {
+    ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3
-    };
+    );
 
     addr_t wow_peb = drakvuf_get_wow_peb(drakvuf, &ctx, info->proc_data.base_addr);
 
@@ -173,10 +172,10 @@ sptr_type_t check_module_linked_wow(drakvuf_t drakvuf,
 }
 
 sptr_type_t check_module_linked(drakvuf_t drakvuf,
-                                vmi_instance_t vmi,
-                                memdump* plugin,
-                                drakvuf_trap_info_t* info,
-                                addr_t dll_base)
+    vmi_instance_t vmi,
+    memdump* plugin,
+    drakvuf_trap_info_t* info,
+    addr_t dll_base)
 {
     sptr_type_t sub_ret = check_module_linked_wow(drakvuf, vmi, plugin, info, dll_base);
 
@@ -188,11 +187,10 @@ sptr_type_t check_module_linked(drakvuf_t drakvuf,
         return ERROR;
 
     addr_t next_module = module_list_head;
-    access_context_t ctx =
-    {
+    ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3
-    };
+    );
 
     bool is_first = true;
     sptr_type_t ret = UNLINKED;

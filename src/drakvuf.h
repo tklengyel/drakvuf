@@ -118,6 +118,7 @@
 #include <plugins/plugins.h>
 #include <libinjector/libinjector.h>
 
+#ifndef PRINT_DEBUG
 #ifdef DRAKVUF_DEBUG
 // This is defined in libdrakvuf
 extern bool verbose;
@@ -131,7 +132,9 @@ extern bool verbose;
 #else
 #define PRINT_DEBUG(...)
 #define UNUSED(...)
-#endif
+
+#endif // DRAKVUF_DEBUG
+#endif // PRINT_DEBUG
 
 class drakvuf_c
 {
@@ -146,15 +149,15 @@ public:
     int interrupted { 0 };
 
     drakvuf_c(const char* domain,
-              const char* json_kernel_path,
-              const char* json_wow_path,
-              output_format_t output,
-              bool verbose,
-              bool leave_paused,
-              bool libvmi_conf,
-              addr_t kpgd,
-              bool fast_singlestep,
-              uint64_t limited_traps_ttl);
+        const char* json_kernel_path,
+        const char* json_wow_path,
+        output_format_t output,
+        bool verbose,
+        bool leave_paused,
+        bool libvmi_conf,
+        addr_t kpgd,
+        bool fast_singlestep,
+        uint64_t limited_traps_ttl);
     ~drakvuf_c();
 
     int is_initialized();
@@ -164,18 +167,18 @@ public:
     void pause();
     void resume();
     injector_status_t inject_cmd(vmi_pid_t injection_pid,
-                                 uint32_t injection_tid,
-                                 const char* inject_cmd,
-                                 const char* cwd,
-                                 injection_method_t method,
-                                 output_format_t format,
-                                 const char* binary_path,
-                                 const char* target_process,
-                                 int timeout,
-                                 bool global_search,
-                                 int args_count,
-                                 const char* args[],
-                                 vmi_pid_t* injected_pid);
+        uint32_t injection_tid,
+        const char* inject_cmd,
+        const char* cwd,
+        injection_method_t method,
+        output_format_t format,
+        const char* binary_path,
+        const char* target_process,
+        int timeout,
+        bool global_search,
+        int args_count,
+        const char* args[],
+        vmi_pid_t* injected_pid);
     void terminate(vmi_pid_t injection_pid, uint32_t injection_tid, vmi_pid_t pid, int termination_timeout, std::shared_ptr<const std::unordered_map<vmi_pid_t, bool>> terminated_processes);
     int start_plugins(const bool* plugin_list, const plugins_options* options);
     int stop_plugins(const bool* plugin_list);

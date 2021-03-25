@@ -131,6 +131,7 @@
 #include "rpcmon/rpcmon.h"
 #include "tlsmon/tlsmon.h"
 #include "codemon/codemon.h"
+#include "libhooktest/libhooktest.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -138,10 +139,10 @@ drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _outp
 }
 
 int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
-                           const plugins_options* options)
+    const plugins_options* options)
 {
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
-         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
+        plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
     {
         PRINT_DEBUG("Starting plugin %s\n", drakvuf_plugin_names[plugin_id]);
 
@@ -390,9 +391,21 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .codemon_default_benign = options->codemon_default_benign,
                     };
                     this->plugins[plugin_id] = std::make_unique<codemon>(this->drakvuf, &config, this->output);
+                    break;
                 }
 #endif
-                case __DRAKVUF_PLUGIN_LIST_MAX: /* fall-through */
+#ifdef ENABLE_PLUGIN_LIBHOOKTEST
+                case PLUGIN_LIBHOOKTEST:
+                {
+                    this->plugins[plugin_id] = std::make_unique<libhooktest>(this->drakvuf, this->output);
+                    break;
+                }
+#endif
+                case __DRAKVUF_PLUGIN_LIST_MAX:
+                    /* Should never reach here */
+                    fprintf(stderr, "Plugin start falls-through to default switch case!\n");
+                    throw -1;
+
                 default:
                     break;
             }
@@ -413,7 +426,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 int drakvuf_plugins::stop(const drakvuf_plugin_t plugin_id)
 {
     if ( __DRAKVUF_PLUGIN_LIST_MAX != 0 &&
-         plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
+        plugin_id < __DRAKVUF_PLUGIN_LIST_MAX )
     {
         PRINT_DEBUG("Stopping plugin %s\n", drakvuf_plugin_names[plugin_id]);
 

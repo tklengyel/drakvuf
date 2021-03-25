@@ -4,6 +4,7 @@ suffix=none
 align-pointer=type
 align-reference=type
 indent=spaces=4
+indent-after-parens
 pad-header
 pad-comma
 min-conditional-indent=0

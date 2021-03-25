@@ -233,12 +233,11 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
     addr_t vad_start = mmvad.starting_vpn << 12;
     size_t vad_length = (mmvad.ending_vpn - mmvad.starting_vpn + 1) << 12;
 
-    access_context_t ctx =
-    {
+    ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
         .addr = vad_start
-    };
+    );
 
     addr_t export_header_rva = 0;
     size_t export_header_size = 0;
@@ -362,12 +361,11 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
 
             if (target.type == HOOK_BY_NAME)
             {
-                access_context_t ctx =
-                {
+                ACCESS_CONTEXT(ctx,
                     .translate_mechanism = VMI_TM_PROCESS_DTB,
                     .dtb = info->regs->cr3,
                     .addr = dll_meta->v.real_dll_base
-                };
+                );
 
                 if (vmi_translate_sym2v(lg.vmi, &ctx, target.target_name.c_str(), &exec_func) != VMI_SUCCESS)
                 {
@@ -418,10 +416,10 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
             }
 
             PRINT_DEBUG("[USERHOOK] Hook %s (vaddr = 0x%llx, dll_base = 0x%llx, result = %s)\n",
-                        target.target_name.c_str(),
-                        (unsigned long long)exec_func,
-                        (unsigned long long)dll_meta->v.real_dll_base,
-                        target.state == HOOK_OK ? "OK" : "FAIL");
+                target.target_name.c_str(),
+                (unsigned long long)exec_func,
+                (unsigned long long)dll_meta->v.real_dll_base,
+                target.state == HOOK_OK ? "OK" : "FAIL");
         }
     }
 
@@ -475,12 +473,11 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
     {
         addr_t base_address;
 
-        access_context_t ctx =
-        {
+        ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
             .addr = base_address_ptr
-        };
+        );
 
         vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
         bool success = (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &base_address));
@@ -516,12 +513,11 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
     {
         addr_t base_address;
 
-        access_context_t ctx =
-        {
+        ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
             .addr = params->base_address_ptr
-        };
+        );
 
         vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
         bool success = (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &base_address));
@@ -544,9 +540,9 @@ static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_t
 {
     auto plugin = get_trap_plugin<userhook>(info);
     auto trap = plugin->register_trap<map_view_of_section_result_t>(
-                    info,
-                    map_view_of_section_ret_cb,
-                    breakpoint_by_pid_searcher());
+            info,
+            map_view_of_section_ret_cb,
+            breakpoint_by_pid_searcher());
 
     auto params = get_trap_params<map_view_of_section_result_t>(trap);
 
@@ -642,7 +638,7 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
             if (target.state == HOOK_OK)
             {
                 PRINT_DEBUG("[USERHOOK] Erased trap for pid %d %s\n", info->attached_proc_data.pid,
-                            target.target_name.c_str());
+                    target.target_name.c_str());
                 drakvuf_remove_trap(drakvuf, target.trap, NULL);
             }
         }
@@ -741,9 +737,9 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
         PRINT_DEBUG("USERHOOK] Found %zu hooks on CoW page, registering return trap\n", hooks.size());
 
         auto trap = plugin->register_trap<copy_on_write_result_t>(
-                        info,
-                        copy_on_write_ret_cb,
-                        breakpoint_by_pid_searcher());
+                info,
+                copy_on_write_ret_cb,
+                breakpoint_by_pid_searcher());
         if (!trap)
             return VMI_EVENT_RESPONSE_NONE;
 
@@ -929,8 +925,8 @@ std::unique_ptr<ArgumentPrinter> make_arg_printer(
 
 
 std::vector<std::unique_ptr<ArgumentPrinter>> parse_arguments(
-            const PrinterConfig& config,
-            std::stringstream& ss)
+        const PrinterConfig& config,
+        std::stringstream& ss)
 {
     std::vector<std::unique_ptr<ArgumentPrinter>> argument_printers;
 
@@ -1006,7 +1002,7 @@ plugin_target_config_entry_t parse_entry(
 
     return entry;
 }
-}
+} // namespace
 
 
 void drakvuf_load_dll_hook_config(drakvuf_t drakvuf, const char* dll_hooks_list_path, bool print_no_addr, const hook_filter_t& hook_filter, wanted_hooks_t& wanted_hooks)

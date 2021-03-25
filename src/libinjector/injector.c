@@ -126,19 +126,19 @@ injector_status_t injector_start_app(
     if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
     {
         return injector_start_app_on_win(drakvuf,
-                                         pid,
-                                         tid,
-                                         app,
-                                         cwd,
-                                         method,
-                                         format,
-                                         binary_path,
-                                         target_process,
-                                         break_loop_on_detection,
-                                         injector_to_be_freed,
-                                         global_search,
-                                         wait_for_exit,
-                                         injected_pid);
+                pid,
+                tid,
+                app,
+                cwd,
+                method,
+                format,
+                binary_path,
+                target_process,
+                break_loop_on_detection,
+                injector_to_be_freed,
+                global_search,
+                wait_for_exit,
+                injected_pid);
     }
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {
@@ -148,13 +148,13 @@ injector_status_t injector_start_app(
             tid = pid;
 
         return injector_start_app_on_linux(drakvuf,
-                                           pid,
-                                           tid,
-                                           app,
-                                           method,
-                                           OUTPUT_DEFAULT,
-                                           args_count,
-                                           args);
+                pid,
+                tid,
+                app,
+                method,
+                OUTPUT_DEFAULT,
+                args_count,
+                args);
     }
     else
     {
@@ -164,9 +164,9 @@ injector_status_t injector_start_app(
 }
 
 void injector_terminate(drakvuf_t drakvuf,
-                        vmi_pid_t injection_pid,
-                        uint32_t injection_tid,
-                        vmi_pid_t pid)
+    vmi_pid_t injection_pid,
+    uint32_t injection_tid,
+    vmi_pid_t pid)
 {
     if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
         injector_terminate_on_win(drakvuf, injection_pid, injection_tid, pid);

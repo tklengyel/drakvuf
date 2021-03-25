@@ -104,7 +104,7 @@
 
 bin_PROGRAMS = drakvuf injector proc_stat
 
-SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libusermode
+SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libusermode libhook
 
 drakvuf_SOURCES = main.cpp drakvuf.cpp drakvuf.h exitcodes.h
 injector_SOURCES = injector.c
@@ -159,6 +159,7 @@ drakvuf_LDADD += xen_helper/libxenhelper.la
 drakvuf_LDADD += plugins/libdrakvufplugins.la
 drakvuf_LDADD += libinjector/libinjector.la
 drakvuf_LDADD += libusermode/libusermode.la
+drakvuf_LDADD += libhook/libhook.la
 
 injector_LDADD = libdrakvuf/libdrakvuf.la
 injector_LDADD += libinjector/libinjector.la

@@ -377,7 +377,7 @@ bool inject_queryvolumeinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_in
     if ( !drakvuf_add_trap(drakvuf, injector->bp) )
     {
         PRINT_DEBUG("Failed to trap return location of injected function call @ 0x%lx!\n",
-                    injector->bp->breakpoint.addr);
+            injector->bp->breakpoint.addr);
         return false;
     }
 
