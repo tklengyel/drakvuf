@@ -180,8 +180,15 @@ static dll_t* get_pending_dll(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
  */
 static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, addr_t dll_base)
 {
+    proc_data_t proc_data = info->proc_data;
+    {
+        vmi_lock_guard vmi(drakvuf);
+        if (VMI_OS_WINDOWS == vmi_get_ostype(vmi))
+            proc_data = info->attached_proc_data;
+    }
+
     mmvad_info_t mmvad;
-    if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, dll_base, &mmvad))
+    if (!drakvuf_find_mmvad(drakvuf, proc_data.base_addr, dll_base, &mmvad))
         return nullptr;
 
     if (mmvad.file_name_ptr == 0)
@@ -575,7 +582,14 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
 
     auto plugin = get_trap_plugin<userhook>(info);
 
-    uint32_t thread_id = info->attached_proc_data.tid;
+    proc_data_t proc_data = info->proc_data;
+    {
+        vmi_lock_guard vmi(drakvuf);
+        if (VMI_OS_WINDOWS == vmi_get_ostype(vmi))
+            proc_data = info->attached_proc_data;
+    }
+
+    uint32_t thread_id = proc_data.tid;
 
     if (!thread_id)
     {
