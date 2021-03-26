@@ -286,7 +286,10 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
 
 static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func)
 {
-    target->pid = info->attached_proc_data.pid;
+    if (VMI_OS_WINDOWS == vmi_get_ostype((vmi)))
+        target->pid = info->attached_proc_data.pid;
+    else
+        target->pid = info->proc_data.pid;
 
     drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
     trap->type = BREAKPOINT;
