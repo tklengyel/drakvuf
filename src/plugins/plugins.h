@@ -253,7 +253,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_RPCMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_TLSMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_CODEMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
-    [PLUGIN_LIBHOOKTEST]  = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
+    [PLUGIN_LIBHOOKTEST]  = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
 class plugin
