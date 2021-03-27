@@ -681,7 +681,6 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     UNUSED(vmi);
     event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
-    bool is_process_monitored = false;
 
     flush_vmi(drakvuf);
 
@@ -869,6 +868,7 @@ void remove_trap(drakvuf_t drakvuf,
 
                 remove_trap(drakvuf, &container->breakpoint.guard);
                 remove_trap(drakvuf, &container->breakpoint.guard2);
+                remove_trap(drakvuf, &container->breakpoint.guard3);
 
                 g_hash_table_remove(drakvuf->breakpoint_lookup_pa, &container->breakpoint.pa);
             }
