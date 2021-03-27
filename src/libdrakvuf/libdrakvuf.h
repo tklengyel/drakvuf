@@ -646,6 +646,10 @@ bool drakvuf_enable_ipt(drakvuf_t drakvuf, unsigned int vcpu, uint8_t** buf, uin
 bool drakvuf_get_ipt_offset(drakvuf_t drakvuf, unsigned int vcpu, uint64_t* offset, uint64_t* last_offset);
 bool drakvuf_disable_ipt(drakvuf_t drakvuf, unsigned int vcpu);
 
+
+void drakvuf_toggle_context_based_interception(drakvuf_t drakvuf);
+void drakvuf_intercept_process_add(drakvuf_t drakvuf, char * process_name);
+
 /*---------------------------------------------------------
  * Event FD functions
  */

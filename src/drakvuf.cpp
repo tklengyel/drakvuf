@@ -286,6 +286,14 @@ void drakvuf_c::resume()
     drakvuf_resume(drakvuf);
 }
 
+void drakvuf_c::toggle_context_interception(char ** processes , int count)
+{
+    for(int c = 0; c <= count; c++)
+        drakvuf_intercept_process_add(drakvuf, processes[c]);
+
+    drakvuf_toggle_context_based_interception(drakvuf);
+}
+
 injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
     uint32_t injection_tid,
     const char* inject_cmd,
@@ -364,6 +372,5 @@ void drakvuf_c::terminate(vmi_pid_t injection_pid,
 
     auto info = termination_info(terminated_processes, pid);
     drakvuf_loop(drakvuf, is_terminated, &info);
-
     cleanup_timer(this, timeout_thread);
 }

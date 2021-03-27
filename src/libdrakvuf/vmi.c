@@ -313,7 +313,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
                 {
                     remove_trap(drakvuf, &s->breakpoint.guard);
                     s->breakpoint.guard.memaccess.access |= VMI_MEMACCESS_X;
-                    if ( !inject_trap_mem(drakvuf, &s->breakpoint.guard, 0) )
+                    if ( !inject_trap_mem(drakvuf, &s->breakpoint.guard, 0, drakvuf->altp2m_idx) )
                         drakvuf->interrupted = -1;
 
                 }
@@ -681,6 +681,7 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     UNUSED(vmi);
     event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
+    bool is_process_monitored = false;
 
     flush_vmi(drakvuf);
 
@@ -703,10 +704,26 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     while (loop)
     {
         trap_info.trap = (drakvuf_trap_t*)loop->data;
+
         rsp |= trap_info.trap->cb(drakvuf, &trap_info);
         loop = loop->next;
     }
     drakvuf->in_callback = 0;
+
+    if(drakvuf->enable_cr3_based_interception)
+    {
+        char * process_name = drakvuf_get_current_process_name(drakvuf, &trap_info, false);
+        if (g_slist_find(drakvuf->context_switch_intercept_processes, process_name))
+        {
+            event->slat_id = drakvuf->altp2m_idx;
+            rsp |= VMI_EVENT_RESPONSE_SLAT_ID;
+        }
+        else
+        {
+            event->slat_id = drakvuf->altp2m_idrw;
+            rsp |= VMI_EVENT_RESPONSE_SLAT_ID;
+        }
+    }
 
     free_proc_data_priv_2(&proc_data, &attached_proc_data);
 
@@ -946,7 +963,7 @@ void remove_trap(drakvuf_t drakvuf,
     }
 }
 
-bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
+bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2, uint16_t view)
 {
     struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &trap->memaccess.gfn);
 
@@ -971,7 +988,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
         {
 
             vmi_mem_access_t update_access = (s->memaccess.access | trap->memaccess.access);
-            status_t ret = vmi_set_mem_event(drakvuf->vmi, trap->memaccess.gfn, update_access, drakvuf->altp2m_idx);
+            status_t ret = vmi_set_mem_event(drakvuf->vmi, trap->memaccess.gfn, update_access, view);
 
             if ( ret == VMI_FAILURE )
             {
@@ -1000,7 +1017,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
          */
         s->memaccess.guard2 = guard2;
 
-        status_t ret = vmi_set_mem_event(drakvuf->vmi, trap->memaccess.gfn, trap->memaccess.access, drakvuf->altp2m_idx);
+        status_t ret = vmi_set_mem_event(drakvuf->vmi, trap->memaccess.gfn, trap->memaccess.access, view);
         if ( ret == VMI_FAILURE )
         {
             PRINT_DEBUG("*** FAILED TO SET MEMORY TRAP @ PAGE %lu ***\n",
@@ -1132,10 +1149,16 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     container->breakpoint.guard.memaccess.access = VMI_MEMACCESS_RW;
     container->breakpoint.guard.memaccess.type = PRE;
     container->breakpoint.guard.memaccess.gfn = current_gfn;
+
     container->breakpoint.guard2.type = MEMACCESS;
     container->breakpoint.guard2.memaccess.access = VMI_MEMACCESS_RWX;
     container->breakpoint.guard2.memaccess.type = PRE;
     container->breakpoint.guard2.memaccess.gfn = remapped_gfn->r;
+
+    container->breakpoint.guard3.type = MEMACCESS;
+    container->breakpoint.guard3.memaccess.access = VMI_MEMACCESS_W;
+    container->breakpoint.guard3.memaccess.type = PRE;
+    container->breakpoint.guard3.memaccess.gfn = current_gfn;
 
     addr_t rpa = (remapped_gfn->r<<12) + (container->breakpoint.pa & VMI_BIT_MASK(0, 11));
     uint8_t test;
@@ -1162,15 +1185,21 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         }
     }
 
-    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard, 0) )
+    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard, 0, drakvuf->altp2m_idx) )
     {
         PRINT_DEBUG("Failed to create guard trap for the breakpoint!\n");
         goto err_exit;
     }
 
-    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard2, 1) )
+    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard2, 1, drakvuf->altp2m_idx) )
     {
         PRINT_DEBUG("Failed to create guard2 trap for the breakpoint!\n");
+        goto err_exit;
+    }
+
+    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard3, 0, drakvuf->altp2m_idrw) )
+    {
+        PRINT_DEBUG("Failed to create W guard trap for the breakpoint!\n");
         goto err_exit;
     }
 
@@ -1365,6 +1394,39 @@ void drakvuf_loop(drakvuf_t drakvuf, bool (*is_interrupted)(drakvuf_t, void*), v
     PRINT_DEBUG("DRAKVUF polling loop finished\n");
 }
 
+void drakvuf_toggle_context_based_interception(drakvuf_t drakvuf)
+{
+    bool toggle = !drakvuf->enable_cr3_based_interception;
+    status_t status;
+    vmi_pause_vm(drakvuf->vmi);
+
+    if(toggle)
+    {
+        status = vmi_slat_switch(drakvuf->vmi, drakvuf->altp2m_idrw);
+        if (VMI_FAILURE == status)
+            PRINT_DEBUG("Enabling context based interception failed. \n");
+
+        if ( !drakvuf->cr3 && !control_cr3_trap(drakvuf, 1) )
+            PRINT_DEBUG("Failed to enable CR3 trap for context based interception. \n");
+
+
+        drakvuf->enable_cr3_based_interception = true;
+    }
+    else
+    {
+        status = vmi_slat_switch(drakvuf->vmi, drakvuf->altp2m_idx);
+        if (VMI_FAILURE == status)
+            PRINT_DEBUG("Disabling context based interception failed. \n");
+
+        if ( !drakvuf->cr3 )
+            control_cr3_trap(drakvuf, 0);
+
+        drakvuf->enable_cr3_based_interception = false;
+    }
+
+    vmi_resume_vm(drakvuf->vmi);
+}
+
 bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
 {
 
@@ -1516,6 +1578,22 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
     }
     PRINT_DEBUG("Altp2m view R created with ID %u\n", drakvuf->altp2m_idr);
 
+    /*
+     * IDRW View is used for context based interception, in order to protect
+     * pages that has breakpoints during execution of unmonitored contexts.
+     */
+    if (drakvuf->enable_cr3_based_interception)
+    {
+        status = vmi_slat_create(drakvuf->vmi, &drakvuf->altp2m_idrw);
+        if (VMI_FAILURE == status)
+        {
+            PRINT_DEBUG("Altp2m view RW creation failed\n");
+            return 0;
+        }
+        PRINT_DEBUG("Altp2m view RW created with ID %u\n", drakvuf->altp2m_idrw);
+
+    }
+
     SETUP_INTERRUPT_EVENT(&drakvuf->interrupt_event, int3_cb);
     drakvuf->interrupt_event.data = drakvuf;
 
@@ -1524,6 +1602,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
         fprintf(stderr, "Failed to register interrupt event\n");
         return 0;
     }
+
 
     SETUP_MEM_EVENT(&drakvuf->mem_event, ~0ULL, VMI_MEMACCESS_RWX, pre_mem_cb, 1);
     drakvuf->mem_event.data = drakvuf;

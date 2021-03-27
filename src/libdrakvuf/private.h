@@ -188,7 +188,7 @@ struct drakvuf
 
     xen_interface_t* xen;
     os_interface_t osi;
-    uint16_t altp2m_idx, altp2m_idr;
+    uint16_t altp2m_idx, altp2m_idr, altp2m_idrw;
 
     xen_pfn_t sink_page_gfn;
 
@@ -247,6 +247,10 @@ struct drakvuf
 
     GSList* cr0, *cr3, *cr4, *debug, *cpuid, *catchall_breakpoint;
 
+    // list of processes to be intercepted
+    bool enable_cr3_based_interception;
+    GSList* context_switch_intercept_processes;
+
     GSList* event_fd_info;     // the list of registered event FDs
     struct pollfd* event_fds;  // auto-generated pollfd for poll()
     int event_fd_cnt;          // auto-generated for poll()
@@ -263,7 +267,7 @@ struct drakvuf
 struct breakpoint
 {
     addr_t pa;
-    drakvuf_trap_t guard, guard2;
+    drakvuf_trap_t guard, guard2, guard3;
     bool doubletrap;
 };
 struct memaccess

@@ -178,6 +178,9 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
 
     (*drakvuf)->json_kernel_path = g_strdup(json_kernel_path);
 
+    (*drakvuf)->context_switch_intercept_processes = NULL;
+    (*drakvuf)->enable_cr3_based_interception = false;
+
     if ( json_wow_path )
     {
         (*drakvuf)->json_wow = json_object_from_file(json_wow_path);
@@ -404,7 +407,7 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
             ret = inject_trap_breakpoint(drakvuf, trap);
             break;
         case MEMACCESS:
-            ret = inject_trap_mem(drakvuf, trap, 0);
+            ret = inject_trap_mem(drakvuf, trap, 0, drakvuf->altp2m_idx);
             break;
         case REGISTER:
             ret = inject_trap_reg(drakvuf, trap);
@@ -930,4 +933,9 @@ bool drakvuf_disable_ipt(drakvuf_t drakvuf, unsigned int vcpu)
         return false;
 
     return true;
+}
+
+void drakvuf_intercept_process_add(drakvuf_t drakvuf, char * process_name)
+{
+    drakvuf->context_switch_intercept_processes = g_slist_append(drakvuf->context_switch_intercept_processes, strdup(process_name));
 }
