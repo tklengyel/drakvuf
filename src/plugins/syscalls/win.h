@@ -2439,6 +2439,11 @@ SYSCALL(NtUnmapViewOfSectionEx, NTSTATUS, 3,
     "BaseAddress", "", DIR_IN, PVOID,
     "Flags", "", DIR_IN, ULONG,
 );
+SYSCALL(NtUserCallNextHookEx, NTSTATUS, 4,
+    "Code", "", DIR_IN, INT,
+    "wParam", "", DIR_IN, WPARAM,
+    "lParam", "", DIR_IN, LPARAM,
+    "Ansi", "", DIR_IN, BOOLEAN);
 SYSCALL(NtUserCallTwoParam, NTSTATUS, 3,
     "Param1", "", DIR_IN, DWORD,
     "Param2", "", DIR_IN, DWORD,
@@ -3541,7 +3546,6 @@ SYSCALL(NtUserCallHwndParamLock, NTSTATUS, 0);
 SYSCALL(NtUserCallHwndParamLockSafe, NTSTATUS, 0);
 SYSCALL(NtUserCallHwndSafe, NTSTATUS, 0);
 SYSCALL(NtUserCallMsgFilter, NTSTATUS, 0);
-SYSCALL(NtUserCallNextHookEx, NTSTATUS, 0);
 SYSCALL(NtUserCallNoParam, NTSTATUS, 0);
 SYSCALL(NtUserCallOneParam, NTSTATUS, 0);
 SYSCALL(NtUserCanBrokerForceForeground, NTSTATUS, 0);

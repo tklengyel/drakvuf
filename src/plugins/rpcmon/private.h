@@ -112,5 +112,22 @@
 #define Oi_PROCNUM_FIELD_OFFSET_WITH_RPCFLAGS 0x6
 #define Oi_PROCNUM_FIELD_OFFSET_WITHOUT_RPCFLAGS 0x2
 
-#define RPC_MESSAGE_PROCNUM_OFFSET 0x1c
-#define RPC_MESSAGE_RPCINTERFACEINFO_OFFSET 0x28
+// typedef struct _RPC_MESSAGE {                        | x86   | x64   |
+//   RPC_BINDING_HANDLE     Handle;                     | +0    | +0    |
+//   unsigned long          DataRepresentation;         | +4    | +8    |
+//   void                   *Buffer;                    | +8    | +0x10 |
+//   unsigned int           BufferLength;               | +0xC  | +0x18 |
+//   unsigned int           ProcNum;                    | +0x10 | +0x1C |
+//   PRPC_SYNTAX_IDENTIFIER TransferSyntax;             | +0x14 | +0x20 |
+//   void                   *RpcInterfaceInformation;   | +0x18 | +0x28 |
+//   void                   *ReservedForRuntime;
+//   RPC_MGR_EPV            *ManagerEpv;
+//   void                   *ImportContext;
+//   unsigned long          RpcFlags;
+// } RPC_MESSAGE, *PRPC_MESSAGE;
+
+#define RPC_MESSAGE_PROCNUM_OFFSET_X64 0x1c
+#define RPC_MESSAGE_RPCINTERFACEINFO_OFFSET_X64 (RPC_MESSAGE_PROCNUM_OFFSET_X64 + 0xc)
+
+#define RPC_MESSAGE_PROCNUM_OFFSET_X86 0x10
+#define RPC_MESSAGE_RPCINTERFACEINFO_OFFSET_X86 (RPC_MESSAGE_PROCNUM_OFFSET_X86 + 0x8)
