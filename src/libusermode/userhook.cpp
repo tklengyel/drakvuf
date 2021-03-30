@@ -180,8 +180,15 @@ static dll_t* get_pending_dll(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
  */
 static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, addr_t dll_base)
 {
+    proc_data_t proc_data = info->proc_data;
+    {
+        vmi_lock_guard vmi(drakvuf);
+        if (VMI_OS_WINDOWS == vmi_get_ostype(vmi))
+            proc_data = info->attached_proc_data;
+    }
+
     mmvad_info_t mmvad;
-    if (!drakvuf_find_mmvad(drakvuf, info->proc_data.base_addr, dll_base, &mmvad))
+    if (!drakvuf_find_mmvad(drakvuf, proc_data.base_addr, dll_base, &mmvad))
         return nullptr;
 
     if (mmvad.file_name_ptr == 0)
@@ -286,7 +293,10 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
 
 static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func)
 {
-    target->pid = info->proc_data.pid;
+    if (VMI_OS_WINDOWS == vmi_get_ostype((vmi)))
+        target->pid = info->attached_proc_data.pid;
+    else
+        target->pid = info->proc_data.pid;
 
     drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
     trap->type = BREAKPOINT;
@@ -529,11 +539,12 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
         dll_meta = create_dll_meta(drakvuf, info, plugin, base_address);
     }
 
+    event_response_t ret = VMI_EVENT_RESPONSE_NONE;
     if (dll_meta)
-        return perform_hooking(drakvuf, info, plugin, dll_meta);
+        ret = perform_hooking(drakvuf, info, plugin, dll_meta);
 
     plugin->destroy_trap(info->trap);
-    return VMI_EVENT_RESPONSE_NONE;
+    return ret;
 }
 
 static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -542,7 +553,8 @@ static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_t
     auto trap = plugin->register_trap<map_view_of_section_result_t>(
             info,
             map_view_of_section_ret_cb,
-            breakpoint_by_pid_searcher());
+            breakpoint_by_pid_searcher(),
+            "NtMapViewOfSection ret");
 
     auto params = get_trap_params<map_view_of_section_result_t>(trap);
 
@@ -570,7 +582,14 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
 
     auto plugin = get_trap_plugin<userhook>(info);
 
-    uint32_t thread_id = info->attached_proc_data.tid;
+    proc_data_t proc_data = info->proc_data;
+    {
+        vmi_lock_guard vmi(drakvuf);
+        if (VMI_OS_WINDOWS == vmi_get_ostype(vmi))
+            proc_data = info->attached_proc_data;
+    }
+
+    uint32_t thread_id = proc_data.tid;
 
     if (!thread_id)
     {
