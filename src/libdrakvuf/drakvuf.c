@@ -150,6 +150,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     {
         json_object_put(drakvuf->json_wow);
         drakvuf->json_wow = NULL;
+        g_free(drakvuf->wow_offsets);
     }
 
     g_free(drakvuf->offsets);
