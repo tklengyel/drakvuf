@@ -188,7 +188,8 @@ struct drakvuf
 
     xen_interface_t* xen;
     os_interface_t osi;
-    uint16_t altp2m_idx, altp2m_idr, altp2m_idrw;
+    uint16_t altp2m_idx, altp2m_idr, altp2m_idrx;
+    bool vcpu_monitor[MAX_DRAKVUF_VCPU];
 
     xen_pfn_t sink_page_gfn;
 
@@ -249,7 +250,7 @@ struct drakvuf
 
     // list of processes to be intercepted
     bool enable_cr3_based_interception;
-    GSList* context_switch_intercept_processes;
+    GSList * context_switch_intercept_processes;
 
     GSList* event_fd_info;     // the list of registered event FDs
     struct pollfd* event_fds;  // auto-generated pollfd for poll()
@@ -328,6 +329,13 @@ struct memcb_pass
     vmi_mem_access_t access;
     GSList* traps;
 };
+
+typedef struct intercept_process
+{
+    char * name;
+    vmi_pid_t pid;
+    bool strict;
+} intercept_process_t;
 
 void drakvuf_force_resume (drakvuf_t drakvuf);
 

@@ -288,10 +288,10 @@ void drakvuf_c::resume()
 
 void drakvuf_c::toggle_context_interception(char ** processes , int count)
 {
-    for(int c = 0; c <= count; c++)
-        drakvuf_intercept_process_add(drakvuf, processes[c]);
+    for(int c = 0; c < count; c++)
+        drakvuf_intercept_process_add(this->drakvuf, processes[c], 0, false);
 
-    drakvuf_toggle_context_based_interception(drakvuf);
+    drakvuf_toggle_context_based_interception(this->drakvuf);
 }
 
 injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,

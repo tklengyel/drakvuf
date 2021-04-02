@@ -432,7 +432,7 @@ int main(int argc, char** argv)
         {"codemon-analyse-system-dll-vad", no_argument, NULL, opt_codemon_analyse_system_dll_vad},
         {"codemon-default-benign", no_argument, NULL, opt_codemon_default_benign},
         {"context-based-interception", no_argument, NULL, 'C'},
-        {"context-processes", required_argument, NULL, opt_context_interception_processes},
+        {"context-process", required_argument, NULL, opt_context_interception_processes},
 
 
 

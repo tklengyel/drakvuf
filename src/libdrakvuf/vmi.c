@@ -157,8 +157,14 @@ event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
     drakvuf_t drakvuf = (drakvuf_t)event->data;
-    PRINT_DEBUG("reset trap on vCPU %u, switching altp2m %u->%u\n", event->vcpu_id, event->slat_id, drakvuf->altp2m_idx);
-    event->slat_id = drakvuf->altp2m_idx;
+    uint16_t view = drakvuf->altp2m_idx;
+
+    if(!drakvuf->vcpu_monitor[event->vcpu_id] && drakvuf->enable_cr3_based_interception)
+        view = drakvuf->altp2m_idrx;
+
+    PRINT_DEBUG("reset trap on vCPU %u, switching altp2m %u->%u\n", event->vcpu_id, event->slat_id, view);
+    event->slat_id = view;
+
     return VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Turn off singlestep
         VMI_EVENT_RESPONSE_SLAT_ID;
 }
@@ -335,8 +341,16 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
 done:
     free_proc_data_priv_2(&pass->proc_data, &pass->attached_proc_data);
     g_slice_free(struct memcb_pass, pass);
+
+    uint16_t view = drakvuf->altp2m_idx;
+
+    // Switch to RX
+    if(!drakvuf->vcpu_monitor[event->vcpu_id] && drakvuf->enable_cr3_based_interception)
+        view = drakvuf->altp2m_idrx;
+
     /* We switch back to the altp2m view no matter what */
-    event->slat_id = drakvuf->altp2m_idx;
+    event->slat_id = view;
+
     drakvuf->step_event[event->vcpu_id]->callback = vmi_reset_trap;
     drakvuf->step_event[event->vcpu_id]->data = drakvuf;
     return rsp |
@@ -449,7 +463,6 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     if (event->mem_event.out_access & VMI_MEMACCESS_X)
     {
         struct wrapper* sbp = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
-
         if (sbp)
         {
             PRINT_DEBUG("Simulated INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64"\n",
@@ -684,7 +697,7 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     flush_vmi(drakvuf);
 
-#ifdef DRAKVUF_DEBUG
+#ifndef DRAKVUF_DEBUG
     /* This is very verbose and always on so we only print debug information
      * when there is a subscriber trap */
     if (drakvuf->cr3)
@@ -712,15 +725,24 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     if(drakvuf->enable_cr3_based_interception)
     {
         char * process_name = drakvuf_get_current_process_name(drakvuf, &trap_info, false);
-        if (g_slist_find(drakvuf->context_switch_intercept_processes, process_name))
+        GSList * process = drakvuf->context_switch_intercept_processes;
+
+        drakvuf->vcpu_monitor[event->vcpu_id] = false;
+        event->slat_id = drakvuf->altp2m_idrx;
+        rsp |= VMI_EVENT_RESPONSE_SLAT_ID;
+
+        while(process != NULL)
         {
-            event->slat_id = drakvuf->altp2m_idx;
-            rsp |= VMI_EVENT_RESPONSE_SLAT_ID;
-        }
-        else
-        {
-            event->slat_id = drakvuf->altp2m_idrw;
-            rsp |= VMI_EVENT_RESPONSE_SLAT_ID;
+            intercept_process_t * process_obj = (intercept_process_t *) process->data;
+            if ( (!strcmp(process_obj->name, process_name) && process_obj->pid == trap_info.proc_data.pid && process_obj->strict ) ||
+                (!process_obj->strict && !strcmp(process_obj->name, process_name) ))
+            {
+                drakvuf->vcpu_monitor[event->vcpu_id] = true;
+                event->slat_id = drakvuf->altp2m_idx;
+            }
+
+
+            process = process->next;    
         }
     }
 
@@ -1138,6 +1160,13 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             PRINT_DEBUG("%s: Failed to change gfn on view %u\n", __FUNCTION__, drakvuf->altp2m_idr);
             goto err_exit;
         }
+
+        if (VMI_FAILURE == vmi_slat_change_gfn(
+        drakvuf->vmi, drakvuf->altp2m_idrx, remapped_gfn->r, drakvuf->sink_page_gfn))
+        {
+            PRINT_DEBUG("%s: Failed to change gfn on view %u\n", __FUNCTION__, drakvuf->altp2m_idrx);
+            goto err_exit;
+        }
     }
 
     /*
@@ -1197,7 +1226,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         goto err_exit;
     }
 
-    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard3, 0, drakvuf->altp2m_idrw) )
+    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard3, 0, drakvuf->altp2m_idrx) )
     {
         PRINT_DEBUG("Failed to create W guard trap for the breakpoint!\n");
         goto err_exit;
@@ -1402,7 +1431,7 @@ void drakvuf_toggle_context_based_interception(drakvuf_t drakvuf)
 
     if(toggle)
     {
-        status = vmi_slat_switch(drakvuf->vmi, drakvuf->altp2m_idrw);
+        status = vmi_slat_switch(drakvuf->vmi, drakvuf->altp2m_idrx);
         if (VMI_FAILURE == status)
             PRINT_DEBUG("Enabling context based interception failed. \n");
 
@@ -1582,17 +1611,14 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
      * IDRW View is used for context based interception, in order to protect
      * pages that has breakpoints during execution of unmonitored contexts.
      */
-    if (drakvuf->enable_cr3_based_interception)
+    drakvuf->context_switch_intercept_processes = NULL;
+    status = vmi_slat_create(drakvuf->vmi, &drakvuf->altp2m_idrx);
+    if (VMI_FAILURE == status)
     {
-        status = vmi_slat_create(drakvuf->vmi, &drakvuf->altp2m_idrw);
-        if (VMI_FAILURE == status)
-        {
-            PRINT_DEBUG("Altp2m view RW creation failed\n");
-            return 0;
-        }
-        PRINT_DEBUG("Altp2m view RW created with ID %u\n", drakvuf->altp2m_idrw);
-
+        PRINT_DEBUG("Altp2m view RW creation failed\n");
+        return 0;
     }
+    PRINT_DEBUG("Altp2m view RW created with ID %u\n", drakvuf->altp2m_idrx);
 
     SETUP_INTERRUPT_EVENT(&drakvuf->interrupt_event, int3_cb);
     drakvuf->interrupt_event.data = drakvuf;
@@ -1602,7 +1628,6 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
         fprintf(stderr, "Failed to register interrupt event\n");
         return 0;
     }
-
 
     SETUP_MEM_EVENT(&drakvuf->mem_event, ~0ULL, VMI_MEMACCESS_RWX, pre_mem_cb, 1);
     drakvuf->mem_event.data = drakvuf;
