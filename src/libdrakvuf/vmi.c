@@ -345,7 +345,7 @@ done:
     uint16_t view = drakvuf->altp2m_idx;
 
     // Switch to RX view if context based views enabled and the VCPU is excuting a process we are NOT interested in
-    if(drakvuf->enable_cr3_based_interception && !drakvuf->vcpu_monitor[event->vcpu_id])
+    if (drakvuf->enable_cr3_based_interception && !drakvuf->vcpu_monitor[event->vcpu_id])
         view = drakvuf->altp2m_idrx;
 
     /* We switch back to the altp2m view no matter what */
@@ -722,10 +722,10 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     }
     drakvuf->in_callback = 0;
 
-    if(drakvuf->enable_cr3_based_interception)
+    if (drakvuf->enable_cr3_based_interception)
     {
-        char * process_name = drakvuf_get_current_process_name(drakvuf, &trap_info, false);
-        GSList * process = drakvuf->context_switch_intercept_processes;
+        char* process_name = drakvuf_get_current_process_name(drakvuf, &trap_info, false);
+        GSList* process = drakvuf->context_switch_intercept_processes;
 
         drakvuf->vcpu_monitor[event->vcpu_id] = false;
         event->slat_id = drakvuf->altp2m_idrx;
@@ -733,16 +733,14 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
 
         while(process != NULL)
         {
-            intercept_process_t * process_obj = (intercept_process_t *) process->data;
+            intercept_process_t* process_obj = (intercept_process_t*) process->data;
             if ( (!strcmp(process_obj->name, process_name) && process_obj->pid == trap_info.proc_data.pid && process_obj->strict ) ||
                 (!process_obj->strict && !strcmp(process_obj->name, process_name) ))
             {
                 drakvuf->vcpu_monitor[event->vcpu_id] = true;
                 event->slat_id = drakvuf->altp2m_idx;
             }
-
-
-            process = process->next;    
+            process = process->next;
         }
     }
 
@@ -1162,7 +1160,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         }
 
         if (VMI_FAILURE == vmi_slat_change_gfn(
-        drakvuf->vmi, drakvuf->altp2m_idrx, remapped_gfn->r, drakvuf->sink_page_gfn))
+                drakvuf->vmi, drakvuf->altp2m_idrx, remapped_gfn->r, drakvuf->sink_page_gfn))
         {
             PRINT_DEBUG("%s: Failed to change gfn on view %u\n", __FUNCTION__, drakvuf->altp2m_idrx);
             goto err_exit;
@@ -1436,7 +1434,7 @@ void drakvuf_toggle_context_based_interception(drakvuf_t drakvuf)
     status_t status;
     vmi_pause_vm(drakvuf->vmi);
 
-    if(toggle)
+    if (toggle)
     {
         status = vmi_slat_switch(drakvuf->vmi, drakvuf->altp2m_idrx);
         if (VMI_FAILURE == status)

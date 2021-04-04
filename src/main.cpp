@@ -334,7 +334,7 @@ int main(int argc, char** argv)
     bool terminate = false;
     int termination_timeout = 20;
     bool context_based_interception = false;
-    GSList * context_processes = NULL;
+    GSList* context_processes = NULL;
 
     eprint_current_time();
 

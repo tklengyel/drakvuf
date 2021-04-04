@@ -286,13 +286,13 @@ void drakvuf_c::resume()
     drakvuf_resume(drakvuf);
 }
 
-void drakvuf_c::toggle_context_interception(GSList * processes)
+void drakvuf_c::toggle_context_interception(GSList* processes)
 {
     GSList * process = processes;
 
     while(process != NULL)
     {
-        drakvuf_intercept_process_add(this->drakvuf, (char *)process->data, 0, false);
+        drakvuf_intercept_process_add(this->drakvuf, (char*)process->data, 0, false);
         process = process->next;
     }
 

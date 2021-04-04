@@ -166,7 +166,7 @@ public:
     void loop(int duration);
     void pause();
     void resume();
-    void toggle_context_interception(GSList * processes);
+    void toggle_context_interception(GSList* processes);
     injector_status_t inject_cmd(vmi_pid_t injection_pid,
         uint32_t injection_tid,
         const char* inject_cmd,

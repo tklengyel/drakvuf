@@ -250,7 +250,7 @@ struct drakvuf
 
     // list of processes to be intercepted
     bool enable_cr3_based_interception;
-    GSList * context_switch_intercept_processes;
+    GSList* context_switch_intercept_processes;
 
     GSList* event_fd_info;     // the list of registered event FDs
     struct pollfd* event_fds;  // auto-generated pollfd for poll()
@@ -332,7 +332,7 @@ struct memcb_pass
 
 typedef struct intercept_process
 {
-    char * name;
+    char* name;
     vmi_pid_t pid;
     bool strict; /* True: Match both Name and PID, False: Match just the name */
 } intercept_process_t;
