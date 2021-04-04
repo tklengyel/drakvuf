@@ -159,7 +159,7 @@ event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf_t drakvuf = (drakvuf_t)event->data;
     uint16_t view = drakvuf->altp2m_idx;
 
-    if(drakvuf->enable_cr3_based_interception && !drakvuf->vcpu_monitor[event->vcpu_id])
+    if (drakvuf->enable_cr3_based_interception && !drakvuf->vcpu_monitor[event->vcpu_id])
         view = drakvuf->altp2m_idrx;
 
     PRINT_DEBUG("reset trap on vCPU %u, switching altp2m %u->%u\n", event->vcpu_id, event->slat_id, view);
@@ -731,7 +731,7 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
         event->slat_id = drakvuf->altp2m_idrx;
         rsp |= VMI_EVENT_RESPONSE_SLAT_ID;
 
-        while(process != NULL)
+        while (process != NULL)
         {
             intercept_process_t* process_obj = (intercept_process_t*) process->data;
             if ( (!strcmp(process_obj->name, process_name) && process_obj->pid == trap_info.proc_data.pid && process_obj->strict ) ||

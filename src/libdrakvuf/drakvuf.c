@@ -938,7 +938,7 @@ bool drakvuf_disable_ipt(drakvuf_t drakvuf, unsigned int vcpu)
 
 void drakvuf_intercept_process_add(drakvuf_t drakvuf, char* process_name, vmi_pid_t pid, bool strict)
 {
-    intercept_process_t* process = (intercept_process_t *) g_try_malloc0(sizeof(intercept_process_t));
+    intercept_process_t* process = (intercept_process_t*) g_try_malloc0(sizeof(intercept_process_t));
     process->name = g_strdup(process_name);
     process->pid = pid;
     process->strict = strict;

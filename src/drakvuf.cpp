@@ -288,9 +288,9 @@ void drakvuf_c::resume()
 
 void drakvuf_c::toggle_context_interception(GSList* processes)
 {
-    GSList * process = processes;
+    GSList* process = processes;
 
-    while(process != NULL)
+    while (process != NULL)
     {
         drakvuf_intercept_process_add(this->drakvuf, (char*)process->data, 0, false);
         process = process->next;
