@@ -286,10 +286,15 @@ void drakvuf_c::resume()
     drakvuf_resume(drakvuf);
 }
 
-void drakvuf_c::toggle_context_interception(char ** processes , int count)
+void drakvuf_c::toggle_context_interception(GSList * processes)
 {
-    for(int c = 0; c < count; c++)
-        drakvuf_intercept_process_add(this->drakvuf, processes[c], 0, false);
+    GSList * process = processes;
+
+    while(process != NULL)
+    {
+        drakvuf_intercept_process_add(this->drakvuf, (char *)process->data, 0, false);
+        process = process->next;
+    }
 
     drakvuf_toggle_context_based_interception(this->drakvuf);
 }
@@ -372,5 +377,6 @@ void drakvuf_c::terminate(vmi_pid_t injection_pid,
 
     auto info = termination_info(terminated_processes, pid);
     drakvuf_loop(drakvuf, is_terminated, &info);
+
     cleanup_timer(this, timeout_thread);
 }

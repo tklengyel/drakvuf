@@ -159,7 +159,7 @@ event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t* event)
     drakvuf_t drakvuf = (drakvuf_t)event->data;
     uint16_t view = drakvuf->altp2m_idx;
 
-    if(!drakvuf->vcpu_monitor[event->vcpu_id] && drakvuf->enable_cr3_based_interception)
+    if(drakvuf->enable_cr3_based_interception && !drakvuf->vcpu_monitor[event->vcpu_id])
         view = drakvuf->altp2m_idrx;
 
     PRINT_DEBUG("reset trap on vCPU %u, switching altp2m %u->%u\n", event->vcpu_id, event->slat_id, view);
@@ -344,8 +344,8 @@ done:
 
     uint16_t view = drakvuf->altp2m_idx;
 
-    // Switch to RX
-    if(!drakvuf->vcpu_monitor[event->vcpu_id] && drakvuf->enable_cr3_based_interception)
+    // Switch to RX view if context based views enabled and the VCPU is excuting a process we are NOT interested in
+    if(drakvuf->enable_cr3_based_interception && !drakvuf->vcpu_monitor[event->vcpu_id])
         view = drakvuf->altp2m_idrx;
 
     /* We switch back to the altp2m view no matter what */
@@ -697,7 +697,7 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     flush_vmi(drakvuf);
 
-#ifndef DRAKVUF_DEBUG
+#ifdef DRAKVUF_DEBUG
     /* This is very verbose and always on so we only print debug information
      * when there is a subscriber trap */
     if (drakvuf->cr3)
@@ -1167,6 +1167,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             PRINT_DEBUG("%s: Failed to change gfn on view %u\n", __FUNCTION__, drakvuf->altp2m_idrx);
             goto err_exit;
         }
+
     }
 
     /*
@@ -1216,19 +1217,25 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 
     if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard, 0, drakvuf->altp2m_idx) )
     {
-        PRINT_DEBUG("Failed to create guard trap for the breakpoint!\n");
+        PRINT_DEBUG("[IDX] Failed to create guard trap for the breakpoint!\n");
         goto err_exit;
     }
 
     if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard2, 1, drakvuf->altp2m_idx) )
     {
-        PRINT_DEBUG("Failed to create guard2 trap for the breakpoint!\n");
+        PRINT_DEBUG("[IDX] Failed to create guard2 trap for the breakpoint!\n");
         goto err_exit;
     }
 
     if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard3, 0, drakvuf->altp2m_idrx) )
     {
-        PRINT_DEBUG("Failed to create W guard trap for the breakpoint!\n");
+        PRINT_DEBUG("[IDRX] Failed to create guard trap for the breakpoint!\n");
+        goto err_exit;
+    }
+
+    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard2, 1, drakvuf->altp2m_idrx) )
+    {
+        PRINT_DEBUG("[IDRX] Failed to create guard2 trap for the breakpoint!\n");
         goto err_exit;
     }
 
@@ -1608,7 +1615,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
     PRINT_DEBUG("Altp2m view R created with ID %u\n", drakvuf->altp2m_idr);
 
     /*
-     * IDRW View is used for context based interception, in order to protect
+     * IDRX View is used for context based interception, in order to protect
      * pages that has breakpoints during execution of unmonitored contexts.
      */
     drakvuf->context_switch_intercept_processes = NULL;
@@ -1640,7 +1647,13 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
 
     if (VMI_FAILURE == vmi_set_mem_event(drakvuf->vmi, drakvuf->sink_page_gfn, VMI_MEMACCESS_RWX, drakvuf->altp2m_idx))
     {
-        PRINT_DEBUG("Sink page protection failed\n");
+        PRINT_DEBUG("Sink page protection failed in IDX view\n");
+        return 0;
+    }
+
+    if (VMI_FAILURE == vmi_set_mem_event(drakvuf->vmi, drakvuf->sink_page_gfn, VMI_MEMACCESS_RWX, drakvuf->altp2m_idrx))
+    {
+        PRINT_DEBUG("Sink page protection failed in IDRX view\n");
         return 0;
     }
 

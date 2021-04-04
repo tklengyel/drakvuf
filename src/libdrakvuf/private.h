@@ -334,7 +334,7 @@ typedef struct intercept_process
 {
     char * name;
     vmi_pid_t pid;
-    bool strict;
+    bool strict; /* True: Match both Name and PID, False: Match just the name */
 } intercept_process_t;
 
 void drakvuf_force_resume (drakvuf_t drakvuf);

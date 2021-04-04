@@ -181,6 +181,8 @@ static void print_usage()
         "\t -g                        Search required for injection functions in all processes\n"
         "\t -j, --injection-timeout <seconds>\n"
         "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
+        "\t -C                        Enable context based views\n"
+        "\t --context-process         Process to be monitored in context based views\n"
         "\t --terminate               Terminate injected process\n"
         "\t --termination-timeout     Timeout to wait for process termination (in seconds)\n"
         "\t -t <timeout>              Timeout (in seconds)\n"
@@ -332,8 +334,7 @@ int main(int argc, char** argv)
     bool terminate = false;
     int termination_timeout = 20;
     bool context_based_interception = false;
-    char * context_processes [100] = {nullptr};
-    int context_processes_count = 0;
+    GSList * context_processes = NULL;
 
     eprint_current_time();
 
@@ -461,13 +462,6 @@ int main(int argc, char** argv)
             case 'c':
                 inject_cwd = optarg;
                 break;
-            case 'C':
-                context_based_interception = true;
-                break;
-            case opt_context_interception_processes:
-                context_processes[context_processes_count] = optarg;
-                context_processes_count++;
-                break;
             case 'g':
                 injection_global_search = true;
                 break;
@@ -476,6 +470,12 @@ int main(int argc, char** argv)
                 break;
             case opt_terminate:
                 terminate = true;
+                break;
+            case 'C':
+                context_based_interception = true;
+                break;
+            case opt_context_interception_processes:
+                context_processes = g_slist_prepend(context_processes, optarg);
                 break;
             case opt_termination_timeout:
                 termination_timeout = atoi(optarg);
@@ -761,7 +761,7 @@ int main(int argc, char** argv)
     PRINT_DEBUG("Enabling context based interception.\n");
 
     if (context_based_interception)
-        drakvuf->toggle_context_interception(context_processes, context_processes_count);
+        drakvuf->toggle_context_interception(context_processes);
 
     PRINT_DEBUG("Starting plugins\n");
 
