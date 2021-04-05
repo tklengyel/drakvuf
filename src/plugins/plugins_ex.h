@@ -407,6 +407,10 @@ public:
         IB init_breakpoint,
         const char* trap_name = nullptr);
 
+    // Params property is optional
+    template<typename Params = void>
+    void register_trap(drakvuf_trap_t* trap);
+
     void destroy_trap(drakvuf_trap_t* target);
 
     const output_format_t m_output_format;
@@ -568,6 +572,22 @@ drakvuf_trap_t* pluginex::register_trap(drakvuf_trap_info_t* info,
 {
     int64_t limited_traps_ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     return register_trap<Params, IB>(info, hook_cb, init_breakpoint, trap_name, limited_traps_ttl, nullptr);
+}
+
+template<typename Params>
+void pluginex::register_trap(drakvuf_trap_t* trap)
+{
+    if constexpr (std::is_same_v<Params, void>)
+    {
+        trap->data = new plugin_data(this, nullptr);
+    }
+    else
+    {
+        static_assert(std::is_base_of_v<call_result_t, Params>, "Params must derive from call_result_t");
+        trap->data = new plugin_data(this, new Params);
+    }
+
+    traps.push_back(std::move(trap));
 }
 
 #endif // PLUGIN_EX_H
