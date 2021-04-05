@@ -889,6 +889,7 @@ void remove_trap(drakvuf_t drakvuf,
                 remove_trap(drakvuf, &container->breakpoint.guard);
                 remove_trap(drakvuf, &container->breakpoint.guard2);
                 remove_trap(drakvuf, &container->breakpoint.guard3);
+                remove_trap(drakvuf, &container->breakpoint.guard4);
 
                 g_hash_table_remove(drakvuf->breakpoint_lookup_pa, &container->breakpoint.pa);
             }
@@ -1188,6 +1189,11 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     container->breakpoint.guard3.memaccess.type = PRE;
     container->breakpoint.guard3.memaccess.gfn = current_gfn;
 
+    container->breakpoint.guard4.type = MEMACCESS;
+    container->breakpoint.guard4.memaccess.access = VMI_MEMACCESS_RWX;
+    container->breakpoint.guard4.memaccess.type = PRE;
+    container->breakpoint.guard4.memaccess.gfn = remapped_gfn->r;
+
     addr_t rpa = (remapped_gfn->r<<12) + (container->breakpoint.pa & VMI_BIT_MASK(0, 11));
     uint8_t test;
 
@@ -1227,13 +1233,13 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 
     if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard3, 0, drakvuf->altp2m_idrx) )
     {
-        PRINT_DEBUG("[IDRX] Failed to create guard trap for the breakpoint!\n");
+        PRINT_DEBUG("[IDRX] Failed to create guard3 trap for the breakpoint!\n");
         goto err_exit;
     }
 
-    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard2, 1, drakvuf->altp2m_idrx) )
+    if ( !inject_trap_mem(drakvuf, &container->breakpoint.guard4, 1, drakvuf->altp2m_idrx) )
     {
-        PRINT_DEBUG("[IDRX] Failed to create guard2 trap for the breakpoint!\n");
+        PRINT_DEBUG("[IDRX] Failed to create guard4 trap for the breakpoint!\n");
         goto err_exit;
     }
 

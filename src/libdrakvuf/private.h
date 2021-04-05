@@ -268,7 +268,7 @@ struct drakvuf
 struct breakpoint
 {
     addr_t pa;
-    drakvuf_trap_t guard, guard2, guard3;
+    drakvuf_trap_t guard, guard2, guard3, guard4;
     bool doubletrap;
 };
 struct memaccess
