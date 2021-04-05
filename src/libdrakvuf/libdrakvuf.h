@@ -648,7 +648,7 @@ bool drakvuf_disable_ipt(drakvuf_t drakvuf, unsigned int vcpu);
 
 
 void drakvuf_toggle_context_based_interception(drakvuf_t drakvuf);
-void drakvuf_intercept_process_add(drakvuf_t drakvuf, char* process_name, vmi_pid_t pid, bool strict);
+void drakvuf_intercept_process_add(drakvuf_t drakvuf, char* process_name, vmi_pid_t pid, unsigned char strict);
 
 /*---------------------------------------------------------
  * Event FD functions

@@ -292,7 +292,28 @@ void drakvuf_c::toggle_context_interception(GSList* processes)
 
     while (process != NULL)
     {
-        drakvuf_intercept_process_add(this->drakvuf, (char*)process->data, 0, false);
+        char* process_arg = (char*)process->data;
+
+        char* name = NULL;
+        vmi_pid_t pid = 0;
+        unsigned char strictness = 0;
+
+        if (process_arg[0] == ':')
+        {
+            pid = atoi(&process_arg[1]);
+            strictness = 1;
+        }
+        else
+        {
+            name = strtok(process_arg, ":");
+            char* pid_str = strtok(NULL, ":");
+            strictness = (pid_str ? 0:2);
+
+            if (strictness)
+                pid = atoi(pid_str);
+        }
+
+        drakvuf_intercept_process_add(this->drakvuf, name, pid, strictness);
         process = process->next;
     }
 

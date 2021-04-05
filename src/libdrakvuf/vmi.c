@@ -734,12 +734,29 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
         while (process != NULL)
         {
             intercept_process_t* process_obj = (intercept_process_t*) process->data;
-            if ( (!strcmp(process_obj->name, process_name) && process_obj->pid == trap_info.proc_data.pid && process_obj->strict ) ||
-                (!process_obj->strict && !strcmp(process_obj->name, process_name) ))
+            bool switch_to_idx = false;
+            switch (process_obj->strict)
+            {
+                case 0:
+                    if (!strcmp(process_obj->name, process_name))
+                        switch_to_idx = true;
+                    break;
+                case 1:
+                    if (process_obj->pid == trap_info.proc_data.pid)
+                        switch_to_idx = true;
+                    break;
+                case 2:
+                    if (!strcmp(process_obj->name, process_name) && (process_obj->pid == trap_info.proc_data.pid))
+                        switch_to_idx = true;
+                    break;
+            }
+
+            if (switch_to_idx)
             {
                 drakvuf->vcpu_monitor[event->vcpu_id] = true;
                 event->slat_id = drakvuf->altp2m_idx;
             }
+
             process = process->next;
         }
     }
