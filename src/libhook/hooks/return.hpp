@@ -184,6 +184,7 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
 
     hook->trap_->type = BREAKPOINT;
     hook->trap_->name = "ReturnHook";
+    hook->trap_->ah_cb = nullptr;
     hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         return GetTrapHook<ReturnHook>(info)->callback_(drakvuf, info);
