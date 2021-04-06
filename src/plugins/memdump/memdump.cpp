@@ -537,57 +537,6 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static void process_visitor(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx)
-{
-    vmi_pid_t temp_pid;
-    pass_context* ctx = static_cast<pass_context*>(visitor_ctx);
-
-    if (!drakvuf_get_process_pid(drakvuf, eprocess, &temp_pid))
-    {
-        PRINT_DEBUG("[MEMDUMP] Failed to get process pid\n");
-        return;
-    }
-    if (temp_pid == *ctx->pid)
-    {
-        PRINT_DEBUG("[MEMDUMP] Found remote process base! Getting dtb..\n");
-        drakvuf_get_process_dtb(drakvuf, eprocess, ctx->dtb);
-        *ctx->process = eprocess;
-    }
-}
-
-static bool get_process_by_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t handle, addr_t* process, addr_t* dtb)
-{
-    // Remote process
-    if (handle != ~0ULL)
-    {
-        vmi_pid_t pid;
-        if (!drakvuf_get_pid_from_handle(drakvuf, info, handle, &pid))
-        {
-            PRINT_DEBUG("[MEMDUMP] Failed to get remote process pid\n");
-            return VMI_EVENT_RESPONSE_NONE;
-        }
-
-        pass_context pctx =
-        {
-            .pid = &pid,
-            .process = process,
-            .dtb = dtb
-        };
-        // Get process by pid
-        drakvuf_enumerate_processes(drakvuf, process_visitor, static_cast<void*>(&pctx));
-    }
-    // Self process
-    else
-    {
-        *process = info->attached_proc_data.base_addr;
-        *dtb     = info->regs->cr3;
-    }
-
-    if (!*process || !*dtb)
-        return false;
-    return true;
-}
-
 static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     // HANDLE ProcessHandle
@@ -598,7 +547,7 @@ static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     addr_t process = 0;
     addr_t dtb     = 0;
 
-    if (!get_process_by_handle(drakvuf, info, handle, &process, &dtb))
+    if (!drakvuf_get_process_by_handle(drakvuf, info, handle, &process, &dtb))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to get process by handle\n");
         return VMI_EVENT_RESPONSE_NONE;

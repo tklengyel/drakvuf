@@ -192,13 +192,6 @@ sptr_type_t check_module_linked(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     addr_t dll_base);
 
-typedef struct pass_context_t
-{
-    addr_t* dtb;
-    addr_t* process;
-    vmi_pid_t* pid;
-} pass_context;
-
 bool dump_memory_region(
     drakvuf_t drakvuf,
     vmi_instance_t vmi,

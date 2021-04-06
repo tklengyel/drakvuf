@@ -439,6 +439,12 @@ bool drakvuf_get_process_pid(drakvuf_t drakvuf,
     addr_t process_base,
     vmi_pid_t* pid) NOEXCEPT;
 
+bool drakvuf_get_process_by_handle(drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    uint64_t handle,
+    addr_t* process,
+    addr_t* dtb);
+
 bool drakvuf_get_process_thread_id( drakvuf_t drakvuf,
     addr_t process_base,
     uint32_t* pid) NOEXCEPT;
