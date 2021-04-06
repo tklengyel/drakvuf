@@ -108,8 +108,7 @@ namespace libhook
 
 ReturnHook::ReturnHook(drakvuf_t drakvuf, cb_wrapper_t cb)
     : BaseHook(drakvuf),
-      callback_(cb),
-      trap_(new drakvuf_trap_t)
+      callback_(cb)
 {}
 
 ReturnHook::~ReturnHook()

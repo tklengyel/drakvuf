@@ -173,6 +173,7 @@ auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_
     {
         PRINT_DEBUG("[LIBHOOK] Failed to receive addr of function %s\n", hook->syscall_name_.c_str());
         delete hook->trap_;
+        hook->trap_ = nullptr;
         return std::unique_ptr<SyscallHook>();
     }
 
@@ -201,7 +202,9 @@ auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_
     {
         PRINT_DEBUG("[LIBHOOK] failed to create trap for syscall hook\n");
         delete static_cast<CallResult*>(hook->trap_->data);
+        hook->trap_->data = nullptr;
         delete hook->trap_;
+        hook->trap_ = nullptr;
         return std::unique_ptr<SyscallHook>();
     }
 
