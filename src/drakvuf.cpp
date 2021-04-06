@@ -293,7 +293,7 @@ void drakvuf_c::toggle_context_interception(GSList* processes)
     while (process != NULL)
     {
         char* process_arg = (char*)process->data;
-
+        char** tokens = NULL;
         char* name = NULL;
         vmi_pid_t pid = 0;
         context_match_t strictness = MATCH_NAME;
@@ -305,8 +305,9 @@ void drakvuf_c::toggle_context_interception(GSList* processes)
         }
         else
         {
-            name = strtok(process_arg, ":");
-            char* pid_str = strtok(NULL, ":");
+            tokens = g_strsplit(process_arg, ":", -1);
+            name = tokens[0];
+            char* pid_str = tokens[1];
             strictness = (pid_str == NULL ? MATCH_NAME:MATCH_PID_NAME);
 
             if (strictness)
@@ -314,6 +315,7 @@ void drakvuf_c::toggle_context_interception(GSList* processes)
         }
 
         drakvuf_intercept_process_add(this->drakvuf, name, pid, strictness);
+        g_strfreev(tokens);
         process = process->next;
     }
 
