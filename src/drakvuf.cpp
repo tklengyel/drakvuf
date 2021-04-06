@@ -296,18 +296,18 @@ void drakvuf_c::toggle_context_interception(GSList* processes)
 
         char* name = NULL;
         vmi_pid_t pid = 0;
-        unsigned char strictness = 0;
+        context_match_t strictness = MATCH_NAME;
 
         if (process_arg[0] == ':')
         {
             pid = atoi(&process_arg[1]);
-            strictness = 1;
+            strictness = MATCH_PID;
         }
         else
         {
             name = strtok(process_arg, ":");
             char* pid_str = strtok(NULL, ":");
-            strictness = (pid_str == NULL ? 0:2);
+            strictness = (pid_str == NULL ? MATCH_NAME:MATCH_PID_NAME);
 
             if (strictness)
                 pid = atoi(pid_str);

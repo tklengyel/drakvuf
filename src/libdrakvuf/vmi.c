@@ -737,15 +737,15 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
             bool switch_to_idx = false;
             switch (process_obj->strict)
             {
-                case 0:
+                case MATCH_NAME:
                     if (!strcmp(process_obj->name, process_name))
                         switch_to_idx = true;
                     break;
-                case 1:
+                case MATCH_PID:
                     if (process_obj->pid == trap_info.proc_data.pid)
                         switch_to_idx = true;
                     break;
-                case 2:
+                case MATCH_PID_NAME:
                     if (!strcmp(process_obj->name, process_name) && (process_obj->pid == trap_info.proc_data.pid))
                         switch_to_idx = true;
                     break;
