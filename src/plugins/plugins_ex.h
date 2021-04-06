@@ -474,7 +474,10 @@ std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_inf
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
     auto hook = libhook::ReturnHook::create<Params>(this->drakvuf, info, cb);
-    static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+    if (hook)
+        static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+    else
+        PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
     return hook;
 }
 
@@ -486,7 +489,10 @@ std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_inf
     {
         return std::invoke(cb, static_cast<typename class_type<Callback>::type*>(this), args...);
     });
-    static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+    if (hook)
+        static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+    else
+        PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
     return hook;
 }
 
@@ -495,7 +501,10 @@ std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::str
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
     auto hook = libhook::SyscallHook::create<Params>(this->drakvuf, syscall_name, cb);
-    static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+    if (hook)
+        static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+    else
+        PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
     return hook;
 }
 
@@ -507,7 +516,10 @@ std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::str
     {
         return std::invoke(cb, static_cast<typename class_type<Callback>::type*>(this), args...);
     });
-    static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+    if (hook)
+        static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+    else
+        PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
     return hook;
 }
 
