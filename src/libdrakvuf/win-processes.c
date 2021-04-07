@@ -331,7 +331,9 @@ char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpat
             while (tokens && tokens[index+1] != NULL)
                 index++;
 
-            name = g_strdup(tokens[index]);
+            if (tokens)
+                name = g_strdup(tokens[index]);
+
             g_strfreev(tokens);
         }
 
