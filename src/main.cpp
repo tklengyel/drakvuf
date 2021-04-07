@@ -181,6 +181,9 @@ static void print_usage()
         "\t -g                        Search required for injection functions in all processes\n"
         "\t -j, --injection-timeout <seconds>\n"
         "\t                           Injection timeout (in seconds, 0 == no timeout)\n"
+        "\t -C                        Enable context based views\n"
+        "\t --context-process         Process to be monitored in context based views (requires -C)\n"
+        "\t                           (e.g.: Name, :PID, Name:PID)\n"
         "\t --terminate               Terminate injected process\n"
         "\t --termination-timeout     Timeout to wait for process termination (in seconds)\n"
         "\t -t <timeout>              Timeout (in seconds)\n"
@@ -331,6 +334,8 @@ int main(int argc, char** argv)
     int args_count = 0;
     bool terminate = false;
     int termination_timeout = 20;
+    bool context_based_interception = false;
+    GSList* context_processes = NULL;
 
     eprint_current_time();
 
@@ -381,6 +386,7 @@ int main(int argc, char** argv)
         opt_codemon_dump_vad,
         opt_codemon_analyse_system_dll_vad,
         opt_codemon_default_benign,
+        opt_context_interception_processes,
     };
     const option long_opts[] =
     {
@@ -427,12 +433,14 @@ int main(int argc, char** argv)
         {"codemon-dump-vad", no_argument, NULL, opt_codemon_dump_vad},
         {"codemon-analyse-system-dll-vad", no_argument, NULL, opt_codemon_analyse_system_dll_vad},
         {"codemon-default-benign", no_argument, NULL, opt_codemon_default_benign},
+        {"context-based-interception", no_argument, NULL, 'C'},
+        {"context-process", required_argument, NULL, opt_context_interception_processes},
 
 
 
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF:C";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
@@ -463,6 +471,12 @@ int main(int argc, char** argv)
                 break;
             case opt_terminate:
                 terminate = true;
+                break;
+            case 'C':
+                context_based_interception = true;
+                break;
+            case opt_context_interception_processes:
+                context_processes = g_slist_prepend(context_processes, optarg);
                 break;
             case opt_termination_timeout:
                 termination_timeout = atoi(optarg);
@@ -744,6 +758,11 @@ int main(int argc, char** argv)
                 return drakvuf_exit_code_t::INJECTION_TIMEOUT;
         }
     }
+
+    PRINT_DEBUG("Enabling context based interception.\n");
+
+    if (context_based_interception)
+        drakvuf->toggle_context_interception(context_processes);
 
     PRINT_DEBUG("Starting plugins\n");
 

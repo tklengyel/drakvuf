@@ -286,6 +286,42 @@ void drakvuf_c::resume()
     drakvuf_resume(drakvuf);
 }
 
+void drakvuf_c::toggle_context_interception(GSList* processes)
+{
+    GSList* process = processes;
+
+    while (process != NULL)
+    {
+        char* process_arg = (char*)process->data;
+        char** tokens = NULL;
+        char* name = NULL;
+        vmi_pid_t pid = 0;
+        context_match_t strictness = MATCH_NAME;
+
+        if (process_arg[0] == ':')
+        {
+            pid = atoi(&process_arg[1]);
+            strictness = MATCH_PID;
+        }
+        else
+        {
+            tokens = g_strsplit(process_arg, ":", -1);
+            name = tokens[0];
+            char* pid_str = tokens[1];
+            strictness = (pid_str == NULL ? MATCH_NAME:MATCH_PID_NAME);
+
+            if (strictness)
+                pid = atoi(pid_str);
+        }
+
+        drakvuf_intercept_process_add(this->drakvuf, name, pid, strictness);
+        g_strfreev(tokens);
+        process = process->next;
+    }
+
+    drakvuf_toggle_context_based_interception(this->drakvuf);
+}
+
 injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
     uint32_t injection_tid,
     const char* inject_cmd,

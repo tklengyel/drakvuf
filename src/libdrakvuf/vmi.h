@@ -125,6 +125,7 @@ void close_vmi(drakvuf_t drakvuf);
 event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t* event);
 event_response_t vmi_reset_trap(vmi_instance_t vmi, vmi_event_t* event);
 event_response_t vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t* event);
+
 void drakvuf_vmi_event_callback (int fd, void* data);
 
 bool inject_trap(drakvuf_t drakvuf,
@@ -133,7 +134,7 @@ bool inject_trap(drakvuf_t drakvuf,
     vmi_pid_t pid);
 bool inject_trap_mem(drakvuf_t drakvuf,
     drakvuf_trap_t* trap,
-    bool guard2);
+    bool guard2, uint16_t view);
 bool inject_trap_pa(drakvuf_t drakvuf,
     drakvuf_trap_t* trap,
     addr_t pa);
