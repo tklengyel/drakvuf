@@ -119,7 +119,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb)
+    static auto create(drakvuf_t, drakvuf_trap_info* info, cb_wrapper_t cb, int ttl)
     -> std::unique_ptr<ReturnHook>;
 
     /**
@@ -188,6 +188,7 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
     hook->trap_->type = BREAKPOINT;
     hook->trap_->name = "ReturnHook";
     hook->trap_->ah_cb = nullptr;
+    hook->trap_->ttl = ttl;
     hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         return GetTrapHook<ReturnHook>(info)->callback_(drakvuf, info);

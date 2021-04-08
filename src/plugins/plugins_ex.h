@@ -375,17 +375,33 @@ public:
     [[nodiscard]]
     std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, hook_cb_t cb);
 
+    template<typename Params = PluginResult>
+    [[nodiscard]]
+    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, hook_cb_t cb, int ttl);
+
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
     std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, Callback cb);
+
+    template<typename Params = PluginResult, typename Callback>
+    [[nodiscard]]
+    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, Callback cb, int ttl);
 
     template<typename Params = PluginResult>
     [[nodiscard]]
     std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, hook_cb_t cb);
 
+    template<typename Params = PluginResult>
+    [[nodiscard]]
+    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, hook_cb_t cb, int ttl);
+
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
     std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, Callback cb);
+
+    template<typename Params = PluginResult, typename Callback>
+    [[nodiscard]]
+    std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, Callback cb, int ttl);
 
     /************************************
      *        Legacy hooking API        *
@@ -472,8 +488,14 @@ Plugin* get_trap_plugin(const drakvuf_trap_info_t* info)
 template<typename Params>
 std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, hook_cb_t cb)
 {
+    return createReturnHook(into, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
+}
+
+template<typename Params>
+std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, hook_cb_t cb, int ttl)
+{
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
-    auto hook = libhook::ReturnHook::create<Params>(this->drakvuf, info, cb);
+    auto hook = libhook::ReturnHook::create<Params>(this->drakvuf, info, cb, ttl);
     if (hook)
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
     else
@@ -483,6 +505,12 @@ std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_inf
 
 template<typename Params, typename Callback>
 std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, Callback cb)
+{
+    return createReturnHook(info, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
+}
+
+template<typename Params, typename Callback>
+std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, Callback cb, int ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
     auto hook = libhook::ReturnHook::create<Params>(this->drakvuf, info, [=](auto&& ...args) -> event_response_t
@@ -499,13 +527,25 @@ std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_inf
 template<typename Params>
 std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, hook_cb_t cb)
 {
+    return createSyscallHook(syscall_name, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
+}
+
+template<typename Params>
+std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, hook_cb_t cb, int ttl)
+{
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
-    auto hook = libhook::SyscallHook::create<Params>(this->drakvuf, syscall_name, cb);
+    auto hook = libhook::SyscallHook::create<Params>(this->drakvuf, syscall_name, cb, ttl);
     if (hook)
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
     else
         PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
     return hook;
+}
+
+template<typename Params, typename Callback>
+std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, Callback cb)
+{
+    return createSyscallHook(syscall_name, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
 }
 
 template<typename Params, typename Callback>

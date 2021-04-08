@@ -118,7 +118,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb)
+    static auto create(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb, int ttl)
     -> std::unique_ptr<SyscallHook>;
 
     /**
@@ -185,6 +185,7 @@ auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_
     hook->trap_->name = hook->syscall_name_.c_str();
     hook->trap_->type = BREAKPOINT;
     hook->trap_->ah_cb = nullptr;
+    hook->trap_->ttl = ttl;
     hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         return GetTrapHook<SyscallHook>(info)->callback_(drakvuf, info);
