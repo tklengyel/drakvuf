@@ -160,7 +160,7 @@ protected:
 };
 
 template<typename Params>
-auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb)
+auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb, int ttl)
 -> std::unique_ptr<SyscallHook>
 {
     PRINT_DEBUG("[LIBHOOK] creating syscall hook\n");
