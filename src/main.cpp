@@ -297,6 +297,10 @@ static void print_usage()
         "\t --codemon-default-benign\n"
         "\t                           By default we assume everything to be malware. If this flag is enabled we assume all analysed memory areas to be goodware instead. This flag should be just set if a classifier is integrated\n"
 #endif
+#ifdef ENABLE_PLUGIN_EXPLOITMON
+        "\t --exploitmon-kernel2user-detect\n"
+        "\t                           Detect kernel thread execution in user mode. This degrades performance."
+#endif
         "\t -h, --help                Show this help\n"
     );
 }
@@ -387,6 +391,7 @@ int main(int argc, char** argv)
         opt_codemon_analyse_system_dll_vad,
         opt_codemon_default_benign,
         opt_context_interception_processes,
+        opt_exploitmon_kernel2user_detect,
     };
     const option long_opts[] =
     {
@@ -435,6 +440,7 @@ int main(int argc, char** argv)
         {"codemon-default-benign", no_argument, NULL, opt_codemon_default_benign},
         {"context-based-interception", no_argument, NULL, 'C'},
         {"context-process", required_argument, NULL, opt_context_interception_processes},
+        {"exploitmon-kernel2user-detect", no_argument, NULL, opt_exploitmon_kernel2user_detect},
 
 
 
@@ -687,6 +693,11 @@ int main(int argc, char** argv)
                 break;
             case opt_codemon_default_benign:
                 options.codemon_default_benign = true;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_EXPLOITMON
+            case opt_exploitmon_kernel2user_detect:
+                options.exploitmon_kernel2user_detect = true;
                 break;
 #endif
             case 'h':
