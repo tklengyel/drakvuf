@@ -428,6 +428,16 @@ if test x$plugin_libhooktest = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_LIBHOOKTEST, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_exploitmon],
+  [AS_HELP_STRING([--disable-plugin-exploitmon],
+    [Enable the exploitmon plugin @<:@yes@:>@])],
+  [plugin_exploitmon="$enableval"],
+  [plugin_exploitmon="yes"])
+AM_CONDITIONAL([PLUGIN_EXPLOITMON], [test x$plugin_exploitmon = xyes])
+if test x$plugin_exploitmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_EXPLOITMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -705,6 +715,7 @@ APIMon:       $plugin_apimon
 RPCMon:       $plugin_rpcmon
 TLSMon:       $plugin_tlsmon
 Codemon:      $plugin_codemon
+Exploitmon:   $plugin_exploitmon
 LibHookTest:  $plugin_libhooktest
 -------------------------------------------------------------------------------
 Deprecated Plugins

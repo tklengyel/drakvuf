@@ -132,6 +132,7 @@
 #include "tlsmon/tlsmon.h"
 #include "codemon/codemon.h"
 #include "libhooktest/libhooktest.h"
+#include "exploitmon/exploitmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -398,6 +399,17 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 case PLUGIN_LIBHOOKTEST:
                 {
                     this->plugins[plugin_id] = std::make_unique<libhooktest>(this->drakvuf, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_EXPLOITMON
+                case PLUGIN_EXPLOITMON:
+                {
+                    struct exploitmon_config config =
+                    {
+                        .enable_k2u = options->exploitmon_kernel2user_detect,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<exploitmon>(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif
