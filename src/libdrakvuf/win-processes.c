@@ -314,37 +314,34 @@ static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t epr
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath)
 {
     unicode_string_t* fullname = win_get_process_full_name( drakvuf, eprocess_base );
+    char* name = vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
 
     if (fullname && fullname->contents && strlen((const char*)fullname->contents) > 0)
     {
+        g_free(name);
         // Replace 'proc_data->name' with 'fullname->contents'
         // Moving ownership of fullname->contents to name for later cleanup
-        char* name = (char*)fullname->contents;
-
+        name = g_strdup((char*)fullname->contents);
         // ImageFileName size differs between kernel builds & versions,
         // relying on it would sometimes yield incomplete process name.
         if ( !fullpath )
         {
-            char** tokens = g_strsplit((char*)fullname->contents, "\\", -1);
+            g_free(name);
+            char** tokens = g_strsplit(name, "\\", -1);
             int index = 0;
 
-            while (tokens && tokens[index+1] != NULL)
-                index++;
-
-            if (tokens)
-                name = g_strdup(tokens[index]);
+            while (tokens[index])
+                name = tokens[index++];
+            name = g_strdup(tokens[index]);
 
             g_strfreev(tokens);
         }
-
-        g_free( (gpointer)fullname );
-        return name;
     }
 
     if (fullname)
         vmi_free_unicode_str(fullname);
 
-    return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
+    return name;
 }
 
 char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base)
