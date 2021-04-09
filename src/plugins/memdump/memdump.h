@@ -126,6 +126,7 @@ struct memdump_config
     const bool memdump_disable_terminate_proc;
     const bool memdump_disable_create_thread;
     const bool memdump_disable_set_thread;
+    const bool memdump_disable_shellcode_detect;
 };
 
 class memdump: public pluginex

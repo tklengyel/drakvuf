@@ -373,6 +373,7 @@ int main(int argc, char** argv)
         opt_memdump_disable_terminate_proc,
         opt_memdump_disable_create_thread,
         opt_memdump_disable_set_thread,
+        opt_memdump_disable_shellcode_detect,
         opt_dll_hooks_list,
         opt_procdump_dir,
         opt_compress_procdumps,
@@ -421,6 +422,7 @@ int main(int argc, char** argv)
         {"memdump-disable-terminate-proc", no_argument, NULL, opt_memdump_disable_terminate_proc},
         {"memdump-disable-create-thread", no_argument, NULL, opt_memdump_disable_create_thread},
         {"memdump-disable-set-thread", no_argument, NULL, opt_memdump_disable_set_thread},
+        {"memdump-disable-shellcode-detect", no_argument, NULL, opt_memdump_disable_shellcode_detect},
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
@@ -665,6 +667,9 @@ int main(int argc, char** argv)
                 break;
             case opt_memdump_disable_set_thread:
                 options.memdump_disable_set_thread = true;
+                break;
+            case opt_memdump_disable_shellcode_detect:
+                options.memdump_disable_shellcode_detect = true;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP
