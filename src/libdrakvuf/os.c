@@ -223,6 +223,64 @@ bool drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* 
     return false;
 }
 
+typedef struct pass_context
+{
+    addr_t* dtb;
+    addr_t* process;
+    vmi_pid_t* pid;
+} pass_context_t;
+
+static void process_visitor(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx)
+{
+    vmi_pid_t temp_pid;
+    pass_context_t* ctx = (pass_context_t*)(visitor_ctx);
+
+    if (!drakvuf_get_process_pid(drakvuf, eprocess, &temp_pid))
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed to get process pid\n");
+        return;
+    }
+    if (temp_pid == *ctx->pid)
+    {
+        PRINT_DEBUG("[MEMDUMP] Found remote process base! Getting dtb..\n");
+        drakvuf_get_process_dtb(drakvuf, eprocess, ctx->dtb);
+        *ctx->process = eprocess;
+    }
+}
+
+bool drakvuf_get_process_by_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t handle, addr_t* process, addr_t* dtb)
+{
+    // Remote process
+    if (handle != ~0ULL)
+    {
+        vmi_pid_t pid;
+        if (!drakvuf_get_pid_from_handle(drakvuf, info, handle, &pid))
+        {
+            PRINT_DEBUG("[MEMDUMP] Failed to get remote process pid\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        pass_context_t pctx =
+        {
+            .pid = &pid,
+            .process = process,
+            .dtb = dtb
+        };
+        // Get process by pid
+        drakvuf_enumerate_processes(drakvuf, process_visitor, (void*)(&pctx));
+    }
+    // Self process
+    else
+    {
+        *process = info->attached_proc_data.base_addr;
+        *dtb     = info->regs->cr3;
+    }
+
+    if (!*process || !*dtb)
+        return false;
+    return true;
+}
+
 bool drakvuf_get_process_thread_id(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid)
 {
     if ( drakvuf->osi.get_process_tid )

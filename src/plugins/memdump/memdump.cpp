@@ -537,6 +537,65 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    // HANDLE ProcessHandle
+    uint64_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    // OUT PVOID *BaseAddress
+    addr_t base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 2);
+
+    addr_t process = 0;
+    addr_t dtb     = 0;
+
+    if (!drakvuf_get_process_by_handle(drakvuf, info, handle, &process, &dtb))
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed to get process by handle\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    auto plugin = get_trap_plugin<memdump>(info);
+
+    vmi_lock_guard lg(drakvuf);
+    access_context_t ctx =
+    {
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = base_address_ptr
+    };
+
+    addr_t base_address;
+    if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &base_address))
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed to read base address in NtFreeVirtualMemory\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    mmvad_info_t mmvad;
+    if (!drakvuf_find_mmvad(drakvuf, process, base_address, &mmvad))
+    {
+        PRINT_DEBUG("[MEMDUMP] Failed to find MMVAD for memory passed to NtFreeVirtualMemory\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    page_info_t p_info = {};
+    if (vmi_pagetable_lookup_extended(lg.vmi, dtb, base_address, &p_info) == VMI_SUCCESS)
+    {
+        bool pte_valid       = (p_info.x86_ia32e.pte_value & (1UL << 0))  != 0;
+        bool page_writeable  = (p_info.x86_ia32e.pte_value & (1UL << 1))  != 0;
+        bool page_executable = (p_info.x86_ia32e.pte_value & (1UL << 63)) == 0;
+        size_t len_bytes     = (mmvad.ending_vpn - mmvad.starting_vpn + 1) * VMI_PS_4KB;
+
+        if (pte_valid && page_writeable && page_executable && len_bytes >= 0x1000)
+        {
+            PRINT_DEBUG("[MEMDUMP] Dumping RWX vad\n");
+            ctx.addr = mmvad.starting_vpn << 12;
+            ctx.dtb  = dtb;
+            dump_memory_region(drakvuf, lg.vmi, info, plugin, &ctx, len_bytes, "Possible shellcode detected", nullptr, false);
+        }
+    }
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 static event_response_t free_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     // HANDLE ProcessHandle
@@ -959,6 +1018,9 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
             throw -1;
     if (!c->memdump_disable_set_thread)
         if (json_wow && !register_trap(nullptr, set_information_thread_hook_cb, bp.for_syscall_name("NtSetInformationThread")))
+            throw -1;
+    if (!c->memdump_disable_shellcode_detect)
+        if (!register_trap(nullptr, shellcode_cb, bp.for_syscall_name("NtFreeVirtualMemory")))
             throw -1;
 
     this->userhook_init(drakvuf, c, output);
