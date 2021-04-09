@@ -326,13 +326,16 @@ char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpat
         // relying on it would sometimes yield incomplete process name.
         if ( !fullpath )
         {
-            g_free(name);
             char** tokens = g_strsplit(name, "\\", -1);
             int index = 0;
 
-            while (tokens[index])
-                name = tokens[index++];
-            name = g_strdup(tokens[index]);
+            if (tokens && tokens[index])
+            {
+                g_free(name);
+                while (tokens[index])
+                    name = tokens[index++];
+                name = g_strdup(name);
+            }
 
             g_strfreev(tokens);
         }
