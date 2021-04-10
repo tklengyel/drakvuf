@@ -298,10 +298,10 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
             const char* name = NULL;
             addr_t module_list = 0;
 
-            if (VMI_OS_WINDOWS == drakvuf->os && (trap->breakpoint.pid == 4 || !strcmp(trap->breakpoint.proc, "System")))
+            if (VMI_OS_WINDOWS == drakvuf->os && (trap->breakpoint.pid == 0 || trap->breakpoint.pid == 4 || !strcmp(trap->breakpoint.proc, "System")))
             {
 
-                pid = 4;
+                pid = 0;
                 if (VMI_FAILURE == vmi_read_addr_ksym(drakvuf->vmi, "PsLoadedModuleList", &module_list))
                     return 0;
 
