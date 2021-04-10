@@ -313,24 +313,38 @@ static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t epr
 
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath)
 {
-    if ( fullpath )
+    unicode_string_t* fullname = win_get_process_full_name( drakvuf, eprocess_base );
+    char* name = vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
+
+    if (fullname && fullname->contents && strlen((const char*)fullname->contents) > 0)
     {
-        unicode_string_t* fullname = win_get_process_full_name( drakvuf, eprocess_base );
-
-        if (fullname && fullname->contents && strlen((const char*)fullname->contents) > 0)
+        g_free(name);
+        // Replace 'proc_data->name' with 'fullname->contents'
+        // Moving ownership of fullname->contents to name for later cleanup
+        name = g_strdup((char*)fullname->contents);
+        // ImageFileName size differs between kernel builds & versions,
+        // relying on it would sometimes yield incomplete process name.
+        if ( !fullpath )
         {
-            // Replace 'proc_data->name' with 'fullname->contents'
-            // Moving ownership of fullname->contents to name for later cleanup
-            char* name = (char*)fullname->contents;
-            g_free( (gpointer)fullname );
-            return name;
-        }
+            char** tokens = g_strsplit(name, "\\", -1);
+            int index = 0;
 
-        if (fullname)
-            vmi_free_unicode_str(fullname);
+            if (tokens && tokens[index])
+            {
+                g_free(name);
+                while (tokens[index])
+                    name = tokens[index++];
+                name = g_strdup(name);
+            }
+
+            g_strfreev(tokens);
+        }
     }
 
-    return vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
+    if (fullname)
+        vmi_free_unicode_str(fullname);
+
+    return name;
 }
 
 char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base)
