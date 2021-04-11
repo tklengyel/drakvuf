@@ -258,6 +258,37 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
         return inject_trap_pa(drakvuf, trap, trap->breakpoint.addr);
     }
 
+    if ( trap->breakpoint.lookup_type == LOOKUP_KERNEL )
+    {
+        addr_t pa;
+        addr_t va = 0;
+
+        if ( trap->breakpoint.addr_type == ADDR_RVA )
+            va = drakvuf->kernbase + trap->breakpoint.rva;
+        else if ( trap->breakpoint.addr_type == ADDR_VA )
+            va = trap->breakpoint.addr;
+        else if ( trap->breakpoint.addr_type == ADDR_SYMBOL )
+        {
+            if ( !drakvuf_get_kernel_symbol_rva(drakvuf, trap->breakpoint.symbol, &va) )
+                return 0;
+            va += drakvuf->kernbase;
+        }
+
+        if ( !va )
+        {
+            PRINT_DEBUG("Invalid setting when using LOOKUP_KERNEL trap type, needs ADDR_RVA or ADDR_VA\n");
+            return 0;
+        }
+
+        if ( VMI_FAILURE == vmi_pagetable_lookup(drakvuf->vmi, drakvuf->kpgd, va, &pa) )
+        {
+            PRINT_DEBUG("Failed to find PA for breakpoint VA addr 0x%lx in the kernel using kpgd 0x%lx\n", va, drakvuf->kpgd);
+            return 0;
+        }
+
+        return inject_trap_pa(drakvuf, trap, pa);
+    }
+
     if (trap->breakpoint.lookup_type == LOOKUP_PID || trap->breakpoint.lookup_type == LOOKUP_NAME)
     {
         if (trap->breakpoint.addr_type == ADDR_RVA && trap->breakpoint.module)
@@ -267,10 +298,10 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
             const char* name = NULL;
             addr_t module_list = 0;
 
-            if (trap->breakpoint.pid == 4 || !strcmp(trap->breakpoint.proc, "System"))
+            if (VMI_OS_WINDOWS == drakvuf->os && (trap->breakpoint.pid == 0 || trap->breakpoint.pid == 4 || !strcmp(trap->breakpoint.proc, "System")))
             {
 
-                pid = 4;
+                pid = 0;
                 if (VMI_FAILURE == vmi_read_addr_ksym(drakvuf->vmi, "PsLoadedModuleList", &module_list))
                     return 0;
 

@@ -1547,6 +1547,10 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
     drakvuf->address_width = vmi_get_address_width(drakvuf->vmi);
     drakvuf->vcpus = vmi_get_num_vcpus(drakvuf->vmi);
     drakvuf->init_memsize = xen_get_maxmemkb(drakvuf->xen, drakvuf->domID);
+
+    if ( !drakvuf->kpgd )
+        vmi_get_offset(drakvuf->vmi, "kpgd", &drakvuf->kpgd);
+
     if ( xc_domain_maximum_gpfn(drakvuf->xen->xc, drakvuf->domID, &drakvuf->max_gpfn) < 0 )
         return 0;
 

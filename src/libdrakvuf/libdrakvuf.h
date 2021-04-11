@@ -142,6 +142,7 @@ typedef enum lookup_type
     LOOKUP_DTB,
     LOOKUP_PID,
     LOOKUP_NAME,
+    LOOKUP_KERNEL,
 } lookup_type_t;
 
 typedef enum addr_type
@@ -149,7 +150,8 @@ typedef enum addr_type
     __INVALID_ADDR_TYPE,
     ADDR_RVA,
     ADDR_VA,
-    ADDR_PA
+    ADDR_PA,
+    ADDR_SYMBOL,
 } addr_type_t;
 
 typedef enum trap_type
@@ -239,6 +241,7 @@ struct drakvuf_trap
             {
                 addr_t rva;
                 addr_t addr;
+                const char* symbol;
             };
         } breakpoint;
 
