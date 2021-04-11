@@ -134,7 +134,7 @@ bool inject_trap(drakvuf_t drakvuf,
     vmi_pid_t pid);
 bool inject_trap_mem(drakvuf_t drakvuf,
     drakvuf_trap_t* trap,
-    bool guard2, uint16_t view);
+    bool guard2);
 bool inject_trap_pa(drakvuf_t drakvuf,
     drakvuf_trap_t* trap,
     addr_t pa);

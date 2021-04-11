@@ -360,6 +360,7 @@ bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 bool inject_trap_catchall_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 
 event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event);
+event_response_t post_mem_idrx_cb(vmi_instance_t vmi, vmi_event_t* event);
 event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event);
 event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event);
 event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event);
