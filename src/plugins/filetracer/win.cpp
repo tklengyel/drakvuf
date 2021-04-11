@@ -589,8 +589,7 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
 
     drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
-    trap->breakpoint.lookup_type = LOOKUP_PID;
-    trap->breakpoint.pid = 4;
+    trap->breakpoint.lookup_type = LOOKUP_KERNEL;
     trap->breakpoint.addr_type = ADDR_VA;
     trap->breakpoint.addr = ret_addr;
     trap->type = BREAKPOINT;
