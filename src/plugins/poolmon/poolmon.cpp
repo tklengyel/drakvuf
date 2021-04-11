@@ -245,14 +245,9 @@ poolmon::poolmon(drakvuf_t drakvuf, output_format_t output)
 {
     this->pooltag_tree = pooltag_build_tree();
 
-    this->trap.breakpoint.lookup_type = LOOKUP_PID;
-    this->trap.breakpoint.pid = 4;
-    this->trap.breakpoint.addr_type = ADDR_RVA;
-
-    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "ExAllocatePoolWithTag", &this->trap.breakpoint.rva) )
-        throw -1;
-
-    this->trap.breakpoint.module = "ntoskrnl.exe";
+    this->trap.breakpoint.lookup_type = LOOKUP_KERNEL;
+    this->trap.breakpoint.addr_type = ADDR_SYMBOL;
+    this->trap.breakpoint.symbol = "ExAllocatePoolWithTag";
     this->trap.name = "ExAllocatePoolWithTag";
     this->trap.type = BREAKPOINT;
     this->trap.cb = cb;
