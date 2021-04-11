@@ -126,10 +126,8 @@ public:
 private:
     drakvuf_trap_t trap =
     {
-        .breakpoint.lookup_type = LOOKUP_PID,
-        .breakpoint.pid = 4,
-        .breakpoint.addr_type = ADDR_RVA,
-        .breakpoint.module = "ntoskrnl.exe",
+        .breakpoint.lookup_type = LOOKUP_KERNEL,
+        .breakpoint.addr_type = ADDR_SYMBOL,
         .type = BREAKPOINT,
         .data = (void*)this,
     };
