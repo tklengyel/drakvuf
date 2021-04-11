@@ -138,10 +138,8 @@ public:
     drakvuf_trap_t traps[6] =
     {
         [0 ... 5] = {
-            .breakpoint.lookup_type = LOOKUP_PID,
-            .breakpoint.pid = 4,
+            .breakpoint.lookup_type = LOOKUP_KERNEL,
             .breakpoint.addr_type = ADDR_RVA,
-            .breakpoint.module = "ntoskrnl.exe",
             .type = BREAKPOINT,
             .data = (void*)this,
             .ah_cb = nullptr

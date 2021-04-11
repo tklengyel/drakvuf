@@ -299,7 +299,7 @@ static void print_usage()
 #endif
 #ifdef ENABLE_PLUGIN_EXPLOITMON
         "\t --exploitmon-kernel2user-detect\n"
-        "\t                           Detect kernel thread execution in user mode. This degrades performance."
+        "\t                           Detect kernel thread execution in user mode. This degrades performance.\n"
 #endif
         "\t -h, --help                Show this help\n"
     );

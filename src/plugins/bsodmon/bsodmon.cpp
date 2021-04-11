@@ -157,12 +157,14 @@ bsodmon::bsodmon(drakvuf_t drakvuf, bool _abort_on_bsod, output_format_t output)
     , format{output}
     , abort_on_bsod{_abort_on_bsod}
 {
-    init_bugcheck_map( this, drakvuf );
-    trap.name = "KeBugCheck2";
+    init_bugcheck_map(this, drakvuf);
+
+    trap.breakpoint.symbol = "KeBugCheck2";
     trap.cb   = hook_cb;
     trap.ttl  = drakvuf_get_limited_traps_ttl(drakvuf);
-    if ( !drakvuf_get_kernel_symbol_rva( drakvuf, "KeBugCheck2", &trap.breakpoint.rva) ) throw -1;
-    if ( ! drakvuf_add_trap( drakvuf, &trap ) ) throw -1;
+
+    if ( !drakvuf_add_trap(drakvuf, &trap) )
+        throw -1;
 }
 
 bsodmon::~bsodmon()

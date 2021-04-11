@@ -577,7 +577,10 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
             .dtb = info->regs->cr3,
         );
         extract_file(f, drakvuf, info, vmi, file, &ctx, filename.c_str(), fo_flags, reason);
+        return;
     }
+
+    print_filedelete_information(f, drakvuf, info, filename.c_str(), reason, 0, 0, 0);
 }
 
 static bool save_file_chunk(filedelete* f, int file_sequence_number, void* buffer, size_t size)
@@ -1143,8 +1146,7 @@ static void createfile_cb_impl(drakvuf_t drakvuf, drakvuf_trap_info_t* info, add
     w->f = (filedelete*)info->trap->data;
 
     drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
-    trap->breakpoint.lookup_type = LOOKUP_PID;
-    trap->breakpoint.pid = 4;
+    trap->breakpoint.lookup_type = LOOKUP_KERNEL;
     trap->breakpoint.addr_type = ADDR_VA;
     trap->breakpoint.addr = ret_addr;
     trap->type = BREAKPOINT;
@@ -1211,7 +1213,6 @@ static event_response_t setinformation_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 
     if (f->is_stopping())
         return VMI_EVENT_RESPONSE_NONE;
-
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
