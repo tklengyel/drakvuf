@@ -575,7 +575,7 @@ drakvuf_trap_t* pluginex::register_trap(drakvuf_trap_info_t* info,
     int64_t ttl,
     ah_cb_t ah_cb)
 {
-    auto trap = new drakvuf_trap_t;
+    auto trap = new drakvuf_trap_t();
 
     if constexpr (std::is_same_v<Params, void>)
     {
