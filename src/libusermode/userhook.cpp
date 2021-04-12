@@ -380,7 +380,8 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
                 if (vmi_translate_sym2v(lg.vmi, &ctx, target.target_name.c_str(), &exec_func) != VMI_SUCCESS)
                 {
                     target.state = HOOK_FAILED;
-                    return VMI_EVENT_RESPONSE_NONE;
+                    PRINT_DEBUG("[USERHOOK] Failed to hook %s: failed to translate symbol to address\n", target.target_name.c_str());
+                    continue;
                 }
 
                 target.offset = exec_func - dll_meta->v.real_dll_base;
