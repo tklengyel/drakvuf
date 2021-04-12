@@ -379,7 +379,7 @@ bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     if (CR3 == trap->reg)
     {
-        if ( !drakvuf->cr3 && !control_cr3_trap(drakvuf, 1) )
+        if ( !drakvuf->cr3 && !drakvuf->enable_cr3_based_interception && !control_cr3_trap(drakvuf, 1) )
             return 0;
 
         drakvuf->cr3 = g_slist_prepend(drakvuf->cr3, trap);
@@ -439,7 +439,7 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
             ret = inject_trap_breakpoint(drakvuf, trap);
             break;
         case MEMACCESS:
-            ret = inject_trap_mem(drakvuf, trap, 0, drakvuf->altp2m_idx);
+            ret = inject_trap_mem(drakvuf, trap, 0);
             break;
         case REGISTER:
             ret = inject_trap_reg(drakvuf, trap);
