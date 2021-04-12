@@ -422,7 +422,7 @@ AC_ARG_ENABLE([plugin_libhooktest],
   [AS_HELP_STRING([--enable-plugin-libhooktest],
     [Enable libhooktest plugin for testing @<:@no@:>@])],
   [plugin_libhooktest="$enableval"],
-  [plugin_libhooktest=""])
+  [plugin_libhooktest="no"])
 AM_CONDITIONAL([PLUGIN_LIBHOOKTEST], [test x$plugin_libhooktest = xyes])
 if test x$plugin_libhooktest = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_LIBHOOKTEST, 1, "")

@@ -210,6 +210,7 @@ typedef struct drakvuf_trap_info
 struct drakvuf_trap
 {
     trap_type_t type;
+    uint64_t id;
     event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*);
     void* data;
 

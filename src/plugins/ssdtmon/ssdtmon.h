@@ -112,8 +112,8 @@ class ssdtmon: public plugin
 {
 public:
     output_format_t format;
-    drakvuf_trap_t ssdtwrite;
-    drakvuf_trap_t ssdtwrite2;
+    drakvuf_trap_t ssdtwrite{};
+    drakvuf_trap_t ssdtwrite2{};
 
     addr_t kiservicetable;
     uint32_t kiservicelimit;
