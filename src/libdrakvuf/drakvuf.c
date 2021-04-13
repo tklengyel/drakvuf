@@ -928,10 +928,17 @@ static bool is_valid_vcpu(drakvuf_t drakvuf, unsigned int vcpu)
     return vcpu < MAX_DRAKVUF_VCPU && drakvuf->vcpus > vcpu;
 }
 
-bool drakvuf_enable_ipt(drakvuf_t drakvuf, unsigned int vcpu, uint8_t** buf, uint64_t* size)
+bool drakvuf_enable_ipt(drakvuf_t drakvuf, unsigned int vcpu, uint8_t** buf, uint64_t* size, uint64_t flags)
 {
     if ( !is_valid_vcpu(drakvuf, vcpu) )
         return false;
+
+    uint64_t rtit_flags = 0;
+    rtit_flags |= (flags & DRAKVUF_IPT_BRANCH_EN) ? RTIT_CTL_BRANCH_EN : 0;
+    rtit_flags |= (flags & DRAKVUF_IPT_TRACE_OS) ? RTIT_CTL_OS : 0;
+    rtit_flags |= (flags & DRAKVUF_IPT_TRACE_USR) ? RTIT_CTL_USR : 0;
+    rtit_flags |= (flags & DRAKVUF_IPT_DIS_RETC) ? RTIT_CTL_DIS_RETC : 0;
+    xen_set_ipt_option(drakvuf->xen, drakvuf->domID, vcpu, MSR_RTIT_CTL, rtit_flags);
 
     if ( !xen_enable_ipt(drakvuf->xen, drakvuf->domID, vcpu, &drakvuf->ipt_state[vcpu]) )
         return false;

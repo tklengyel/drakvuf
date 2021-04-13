@@ -8,7 +8,7 @@
  * CLARIFICATIONS AND EXCEPTIONS DESCRIBED HEREIN.  This guarantees your   *
  * right to use, modify, and redistribute this software under certain      *
  * conditions.  If you wish to embed DRAKVUF technology into proprietary   *
- * software, alternative licenses can be acquired from the author.         *
+ * software, alternative licenses can be aquired from the author.          *
  *                                                                         *
  * Note that the GPL places important restrictions on "derivative works",  *
  * yet it does not provide a detailed definition of that term.  To avoid   *
@@ -102,68 +102,69 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef XEN_HELPER_H
-#define XEN_HELPER_H
+#ifndef IPT_H
+#define IPT_H
 
-#define LIBXL_API_VERSION 0x040500
-#define XC_WANT_COMPAT_EVTCHN_API 1
-#define XC_WANT_COMPAT_MAP_FOREIGN_API 1
+#include <array>
+#include <fstream>
 
-#include <stdbool.h>
-#include <libxl_utils.h>
-#include <xenctrl.h>
-#include <xenforeignmemory.h>
+#include "plugins/private.h"
+#include "plugins/plugins_ex.h"
 
-#define MSR_RTIT_CTL 0x00000570
-#define RTIT_CTL_OS        (1 <<  2)
-#define RTIT_CTL_USR       (1 <<  3)
-#define RTIT_CTL_DIS_RETC  (1 << 11)
-#define RTIT_CTL_BRANCH_EN (1 << 13)
+#define MAX_DRAKVUF_VCPU 16
 
-typedef struct xen_interface
+#define PTW_CURRENT_CR3  (0xC3000000)
+#define PTW_CURRENT_TID  (0x1D000000)
+#define PTW_EVENT_ID     (0xCC000000)
+#define PTW_ERROR_EMPTY  (0xBAD10000)
+
+struct ipt_config
 {
-    //struct xs_handle *xsh;
-    xc_interface* xc;
-    libxl_ctx* xl_ctx;
-    xentoollog_logger* xl_logger;
-    xc_evtchn* evtchn;             // the Xen event channel
-    int evtchn_fd;                 // its FD
+    // Location of IPT stream files
+    const char* ipt_dir;
+    // Trace code in ring 0
+    bool trace_os;
+    // Trace code in ring > 0
+    bool trace_user;
+};
 
-    xenforeignmemory_handle* fmem;
-} xen_interface_t;
-
-typedef struct ipt_state
+struct ipt_vcpu
 {
+    // vCPU number
+    int id;
+
+    // pointer to IPT buffer for this vCPU
     uint8_t* buf;
-    size_t size;
 
-    uint64_t offset;
+    // IPT buffer size
+    uint64_t size;
+
+    // where IPT data stream is saved
+    std::ofstream output_stream;
+
+    // used to diff between last buffer offset and current offset
     uint64_t last_offset;
 
-    xenforeignmemory_resource_handle* fres;
-} ipt_state_t;
+    // append ptwrite packet with given payload
+    void annotate(uint64_t data);
 
-/* FUNCTIONS */
+    // write data from IPT buffer to output_stream
+    void flush(uint64_t current_pos);
+};
 
-bool xen_init_interface(xen_interface_t** xen);
-void xen_free_interface(xen_interface_t* xen);
+class ipt: public pluginex
+{
+    int num_vcpus_ = 0;
+    // save drakvuf pointer to make cleanup possible
+    drakvuf_t drakvuf_ = nullptr;
+public:
+    std::array<ipt_vcpu, MAX_DRAKVUF_VCPU> vcpus;
 
-int get_dom_info(xen_interface_t* xen, const char* input, domid_t* domID,
-    char** name);
+    ipt(drakvuf_t drakvuf, const ipt_config& config, output_format_t output);
+    ~ipt();
 
-uint64_t xen_get_maxmemkb(xen_interface_t* xen, domid_t domID);
+    static drakvuf_trap_t* reg_cr3_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap);
+    static drakvuf_trap_t* reg_catchall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap);
+};
 
-bool xen_pause(xen_interface_t* xen, domid_t domID);
-void xen_resume(xen_interface_t* xen, domid_t domID);
-void xen_force_resume(xen_interface_t* xen, domid_t domID);
-bool xen_enable_altp2m(xen_interface_t* xen, domid_t domID);
-int xen_version(void);
-bool xen_get_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* regs);
-bool xen_set_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* regs);
-
-bool xen_enable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
-bool xen_get_ipt_offset(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
-bool xen_set_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t value);
-bool xen_get_ipt_option(xen_interface_t* xen, domid_t domID, unsigned int vcpu, uint64_t key, uint64_t* value);
-bool xen_disable_ipt(xen_interface_t* xen, domid_t domID, unsigned int vcpu, ipt_state_t* ipt_state);
 #endif

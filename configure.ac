@@ -438,6 +438,16 @@ if test x$plugin_exploitmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_EXPLOITMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_ipt],
+  [AS_HELP_STRING([--disable-plugin-ipt],
+    [Enable processor trace plugin @<:@yes@:>@])],
+  [plugin_ipt="$enableval"],
+  [plugin_ipt="yes"])
+AM_CONDITIONAL([PLUGIN_IPT], [test x$plugin_ipt = xyes])
+if test x$plugin_ipt = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_IPT, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -484,10 +494,10 @@ AS_IF([test "x$with_stdlib" != "xsystem"],
   [CXXFLAGS="$CXXFLAGS -stdlib=$with_stdlib"])
 
 AC_ARG_ENABLE([ipt],
-  [AS_HELP_STRING([--enable-ipt],
-    [Enable Intel Processor Trace support (special Xen version required) @<:@no@:>@])],
+  [AS_HELP_STRING([--disable-ipt],
+    [Enable Intel Processor Trace support (requires Xen 4.15) @<:@yes@:>@])],
   [enable_ipt="$enableval"],
-  [enable_ipt="no"])
+  [enable_ipt="yes"])
 AM_CONDITIONAL([ENABLE_IPT], [test x$enable_ipt = xyes])
 
 #####################################################
@@ -717,6 +727,7 @@ TLSMon:       $plugin_tlsmon
 Codemon:      $plugin_codemon
 Exploitmon:   $plugin_exploitmon
 LibHookTest:  $plugin_libhooktest
+IPT:          $plugin_ipt
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:       $plugin_wmimon
