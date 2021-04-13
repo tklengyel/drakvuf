@@ -124,6 +124,12 @@ void close_handler(int signal)
     drakvuf->interrupt(signal);
 }
 
+void timeout_handler(int signal)
+{
+    (void)signal;
+    drakvuf->interrupt(SIGDRAKVUFTIMEOUT);
+}
+
 static inline bool disable_plugin(char* optarg, bool* plugin_list)
 {
     for (int i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
@@ -322,7 +328,6 @@ int main(int argc, char** argv)
     char* target_process = nullptr;
     vmi_pid_t injection_pid = -1;
     uint32_t injection_thread = 0;
-    struct sigaction act;
     output_format_t output = OUTPUT_DEFAULT;
     bool plugin_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 1};
     int wait_stop_plugins = 0;
@@ -749,13 +754,19 @@ int main(int argc, char** argv)
     PRINT_DEBUG("DRAKVUF initializated\n");
 
     /* for a clean exit */
+    struct sigaction act;
     act.sa_handler = close_handler;
     act.sa_flags = 0;
     sigemptyset(&act.sa_mask);
     sigaction(SIGHUP, &act, nullptr);
     sigaction(SIGTERM, &act, nullptr);
     sigaction(SIGINT, &act, nullptr);
-    sigaction(SIGALRM, &act, nullptr);
+
+    struct sigaction act_timer;
+    act_timer.sa_handler = timeout_handler;
+    act_timer.sa_flags = 0;
+    sigemptyset(&act_timer.sa_mask);
+    sigaction(SIGALRM, &act_timer, nullptr);
 
     vmi_pid_t injected_pid = 0;
     if (injection_pid > 0 && inject_file)

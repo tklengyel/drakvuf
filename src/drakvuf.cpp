@@ -104,46 +104,31 @@
 
 #include "drakvuf.h"
 #include <stdexcept>
+#include <errno.h>
 
-static gpointer timer(gpointer data)
-{
-    drakvuf_c* drakvuf = (drakvuf_c*)data;
-
-    while (drakvuf->timeout && !drakvuf->interrupted)
-    {
-        sleep(1);
-        --drakvuf->timeout;
-    }
-
-    if (!drakvuf->interrupted)
-    {
-        drakvuf->interrupt(SIGDRAKVUFTIMEOUT);
-    }
-
-    g_thread_exit(nullptr);
-    return nullptr;
-}
-
-static GThread* startup_timer(drakvuf_c* drakvuf, int timeout)
+static bool startup_timer(drakvuf_c* drakvuf, int timeout)
 {
     drakvuf->interrupted = 0;
     drakvuf->timeout = timeout;
 
-    GThread* timeout_thread = nullptr;
-    if (drakvuf->timeout > 0)
-        timeout_thread = g_thread_new("timer", timer, (void*)drakvuf);
-    return timeout_thread;
+    struct itimerval it =
+    {
+        .it_value.tv_sec = timeout
+    };
+
+    if ( setitimer(ITIMER_REAL, &it, NULL) )
+    {
+        fprintf(stderr, "Failed to setup timeout: %i\n", errno);
+        return false;
+    }
+
+    return true;
 }
 
-static void cleanup_timer(drakvuf_c* drakvuf, GThread* timeout_thread)
+static void cleanup_timer(void)
 {
-    if (timeout_thread)
-    {
-        // Force stop timeout thread
-        if (drakvuf->timeout && !drakvuf->interrupted)
-            drakvuf->interrupted = -1;
-        g_thread_join(timeout_thread);
-    }
+    struct itimerval it {};
+    setitimer(ITIMER_REAL, &it, NULL);
 }
 
 int drakvuf_c::start_plugins(const bool* plugin_list, const plugins_options* options)
@@ -211,12 +196,14 @@ static bool is_stopped(drakvuf_t drakvuf, void* data)
 
 void drakvuf_c::plugin_stop_loop(int timeout, const bool* plugin_list)
 {
-    GThread* timeout_thread = startup_timer(this, timeout);
+    if ( !startup_timer(this, timeout) )
+        return;
+
     struct stop_plugins_data data;
     data._drakvuf_c = this;
     data.plugin_list = plugin_list;
     drakvuf_loop(drakvuf, ::is_stopped, (void*)&data);
-    cleanup_timer(this, timeout_thread);
+    cleanup_timer();
 }
 
 drakvuf_c::drakvuf_c(const char* domain,
@@ -271,9 +258,11 @@ int drakvuf_c::is_interrupted()
 
 void drakvuf_c::loop(int duration)
 {
-    GThread* timeout_thread = startup_timer(this, duration);
+    if ( !startup_timer(this, duration) )
+        return;
+
     drakvuf_loop(drakvuf, ::is_interrupted, nullptr);
-    cleanup_timer(this, timeout_thread);
+    cleanup_timer();
 }
 
 void drakvuf_c::pause()
@@ -336,7 +325,8 @@ injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
     const char* args[],
     vmi_pid_t* injected_pid)
 {
-    GThread* timeout_thread = startup_timer(this, timeout);
+    if ( !startup_timer(this, timeout) )
+        return INJECTOR_FAILED;
 
     auto rc = injector_start_app(drakvuf,
             injection_pid,
@@ -359,7 +349,7 @@ injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
     if (INJECTOR_SUCCEEDED != rc)
         fprintf(stderr, "Process startup failed\n");
 
-    cleanup_timer(this, timeout_thread);
+    cleanup_timer();
     return rc;
 }
 
@@ -396,10 +386,11 @@ void drakvuf_c::terminate(vmi_pid_t injection_pid,
     else
         injector_terminate(drakvuf, injection_pid, injection_tid, pid);
 
-    GThread* timeout_thread = startup_timer(this, termination_timeout);
+    if ( !startup_timer(this, termination_timeout) )
+        return;
 
     auto info = termination_info(terminated_processes, pid);
     drakvuf_loop(drakvuf, is_terminated, &info);
 
-    cleanup_timer(this, timeout_thread);
+    cleanup_timer();
 }
