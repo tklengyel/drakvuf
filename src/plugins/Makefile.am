@@ -293,6 +293,11 @@ sources += exploitmon/exploitmon.h
 sources += exploitmon/private.h
 endif
 
+if PLUGIN_IPT
+sources += ipt/ipt.cpp
+sources += ipt/ipt.h
+endif
+
 ###############################################################################
 sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h type_traits_helpers.h filesystem.hpp hook_helpers.h
 sources += output_format.h output_format/common.h output_format/csvfmt.h output_format/deffmt.h output_format/jsonfmt.h output_format/kvfmt.h
