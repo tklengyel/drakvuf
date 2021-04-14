@@ -500,6 +500,13 @@ AC_ARG_ENABLE([ipt],
   [enable_ipt="yes"])
 AM_CONDITIONAL([ENABLE_IPT], [test x$enable_ipt = xyes])
 
+AC_ARG_ENABLE([xtf],
+  [AS_HELP_STRING([--enable-xtf],
+    [Enable the XTF test tool @<:@no@:>@])],
+  [xtf="$enableval"],
+  [xtf="no"])
+AM_CONDITIONAL([XTF], [test x$xtf = xyes])
+
 #####################################################
 # AUTOHARDEN START
 # We want to check for compiler flag support, but there is no way to make

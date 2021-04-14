@@ -166,6 +166,12 @@ injector_LDADD += libinjector/libinjector.la
 
 proc_stat_LDADD = libdrakvuf/libdrakvuf.la
 
+if XTF
+bin_PROGRAMS += xtf
+xtf_SOURCES = xtf.c
+xtf_LDADD = libdrakvuf/libdrakvuf.la
+endif
+
 if REPL
 bin_PROGRAMS += repl
 
