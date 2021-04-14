@@ -166,7 +166,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
 bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool _verbose, bool libvmi_conf, addr_t kpgd, bool fast_singlestep, uint64_t limited_traps_ttl)
 {
 
-    if ( !domain || !json_kernel_path )
+    if ( !domain )
         return 0;
 
 #ifdef DRAKVUF_DEBUG
@@ -176,11 +176,11 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
     *drakvuf = (drakvuf_t)g_try_malloc0(sizeof(struct drakvuf));
 
     (*drakvuf)->limited_traps_ttl = limited_traps_ttl;
-
-    (*drakvuf)->json_kernel_path = g_strdup(json_kernel_path);
-
     (*drakvuf)->context_switch_intercept_processes = NULL;
     (*drakvuf)->enable_cr3_based_interception = false;
+
+    if ( json_kernel_path )
+        (*drakvuf)->json_kernel_path = g_strdup(json_kernel_path);
 
     if ( json_wow_path )
     {
@@ -224,8 +224,7 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
         case VMI_OS_UNKNOWN: /* fall-through */
         case VMI_OS_FREEBSD: /* fall-through */
         default:
-            fprintf(stderr, "The Rekall profile describes an unknown operating system kernel!\n");
-            goto err;
+            break;
     }
 
     PRINT_DEBUG("libdrakvuf initialized\n");
@@ -362,7 +361,10 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
         {
             addr_t trap_pa;
             if ( VMI_FAILURE == vmi_pagetable_lookup(drakvuf->vmi, trap->breakpoint.dtb, trap->breakpoint.addr, &trap_pa) )
+            {
+                PRINT_DEBUG("Breakpoint VA 0x%" PRIx64" not found in pagetable at 0x%" PRIx64 "\n", trap->breakpoint.addr, trap->breakpoint.dtb);
                 return 0;
+            }
 
             PRINT_DEBUG("Breakpoint VA 0x%" PRIx64" -> PA 0x%" PRIx64 "\n", trap->breakpoint.addr, trap_pa);
 

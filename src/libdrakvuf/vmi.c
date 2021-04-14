@@ -1590,7 +1590,7 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
 
     if (libvmi_conf)
         drakvuf->os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL);
-    else
+    else if ( drakvuf->json_kernel_path )
     {
         GHashTable* config = g_hash_table_new(g_str_hash, g_str_equal);
         g_hash_table_insert(config, "volatility_ist", drakvuf->json_kernel_path);
@@ -1601,20 +1601,20 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
         drakvuf->os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GHASHTABLE, config, NULL);
         g_hash_table_destroy(config);
     }
-
-    if ( drakvuf->os == VMI_OS_UNKNOWN )
+    else
     {
-        PRINT_DEBUG("Failed to init LibVMI library.\n");
-        return 0;
+        vmi_init_paging(drakvuf->vmi, 0);
+        drakvuf->os = VMI_OS_UNKNOWN;
     }
-    PRINT_DEBUG("init_vmi: initializing vmi OS done\n");
+
+    PRINT_DEBUG("init_vmi: initializing vmi OS bits done: %u\n", drakvuf->os);
 
     drakvuf->pm = vmi_get_page_mode(drakvuf->vmi, 0);
     drakvuf->address_width = vmi_get_address_width(drakvuf->vmi);
     drakvuf->vcpus = vmi_get_num_vcpus(drakvuf->vmi);
     drakvuf->init_memsize = xen_get_maxmemkb(drakvuf->xen, drakvuf->domID);
 
-    if ( !drakvuf->kpgd )
+    if ( !drakvuf->kpgd && drakvuf->os != VMI_OS_UNKNOWN )
         vmi_get_offset(drakvuf->vmi, "kpgd", &drakvuf->kpgd);
 
     if ( xc_domain_maximum_gpfn(drakvuf->xen->xc, drakvuf->domID, &drakvuf->max_gpfn) < 0 )
