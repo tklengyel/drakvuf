@@ -714,6 +714,7 @@ int main(int argc, char** argv)
                 break;
             case opt_codemon_default_benign:
                 options.codemon_default_benign = true;
+                break;
 #endif
 #ifdef ENABLE_PLUGIN_IPT
             case opt_ipt_dir:
