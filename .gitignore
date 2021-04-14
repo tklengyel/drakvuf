@@ -38,6 +38,7 @@ injector
 xen_memclone
 proc_stat
 repl
+xtf
 
 libtool
 ltmain.sh
