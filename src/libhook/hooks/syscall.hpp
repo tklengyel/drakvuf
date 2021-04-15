@@ -167,7 +167,7 @@ auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_
 
     // not using std::make_unique because ctor is private
     auto hook = std::unique_ptr<SyscallHook>(new SyscallHook(drakvuf, syscall_name, cb));
-    hook->trap_ = new drakvuf_trap_t();
+    hook->trap_ = new drakvuf_trap_t;
 
     if (!drakvuf_get_kernel_symbol_rva(hook->drakvuf_, hook->syscall_name_.c_str(), &hook->trap_->breakpoint.rva))
     {

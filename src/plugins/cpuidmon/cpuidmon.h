@@ -112,7 +112,7 @@ class cpuidmon: public plugin
 {
 public:
     output_format_t format;
-    drakvuf_trap_t cpuid{};
+    drakvuf_trap_t cpuid;
     drakvuf_t drakvuf;
     bool stealth;
 

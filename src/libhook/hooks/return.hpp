@@ -167,7 +167,7 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
 
     // not using std::make_unique because ctor is private
     auto hook = std::unique_ptr<ReturnHook>(new ReturnHook(drakvuf, cb));
-    hook->trap_ = new drakvuf_trap_t();
+    hook->trap_ = new drakvuf_trap_t;
 
     auto ret_addr = drakvuf_get_function_return_address(drakvuf, info);
     if (!ret_addr)
