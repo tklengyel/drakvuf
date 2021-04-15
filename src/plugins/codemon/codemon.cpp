@@ -568,9 +568,6 @@ bool setup_dump_context(mmvad_info_t mmvad,
     ctx_memory_dump->translate_mechanism = VMI_TM_PROCESS_DTB;
     //The CR3 reg stores the address to the directory table base
     ctx_memory_dump->dtb = cr3;
-    //Required to be set to "null"
-    ctx_memory_dump->ksym = nullptr;
-    ctx_memory_dump->pid = 0;
 
     //Option to dump the whole VAD node instead of just a single page
     if (dump_vad)
