@@ -913,7 +913,7 @@ void remove_trap(drakvuf_t drakvuf,
     {
         case BREAKPOINT:
         {
-            struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_trap, &trap);
+            struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_trap, trap);
 
             if ( !container )
                 return;
@@ -924,7 +924,7 @@ void remove_trap(drakvuf_t drakvuf,
             PRINT_DEBUG("Removing breakpoint trap from 0x%lx.\n",
                 container->breakpoint.pa);
 
-            g_hash_table_remove(drakvuf->breakpoint_lookup_trap, &trap);
+            g_hash_table_remove(drakvuf->breakpoint_lookup_trap, trap);
             container->traps = g_slist_remove(container->traps, trap);
 
             /* Update list of traps on this gfn */
@@ -988,7 +988,7 @@ void remove_trap(drakvuf_t drakvuf,
         case MEMACCESS:
         {
             status_t ret;
-            struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_trap, &trap);
+            struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_trap, trap);
             if ( !container )
                 return;
 
@@ -1005,7 +1005,7 @@ void remove_trap(drakvuf_t drakvuf,
                     if ( remapped_gfn )
                         remapped_gfn->active = 0;
 
-                    g_hash_table_remove(drakvuf->memaccess_lookup_trap, &trap);
+                    g_hash_table_remove(drakvuf->memaccess_lookup_trap, trap);
                     g_hash_table_remove(drakvuf->memaccess_lookup_gfn, &container->memaccess.gfn);
 
                 }
@@ -1110,7 +1110,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
         }
 
         s->traps = g_slist_prepend(s->traps, trap);
-        g_hash_table_insert(drakvuf->memaccess_lookup_trap, g_memdup(&trap, sizeof(void*)), s);
+        g_hash_table_insert(drakvuf->memaccess_lookup_trap, trap, s);
         return 1;
     }
     else
@@ -1138,7 +1138,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
         }
 
         g_hash_table_insert(drakvuf->memaccess_lookup_gfn, g_memdup(&s->memaccess.gfn, sizeof(addr_t)), s);
-        g_hash_table_insert(drakvuf->memaccess_lookup_trap, g_memdup(&trap, sizeof(void*)), s);
+        g_hash_table_insert(drakvuf->memaccess_lookup_trap, trap, s);
     }
 
     return 1;
@@ -1158,7 +1158,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     if (container)
     {
         g_hash_table_insert(drakvuf->breakpoint_lookup_trap,
-            g_memdup(&trap, sizeof(void*)),
+            trap,
             container);
         container->traps = g_slist_prepend(container->traps, trap);
 
@@ -1343,7 +1343,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     uint64_t _current_gfn = current_gfn;
     g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, g_memdup(&_current_gfn, sizeof(uint64_t)), traps);
     g_hash_table_insert(drakvuf->breakpoint_lookup_pa, g_memdup(&container->breakpoint.pa, sizeof(addr_t)), container);
-    g_hash_table_insert(drakvuf->breakpoint_lookup_trap, g_memdup(&trap, sizeof(void*)), container);
+    g_hash_table_insert(drakvuf->breakpoint_lookup_trap, trap, container);
 
     PRINT_DEBUG("\t\tTrap added @ PA 0x%" PRIx64 " RPA 0x%" PRIx64 " Page %" PRIu64 " for %s.\n",
         container->breakpoint.pa, rpa, pa >> 12, trap->name);
@@ -1634,9 +1634,9 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
     // Crete tables to lookup breakpoints
     drakvuf->breakpoint_lookup_pa = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free_wrapper);
     drakvuf->breakpoint_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
-    drakvuf->breakpoint_lookup_trap = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->breakpoint_lookup_trap = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
     drakvuf->memaccess_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free_wrapper);
-    drakvuf->memaccess_lookup_trap = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->memaccess_lookup_trap = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
     drakvuf->remapped_gfns = g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free_remapped_gfn);
     drakvuf->remove_traps = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
 
