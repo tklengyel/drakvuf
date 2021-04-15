@@ -424,14 +424,12 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
     if (!trap || !trap->cb)
         return 0;
 
-    if (!trap->id)
-        trap->id = ++drakvuf->trap_counter;
     if (!trap->ah_cb)
         trap->ah_cb = drakvuf_unhook_trap;
 
-    if (g_hash_table_lookup(drakvuf->remove_traps, GSIZE_TO_POINTER(trap->id)))
+    if (g_hash_table_lookup(drakvuf->remove_traps, &trap))
     {
-        g_hash_table_remove(drakvuf->remove_traps, GSIZE_TO_POINTER(trap->id));
+        g_hash_table_remove(drakvuf->remove_traps, &trap);
         return 1;
     }
 
@@ -479,7 +477,9 @@ void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap,
             free_wrapper = (struct free_trap_wrapper*)g_slice_alloc0(sizeof(struct free_trap_wrapper));
             free_wrapper->free_routine = free_routine;
             free_wrapper->trap = trap;
-            g_hash_table_insert(drakvuf->remove_traps, GSIZE_TO_POINTER(trap->id), free_wrapper);
+            g_hash_table_insert(drakvuf->remove_traps,
+                g_memdup(&trap, sizeof(void*)),
+                free_wrapper);
         }
 
         free_wrapper->counter++;

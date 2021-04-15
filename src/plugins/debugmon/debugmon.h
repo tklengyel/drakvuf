@@ -112,7 +112,7 @@ class debugmon: public plugin
 {
 public:
     output_format_t format;
-    drakvuf_trap_t debug{};
+    drakvuf_trap_t debug;
     drakvuf_t drakvuf;
 
     debugmon(drakvuf_t drakvuf, output_format_t output);

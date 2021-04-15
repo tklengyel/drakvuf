@@ -189,7 +189,7 @@ void process_free_requests(drakvuf_t drakvuf)
     }
 
     g_hash_table_destroy(drakvuf->remove_traps);
-    drakvuf->remove_traps = g_hash_table_new(g_direct_hash, g_direct_equal);
+    drakvuf->remove_traps = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
 }
 
 static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
@@ -223,7 +223,7 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
 
         addr_t* pa = (addr_t*)loop->data;
         uint8_t test = 0;
-        struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(*pa));
+        struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, pa);
 
         if ( VMI_FAILURE == vmi_read_8_pa(vmi, *pa, &test) )
         {
@@ -284,7 +284,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
      * The trap may have been removed since in another callback,
      * in which case we have nothing to do.
      */
-    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, GSIZE_TO_POINTER(pass->gfn));
+    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &pass->gfn);
     if (!s)
     {
         PRINT_DEBUG("Post mem cb @ 0x%lx has been cleared\n", pass->gfn);
@@ -463,8 +463,8 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
         pass->drakvuf = drakvuf;
         pass->gfn = event->mem_event.gfn;
         pass->pa = pa;
-        pass->traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(pass->gfn));
-        pass->remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, GSIZE_TO_POINTER(pass->gfn));
+        pass->traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &pass->gfn);
+        pass->remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &pass->gfn);
 
         event->slat_id = 0;
 
@@ -475,7 +475,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
             VMI_EVENT_RESPONSE_SLAT_ID;
     }
 
-    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, GSIZE_TO_POINTER(event->mem_event.gfn));
+    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &event->mem_event.gfn);
     if (!s)
     {
         PRINT_DEBUG("Event has been cleared for GFN 0x%lx but we are still in view %u\n",
@@ -518,7 +518,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     /* We need to call breakpoint handlers registered for this physical address */
     if (event->mem_event.out_access & VMI_MEMACCESS_X)
     {
-        struct wrapper* sbp = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(pa));
+        struct wrapper* sbp = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
         if (sbp)
         {
             PRINT_DEBUG("Simulated INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64"\n",
@@ -543,7 +543,7 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     process_free_requests(drakvuf);
 
     // Check if we have traps still active on this page
-    s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, GSIZE_TO_POINTER(event->mem_event.gfn));
+    s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &event->mem_event.gfn);
     if (s)
     {
         /*
@@ -577,9 +577,9 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
              */
             if ( event->mem_event.out_access & VMI_MEMACCESS_W )
             {
-                pass->traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(pass->gfn));
+                pass->traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &pass->gfn);
                 if ( pass->traps )
-                    pass->remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, GSIZE_TO_POINTER(pass->gfn));
+                    pass->remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &pass->gfn);
             }
         }
         else
@@ -635,7 +635,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
         event->interrupt_event.gla, event->interrupt_event.insn_length);
 #endif
 
-    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(pa));
+    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
     if (!s)
     {
         /*
@@ -729,7 +729,7 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     process_free_requests(drakvuf);
 
     // Check if we have traps still active on this breakpoint
-    if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(pa)) )
+    if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa) )
     {
         PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u\n", event->vcpu_id);
         event->slat_id = 0;
@@ -913,33 +913,34 @@ void remove_trap(drakvuf_t drakvuf,
     {
         case BREAKPOINT:
         {
-            struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_trap, GSIZE_TO_POINTER(trap->id));
+            struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_trap, &trap);
 
             if ( !container )
                 return;
 
             xen_pfn_t current_gfn = container->breakpoint.pa >> 12;
+            uint64_t _current_gfn = current_gfn;
 
             PRINT_DEBUG("Removing breakpoint trap from 0x%lx.\n",
                 container->breakpoint.pa);
 
-            g_hash_table_remove(drakvuf->breakpoint_lookup_trap, GSIZE_TO_POINTER(trap->id));
+            g_hash_table_remove(drakvuf->breakpoint_lookup_trap, &trap);
             container->traps = g_slist_remove(container->traps, trap);
 
             /* Update list of traps on this gfn */
-            GSList* traps_on_gfn = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn));
+            GSList* traps_on_gfn = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &_current_gfn);
             traps_on_gfn = g_slist_remove(traps_on_gfn, &container->breakpoint.pa);
-            g_hash_table_remove(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn));
+            g_hash_table_remove(drakvuf->breakpoint_lookup_gfn, &_current_gfn);
 
             if ( traps_on_gfn )
             {
                 // the list head may change so we force a reinsert
-                g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn), traps_on_gfn);
+                g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, g_memdup(&_current_gfn, sizeof(uint64_t)), traps_on_gfn);
             }
 
             if (!container->traps)
             {
-                struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, GSIZE_TO_POINTER(current_gfn));
+                struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &current_gfn);
                 uint8_t backup;
 
                 if ( VMI_FAILURE == vmi_read_8_pa(drakvuf->vmi, container->breakpoint.pa, &backup) )
@@ -987,7 +988,7 @@ void remove_trap(drakvuf_t drakvuf,
         case MEMACCESS:
         {
             status_t ret;
-            struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_trap, GSIZE_TO_POINTER(trap->id));
+            struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_trap, &trap);
             if ( !container )
                 return;
 
@@ -1000,12 +1001,12 @@ void remove_trap(drakvuf_t drakvuf,
                     PRINT_DEBUG("Removed memtrap for GFN 0x%lx in altp2m view %u\n",
                         container->memaccess.gfn, drakvuf->altp2m_idx);
 
-                    struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, GSIZE_TO_POINTER(container->memaccess.gfn));
+                    struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &container->memaccess.gfn);
                     if ( remapped_gfn )
                         remapped_gfn->active = 0;
 
-                    g_hash_table_remove(drakvuf->memaccess_lookup_trap, GSIZE_TO_POINTER(trap->id));
-                    g_hash_table_remove(drakvuf->memaccess_lookup_gfn, GSIZE_TO_POINTER(container->memaccess.gfn));
+                    g_hash_table_remove(drakvuf->memaccess_lookup_trap, &trap);
+                    g_hash_table_remove(drakvuf->memaccess_lookup_gfn, &container->memaccess.gfn);
 
                 }
                 return;
@@ -1074,7 +1075,7 @@ void remove_trap(drakvuf_t drakvuf,
 
 bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
 {
-    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, GSIZE_TO_POINTER(trap->memaccess.gfn));
+    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &trap->memaccess.gfn);
 
     // We already have a trap registered on this page
     // check if type matches, if so, add trap to the list
@@ -1109,7 +1110,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
         }
 
         s->traps = g_slist_prepend(s->traps, trap);
-        g_hash_table_insert(drakvuf->memaccess_lookup_trap, GSIZE_TO_POINTER(trap->id), s);
+        g_hash_table_insert(drakvuf->memaccess_lookup_trap, g_memdup(&trap, sizeof(void*)), s);
         return 1;
     }
     else
@@ -1136,8 +1137,8 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
             return 0;
         }
 
-        g_hash_table_insert(drakvuf->memaccess_lookup_gfn, GSIZE_TO_POINTER(trap->memaccess.gfn), s);
-        g_hash_table_insert(drakvuf->memaccess_lookup_trap, GSIZE_TO_POINTER(trap->id), s);
+        g_hash_table_insert(drakvuf->memaccess_lookup_gfn, g_memdup(&s->memaccess.gfn, sizeof(addr_t)), s);
+        g_hash_table_insert(drakvuf->memaccess_lookup_trap, g_memdup(&trap, sizeof(void*)), s);
     }
 
     return 1;
@@ -1152,19 +1153,24 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     // check if already marked
     vmi_instance_t vmi = drakvuf->vmi;
     xen_pfn_t current_gfn = pa >> 12;
-    struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(pa));
+    struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
 
     if (container)
     {
-        g_hash_table_insert(drakvuf->breakpoint_lookup_trap, GSIZE_TO_POINTER(trap->id), container);
+        g_hash_table_insert(drakvuf->breakpoint_lookup_trap,
+            g_memdup(&trap, sizeof(void*)),
+            container);
         container->traps = g_slist_prepend(container->traps, trap);
 
-        GSList* traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn));
+        GSList* traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &current_gfn);
         traps = g_slist_append(traps, &container->breakpoint.pa);
 
         /* this should never happen but at least it makes some static analyzers happy */
         if ( 1 == g_slist_length(traps) )
-            g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn), traps);
+            g_hash_table_insert(drakvuf->breakpoint_lookup_gfn,
+                g_memdup(&current_gfn, sizeof(xen_pfn_t)),
+                traps);
+
         return 1;
     }
 
@@ -1177,7 +1183,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     container->breakpoint.pa = pa;
 
     /* Let's see if we have already created the shadow copy of this page */
-    struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, GSIZE_TO_POINTER(current_gfn));
+    struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &current_gfn);
 
     if ( !remapped_gfn )
     {
@@ -1197,14 +1203,16 @@ bool inject_trap_pa(drakvuf_t drakvuf,
             goto err_exit;
         }
 
-        g_hash_table_insert(drakvuf->remapped_gfns, GSIZE_TO_POINTER(remapped_gfn->o), remapped_gfn);
+        g_hash_table_insert(drakvuf->remapped_gfns,
+            &remapped_gfn->o,
+            remapped_gfn);
     }
 
     /*
      * The page may have been remapped previously but if it has no active traps
      * then the contents may be stale, so we copy it in that case just to make sure
      */
-    if (!g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(remapped_gfn->o)) )
+    if (!g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &remapped_gfn->o) )
     {
         uint8_t backup[VMI_PS_4KB];
         if ( VMI_FAILURE == vmi_read_pa(drakvuf->vmi, current_gfn<<12, VMI_PS_4KB, &backup, NULL) )
@@ -1328,13 +1336,14 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     }
 
     // list of traps on this page
-    GSList* traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn));
+    GSList* traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &current_gfn);
     traps = g_slist_append(traps, &container->breakpoint.pa);
 
     // save trap location into lookup tree
-    g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(current_gfn), traps);
-    g_hash_table_insert(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(pa), container);
-    g_hash_table_insert(drakvuf->breakpoint_lookup_trap, GSIZE_TO_POINTER(trap->id), container);
+    uint64_t _current_gfn = current_gfn;
+    g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, g_memdup(&_current_gfn, sizeof(uint64_t)), traps);
+    g_hash_table_insert(drakvuf->breakpoint_lookup_pa, g_memdup(&container->breakpoint.pa, sizeof(addr_t)), container);
+    g_hash_table_insert(drakvuf->breakpoint_lookup_trap, g_memdup(&trap, sizeof(void*)), container);
 
     PRINT_DEBUG("\t\tTrap added @ PA 0x%" PRIx64 " RPA 0x%" PRIx64 " Page %" PRIu64 " for %s.\n",
         container->breakpoint.pa, rpa, pa >> 12, trap->name);
@@ -1344,7 +1353,7 @@ err_exit:
     if ( container->traps )
         g_slist_free(container->traps);
     if ( remapped_gfn )
-        g_hash_table_remove(drakvuf->remapped_gfns, GSIZE_TO_POINTER(remapped_gfn->o));
+        g_hash_table_remove(drakvuf->remapped_gfns, &remapped_gfn->o);
     g_slice_free(struct wrapper, container);
     return 0;
 }
@@ -1623,13 +1632,13 @@ bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep)
     PRINT_DEBUG("Max GPFN: 0x%lx\n", drakvuf->max_gpfn);
 
     // Crete tables to lookup breakpoints
-    drakvuf->breakpoint_lookup_pa = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, free_wrapper);
-    drakvuf->breakpoint_lookup_gfn = g_hash_table_new(g_direct_hash, g_direct_equal);
-    drakvuf->breakpoint_lookup_trap = g_hash_table_new(g_direct_hash, g_direct_equal);
-    drakvuf->memaccess_lookup_gfn = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, free_wrapper);
-    drakvuf->memaccess_lookup_trap = g_hash_table_new(g_direct_hash, g_direct_equal);
-    drakvuf->remapped_gfns = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, free_remapped_gfn);
-    drakvuf->remove_traps = g_hash_table_new(g_direct_hash, g_direct_equal);
+    drakvuf->breakpoint_lookup_pa = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free_wrapper);
+    drakvuf->breakpoint_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->breakpoint_lookup_trap = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->memaccess_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free_wrapper);
+    drakvuf->memaccess_lookup_trap = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->remapped_gfns = g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free_remapped_gfn);
+    drakvuf->remove_traps = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
 
     unsigned int i;
     /*

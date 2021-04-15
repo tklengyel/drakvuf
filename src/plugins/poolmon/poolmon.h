@@ -113,7 +113,7 @@ class poolmon: public plugin
 public:
     output_format_t format;
     GTree* pooltag_tree;
-    drakvuf_trap_t trap{};
+    drakvuf_trap_t trap;
 
     poolmon(drakvuf_t drakvuf, output_format_t output);
     ~poolmon();
