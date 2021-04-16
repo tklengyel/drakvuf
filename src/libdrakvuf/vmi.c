@@ -245,8 +245,9 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
              * If a write was observed near or at a breakpoint we automatically
              * fall back to memory access permission based monitoring.
              */
-            if ( pass->pa <= *pa && pass->pa >= *pa-14 )
+            if ( pass->pa < *pa && pass->pa >= *pa-14 )
             {
+                PRINT_DEBUG("Write happened near a breakpoint at 0x%lx, switching to mem X-based monitoring\n", *pa);
                 remove_trap(drakvuf, &s->breakpoint.guard);
                 s->breakpoint.guard.memaccess.access |= VMI_MEMACCESS_X;
                 if ( !inject_trap_mem(drakvuf, &s->breakpoint.guard, 0) )
@@ -416,8 +417,12 @@ static void fill_common_event_trap_info(drakvuf_t drakvuf, drakvuf_trap_info_t* 
     uint32_t thread_id;
     if (!drakvuf_get_current_thread_id(drakvuf, trap_info, &thread_id))
     {
-        PRINT_DEBUG("[TRAP_INFO] Failed to get TID\n");
+#ifdef DRAKVUF_DEBUG
+        if ( drakvuf->json_kernel_path )
+            PRINT_DEBUG("[TRAP_INFO] Failed to get TID\n");
+#endif
         thread_id = 0;
+        return;
     }
 
     drakvuf_get_process_data_priv(drakvuf, process_base, proc_data);
