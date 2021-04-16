@@ -171,9 +171,9 @@ event_response_t cpuid_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if ( counter == 2 )
     {
-        if ( info->cpuid->subleaf != 0xFF )
+        if ( info->cpuid->subleaf )
         {
-            printf("Shadow page test FAILED\n");
+            printf("Shadow page test FAILED at test %u\n", info->cpuid->subleaf);
             ret = 1;
         }
         else
@@ -196,7 +196,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    if (!drakvuf_init(&drakvuf, argv[1], NULL, NULL, false, false, 0, false, UNLIMITED_TTL))
+    if (!drakvuf_init(&drakvuf, argv[1], NULL, NULL, true, false, 0, false, UNLIMITED_TTL))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", argv[1]);
         return 1;
