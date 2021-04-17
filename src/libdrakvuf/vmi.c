@@ -1789,16 +1789,27 @@ void close_vmi(drakvuf_t drakvuf)
 
     drakvuf_pause(drakvuf);
 
-    if (VMI_FAILURE == vmi_slat_switch(drakvuf->vmi, 0))
-        PRINT_DEBUG("Failed to switch on default view\n");
-    if (drakvuf->altp2m_idx && VMI_FAILURE == vmi_slat_destroy(drakvuf->vmi, drakvuf->altp2m_idx))
-        fprintf(stderr, "Altp2m view X %u destruction failed\n", drakvuf->altp2m_idx);
-    if (drakvuf->altp2m_idr && VMI_FAILURE == vmi_slat_destroy(drakvuf->vmi, drakvuf->altp2m_idr))
-        fprintf(stderr, "Altp2m view R %u destruction failed\n", drakvuf->altp2m_idr);
-    if (drakvuf->altp2m_idrx && VMI_FAILURE == vmi_slat_destroy(drakvuf->vmi, drakvuf->altp2m_idrx))
-        fprintf(stderr, "Altp2m view RX %u destruction failed\n", drakvuf->altp2m_idrx);
-    if (VMI_FAILURE == vmi_slat_set_domain_state(drakvuf->vmi, false))
-        PRINT_DEBUG("Failed to disable alternate SLAT\n");
+    if (drakvuf->vmi)
+    {
+        // clear the ring
+        vmi_events_listen(drakvuf->vmi, 0);
+
+        if (VMI_FAILURE == vmi_slat_switch(drakvuf->vmi, 0))
+            fprintf(stderr, "Failed to switch on default view\n");
+        if (drakvuf->altp2m_idx && VMI_FAILURE == vmi_slat_destroy(drakvuf->vmi, drakvuf->altp2m_idx))
+            fprintf(stderr, "Altp2m view X %u destruction failed\n", drakvuf->altp2m_idx);
+        if (drakvuf->altp2m_idr && VMI_FAILURE == vmi_slat_destroy(drakvuf->vmi, drakvuf->altp2m_idr))
+            fprintf(stderr, "Altp2m view R %u destruction failed\n", drakvuf->altp2m_idr);
+        if (drakvuf->altp2m_idrx && VMI_FAILURE == vmi_slat_destroy(drakvuf->vmi, drakvuf->altp2m_idrx))
+            fprintf(stderr, "Altp2m view RX %u destruction failed\n", drakvuf->altp2m_idrx);
+        if (VMI_FAILURE == vmi_slat_set_domain_state(drakvuf->vmi, false))
+            fprintf(stderr, "Failed to disable alternate SLAT\n");
+
+        // clear the generic mem_event to speed up shutdown
+        vmi_clear_event(drakvuf->vmi, &drakvuf->mem_event, NULL);
+        vmi_destroy(drakvuf->vmi);
+        drakvuf->vmi = NULL;
+    }
 
     if (drakvuf->memaccess_lookup_gfn)
     {
@@ -1903,14 +1914,6 @@ void close_vmi(drakvuf_t drakvuf)
     drakvuf->altp2m_idx = 0;
     drakvuf->altp2m_idr = 0;
     drakvuf->sink_page_gfn = 0;
-
-    if (drakvuf->vmi)
-    {
-        // clear the generic mem_event to speed up shutdown
-        vmi_clear_event(drakvuf->vmi, &drakvuf->mem_event, NULL);
-        vmi_destroy(drakvuf->vmi);
-        drakvuf->vmi = NULL;
-    }
 
     drakvuf_resume(drakvuf);
 
