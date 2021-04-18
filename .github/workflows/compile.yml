@@ -18,7 +18,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get remove -y clang
-          sudo apt-get install -y clang-10 autoconf-archive flex bison libjson-c-dev
+          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
       - name: Get Xen version
         id: get-xen-hash
         run: |
@@ -32,7 +32,7 @@ jobs:
       - name: Create Xen debball
         if: steps.cache-xen.outputs.cache-hit != 'true'
         run: |
-          sudo apt-get install -y wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev bzip2 libpci-dev build-essential make gcc clang libc6-dev libc6-dev-i386 linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libglib2.0-dev autoconf automake libtool libjson-c-dev libfuse-dev liblzma-dev autoconf-archive kpartx python3-dev python3-pip golang python-dev libsystemd-dev
+          sudo apt-get install -y wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev bzip2 libpci-dev build-essential make gcc clang libc6-dev linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libfuse-dev liblzma-dev kpartx python3-dev python3-pip golang python-dev libsystemd-dev
           git submodule update --init xen
           cd xen
           ./configure --enable-githttp --disable-pvshim
