@@ -119,7 +119,7 @@
       g_hash_table_iter_init(&i, table); \
       while(g_hash_table_iter_next(&i,(void**)&key,(void**)&val))
 
-bool init_vmi(drakvuf_t drakvuf, bool libvmi_conf, bool fast_singlestep);
+bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep);
 void close_vmi(drakvuf_t drakvuf);
 
 event_response_t trap_guard(vmi_instance_t vmi, vmi_event_t* event);

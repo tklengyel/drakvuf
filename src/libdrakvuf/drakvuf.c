@@ -178,6 +178,8 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
     (*drakvuf)->limited_traps_ttl = limited_traps_ttl;
     (*drakvuf)->context_switch_intercept_processes = NULL;
     (*drakvuf)->enable_cr3_based_interception = false;
+    (*drakvuf)->libvmi_conf = libvmi_conf;
+    (*drakvuf)->kpgd = kpgd;
 
     if ( json_kernel_path )
         (*drakvuf)->json_kernel_path = g_strdup(json_kernel_path);
@@ -189,8 +191,6 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
     }
     else
         PRINT_DEBUG("drakvuf_init: Rekall WoW64 profile not used\n");
-
-    (*drakvuf)->kpgd = kpgd;
 
     g_mutex_init(&(*drakvuf)->vmi_lock);
 
@@ -208,23 +208,15 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
 
     drakvuf_pause(*drakvuf);
 
-    if (!init_vmi(*drakvuf, libvmi_conf, fast_singlestep))
+    if (!init_vmi(*drakvuf, fast_singlestep))
         goto err;
 
-    switch ((*drakvuf)->os)
+    drakvuf_init_os(*drakvuf);
+
+    if ( (*drakvuf)->pm == VMI_PM_UNKNOWN )
     {
-        case VMI_OS_WINDOWS:
-            if ( !set_os_windows(*drakvuf) )
-                goto err;
-            break;
-        case VMI_OS_LINUX:
-            if ( !set_os_linux(*drakvuf) )
-                goto err;
-            break;
-        case VMI_OS_UNKNOWN: /* fall-through */
-        case VMI_OS_FREEBSD: /* fall-through */
-        default:
-            break;
+        fprintf(stderr, "Failed to determine paging mode\n");
+        goto err;
     }
 
     PRINT_DEBUG("libdrakvuf initialized\n");
@@ -238,6 +230,52 @@ err:
     PRINT_DEBUG("libdrakvuf initialization failed\n");
 
     return 0;
+}
+
+bool drakvuf_init_os(drakvuf_t drakvuf)
+{
+    /*
+     * We want to make sure paging is initialized with the actual state. LibVMI
+     * only auto-detects paging during vmi_init_os the first time its called.
+     * In case the OS not yet booted then paging mode might change, so we force a
+     * refresh here.
+     */
+    if ( VMI_PM_UNKNOWN == (drakvuf->pm = vmi_init_paging(drakvuf->vmi, 0)) )
+        return false;
+
+    drakvuf->address_width = vmi_get_address_width(drakvuf->vmi);
+
+    if (drakvuf->libvmi_conf)
+        drakvuf->os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL);
+    else if ( drakvuf->json_kernel_path )
+    {
+        GHashTable* config = g_hash_table_new(g_str_hash, g_str_equal);
+        g_hash_table_insert(config, "volatility_ist", drakvuf->json_kernel_path);
+        if (drakvuf->kpgd)
+            g_hash_table_insert(config, "kpgd", &drakvuf->kpgd);
+        drakvuf->os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GHASHTABLE, config, NULL);
+        g_hash_table_destroy(config);
+    }
+
+    switch (drakvuf->os)
+    {
+        case VMI_OS_WINDOWS:
+            if ( !set_os_windows(drakvuf) )
+                drakvuf->os = VMI_OS_UNKNOWN;
+            else
+                drakvuf->pm = vmi_init_paging(drakvuf->vmi, VMI_PM_INITFLAG_TRANSITION_PAGES);
+            break;
+        case VMI_OS_LINUX:
+            if ( !set_os_linux(drakvuf) )
+                drakvuf->os = VMI_OS_UNKNOWN;
+            break;
+        case VMI_OS_UNKNOWN: /* fall-through */
+        case VMI_OS_FREEBSD: /* fall-through */
+        default:
+            break;
+    }
+
+    return drakvuf->os != VMI_OS_UNKNOWN;
 }
 
 void drakvuf_interrupt(drakvuf_t drakvuf, int sig)
