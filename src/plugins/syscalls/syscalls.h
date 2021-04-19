@@ -120,6 +120,7 @@ struct syscalls_config
 class syscalls: public plugin
 {
 public:
+    drakvuf_t m_drakvuf;
     GSList* traps;
     GHashTable* filter;
     json_object* win32k_json;
