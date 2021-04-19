@@ -1,0 +1,86 @@
+extraction:
+  cpp:
+    prepare:
+      packages:
+        - autoconf-archive
+        - clang-10
+        - build-essential
+        - autotools-dev
+        - flex
+        - bison
+        - libjson-c-dev
+        - liblzo2-dev
+        - libglib2.0-dev
+        - libtool
+        - wget
+        - bcc
+        - bin86
+        - gawk
+        - libcurl4-openssl-dev
+        - bzip2
+        - libpci-dev
+        - build-essential
+        - libc6-dev
+        - linux-libc-dev
+        - zlib1g-dev
+        - libncurses5-dev
+        - patch
+        - libvncserver-dev
+        - libssl-dev
+        - libsdl-dev
+        - iasl
+        - libbz2-dev
+        - e2fslibs-dev
+        - uuid-dev
+        - ocaml
+        - ocaml-findlib
+        - libx11-dev
+        - xz-utils
+        - gettext
+        - libyajl-dev
+        - libpixman-1-dev
+        - libaio-dev
+        - libfdt-dev
+        - liblzma-dev
+        - libsystemd-dev
+        - python3-dev
+    after_prepare:
+      command:
+        - mkdir -p install
+        - export DESTDIR=$PWD/install
+        - export LD_LIBRARY_PATH=$DESTDIR/lib
+        - export C_INCLUDE_PATH=$DESTDIR/include
+        - export CPLUS_INCLUDE_PATH=$DESTDIR/include
+        - git submodule update --init xen
+        - git submodule update --init libvmi
+        - cd xen
+        - ./configure --prefix=$DESTDIR --disable-stubdom --disable-docs
+        - make -j2 dist-xen
+        - make -j2 dist-tools
+        - make -j2 install-xen
+        - make -j2 install-tools
+        - cd ..
+        - cd libvmi
+        - autoreconf -vif
+        - ./configure --prefix=$DESTDIR --disable-kvm --disable-file --disable-bareflank --disable-examples --disable-vmifs
+        - make -j2
+        - make -j2 install
+    configure:
+      command:
+        - export CXX=clang++-10
+        - export INSTALLDIR=$PWD/install
+        - export LD_LIBRARY_PATH=$INSTALLDIR/lib
+        - export C_INCLUDE_PATH=$INSTALLDIR/include
+        - export CPLUS_INCLUDE_PATH=$INSTALLDIR/include
+        - export PKG_CONFIG_PATH=$INSTALLDIR/lib/pkgconfig
+        - autoreconf -vif
+        - ./configure --enable-debug
+    index:
+      build_command:
+        - export CXX=clang++-10
+        - export INSTALLDIR=$PWD/install
+        - export LD_LIBRARY_PATH=$INSTALLDIR/lib
+        - export C_INCLUDE_PATH=$INSTALLDIR/include
+        - export CPLUS_INCLUDE_PATH=$INSTALLDIR/include
+        - export PKG_CONFIG_PATH=$INSTALLDIR/lib/pkgconfig
+        - make -j2
