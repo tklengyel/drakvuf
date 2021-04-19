@@ -468,8 +468,10 @@ bool win_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t
 
 bool set_os_windows(drakvuf_t drakvuf)
 {
-
     if ( !find_kernbase(drakvuf) )
+        return 0;
+
+    if ( !drakvuf->kpgd && VMI_FAILURE == vmi_get_offset(drakvuf->vmi, "kpgd", &drakvuf->kpgd) )
         return 0;
 
     // Get the offsets from the JSON profile

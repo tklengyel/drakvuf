@@ -178,6 +178,9 @@ bool set_os_linux(drakvuf_t drakvuf)
     if ( !find_kernbase(drakvuf) )
         return 0;
 
+    if ( !drakvuf->kpgd && VMI_FAILURE == vmi_get_offset(drakvuf->vmi, "kpgd", &drakvuf->kpgd) )
+        return 0;
+
     // Get the offsets from the Rekall profile
     if ( !fill_kernel_offsets(drakvuf, __LINUX_OFFSETS_MAX, linux_offset_names) )
         return 0;
