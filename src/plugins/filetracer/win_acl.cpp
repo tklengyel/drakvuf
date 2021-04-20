@@ -535,6 +535,7 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
         aces_size != bytes_read)
         return string();
 
+    // manual work done, may arise issues
     switch (format)
     {
         case OUTPUT_CSV:
@@ -592,6 +593,7 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
                 break;
         }
 
+        // manual work done, may arise issues
         switch (format)
         {
             case OUTPUT_CSV:
@@ -625,6 +627,7 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
         ace_ptr += ace_size;
     }
 
+    // manual work done, may arise issues
     switch (format)
     {
         case OUTPUT_CSV:
