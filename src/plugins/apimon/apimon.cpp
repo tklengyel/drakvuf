@@ -278,6 +278,7 @@ static void print_addresses(drakvuf_t drakvuf, apimon* plugin, const dll_view_t*
             json_object_object_add(j_rvas, target.target_name.c_str(), json_object_new_int(target.offset));
     }
 
+    // does this need to be converted to fmt?
     json_object_object_add(j_root, "Plugin", json_object_new_string("apimon"));
     json_object_object_add(j_root, "Event", json_object_new_string("dll_loaded"));
     json_object_object_add(j_root, "Rva", j_rvas);
