@@ -145,12 +145,12 @@ event_response_t debug_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     debugmon* s = (debugmon*)info->trap->data;
 
-    fmt::print(s->format, "debugmon", drakvuf, info, 
-       keyval("VCPU", fmt::Nval(info->vcpu)),
-       keyval("CR3", fmt::Nval(info->regs->cr3)),
-       keyval("RIP", fmt::Xval(info->regs->rip)),
-       keyval("DebugType", fmt::Nval(info->debug->type)),
-       keyval("DebugTypeStr", fmt::Qstr(debug_type[info->debug->type]))
+    fmt::print(s->format, "debugmon", drakvuf, info,
+        keyval("VCPU", fmt::Nval(info->vcpu)),
+        keyval("CR3", fmt::Nval(info->regs->cr3)),
+        keyval("RIP", fmt::Xval(info->regs->rip)),
+        keyval("DebugType", fmt::Nval(info->debug->type)),
+        keyval("DebugTypeStr", fmt::Qstr(debug_type[info->debug->type]))
     );
 
     return 0;

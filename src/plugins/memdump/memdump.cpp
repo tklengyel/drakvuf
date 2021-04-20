@@ -306,22 +306,22 @@ printout:
     // bypasses variable initialization
     {
         auto default_print=std::make_tuple(
-            keyval("DumpReason", fmt::Qstr(reason)),
-            keyval("DumpPID", fmt::Nval(info->attached_proc_data.pid)),
-            keyval("DumpAddr", fmt::Xval(ctx->addr, false)),
-            keyval("DumpSize", fmt::Xval(len_bytes)),
-            keyval("DumpFilename", fmt::Qstr(display_file)),
-            keyval("DumpsCount", fmt::Nval(plugin->dumps_count))
-        );
+                keyval("DumpReason", fmt::Qstr(reason)),
+                keyval("DumpPID", fmt::Nval(info->attached_proc_data.pid)),
+                keyval("DumpAddr", fmt::Xval(ctx->addr, false)),
+                keyval("DumpSize", fmt::Xval(len_bytes)),
+                keyval("DumpFilename", fmt::Qstr(display_file)),
+                keyval("DumpsCount", fmt::Nval(plugin->dumps_count))
+            );
         if (print_extras)
         {
             target_pid = fmt::Nval(extras->write_virtual_memory_extras.target_pid);
             write_addr = fmt::Xval(extras->write_virtual_memory_extras.base_address, false);
             auto extra_arguments=std::make_tuple(
-                keyval("TargetPID", target_pid),
-                keyval("WriteAddr", write_addr)
-            );
-            fmt::print(plugin->m_output_format, "memdump", drakvuf, info, 
+                    keyval("TargetPID", target_pid),
+                    keyval("WriteAddr", write_addr)
+                );
+            fmt::print(plugin->m_output_format, "memdump", drakvuf, info,
                 std::tuple_cat(default_print, extra_arguments)
             );
         }

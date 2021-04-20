@@ -146,24 +146,24 @@ void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_wrapper* lw)
     linux_filetracer* f = (linux_filetracer*)info->trap->data;
     gchar* escaped_fname = NULL;
 
-    std::vector<std::pair<std::string, fmt::Rstr<const char *>>> extra_args;
+    std::vector<std::pair<std::string, fmt::Rstr<const char*>>> extra_args;
     escaped_fname = drakvuf_escape_str(lw->filename->str);
-    extra_args.emplace_back(keyval("FileName", fmt::Rstr(const_cast<const char *>(escaped_fname))));
+    extra_args.emplace_back(keyval("FileName", fmt::Rstr(const_cast<const char*>(escaped_fname))));
 
     if (lw->modes->len)
-        extra_args.emplace_back(keyval("Mode", fmt::Rstr(const_cast<const char *>(lw->modes->str))));
+        extra_args.emplace_back(keyval("Mode", fmt::Rstr(const_cast<const char*>(lw->modes->str))));
     if (lw->flags->len)
-        extra_args.emplace_back(keyval("Flag", fmt::Rstr(const_cast<const char *>(lw->flags->str))));
+        extra_args.emplace_back(keyval("Flag", fmt::Rstr(const_cast<const char*>(lw->flags->str))));
     if (lw->uid->len)
-        extra_args.emplace_back(keyval("UID", fmt::Rstr(const_cast<const char *>(lw->uid->str))));
+        extra_args.emplace_back(keyval("UID", fmt::Rstr(const_cast<const char*>(lw->uid->str))));
     if (lw->gid->len)
-        extra_args.emplace_back(keyval("GID", fmt::Rstr(const_cast<const char *>(lw->gid->str))));
+        extra_args.emplace_back(keyval("GID", fmt::Rstr(const_cast<const char*>(lw->gid->str))));
     for (auto arg : lw->args)
     {
-        extra_args.emplace_back(std::make_pair(arg.first.c_str(), fmt::Rstr(const_cast<const char *>(arg.second->str))));
+        extra_args.emplace_back(std::make_pair(arg.first.c_str(), fmt::Rstr(const_cast<const char*>(arg.second->str))));
     }
-    fmt::print(f->format, "filetracer", drakvuf, info, 
-        keyval("Permissions",fmt::Nval(lw->permissions)),
+    fmt::print(f->format, "filetracer", drakvuf, info,
+        keyval("Permissions", fmt::Nval(lw->permissions)),
         extra_args
     );
 
