@@ -166,22 +166,9 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     auto key = std::string(ckey._key, 4);
 
-    switch (o->format)
-    {
-        case OUTPUT_CSV:
-        case OUTPUT_DEFAULT:
-            fmt::print(o->format, "objmon", drakvuf, info,
-                keyval("Key", fmt::Rstr(key))
-            );
-            break;
-
-        case OUTPUT_KV:
-        case OUTPUT_JSON:
-            fmt::print(o->format, "objmon", drakvuf, info,
-                keyval("Key", fmt::Qstr(key))
-            );
-            break;
-    }
+    fmt::print(o->format, "objmon", drakvuf, info,
+        keyval("Key", fmt::Qstr(key))
+    );
 
     return 0;
 }
