@@ -29,20 +29,11 @@ static event_response_t trap_NtDelayExecution_cb(drakvuf_t drakvuf, drakvuf_trap
 
     auto delay_interval_miliseconds = fmt::Fval(delay / 10000.0); // delay in miliseconds
 
-    if (sm->format == OUTPUT_JSON)
-    {
-        jsonfmt::print("delaymon", drakvuf, info,
-            keyval("VCPU", fmt::Nval(info->vcpu)),
-            keyval("CR3", fmt::Nval(info->regs->cr3)),
-            keyval("DelayIntervalMs", delay_interval_miliseconds)
-        );
-    }
-    else
-    {
-        fmt::print(sm->format, "delaymon", drakvuf, info,
-            keyval("DelayIntervalMs", delay_interval_miliseconds)
-        );
-    }
+    fmt::print(sm->format, "delaymon", drakvuf, info,
+        keyval("VCPU", fmt::Nval(info->vcpu)),
+        keyval("CR3", fmt::Nval(info->regs->cr3)),
+        keyval("DelayIntervalMs", delay_interval_miliseconds)
+    );
 
     return 0;
 }
