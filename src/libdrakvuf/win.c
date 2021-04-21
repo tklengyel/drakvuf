@@ -461,9 +461,23 @@ bool fill_wow_offsets( drakvuf_t drakvuf, size_t size, const char* names [][2] )
 
 bool win_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
 {
+    /* Target RSP is special for return hooks and injection return hooks.
+     * On function call (for x86_64 architecture) the stack looks like this:
+     * ...
+     * +0x10 | home space 2 |
+     * +0x8  | home space 1 |
+     * +0x0  | ret addr     | <- RSP
+     * -0x8  | FRAME START  | <- Called function frame
+     *
+     * After hitting the "ret addr" the stack should point to "RSP+0x8".
+     *
+     * Though in some cases one could see that at the time current RSP
+     * equals saved RSP. Is this result of work of underling hardware
+     * virtualiztioin (e.g. Intel VMX)?
+     */
     return (info->attached_proc_data.pid == pid)
         && (info->attached_proc_data.tid == tid)
-        && (!rsp || info->regs->rsp > rsp);
+        && (!rsp || info->regs->rsp >= rsp);
 }
 
 bool set_os_windows(drakvuf_t drakvuf)
