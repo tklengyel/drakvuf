@@ -311,9 +311,9 @@ static void print_usage()
         "\t --ipt-dir <directory>\n"
         "\t                           Where to store data recorded with Intel Processor Trace\n"
         "\t --ipt-trace-os\n"
-        "\t                           Enable IPT tracing in ring 0"
+        "\t                           Enable IPT tracing in ring 0\n"
         "\t --ipt-trace-user\n"
-        "\t                           Enable IPT tracing in ring > 0"
+        "\t                           Enable IPT tracing in ring > 0\n"
 #endif
         "\t -h, --help                Show this help\n"
     );
