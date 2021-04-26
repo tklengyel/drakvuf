@@ -463,7 +463,7 @@ bool win_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t
 {
     return (info->attached_proc_data.pid == pid)
         && (info->attached_proc_data.tid == tid)
-        && (!rsp || info->regs->rsp > rsp);
+        && (!rsp || info->regs->rsp >= rsp);
 }
 
 bool set_os_windows(drakvuf_t drakvuf)
