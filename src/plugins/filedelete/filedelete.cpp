@@ -292,41 +292,14 @@ static void print_filedelete_information(filedelete* f, drakvuf_t drakvuf,
             break;
     }
 
-    switch (f->format)
-    {
-        case OUTPUT_KV:
-            kvfmt::print("fileextractor", drakvuf, info,
-                keyval("FileName", fmt::Qstr(filename)),
-                keyval("Size", fmt::Nval(bytes_read)),
-                keyval("Flags", fmt::Xval(fo_flags)),
-                fmt::Rstr(flags),
-                keyval("SN", fmt::Nval(seq_number)),
-                keyval("Reason", fmt::Qstr(r))
-            );
-            break;
-        case OUTPUT_JSON:
-            jsonfmt::print("fileextractor", drakvuf, info,
-                keyval("FileName", fmt::Qstr(filename)),
-                keyval("Size", fmt::Nval(bytes_read)),
-                keyval("Flags", fmt::Xval(fo_flags)),
-                keyval("FlagsExpanded", fmt::Qstr(flags)),
-                keyval("SeqNum", fmt::Nval(seq_number)),
-                keyval("Reason", fmt::Qstr(r))
-            );
-            break;
-        default:
-        case OUTPUT_CSV:
-        case OUTPUT_DEFAULT:
-            fmt::print(f->format, "fileextractor", drakvuf, info,
-                keyval("FILE", fmt::Qstr(filename)),
-                keyval("SIZE", fmt::Nval(bytes_read)),
-                keyval("FO_FLAGS", fmt::Xval(fo_flags)),
-                keyval("FLAGS", fmt::Qstr(flags)),
-                keyval("SN", fmt::Nval(seq_number)),
-                keyval("REASON", fmt::Qstr(r))
-            );
-            break;
-    }
+    fmt::print(f->format, "fileextractor", drakvuf, info,
+        keyval("FileName", fmt::Qstr(filename)),
+        keyval("Size", fmt::Nval(bytes_read)),
+        keyval("Flags", fmt::Xval(fo_flags)),
+        keyval("FlagsExpanded", fmt::Qstr(flags)),
+        keyval("SeqNum", fmt::Nval(seq_number)),
+        keyval("Reason", fmt::Qstr(r))
+    );
 }
 
 static void print_extraction_failure(filedelete* f, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const string& filename, const string& message)

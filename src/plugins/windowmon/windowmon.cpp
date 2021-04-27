@@ -144,20 +144,10 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     auto window_class = get_value_name(class_us);
     auto window_name = get_value_name(name_us);
 
-    if (c->format == OUTPUT_JSON)
-    {
-        jsonfmt::print("windowmon", drakvuf, info,
-            keyval("Class", fmt::Qstr(window_class)),
-            keyval("Name", fmt::Qstr(window_name))
-        );
-    }
-    else
-    {
-        fmt::print(c->format, "windowmon", drakvuf, info,
-            keyval("Class", fmt::Rstr(window_class)),
-            keyval("Name", fmt::Rstr(window_name))
-        );
-    }
+    fmt::print(c->format, "windowmon", drakvuf, info,
+        keyval("Class", fmt::Rstr(window_class)),
+        keyval("Name", fmt::Rstr(window_name))
+    );
 
     vmi_free_unicode_str(class_us);
     vmi_free_unicode_str(name_us);

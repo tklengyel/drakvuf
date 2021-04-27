@@ -124,6 +124,7 @@
 #include <libvmi/libvmi.h>
 #include "linux.h"
 #include "filetracer.h"
+#include "plugins/output_format.h"
 #include "private.h"
 
 void free_gstrings(struct linux_wrapper* lw)
@@ -143,116 +144,31 @@ void free_gstrings(struct linux_wrapper* lw)
 void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_wrapper* lw)
 {
     linux_filetracer* f = (linux_filetracer*)info->trap->data;
-    gchar* escaped_pname = NULL;
     gchar* escaped_fname = NULL;
 
-    switch (f->format)
+    std::vector<std::pair<std::string, fmt::Rstr<const char*>>> extra_args;
+    escaped_fname = drakvuf_escape_str(lw->filename->str);
+    extra_args.emplace_back(keyval("FileName", fmt::Rstr(const_cast<const char*>(escaped_fname))));
+
+    if (lw->modes->len)
+        extra_args.emplace_back(keyval("Mode", fmt::Rstr(const_cast<const char*>(lw->modes->str))));
+    if (lw->flags->len)
+        extra_args.emplace_back(keyval("Flag", fmt::Rstr(const_cast<const char*>(lw->flags->str))));
+    if (lw->uid->len)
+        extra_args.emplace_back(keyval("UID", fmt::Rstr(const_cast<const char*>(lw->uid->str))));
+    if (lw->gid->len)
+        extra_args.emplace_back(keyval("GID", fmt::Rstr(const_cast<const char*>(lw->gid->str))));
+    for (auto arg : lw->args)
     {
-        case OUTPUT_CSV:
-            printf("filetracer," FORMAT_TIMEVAL ",%" PRIu32 ",0x%" PRIx64 ",\"%s\",%" PRIi64 ",%s,%s",
-                UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name, info->proc_data.userid, info->trap->name, lw->filename->str);
-            if (lw->modes->len)
-                printf(",\"%s\"", lw->modes->str);
-            if (lw->flags->len)
-                printf(",\"%s\"", lw->flags->str);
-            if (lw->uid->len)
-                printf(",%s", lw->uid->str);
-            if (lw->gid->len)
-                printf(",%s", lw->gid->str);
-            for (auto arg : lw->args)
-            {
-                if (arg.second->len)
-                    printf(",%s", arg.second->str);
-            }
-            printf("\n");
-            break;
-
-        case OUTPUT_KV:
-            printf("filetracer Time=" FORMAT_TIMEVAL ",PID=%d,PPID=%d,ProcessName=\"%s\",Method=%s,File=\"%s\"",
-                UNPACK_TIMEVAL(info->timestamp), info->proc_data.pid, info->proc_data.ppid, info->proc_data.name,
-                info->trap->name, lw->filename->str);
-            if (lw->modes->len)
-                printf(",Modes=%s", lw->modes->str);
-            if (lw->flags->len)
-                printf(",Flags=%s", lw->flags->str);
-            if (lw->uid->len)
-                printf(",UID=%s", lw->uid->str);
-            if (lw->gid->len)
-                printf(",GID=%s", lw->gid->str);
-            for (auto arg : lw->args)
-            {
-                if (arg.second->len)
-                    printf(",%s=%s", arg.first.c_str(), arg.second->str);
-            }
-            printf("\n");
-            break;
-
-        case OUTPUT_JSON:
-            escaped_fname = drakvuf_escape_str(lw->filename->str);
-            escaped_pname = drakvuf_escape_str(info->proc_data.name);
-
-            printf("{"
-                "\"Plugin\" : \"filetracer\","
-                "\"TimeStamp\" :"
-                "\"" FORMAT_TIMEVAL "\","
-                "\"ProcessName\": %s,"
-                "\"UserName\": \"%s\","
-                "\"UserId\": %" PRIu64 ","
-                "\"PID\" : %d,"
-                "\"PPID\": %d,"
-                "\"TID\": %d,"
-                "\"Method\": \"%s\","
-                "\"FileName\": \"%s\",",
-                UNPACK_TIMEVAL(info->timestamp),
-                escaped_pname,
-                USERIDSTR(drakvuf), info->proc_data.userid,
-                info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid,
-                info->trap->name, escaped_fname);
-            if (lw->permissions)
-                printf("\"Permissions\": %o,", lw->permissions);
-            if (lw->modes->len)
-                printf("\"Mode\": \"%s\",", lw->modes->str);
-            if (lw->flags->len)
-                printf("\"Flag\": \"%s\",", lw->flags->str);
-            if (lw->uid->len)
-                printf("\"UID\": %s,", lw->uid->str);
-            if (lw->gid->len)
-                printf("\"GID\": %s,", lw->gid->str);
-            for (auto arg : lw->args)
-            {
-                if (arg.second->len)
-                    printf("\"%s\" : \"%s\",", arg.first.c_str(), arg.second->str);
-            }
-
-            printf("}\n");
-            g_free(escaped_fname);
-            g_free(escaped_pname);
-            break;
-
-        default:
-        case OUTPUT_DEFAULT:
-            printf("[FILETRACER] TIME:" FORMAT_TIMEVAL " VCPU:%" PRIu32 " CR3:0x%" PRIx64 ",\"%s\" %s:%" PRIi64 " %s,%s",
-                UNPACK_TIMEVAL(info->timestamp), info->vcpu, info->regs->cr3, info->proc_data.name,
-                USERIDSTR(drakvuf), info->proc_data.userid, info->trap->name, lw->filename->str);
-
-            if (lw->permissions)
-                printf(",\"Permissions:%o\"", lw->permissions);
-            if (lw->modes->len)
-                printf(",\"Mode:%s\"", lw->modes->str);
-            if (lw->flags->len)
-                printf(",\"Flag:%s\"", lw->flags->str);
-            if (lw->uid->len)
-                printf(",UID:%s", lw->uid->str);
-            if (lw->gid->len)
-                printf(",GID:%s", lw->gid->str);
-            for (auto arg : lw->args)
-            {
-                if (arg.second->len)
-                    printf(",%s:%s", arg.first.c_str(), arg.second->str);
-            }
-            printf("\n");
-            break;
+        extra_args.emplace_back(std::make_pair(arg.first.c_str(), fmt::Rstr(const_cast<const char*>(arg.second->str))));
     }
+    fmt::print(f->format, "filetracer", drakvuf, info,
+        keyval("Permissions", fmt::Nval(lw->permissions)),
+        extra_args
+    );
+
+    g_free(escaped_fname);
+
 }
 
 GString* get_filepath(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, addr_t dentry_addr)

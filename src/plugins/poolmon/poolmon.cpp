@@ -191,36 +191,22 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         description = fmt::Rstr(s->description);
     }
 
-    auto tuple = std::make_tuple(
-            keyval("Tag", fmt::Rstr((const char*)tag)),
-            keyval("Type", fmt::Rstr(pool_type_str)),
-            keyval("Size", fmt::Nval(size)),
-            keyval("Source", source),
-            keyval("Description", description)
-        );
-    if (p->format == OUTPUT_JSON)
+    // Remove non-ascii characters from tag
+    for (size_t i = 0; i < sizeof(tag); ++i)
     {
-        // Remove non-ascii characters from tag
-        for (size_t i = 0; i < sizeof(tag); ++i)
-        {
-            if (!isascii(tag[i]))
-                tag[i] = '?';
-        }
+        if (!isascii(tag[i]))
+            tag[i] = '?';
+    }
 
-        jsonfmt::print("poolmon", drakvuf, info,
-            keyval("VCPU", fmt::Nval(info->vcpu)),
-            keyval("CR3", fmt::Nval(info->regs->cr3)),
-            keyval("Tag", fmt::Qstr(tag)),
-            keyval("Type", fmt::Qstr(pool_type_str)),
-            keyval("Size", fmt::Nval(size)),
-            keyval("Source", source),
-            keyval("Description", description)
-        );
-    }
-    else
-    {
-        fmt::print(p->format, "poolmon", drakvuf, info, tuple);
-    }
+    fmt::print(p->format, "poolmon", drakvuf, info,
+        keyval("VCPU", fmt::Nval(info->vcpu)),
+        keyval("CR3", fmt::Nval(info->regs->cr3)),
+        keyval("Tag", fmt::Qstr(tag)),
+        keyval("Type", fmt::Qstr(pool_type_str)),
+        keyval("Size", fmt::Nval(size)),
+        keyval("Source", source),
+        keyval("Description", description)
+    );
 
     return 0;
 }

@@ -144,47 +144,24 @@ static void print_file_obj_info(drakvuf_t drakvuf,
 {
     win_filetracer* f = (win_filetracer*)info->trap->data;
 
-    switch (f->format)
-    {
-        case OUTPUT_KV:
-            kvfmt::print("filetracer", drakvuf, info,
-                keyval("FileName", fmt::Qstr(file_path)),
-                keyval("FileHandle", fmt::Xval(handle)),
-                fmt::Rstr(file_attr),
-                fmt::Rstr(security_flags),
-                fmt::Rstr(owner),
-                fmt::Rstr(group),
-                fmt::Rstr(sacl),
-                fmt::Rstr(dacl)
-            );
-            break;
+    std::vector<std::pair<std::string, fmt::Rstr<std::string>>> security_descriptor;
+    if (!security_flags.empty())
+        security_descriptor.emplace_back("Control", security_flags);
+    if (!owner.empty())
+        security_descriptor.emplace_back("Owner", owner);
+    if (!group.empty())
+        security_descriptor.emplace_back("Group", group);
+    if (!sacl.empty())
+        security_descriptor.emplace_back("Sacl", sacl);
+    if (!dacl.empty())
+        security_descriptor.emplace_back("Dacl", dacl);
 
-        default:
-        case OUTPUT_DEFAULT:
-        case OUTPUT_CSV:
-        case OUTPUT_JSON:
-        {
-            std::vector<std::pair<std::string, fmt::Rstr<std::string>>> security_descriptor;
-            if (!security_flags.empty())
-                security_descriptor.emplace_back("Control", security_flags);
-            if (!owner.empty())
-                security_descriptor.emplace_back("Owner", owner);
-            if (!group.empty())
-                security_descriptor.emplace_back("Group", group);
-            if (!sacl.empty())
-                security_descriptor.emplace_back("Sacl", sacl);
-            if (!dacl.empty())
-                security_descriptor.emplace_back("Dacl", dacl);
-
-            fmt::print(f->format, "filetracer", drakvuf, info,
-                keyval("FileName", fmt::Qstr(file_path)),
-                keyval("FileHandle", fmt::Xval(handle)),
-                keyval("ObjectAttributes", fmt::Qstr(file_attr)),
-                keyval("SecurityDescriptor", security_descriptor)
-            );
-            break;
-        }
-    }
+    fmt::print(f->format, "filetracer", drakvuf, info,
+        keyval("FileName", fmt::Qstr(file_path)),
+        keyval("FileHandle", fmt::Xval(handle)),
+        keyval("ObjectAttributes", fmt::Qstr(file_attr)),
+        keyval("SecurityDescriptor", security_descriptor)
+    );
 }
 
 static string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs, uint32_t handle = 0)
