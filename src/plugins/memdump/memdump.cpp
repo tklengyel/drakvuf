@@ -541,12 +541,11 @@ static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     auto plugin = get_trap_plugin<memdump>(info);
 
     vmi_lock_guard lg(drakvuf);
-    access_context_t ctx =
-    {
+    ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
         .addr = base_address_ptr
-    };
+    );
 
     addr_t base_address;
     if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &base_address))
