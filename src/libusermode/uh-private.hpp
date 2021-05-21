@@ -211,8 +211,8 @@ public:
     std::array<size_t, __OFFSET_MAX> offsets;
 
     std::vector<usermode_cb_registration> plugins;
-    // map dtb -> list of hooked dlls
-    std::map<addr_t, std::vector<dll_t>> loaded_dlls;
+    // map pid -> list of hooked dlls
+    std::map<vmi_pid_t, std::vector<dll_t>> loaded_dlls;
 
     static userhook& get_instance(drakvuf_t drakvuf)
     {
