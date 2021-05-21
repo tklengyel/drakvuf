@@ -462,20 +462,8 @@ static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* in
     return ret;
 }
 
-/**
- * This is used in order to observe when SysWOW64 process is loading a new DLL.
- * If the DLL is interesting, we perform further investigation and try to equip user mode hooks.
- */
-static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t do_hooking(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t base_address_ptr)
 {
-    // IN HANDLE ProcessHandle
-    uint64_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    // IN OUT PVOID *BaseAddress
-    addr_t base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 2);
-
-    if (process_handle != ~0ULL)
-        return VMI_EVENT_RESPONSE_NONE;
-
     auto plugin = get_trap_plugin<userhook>(info);
 
     dll_t* dll_meta = get_pending_dll(drakvuf, info, plugin);
@@ -490,12 +478,11 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
             .addr = base_address_ptr
         );
 
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        bool success = (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &base_address));
-        drakvuf_release_vmi(drakvuf);
-
-        if (!success)
-            return VMI_EVENT_RESPONSE_NONE;
+        {
+            auto vmi = vmi_lock_guard(drakvuf);
+            if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &base_address))
+                return VMI_EVENT_RESPONSE_NONE;
+        }
 
         dll_meta = create_dll_meta(drakvuf, info, plugin, base_address);
     }
@@ -504,6 +491,23 @@ static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvu
         return perform_hooking(drakvuf, info, plugin, dll_meta);
 
     return VMI_EVENT_RESPONSE_NONE;
+}
+
+/**
+ * This is used in order to observe when SysWOW64 process is loading a new DLL.
+ * If the DLL is interesting, we perform further investigation and try to equip user mode hooks.
+ */
+static event_response_t protect_virtual_memory_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    // IN HANDLE ProcessHandle
+    uint64_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    // IN OUT PVOID *BaseAddress
+    addr_t base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 2);
+
+    if (process_handle != ~0ULL)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    return do_hooking(drakvuf, info, base_address_ptr);
 }
 
 /**
@@ -518,32 +522,7 @@ static event_response_t map_view_of_section_ret_cb(drakvuf_t drakvuf, drakvuf_tr
     if (!params->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
 
-    dll_t* dll_meta = get_pending_dll(drakvuf, info, plugin);
-
-    if (!dll_meta)
-    {
-        addr_t base_address;
-
-        ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
-            .addr = params->base_address_ptr
-        );
-
-        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        bool success = (VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &base_address));
-        drakvuf_release_vmi(drakvuf);
-
-        if (!success)
-            return VMI_EVENT_RESPONSE_NONE;
-
-        dll_meta = create_dll_meta(drakvuf, info, plugin, base_address);
-    }
-
-    event_response_t ret = VMI_EVENT_RESPONSE_NONE;
-    if (dll_meta)
-        ret = perform_hooking(drakvuf, info, plugin, dll_meta);
-
+    event_response_t ret = do_hooking(drakvuf, info, params->base_address_ptr);
     plugin->destroy_trap(info->trap);
     return ret;
 }
