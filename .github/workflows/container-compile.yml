@@ -9,7 +9,8 @@ jobs:
         container:
           - 'debian:buster-slim'
           - 'debian:bullseye-slim'
-          - 'ubuntu:rolling'
+          - 'ubuntu:focal'
+          - 'ubuntu:groovy'
 
     runs-on: ubuntu-latest
     container:
