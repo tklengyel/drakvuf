@@ -150,6 +150,17 @@ static std::string drakvuf_read_unicode(drakvuf_t drakvuf, addr_t addr)
     return str;
 }
 
+static auto get_proc_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
+{
+    proc_data_t proc_data = info->proc_data;
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+        if (VMI_OS_WINDOWS == vmi_get_ostype(vmi))
+            proc_data = info->attached_proc_data;
+    }
+    return proc_data;
+}
+
 /**
  * Check if this thread is currently in process of loading a DLL.
  * If so, return a pointer to the associated metadata.
@@ -160,7 +171,9 @@ static dll_t* get_pending_dll(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
     if (!drakvuf_get_current_thread_id(drakvuf, info, &thread_id))
         return nullptr;
 
-    auto vec_it = plugin->loaded_dlls.find(info->regs->cr3);
+    proc_data_t proc_data = get_proc_data(drakvuf, info);
+
+    auto vec_it = plugin->loaded_dlls.find(proc_data.pid);
 
     if (vec_it == plugin->loaded_dlls.end())
         return nullptr;
@@ -180,12 +193,7 @@ static dll_t* get_pending_dll(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
  */
 static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, addr_t dll_base)
 {
-    proc_data_t proc_data = info->proc_data;
-    {
-        vmi_lock_guard vmi(drakvuf);
-        if (VMI_OS_WINDOWS == vmi_get_ostype(vmi))
-            proc_data = info->attached_proc_data;
-    }
+    proc_data_t proc_data = get_proc_data(drakvuf, info);
 
     mmvad_info_t mmvad;
     if (!drakvuf_find_mmvad(drakvuf, proc_data.base_addr, dll_base, &mmvad))
@@ -194,7 +202,7 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
     if (mmvad.file_name_ptr == 0)
         return nullptr;
 
-    auto vec_it = plugin->loaded_dlls.find(info->regs->cr3);
+    auto vec_it = plugin->loaded_dlls.find(proc_data.pid);
 
     if (vec_it != plugin->loaded_dlls.end())
     {
@@ -202,7 +210,7 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
         {
             if (dll_meta.v.real_dll_base == mmvad.starting_vpn << 12)
             {
-                PRINT_DEBUG("[USERHOOK] DLL %d!%llx is already hooked\n", info->proc_data.pid, (unsigned long long)mmvad.starting_vpn << 12);
+                PRINT_DEBUG("[USERHOOK] DLL %d!%llx is already hooked\n", proc_data.pid, (unsigned long long)mmvad.starting_vpn << 12);
                 return nullptr;
             }
         }
@@ -286,7 +294,7 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
         dll_meta.pf_max_addr = dll_meta.pf_max_addr & ~(VMI_PS_4KB - 1);
     }
 
-    auto it = plugin->loaded_dlls.emplace(info->regs->cr3, std::vector<dll_t>()).first;
+    auto it = plugin->loaded_dlls.emplace(proc_data.pid, std::vector<dll_t>()).first;
     it->second.push_back(std::move(dll_meta));
     return &it->second.back();
 }
@@ -562,12 +570,7 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
 
     auto plugin = get_trap_plugin<userhook>(info);
 
-    proc_data_t proc_data = info->proc_data;
-    {
-        vmi_lock_guard vmi(drakvuf);
-        if (VMI_OS_WINDOWS == vmi_get_ostype(vmi))
-            proc_data = info->attached_proc_data;
-    }
+    proc_data_t proc_data = get_proc_data(drakvuf, info);
 
     uint32_t thread_id = proc_data.tid;
 
@@ -579,7 +582,7 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
 
     bool our_fault = false;
 
-    auto vec_it = plugin->loaded_dlls.find(info->regs->cr3);
+    auto vec_it = plugin->loaded_dlls.find(proc_data.pid);
 
     if (vec_it != plugin->loaded_dlls.end())
     {
@@ -625,7 +628,21 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
 {
     auto plugin = get_trap_plugin<userhook>(info);
 
-    auto vec_it = plugin->loaded_dlls.find(info->regs->cr3);
+    uint32_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+
+    vmi_pid_t exit_pid;
+    if (0 != handle && 0xffffffff != handle)
+    {
+        if (!drakvuf_get_pid_from_handle(drakvuf, info, handle, &exit_pid))
+            return VMI_EVENT_RESPONSE_NONE;
+    }
+    else
+    {
+        proc_data_t proc_data = get_proc_data(drakvuf, info);
+        exit_pid = proc_data.pid;
+    }
+
+    auto vec_it = plugin->loaded_dlls.find(exit_pid);
 
     if (vec_it == plugin->loaded_dlls.end())
         return VMI_EVENT_RESPONSE_NONE;
@@ -636,9 +653,9 @@ static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_tra
         {
             if (target.state == HOOK_OK)
             {
-                PRINT_DEBUG("[USERHOOK] Erased trap for pid %d %s\n", info->attached_proc_data.pid,
+                PRINT_DEBUG("[USERHOOK] Erased trap for pid %d %s\n", exit_pid,
                     target.target_name.c_str());
-                drakvuf_remove_trap(drakvuf, target.trap, NULL);
+                drakvuf_remove_trap(drakvuf, target.trap, wrap_delete);
             }
         }
     }
@@ -701,6 +718,8 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
     addr_t pte = drakvuf_get_function_argument(drakvuf, info, 2);
     addr_t pa;
 
+    proc_data_t proc_data = get_proc_data(drakvuf, info);
+
     {
         // using vmi
         vmi_lock_guard lg(drakvuf);
@@ -713,7 +732,7 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
     }
 
     std::vector < hook_target_entry_t* > hooks;
-    for (auto& dll : plugin->loaded_dlls[info->regs->cr3])
+    for (auto& dll : plugin->loaded_dlls[proc_data.pid])
     {
         for (auto& hook : dll.targets)
         {
@@ -728,7 +747,7 @@ static event_response_t copy_on_write_handler(drakvuf_t drakvuf, drakvuf_trap_in
         }
     }
 
-    PRINT_DEBUG("[USERHOOK] copy on write called: vaddr: %llx pte: %llx, pid: %d, cr3: %llx\n", (unsigned long long)vaddr, (unsigned long long)pte, info->proc_data.pid, (unsigned long long)info->regs->cr3);
+    PRINT_DEBUG("[USERHOOK] copy on write called: vaddr: %llx pte: %llx, pid: %d, cr3: %llx\n", (unsigned long long)vaddr, (unsigned long long)pte, proc_data.pid, (unsigned long long)info->regs->cr3);
     PRINT_DEBUG("[USERHOOK] old CoW PA: %llx\n", (unsigned long long)pa);
 
     if (!hooks.empty())
