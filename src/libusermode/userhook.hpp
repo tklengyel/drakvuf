@@ -250,16 +250,11 @@ struct usermode_cb_registration
 class wanted_hooks_t
 {
 public:
-    void add_hook(plugin_target_config_entry_t&& e)
-    {
-        hooks[e.dll_name].emplace_back(std::move(e));
-    }
-
     template<typename... Args>
     void add_hook(Args&& ... args)
     {
         auto e = plugin_target_config_entry_t(std::forward<Args>(args)...);
-        add_hook(std::move(e));
+        hooks[e.dll_name].emplace_back(std::move(e));
     }
 
     bool empty() const noexcept
