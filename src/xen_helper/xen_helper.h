@@ -113,6 +113,7 @@
 #include <libxl_utils.h>
 #include <xenctrl.h>
 #include <xenforeignmemory.h>
+#include <libxl.h>
 
 #define MSR_RTIT_CTL 0x00000570
 #define RTIT_CTL_OS        (1 <<  2)
@@ -156,6 +157,7 @@ uint64_t xen_get_maxmemkb(xen_interface_t* xen, domid_t domID);
 bool xen_pause(xen_interface_t* xen, domid_t domID);
 void xen_resume(xen_interface_t* xen, domid_t domID);
 void xen_force_resume(xen_interface_t* xen, domid_t domID);
+int xen_send_qemu_monitor_command(xen_interface_t* xen, domid_t domID, const char* command_line, char** output);
 bool xen_enable_altp2m(xen_interface_t* xen, domid_t domID);
 int xen_version(void);
 bool xen_get_vcpu_ctx(xen_interface_t* xen, domid_t domID, unsigned int vcpu, vcpu_guest_context_any_t* regs);
