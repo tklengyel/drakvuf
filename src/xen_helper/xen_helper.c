@@ -274,6 +274,25 @@ void xen_force_resume(xen_interface_t* xen, domid_t domID)
     } while (1);
 }
 
+/* Sends a Qemu monitor command (HMP-flavour) by utilizing libxl */
+int xen_send_qemu_monitor_command(xen_interface_t* xen, domid_t domID, const char* command_line, char** output)
+{
+    /* Checks, if qemu monitor is available */
+    if (!LIBXL_HAVE_QEMU_MONITOR_COMMAND)
+    {
+        fprintf(stderr, "Qemu monitor commands are not available in libxl\n");
+        return -1;
+    }
+
+#if defined(LIBXL_API_VERSION) && LIBXL_API_VERSION < 0x041300
+    /* Uses the deprecated function signature, if an old version of libxl is used */
+    return libxl_qemu_monitor_command(xen->xl_ctx, (uint32_t) domID, command_line, output);
+#else
+    /* Performs only synchronous calling by setting libxl_asyncop_how to NULL for now */
+    return libxl_qemu_monitor_command(xen->xl_ctx, (uint32_t) domID, command_line, output, NULL);
+#endif
+}
+
 bool xen_enable_altp2m(xen_interface_t* xen, domid_t domID)
 {
     uint64_t param_altp2m;

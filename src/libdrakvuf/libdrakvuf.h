@@ -386,6 +386,7 @@ bool drakvuf_init (drakvuf_t* drakvuf,
     uint64_t limited_traps_ttl) NOEXCEPT;
 bool drakvuf_init_os (drakvuf_t drakvuf) NOEXCEPT;
 void drakvuf_close (drakvuf_t drakvuf, const bool pause) NOEXCEPT;
+int drakvuf_send_qemu_monitor_command(drakvuf_t drakvuf, const char* in, char** out);
 bool drakvuf_add_trap(drakvuf_t drakvuf,
     drakvuf_trap_t* trap) NOEXCEPT;
 void drakvuf_remove_trap (drakvuf_t drakvuf,
