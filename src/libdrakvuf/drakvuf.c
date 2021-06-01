@@ -561,6 +561,11 @@ void drakvuf_force_resume (drakvuf_t drakvuf)
     xen_force_resume(drakvuf->xen, drakvuf->domID);
 }
 
+int drakvuf_send_qemu_monitor_command(drakvuf_t drakvuf, const char* in, char** out)
+{
+    return xen_send_qemu_monitor_command(drakvuf->xen, drakvuf->domID, in, out);
+}
+
 bool json_get_struct_members_array_rva(
     drakvuf_t drakvuf,
     json_object* json,
