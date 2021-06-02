@@ -623,23 +623,15 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
 /**
  * Observe process exit and remove all user mode hooks
  */
-static event_response_t terminate_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t clean_process_address_space_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto plugin = get_trap_plugin<userhook>(info);
 
-    uint32_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t cleaned_process_base = drakvuf_get_function_argument(drakvuf, info, 1);
 
     vmi_pid_t exit_pid;
-    if (0 != handle && 0xffffffff != handle)
-    {
-        if (!drakvuf_get_pid_from_handle(drakvuf, info, handle, &exit_pid))
-            return VMI_EVENT_RESPONSE_NONE;
-    }
-    else
-    {
-        proc_data_t proc_data = get_proc_data(drakvuf, info);
-        exit_pid = proc_data.pid;
-    }
+    if (!drakvuf_get_process_pid(drakvuf, cleaned_process_base, &exit_pid))
+        return VMI_EVENT_RESPONSE_NONE;
 
     auto vec_it = plugin->loaded_dlls.find(exit_pid);
 
@@ -824,7 +816,7 @@ userhook::userhook(drakvuf_t drakvuf): pluginex(drakvuf, OUTPUT_DEFAULT)
     if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory"), nullptr, UNLIMITED_TTL) ||
         !register_trap(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection"), nullptr, UNLIMITED_TTL) ||
         !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler"), nullptr, UNLIMITED_TTL) ||
-        !register_trap(nullptr, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess"), nullptr, UNLIMITED_TTL) ||
+        !register_trap(nullptr, clean_process_address_space_hook_cb, bp.for_syscall_name("MmCleanProcessAddressSpace"), nullptr, UNLIMITED_TTL) ||
         !register_trap(nullptr, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite"), nullptr, UNLIMITED_TTL))
         throw -1;
 }
