@@ -408,6 +408,8 @@ os_t drakvuf_get_os_type(drakvuf_t drakvuf) NOEXCEPT;
 page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf) NOEXCEPT;
 int drakvuf_get_address_width(drakvuf_t drakvuf) NOEXCEPT;
 
+uint16_t drakvuf_get_dom_id(drakvuf_t drakvuf) NOEXCEPT;
+
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf) NOEXCEPT;
 
 addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
