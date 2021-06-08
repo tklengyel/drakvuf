@@ -592,6 +592,11 @@ json_object* drakvuf_get_json_wow(drakvuf_t drakvuf)
     return drakvuf->json_wow;
 }
 
+uint16_t drakvuf_get_dom_id(drakvuf_t drakvuf)
+{
+    return drakvuf->domID;
+}
+
 addr_t drakvuf_get_kernel_base(drakvuf_t drakvuf)
 {
     return drakvuf->kernbase;
