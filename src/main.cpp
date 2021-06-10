@@ -183,6 +183,7 @@ static void print_usage()
         "\t -c <current_working_dir>  The current working directory for injected executable\n"
         "\t -m <inject_method>        The injection method: [WIN]  : createproc, shellexec, shellcode, doppelganging\n"
         "\t                                               : [LINUX]: execproc -> execlp(), linuxshellcode \n"
+        "\t --write-file <src> <dst>  Copy host file <src> into running VM's path <dst> \n"
         "\t -f <args for exec>        Additional args for exec() (requires -m execproc)\n"
         "\t -g                        Search required for injection functions in all processes\n"
         "\t -j, --injection-timeout <seconds>\n"
@@ -326,6 +327,9 @@ int main(int argc, char** argv)
     uint64_t limited_traps_ttl = UNLIMITED_TTL;
     char const* inject_file = nullptr;
     char const* inject_cwd = nullptr;
+    bool write_file = false;
+    char const* write_file_src = nullptr;
+    char const* write_file_dst = nullptr;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     int injection_timeout = 0;
     bool injection_global_search = false;
@@ -409,6 +413,7 @@ int main(int argc, char** argv)
         opt_ipt_dir,
         opt_ipt_trace_os,
         opt_ipt_trace_user,
+        opt_write_file,
     };
     const option long_opts[] =
     {
@@ -462,6 +467,7 @@ int main(int argc, char** argv)
         {"ipt-dir", required_argument, NULL, opt_ipt_dir},
         {"ipt-trace-os", no_argument, NULL, opt_ipt_trace_os},
         {"ipt-trace-user", no_argument, NULL, opt_ipt_trace_user},
+        {"write-file", required_argument, NULL, opt_write_file},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF:C";
@@ -525,6 +531,17 @@ int main(int argc, char** argv)
                     injection_method = INJECT_METHOD_EXECPROC;
                 if (!strncmp(optarg, "linuxshellcode", 14))
                     injection_method = INJECT_METHOD_SHELLCODE_LINUX;
+                break;
+            case opt_write_file:
+                if (optind >= argc || *argv[optind] == '-')
+                {
+                    fprintf(stderr, "Missing <dst> parameter for write-file injection!\n");
+                    return drakvuf_exit_code_t::FAIL;
+                }
+
+                write_file = true;
+                write_file_src = optarg;
+                write_file_dst = argv[optind++];
                 break;
 #ifdef ENABLE_DOPPELGANGING
             case 'B':
@@ -791,6 +808,21 @@ int main(int argc, char** argv)
     sigaction(SIGALRM, &act_timer, nullptr);
 
     vmi_pid_t injected_pid = 0;
+
+    if (write_file)
+    {
+        PRINT_DEBUG("Writing file ('%s' -> '%s') into running VM\n", write_file_src, write_file_dst);
+
+        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, write_file_dst, nullptr, INJECT_METHOD_WRITE_FILE, output, write_file_src, nullptr, injection_timeout, injection_global_search, 0, nullptr, &injected_pid);
+        if (ret != INJECTOR_SUCCEEDED)
+        {
+            fprintf(stderr, "Can not copy file into VM!\n");
+            return drakvuf_exit_code_t::WRITE_FILE_ERROR;
+        }
+
+        drakvuf->interrupt(0); // clear
+    }
+
     if (injection_pid > 0 && inject_file)
     {
         PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
