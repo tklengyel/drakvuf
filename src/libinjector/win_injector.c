@@ -2422,7 +2422,8 @@ injector_status_t injector_start_app_on_win(
     }
 
     rc = injector->rc;
-    *injected_pid = injector->pid;
+    if (injected_pid)
+        *injected_pid = injector->pid;
     PRINT_DEBUG("Finished with injection. Ret: %i.\n", rc);
 
     switch (method)
