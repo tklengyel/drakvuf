@@ -45,7 +45,6 @@ jobs:
       matrix:
         container:
           - "debian:buster"
-          - "ubuntu:bionic"
           - "ubuntu:focal"
     steps:
       - uses: actions/checkout@v2
