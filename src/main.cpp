@@ -115,7 +115,7 @@
 #include <memory>
 
 #include <map>
-#include <string>
+#include <filesystem>
 
 #include "drakvuf.h"
 #include "exitcodes.h"
@@ -331,7 +331,7 @@ int main(int argc, char** argv)
     uint64_t limited_traps_ttl = UNLIMITED_TTL;
     char const* inject_file = nullptr;
     char const* inject_cwd = nullptr;
-    std::map<std::string, std::string> write_files;
+    std::map<std::filesystem::path, std::filesystem::path> write_files;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     int injection_timeout = 0;
     bool injection_global_search = false;
@@ -537,7 +537,13 @@ int main(int argc, char** argv)
             case opt_write_file:
                 if (optind >= argc || *argv[optind] == '-')
                 {
-                    fprintf(stderr, "Missing <dst> parameter for write-file injection!\n");
+                    fprintf(stderr, "--write-file <dst> parameter is missing!\n");
+                    return drakvuf_exit_code_t::FAIL;
+                }
+
+                if (!std::filesystem::exists(optarg))
+                {
+                    fprintf(stderr, "--write-file <src> file (%s) not found!\n", optarg);
                     return drakvuf_exit_code_t::FAIL;
                 }
 
