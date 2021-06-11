@@ -819,7 +819,7 @@ int main(int argc, char** argv)
     {
         PRINT_DEBUG("Writing file ('%s' -> '%s') into running VM\n", src.c_str(), dst.c_str());
 
-        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, dst.c_str(), nullptr, INJECT_METHOD_WRITE_FILE, output, src.c_str(), nullptr, injection_timeout, injection_global_search, 0, nullptr, &injected_pid);
+        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, dst.c_str(), nullptr, INJECT_METHOD_WRITE_FILE, output, src.c_str(), nullptr, 0, true, 0, nullptr, &injected_pid);
         if (ret != INJECTOR_SUCCEEDED)
         {
             fprintf(stderr, "Failed to copy file (%s) into VM!\n", src.c_str());
