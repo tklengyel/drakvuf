@@ -114,6 +114,9 @@
 #include <exception>
 #include <memory>
 
+#include <map>
+#include <string>
+
 #include "drakvuf.h"
 #include "exitcodes.h"
 
@@ -183,7 +186,8 @@ static void print_usage()
         "\t -c <current_working_dir>  The current working directory for injected executable\n"
         "\t -m <inject_method>        The injection method: [WIN]  : createproc, shellexec, shellcode, doppelganging\n"
         "\t                                               : [LINUX]: execproc -> execlp(), linuxshellcode \n"
-        "\t --write-file <src> <dst>  Copy host file <src> into running VM's path <dst> \n"
+        "\t --write-file <src> <dst>  [WIN] Copy host file <src> into running VM's path <dst> (writefile injection method)\n"
+        "\t                           Can be used multiple times to copy multiple files\n"
         "\t -f <args for exec>        Additional args for exec() (requires -m execproc)\n"
         "\t -g                        Search required for injection functions in all processes\n"
         "\t -j, --injection-timeout <seconds>\n"
@@ -327,9 +331,7 @@ int main(int argc, char** argv)
     uint64_t limited_traps_ttl = UNLIMITED_TTL;
     char const* inject_file = nullptr;
     char const* inject_cwd = nullptr;
-    bool write_file = false;
-    char const* write_file_src = nullptr;
-    char const* write_file_dst = nullptr;
+    std::map<std::string, std::string> write_files;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     int injection_timeout = 0;
     bool injection_global_search = false;
@@ -539,9 +541,7 @@ int main(int argc, char** argv)
                     return drakvuf_exit_code_t::FAIL;
                 }
 
-                write_file = true;
-                write_file_src = optarg;
-                write_file_dst = argv[optind++];
+                write_files[optarg] = argv[optind++];
                 break;
 #ifdef ENABLE_DOPPELGANGING
             case 'B':
@@ -809,14 +809,14 @@ int main(int argc, char** argv)
 
     vmi_pid_t injected_pid = 0;
 
-    if (write_file)
+    for (const auto&[src, dst] : write_files)
     {
-        PRINT_DEBUG("Writing file ('%s' -> '%s') into running VM\n", write_file_src, write_file_dst);
+        PRINT_DEBUG("Writing file ('%s' -> '%s') into running VM\n", src.c_str(), dst.c_str());
 
-        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, write_file_dst, nullptr, INJECT_METHOD_WRITE_FILE, output, write_file_src, nullptr, injection_timeout, injection_global_search, 0, nullptr, &injected_pid);
+        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, dst.c_str(), nullptr, INJECT_METHOD_WRITE_FILE, output, src.c_str(), nullptr, injection_timeout, injection_global_search, 0, nullptr, &injected_pid);
         if (ret != INJECTOR_SUCCEEDED)
         {
-            fprintf(stderr, "Can not copy file into VM!\n");
+            fprintf(stderr, "Failed to copy file (%s) into VM!\n", src.c_str());
             return drakvuf_exit_code_t::WRITE_FILE_ERROR;
         }
 
