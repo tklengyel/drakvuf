@@ -206,6 +206,7 @@ struct drakvuf
     vmi_event_t mem_event;
     vmi_event_t debug_event;
     vmi_event_t cpuid_event;
+    vmi_event_t msr_event;
     vmi_event_t* step_event[MAX_DRAKVUF_VCPU];
 
     size_t* offsets;
@@ -246,7 +247,7 @@ struct drakvuf
     GHashTable* memaccess_lookup_trap; // key: trap pointer
     // val: struct memaccess
 
-    GSList* cr0, *cr3, *cr4, *debug, *cpuid, *catchall_breakpoint;
+    GSList* cr0, *cr3, *cr4, *debug, *cpuid, *catchall_breakpoint, *msr;
 
     // list of processes to be intercepted
     bool enable_cr3_based_interception;
@@ -367,5 +368,6 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event);
 event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event);
 event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event);
 event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event);
+event_response_t msr_cb(vmi_instance_t vmi, vmi_event_t* event);
 
 #endif

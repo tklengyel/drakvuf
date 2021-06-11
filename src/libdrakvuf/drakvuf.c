@@ -425,8 +425,16 @@ bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
         drakvuf->cr3 = g_slist_prepend(drakvuf->cr3, trap);
         return 1;
     }
-
-    fprintf(stderr, "Support for trapping requested register is not (yet) implemented!\n");
+    else if (MSR_ALL == trap->reg)
+    {
+        if ( !drakvuf->msr && !control_msr_trap(drakvuf, 1) )
+            return 0;
+            
+        drakvuf->msr = g_slist_prepend(drakvuf->msr, trap);
+        return 1;
+    }
+    else
+        fprintf(stderr, "Support for trapping requested register is not (yet) implemented!\n");
 
     return 0;
 }

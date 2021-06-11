@@ -201,6 +201,7 @@ typedef struct drakvuf_trap_info
     {
         const cpuid_event_t* cpuid; /* For CPUID traps */
         const debug_event_t* debug; /* For DEBUG traps */
+        const reg_event_t*   reg;   /* For MSR traps */
     };
 } drakvuf_trap_info_t;
 
