@@ -19,6 +19,7 @@ parts:
         - build-essential
         - pkg-config
         - libglib2.0-dev
+        - libx11-dev
         - clang
         - libtool
         - automake
