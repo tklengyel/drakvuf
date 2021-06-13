@@ -869,6 +869,40 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
     return rsp;
 }
 
+event_response_t msr_cb(vmi_instance_t vmi, vmi_event_t* event)
+{
+    UNUSED(vmi);
+    event_response_t rsp = 0;
+    drakvuf_t drakvuf = (drakvuf_t)event->data;
+
+    flush_vmi(drakvuf);
+#ifdef DEBUG
+    PRINT_DEBUG("MSR event vCPU %u altp2m:%u MSR=0x%"PRIx32" Value=0x%"PRIx64"\n",
+        event->vcpu_id, event->slat_id, event->reg_event.msr, event->reg_event.value);
+#endif
+    drakvuf_trap_info_t trap_info;
+    proc_data_priv_t proc_data;
+    proc_data_priv_t attached_proc_data;
+    fill_common_event_trap_info(drakvuf, &trap_info, &proc_data, &attached_proc_data, event);
+    trap_info.reg = &event->reg_event;
+
+    drakvuf->in_callback = 1;
+    GSList* loop = drakvuf->msr;
+    while (loop)
+    {
+        trap_info.trap = (drakvuf_trap_t*)loop->data;
+        rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+        loop = loop->next;
+    }
+    drakvuf->in_callback = 0;
+
+    free_proc_data_priv_2(&proc_data, &attached_proc_data);
+
+    process_free_requests(drakvuf);
+
+    return rsp;
+}
+
 event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
@@ -1057,6 +1091,12 @@ void remove_trap(drakvuf_t drakvuf,
                 drakvuf->cr3 = g_slist_remove(drakvuf->cr3, trap);
                 if ( !drakvuf->cr3 && !drakvuf->enable_cr3_based_interception )
                     control_cr3_trap(drakvuf, 0);
+            }
+            else if (MSR_ALL == trap->reg)
+            {
+                drakvuf->msr = g_slist_remove(drakvuf->msr, trap);
+                if (!drakvuf->msr)
+                    control_msr_trap(drakvuf, 0);
             }
             break;
         }
@@ -1464,6 +1504,35 @@ bool control_cpuid_trap(drakvuf_t drakvuf, bool toggle)
         if (VMI_FAILURE == vmi_clear_event(drakvuf->vmi, &drakvuf->cpuid_event, NULL))
         {
             fprintf(stderr, "Failed to clear CPUID event\n");
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+bool control_msr_trap(drakvuf_t drakvuf, bool toggle)
+{
+    drakvuf->msr_event.version = VMI_EVENTS_VERSION;
+    drakvuf->msr_event.type = VMI_EVENT_REGISTER;
+    drakvuf->msr_event.reg_event.reg = MSR_ALL;
+    drakvuf->msr_event.reg_event.in_access = VMI_REGACCESS_W;
+    drakvuf->msr_event.data = drakvuf;
+    drakvuf->msr_event.callback = msr_cb;
+
+    if ( toggle )
+    {
+        if (VMI_FAILURE == vmi_register_event(drakvuf->vmi, &drakvuf->msr_event))
+        {
+            fprintf(stderr, "Failed to register MSR event\n");
+            return 0;
+        }
+    }
+    else
+    {
+        if (VMI_FAILURE == vmi_clear_event(drakvuf->vmi, &drakvuf->msr_event, NULL))
+        {
+            fprintf(stderr, "Failed to clear MSR event\n");
             return 0;
         }
     }
