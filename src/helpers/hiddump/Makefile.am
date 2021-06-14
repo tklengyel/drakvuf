@@ -102,88 +102,17 @@
 #                                                                         #
 #*************************************************************************#
 
-bin_PROGRAMS = drakvuf injector proc_stat
+if HAVE_LIBX11
+bin_PROGRAMS = hiddump
 
-SUBDIRS = xen_helper libdrakvuf libinjector plugins dirwatch libusermode libhook helpers/hiddump
+hiddump_SOURCES = hiddump.c
 
-drakvuf_SOURCES = main.cpp drakvuf.cpp drakvuf.h exitcodes.h
-injector_SOURCES = injector.c
-proc_stat_SOURCES = proc_stat.cpp
+AM_CPPFLAGS = $(CPPFLAGS) $(GLIB_CFLAGS)
+AM_CFLAGS =  $(CFLAGS) $(GLIB_CFLAGS) $(X11_CFLAGS)
+AM_LDFLAGS = $(LDFLAGS) $(GLIB_LIBS) $(X11_LIBS)
 
-AM_CPPFLAGS = $(CPPFLAGS)
-AM_CPPFLAGS += $(VMI_CFLAGS)
-AM_CPPFLAGS += $(GLIB_CFLAGS)
-AM_CPPFLAGS += $(JSONC_CFLAGS)
-AM_CPPFLAGS += $(ZLIB_CFLAGS)
-AM_CPPFLAGS += -I$(top_srcdir) -I$(srcdir)
-
-AM_LDFLAGS =  $(LDFLAGS)
-AM_LDFLAGS += $(VMI_LIBS)
-AM_LDFLAGS += $(GLIB_LIBS)
-AM_LDFLAGS += $(JSONC_LIBS)
-AM_LDFLAGS += $(ZLIB_LIBS)
-
-AM_CFLAGS = $(CFLAGS)
-AM_CXXFLAGS = $(CXXFLAGS)
-
-if HARDENING
-AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
-AM_CXXFLAGS += $(HARDEN_CFLAGS) -DHARDENING
-AM_LDFLAGS += $(HARDEN_LDFLAGS)
+if DEBUG
+AM_CFLAGS += -Werror -Wall -Wextra -Wno-missing-field-initializers
 endif
 
-if SANITIZE
-AM_CFLAGS += $(SANITIZE_CFLAGS)
-AM_CXXFLAGS += $(SANITIZE_CFLAGS)
-AM_LDFLAGS += $(SANITIZE_LDFLAGS)
-endif
-
-# Note that -pg is incompatible with HARDENING
-if !DEBUG
-AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
-AM_CXXFLAGS += -Wno-unknown-warning-option
-else
-AM_CFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
-AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
-AM_CXXFLAGS += -Wformat -Wformat-security
-AM_CXXFLAGS += -ferror-limit=0 -Wno-unknown-warning-option
-AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
-if !HARDENING
-AM_CFLAGS += -pg
-AM_CXXFLAGS += -pg
-endif
-endif
-
-drakvuf_LDADD = libdrakvuf/libdrakvuf.la
-drakvuf_LDADD += xen_helper/libxenhelper.la
-drakvuf_LDADD += plugins/libdrakvufplugins.la
-drakvuf_LDADD += libinjector/libinjector.la
-drakvuf_LDADD += libusermode/libusermode.la
-drakvuf_LDADD += libhook/libhook.la
-
-injector_LDADD = libdrakvuf/libdrakvuf.la
-injector_LDADD += libinjector/libinjector.la
-
-proc_stat_LDADD = libdrakvuf/libdrakvuf.la
-
-if XTF
-bin_PROGRAMS += xtf
-xtf_SOURCES = xtf.c
-xtf_LDADD = libdrakvuf/libdrakvuf.la
-endif
-
-if REPL
-bin_PROGRAMS += repl
-
-SUBDIRS += librepl
-
-repl_SOURCES = repl.cpp
-
-drakvuf_LDADD += librepl/librepl.la
-
-repl_LDADD = librepl/librepl.la
-repl_LDADD += libdrakvuf/libdrakvuf.la
-
-repl_CXXFLAGS = $(AM_CXXFLAGS) -fpie
-repl_LDFLAGS = $(AM_LDFLAGS) -Wl,-E
 endif

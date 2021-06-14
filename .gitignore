@@ -45,6 +45,7 @@ ltmain.sh
 m4/*.m4
 src/dirwatch/dirwatch
 src/dirwatch/distributor
+src/helpers/hiddump/hiddump
 test-drive
 ylwrap
 
