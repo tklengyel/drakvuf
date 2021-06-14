@@ -1,0 +1,101 @@
+* hiddump
+A utility to record HID events.
+
+** Overview
+~hiddump~ is a utility program to capture HID events on a Linux system and store relative and normalized versions of those events in a binary file, which can then serve later as a template for sending those recorded HID events to an analysis guest by utilizing the plugin ~hidsim~ and the CLI argument ~--hid-template /path/to/events.bin~.
+
+** Dependencies
+~hiddump~ is written in plain C and depends only on GlibC and X11. GlibC is required for general system interaction and the X window system is needed to read the screen dimensions. A task, which is actually needed to perform the mapping of mouse coordinates into a normalized value range. To ensure the availability of the the [[https://packages.debian.org/search?keywords=libx11-dev][X11-library]], run ~sudo apt install libx11-dev~ on a Debian-based box.
+** Compilation
+The compilation of this tool is performed by Drakvuf's-automake system. The only requirement for this is, that the a/m X11-library is available on the system running =configure= and =make=. So if you build Drakvuf on a machine with an X server, just run the usual compilation steps from within Drakvuf's root directory:
+
+#+begin_src shell
+  ./autogen.sh
+  ./configure --enable-debug
+  make -j6
+#+end_src
+
+If you want or need to compile the tool separately, this can be accomplished with the following command:
+
+~gcc -o hiddump hiddump.c -lX11~.
+
+** Usage
+To run the tool, make sure to acquire root-privileges beforehand, which are needed to access the event-files, serving the events of the HID-devices. If you run it without any parameters, ~hiddump~ will try to find the current mouse-event file. (Note: this has been tested under Ubuntu 18.04 and 20.04) Then these mouse events will be captured for an inifinite amount of time until the user stops recording by typing =Ctrl+C=. Captured events will be outputted to stdout, while verbose debug information is sent to stderr. So the most basic usage of the tool is illustrated by the following command:
+
+#+begin_src shell
+  sudo ./src/helpers/hiddump > events.bin
+#+end_src
+
+The resulting binary event data can be either redirected from stdout like in the example above or can be alternatively written directly to a file specified by a positional argument. If you want to capture events only for a certain amount of time, use the short option ~-d~ to specify the capture interval in seconds. To record events of one or multiple specific HID-devices, use ~-e /dev/input/eventXX~. Right now five event-files can be monitored at the same time at maximum.
+
+A comprehensive example of ~hiddump~'s usage could be the following one, which reads events for 30 seconds from two devices and saves those events in ~/tmp/events.bin~.
+
+#+begin_src shell
+  sudo ./hiddump -e /dev/input/event16 -e /dev/input/8 -d 30 /tmp/events.bin
+#+end_src
+
+~hiddump~ serves the following, self-explaining help page:
+
+#+begin_example
+      usage: ./hiddump [-h] [-e /dev/input/eventX] [file]
+
+      A utility to record HID events
+
+      positional arguments:
+	file          binary file to store events
+
+      optional arguments:
+	-h                    show this help message and exit
+	-e <eventfile>        event file to read events from;
+	  multiple event files can be specifed -e file1 -e file2 (max. 3)
+	-d <seconds>          time frame in seconds to record events
+
+      examples:
+	# capture mouse events infinitely
+	./hiddump > events.in
+
+	# read from specified event files for 20 secs
+	./hiddump -e /dev/input/event7 -e /dev/input/event16 -d 20 events.bin
+
+	<snip>
+#+end_example
+
+In order to identify relevant event files and retrieve their path, use the following commands:
+
+#+begin_src shell
+  ls -l /dev/input/by-id | grep -E 'mouse|kbd'
+#+end_src
+
+or alternatively
+
+#+begin_src shell
+  cat /proc/bus/input/devices  | grep -E 'mouse|kdb'
+#+end_src
+
+** Inner workings of the tool
+~hiddump~ utilizes the [[https://www.kernel.org/doc/html/latest/input/input_uapi.html][input subsystem]] of the Linux kernel to record HID events. When executed, ~hiddump~ reads ~input_event~-structs from one or multiple event files under ~/dev/input/~, which are continuosly polled during the recording period. The timing information, which is provided in the form of ~timeval~-structs, is converted to a relative timestamp starting at the beginning of the recording. If the event houses coordinates, then those are mapped to a value range, which qemu uses in its monitor protocol. After retrieval and normalization of the events, they are be dumped to ~stdout~ or written to a specified file in a binary representation, which is presented below. By using the input event format of the Linux input subsystem the tool builds upon a proven format and a stable interface.
+
+** File format
+To preserve the relative and normalized HID events for later use, the ~input_event~-structs are stored sequentially in a binary file, whereas each entry consists of the following fields:
+
+#+begin_src C
+  struct input_event {
+      struct timeval time;     // relative to the start
+      unsigned short type;     // EV_REL, EV_KEY, etc.
+      unsigned short code;     // REL_X, BTN_LEFT, etc.
+      unsigned int value;      // Coordinates, button down, etc.
+  };
+#+end_src
+
+In order to be able to identify a file as a valid HID template file, which was created by ~hiddump~ and which contains HID data in the specified format, a short header is prepended at the beginning of the
+file. The header consists of 12 bytes in total. Its magic number =0xc4d2c1cb= is derived from the string 'DRAK'.
+
+#+begin_example
+  | Symbol                    | Size  | Content             |
+  |---------------------------+-------+---------------------|
+  | Magic number              | DWORD | 0xCB 0xC1 0xD2 0xC4 |
+  | ASCII identifier ('DRAK') | DWORD | 0x44 0x52 0x41 0x4b |
+  | Version information       | DWORD | 0x01 0x00 0x00 0x00 |
+#+end_example
+
+Output in this form can be used for the simulation of human-like interaction with the help of the plugin ~hidsim~.

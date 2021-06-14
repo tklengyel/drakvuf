@@ -683,6 +683,9 @@ if test x$repl = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_REPL, 1, "")
 fi
 
+PKG_CHECK_MODULES([X11], [x11], [lx11=1], [lx11=0])
+AM_CONDITIONAL([HAVE_LIBX11], [test x$lx11 = x1])
+
 #####################################################
 
 AC_CONFIG_FILES([Makefile src/Makefile
@@ -694,6 +697,7 @@ AC_CONFIG_FILES([Makefile src/Makefile
                  src/libusermode/Makefile
                  src/librepl/Makefile
                  src/libhook/Makefile
+                 src/helpers/hiddump/Makefile
                ])
 
 AC_OUTPUT
