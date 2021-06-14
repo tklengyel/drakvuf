@@ -242,8 +242,6 @@ int center_cursor(unsigned int width, unsigned int height)
     /* Gets connection to X11 display server */
     if ((display = XOpenDisplay(NULL)) == NULL)
     {
-        if (display)
-            free(display);
         return 1;
     }
     root_window = XRootWindow(display, 0);
@@ -278,12 +276,14 @@ void write_file_header(FILE* f)
     fwrite(&i, sizeof(i), 1, f);
 }
 
-void store_event(struct timeval* rel_t, unsigned short* type, unsigned short* code, int* val, FILE* fout)
+int store_event(struct timeval* rel_t, unsigned short* type, unsigned short* code, int* val, FILE* fout)
 {
-    fwrite(rel_t, sizeof(struct timeval), 1, fout);
-    fwrite(type, sizeof(unsigned short), 1, fout);
-    fwrite(code, sizeof(unsigned short), 1, fout);
-    fwrite(val, sizeof(int), 1, fout);
+    int cnt = 0;
+    cnt += fwrite(rel_t, sizeof(struct timeval), 1, fout);
+    cnt += fwrite(type, sizeof(unsigned short), 1, fout);
+    cnt += fwrite(code, sizeof(unsigned short), 1, fout);
+    cnt += fwrite(val, sizeof(int), 1, fout);
+    return cnt;
 }
 
 int normalize(int value, double factor)
@@ -375,7 +375,8 @@ int poll_events(struct pollfd* fds, size_t n, FILE* fout, int seconds, double x_
                         default:
                             continue;
                     }
-                    store_event(&rel_t, &(ie.type), &(ie.code), &val, fout);
+                    if (store_event(&rel_t, &(ie.type), &(ie.code), &val, fout) < 4)
+                        fprintf(stderr, "Error storing event!\n");;
                 }
 
                 /* Handles button presses, no need to normalize */
@@ -401,7 +402,8 @@ int poll_events(struct pollfd* fds, size_t n, FILE* fout, int seconds, double x_
                             val = ie.value;
                             break;
                     }
-                    store_event(&rel_t, &(ie.type), &(ie.code), &val, fout);
+                    if (store_event(&rel_t, &(ie.type), &(ie.code), &val, fout) < 4)
+                        fprintf(stderr, "Error storing event!\n");;
                 }
                 val = 0;
             }
@@ -436,16 +438,32 @@ int populate_fds(struct pollfd* fds, char** event_files, size_t n)
 }
 int record(char** event_files, size_t n, const char* output_file, int seconds)
 {
-    int ret;
+    /* FDs of event files to poll */
+    struct pollfd fds[n];
 
     /* Prepares event files to poll from */
-    struct pollfd fds[n];
-    ret = populate_fds(fds, event_files, n);
-
-    if (ret == 1)
+    if (populate_fds(fds, event_files, n) == 1)
         return 1;
 
-    FILE* fout;
+    /* Retrieves display dimensions, needed for coordate normalization */
+    unsigned int w, h = -1;
+    if (get_dimensions(&w, &h) == 1)
+    {
+        fprintf(stderr, "Failed to retrieve display dimensions");
+        return 1;
+    }
+
+    fprintf(stderr, "Screen dimensions: %d x %d\n", w, h);
+
+    /* Centers cursor for reproducible replay */
+    if (center_cursor(w, h) != 0)
+    {
+        fprintf(stderr, "Could not center cursor");
+        return 1;
+    }
+
+    /* Buffered stream to write to */
+    FILE* fout = NULL;
 
     /* Opens output file or STDOUT, if not specified */
     if (output_file && strlen(output_file) > 0)
@@ -453,7 +471,8 @@ int record(char** event_files, size_t n, const char* output_file, int seconds)
         fprintf(stderr, "Opening %s\n", output_file);
 
         /* Use creat-syscall to open file with restrictive permissions right away */
-        int fd = creat(output_file, 0644);
+        int fd = creat(output_file, 0664);
+
         if (fd == -1)
         {
             perror("creat()");
@@ -465,7 +484,7 @@ int record(char** event_files, size_t n, const char* output_file, int seconds)
     else
     {
         /* Write to stdout */
-        fout = fdopen(dup(fileno(stdout)), "w");
+        fout = stdout;
     }
 
     if (fout == NULL)
@@ -476,23 +495,6 @@ int record(char** event_files, size_t n, const char* output_file, int seconds)
     }
 
     write_file_header(fout);
-
-    /* Retrieves display dimensions, needed for coordate normalization */
-    unsigned int w, h = -1;
-
-    if (get_dimensions(&w, &h) == 1)
-    {
-        fprintf(stderr, "Failed to retrieve display dimensions");
-        return 1;
-    }
-    fprintf(stderr, "Screen dimensions: %d x %d\n", w, h);
-
-    /* Centers cursor for reproducible replay */
-    if (center_cursor(w, h) != 0)
-    {
-        fprintf(stderr, "Could not center cursor");
-        return 1;
-    }
 
     /* Map recorded coordinates into  value range used by QMP */
     double x_scale = (float)(1<<15)/w;
@@ -596,11 +598,10 @@ int main(int argc, char** argv)
     }
 
     /* Handles positional argument */
-    for (; optind < argc; optind++)
+    if (optind < argc)
     {
         output_file = strdup(argv[optind]);
         fprintf(stderr, "Writing output to %s\n", output_file);
-        break;
     }
 
     /* Start recording mouse movements */
