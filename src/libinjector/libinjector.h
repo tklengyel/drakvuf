@@ -193,6 +193,9 @@ void init_int_argument(struct argument* arg,
 void init_unicode_argument(struct argument* arg,
     unicode_string_t* us) NOEXCEPT;
 
+void init_string_argument(struct argument* arg,
+    const char *string) NOEXCEPT;
+
 #define init_struct_argument(arg, sv) \
     init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
 
