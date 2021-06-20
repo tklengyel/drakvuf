@@ -128,11 +128,12 @@ void init_int_argument(struct argument* arg, uint64_t value)
     arg->data_on_stack = 0;
 }
 
-void init_string_argument(struct argument* arg, const char *string){
-   arg->type = ARGUMENT_STRING;
-   arg->size = strlen(string);
-   arg->data = (char*)string;
-   arg->data_on_stack = 0;
+void init_string_argument(struct argument* arg, const char* string)
+{
+    arg->type = ARGUMENT_STRING;
+    arg->size = strlen(string);
+    arg->data = (char*)string;
+    arg->data_on_stack = 0;
 }
 
 void init_unicode_argument(struct argument* arg, unicode_string_t* us)
