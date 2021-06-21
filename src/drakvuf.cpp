@@ -188,7 +188,7 @@ static bool is_stopped(drakvuf_t drakvuf, void* data)
     }
     else
     {
-        rc = rc || !d->_drakvuf_c->stop_plugins(d->plugin_list);
+        rc = rc || d->_drakvuf_c->stop_plugins(d->plugin_list);
         PRINT_DEBUG("[STOP] Check plugins %d\n", rc);
         return rc == 0;
     }
