@@ -188,6 +188,8 @@ static void print_usage()
         "\t                                               : [LINUX]: execproc -> execlp(), linuxshellcode \n"
         "\t --write-file <src> <dst>  [WIN] Copy host file <src> into running VM's path <dst> (writefile injection method)\n"
         "\t                           Can be used multiple times to copy multiple files\n"
+        "\t --write-file-timeout <seconds>\n"
+        "\t                           write-file timeout (in seconds, default: 0 == no timeout, requires --write-file)\n"
         "\t -f <args for exec>        Additional args for exec() (requires -m execproc)\n"
         "\t -g                        Search required for injection functions in all processes\n"
         "\t -j, --injection-timeout <seconds>\n"
@@ -334,6 +336,7 @@ int main(int argc, char** argv)
     std::map<std::filesystem::path, std::filesystem::path> write_files;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     int injection_timeout = 0;
+    int write_file_timeout = 0;
     bool injection_global_search = false;
     char* domain = nullptr;
     char* json_kernel_path = nullptr;
@@ -416,6 +419,7 @@ int main(int argc, char** argv)
         opt_ipt_trace_os,
         opt_ipt_trace_user,
         opt_write_file,
+        opt_write_file_timeout,
     };
     const option long_opts[] =
     {
@@ -470,6 +474,7 @@ int main(int argc, char** argv)
         {"ipt-trace-os", no_argument, NULL, opt_ipt_trace_os},
         {"ipt-trace-user", no_argument, NULL, opt_ipt_trace_user},
         {"write-file", required_argument, NULL, opt_write_file},
+        {"write-file-timeout", required_argument, NULL, opt_write_file_timeout},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF:C";
@@ -548,6 +553,9 @@ int main(int argc, char** argv)
                 }
 
                 write_files[optarg] = argv[optind++];
+                break;
+            case opt_write_file_timeout:
+                write_file_timeout = atoi(optarg);
                 break;
 #ifdef ENABLE_DOPPELGANGING
             case 'B':
@@ -818,12 +826,17 @@ int main(int argc, char** argv)
     for (const auto&[src, dst] : write_files)
     {
         PRINT_DEBUG("Writing file ('%s' -> '%s') into running VM\n", src.c_str(), dst.c_str());
-
-        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, dst.c_str(), nullptr, INJECT_METHOD_WRITE_FILE, output, src.c_str(), nullptr, 0, true, 0, nullptr, &injected_pid);
-        if (ret != INJECTOR_SUCCEEDED)
+        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, dst.c_str(), nullptr, INJECT_METHOD_WRITE_FILE, output, src.c_str(), nullptr, write_file_timeout, true, 0, nullptr, &injected_pid);
+        switch (ret)
         {
-            fprintf(stderr, "Failed to copy file (%s) into VM!\n", src.c_str());
-            return drakvuf_exit_code_t::WRITE_FILE_ERROR;
+            case INJECTOR_SUCCEEDED:
+                break;
+            case INJECTOR_TIMEOUTED:
+                fprintf(stderr, "Writefile timeout exceeds! (%s)!\n", src.c_str());
+                return drakvuf_exit_code_t::WRITE_FILE_TIMEOUT;
+            default:
+                fprintf(stderr, "Failed to copy file (%s) into VM!\n", src.c_str());
+                return drakvuf_exit_code_t::WRITE_FILE_ERROR;
         }
 
         drakvuf->interrupt(0); // clear
