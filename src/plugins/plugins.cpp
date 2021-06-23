@@ -134,6 +134,7 @@
 #include "libhooktest/libhooktest.h"
 #include "exploitmon/exploitmon.h"
 #include "ipt/ipt.h"
+#include "hidsim/hidsim.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -425,6 +426,17 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .trace_user = options->ipt_trace_user,
                     };
                     this->plugins[plugin_id] = std::make_unique<ipt>(this->drakvuf, config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_HIDSIM
+                case PLUGIN_HIDSIM:
+                {
+                    struct hidsim_config config =
+                    {
+                        .template_fp = options->hidsim_template,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<hidsim>(this->drakvuf, &config);
                     break;
                 }
 #endif
