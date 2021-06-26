@@ -404,35 +404,6 @@ err:
     return 0;
 }
 
-static addr_t place_string_on_linux_stack(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, void const* str, size_t str_len)
-{
-    if (!str) return addr;
-    // String length with null terminator
-    size_t len = str_len + 2;
-    addr_t orig_addr = addr;
-
-    addr -= len;
-    // Align string address on 32B boundary (for SSE2 instructions).
-    addr &= ~0x1f;
-
-    size_t buf_len = orig_addr - addr;
-    void* buf = g_try_malloc0(buf_len);
-
-    if (!buf) return 0;
-    memcpy(buf, str, str_len);
-
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3,
-        .addr = addr
-    );
-
-    status_t status = vmi_write(vmi, &ctx, buf_len, buf, NULL);
-    g_free(buf);
-
-    return status == VMI_FAILURE ? 0 : addr;
-}
-
 bool setup_linux_stack(vmi_instance_t vmi, x86_registers_t* regs, struct argument args[], int nb_args)
 {
     uint64_t nul64 = 0;
@@ -455,7 +426,7 @@ bool setup_linux_stack(vmi_instance_t vmi, x86_registers_t* regs, struct argumen
             switch (args[i].type)
             {
                 case ARGUMENT_STRING:
-                    addr = place_string_on_linux_stack(vmi, regs, addr, args[i].data, args[i].size);
+                    addr = place_string_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
                     if ( !addr ) goto err;
                     args[i].data_on_stack = addr;
                     break;
