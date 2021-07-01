@@ -122,6 +122,119 @@
 #include "plugins/output_format.h"
 
 /*
+NTSYSAPI NTSTATUS ZwDuplicateObject(
+  HANDLE      SourceProcessHandle,
+  HANDLE      SourceHandle,
+  HANDLE      TargetProcessHandle,
+  PHANDLE     TargetHandle,
+  ACCESS_MASK DesiredAccess,
+  ULONG       HandleAttributes,
+  ULONG       Options
+);
+*/
+
+struct duplicate_result_t : public call_result_t
+{
+    duplicate_result_t() : call_result_t()
+    {}
+    addr_t source_process_handle = 0;
+    addr_t source_handle = 0;
+    addr_t target_process_handle = 0;
+    addr_t target_handle_va = 0;
+    uint32_t desired_access = 0;
+    uint32_t handle_attributes = 0;
+    uint32_t options = 0;
+};
+
+static event_response_t ntduplicateobject_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    //Loads a pointer to the plugin, which is responsible for the trap
+    auto plugin = get_trap_plugin<objmon>(info);
+
+    //get_trap_params reinterprets the pointer of info->trap->data as a pointer to duplicate_result_t
+    auto params = get_trap_params<duplicate_result_t>(info);
+
+    //Verifies that the params we got above (preset by the previous trap) match the trap_information this cb got called with.
+    if (!params->verify_result_call_params(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    vmi_lock_guard lg(drakvuf);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = params->target_handle_va
+    );
+
+    addr_t target_handle;
+    if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &target_handle))
+    {
+        PRINT_DEBUG("[OBJMON] Failed to read HANDLE at %#lx\n", params->target_handle_va);
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    fmt::print(plugin->format, "objmon", drakvuf, info,
+        keyval("SourceProcessHandle", fmt::Xval(params->source_process_handle)),
+        keyval("SourceHandle", fmt::Xval(params->source_handle)),
+        keyval("TargetProcessHandle", fmt::Xval(params->target_process_handle)),
+        keyval("TargetHandle", fmt::Xval(target_handle)),
+        keyval("DesiredAccess", fmt::Xval(params->desired_access)),
+        keyval("HandleAttributes", fmt::Xval(params->handle_attributes)),
+        keyval("Options", fmt::Xval(params->options))
+    );
+
+    //Destroys this return trap, because it is specific for the RIP and not usable anymore. This was the trap being called when the physical address got computed.
+    //Deletes this trap from the list of existing traps traps
+    //Additionally removes the trap and frees the memory
+    plugin->destroy_trap(info->trap);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t ntduplicateobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin = get_trap_plugin<objmon>(info);
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+    if ( !ret_addr )
+        return VMI_EVENT_RESPONSE_NONE;
+
+    //Adds a return hook, a hook which will be called after function completes and returns.
+    //Each time registers a trap, which is just for the process at the current step -> specific for the RIP
+    auto trap = plugin->register_trap<duplicate_result_t>(
+            info,
+            ntduplicateobject_ret_cb,
+            breakpoint_by_dtb_searcher());
+
+    //If trap creation failed
+    if (!trap)
+    {
+        PRINT_DEBUG("[OBJMON] Could not create NtDuplicateObject return hook\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    //After the trap got constructed, enrich its details already with some information we already (and just) know here (at this point).
+
+    //duplicate_result_t extends from call_result_t which extends from plugin_params
+    //get_trap_params reinterprets the pointer of trap->data as a pointer to duplicate_result_t
+    //Load the information that is saved by hitting the first trap.
+    //With params we can preset the params that the newly risen second breakpoint will receive.
+    auto params = get_trap_params<duplicate_result_t>(trap);
+
+    //Save the address of the target thread, address of the rsp (this was the rip-address, which we used for construction) and the value of the CR3 register to the params.
+    params->set_result_call_params(info);
+
+    //enrich the params of the new/next trap. This information is used later.
+    params->source_process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    params->source_handle = drakvuf_get_function_argument(drakvuf, info, 2);
+    params->target_process_handle = drakvuf_get_function_argument(drakvuf, info, 3);
+    params->target_handle_va = drakvuf_get_function_argument(drakvuf, info, 4);
+    params->desired_access = drakvuf_get_function_argument(drakvuf, info, 5);
+    params->handle_attributes = drakvuf_get_function_argument(drakvuf, info, 6);
+    params->options = drakvuf_get_function_argument(drakvuf, info, 7);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+/*
  NTKERNELAPI
  NTSTATUS
  ObCreateObject (
@@ -146,10 +259,10 @@ struct ckey
     };
 };
 
-static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t obcreateobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
 
-    objmon* o = (objmon*)info->trap->data;
+    auto o = get_trap_plugin<objmon>(info);
     struct ckey ckey = {};
 
     addr_t addr = drakvuf_get_function_argument(drakvuf, info, 2);
@@ -175,19 +288,26 @@ static event_response_t cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 /* ----------------------------------------------------- */
 
-objmon::objmon(drakvuf_t drakvuf, output_format_t output) :
-    format(output)
+objmon::objmon(drakvuf_t drakvuf, const objmon_config* config, output_format_t output)
+    : pluginex(drakvuf, output)
+    , format(output)
 {
-    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "ObCreateObject", &this->trap.breakpoint.rva) )
-        throw -1;
-    if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "_OBJECT_TYPE", "Key", &this->key_offset) )
-        throw -1;
+    breakpoint_in_system_process_searcher bp;
 
-    this->trap.cb = cb;
-    this->trap.ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+    if (!config->disable_obcreateobject)
+    {
+        if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "_OBJECT_TYPE", "Key", &this->key_offset) )
+            throw -1;
 
-    if ( !drakvuf_add_trap(drakvuf, &this->trap) )
+        if (!register_trap(nullptr, obcreateobject_cb, bp.for_syscall_name("ObCreateObject")))
+            throw -1;
+    }
+
+    if (!config->disable_ntduplicateobject &&
+        !register_trap(nullptr, ntduplicateobject_cb, bp.for_syscall_name("NtDuplicateObject")))
+    {
         throw -1;
+    }
 }
 
 objmon::~objmon() {}

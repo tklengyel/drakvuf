@@ -420,6 +420,8 @@ int main(int argc, char** argv)
         opt_ipt_trace_user,
         opt_write_file,
         opt_write_file_timeout,
+        opt_objmon_disable_create_hook,
+        opt_objmon_disable_duplicate_hook,
     };
     const option long_opts[] =
     {
@@ -475,6 +477,8 @@ int main(int argc, char** argv)
         {"ipt-trace-user", no_argument, NULL, opt_ipt_trace_user},
         {"write-file", required_argument, NULL, opt_write_file},
         {"write-file-timeout", required_argument, NULL, opt_write_file_timeout},
+        {"objmon-disable-create-hook", no_argument, NULL, opt_objmon_disable_create_hook},
+        {"objmon-disable-duplicate-hook", no_argument, NULL, opt_objmon_disable_duplicate_hook},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF:C";
@@ -761,6 +765,14 @@ int main(int argc, char** argv)
 #ifdef ENABLE_PLUGIN_EXPLOITMON
             case opt_exploitmon_kernel2user_detect:
                 options.exploitmon_kernel2user_detect = true;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_OBJMON
+            case opt_objmon_disable_create_hook:
+                options.objmon_disable_create_hook = true;
+                break;
+            case opt_objmon_disable_duplicate_hook:
+                options.objmon_disable_duplicate_hook = true;
                 break;
 #endif
             case 'h':
