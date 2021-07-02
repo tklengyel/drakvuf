@@ -151,7 +151,7 @@ int drakvuf_c::stop_plugins(const bool* plugin_list)
     bool failed = false;
     bool pending = false;
 
-    for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX && !failed && !pending; i++)
+    for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
     {
         if (plugin_list[i])
         {

@@ -113,6 +113,7 @@ enum drakvuf_exit_code_t
     INJECTION_UNSUCCESSFUL = 4, /* Injection has been done correctly, but
                                  * the sample could not be started
                                  * (corrupted, arch mismatch and so on) */
-    WRITE_FILE_ERROR = 5,
+    WRITE_FILE_TIMEOUT = 5,
+    WRITE_FILE_ERROR = 6,
     KERNEL_PANIC = 10,
 };

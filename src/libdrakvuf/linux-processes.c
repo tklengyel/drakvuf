@@ -246,7 +246,7 @@ char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = drakvuf->kpgd,
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]
     );
 
@@ -281,7 +281,7 @@ int64_t linux_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = drakvuf->kpgd,
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_CRED]
     );
 
@@ -308,7 +308,7 @@ bool linux_get_current_thread_id( drakvuf_t drakvuf, drakvuf_trap_info_t* info, 
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = drakvuf->kpgd,
         .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]
     );
     uint32_t _thread_id;
