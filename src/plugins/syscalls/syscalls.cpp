@@ -255,6 +255,7 @@ void free_trap(gpointer p)
 syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output)
     : m_drakvuf(drakvuf)
     , traps(NULL)
+    , ret_traps(NULL)
     , filter(NULL)
     , win32k_json(NULL)
     , format{output}
@@ -285,16 +286,27 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
 
 syscalls::~syscalls()
 {
+    if ( this->filter )
+        g_hash_table_destroy(this->filter);
+
+    g_free(this->offsets);
+    g_slist_free(this->traps);
+}
+
+bool syscalls::stop()
+{
+    m_is_stopping = true;
+
+    if (this->ret_traps)
+        return false;
+
     GSList* loop = this->traps;
     while (loop)
     {
         drakvuf_remove_trap(m_drakvuf, (drakvuf_trap_t*)loop->data, (drakvuf_trap_free_t)free_trap);
         loop = loop->next;
     }
+    this->traps = nullptr;
 
-    if ( this->filter )
-        g_hash_table_destroy(this->filter);
-
-    g_free(this->offsets);
-    g_slist_free(this->traps);
+    return true;
 }

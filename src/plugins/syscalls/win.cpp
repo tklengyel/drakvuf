@@ -140,7 +140,7 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     print_syscall(s, drakvuf, VMI_OS_WINDOWS, false, info, w->num, std::string(info->trap->breakpoint.module), sc, args, info->regs->rax, exit_status_str);
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
-    s->traps = g_slist_remove(s->traps, info->trap);
+    s->ret_traps = g_slist_remove(s->ret_traps, info->trap);
 
     return 0;
 }
@@ -204,7 +204,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     print_syscall(s, drakvuf, VMI_OS_WINDOWS, true, info, w->num, std::string(w->type), sc, args, 0, NULL);
     vmi.lock();
 
-    if ( s->disable_sysret )
+    if ( s->disable_sysret || s->is_stopping() )
         return 0;
 
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
@@ -243,7 +243,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     ret_trap->ttl = UNLIMITED_TTL;
 
     if ( drakvuf_add_trap(drakvuf, ret_trap) )
-        s->traps = g_slist_prepend(s->traps, ret_trap);
+        s->ret_traps = g_slist_prepend(s->ret_traps, ret_trap);
     else
     {
         g_slice_free(drakvuf_trap_t, ret_trap);

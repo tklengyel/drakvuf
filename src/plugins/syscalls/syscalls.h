@@ -122,6 +122,7 @@ class syscalls: public plugin
 public:
     drakvuf_t m_drakvuf;
     GSList* traps;
+    GSList* ret_traps;
     GHashTable* filter;
     json_object* win32k_json;
 
@@ -142,6 +143,7 @@ public:
 
     syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     ~syscalls();
+    bool stop();
 };
 
 #endif
