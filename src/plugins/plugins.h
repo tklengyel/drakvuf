@@ -161,6 +161,8 @@ struct plugins_options
     const char* ipt_dir;                // PLUGIN_IPT
     bool ipt_trace_os;                  // PLUGIN_IPT
     bool ipt_trace_user;                // PLUGIN_IPT
+    bool objmon_disable_create_hook;    // PLUGIN_OBJMON
+    bool objmon_disable_duplicate_hook; // PLUGIN_OBJMON
 };
 
 typedef enum drakvuf_plugin
