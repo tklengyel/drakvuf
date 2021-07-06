@@ -112,17 +112,10 @@
 #include <json-c/json_object.h>
 #include <stdbool.h>
 
-/* QMP command string templates */
+/* QMP-command string templates */
 #define QMP_EXEC_CAPABILITIES "{ \"execute\": \"qmp_capabilities\" }"
-#define QMP_SEND_INPUT_OPENING "{ \"execute\": \"input-send-event\" , \"arguments\": { \"events\": ["
-#define QMP_MOUSE_MOVE_EVENT_FMT_STR " { \"type\": \"%s\", \"data\" : {\"axis\": \"x\", \"value\": %d } }, {\"type\": \"%s\", \"data\": { \"axis\": \"y\", \"value\": %d } }"
-#define QMP_MOUSE_BTN_EVENT_FMT_STR " { \"type\": \"btn\" , \"data\" : { \"down\": %s, \"button\": \"%s\" } } %c"
-#define QMP_SCREEN_DUMP_FMT_STR "{ \"execute\":\"screendump\", \"arguments\": { \"filename\": \"%s\" } }"
-#define QMP_KEY_PRESS_QAPI_FMT_STR " { \"type\": \"key\", \"data\" : { \"down\": %s, \"key\": {\"type\": \"qcode\", \"data\": \"%s\" } } } %c "
-#define QMP_KEY_PRESS_CODE_FMT_STR " { \"type\": \"key\", \"data\" : { \"down\": %s, \"key\": {\"type\": \"number\", \"data\": %d } } } %c "
-#define QMP_SEND_INPUT_CLOSING "] } }"
-
 #define QMP_SUCCESS "{\"return\": {}}\r\n"
+#define QMP_RETURN "return"
 
 #define BUF_SIZE 0x2000
 
@@ -136,7 +129,10 @@ typedef struct qmp_connection
     bool is_connected;
 } qmp_connection;
 
-/* Takes a caller allocated QMPConnection strcut and initializes connection to unix domain socket */
+/*
+ * Takes a caller allocated QMPConnection strcut and initializes connection to
+ * unix domain socket
+ */
 int qmp_init_conn(qmp_connection* qc,  char const* path);
 
 /* Sends the given data to the QMPConnection */
@@ -144,6 +140,12 @@ int qmp_communicate_json(qmp_connection* qc, json_object* in, json_object** out)
 
 /* Sends the given data to the QMPConnection */
 int qmp_communicate(qmp_connection* qc, const char* in, char** out);
+
+/* Checks a result string, it it matches a success response */
+int qmp_check_result_str(const char* s);
+
+/* Checks, resulting JSON-object, if it matches a success response */
+int qmp_check_result_json(struct json_object* jo);
 
 /* Clean-up */
 int qmp_close_conn(qmp_connection* qc);

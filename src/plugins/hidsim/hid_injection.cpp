@@ -104,13 +104,15 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#include<fcntl.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <linux/input.h>
 #include <sys/time.h>
+#include <json-c/json.h>
+#include <json-c/json_object.h>
 #include <math.h>
 
 #include <libdrakvuf/libdrakvuf.h> /* eprint_current_time */
@@ -120,6 +122,7 @@
 #include "keymap_evdev_to_qapi.h" /* Mapping evdev->qapi name */
 #include "qmp_connection.h"
 #include "hid_injection.h"
+#include "qmp_commands.h"
 
 /* Drakvuf HID template */
 #define DRAK_MAGIC_NUMBER 0xc4d2c1cb
@@ -136,46 +139,58 @@
 #define M_BTN_STR "middle"
 #define R_BTN_STR "right"
 
-/* Throttle injection down to 50 microsec intervals */
+/* Throttle injection down to 50 microsecond intervals */
 #define TIME_BIN 50
 
-struct dimensions
+typedef struct dimensions
 {
     int width;      /* display width */
     int height;     /* display height */
     float dx;       /* one pixel equivalent on x-axis */
     float dy;       /* one pixel equivalent on y-axis */
-};
+} dimensions;
 
 /* Keep track of the current cursor position */
 int new_x = 1 << 14;
 int new_y = 1 << 14;
 
+/*
+ * Dumps the screen by using QMP's screendump-command and stores the result
+ * as the specified file
+ */
 static int dump_screen(qmp_connection* qc, const char* path)
 {
-    char cmd[0x200];
-    snprintf(cmd, 0x200,
-        QMP_SCREEN_DUMP_FMT_STR,
-        path);
-    char* out = NULL;
+    struct json_object* cmd = construct_screendump_cmd(path);
 
-    qmp_communicate(qc, cmd, &out);
+    json_object* out = NULL;
 
-    if (strcmp(out, QMP_SUCCESS) != 0)
+    qmp_communicate_json(qc, cmd, &out);
+
+    if (qmp_check_result_json(out))
     {
-        fprintf(stderr, "[HIDSIM]: Error dumping screen - %s\n", out);
+        fprintf(stderr, "[HIDSIM]: Error dumping screen");
+        json_object_put(out);
+        json_object_put(cmd);
+        return -1;
     }
+
+    json_object_put(out);
+    json_object_put(cmd);
+
     return 0;
 }
 
-/* For absolute pointing devices 2^15 is used to specify maximum */
+/*
+ * For absolute pointing devices 2^15 is used to specify the maximum of each
+ * axis regardless of the actual screen resolution
+ */
 static float calculate_pixel_unit(int u)
 {
     return (float)(1<<15)/u;
 }
 
 /* Retrieves display dimensions for coordination of mouse movements */
-static int get_display_dimensions(qmp_connection* qc, struct dimensions* dims)
+static int get_display_dimensions(qmp_connection* qc, dimensions* dims)
 {
     const char* tmp_path = "/tmp/tmp.ppm";
 
@@ -209,7 +224,8 @@ static int get_display_dimensions(qmp_connection* qc, struct dimensions* dims)
     if (remove(tmp_path) != 0)
         fprintf(stderr, "[HIDSIM]: Error deleting screen dump %s\n", tmp_path);
 
-    PRINT_DEBUG("[HIDSIM] Screen dimension: %d x %d\n", dims->width, dims->height);
+    PRINT_DEBUG("[HIDSIM] Screen dimension: %d x %d\n",
+        dims->width, dims->height);
     return ret;
 }
 
@@ -224,7 +240,7 @@ static int read_header(FILE* f)
     nr += fread(&version, sizeof(version), 1, f);
     if (nr < 3)
     {
-        fprintf(stderr, "[HIDSIM] Generic error reading file header of HID-template\n");
+        fprintf(stderr, "[HIDSIM] Error reading header of HID-template\n");
         return 1;
     }
 
@@ -237,67 +253,42 @@ static int read_header(FILE* f)
     return 0;
 }
 
-/* Constructs a QMP event-string to instruct a mouse movement */
-static void construct_move_mouse_event(char* buf, int len, int x, int y, bool is_rel)
+/* Helper function to send a mouse move command via qmp */
+static void move_mouse(qmp_connection* qc, int x, int y, bool is_abs)
 {
-    const char* type = is_rel ? "rel" : "abs";
-    snprintf(buf + strlen(buf), len - strlen(buf), QMP_MOUSE_MOVE_EVENT_FMT_STR,
-        type, x, type, y);
+    struct json_object* cmd, *events;
+
+    /* Array to hold an event for each axis */
+    events = json_object_new_array();
+
+    /* Constructs events for x- and y-axis */
+    json_object_array_add(events,
+        construct_mouse_move_event(ax_x, is_abs, x));
+    json_object_array_add(events,
+        construct_mouse_move_event(ax_y, is_abs, y));
+
+    /* Wraps it */
+    cmd = construct_input_event_cmd(events);
+
+    /* Sends command */
+    qmp_communicate_json(qc, cmd, NULL);
+    PRINT_DEBUG("[HIDSIM] %s\n", json_object_to_json_string_ext(
+            cmd, JSON_C_TO_STRING_SPACED));
+
+    /* Clean up */
+    json_object_put(cmd);
 }
 
-/* Constructs a QMP event-string for sending a button press or release */
-static void construct_button_event(char* buf, int len, const char* btn, int is_down, bool is_append)
-{
-    const char* type = is_down ? "true" : "false";
-    snprintf(buf + strlen(buf), len + strlen(buf),
-        QMP_MOUSE_BTN_EVENT_FMT_STR,
-        type, btn, is_append ? ',' : ' ');
-}
-
-/* Constructs a QMP event-string to send key down or up-command */
-static void construct_key_event(char* buf, int len, const unsigned int key, bool is_down, bool is_append)
-{
-    /*
-     * For some reason sending QKeyCodes as their numbers does not work reliably.
-     * Therefore it is required to map EvDev codes to the QAPI-names of QKeyCodes,
-     * which QMP understands
-     *
-     */
-    const char* state = is_down ? "true" : "false";
-    const char* qapi_name = NULL;
-
-
-    if (key < name_map_linux_to_qcode_len)
-    {
-        /*
-         * Since raw values do not reliably work in (at least) Windows guests,
-         *convert to qapi-names of QKeyCodes!
-         */
-        qapi_name = name_map_linux_to_qcode[key];
-        snprintf(buf + strlen(buf), len - strlen(buf),
-            QMP_KEY_PRESS_QAPI_FMT_STR,
-            state, qapi_name, is_append ? ',' : ' ');
-    }
-    else
-        /* Send raw evdev representation as fallback */
-        snprintf(buf + strlen(buf), len - strlen(buf),
-            QMP_KEY_PRESS_CODE_FMT_STR,
-            state, key, is_append ? ',' : ' ');
-}
 
 /* Helper function to center cursor */
 static void center_cursor(qmp_connection* qc)
 {
-    /* Command buffer */
-    char buf[CMD_BUF_LEN];
-
-    /* 2^15 == max, 2^14 == max/2 */
-    construct_move_mouse_event(buf, CMD_BUF_LEN, 1<<14, 1<<14, false);
-    qmp_communicate(qc, buf, NULL);
+    move_mouse(qc, 1<<14, 1<<14, true);
 }
 
 /* Resets file stream, timer and cursor position */
-static int reset_hid_injection(qmp_connection* qc, FILE* f, struct timeval* tv, int* nx, int* ny)
+static int reset_hid_injection(qmp_connection* qc, FILE* f, struct timeval* tv,
+    int* nx, int* ny)
 {
     /* Jumps to the beginning of the HID data */
     int ret = fseek(f, HEADER_LEN, SEEK_SET);
@@ -311,68 +302,86 @@ static int reset_hid_injection(qmp_connection* qc, FILE* f, struct timeval* tv, 
 
     return ret;
 }
+
 /* Processes evdev-events, which encode keypresses/-releases */
-static void handle_key_event(input_event* ie, char* buf, size_t n, bool is_append)
+static struct json_object* handle_key_event(struct input_event* ie)
 {
     /* Ignores value 2 -> key still pressed */
     if (ie->value == 0  || ie->value == 1)
-        construct_key_event(buf, n, ie->code, (const unsigned int) ie->value, is_append);
+        return construct_qapi_keypress_event(ie->code, ie->value);
+    return NULL;
 }
 
 /* Processes evdev-events, which encode mouse button presses/releases */
-static void handle_btn_event(input_event* ie, char* buf, size_t n, bool is_append)
+static struct json_object* handle_btn_event(struct input_event* ie)
 {
     if (ie->code == BTN_LEFT)
     {
-        construct_button_event(buf, n, L_BTN_STR, ie->value, is_append);
+        return construct_mouse_button_event(left, ie->value);
     }
     if (ie->code == BTN_MIDDLE)
     {
-        construct_button_event(buf, n, M_BTN_STR, ie->value, is_append);
+        return construct_mouse_button_event(middle, ie->value);
     }
     if (ie->code == BTN_RIGHT)
     {
-        construct_button_event(buf, n, R_BTN_STR, ie->value, is_append);
+        return construct_mouse_button_event(middle, ie->value);
     }
+
+    return NULL;
 }
 
 /* Processes Evdev-events, which encode mouse movements */
-static void handle_move_event(input_event* ie, char* buf, size_t n, int* nx, int* ny, bool is_append)
+static struct json_object* handle_move_event(struct input_event* ie, int* nx, int* ny)
 {
+    int* v = NULL;
+    enum AXIS_ENUM ax;
+
     if (ie->code == REL_X)
     {
         *nx += ie->value;
+        v = nx;
+        ax = ax_x;
     }
     if (ie->code == REL_Y)
     {
         *ny += ie->value;
+        v = ny;
+        ax = ax_y;
     }
-    /*
-     * For mouse movements only coords have to be updated,
-     * when appending is requested
-     */
-    if (!is_append)
-        construct_move_mouse_event(buf, n, *nx, *ny, false);
+
+    if (v)
+        return construct_mouse_move_event(ax, true, *v);
+
+    /* Return NULL for an irrelevant axis */
+    return NULL;
 }
 
-/* Takes an input event and delegates the construction of a QMP event-string accordingly */
-static void handle_event(input_event* ie, char* buf, size_t n, bool is_append)
+/*
+ * Takes an input event and delegates the construction of a QMP
+ * event-string accordingly
+ */
+struct json_object* handle_event(struct input_event* ie)
 {
     /* Handles mouse move events */
     if (ie->type == EV_REL)
     {
-        /* Converts to absolute coordinates */
-        handle_move_event(ie, buf, n, &new_x, &new_y, is_append);
+        /*
+         * Converts to absolute coordinates and returns qmp-event-str,
+         * if it should not be "appended"
+         */
+        return handle_move_event(ie, &new_x, &new_y);
 
     }
     if (ie->type == EV_KEY)
     {
         if (ie->code < 0x100)
-            handle_key_event(ie, buf, n, is_append);
+            return handle_key_event(ie);
 
         if (ie->code > 255 && ie->code < 0x120)
-            handle_btn_event(ie, buf, n, is_append);
+            return handle_btn_event(ie);
     }
+    return NULL;
 }
 
 /* Calculates the length of a hypotenuse */
@@ -430,12 +439,9 @@ double gaussian_rand (double mean, double sigma)
 }
 
 /* Smoothly moves the cursor to new coordinates in a given time frame */
-void translate(qmp_connection* qc, dimensions* dim, int time_frame, int ox, int oy, int dx, int dy, int* newx, int* newy)
+void translate(qmp_connection* qc, dimensions* dim, int time_frame,
+    int ox, int oy, int dx, int dy, int* newx, int* newy)
 {
-
-    /* Command buffer */
-    char buf[CMD_BUF_LEN];
-
     const float DISP_RES = dim->dx < dim->dy ? dim->dy : dim->dx;
     int nx, ny;
     int sleep, s;
@@ -480,7 +486,8 @@ void translate(qmp_connection* qc, dimensions* dim, int time_frame, int ox, int 
 
     /*
      * Inspired by
-     * https://github.com/autopilot-rs/autopy-legacy/blob/1cbf4e842c4d43f706a16ac6106f77031ab00163/src/mouse.c#L151
+     * https://github.com/autopilot-rs/autopy-legacy/blob/\
+     * 1cbf4e842c4d43f706a16ac6106f77031ab00163/src/mouse.c#L151
      */
     while ((d = hypot((double)(nx - cx), (double)(ny - cy))) > DISP_RES)
     {
@@ -498,11 +505,7 @@ void translate(qmp_connection* qc, dimensions* dim, int time_frame, int ox, int 
             break;
         }
 
-        snprintf(buf, CMD_BUF_LEN, "%s", QMP_SEND_INPUT_OPENING);
-        construct_move_mouse_event(buf, CMD_BUF_LEN, cx, cy, false);
-        snprintf(buf + strlen(buf), CMD_BUF_LEN - strlen(buf), "%s", QMP_SEND_INPUT_CLOSING);
-        qmp_communicate(qc, buf, NULL);
-        buf[0] = '\0';
+        move_mouse(qc, cx, cy, true);
 
         /* Randomize the sleep */
         s = (int) gaussian_rand((float)sleep, sleep/16);
@@ -510,14 +513,13 @@ void translate(qmp_connection* qc, dimensions* dim, int time_frame, int ox, int 
     }
     *newx = cx;
     *newy = cy;
-
 }
 
 /* Injects random mouse movements */
 static int run_random_injection(qmp_connection* qc, sig_atomic_t* has_to_stop)
 {
     PRINT_DEBUG("[HIDSIM] injecting random mouse movements\n");
-    struct dimensions dim;
+    dimensions dim;
 
     /* Needed for retrieval of screen resolution */
     if (get_display_dimensions(qc, &dim) != 0)
@@ -541,10 +543,11 @@ static int run_random_injection(qmp_connection* qc, sig_atomic_t* has_to_stop)
     int time_frame = 0;
 
     /* Seed RNG */
-    timeval t;
+    struct timeval t;
     gettimeofday(&t, NULL);
     srand(t.tv_sec);
     int s = rand()%512;
+
     /* Loops, until stopped */
     while (!*has_to_stop)
     {
@@ -564,7 +567,6 @@ static int run_random_injection(qmp_connection* qc, sig_atomic_t* has_to_stop)
 
         /* Reverse negative */
         time_frame = time_frame < dist ? dist + (dist-time_frame) : time_frame;
-
         /* Moves the cursor smoothy */
         translate(qc, &dim, (int)time_frame, ox, oy, dx, dy, &nx, &ny);
 
@@ -581,19 +583,21 @@ static int run_random_injection(qmp_connection* qc, sig_atomic_t* has_to_stop)
     return 0;
 }
 
-/* Performs HID event injection according to pre-recorded Evdev-events given by a binary file */
-static int run_template_injection(qmp_connection* qc, FILE* f, sig_atomic_t* has_to_stop)
+/*
+ * Performs HID event injection according to pre-recorded Evdev-events
+ * given by a binary file
+ */
+static int run_template_injection(qmp_connection* qc, FILE* f,
+    sig_atomic_t* has_to_stop)
 {
     PRINT_DEBUG("[HIDSIM] running template injection\n");
 
-    /* Command buffer */
-    char cmd[CMD_BUF_LEN];
-
-    /* Event buffer */
-    char buf[CMD_BUF_LEN];
-
     /* Evdev events to inject */
     struct input_event ie_next, ie_cur;
+
+    /* QMP-event representation of input_event */
+    struct json_object* evt;
+    struct json_object* events = json_object_new_array();
 
     /* Keeping track of time */
     struct timeval tv_old;
@@ -641,32 +645,32 @@ static int run_template_injection(qmp_connection* qc, FILE* f, sig_atomic_t* has
             timersub(&ie_next.time, &ie_cur.time, &tv_diff);
             sleep = tv_diff.tv_sec * 1000000 + tv_diff.tv_usec;
         }
+
+        /* Converts evdev-event to qmp-string and appends it to buffer */
+        evt = handle_event(&ie_cur);
+
+        if (evt)
+            json_object_array_add(events, evt);
+
         /*
          * Throttles event injection, by combing all events within a timeframe of 50 usecs
          * This performs actually a binning with bin size of 50 usecs
          */
-        if ( sleep > TIME_BIN)
+        if (sleep > TIME_BIN)
         {
-            /* Constructs event-string corresponding to evdev-event in question */
-            handle_event(&ie_cur, buf, CMD_BUF_LEN, false);
+            /* Constructs execute-cmd containing various events */
+            struct json_object* cmd = construct_input_event_cmd(events);
 
-            /* Constructs execute-buffer containing various events */
-            snprintf(cmd, CMD_BUF_LEN, "%s", QMP_SEND_INPUT_OPENING);
-            snprintf(cmd + strlen(cmd), CMD_BUF_LEN - strlen(cmd), "%s", buf);
-            snprintf(cmd + strlen(cmd), CMD_BUF_LEN - strlen(cmd), "%s", QMP_SEND_INPUT_CLOSING);
-
-            /* Sends command buffer */
-            qmp_communicate(qc, cmd, NULL);
-            PRINT_DEBUG("[HIDSIM] %s\n", cmd);
+            /* Sends command */
+            qmp_communicate_json(qc, cmd, NULL);
+            PRINT_DEBUG("[HIDSIM] %s\n", json_object_to_json_string_ext(cmd,
+                    JSON_C_TO_STRING_SPACED));
 
             /* Resets event buffer */
-            buf[0] = '\0';
+            json_object_put(cmd);
+            events = json_object_new_array();
         }
-        else
-        {
-            /* Converts evdev-event to qmp-string and appends it to buffer */
-            handle_event(&ie_cur, buf, CMD_BUF_LEN, true);
-        }
+
         /* Omits sleeping after injection of last event */
         if (!was_last)
         {
@@ -684,7 +688,8 @@ static int hid_cleanup(qmp_connection* qc, int fd, FILE* f)
 
     if (qc)
         if ((ret = qmp_close_conn(qc)) != 0)
-            fprintf(stderr, "[HIDSIM] Error closing QMP socket %s\n", qc->sa.sun_path);
+            fprintf(stderr, "[HIDSIM] Error closing QMP socket %s\n",
+                qc->sa.sun_path);
     if (f)
         if ((ret = fclose(f)) != 0)
             fprintf(stderr, "[HIDSIM] Error closing %p", f);
@@ -696,7 +701,8 @@ static int hid_cleanup(qmp_connection* qc, int fd, FILE* f)
 }
 
 /* Worker thread function */
-int hid_inject(const char* sock_path, const char* template_path, sig_atomic_t* has_to_stop)
+int hid_inject(const char* sock_path, const char* template_path,
+    sig_atomic_t* has_to_stop)
 {
     /* Initializes qmp connection */
     qmp_connection qc;
@@ -706,7 +712,8 @@ int hid_inject(const char* sock_path, const char* template_path, sig_atomic_t* h
 
     if (qmp_init_conn(&qc, sock_path) < 0)
     {
-        fprintf(stderr, "[HIDSIM] Could not connect to Unix Domain Socket %s.\n", sock_path);
+        fprintf(stderr, "[HIDSIM] Could not connect to Unix Domain Socket %s.\n",
+            sock_path);
         return 1;
     }
 
@@ -724,7 +731,8 @@ int hid_inject(const char* sock_path, const char* template_path, sig_atomic_t* h
         /* Asks for aggressive readahead */
         if (posix_fadvise(fd, 0, 0, POSIX_FADV_SEQUENTIAL)!=0)
         {
-            fprintf(stderr, "[HIDSIM] Asking for aggressive readahead on FD %d failed. Continuing anyway...\n", fd);
+            fprintf(stderr, "[HIDSIM] Asking for aggressive readahead on FD %d \
+            failed. Continuing anyway...\n", fd);
         }
 
         f = fdopen(fd, "rb");

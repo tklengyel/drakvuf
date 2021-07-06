@@ -104,13 +104,219 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef HID_INJECTION_H
-#define HID_INJECTION_H
+#ifndef QMP_COMMANDS_H
+#define QMP_COMMANDS_H
 
-#include "../private.h" //  PRINT_DEBUG
+#include <stdbool.h>
+#include <json-c/json.h>
 
-/* Injects random HID events or events specified in a template file */
-int hid_inject(const char* sock_path, const char* template_path,
-    sig_atomic_t* has_to_stop);
+#include "keymap_evdev_to_qapi.h"
+
+/* Constants used as key/values in QMP's JSON */
+#define QMP_KEY_EXECUTE "execute"
+#define QMP_KEY_ARGUMENTS "arguments"
+#define QMP_VAL_SCREENDUMP "screendump"
+#define QMP_VAL_FILENAME "filename"
+#define QMP_KEY_TYPE "type"
+#define QMP_VAL_INPUT_SEND_EVENT "input-send-event"
+#define QMP_VAL_ABSOLUTE "abs"
+#define QMP_VAL_RELATIVE "rel"
+#define QMP_KEY_DATA "data"
+#define QMP_KEY_AXIS "axis"
+#define QMP_KEY_VALUE "value"
+#define QMP_VAL_BTN_TYPE "btn"
+#define QMP_KEY_BTN "button"
+#define QMP_KEY_DOWN "down"
+#define QMP_KEY_KEY "key"
+#define QMP_VAL_QCODE "qcode"
+#define QMP_VAL_NUMBER "number"
+#define QMP_KEY_EVENTS "events"
+
+/* Enum used as mapping for BTN_VALUES */
+enum BTN_ENUM
+{
+    left, middle, right
+};
+
+static const char* BTN_VALUES[] =
+{
+    "left", "middle", "right"
+};
+
+/* Enum used as mapping for AXIS_VALUES */
+enum AXIS_ENUM
+{
+    ax_x, ax_y, ax_z
+};
+
+static const char* AXIS_VALUES[] =
+{
+    "x", "y", "z"
+};
+
+/*
+ * Wraps a given array of json_objects in an input-send-event-command.
+ * This funtion creates a json_object, which has the b/m string representation
+ * to submit to QMP socket:
+ *
+ * "{ \"execute\": \"input-send-event\" , \"arguments\": { \"events\":
+ * [ ..events.. ]}}"
+ */
+struct json_object* construct_input_event_cmd(struct json_object* events)
+{
+    struct json_object* jobj, *arg_obj;
+
+    if (!events)
+        return NULL;
+
+    arg_obj = json_object_new_object();
+    json_object_object_add(arg_obj, QMP_KEY_EVENTS, events);
+
+    jobj = json_object_new_object();
+
+    json_object_object_add(jobj, QMP_KEY_EXECUTE,
+        json_object_new_string(QMP_VAL_INPUT_SEND_EVENT));
+    json_object_object_add(jobj, QMP_KEY_ARGUMENTS, arg_obj);
+
+    return jobj;
+}
+
+/*
+ * Creates a json_object, which resembles a QMP's screendump-command
+ *
+ * This funtion creates a json_object, which has the b/m string representation
+ * to submit to the QMP socket:
+ * "{ \"execute\":\"screendump\", \"arguments\": { \"filename\":
+ * \"/given/filename\" } }"
+ */
+struct json_object* construct_screendump_cmd(const char* filename)
+{
+    struct json_object* jobj, *fn_obj;
+
+    if (!filename)
+        return NULL;
+
+    jobj = json_object_new_object();
+    json_object_object_add(jobj, QMP_KEY_EXECUTE,
+        json_object_new_string(QMP_VAL_SCREENDUMP));
+
+    fn_obj = json_object_new_object();
+    json_object_object_add(fn_obj, QMP_VAL_FILENAME,
+        json_object_new_string(filename));
+    json_object_object_add(jobj, QMP_KEY_ARGUMENTS, fn_obj);
+
+    return jobj;
+}
+
+/*
+ * Adds a type element ("type": "given_type")to an existing json_object
+ */
+void add_type(struct json_object* type_obj, const char* type)
+{
+    if (!type_obj || !type)
+        return;
+
+    json_object_object_add(type_obj, QMP_KEY_TYPE, json_object_new_string(type));
+}
+
+/*
+ * Creates a json_object, which resembles a QMP's command to move the mouse
+ * cursor. This funtion creates a json_object, which has the b/m string
+ * representation to submit to the QMP socket:
+ *
+ * " { \"type\": \"%s\", \"data\" : {\"axis\": \"x\", \"value\": %d } },
+ * {\"type\": \"%s\", \"data\": { \"axis\": \"y\", \"value\": %d } }"
+ */
+struct json_object* construct_mouse_move_event(enum AXIS_ENUM ax, bool is_abs,
+    int z)
+{
+    struct json_object* evt_obj, *data_obj;
+
+    evt_obj = json_object_new_object();
+
+    if (is_abs)
+        add_type(evt_obj, QMP_VAL_ABSOLUTE);
+    else
+        add_type(evt_obj, QMP_VAL_RELATIVE);
+
+    /*
+     * Constructs an element in the form of
+     * "data":  { \"axis\": \"x\", \"value\": %d }
+     */
+    data_obj = json_object_new_object();
+    json_object_object_add(data_obj, QMP_KEY_AXIS,
+        json_object_new_string(AXIS_VALUES[ax]));
+    json_object_object_add(data_obj, QMP_KEY_VALUE, json_object_new_int(z));
+    json_object_object_add(evt_obj, QMP_KEY_DATA, data_obj);
+
+    return evt_obj;
+}
+
+/*
+ * Creates a json_object, which resembles a QMP's command to press a mouse
+ * button. This funtion creates a json_object, which has the b/m string
+ * representation to submit to the QMP socket:
+ *
+ * " { \"type\": \"btn\" , \"data\" : { \"down\": %s, \"button\": \"%s\" } }"
+ */
+struct json_object* construct_mouse_button_event(enum BTN_ENUM b, bool is_down)
+{
+    struct json_object* evt_obj, *data_obj;
+
+    evt_obj = json_object_new_object();
+    add_type(evt_obj, QMP_VAL_BTN_TYPE);
+
+    /* Constructs "data":  { \"down\": \"%s\", \"button\": %s } */
+    data_obj = json_object_new_object();
+    json_object_object_add(data_obj, QMP_KEY_DOWN,
+        json_object_new_boolean(is_down));
+    json_object_object_add(data_obj, QMP_KEY_BTN,
+        json_object_new_string(BTN_VALUES[b]));
+    json_object_object_add(evt_obj, QMP_KEY_DATA, data_obj);
+
+    return evt_obj;
+}
+
+/*
+ * Creates a json_object, which resembles a QMP's command to press a key
+ *
+ * This funtion creates a json_object, which has the b/m string representation
+ * to submit to the QMP socket:
+ * " { \"type\": \"key\", \"data\" : { \"down\": %s, \"key\": {\"type\":
+ * \"qcode\", \"data\": \"%s\" } } } "
+ */
+struct json_object* construct_qapi_keypress_event(int key, bool is_down)
+{
+    struct json_object* evt_obj, *data_obj, *key_obj;
+
+
+    evt_obj = json_object_new_object();
+    add_type(evt_obj, QMP_KEY_KEY);
+
+    /* Constructs \"data\" : { \"down\": %s, \"key\": { */
+    data_obj = json_object_new_object();
+    json_object_object_add(data_obj, QMP_KEY_DOWN,
+        json_object_new_boolean(is_down));
+
+    /* Constructs {\"type\": \"qcode\", \"data\": \"%s\" } */
+    key_obj = json_object_new_object();
+
+    if ((unsigned int) key < name_map_linux_to_qcode_len)
+    {
+        add_type(key_obj, QMP_VAL_QCODE);
+        json_object_object_add(key_obj, QMP_KEY_DATA,
+            json_object_new_string(name_map_linux_to_qcode[key]));
+    }
+    else
+    {
+        add_type(key_obj, QMP_VAL_NUMBER);
+        json_object_object_add(key_obj, QMP_KEY_DATA, json_object_new_int(key));
+    }
+
+    json_object_object_add(data_obj, QMP_KEY_KEY, key_obj);
+    json_object_object_add(evt_obj, QMP_KEY_DATA, data_obj);
+
+    return evt_obj;
+}
 
 #endif

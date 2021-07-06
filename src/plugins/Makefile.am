@@ -304,6 +304,7 @@ sources += hidsim/hid_injection.cpp
 sources += hidsim/hid_injection.h
 sources += hidsim/qmp_connection.cpp
 sources += hidsim/qmp_connection.h
+sources += hidsim/qmp_commands.h
 sources += hidsim/hidsim.cpp
 sources += hidsim/hidsim.h
 endif

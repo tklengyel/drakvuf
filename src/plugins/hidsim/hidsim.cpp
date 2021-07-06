@@ -123,25 +123,25 @@ hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config)
     if (config->template_fp)
     {
         this->template_path = config->template_fp;
-        PRINT_DEBUG("[HIDSIM] Using template file: %s\n", this->template_path.c_str());
+        PRINT_DEBUG("[HIDSIM] Using template file: %s\n",
+            this->template_path.c_str());
     }
 
     /* Constructs path to Unix domain socket of Xen guest under investigation */
     this->sock_path = construct_sock_path(drakvuf);
-    PRINT_DEBUG("[HIDSIM] Using Unix domain socket: %s\n", this->sock_path.c_str());
+    PRINT_DEBUG("[HIDSIM] Using Unix domain socket: %s\n",
+        this->sock_path.c_str());
     this->has_to_stop = false;
 
     /* Starts worker thread */
-    this->t = std::thread(hid_inject, sock_path.c_str(), template_path.c_str(), &has_to_stop);
+    this->t = std::thread(hid_inject, sock_path.c_str(), template_path.c_str(),
+            &has_to_stop);
     PRINT_DEBUG("[HIDSIM] HID injection started\n");
 }
 
 hidsim::~hidsim()
 {
-    if (!this->m_is_stopping)
-    {
-        this->stop();
-    }
+    this->stop();
 };
 
 bool hidsim::stop()

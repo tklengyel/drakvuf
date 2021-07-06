@@ -111,6 +111,25 @@
 //#include "../plugins.h"
 #include "qmp_connection.h"
 
+/* Checks a result string, it it matches a success response */
+int qmp_check_result_str(const char* s)
+{
+    if (strcmp(s, QMP_SUCCESS) != 0)
+        return -1;
+
+    return 0;
+}
+
+/* Checks, resulting JSON-object, if it matches a success response */
+int qmp_check_result_json(struct json_object* jo)
+{
+    if (json_object_object_get_ex(jo, QMP_RETURN, NULL))
+    {
+        return 0;
+    }
+
+    return -1;
+}
 
 /* Takes a caller allocated QMPConnection strcut and initializes connection */
 int qmp_init_conn(qmp_connection* qc,  const char* path)
@@ -130,7 +149,8 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
     /* Check, if path to domain is too long */
     if ((strlen(path) + 1) > sizeof(qc->sa.sun_path))
     {
-        fprintf(stderr, "Path to domain socket exceeds %ld characters\n", sizeof(qc->sa.sun_path) );
+        fprintf(stderr, "Path to domain socket exceeds %ld characters\n",
+            sizeof(qc->sa.sun_path));
         return qc->fd;
     }
 
@@ -142,7 +162,8 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
 
     if (ret == -1)
     {
-        fprintf(stderr, "Connect to %s failed - %s\n", qc->sa.sun_path, strerror(errno));
+        fprintf(stderr, "Connecting to %s failed - %s\n", qc->sa.sun_path,
+            strerror(errno));
         return -1;
     }
 
@@ -163,7 +184,8 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
 
     if (ret == -1)
     {
-        fprintf(stderr, "Write to %s failed - %s\n", qc->sa.sun_path, strerror(errno));
+        fprintf(stderr, "Write to %s failed - %s\n", qc->sa.sun_path,
+            strerror(errno));
         return -1;
     }
     /* Check return value */
@@ -171,12 +193,12 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
 
     if (ret == -1)
     {
-        fprintf(stderr, "Read from %s failed - %s\n", qc->sa.sun_path, strerror(errno));
+        fprintf(stderr, "Read from %s failed - %s\n", qc->sa.sun_path,
+            strerror(errno));
         return -1;
     }
 
-    ret = strcmp(qc->buf, QMP_SUCCESS);
-    if (ret != 0)
+    if (qmp_check_result_str(qc->buf) != 0)
     {
         fprintf(stderr, "Capability negotiation failed, msg: %s\n", qc->buf);
         return -1;
@@ -188,13 +210,18 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
 }
 
 /* Sends the given data to the QMPConnection and reads the response */
-int qmp_communicate_json(qmp_connection* qc, struct json_object* in, struct json_object** out)
+int qmp_communicate_json(qmp_connection* qc, struct json_object* in,
+    struct json_object** out)
 {
+    const char* in_str = json_object_to_json_string_ext(in,
+            JSON_C_TO_STRING_SPACED);
 
-    const char* in_str = json_object_to_json_string(in);
     char* out_str = NULL;
+
     qmp_communicate(qc, in_str, &out_str);
-    *out = json_tokener_parse(out_str);
+
+    if (out)
+        *out = json_tokener_parse(out_str);
 
     if (out_str)
     {
@@ -212,7 +239,8 @@ int qmp_communicate(qmp_connection* qc, const char* in, char** out)
     int ret = write(qc->fd, in, strlen(in));
     if (ret == -1)
     {
-        fprintf(stderr, "Write to %s failed - %s\n", qc->sa.sun_path, strerror(errno));
+        fprintf(stderr, "Write to %s failed - %s\n", qc->sa.sun_path,
+            strerror(errno));
         return ret;
     }
 
@@ -221,7 +249,8 @@ int qmp_communicate(qmp_connection* qc, const char* in, char** out)
 
     if (ret == -1)
     {
-        fprintf(stderr, "Read from %s failed - %s\n", qc->sa.sun_path, strerror(errno));
+        fprintf(stderr, "Read from %s failed - %s\n", qc->sa.sun_path,
+            strerror(errno));
         return ret;
     }
     if (out)

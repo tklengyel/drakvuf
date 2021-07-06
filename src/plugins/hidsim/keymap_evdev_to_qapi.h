@@ -103,8 +103,8 @@
  * This file was created by Jan Gruber.                                    *
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
-
-
+#ifndef KEYMAP_EVDEV_TO_QAPI_H
+#define KEYMAP_EVDEV_TO_QAPI_H
 /*
  * Qemu's keycode mapping is defined within the following tabular file:
  * https://github.com/qemu/keycodemapdb/blob/master/data/keymaps.csv
@@ -269,3 +269,5 @@ const char* name_map_linux_to_qcode[525] =
     [0xe2] = "mediaselect",      /* linux:226 (KEY_MEDIA) -> linux:226 (KEY_MEDIA) -> qcode:mediaselect (mediaselect) */
 };
 const unsigned int name_map_linux_to_qcode_len = sizeof(name_map_linux_to_qcode) / sizeof(name_map_linux_to_qcode[0]);
+
+#endif
