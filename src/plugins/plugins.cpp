@@ -194,8 +194,15 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #endif
 #ifdef ENABLE_PLUGIN_OBJMON
                 case PLUGIN_OBJMON:
-                    this->plugins[plugin_id] = std::make_unique<objmon>(this->drakvuf, this->output);
+                {
+                    objmon_config config =
+                    {
+                        .disable_obcreateobject = options->objmon_disable_create_hook,
+                        .disable_ntduplicateobject = options->objmon_disable_duplicate_hook,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<objmon>(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_EXMON
                 case PLUGIN_EXMON:

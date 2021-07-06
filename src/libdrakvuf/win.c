@@ -383,6 +383,8 @@ bool win_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg)
 {
+    g_assert(narg > 0);
+
     bool is32 = drakvuf->pm != VMI_PM_IA32E || win_is_wow64(drakvuf, info);
     if (!is32)
     {

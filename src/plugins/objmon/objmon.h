@@ -106,26 +106,21 @@
 #define OBJMON_H
 
 #include "plugins/private.h"
-#include "plugins/plugins.h"
+#include "plugins/plugins_ex.h"
 
-class objmon: public plugin
+struct objmon_config
+{
+    bool disable_obcreateobject;
+    bool disable_ntduplicateobject;
+};
+
+class objmon: public pluginex
 {
 public:
     output_format_t format;
-    drakvuf_trap_t trap =
-    {
-        .breakpoint.lookup_type = LOOKUP_PID,
-        .breakpoint.pid = 4,
-        .breakpoint.addr_type = ADDR_RVA,
-        .breakpoint.module = "ntoskrnl.exe",
-        .name = "ObCreateObject",
-        .type = BREAKPOINT,
-        .data = (void*)this,
-        .ah_cb = nullptr
-    };
     addr_t key_offset;
 
-    objmon(drakvuf_t drakvuf, output_format_t output);
+    objmon(drakvuf_t drakvuf, const objmon_config* config, output_format_t output);
     ~objmon();
 };
 
