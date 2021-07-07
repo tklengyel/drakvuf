@@ -106,7 +106,7 @@
 #define SYSCALLS_H
 
 #include <glib.h>
-#include "plugins/plugins.h"
+#include "plugins/plugins_ex.h"
 #include "plugins/private.h"
 #include "plugins/output_format.h"
 
@@ -117,12 +117,9 @@ struct syscalls_config
     bool disable_sysret;
 };
 
-class syscalls: public plugin
+class syscalls: public pluginex
 {
 public:
-    drakvuf_t m_drakvuf;
-    GSList* traps;
-    GSList* ret_traps;
     GHashTable* filter;
     json_object* win32k_json;
 
@@ -143,7 +140,6 @@ public:
 
     syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
     ~syscalls();
-    bool stop();
 };
 
 #endif

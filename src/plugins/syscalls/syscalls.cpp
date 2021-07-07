@@ -240,22 +240,8 @@ static GHashTable* read_syscalls_filter(const char* filter_file)
     return table;
 }
 
-void free_trap(gpointer p)
-{
-    if ( !p )
-        return;
-
-    drakvuf_trap_t* t = (drakvuf_trap_t*)p;
-    if ( t->data )
-        g_slice_free(struct wrapper, t->data);
-
-    g_slice_free(drakvuf_trap_t, t);
-}
-
 syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output)
-    : m_drakvuf(drakvuf)
-    , traps(NULL)
-    , ret_traps(NULL)
+    : pluginex(drakvuf, output)
     , filter(NULL)
     , win32k_json(NULL)
     , format{output}
@@ -276,62 +262,12 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
         setup_windows(drakvuf, this);
     else
         setup_linux(drakvuf, this);
-
-    if ( !this->traps )
-    {
-        PRINT_DEBUG("No traps were added by setup\n");
-        throw -1;
-    }
 }
 
 syscalls::~syscalls()
 {
-    if (this->traps || this->ret_traps ||
-        this->os != VMI_OS_WINDOWS) // NOTE Hack for Linux (part 2)
-    {
-        // This means that there was no time to wait for plug-in stop
-        // so remove all data here.
-        // Or this is a Linux system.
-        GSList* loop = this->traps;
-        while (loop)
-        {
-            free_trap(loop->data);
-            loop = loop->next;
-        }
-
-        loop = this->ret_traps;
-        while (loop)
-        {
-            free_trap(loop->data);
-            loop = loop->next;
-        }
-    }
-
     if ( this->filter )
         g_hash_table_destroy(this->filter);
 
     g_free(this->offsets);
-    g_slist_free(this->traps);
-}
-
-bool syscalls::stop()
-{
-    m_is_stopping = true;
-
-    // NOTE Hack for Linux (part 1)
-    if ( this->os != VMI_OS_WINDOWS )
-        return true;
-
-    if (this->ret_traps)
-        return false;
-
-    GSList* loop = this->traps;
-    while (loop)
-    {
-        drakvuf_remove_trap(m_drakvuf, (drakvuf_trap_t*)loop->data, (drakvuf_trap_free_t)free_trap);
-        loop = loop->next;
-    }
-    this->traps = nullptr;
-
-    return true;
 }

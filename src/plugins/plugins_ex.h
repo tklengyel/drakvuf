@@ -155,13 +155,20 @@ std::string FieldToString(const std::map<uint64_t, std::string>& maps, uint64_t 
 
 struct breakpoint_in_system_process_searcher
 {
-    breakpoint_in_system_process_searcher() : m_syscall_name() {}
+    breakpoint_in_system_process_searcher() : m_pid(), m_syscall_name(), m_virt_addr() {}
 
     breakpoint_in_system_process_searcher& for_syscall_name(const char* syscall_name)
     {
         if (syscall_name)
             m_syscall_name = syscall_name;
 
+        return *this;
+    }
+
+    breakpoint_in_system_process_searcher& for_linux(vmi_pid_t pid, addr_t addr)
+    {
+        m_pid = pid;
+        m_virt_addr = addr;
         return *this;
     }
 
@@ -175,12 +182,22 @@ struct breakpoint_in_system_process_searcher
                 return nullptr;
             }
 
-            trap->breakpoint.lookup_type = LOOKUP_PID;
-            trap->breakpoint.pid = 4;
-            trap->breakpoint.addr_type = ADDR_RVA;
-            trap->breakpoint.module = "ntoskrnl.exe";
+            if (m_virt_addr)
+            {
+                trap->breakpoint.lookup_type = LOOKUP_PID;
+                trap->breakpoint.pid = m_pid;
+                trap->breakpoint.addr_type = ADDR_VA;
+                trap->breakpoint.addr = m_virt_addr;
+            }
+            else
+            {
+                trap->breakpoint.lookup_type = LOOKUP_PID;
+                trap->breakpoint.pid = 4;
+                trap->breakpoint.addr_type = ADDR_RVA;
+                trap->breakpoint.module = "ntoskrnl.exe";
 
-            trap->name = m_syscall_name;
+                trap->name = m_syscall_name;
+            }
 
             if (!drakvuf_add_trap(drakvuf, trap))
                 return nullptr;
@@ -188,7 +205,9 @@ struct breakpoint_in_system_process_searcher
         return trap;
     }
 
+    vmi_pid_t m_pid;
     const char* m_syscall_name;
+    addr_t m_virt_addr;
 };
 
 struct breakpoint_in_dll_module_searcher
@@ -262,21 +281,53 @@ struct breakpoint_in_dll_module_searcher
 
 struct breakpoint_by_dtb_searcher
 {
+    breakpoint_by_dtb_searcher() : m_addr(), m_dtb() {}
+
+    breakpoint_by_dtb_searcher& for_virt_addr(addr_t addr)
+    {
+        if (addr)
+            m_addr = addr;
+
+        return *this;
+    }
+
+    breakpoint_by_dtb_searcher& for_dtb(addr_t dtb)
+    {
+        if (dtb)
+            m_dtb = dtb;
+
+        return *this;
+    }
+
     drakvuf_trap_t* operator()(drakvuf_t drakvuf, drakvuf_trap_info_t* info, drakvuf_trap_t* trap) const
     {
         if (trap)
         {
-            addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
-            if (!ret_addr)
-                return nullptr;
+            // NOTE This is rather ugly solution but is backword compatible.
+            // TODO Add "for_ret_addr" method and use it.
+            addr_t addr = m_addr;
+            if (!addr)
+            {
+                addr = drakvuf_get_function_return_address(drakvuf, info);
+                if (!addr)
+                    return nullptr;
+            }
+
+            addr_t dtb = m_dtb;
+            if (!dtb)
+            {
+                if (info && info->regs)
+                    dtb = info->regs->cr3;
+                else
+                    return nullptr;
+            }
 
             trap->breakpoint.lookup_type = LOOKUP_DTB;
-            trap->breakpoint.dtb = info->regs->cr3;
+            trap->breakpoint.dtb = dtb;
             trap->breakpoint.addr_type = ADDR_VA;
-            trap->breakpoint.addr = ret_addr;
-            trap->breakpoint.module = info->trap->breakpoint.module;
+            trap->breakpoint.addr = addr;
 
-            if (!trap->name)
+            if (!trap->name && info && info->trap)
                 trap->name = info->trap->name;
 
             if (!drakvuf_add_trap(drakvuf, trap))
@@ -284,6 +335,9 @@ struct breakpoint_by_dtb_searcher
         }
         return trap;
     }
+
+    addr_t m_addr;
+    addr_t m_dtb;
 };
 
 struct breakpoint_by_pid_searcher
@@ -596,6 +650,7 @@ drakvuf_trap_t* pluginex::register_trap(drakvuf_trap_info_t* info,
     if (!init_breakpoint(drakvuf, info, trap))
     {
         PRINT_DEBUG("%s for %s\n", ERROR_MSG_ADDING_TRAP, trap_name ? trap_name : trap->name);
+        delete static_cast<plugin_data*>(trap->data);
         delete trap;
         return nullptr;
     }
