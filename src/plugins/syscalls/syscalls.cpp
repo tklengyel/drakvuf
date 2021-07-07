@@ -286,10 +286,20 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
 
 syscalls::~syscalls()
 {
-    // NOTE Hack for Linux (part 2)
-    if ( this->os != VMI_OS_WINDOWS )
+    if (this->traps || this->ret_traps ||
+        this->os != VMI_OS_WINDOWS) // NOTE Hack for Linux (part 2)
     {
+        // This means that there was no time to wait for plug-in stop
+        // so remove all data here.
+        // Or this is a Linux system.
         GSList* loop = this->traps;
+        while (loop)
+        {
+            free_trap(loop->data);
+            loop = loop->next;
+        }
+
+        loop = this->ret_traps;
         while (loop)
         {
             free_trap(loop->data);
