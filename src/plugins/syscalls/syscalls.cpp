@@ -286,6 +286,17 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
 
 syscalls::~syscalls()
 {
+    // NOTE Hack for Linux (part 2)
+    if ( this->os != VMI_OS_WINDOWS )
+    {
+        GSList* loop = this->traps;
+        while (loop)
+        {
+            free_trap(loop->data);
+            loop = loop->next;
+        }
+    }
+
     if ( this->filter )
         g_hash_table_destroy(this->filter);
 
@@ -296,6 +307,10 @@ syscalls::~syscalls()
 bool syscalls::stop()
 {
     m_is_stopping = true;
+
+    // NOTE Hack for Linux (part 1)
+    if ( this->os != VMI_OS_WINDOWS )
+        return true;
 
     if (this->ret_traps)
         return false;
