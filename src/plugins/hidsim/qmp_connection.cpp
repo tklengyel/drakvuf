@@ -108,7 +108,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/socket.h>
-//#include "../plugins.h"
 #include "qmp_connection.h"
 
 /* Checks a result string, it it matches a success response */
@@ -151,7 +150,7 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
     {
         fprintf(stderr, "Path to domain socket exceeds %ld characters\n",
             sizeof(qc->sa.sun_path));
-        return qc->fd;
+        return -1;
     }
 
     /* Sets socket path */
@@ -172,11 +171,10 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
 
     if (ret == -1)
     {
-        fprintf(stderr, "Capability negotiation failed - %s\n", qc->buf);
+        fprintf(stderr, "Fetching QMP greeting banner failed - %s\n", qc->buf);
         return -1;
     }
-    /* Stores capabilities for later use */
-    qc->capabilities = json_tokener_parse(qc->buf);
+
     memset(qc->buf, 0, sizeof(qc->buf));
 
     /* Exits capabilities negotiation mode */
@@ -200,7 +198,7 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
 
     if (qmp_check_result_str(qc->buf) != 0)
     {
-        fprintf(stderr, "Capability negotiation failed, msg: %s\n", qc->buf);
+        fprintf(stderr, "Entering command mode failed, msg: %s\n", qc->buf);
         return -1;
     }
 
@@ -264,12 +262,5 @@ int qmp_communicate(qmp_connection* qc, const char* in, char** out)
 /* Clean-up */
 int qmp_close_conn(qmp_connection* qc)
 {
-    close(qc->fd);
-
-    if (qc->capabilities)
-    {
-        free(qc->capabilities);
-        qc->capabilities = NULL;
-    }
-    return 0;
+    return close(qc->fd);
 }
