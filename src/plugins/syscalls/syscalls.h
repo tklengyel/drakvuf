@@ -120,6 +120,7 @@ struct syscalls_config
 class syscalls: public pluginex
 {
 public:
+    GSList* traps; // NOTE Non "pluginex" support for linux
     GHashTable* filter;
     json_object* win32k_json;
 

@@ -240,8 +240,21 @@ static GHashTable* read_syscalls_filter(const char* filter_file)
     return table;
 }
 
+void free_trap(gpointer p)
+{
+    if ( !p )
+        return;
+
+    drakvuf_trap_t* t = (drakvuf_trap_t*)p;
+    if ( t->data )
+        g_slice_free(struct wrapper, t->data);
+
+    g_slice_free(drakvuf_trap_t, t);
+}
+
 syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output)
     : pluginex(drakvuf, output)
+    , traps(NULL)
     , filter(NULL)
     , win32k_json(NULL)
     , format{output}
@@ -266,6 +279,18 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
 
 syscalls::~syscalls()
 {
+    // NOTE Non "pluginex" support for linux
+    if ( this->os != VMI_OS_WINDOWS )
+    {
+        GSList* loop = this->traps;
+        while (loop)
+        {
+            free_trap(loop->data);
+            loop = loop->next;
+        }
+        g_slist_free(this->traps);
+    }
+
     if ( this->filter )
         g_hash_table_destroy(this->filter);
 

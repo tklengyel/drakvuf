@@ -480,4 +480,19 @@ void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
     const std::vector<uint64_t>& args,
     uint64_t ret, const char* extra_info);
 
+// NOTE Non "pluginex" support for linux
+struct wrapper;
+struct wrapper
+{
+    syscalls* s;
+    const syscall_t* sc;
+    const char* type;
+    struct wrapper* w;
+    uint16_t num;
+    vmi_pid_t pid;
+    addr_t tid;
+    addr_t stack_fingerprint;
+};
+void free_trap(gpointer p);
+
 #endif // commoncsproto_h
