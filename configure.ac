@@ -115,6 +115,10 @@ AC_CONFIG_MACRO_DIR([m4])
 
 AC_PROG_CC_STDC
 AC_PROG_CXX(clang++)
+
+# Pthread support!
+AX_PTHREAD(, [AC_MSG_ERROR([libpthread is required])])
+
 AX_REQUIRE_DEFINED([AX_CXX_COMPILE_STDCXX])
 AX_CXX_COMPILE_STDCXX([17], [ext], [mandatory])
 CXXFLAGS="-std=gnu++17"
@@ -448,6 +452,15 @@ if test x$plugin_ipt = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_IPT, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_hidsim],
+  [AS_HELP_STRING([--disable-plugin-hidsim],
+    [Enable the HIDSIM plugin @<:@yes@:>@])],
+  [plugin_hisim="$enableval"],
+  [plugin_hidsim="yes"])
+AM_CONDITIONAL([PLUGIN_HIDSIM], [test x$plugin_hidsim = xyes])
+if test x$plugin_hidsim = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_HIDSIM, 1, "")
+fi
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -739,6 +752,7 @@ Codemon:      $plugin_codemon
 Exploitmon:   $plugin_exploitmon
 LibHookTest:  $plugin_libhooktest
 IPT:          $plugin_ipt
+HidSim:       $plugin_hidsim
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:       $plugin_wmimon

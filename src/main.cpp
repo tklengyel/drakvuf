@@ -322,6 +322,10 @@ static void print_usage()
         "\t --ipt-trace-user\n"
         "\t                           Enable IPT tracing in ring > 0\n"
 #endif
+#ifdef ENABLE_PLUGIN_HIDSIM
+        "\t --hid-template <path to template>\n"
+        "\t                           The template specifying the HID events to simulate\n"
+#endif
         "\t -h, --help                Show this help\n"
     );
 }
@@ -422,6 +426,7 @@ int main(int argc, char** argv)
         opt_write_file_timeout,
         opt_objmon_disable_create_hook,
         opt_objmon_disable_duplicate_hook,
+        opt_hidsim_template,
     };
     const option long_opts[] =
     {
@@ -479,6 +484,7 @@ int main(int argc, char** argv)
         {"write-file-timeout", required_argument, NULL, opt_write_file_timeout},
         {"objmon-disable-create-hook", no_argument, NULL, opt_objmon_disable_create_hook},
         {"objmon-disable-duplicate-hook", no_argument, NULL, opt_objmon_disable_duplicate_hook},
+        {"hid-template", required_argument, NULL, opt_hidsim_template},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF:C";
@@ -775,6 +781,12 @@ int main(int argc, char** argv)
                 options.objmon_disable_duplicate_hook = true;
                 break;
 #endif
+#ifdef ENABLE_PLUGIN_HIDSIM
+            case opt_hidsim_template:
+                options.hidsim_template = optarg;
+                break;
+#endif
+
             case 'h':
                 print_usage();
                 return drakvuf_exit_code_t::SUCCESS;
