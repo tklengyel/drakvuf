@@ -118,18 +118,15 @@
 
 static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    struct wrapper* wr = (struct wrapper*)info->trap->data;
+    //Loads a pointer to the plugin, which is responsible for the trap
+    auto s = get_trap_plugin<syscalls>(info);
 
-    /*
-     * Multiple syscalls might hit the same return address so make sure we are
-     * handling the correct thread's return here.
-     */
-    if (!drakvuf_check_return_context(drakvuf, info, wr->pid, wr->tid, wr->stack_fingerprint - 1))
+    //get_trap_params reinterprets the pointer of info->trap->data as a pointer to duplicate_result_t
+    auto wr = get_trap_params<wrapper_t>(info);
+
+    //Verifies that the params we got above (preset by the previous trap) match the trap_information this cb got called with.
+    if (!wr->verify_result_call_params(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
-
-    struct wrapper* w = (struct wrapper*)wr->w;
-    const syscall_t* sc = w->sc;
-    syscalls* s = w->s;
 
     char exit_status_buf[NTSTATUS_MAX_FORMAT_STR_SIZE] = {0};
     const char* exit_status_str = ntstatus_to_string(ntstatus_t(info->regs->rax));
@@ -137,10 +134,12 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         exit_status_str = ntstatus_format_string(ntstatus_t(info->regs->rax), exit_status_buf, sizeof(exit_status_buf));
 
     std::vector<uint64_t> args;
-    print_syscall(s, drakvuf, VMI_OS_WINDOWS, false, info, w->num, std::string(info->trap->breakpoint.module), sc, args, info->regs->rax, exit_status_str);
+    print_syscall(s, drakvuf, VMI_OS_WINDOWS, false, info, wr->num, std::string(info->trap->breakpoint.module), wr->sc, args, info->regs->rax, exit_status_str);
 
-    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
-    s->traps = g_slist_remove(s->traps, info->trap);
+    //Destroys this return trap, because it is specific for the RIP and not usable anymore. This was the trap being called when the physical address got computed.
+    //Deletes this trap from the list of existing traps traps
+    //Additionally removes the trap and frees the memory
+    s->destroy_trap(info->trap);
 
     return 0;
 }
@@ -148,9 +147,13 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto vmi = vmi_lock_guard(drakvuf);
-    struct wrapper* w = (struct wrapper*)info->trap->data;
+
+    //Loads a pointer to the plugin, which is responsible for the trap
+    auto s = get_trap_plugin<syscalls>(info);
+
+    //get_trap_params reinterprets the pointer of info->trap->data as a pointer to duplicate_result_t
+    auto w = get_trap_params<wrapper_t>(info);
     const syscall_t* sc = w->sc;
-    syscalls* s = w->s;
 
     unsigned int nargs = sc ? sc->num_args : 0;
     std::vector<uint64_t> args(nargs);
@@ -204,51 +207,39 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     print_syscall(s, drakvuf, VMI_OS_WINDOWS, true, info, w->num, std::string(w->type), sc, args, 0, NULL);
     vmi.lock();
 
-    if ( s->disable_sysret )
+    if ( s->disable_sysret || s->is_stopping() )
         return 0;
 
     addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
     if ( !ret_addr )
         return 0;
 
-    drakvuf_trap_t* ret_trap = g_slice_new0(drakvuf_trap_t);
-    struct wrapper* wr = g_slice_new0(struct wrapper);
-
-    wr->pid = info->attached_proc_data.pid;
-    wr->tid = info->attached_proc_data.tid;
-    wr->w = w;
-    if ( 4 == s->reg_size )
+    auto trap = s->register_trap<wrapper_t>(
+            info,
+            ret_cb,
+            breakpoint_by_dtb_searcher());
+    if (!trap)
     {
-        // For 32-bit Windows, the calling convention of the syscall api is _stdcall, which means the callee to clear the stack space.
-        // So when the function returns, the value of the stack pointer should be the current rsp add the size of the parameters and
-        // the size of the return address (4 bytes)
-        wr->stack_fingerprint = info->regs->rsp + 4 * nargs + 4;
+        PRINT_DEBUG("Failed to trap syscall return %hu\n", w->num);
+        return 0;
     }
-    else
-    {
-        // For 64-bit windows calling convention, the stack pointer remains unchanged before and after the function call.
-        // So when the function returns, the value of the stack pointer should be the current rsp add the size of the return address (8 bytes)
-        // See : https://docs.microsoft.com/en-us/cpp/build/x64-software-conventions?view=vs-2019
-        wr->stack_fingerprint = info->regs->rsp + 8;
-    }
+    trap->breakpoint.module = w->type;
 
-    ret_trap->breakpoint.lookup_type = LOOKUP_DTB;
-    ret_trap->breakpoint.addr_type = ADDR_VA;
-    ret_trap->breakpoint.addr = ret_addr;
-    ret_trap->breakpoint.dtb = info->regs->cr3;
-    ret_trap->breakpoint.module = w->type;
-    ret_trap->type = BREAKPOINT;
-    ret_trap->cb = ret_cb;
-    ret_trap->data = (void*)wr;
-    ret_trap->ttl = UNLIMITED_TTL;
+    //After the trap got constructed, enrich its details already with some information we already (and just) know here (at this point).
 
-    if ( drakvuf_add_trap(drakvuf, ret_trap) )
-        s->traps = g_slist_prepend(s->traps, ret_trap);
-    else
-    {
-        g_slice_free(drakvuf_trap_t, ret_trap);
-        g_slice_free(struct wrapper, wr);
-    }
+    //wrapper extends from call_result_t which extends from plugin_params
+    //get_trap_params reinterprets the pointer of trap->data as a pointer to wrapper
+    //Load the information that is saved by hitting the first trap.
+    //With params we can preset the params that the newly risen second breakpoint will receive.
+    auto wr = get_trap_params<wrapper_t>(trap);
+
+    //Save the address of the target thread, address of the rsp (this was the rip-address, which we used for construction) and the value of the CR3 register to the params.
+    wr->set_result_call_params(info);
+
+    //enrich the params of the new/next trap. This information is used later.
+    wr->num = w->num;
+    wr->type = w->type;
+    wr->sc = w->sc;
 
     return 0;
 }
@@ -338,32 +329,29 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
             continue;
         }
 
-        struct wrapper* w = g_slice_new0(struct wrapper);
-        drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
+        breakpoint_by_dtb_searcher bp;
+        auto trap = s->register_trap<wrapper_t>(
+                nullptr,
+                syscall_cb,
+                bp.for_virt_addr(syscall_va).for_dtb(cr3));
+        if (!trap)
+        {
+            PRINT_DEBUG("Failed to trap syscall %lu @ 0x%lx\n", syscall_num, syscall_va);
+            continue;
+        }
 
+        //After the trap got constructed, enrich its details already with some information we already (and just) know here (at this point).
+
+        //wrapper extends from call_result_t which extends from plugin_params
+        //get_trap_params reinterprets the pointer of trap->data as a pointer to wrapper
+        //Load the information that is saved by hitting the first trap.
+        //With params we can preset the params that the newly risen second breakpoint will receive.
+        auto w = get_trap_params<wrapper_t>(trap);
+
+        //enrich the params of the new/next trap. This information is used later.
         w->num = syscall_num;
-        w->s = s;
         w->type = ntos ? "nt" : "win32k";
         w->sc = definition;
-
-        trap->breakpoint.lookup_type = LOOKUP_DTB;
-        trap->breakpoint.dtb = cr3;
-        trap->breakpoint.addr_type = ADDR_VA;
-        trap->breakpoint.addr = syscall_va;
-        trap->type = BREAKPOINT;
-        trap->cb = syscall_cb;
-        trap->data = w;
-        trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
-        trap->ah_cb = nullptr;
-
-        if ( drakvuf_add_trap(drakvuf, trap) )
-            s->traps = g_slist_prepend(s->traps, trap);
-        else
-        {
-            PRINT_DEBUG("Failed to trap syscall %lu @ 0x%lx\n", syscall_num, trap->breakpoint.addr);
-            g_slice_free(struct wrapper, trap->data);
-            g_slice_free(drakvuf_trap_t, trap);
-        }
     }
 
     error = 0;
