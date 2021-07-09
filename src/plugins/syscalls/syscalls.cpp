@@ -253,7 +253,8 @@ void free_trap(gpointer p)
 }
 
 syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output)
-    : traps(NULL)
+    : pluginex(drakvuf, output)
+    , traps(NULL)
     , filter(NULL)
     , win32k_json(NULL)
     , format{output}
@@ -274,26 +275,24 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
         setup_windows(drakvuf, this);
     else
         setup_linux(drakvuf, this);
-
-    if ( !this->traps )
-    {
-        PRINT_DEBUG("No traps were added by setup\n");
-        throw -1;
-    }
 }
 
 syscalls::~syscalls()
 {
-    GSList* loop = this->traps;
-    while (loop)
+    // NOTE Non "pluginex" support for linux
+    if ( this->os != VMI_OS_WINDOWS )
     {
-        free_trap(loop->data);
-        loop = loop->next;
+        GSList* loop = this->traps;
+        while (loop)
+        {
+            free_trap(loop->data);
+            loop = loop->next;
+        }
+        g_slist_free(this->traps);
     }
 
     if ( this->filter )
         g_hash_table_destroy(this->filter);
 
     g_free(this->offsets);
-    g_slist_free(this->traps);
 }

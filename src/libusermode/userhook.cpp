@@ -805,7 +805,7 @@ bool userhook::is_supported(drakvuf_t drakvuf)
     return true;
 }
 
-userhook::userhook(drakvuf_t drakvuf): pluginex(drakvuf, OUTPUT_DEFAULT)
+userhook::userhook(drakvuf_t drakvuf): pluginex(drakvuf, OUTPUT_DEFAULT), m_drakvuf(drakvuf)
 {
     if (!is_supported(drakvuf))
         throw -1;
@@ -831,7 +831,7 @@ userhook::~userhook()
             {
                 if (target.state == HOOK_OK)
                 {
-                    wrap_delete(target.trap);
+                    drakvuf_remove_trap(m_drakvuf, target.trap, wrap_delete);
                 }
             }
         }

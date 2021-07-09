@@ -106,7 +106,7 @@
 #define SYSCALLS_H
 
 #include <glib.h>
-#include "plugins/plugins.h"
+#include "plugins/plugins_ex.h"
 #include "plugins/private.h"
 #include "plugins/output_format.h"
 
@@ -117,10 +117,10 @@ struct syscalls_config
     bool disable_sysret;
 };
 
-class syscalls: public plugin
+class syscalls: public pluginex
 {
 public:
-    GSList* traps;
+    GSList* traps; // NOTE Non "pluginex" support for linux
     GHashTable* filter;
     json_object* win32k_json;
 

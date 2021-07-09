@@ -206,6 +206,8 @@ struct copy_on_write_result_t : public call_result_t
 class userhook : public pluginex
 {
 public:
+    drakvuf_t m_drakvuf = nullptr;
+
     userhook(userhook const&) = delete;
 
     std::array<size_t, __OFFSET_MAX> offsets;

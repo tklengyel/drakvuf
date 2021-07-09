@@ -455,17 +455,14 @@ typedef struct
     const arg_t* args;
 } syscall_t;
 
-struct wrapper;
-struct wrapper
+struct wrapper_t : public call_result_t
 {
-    syscalls* s;
+    wrapper_t() : call_result_t()
+    {}
+
     const syscall_t* sc;
     const char* type;
-    struct wrapper* w;
     uint16_t num;
-    vmi_pid_t pid;
-    addr_t tid;
-    addr_t stack_fingerprint;
 };
 
 #define SYSCALL(_name, _ret, _num_args, ...)                     \
@@ -482,6 +479,20 @@ void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
     int nr, std::string module, const syscall_t* sc,
     const std::vector<uint64_t>& args,
     uint64_t ret, const char* extra_info);
+
+// NOTE Non "pluginex" support for linux
+struct wrapper;
+struct wrapper
+{
+    syscalls* s;
+    const syscall_t* sc;
+    const char* type;
+    struct wrapper* w;
+    uint16_t num;
+    vmi_pid_t pid;
+    addr_t tid;
+    addr_t stack_fingerprint;
+};
 void free_trap(gpointer p);
 
 #endif // commoncsproto_h
