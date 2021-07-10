@@ -124,7 +124,6 @@ typedef struct qmp_connection
 {
     int fd;
     struct sockaddr_un sa;
-    json_object* capabilities;
     char buf[BUF_SIZE];
     bool is_connected;
 } qmp_connection;
