@@ -111,9 +111,9 @@
 #include "qmp_connection.h"
 
 /* Checks a result string, it it matches a success response */
-int qmp_check_result_str(const char* s)
+int qmp_check_result_str(const char* s, size_t n)
 {
-    if (strcmp(s, QMP_SUCCESS) != 0)
+    if (strncmp(s, QMP_SUCCESS, n) != 0)
         return -1;
 
     return 0;
@@ -171,6 +171,7 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
 
     if (ret == -1)
     {
+        qc->buf[BUF_SIZE - 1] = '\0'; /* Ensures termination */
         fprintf(stderr, "Fetching QMP greeting banner failed - %s\n", qc->buf);
         return -1;
     }
@@ -196,8 +197,9 @@ int qmp_init_conn(qmp_connection* qc,  const char* path)
         return -1;
     }
 
-    if (qmp_check_result_str(qc->buf) != 0)
+    if (qmp_check_result_str(qc->buf, BUF_SIZE) != 0)
     {
+        qc->buf[BUF_SIZE - 1] = '\0'; /* Ensures termination */
         fprintf(stderr, "Entering command mode failed, msg: %s\n", qc->buf);
         return -1;
     }
@@ -252,7 +254,7 @@ int qmp_communicate(qmp_connection* qc, const char* in, char** out)
         return ret;
     }
     if (out)
-        *out = strdup(qc->buf);
+        *out = strndup(qc->buf, BUF_SIZE);
 
     memset(qc->buf, 0, sizeof(qc->buf));
 
