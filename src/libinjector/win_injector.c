@@ -1443,7 +1443,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             return 0;
         }
 
-        uint8_t buf[FILE_BUF_SIZE];
+        uint8_t buf[FILE_BUF_SIZE] = {0};;
         unicode_string_t in;
 
         ACCESS_CONTEXT(ctx);
@@ -1458,7 +1458,13 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         }
 
         vmi = drakvuf_lock_and_get_vmi(drakvuf);
-        vmi_read(vmi, &ctx, regs.x86.rax * 2, buf, NULL);
+        if (VMI_SUCCESS != vmi_read(vmi, &ctx, regs.x86.rax * 2, buf, NULL))
+        {
+            drakvuf_release_vmi(drakvuf);
+            PRINT_DEBUG("Failed to read buffer at %lx\n", regs.x86.rax * 2);
+            return 0;
+        }
+
         drakvuf_release_vmi(drakvuf);
         in.contents = buf;
         in.length = regs.x86.rax * 2;
@@ -1982,7 +1988,8 @@ static void print_injection_info(output_format_t format, const char* file, injec
 
     if (*split_results_iterator)
     {
-        process_name = *(split_results_iterator++);
+        // Advance iterator to step over image/process name
+        split_results_iterator++;
     }
 
     if (*split_results_iterator)
