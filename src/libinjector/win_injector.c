@@ -1982,7 +1982,8 @@ static void print_injection_info(output_format_t format, const char* file, injec
 
     if (*split_results_iterator)
     {
-        process_name = *(split_results_iterator++);
+        // Advance iterator to step over image/process name
+        split_results_iterator++;
     }
 
     if (*split_results_iterator)
