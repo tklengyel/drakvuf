@@ -551,7 +551,7 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     );
     */
     win_filetracer* f = (win_filetracer*)info->trap->data;
-    struct wrapper* w = new wrapper;
+    struct wrapper* w = new (std::nothrow) wrapper;
     if (!w) return 0;
     w->f = f;
     w->rsp = info->regs->rsp;
