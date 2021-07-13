@@ -135,7 +135,7 @@
 #include <cstdio>
 #include <cstring>
 
-#include <plugins/filesystem.hpp>
+#include "filesystem.hpp"
 #include <libdrakvuf/json-util.h>
 #include "codemon.h"
 #include "plugins/output_format.h"
