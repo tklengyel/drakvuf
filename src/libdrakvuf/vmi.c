@@ -189,7 +189,7 @@ void process_free_requests(drakvuf_t drakvuf)
     }
 
     g_hash_table_destroy(drakvuf->remove_traps);
-    drakvuf->remove_traps = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->remove_traps = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
 }
 
 static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
@@ -1677,7 +1677,7 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
     drakvuf->memaccess_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free_wrapper);
     drakvuf->memaccess_lookup_trap = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
     drakvuf->remapped_gfns = g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free_remapped_gfn);
-    drakvuf->remove_traps = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
+    drakvuf->remove_traps = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
 
     unsigned int i;
     /*
