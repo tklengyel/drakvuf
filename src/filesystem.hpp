@@ -102,61 +102,73 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef CODEMON_H
-#define CODEMON_H
+// We haven't checked which filesystem to include yet
+#ifndef INCLUDE_STD_FILESYSTEM_EXPERIMENTAL
 
-#include <vector>
-#include <memory>
-#include <set>
-#include <glib.h>
-#include "filesystem.hpp"
-#include "plugins/private.h"
-#include "plugins/plugins_ex.h"
+// Check for feature test macro for <filesystem>
+#   if defined(__cpp_lib_filesystem)
+#       define INCLUDE_STD_FILESYSTEM_EXPERIMENTAL 0
 
-//Struct to pass the parameters
-struct codemon_config_struct
+// Check for feature test macro for <experimental/filesystem>
+#   elif defined(__cpp_lib_experimental_filesystem)
+#       define INCLUDE_STD_FILESYSTEM_EXPERIMENTAL 1
+
+// We can't check if headers exist...
+// Let's assume experimental to be safe
+#   elif !defined(__has_include)
+#       define INCLUDE_STD_FILESYSTEM_EXPERIMENTAL 1
+
+// Check if the header "<filesystem>" exists
+#   elif __has_include(<filesystem>)
+
+// If we're compiling on Visual Studio and are not compiling with C++17, we need to use experimental
+#       ifdef _MSC_VER
+
+// Check and include header that defines "_HAS_CXX17"
+#           if __has_include(<yvals_core.h>)
+#               include <yvals_core.h>
+
+// Check for enabled C++17 support
+#               if defined(_HAS_CXX17) && _HAS_CXX17
+// We're using C++17, so let's use the normal version
+#                   define INCLUDE_STD_FILESYSTEM_EXPERIMENTAL 0
+#               endif
+#           endif
+
+// If the marco isn't defined yet, that means any of the other VS specific checks failed, so we need to use experimental
+#           ifndef INCLUDE_STD_FILESYSTEM_EXPERIMENTAL
+#               define INCLUDE_STD_FILESYSTEM_EXPERIMENTAL 1
+#           endif
+
+// Not on Visual Studio. Let's use the normal version
+#       else // #ifdef _MSC_VER
+#           define INCLUDE_STD_FILESYSTEM_EXPERIMENTAL 0
+#       endif
+
+// Check if the header "<filesystem>" exists
+#   elif __has_include(<experimental/filesystem>)
+#       define INCLUDE_STD_FILESYSTEM_EXPERIMENTAL 1
+
+// Fail if neither header is available with a nice error message
+#   else
+#       error Could not find system header "<filesystem>" or "<experimental/filesystem>"
+#   endif
+
+// We priously determined that we need the exprimental version
+#   if INCLUDE_STD_FILESYSTEM_EXPERIMENTAL
+// Include it
+#       include <experimental/filesystem>
+
+// We need the alias from std::experimental::filesystem to std::filesystem
+namespace std
 {
-    //Dir to save extracted frames to
-    const char* codemon_dump_dir;
-    //Executable to filter
-    const char* codemon_filter_executable;
-    //Enables logging (to shell) of pagefaults and writefaults. Additionally, logs of analysed pages can be printed regardless if malware was detected or not.
-    bool codemon_log_everything;
-    //By default only page sized areas are dumped. By setting this flag whole VAD nodes can be dumped instead.
-    bool codemon_dump_vad;
-    //Can be utilised to enforce the analysis of vads, which names (paths of mapped dlls / exes) contain System32 or SysWOW64
-    bool codemon_analyse_system_dll_vad;
-    //By default we assume everything to be malware. If this flag is enabled we assume all analysed memory areas to be goodware instead. This flag should be just set if a classifier is integrated.
-    bool codemon_default_benign;
-};
+namespace filesystem = experimental::filesystem;
+}
 
-class codemon : public pluginex
-{
+// We have a decent compiler and can use the normal version
+#   else
+// Include it
+#       include <filesystem>
+#   endif
 
-public:
-    //See codemon_config_struct
-    std::filesystem::path dump_dir;
-    const char* filter_executable = "";
-
-    //a temporary  dump file
-    char* tmp_file_path = nullptr;
-
-    //Counts how often an actual dump occured
-    unsigned int dump_id = 0;
-
-    //Set to store all traps so they can be deleted in the end
-    std::set<drakvuf_trap*> traps;
-
-    //Keeps track of monitored pages. Prevents duplicate traps.
-    std::set<std::pair<addr_t, addr_t>> monitored_pages;
-
-    //Keeps track of the data which was already dumped, used to prevent duplicate dump files.
-    // Uses the hash as key and the dumped file stem (without extension) as value.
-    std::unordered_map<std::string, std::string> dumped_memory_map;
-
-    codemon(drakvuf_t drakvuf, const codemon_config_struct* config, output_format_t output);
-
-    ~codemon();
-};
-
-#endif
+#endif // #ifndef INCLUDE_STD_FILESYSTEM_EXPERIMENTAL
