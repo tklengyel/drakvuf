@@ -116,7 +116,7 @@
 
 #include <map>
 
-#include "plugins/filesystem.hpp"
+#include "filesystem.hpp"
 #include "drakvuf.h"
 #include "exitcodes.h"
 
