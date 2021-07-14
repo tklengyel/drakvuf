@@ -1971,11 +1971,11 @@ static void print_injection_info(output_format_t format, const char* file, injec
 {
     gint64 t = g_get_real_time();
 
-    char* process_name = NULL;
-    char* arguments = NULL;
+    const char* process_name = "";
+    const char* arguments = "";
 
-    char* splitter = " ";
-    const char* begin_proc_name = &file[0];
+    const char* splitter = " ";
+    const char* begin_proc_name = file;
 
     if (file[0] == '"')
     {
@@ -1995,16 +1995,12 @@ static void print_injection_info(output_format_t format, const char* file, injec
     if (*split_results_iterator)
     {
         arguments = *(split_results_iterator++);
-        if (arguments[0] == ' ')
+        while (*arguments == ' ')
             arguments++;
     }
-    else
-        arguments = "";
 
     if (injector->expanded_target && injector->expanded_target->contents)
-        process_name = (char*)injector->expanded_target->contents;
-    else
-        process_name = "";
+        process_name = (const char*)injector->expanded_target->contents;
 
     char* escaped_pname = g_strescape(process_name, NULL);
     char* escaped_arguments = g_strescape(arguments, NULL);
