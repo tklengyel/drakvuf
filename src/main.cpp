@@ -850,7 +850,7 @@ int main(int argc, char** argv)
     for (const auto&[src, dst] : write_files)
     {
         PRINT_DEBUG("Writing file ('%s' -> '%s') into running VM\n", src.c_str(), dst.c_str());
-        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, dst.c_str(), nullptr, INJECT_METHOD_WRITE_FILE, output, src.c_str(), nullptr, write_file_timeout, true, 0, nullptr, &injected_pid);
+        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, dst.c_str(), nullptr, INJECT_METHOD_WRITE_FILE, output, src.c_str(), nullptr, write_file_timeout, injection_global_search, 0, nullptr, &injected_pid);
         switch (ret)
         {
             case INJECTOR_SUCCEEDED:
