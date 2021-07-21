@@ -448,6 +448,23 @@ static event_response_t terminate_process_hook(
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+static event_response_t clean_process_address_space_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin = get_trap_plugin<procmon>(info);
+    // PEPROCESS Process
+    addr_t cleaned_process_base = drakvuf_get_function_argument(drakvuf, info, 1);
+    vmi_pid_t exit_pid;
+    if (!drakvuf_get_process_pid(drakvuf, cleaned_process_base, &exit_pid))
+        exit_pid = -1;
+
+    fmt::print(plugin->m_output_format, "procmon", drakvuf, info,
+        keyval("ExitPid", fmt::Nval(exit_pid))
+    );
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+
 static event_response_t create_user_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     // PHANDLE ProcessHandle
@@ -779,6 +796,7 @@ procmon::procmon(drakvuf_t drakvuf, output_format_t output)
     if (!register_trap(nullptr, create_user_process_hook_cb, bp.for_syscall_name("NtCreateUserProcess")) ||
         !register_trap(nullptr, create_process_ex_hook_cb, bp.for_syscall_name("NtCreateProcessEx")) ||
         !register_trap(nullptr, terminate_process_hook_cb, bp.for_syscall_name("NtTerminateProcess")) ||
+        !register_trap(nullptr, clean_process_address_space_hook_cb, bp.for_syscall_name("MmCleanProcessAddressSpace")) ||
         !register_trap(nullptr, open_process_hook_cb, bp.for_syscall_name("NtOpenProcess")) ||
         !register_trap(nullptr, open_thread_hook_cb, bp.for_syscall_name("NtOpenThread")) ||
         !register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory")) ||
