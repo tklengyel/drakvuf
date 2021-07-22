@@ -312,7 +312,7 @@ static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* 
     trap->data = target;
 
     // during CoW we need to find all traps placed on the same physical page
-    // that's why we'll manually resolve vaddr and strore paddr under trap->breakpoint.addr
+    // that's why we'll manually resolve vaddr and store paddr under trap->breakpoint.addr
     addr_t pa;
 
     if (vmi_pagetable_lookup(vmi, info->regs->cr3, exec_func, &pa) != VMI_SUCCESS)
@@ -587,7 +587,7 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
     {
         for (auto const& dll_meta : vec_it->second)
         {
-            if (dll_meta.v.dtb == info->regs->cr3 && dll_meta.v.thread_id == thread_id)
+            if (!dll_meta.v.is_hooked && dll_meta.v.dtb == info->regs->cr3 && dll_meta.v.thread_id == thread_id)
             {
                 our_fault = true;
                 break;
