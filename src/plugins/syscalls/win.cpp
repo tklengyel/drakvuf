@@ -333,7 +333,9 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
         auto trap = s->register_trap<wrapper_t>(
                 nullptr,
                 syscall_cb,
-                bp.for_virt_addr(syscall_va).for_dtb(cr3));
+                bp.for_virt_addr(syscall_va).for_dtb(cr3),
+                symbol ? symbol->name : nullptr);
+
         if (!trap)
         {
             PRINT_DEBUG("Failed to trap syscall %lu @ 0x%lx\n", syscall_num, syscall_va);
