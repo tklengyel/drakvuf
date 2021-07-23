@@ -368,23 +368,25 @@ event_response_t wait_for_target_process_cb(
         return VMI_EVENT_RESPONSE_NONE;
     }
 
+    bool const is64bit = (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E);
+    size_t const rip_offset = is64bit ? userhook_plugin->offsets[KTRAP_FRAME_RIP] : userhook_plugin->offsets[KTRAP_FRAME_EIP];
+
     addr_t rip = 0;
     {
-        // Lock vmi.
-        vmi_lock_guard lg(drakvuf);
+        auto vmi = vmi_lock_guard(drakvuf);
         addr_t trap_frame = 0;
-        if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, thread + userhook_plugin->offsets[KTHREAD_TRAPFRAME], 0, &trap_frame))
+        if (VMI_SUCCESS != vmi_read_addr_va(vmi, thread + userhook_plugin->offsets[KTHREAD_TRAPFRAME], 0, &trap_frame))
         {
             userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
 
-        if (VMI_SUCCESS != vmi_read_addr_va(lg.vmi, trap_frame + userhook_plugin->offsets[KTRAP_FRAME_RIP], 0, &rip))
+        if (VMI_SUCCESS != vmi_read_addr_va(vmi, trap_frame + rip_offset, 0, &rip))
         {
             userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
             return VMI_EVENT_RESPONSE_NONE;
         }
-    } // Unlock vmi.
+    }
 
     drakvuf_trap_t* trap = new drakvuf_trap_t();
     trap->type = BREAKPOINT;

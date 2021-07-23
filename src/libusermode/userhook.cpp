@@ -630,15 +630,6 @@ bool userhook::is_supported(drakvuf_t drakvuf)
         }
     } // Unlock vmi.
 
-#ifndef LIBUSERMODE_USE_INJECTION
-    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-    if (pm != VMI_PM_IA32E)
-    {
-        PRINT_DEBUG("[USERHOOK] Usermode hooking is not yet supported on this architecture/bitness.\n");
-        return false;
-    }
-#endif
-
     return true;
 }
 
@@ -649,11 +640,13 @@ userhook::userhook(drakvuf_t drakvuf): pluginex(drakvuf, OUTPUT_DEFAULT), m_drak
 
     if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets.data()))
     {
-        PRINT_DEBUG("[USERHOOK] Failed to get kernel struct member offsets\n");
-#ifndef LIBUSERMODE_USE_INJECTION
-        throw -1;
-#endif
+        PRINT_DEBUG("[USERHOOK] Failed to get some kernel struct member offsets\n");
     }
+
+#ifndef LIBUSERMODE_USE_INJECTION
+    bool const is64bit = (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E);
+    const char* exception_handler = is64bit ? "KiSystemServiceHandler" : "ExecuteHandler";
+#endif
 
     this->copy_virt_mem_va =
         drakvuf_kernel_symbol_to_va(drakvuf, "MmCopyVirtualMemory");
@@ -662,7 +655,7 @@ userhook::userhook(drakvuf_t drakvuf): pluginex(drakvuf, OUTPUT_DEFAULT), m_drak
     if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory"), nullptr, UNLIMITED_TTL) ||
         !register_trap(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection"), nullptr, UNLIMITED_TTL) ||
 #ifndef LIBUSERMODE_USE_INJECTION
-        !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler"), nullptr, UNLIMITED_TTL) ||
+        !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name(exception_handler), nullptr, UNLIMITED_TTL) ||
 #endif
         !register_trap(nullptr, clean_process_address_space_hook_cb, bp.for_syscall_name("MmCleanProcessAddressSpace"), nullptr, UNLIMITED_TTL) ||
         !register_trap(nullptr, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite"), nullptr, UNLIMITED_TTL))

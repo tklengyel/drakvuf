@@ -955,6 +955,7 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_rva) ||
         !drakvuf_get_kernel_struct_member_rva(drakvuf, "_KTHREAD", "Process", &this->kthread_process_rva))
     {
+        PRINT_DEBUG("[MEMDUMP] Failed to get kernel struct member RVAs\n");
         throw -1;
     }
 

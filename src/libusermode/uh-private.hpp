@@ -120,6 +120,7 @@ enum offset
 {
     KTHREAD_TRAPFRAME,
     KTRAP_FRAME_RIP,
+    KTRAP_FRAME_EIP,
     __OFFSET_MAX
 };
 
@@ -127,6 +128,7 @@ static const char* offset_names[__OFFSET_MAX][2] =
 {
     [KTHREAD_TRAPFRAME] = { "_KTHREAD", "TrapFrame" },
     [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip"},
+    [KTRAP_FRAME_EIP] = {"_KTRAP_FRAME", "Eip"},
 };
 
 /**
