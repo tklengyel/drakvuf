@@ -914,19 +914,18 @@ bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     auto vmi = vmi_lock_guard(drakvuf);
     vmi_v2pcache_flush(vmi, info->regs->cr3);
 
-    bool is_syswow = drakvuf_is_wow64(drakvuf, info);
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E) || drakvuf_is_wow64(drakvuf, info);
+    const auto ptr_size = is32bit ? 4 : 8;
 
-    addr_t data_size = 0;
+    addr_t addr = drakvuf_get_function_argument(drakvuf, info, 1) + ptr_size;
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = info->regs->rcx
+        .addr = addr
     );
 
-    const auto ptr_size = is_syswow ? sizeof(uint32_t) : sizeof(addr_t);
-    ctx.addr += ptr_size;
-
+    addr_t data_size = 0;
     if (vmi_read(vmi, &ctx, ptr_size, &data_size, nullptr) != VMI_SUCCESS)
     {
         PRINT_DEBUG("[MEMDUMP.NET] failed to read size of dump from memory.");
@@ -960,29 +959,32 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
 
     json_object* json_wow = drakvuf_get_json_wow(drakvuf);
 
-    if (json_wow)
+    if (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E)
     {
-        if (!json_get_struct_member_rva(drakvuf, json_wow, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_wow_rva) ||
-            !json_get_struct_member_rva(drakvuf, json_wow, "_CONTEXT", "Eip", &this->wow64context_eip_rva) ||
-            !json_get_struct_member_rva(drakvuf, json_wow, "_CONTEXT", "Eax", &this->wow64context_eax_rva))
+        if (json_wow)
         {
-            throw -1;
+            if (!json_get_struct_member_rva(drakvuf, json_wow, "_LDR_DATA_TABLE_ENTRY", "DllBase", &this->dll_base_wow_rva) ||
+                !json_get_struct_member_rva(drakvuf, json_wow, "_CONTEXT", "Eip", &this->wow64context_eip_rva) ||
+                !json_get_struct_member_rva(drakvuf, json_wow, "_CONTEXT", "Eax", &this->wow64context_eax_rva))
+            {
+                throw -1;
+            }
         }
-    }
-    else
-    {
-        PRINT_DEBUG("Memdump works better when there is a JSON profile for WoW64 NTDLL (-w)\n");
+        else
+        {
+            PRINT_DEBUG("Memdump works better when there is a JSON profile for WoW64 NTDLL (-w)\n");
+        }
     }
 
     if (c->clr_profile)
         this->setup_dotnet_hooks(drakvuf, "clr.dll", c->clr_profile);
     else
-        PRINT_DEBUG("clr.dll profile not found, memdump will procede without .NET hooks\n");
+        PRINT_DEBUG("clr.dll profile not found, memdump will proceed without .NET hooks\n");
 
     if (c->mscorwks_profile)
         this->setup_dotnet_hooks(drakvuf, "mscorwks.dll", c->mscorwks_profile);
     else
-        PRINT_DEBUG("mscorwks.dll profile not found, memdump will procede without .NET hooks\n");
+        PRINT_DEBUG("mscorwks.dll profile not found, memdump will proceed without .NET hooks\n");
 
     breakpoint_in_system_process_searcher bp;
     if (!c->memdump_disable_free_vm)
@@ -1000,8 +1002,8 @@ memdump::memdump(drakvuf_t drakvuf, const memdump_config* c, output_format_t out
     if (!c->memdump_disable_create_thread)
         if (!register_trap(nullptr, create_remote_thread_hook_cb,   bp.for_syscall_name("NtCreateThreadEx")))
             throw -1;
-    if (!c->memdump_disable_set_thread)
-        if (json_wow && !register_trap(nullptr, set_information_thread_hook_cb, bp.for_syscall_name("NtSetInformationThread")))
+    if (!c->memdump_disable_set_thread && json_wow)
+        if (!register_trap(nullptr, set_information_thread_hook_cb, bp.for_syscall_name("NtSetInformationThread")))
             throw -1;
     if (!c->memdump_disable_shellcode_detect)
         if (!register_trap(nullptr, shellcode_cb, bp.for_syscall_name("NtFreeVirtualMemory")))
