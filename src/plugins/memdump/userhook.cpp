@@ -204,19 +204,23 @@ void memdump::setup_dotnet_hooks(drakvuf_t drakvuf, const char* dll_name, const 
 {
     PRINT_DEBUG("%s profile found, will setup usermode hooks for .NET\n", dll_name);
 
-    auto profile_json = json_object_from_file(profile);
-    if (!profile_json)
-    {
-        PRINT_DEBUG("[MEMDUMP] Failed to load JSON debug info for %s\n", dll_name);
-        return;
-    }
-
     addr_t func_rva = 0;
-    // LoadImage_1 => AssemblyNative::LoadImage
-    if (!json_get_symbol_rva(drakvuf, profile_json, "LoadImage_1", &func_rva))
     {
-        PRINT_DEBUG("[MEMDUMP] Failed to find LoadImage_1 (AssemblyNative::LoadImage) RVA in json for %s", dll_name);
-        return;
+        auto profile_json = json_object_from_file(profile);
+        if (!profile_json)
+        {
+            PRINT_DEBUG("[MEMDUMP] Failed to load JSON debug info for %s\n", dll_name);
+            return;
+        }
+
+        // LoadImage_1 => AssemblyNative::LoadImage
+        if (!json_get_symbol_rva(drakvuf, profile_json, "LoadImage_1", &func_rva))
+        {
+            PRINT_DEBUG("[MEMDUMP] Failed to find LoadImage_1 (AssemblyNative::LoadImage) RVA in json for %s\n", dll_name);
+            json_object_put(profile_json);
+            return;
+        }
+        json_object_put(profile_json);
     }
 
     auto actions = HookActions::empty().set_log().set_stack();
