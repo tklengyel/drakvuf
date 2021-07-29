@@ -143,6 +143,7 @@ private:
     drakvuf_t drakvuf { nullptr };
     drakvuf_plugins* plugins { nullptr };
     injector_t injector_to_be_freed { nullptr };
+    output_format_t format;
 
 public:
     int timeout { 0 };
@@ -167,12 +168,17 @@ public:
     void pause();
     void resume();
     void toggle_context_interception(GSList* processes);
+    injector_status_t write_file(vmi_pid_t injection_pid,
+        uint32_t injection_tid,
+        const char* src,
+        const char* dst,
+        int timeout,
+        bool global_search);
     injector_status_t inject_cmd(vmi_pid_t injection_pid,
         uint32_t injection_tid,
-        const char* inject_cmd,
-        const char* cwd,
+        const char* injection_cmd,
+        const char* injection_cwd,
         injection_method_t method,
-        output_format_t format,
         const char* binary_path,
         const char* target_process,
         int timeout,
