@@ -383,8 +383,7 @@ event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_
         .addr = data->m_object
     };
 
-    vmi_lock_guard wmi_lock(drakvuf);
-    auto object = drakvuf_read_wchar_string(wmi_lock, &ctx);
+    auto object = drakvuf_read_wchar_string(drakvuf, &ctx);
     if (!object)
     {
         PRINT_DEBUG("[WMIMon] ExecMethodReturn failed to receive a name of object!\n");
@@ -392,15 +391,13 @@ event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_
     }
 
     ctx.addr = data->m_method;
-    auto method = drakvuf_read_wchar_string(wmi_lock, &ctx);
+    auto method = drakvuf_read_wchar_string(drakvuf, &ctx);
     if (!method)
     {
         PRINT_DEBUG("[WMIMon] ExecMethodReturn failed to receive a name of method!\n");
         vmi_free_unicode_str(object);
         return VMI_EVENT_RESPONSE_NONE;
     }
-
-    wmi_lock.unlock();
 
     fmt::print(plugin->m_output_format, "wmimon", drakvuf, info,
         keyval("Object", fmt::Qstr(reinterpret_cast<const char*>(object->contents))),
@@ -469,9 +466,7 @@ event_response_t GetObject_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         .addr = data->m_object
     };
 
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    auto object = drakvuf_read_wchar_string(vmi, &ctx);
-    drakvuf_release_vmi(drakvuf);
+    auto object = drakvuf_read_wchar_string(drakvuf, &ctx);
 
     if (!object)
     {
@@ -543,9 +538,7 @@ event_response_t ExecQuery_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
         .addr = data->m_command
     };
 
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    auto command = drakvuf_read_wchar_string(vmi, &ctx);
-    drakvuf_release_vmi(drakvuf);
+    auto command = drakvuf_read_wchar_string(drakvuf, &ctx);
 
     if (!command)
     {
@@ -617,9 +610,7 @@ event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_in
         .addr = data->m_resource
     };
 
-    auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    auto resource = drakvuf_read_wchar_string(vmi, &ctx);
-    drakvuf_release_vmi(drakvuf);
+    auto resource = drakvuf_read_wchar_string(drakvuf, &ctx);
 
     if (!resource)
     {

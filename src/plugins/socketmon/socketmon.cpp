@@ -502,10 +502,7 @@ static event_response_t trap_DnsQuery_W_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     ctx.dtb = info->regs->cr3;
     ctx.addr = domain_name_addr;
 
-    {
-        vmi_lock_guard vmi_lg(drakvuf);
-        domain_name_us = drakvuf_read_wchar_string(vmi_lg.vmi, &ctx);
-    }
+    domain_name_us = drakvuf_read_wchar_string(drakvuf, &ctx);
 
     if (domain_name_us)
     {
@@ -547,7 +544,7 @@ static event_response_t trap_DnsQueryExW_cb(drakvuf_t drakvuf, drakvuf_trap_info
         }
 
         ctx.addr = function_specific_string.pBuffer;
-        domain_name_us = drakvuf_read_wchar_string(vmi_lg.vmi, &ctx);
+        domain_name_us = drakvuf_read_wchar_string(drakvuf, &ctx);
     }
 
     if (domain_name_us)
@@ -613,7 +610,7 @@ static event_response_t trap_DnsQueryEx_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         }
 
         ctx.addr = query_name_addr;
-        domain_name_us = drakvuf_read_wchar_string(vmi_lg.vmi, &ctx);
+        domain_name_us = drakvuf_read_wchar_string(drakvuf, &ctx);
     }
 
     if (domain_name_us)

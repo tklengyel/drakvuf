@@ -599,15 +599,15 @@ bool setup_dump_context(mmvad_info_t mmvad,
 /**
  * Extracts the name of the current analysed vad node.
  * - Commonly this is some mapped file, like a dll. If no name was extracted leave it as nullptr
- * @param vmi the current vmi instance for the guest access
+ * @param drakvuf the current drakvuf instance for the guest access
  * @param file_name_ptr the pointer of the filename which is contained in a mmvad struct
  * @param dump_metadata storing the vad node name
  * @return if the extraction was successful or not
  */
-bool retrieve_and_filter_vad_name(const vmi_lock_guard& vmi, addr_t file_name_ptr, dump_metadata_struct* dump_metadata)
+bool retrieve_and_filter_vad_name(drakvuf_t drakvuf, addr_t file_name_ptr, dump_metadata_struct* dump_metadata)
 {
     //Read the name of the dll/binary this node belongs to
-    dump_metadata->vad_name = drakvuf_read_unicode_va(vmi, file_name_ptr, 0);
+    dump_metadata->vad_name = drakvuf_read_unicode_va(drakvuf, file_name_ptr, 0);
 
     if (dump_metadata->vad_name != nullptr)
     {
@@ -670,7 +670,7 @@ bool analyse_memory(drakvuf_t drakvuf,
     dump_metadata->vad_node_base = mmvad.starting_vpn << 12;
     dump_metadata->vad_node_end = ((mmvad.ending_vpn + 1) << 12) - 1;
 
-    bool is_interesting_node = retrieve_and_filter_vad_name(vmi, mmvad.file_name_ptr, dump_metadata);
+    bool is_interesting_node = retrieve_and_filter_vad_name(drakvuf, mmvad.file_name_ptr, dump_metadata);
     if (!is_interesting_node)
     {
         //debug message within retrieve_and_filter_vad_name

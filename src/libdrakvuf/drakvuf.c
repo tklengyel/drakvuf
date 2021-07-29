@@ -654,8 +654,10 @@ char* drakvuf_read_ascii_str(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
     return vmi_read_str(drakvuf->vmi, &ctx);
 }
 
-unicode_string_t* drakvuf_read_unicode_common(vmi_instance_t vmi, const access_context_t* ctx)
+unicode_string_t* drakvuf_read_unicode_common(drakvuf_t drakvuf, const access_context_t* ctx)
 {
+    vmi_instance_t vmi = drakvuf->vmi;
+
     unicode_string_t* us = vmi_read_unicode_str(vmi, ctx);
     if ( !us )
         return NULL;
@@ -683,17 +685,16 @@ unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     if ( !addr )
         return NULL;
 
-    vmi_instance_t vmi = drakvuf->vmi;
     ACCESS_CONTEXT(ctx,
         .addr = addr,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
     );
 
-    return drakvuf_read_unicode_common(vmi, &ctx);
+    return drakvuf_read_unicode_common(drakvuf, &ctx);
 }
 
-unicode_string_t* drakvuf_read_unicode_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid)
+unicode_string_t* drakvuf_read_unicode_va(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid)
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -701,11 +702,13 @@ unicode_string_t* drakvuf_read_unicode_va(vmi_instance_t vmi, addr_t vaddr, vmi_
         .pid = pid
     );
 
-    return drakvuf_read_unicode_common(vmi, &ctx);
+    return drakvuf_read_unicode_common(drakvuf, &ctx);
 }
 
-unicode_string_t* drakvuf_read_unicode32_common(vmi_instance_t vmi, const access_context_t* ctx)
+unicode_string_t* drakvuf_read_unicode32_common(drakvuf_t drakvuf, const access_context_t* ctx)
 {
+    vmi_instance_t vmi = drakvuf->vmi;
+
     unicode_string_t* us = vmi_read_unicode_str_pm( vmi, ctx, VMI_PM_LEGACY );
     if ( !us )
         return NULL;
@@ -733,17 +736,16 @@ unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t*
     if ( !addr )
         return NULL;
 
-    vmi_instance_t vmi = drakvuf->vmi;
     ACCESS_CONTEXT(ctx,
         .addr = addr,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
     );
 
-    return drakvuf_read_unicode32_common(vmi, &ctx);
+    return drakvuf_read_unicode32_common(drakvuf, &ctx);
 }
 
-unicode_string_t* drakvuf_read_unicode32_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid)
+unicode_string_t* drakvuf_read_unicode32_va(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid)
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -751,11 +753,12 @@ unicode_string_t* drakvuf_read_unicode32_va(vmi_instance_t vmi, addr_t vaddr, vm
         .pid = pid
     );
 
-    return drakvuf_read_unicode32_common(vmi, &ctx);
+    return drakvuf_read_unicode32_common(drakvuf, &ctx);
 }
 
-size_t drakvuf_wchar_string_length(vmi_instance_t vmi, const access_context_t* ctx)
+size_t drakvuf_wchar_string_length(drakvuf_t drakvuf, const access_context_t* ctx)
 {
+    vmi_instance_t vmi = drakvuf->vmi;
     access_context_t mutable_ctx = *ctx;
 
     size_t str_len = 0;
@@ -774,8 +777,10 @@ end:
     return (str_len / 2);
 }
 
-unicode_string_t* drakvuf_read_wchar_array(vmi_instance_t vmi, const access_context_t* ctx, size_t length)
+unicode_string_t* drakvuf_read_wchar_array(drakvuf_t drakvuf, const access_context_t* ctx, size_t length)
 {
+    vmi_instance_t vmi = drakvuf->vmi;
+
     unicode_string_t us;
 
     us.length = length * 2;
@@ -818,10 +823,10 @@ unicode_string_t* drakvuf_read_wchar_array(vmi_instance_t vmi, const access_cont
     return out;
 }
 
-unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_context_t* ctx)
+unicode_string_t* drakvuf_read_wchar_string(drakvuf_t drakvuf, const access_context_t* ctx)
 {
-    size_t strlen = drakvuf_wchar_string_length(vmi, ctx);
-    return drakvuf_read_wchar_array(vmi, ctx, strlen);
+    size_t strlen = drakvuf_wchar_string_length(drakvuf, ctx);
+    return drakvuf_read_wchar_array(drakvuf, ctx, strlen);
 }
 
 // Returns JSON-compliant copy of input string

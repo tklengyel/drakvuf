@@ -234,7 +234,7 @@ static std::vector<std::string> enumerate_drivers(dkommon* d, drakvuf_t drakvuf)
         }
 
         ctx.addr = entry + d->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
-        auto name = drakvuf_read_unicode_common(vmi.vmi, &ctx);
+        auto name = drakvuf_read_unicode_common(drakvuf, &ctx);
         if (name && name->contents)
         {
             drivers_list.push_back(std::string(reinterpret_cast<char*>(name->contents)));

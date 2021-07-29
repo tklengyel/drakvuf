@@ -258,7 +258,7 @@ module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_he
             if ( vmi_read_addr( vmi, ctx, &ret_module_info->base_addr ) == VMI_SUCCESS )
             {
                 ctx->addr                  = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-                ret_module_info->base_name = drakvuf_read_unicode_common( vmi, ctx );
+                ret_module_info->base_name = drakvuf_read_unicode_common( drakvuf, ctx );
 
                 if ( ret_module_info->base_name )
                 {
@@ -267,7 +267,7 @@ module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_he
                     if ( !strcasecmp( (char*)ret_module_info->base_name->contents, module_name ) )
                     {
                         ctx->addr                  = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
-                        ret_module_info->full_name = drakvuf_read_unicode_common( vmi, ctx );
+                        ret_module_info->full_name = drakvuf_read_unicode_common( drakvuf, ctx );
 
                         return ret_module_info ;
                     }
@@ -314,7 +314,7 @@ module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_lis
             if ( vmi_read_32( vmi, ctx, (uint32_t*)&ret_module_info->base_addr ) == VMI_SUCCESS )
             {
                 ctx->addr                  = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-                ret_module_info->base_name = drakvuf_read_unicode32_common( vmi, ctx );
+                ret_module_info->base_name = drakvuf_read_unicode32_common( drakvuf, ctx );
 
                 if ( ret_module_info->base_name )
                 {
@@ -323,7 +323,7 @@ module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_lis
                     if ( !strcasecmp( (char*)ret_module_info->base_name->contents, module_name ) )
                     {
                         ctx->addr                  = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
-                        ret_module_info->full_name = drakvuf_read_unicode32_common( vmi, ctx );
+                        ret_module_info->full_name = drakvuf_read_unicode32_common( drakvuf, ctx );
 
                         return ret_module_info ;
                     }

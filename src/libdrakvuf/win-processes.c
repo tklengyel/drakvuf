@@ -307,7 +307,7 @@ static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t epr
         return NULL;
     }
 
-    return drakvuf_read_unicode_va(drakvuf->vmi,
+    return drakvuf_read_unicode_va(drakvuf,
             image_file_name_addr + drakvuf->offsets[OBJECTNAMEINFORMATION_NAME], 0);
 }
 
@@ -442,7 +442,7 @@ unicode_string_t* win_get_process_csdversion(drakvuf_t drakvuf, addr_t eprocess_
     if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &csdversion_va) )
         return NULL;
 
-    return drakvuf_read_unicode_va(drakvuf->vmi, csdversion_va, 0);
+    return drakvuf_read_unicode_va(drakvuf, csdversion_va, 0);
 };
 
 int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
