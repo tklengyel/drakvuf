@@ -442,6 +442,8 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     struct hidsim_config config =
                     {
                         .template_fp = options->hidsim_template,
+                        .is_monitor = options->hidsim_monitor_gui,
+                        .win32k_profile = options->win32k_profile,
                     };
                     this->plugins[plugin_id] = std::make_unique<hidsim>(this->drakvuf, &config);
                     break;

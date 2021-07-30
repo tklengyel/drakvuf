@@ -109,16 +109,18 @@
 
 #include <string>
 #include <thread>
+#include <signal.h>
 #include <stdbool.h>
 
 #include "../plugins.h"
-#include "hid_injection.h"
 
 #define SOCK_STUB "/run/xen/qmp-libxl-"
 
 struct hidsim_config
 {
     const char* template_fp;
+    const char* win32k_profile;
+    bool is_monitor;
 };
 
 class hidsim : public plugin
@@ -131,10 +133,25 @@ public:
     ~hidsim();
 
 private:
-    std::thread t;
+    /* Configuration passed via CLI */
     std::string sock_path;
     std::string template_path;
-    sig_atomic_t has_to_stop;
+    std::string win32k_json_path;
+
+    bool is_monitor;
+    bool is_gui_support;
+
+    /* Worker threads */
+    std::thread thread_inject;
+    std::thread thread_reconstruct;
+
+    /* Thread communication */
+    volatile sig_atomic_t has_to_stop;
+    volatile sig_atomic_t coords;
+
+    bool prepare_gui_reconstruction(drakvuf_t drakvuf,
+        const char* win32k_profile);
+    bool check_platform_support(drakvuf_t dv);
 };
 
 #endif

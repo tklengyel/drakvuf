@@ -106,7 +106,66 @@
 
 #include <libdrakvuf/libdrakvuf.h>  /* eprint_current_time */
 #include "../private.h"             /* PRINT_DEBUG */
+#include "hid_injection.h"          /* hid_inject */
+#include "gui_monitor.h"            /* gui_reconstruct */
+
 #include "hidsim.h"
+
+/*
+ * Checks, if GUI reconstruction is supported on the system under
+ * investigation
+ */
+bool hidsim::check_platform_support(drakvuf_t drakvuf)
+{
+    win_build_info_t bi;
+
+    {
+        vmi_lock_guard vmi(drakvuf);
+
+        if (!vmi_get_windows_build_info(vmi.vmi, &bi))
+            return false;
+
+    }
+
+    if (bi.version == VMI_OS_WINDOWS_7)
+    {
+
+        PRINT_DEBUG("[HIDSIM] GUI reconstruction supported"
+            "on Windows 7\n");
+        return true;
+    }
+
+    PRINT_DEBUG("[HIDSIM] GUI reconstruction is NOT supported "
+        "on this guest system\n");
+
+    return false;
+}
+
+bool hidsim::prepare_gui_reconstruction(drakvuf_t drakvuf, const char* win32k_profile)
+{
+    if (!win32k_profile)
+    {
+        PRINT_DEBUG("[HIDSIM] No win32k-profile provided. Unable to monitor the GUI\n");
+        return false;
+    }
+
+    this->win32k_json_path = win32k_profile;
+
+    this->is_gui_support = this->check_platform_support(drakvuf);
+
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
+    bool is_x86 = pm == VMI_PM_PAE ? true: false;
+
+    if (this->is_gui_support)
+    {
+        /* Initializes reconstruction  */
+        if (gui_init_reconstruction(drakvuf, this->win32k_json_path.c_str(), is_x86) != 0)
+            return false;
+
+        return true;
+    }
+    return false;
+}
 
 /* Infers socket path from drakvuf's actual domID */
 std::string construct_sock_path(drakvuf_t drakvuf)
@@ -119,6 +178,13 @@ std::string construct_sock_path(drakvuf_t drakvuf)
 
 hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config)
 {
+    /* Explicitly initialize thread communication primitives */
+    this->has_to_stop = false;
+    this->coords = 0;
+
+    /* Constructs path to Unix domain socket of Xen guest under investigation */
+    this->sock_path = construct_sock_path(drakvuf);
+    PRINT_DEBUG("[HIDSIM] Using Unix domain socket: %s\n", this->sock_path.c_str());
 
     if (config->template_fp)
     {
@@ -127,15 +193,25 @@ hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config)
             this->template_path.c_str());
     }
 
-    /* Constructs path to Unix domain socket of Xen guest under investigation */
-    this->sock_path = construct_sock_path(drakvuf);
-    PRINT_DEBUG("[HIDSIM] Using Unix domain socket: %s\n",
-        this->sock_path.c_str());
-    this->has_to_stop = false;
+    /* Prepares monitoring, if requested */
+    if (config->is_monitor)
+    {
+        PRINT_DEBUG("[HIDSIM] GUI monitoring requested\n");
+        this->is_monitor = prepare_gui_reconstruction(drakvuf, config->win32k_profile);
 
-    /* Starts worker thread */
-    this->t = std::thread(hid_inject, sock_path.c_str(), template_path.c_str(),
-            &has_to_stop);
+    }
+    else
+        this->is_monitor = false;
+
+    /* Starts injection thread */
+    this->thread_inject = std::thread(hid_inject, sock_path.c_str(),
+            template_path.c_str(), &coords, &has_to_stop);
+
+    /* GUI Reconstruction thread */
+    if (this->is_monitor && this->is_gui_support)
+        this->thread_reconstruct = std::thread(gui_monitor, drakvuf, &coords,
+                &has_to_stop);
+
     PRINT_DEBUG("[HIDSIM] HID injection started\n");
 }
 
@@ -150,9 +226,15 @@ bool hidsim::stop()
 
     if (!this->m_is_stopping)
     {
+
         this->m_is_stopping = true;
         this->has_to_stop = true;
-        this->t.join();
+
+        if (this->thread_inject.joinable())
+            this->thread_inject.join();
+
+        if (this->is_monitor && this->thread_reconstruct.joinable())
+            this->thread_reconstruct.join();
     }
     PRINT_DEBUG("[HIDSIM] Successfully joined thread \n");
 

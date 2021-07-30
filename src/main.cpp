@@ -324,7 +324,10 @@ static void print_usage()
 #endif
 #ifdef ENABLE_PLUGIN_HIDSIM
         "\t --hid-template <path to template>\n"
-        "\t                           The template specifying the HID events to simulate\n"
+        "\t                           The template specifying the HID events to simulate. If not specified, the mouse will be move randomly\n"
+        "\t                           The HID events in the template will be replayed in a loop.\n"
+        "\t --hid-monitor-gui\n"
+        "\t                           Monitor the GUI to try to detect clickable buttons. This requires the presence of a win32k-profile, which has to be specified via -W\n"
 #endif
         "\t -h, --help                Show this help\n"
     );
@@ -427,6 +430,7 @@ int main(int argc, char** argv)
         opt_objmon_disable_create_hook,
         opt_objmon_disable_duplicate_hook,
         opt_hidsim_template,
+        opt_hidsim_monitor_gui,
     };
     const option long_opts[] =
     {
@@ -485,6 +489,7 @@ int main(int argc, char** argv)
         {"objmon-disable-create-hook", no_argument, NULL, opt_objmon_disable_create_hook},
         {"objmon-disable-duplicate-hook", no_argument, NULL, opt_objmon_disable_duplicate_hook},
         {"hid-template", required_argument, NULL, opt_hidsim_template},
+        {"hid-monitor-gui", no_argument, NULL, opt_hidsim_monitor_gui},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF:C";
@@ -784,6 +789,9 @@ int main(int argc, char** argv)
 #ifdef ENABLE_PLUGIN_HIDSIM
             case opt_hidsim_template:
                 options.hidsim_template = optarg;
+                break;
+            case opt_hidsim_monitor_gui:
+                options.hidsim_monitor_gui = true;
                 break;
 #endif
 

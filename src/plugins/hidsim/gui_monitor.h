@@ -104,16 +104,22 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef HID_INJECTION_H
-#define HID_INJECTION_H
+#ifndef GUI_RECONSTRUCTION_H
+#define GUI_RECONSTRUCTION_H
 
 #include <signal.h>
 #include <mutex>
 
-#include "../private.h" //  PRINT_DEBUG
+#include <libdrakvuf/libdrakvuf.h>
 
-/* Injects random HID events or events specified in a template file */
-int hid_inject(const char* sock_path, const char* template_path,
-    volatile sig_atomic_t* coords, volatile sig_atomic_t* has_to_stop);
+/* Delay in microsecs to wait until a draw event */
+#define DELAY 100000
 
-#endif
+int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_profile,
+    bool is_x86);
+
+/* Find button  */
+int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
+    volatile sig_atomic_t* has_to_stop);
+
+#endif // GUI_RECONSTRUCTION_H

@@ -104,16 +104,44 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef HID_INJECTION_H
-#define HID_INJECTION_H
+#ifndef VMI_WIN_BUTTON_DEFINTIONS_H
+#define VMI_WIN_BUTTON_DEFINTIONS_H
 
-#include <signal.h>
-#include <mutex>
+#include <wchar.h>
 
-#include "../private.h" //  PRINT_DEBUG
+/*
+ * Maximum displacement of string of interest from the beginning of a
+ * windows text. This is set to avoid false positive, when a relevant
+ * BTN_TEXT is contained within a longe window text.
+ */
+#define BTN_THRESHOLD 3
 
-/* Injects random HID events or events specified in a template file */
-int hid_inject(const char* sock_path, const char* template_path,
-    volatile sig_atomic_t* coords, volatile sig_atomic_t* has_to_stop);
+const wchar_t* BTN_TEXTS[] =
+{
+    L"Agree",
+    L"Ok",
+    L"OK",
+    L"Go",
+    L"Run",
+    L"Click",
+    L"Enable",
+};
+/*
+ * Ignores tagWND-structs of this window class
+ * See https://docs.microsoft.com/en-us/windows/win32/winmsg/about-window-classes
+ */
+const wchar_t* IRRELEVANT_ATOM_CLASSES [] =
+{
+    L"ComboLBox" 	/* The class for the list box contained in a combo box. */
+    L"DDEMLEvent" 	/* The class for Dynamic Data Exchange Management Library (DDEML) events.*/
+    L"Message" 	/* The class for a message-only window.*/
+    L"#32768"   	/* The class for a menu.*/
+    L"#32769"  	/* The class for the desktop window.*/
+    L"#32770"  	/* The class for a dialog box.*/
+    L"#32771"  	/* The class for the task switch window.*/
+    L"#32772"  	/* The class for icon titles.*/
+    L"Shell",
+    L"Shell_TrayWnd",
+};
 
-#endif
+#endif //VMI_WIN_GUI_PARSER_H_

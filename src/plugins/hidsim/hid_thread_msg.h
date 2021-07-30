@@ -104,16 +104,41 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef HID_INJECTION_H
-#define HID_INJECTION_H
+#ifndef HID_THREAD_MSG_H
+#define HID_THREAD_MSG_H
 
-#include <signal.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <mutex>
+#include <cstring>
 
-#include "../private.h" //  PRINT_DEBUG
+std::mutex g_lock;
 
-/* Injects random HID events or events specified in a template file */
-int hid_inject(const char* sock_path, const char* template_path,
-    volatile sig_atomic_t* coords, volatile sig_atomic_t* has_to_stop);
+struct h_thr_msg
+{
+    /* Signifying, whether an action has to be taken */
+    bool has_to_be_processed;
 
-#endif
+    /* Actual resolution dependent screen coordinates */
+    uint16_t x;
+    uint16_t y;
+
+};
+
+static struct h_thr_msg g_msg;
+
+bool write_msg(struct h_thr_msg msg)
+{
+    std::lock_guard<std::mutex> guard(g_lock);
+    return true;
+}
+
+bool read_msg(struct h_thr_msg* msg)
+{
+    std::lock_guard<std::mutex> guard(g_lock);
+    memcpy(msg, &g_msg, sizeof(g_msg));
+    return true;
+}
+
+
+#endif // HID_THREAD_MSG_H
