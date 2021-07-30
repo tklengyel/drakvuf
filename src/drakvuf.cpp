@@ -217,6 +217,7 @@ drakvuf_c::drakvuf_c(const char* domain,
     bool fast_singlestep,
     uint64_t limited_traps_ttl)
     : leave_paused{ leave_paused }
+    , format{ output }
 {
     if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, verbose, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl))
     {
@@ -311,12 +312,47 @@ void drakvuf_c::toggle_context_interception(GSList* processes)
     drakvuf_toggle_context_based_interception(this->drakvuf);
 }
 
-injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
+injector_status_t drakvuf_c::write_file(
+    vmi_pid_t injection_pid,
     uint32_t injection_tid,
-    const char* inject_cmd,
-    const char* cwd,
+    const char* src,
+    const char* dst,
+    int timeout,
+    bool global_search)
+{
+    if ( !startup_timer(this, timeout) )
+        return INJECTOR_FAILED;
+
+    auto rc = injector_start_app(drakvuf,
+            injection_pid,
+            injection_tid,
+            dst,
+            nullptr,
+            INJECT_METHOD_WRITE_FILE,
+            format,
+            src,
+            nullptr,
+            true,
+            &injector_to_be_freed,
+            global_search,
+            false,
+            0,
+            nullptr,
+            nullptr);
+
+    if (INJECTOR_SUCCEEDED != rc)
+        fprintf(stderr, "File copying failed\n");
+
+    cleanup_timer();
+    return rc;
+}
+
+injector_status_t drakvuf_c::inject_cmd(
+    vmi_pid_t injection_pid,
+    uint32_t injection_tid,
+    const char* injection_cmd,
+    const char* injection_cwd,
     injection_method_t method,
-    output_format_t format,
     const char* binary_path,
     const char* target_process,
     int timeout,
@@ -331,8 +367,8 @@ injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
     auto rc = injector_start_app(drakvuf,
             injection_pid,
             injection_tid,
-            inject_cmd,
-            cwd,
+            injection_cmd,
+            injection_cwd,
             method,
             format,
             binary_path,
@@ -344,7 +380,6 @@ injector_status_t drakvuf_c::inject_cmd(vmi_pid_t injection_pid,
             args_count,
             args,
             injected_pid);
-
 
     if (INJECTOR_SUCCEEDED != rc)
         fprintf(stderr, "Process startup failed\n");

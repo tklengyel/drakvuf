@@ -182,7 +182,7 @@ static void print_usage()
         "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
         "\t -i <injection pid>        The PID of the process to hijack for injection\n"
         "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
-        "\t -e <inject_file>          The executable to start with injection\n"
+        "\t -e <injection_cmd>        The executable to start with injection\n"
         "\t -c <current_working_dir>  The current working directory for injected executable\n"
         "\t -m <inject_method>        The injection method: [WIN]  : createproc, shellexec, shellcode, doppelganging\n"
         "\t                                               : [LINUX]: execproc -> execlp(), linuxshellcode \n"
@@ -335,8 +335,8 @@ int main(int argc, char** argv)
     int c;
     int timeout = 0;
     uint64_t limited_traps_ttl = UNLIMITED_TTL;
-    char const* inject_file = nullptr;
-    char const* inject_cwd = nullptr;
+    char const* injection_cmd = nullptr;
+    char const* injection_cwd = nullptr;
     std::map<std::filesystem::path, std::filesystem::path> write_files;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
     int injection_timeout = 0;
@@ -505,10 +505,10 @@ int main(int argc, char** argv)
                 injection_thread = atoi(optarg);
                 break;
             case 'e':
-                inject_file = optarg;
+                injection_cmd = optarg;
                 break;
             case 'c':
-                inject_cwd = optarg;
+                injection_cwd = optarg;
                 break;
             case 'g':
                 injection_global_search = true;
@@ -845,12 +845,10 @@ int main(int argc, char** argv)
     sigemptyset(&act_timer.sa_mask);
     sigaction(SIGALRM, &act_timer, nullptr);
 
-    vmi_pid_t injected_pid = 0;
-
     for (const auto&[src, dst] : write_files)
     {
         PRINT_DEBUG("Writing file ('%s' -> '%s') into running VM\n", src.c_str(), dst.c_str());
-        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, dst.c_str(), nullptr, INJECT_METHOD_WRITE_FILE, output, src.c_str(), nullptr, write_file_timeout, injection_global_search, 0, nullptr, &injected_pid);
+        injector_status_t ret = drakvuf->write_file(injection_pid, injection_thread, src.c_str(), dst.c_str(), write_file_timeout, injection_global_search);
         switch (ret)
         {
             case INJECTOR_SUCCEEDED:
@@ -866,10 +864,11 @@ int main(int argc, char** argv)
         drakvuf->interrupt(0); // clear
     }
 
-    if (injection_pid > 0 && inject_file)
+    vmi_pid_t injected_pid = 0;
+    if (injection_cmd)
     {
-        PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, inject_file);
-        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, inject_file, inject_cwd, injection_method, output, binary_path, target_process, injection_timeout, injection_global_search, args_count, args, &injected_pid);
+        PRINT_DEBUG("Starting injection with PID %i(%i) for %s\n", injection_pid, injection_thread, injection_cmd);
+        injector_status_t ret = drakvuf->inject_cmd(injection_pid, injection_thread, injection_cmd, injection_cwd, injection_method, binary_path, target_process, injection_timeout, injection_global_search, args_count, args, &injected_pid);
         switch (ret)
         {
             case INJECTOR_FAILED_WITH_ERROR_CODE:
@@ -881,6 +880,8 @@ int main(int argc, char** argv)
             case INJECTOR_TIMEOUTED:
                 return drakvuf_exit_code_t::INJECTION_TIMEOUT;
         }
+
+        drakvuf->interrupt(0); // clear
     }
 
     PRINT_DEBUG("Enabling context based interception.\n");
