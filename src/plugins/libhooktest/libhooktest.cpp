@@ -131,6 +131,6 @@ libhooktest::libhooktest(drakvuf_t drakvuf, output_format_t output)
 {
     PRINT_DEBUG("[LIBHOOKTEST] works\n");
 
-    this->cr3_hook = createManualHook(&(this->inject_trap), nullptr);
+    this->cr3_hook = createCr3Hook(&cr3_cb);
     this->sys_hook = createSyscallHook("NtProtectVirtualMemory", &libhooktest::protectVirtualMemoryCb);
 }
