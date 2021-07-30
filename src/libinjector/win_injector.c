@@ -681,13 +681,19 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         regs.x86.rip);
 
     regs.x86.rip = injector->exec_func;
-    if (INJECT_METHOD_WRITE_FILE == injector->method)
+
+    switch (injector->method)
     {
-        injector->status = STATUS_ALLOC_OK;
-    }
-    else
-    {
-        injector->status = STATUS_CREATE_OK;
+        case INJECT_METHOD_CREATEPROC:
+        case INJECT_METHOD_SHELLEXEC:
+            injector->status = STATUS_CREATE_OK;
+            break;
+        case INJECT_METHOD_WRITE_FILE:
+            injector->status = STATUS_ALLOC_OK;
+            break;
+        default:
+            // TODO Implement
+            break;
     }
 
     drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
