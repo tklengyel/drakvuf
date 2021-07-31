@@ -465,8 +465,6 @@ public:
     [[nodiscard]]
     std::unique_ptr<libhook::Cr3Hook> createCr3Hook(Callback cb, int ttl);
 
-    template<typename Params = PluginResult,
-
     /************************************
      *        Legacy hooking API        *
      ************************************/
