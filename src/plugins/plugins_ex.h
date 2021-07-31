@@ -630,13 +630,13 @@ std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::str
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::Cr3Hook> createCr3Hook(Callback cb)
+std::unique_ptr<libhook::Cr3Hook> pluginex::createCr3Hook(Callback cb)
 {
     return createCr3Hook(cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
 }
 
 template<typename Params, typename Callback>
-std::unique_ptr<libhook::Cr3Hook> createCr3Hook(Callback cb, int ttl)
+std::unique_ptr<libhook::Cr3Hook> pluginex::createCr3Hook(Callback cb, int ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
     auto hook = libhook::Cr3Hook::create<Params>(this->drakvuf, [=](auto&& ...args) -> event_response_t
