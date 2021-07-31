@@ -644,13 +644,22 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
     bool success = false;
-    if (injector->method == INJECT_METHOD_CREATEPROC)
+    switch (injector->method)
     {
-        success = setup_create_process_stack(injector, &regs.x86);
-        injector->target_rsp = regs.x86.rsp;
+        case INJECT_METHOD_CREATEPROC:
+            success = setup_create_process_stack(injector, &regs.x86);
+            injector->target_rsp = regs.x86.rsp;
+            break;
+        case INJECT_METHOD_SHELLEXEC:
+            success = setup_shell_execute_stack(injector, &regs.x86);
+            break;
+        case INJECT_METHOD_WRITE_FILE:
+            success = setup_virtual_alloc_stack(injector, &regs.x86);
+            break;
+        default:
+            // TODO Implement
+            break;
     }
-    else if (injector->method == INJECT_METHOD_SHELLEXEC)
-        success = setup_shell_execute_stack(injector, &regs.x86);
 
     if (!success)
     {
@@ -672,7 +681,20 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         regs.x86.rip);
 
     regs.x86.rip = injector->exec_func;
-    injector->status = STATUS_CREATE_OK;
+
+    switch (injector->method)
+    {
+        case INJECT_METHOD_CREATEPROC:
+        case INJECT_METHOD_SHELLEXEC:
+            injector->status = STATUS_CREATE_OK;
+            break;
+        case INJECT_METHOD_WRITE_FILE:
+            injector->status = STATUS_ALLOC_OK;
+            break;
+        default:
+            // TODO Implement
+            break;
+    }
 
     drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
 
@@ -705,15 +727,15 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
     if (info->proc_data.pid != injector->target_pid)
         return 0;
 
+    if (injector->target_tid && injector->target_tid != (uint32_t)info->proc_data.tid)
+        return 0;
+
     addr_t thread = drakvuf_get_current_thread(drakvuf, info);
     if (!thread)
     {
         PRINT_DEBUG("Failed to find current thread\n");
         return 0;
     }
-
-    if (injector->target_tid && injector->target_tid != (uint32_t)info->proc_data.tid)
-        return 0;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -1350,7 +1372,6 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
                 break;
             default:
                 // TODO Implement
-                success = false;
                 break;
         }
 
@@ -1382,7 +1403,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     }
 
     // Chain the injection with a second function
-    if ( !injector->is32bit && STATUS_ALLOC_OK == injector->status)
+    if (STATUS_ALLOC_OK == injector->status)
     {
         PRINT_DEBUG("Writing to allocated virtual memory to allocate physical memory..\n");
 
@@ -1406,7 +1427,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
     }
 
     // Execute the payload
-    if ( !injector->is32bit && STATUS_PHYS_ALLOC_OK == injector->status)
+    if (STATUS_PHYS_ALLOC_OK == injector->status)
     {
         if (INJECT_METHOD_READ_FILE != injector->method &&
             INJECT_METHOD_WRITE_FILE != injector->method)
@@ -1433,7 +1454,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         }
     }
 
-    if ( !injector->is32bit && STATUS_EXPAND_ENV_OK == injector->status )
+    if (STATUS_EXPAND_ENV_OK == injector->status)
     {
         PRINT_DEBUG("Env expand status: %lx\n", regs.x86.rax);
 
@@ -1443,7 +1464,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
             return 0;
         }
 
-        uint8_t buf[FILE_BUF_SIZE] = {0};;
+        uint8_t buf[FILE_BUF_SIZE] = {0};
         unicode_string_t in;
 
         ACCESS_CONTEXT(ctx);
@@ -1495,8 +1516,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         return 0;
     }
 
-    if (!injector->is32bit &&
-        ( STATUS_CREATE_FILE_OK == injector->status || STATUS_WRITE_FILE_OK == injector->status ) &&
+    if (( STATUS_CREATE_FILE_OK == injector->status || STATUS_WRITE_FILE_OK == injector->status ) &&
         INJECT_METHOD_WRITE_FILE == injector->method)
     {
         uint8_t buf[FILE_BUF_SIZE];
@@ -1732,7 +1752,7 @@ static event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t*
         return 0;
     }
 
-    if ( !injector->is32bit && STATUS_CLOSE_FILE_OK == injector->status )
+    if (STATUS_CLOSE_FILE_OK == injector->status)
     {
         PRINT_DEBUG("Close handle RAX: 0x%lx\n", regs.x86.rax);
         fclose(injector->host_file);
