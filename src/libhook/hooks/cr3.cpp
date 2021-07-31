@@ -101,7 +101,7 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-#include <libhook/hooks/syscall.hpp>
+#include <libhook/hooks/cr3.hpp>
 
 namespace libhook
 {
