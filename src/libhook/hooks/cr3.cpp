@@ -106,7 +106,7 @@
 namespace libhook
 {
 
-SyscallHook::~SyscallHook()
+Cr3Hook::~Cr3Hook()
 {
     if (this->drakvuf_ && this->trap_)
     {

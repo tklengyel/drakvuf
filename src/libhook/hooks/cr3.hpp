@@ -174,7 +174,7 @@ auto Cr3Hook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
     hook->trap_->ttl = ttl;
     hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
-        return GetTrapHook<SyscallHook>(info)->callback_(drakvuf, info);
+        return GetTrapHook<Cr3Hook>(info)->callback_(drakvuf, info);
     };
 
     static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
@@ -192,7 +192,7 @@ auto Cr3Hook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
         hook->trap_->data = nullptr;
         delete hook->trap_;
         hook->trap_ = nullptr;
-        return std::unique_ptr<SyscallHook>();
+        return std::unique_ptr<Cr3Hook>();
     }
 
     PRINT_DEBUG("[LIBHOOK] cr3 hook OK\n");
