@@ -101,36 +101,102 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-#include "libhooktest.h"
+#pragma once
 
-event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+#include <string>
+#include <libhook/call_result.hpp>
+#include <libhook/hooks/base.hpp>
+
+namespace libhook
 {
-    PRINT_DEBUG("[LIBHOOKTEST] CR3 changed\n");
-    auto plugin = GetTrapPlugin<libhooktest>(info);
-    plugin->cr3_hook.reset();
-    PRINT_DEBUG("[LIBHOOKTEST] CR3 unhooked\n");
-    return VMI_EVENT_RESPONSE_NONE;
+
+class Cr3Hook : public BaseHook
+{
+public:
+    /**
+     * Factory function to create the trap and perform hooking at the same time.
+     */
+    template<typename Params = CallResult>
+    [[nodiscard]]
+    static auto create(drakvuf_t, cb_wrapper_t cb, int ttl)
+    -> std::unique_ptr<Cr3Hook>;
+
+    /**
+     * unhook on dctor
+     */
+    ~Cr3Hook() override;
+
+    /**
+     * delete copy ctor, as this class has ownership via RAII
+     */
+    Cr3Hook(const Cr3Hook&) = delete;
+
+    /**
+     * move ctor, required for move semantics to work properly
+     * important to be noexcept, otherwise bad things will happen
+     */
+    Cr3Hook(Cr3Hook&&) noexcept;
+
+    /**
+     * delete copy assignment operator, as this class has ownership via RAII
+     */
+    Cr3Hook& operator=(const Cr3Hook&) = delete;
+
+    /**
+     * move assignment operator, required for move semantics to work properly
+     * important to be noexcept, otherwise bad things will happen
+     */
+    Cr3Hook& operator=(Cr3Hook&&) noexcept;
+
+    cb_wrapper_t callback_;
+    drakvuf_trap_t* trap_;
+
+protected:
+    /**
+     * Hide ctor from users, as we enforce factory function usage.
+     */
+    Cr3Hook(drakvuf_t, cb_wrapper_t cb);
+};
+
+template<typename Params>
+auto Cr3Hook::create(drakvuf_t drakvuf, cb_wrapper_t cb, int ttl)
+-> std::unique_ptr<Cr3Hook>
+{
+    PRINT_DEBUG("[LIBHOOK] creating cr3 hook\n");
+
+    // not using std::make_unique because ctor is private
+    auto hook = std::unique_ptr<Cr3Hook>(new Cr3Hook(drakvuf, cb));
+    hook->trap_ = new drakvuf_trap_t();
+
+    hook->trap_->name = "libhook cr3";
+    hook->trap_->type = REGISTER;
+    hook->trap_->reg = CR3;
+    hook->trap_->ttl = ttl;
+    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    {
+        return GetTrapHook<Cr3Hook>(info)->callback_(drakvuf, info);
+    };
+
+    static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
+    static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
+
+    // populate backref
+    auto* params = new Params();
+    params->hook_ = hook.get();
+    hook->trap_->data = static_cast<void*>(params);
+
+    if (!drakvuf_add_trap(drakvuf, hook->trap_))
+    {
+        PRINT_DEBUG("[LIBHOOK] failed to create cr3 trap!\n");
+        delete static_cast<CallResult*>(hook->trap_->data);
+        hook->trap_->data = nullptr;
+        delete hook->trap_;
+        hook->trap_ = nullptr;
+        return std::unique_ptr<Cr3Hook>();
+    }
+
+    PRINT_DEBUG("[LIBHOOK] cr3 hook OK\n");
+    return hook;
 }
 
-event_response_t libhooktest::protectVirtualMemoryCb(drakvuf_t drakvuf, drakvuf_trap_info* info)
-{
-    PRINT_DEBUG("[LIBHOOKTEST] NtProtectVirtualMemory called\n");
-    this->ret_hooks.push_back(createReturnHook(info, &libhooktest::protectVirtualMemoryRetCb));
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-event_response_t libhooktest::protectVirtualMemoryRetCb(drakvuf_t drakvuf, drakvuf_trap_info* info)
-{
-    PRINT_DEBUG("[LIBHOOKTEST] NtProtectVirtualMemory Return Hook called\n");
-    this->ret_hooks.clear();
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-libhooktest::libhooktest(drakvuf_t drakvuf, output_format_t output)
-    : pluginex(drakvuf, output)
-{
-    PRINT_DEBUG("[LIBHOOKTEST] works\n");
-
-    this->cr3_hook = createCr3Hook(&cr3_cb);
-    this->sys_hook = createSyscallHook("NtProtectVirtualMemory", &libhooktest::protectVirtualMemoryCb);
-}
+};  // namespace libhook

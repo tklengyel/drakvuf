@@ -106,6 +106,7 @@ sources  = hooks/base.hpp hooks/base.cpp
 sources += hooks/manual.hpp hooks/manual.cpp
 sources += hooks/syscall.hpp hooks/syscall.cpp
 sources += hooks/return.hpp hooks/return.cpp
+sources += hooks/cr3.hpp hooks/cr3.cpp
 sources += call_result.hpp
 sources += libhook.hpp
 sources += private.h

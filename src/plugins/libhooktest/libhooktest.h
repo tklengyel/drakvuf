@@ -116,16 +116,7 @@ public:
     event_response_t protectVirtualMemoryCb(drakvuf_t, drakvuf_trap_info*);
     event_response_t protectVirtualMemoryRetCb(drakvuf_t, drakvuf_trap_info*);
 
-    drakvuf_trap_t inject_trap =
-    {
-        .type = REGISTER,
-        .reg = CR3,
-        .name = "test trap",
-        .cb = &cr3_cb,
-        .data = this,
-    };
-
-    std::unique_ptr<libhook::ManualHook> cr3_hook;
+    std::unique_ptr<libhook::Cr3Hook> cr3_hook;
     std::unique_ptr<libhook::SyscallHook> sys_hook;
     std::vector<std::unique_ptr<libhook::ReturnHook>> ret_hooks;
 };
