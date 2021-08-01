@@ -101,36 +101,53 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-#include "libhooktest.h"
+#include <libhook/hooks/cr3.hpp>
 
-event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+namespace libhook
 {
-    PRINT_DEBUG("[LIBHOOKTEST] CR3 changed\n");
-    auto plugin = GetTrapPlugin<libhooktest>(info);
-    plugin->cr3_hook.reset();
-    PRINT_DEBUG("[LIBHOOKTEST] CR3 unhooked\n");
-    return VMI_EVENT_RESPONSE_NONE;
+
+Cr3Hook::~Cr3Hook()
+{
+    if (this->drakvuf_ && this->trap_)
+    {
+        PRINT_DEBUG("[LIBHOOK] destroying cr3 hook...\n");
+        // read in libhook.hpp why this happens
+        this->trap_->cb = [](drakvuf_t, drakvuf_trap_info_t*) -> event_response_t
+        {
+            PRINT_DEBUG("[LIBHOOK] drakvuf called deleted hook, replaced by nullstub\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        };
+        drakvuf_remove_trap(this->drakvuf_, this->trap_, [](drakvuf_trap_t* trap)
+        {
+            delete static_cast<CallResult*>(trap->data);
+            delete trap;
+        });
+    }
+    else
+    {
+        // otherwise this has been moved from and we don't free the trap
+        // as the ownership has been passed elsewhere, so we do nothing
+        PRINT_DEBUG("[LIBHOOK] destruction not needed, as cr3 hook was moved from\n");
+    }
 }
 
-event_response_t libhooktest::protectVirtualMemoryCb(drakvuf_t drakvuf, drakvuf_trap_info* info)
+Cr3Hook::Cr3Hook(Cr3Hook&& rhs) noexcept
+    : BaseHook(std::forward<BaseHook>(rhs))
 {
-    PRINT_DEBUG("[LIBHOOKTEST] NtProtectVirtualMemory called\n");
-    this->ret_hooks.push_back(createReturnHook(info, &libhooktest::protectVirtualMemoryRetCb));
-    return VMI_EVENT_RESPONSE_NONE;
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->callback_, rhs.callback_);
 }
 
-event_response_t libhooktest::protectVirtualMemoryRetCb(drakvuf_t drakvuf, drakvuf_trap_info* info)
+Cr3Hook& Cr3Hook::operator=(Cr3Hook&& rhs) noexcept
 {
-    PRINT_DEBUG("[LIBHOOKTEST] NtProtectVirtualMemory Return Hook called\n");
-    this->ret_hooks.clear();
-    return VMI_EVENT_RESPONSE_NONE;
+    std::swap(this->trap_, rhs.trap_);
+    std::swap(this->callback_, rhs.callback_);
+    return *this;
 }
 
-libhooktest::libhooktest(drakvuf_t drakvuf, output_format_t output)
-    : pluginex(drakvuf, output)
-{
-    PRINT_DEBUG("[LIBHOOKTEST] works\n");
+Cr3Hook::Cr3Hook(drakvuf_t drakvuf, cb_wrapper_t cb)
+    : BaseHook(drakvuf),
+      callback_(cb)
+{}
 
-    this->cr3_hook = createCr3Hook(&cr3_cb);
-    this->sys_hook = createSyscallHook("NtProtectVirtualMemory", &libhooktest::protectVirtualMemoryCb);
-}
+} // namespace libhook

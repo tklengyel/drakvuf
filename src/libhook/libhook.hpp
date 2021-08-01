@@ -108,6 +108,7 @@
 #include <libhook/hooks/manual.hpp>
 #include <libhook/hooks/return.hpp>
 #include <libhook/hooks/syscall.hpp>
+#include <libhook/hooks/cr3.hpp>
 
 /**
  * A brief information about caveats of libhook.
