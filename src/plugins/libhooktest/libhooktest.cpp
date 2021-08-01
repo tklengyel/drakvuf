@@ -106,7 +106,7 @@
 event_response_t cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     PRINT_DEBUG("[LIBHOOKTEST] CR3 changed\n");
-    auto plugin = static_cast<libhooktest*>(info->trap->data);
+    auto plugin = GetTrapPlugin<libhooktest>(info);
     plugin->cr3_hook.reset();
     PRINT_DEBUG("[LIBHOOKTEST] CR3 unhooked\n");
     return VMI_EVENT_RESPONSE_NONE;
