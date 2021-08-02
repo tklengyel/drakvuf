@@ -116,15 +116,22 @@
  */
 #define BTN_THRESHOLD 3
 
+/*
+ * Button texts to click on
+ * Add more labels, if needed
+ */
 const wchar_t* BTN_TEXTS[] =
 {
     L"Agree",
+    L"Continue",
+    L"Yes",
     L"Ok",
     L"OK",
     L"Go",
     L"Run",
     L"Click",
     L"Enable",
+    L"Try Again"
 };
 /*
  * Ignores tagWND-structs of this window class
