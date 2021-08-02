@@ -308,8 +308,6 @@ static void move_mouse(qmp_connection* qc, int x, int y, bool is_abs)
 
     /* Sends command */
     qmp_communicate_json(qc, cmd, NULL);
-    // PRINT_DEBUG("[HIDSIM] %s\n", json_object_to_json_string_ext(
-    //         cmd, JSON_C_TO_STRING_SPACED));
 
     /* Clean up */
     json_object_put(cmd);
