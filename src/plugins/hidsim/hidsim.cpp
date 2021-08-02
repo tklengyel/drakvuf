@@ -118,18 +118,14 @@
 bool hidsim::check_platform_support(drakvuf_t drakvuf)
 {
     win_build_info_t bi;
-
     {
         vmi_lock_guard vmi(drakvuf);
-
         if (!vmi_get_windows_build_info(vmi.vmi, &bi))
             return false;
-
     }
 
     if (bi.version == VMI_OS_WINDOWS_7)
     {
-
         PRINT_DEBUG("[HIDSIM] GUI reconstruction supported"
             "on Windows 7\n");
         return true;
@@ -137,7 +133,6 @@ bool hidsim::check_platform_support(drakvuf_t drakvuf)
 
     PRINT_DEBUG("[HIDSIM] GUI reconstruction is NOT supported "
         "on this guest system\n");
-
     return false;
 }
 
