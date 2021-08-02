@@ -154,10 +154,8 @@ bool hidsim::prepare_gui_reconstruction(drakvuf_t drakvuf, const char* win32k_pr
     if (this->is_gui_support)
     {
         /* Initializes reconstruction  */
-        if (gui_init_reconstruction(drakvuf, this->win32k_json_path.c_str(), is_x86) != 0)
-            return false;
-
-        return true;
+        return gui_init_reconstruction(drakvuf, this->win32k_json_path.c_str(),
+                is_x86) == 0;
     }
     return false;
 }
