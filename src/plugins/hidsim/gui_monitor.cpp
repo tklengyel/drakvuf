@@ -419,13 +419,15 @@ int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
                 y = btn.r.y0 + btn.r.h/2;
                 *coords = x << 16 | y;
 
-                printf("[HIDSIM] [MONITOR] Found \"%S\"-button to click at"
+                PRINT_DEBUG("[HIDSIM] [MONITOR] Found \"%S\"-button to click at"
                     "(%d, %d)\n", btn.text, btn.r.x0, btn.r.y0);
 
             }
             /* Some error occured */
             else if (res < 0)
             {
+                PRINT_DEBUG("[HIDSIM] [MONITOR] Error reconstructing GUI:"
+                    "%d\n", res);
                 break;
             }
         }
