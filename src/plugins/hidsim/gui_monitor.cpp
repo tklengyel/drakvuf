@@ -226,25 +226,28 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json,
         return false;
     }
 
-    vmi_lock_guard vmi(drakvuf);
-
-    if (VMI_SUCCESS != vmi_pid_to_dtb(vmi.vmi, pid, &trap->breakpoint.dtb))
-    {
-        PRINT_DEBUG("[HIDSIM] [Init] Failed to get CR3 of \"explorer.exe\"\n");
-        return false;
-    }
-
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .addr = ssdt_ptr_va,
-        .dtb = trap->breakpoint.dtb
-    );
-
     addr_t ssdt_va = 0;
-    if (VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &ssdt_va))
     {
-        PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to read the address of SSDT (VA 0x%lx)\n", ssdt_ptr_va);
-        return false;
+        vmi_instance_t vmi = vmi_lock_guard(drakvuf);
+
+        if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, pid, &trap->breakpoint.dtb))
+        {
+            PRINT_DEBUG("[HIDSIM] [Init] Failed to get CR3 of \"explorer.exe\"\n");
+            return false;
+        }
+
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .addr = ssdt_ptr_va,
+            .dtb = trap->breakpoint.dtb
+        );
+
+        if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &ssdt_va))
+        {
+            PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to read the address of SSDT "
+                "(VA 0x%lx)\n", ssdt_ptr_va);
+            return false;
+        }
     }
 
     trap->name = function_name;
@@ -252,7 +255,7 @@ static bool register_trap( drakvuf_t drakvuf, json_object* profile_json,
     trap->breakpoint.addr = ssdt_va - w32pst_rva + func_rva;
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
 
-    if ( !drakvuf_add_trap( drakvuf, trap ) )
+    if (!drakvuf_add_trap(drakvuf, trap))
     {
         PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to trap VA 0x%lx\n", trap->breakpoint.addr);
         return false;
@@ -300,23 +303,23 @@ bool check_platform_support(drakvuf_t drakvuf)
 int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_path, bool is_x86)
 {
     json_object* win32k_json = json_object_from_file(win32k_path);
+    json_object* kernel_profile = NULL;
 
     if (!win32k_json)
     {
         PRINT_DEBUG("[HIDSIM] [MONITOR] Plugin failed to load JSON debug info for win32k.sys\n");
         return -1;
     }
-
-    /* Populates the kernel offsets */
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    json_object* kernel_profile = vmi_get_kernel_json(vmi);
-    status_t s = initialize_offsets(vmi, kernel_profile, win32k_json, is_x86);
-    drakvuf_release_vmi(drakvuf);
-
-    if (s == VMI_FAILURE)
     {
-        PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to populate offsets for GUI reconstruction\n");
-        return -1;
+        /* Populates the kernel offsets */
+        vmi_instance_t vmi = vmi_lock_guard(drakvuf);
+        kernel_profile = vmi_get_kernel_json(vmi);
+
+        if (VMI_FAILURE == initialize_offsets(vmi, kernel_profile, win32k_json, is_x86))
+        {
+            PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to populate offsets for GUI reconstruction\n");
+            return -1;
+        }
     }
 
     /*
@@ -352,22 +355,19 @@ int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
     int res = -1;
     vmi_instance_t vmi;
     struct desktop d = {};
-
-    vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    /*
-     * The PID, provided by the desktop struct, is required for accessing the
-     * desktop heap in user mode. Since explorer.exe, dwm.exe or other always
-     * existing processes are used due to their low-order PIDs, those are fairly
-     * stable, so it has not to be recreated in each iteration
-     */
-    if (VMI_FAILURE == find_first_active_desktop(vmi, &d))
     {
-        drakvuf_release_vmi(drakvuf);
-        return -1;
+        vmi = vmi_lock_guard(drakvuf);
+        /*
+         * The PID, provided by the desktop struct, is required for accessing the
+         * desktop heap in user mode. Since explorer.exe, dwm.exe or other always
+         * existing processes are used due to their low-order PIDs, those are fairly
+         * stable, so it has not to be recreated in each iteration
+         */
+        if (VMI_FAILURE == find_first_active_desktop(vmi, &d))
+        {
+            return -1;
+        }
     }
-    drakvuf_release_vmi(drakvuf);
-
     *coords = 0;
 
     /* Keeps track of time to meet delays */
@@ -406,10 +406,10 @@ int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
         if (elapsed >= DELAY)
         {
             PRINT_DEBUG("[HIDSIM] [MONITOR] Detected GUI update\n");
-
-            vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            res = scan_for_clickable_button(vmi, &d, &btn);
-            drakvuf_release_vmi(drakvuf);
+            {
+                vmi = vmi_lock_guard(drakvuf);
+                res = scan_for_clickable_button(vmi, &d, &btn);
+            }
             has_gui_update = false;
 
             if (res >  0)
