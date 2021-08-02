@@ -145,12 +145,11 @@ static drakvuf_trap_t gui_trap =
 static event_response_t on_draw(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     has_gui_update = true;
-
-    lock.lock();
-    /* Keeps track of the last event */
-    gettimeofday(&last, NULL);
-    lock.unlock();
-
+    {
+        std::lock_guard<std::mutex> guard(lock);
+        /* Keeps track of the last event */
+        gettimeofday(&last, NULL);
+    }
     return VMI_EVENT_RESPONSE_NONE;
 }
 /*
@@ -394,9 +393,11 @@ int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
          */
         gettimeofday(&curr, NULL);
 
-        lock.lock();
-        timersub(&curr, &last, &diff);
-        lock.unlock();
+        {
+            std::lock_guard<std::mutex> guard(lock);
+            timersub(&curr, &last, &diff);
+        }
+
 
         elapsed = diff.tv_sec * 1000000 + diff.tv_usec;
 
