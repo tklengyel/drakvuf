@@ -318,6 +318,7 @@ int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_path, bool is_
         if (VMI_FAILURE == initialize_offsets(vmi, kernel_profile, win32k_json, is_x86))
         {
             PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to populate offsets for GUI reconstruction\n");
+            json_object_put(win32k_json);
             return -1;
         }
     }
