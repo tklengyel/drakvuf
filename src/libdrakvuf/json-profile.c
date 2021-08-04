@@ -263,21 +263,21 @@ const char* drakvuf_get_struct_field_type_name(drakvuf_t drakvuf, const char* st
     struct json_object* json_user_types;
     if (!json_object_object_get_ex(json_profile, "user_types", &json_user_types))
     {
-        PRINT_DEBUG("[!] Failed to find `user_types` section.\n");
+        PRINT_DEBUG("Failed to find `user_types` section.\n");
         return NULL;
     }
 
     struct json_object* json_struct;
     if (!json_object_object_get_ex(json_user_types, struct_name, &json_struct))
     {
-        PRINT_DEBUG("[!] Failed to find %s in user_types.\n", struct_name);
+        PRINT_DEBUG("Failed to find %s in user_types.\n", struct_name);
         return NULL;
     }
 
     struct json_object* json_fields;
     if (!json_object_object_get_ex(json_struct, "fields", &json_fields))
     {
-        PRINT_DEBUG("[!] %s has no `fields` key.\n", struct_name);
+        PRINT_DEBUG("%s has no `fields` key.\n", struct_name);
         return NULL;
     }
 
@@ -297,14 +297,14 @@ const char* drakvuf_get_struct_field_type_name(drakvuf_t drakvuf, const char* st
             struct json_object* json_field_subtype;
             if (!json_object_object_get_ex(json_field_val, "type", &json_field_subtype))
             {
-                PRINT_DEBUG("[!] Failed to find `type` key.\n");
+                PRINT_DEBUG("Failed to find `type` key.\n");
                 return NULL;
             }
 
             struct json_object* json_field_subkind;
             if (!json_object_object_get_ex(json_field_subtype, "kind", &json_field_subkind))
             {
-                PRINT_DEBUG("[!] Failed to find `kind` key.\n");
+                PRINT_DEBUG("Failed to find `kind` key.\n");
                 return NULL;
             }
             if (strcmp(json_object_get_string(json_field_subkind), "struct") != 0)
@@ -313,21 +313,21 @@ const char* drakvuf_get_struct_field_type_name(drakvuf_t drakvuf, const char* st
             struct json_object* json_anonymous_struct_name;
             if (!json_object_object_get_ex(json_field_subtype, "name", &json_anonymous_struct_name))
             {
-                PRINT_DEBUG("[!] Failed to find `name` key\n");
+                PRINT_DEBUG("Failed to find `name` key\n");
                 return NULL;
             }
 
             struct json_object* json_anonymous_struct;
             if (!json_object_object_get_ex(json_user_types, json_object_get_string(json_anonymous_struct_name), &json_anonymous_struct))
             {
-                PRINT_DEBUG("[!] Failed to find %s in user_types.\n", json_object_get_string(json_anonymous_struct_name));
+                PRINT_DEBUG("Failed to find %s in user_types.\n", json_object_get_string(json_anonymous_struct_name));
                 return NULL;
             }
 
             struct json_object* json_anonymous_struct_fields;
             if (!json_object_object_get_ex(json_anonymous_struct, "fields", &json_anonymous_struct_fields))
             {
-                PRINT_DEBUG("[!] Failed to find `fields` key.\n");
+                PRINT_DEBUG("Failed to find `fields` key.\n");
                 return NULL;
             }
 
@@ -337,21 +337,21 @@ const char* drakvuf_get_struct_field_type_name(drakvuf_t drakvuf, const char* st
     }
     if (!json_field)
     {
-        PRINT_DEBUG("[!] Failed to find %s\n", field_name);
+        PRINT_DEBUG("Failed to find %s\n", field_name);
         return NULL;
     }
 
     struct json_object* json_struct_type;
     if (!json_object_object_get_ex(json_field, "type", &json_struct_type))
     {
-        PRINT_DEBUG("[!] Failed to find `type` key.\n");
+        PRINT_DEBUG("Failed to find `type` key.\n");
         return NULL;
     }
 
     struct json_object* json_type_name;
     if (!json_object_object_get_ex(json_struct_type, "name", &json_type_name))
     {
-        PRINT_DEBUG("[!] Failed to find `name` key.\n");
+        PRINT_DEBUG("Failed to find `name` key.\n");
         return NULL;
     }
 
