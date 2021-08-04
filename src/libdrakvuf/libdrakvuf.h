@@ -350,7 +350,10 @@ bool json_get_struct_member_rva(drakvuf_t drakvuf,
     const char* struct_name,
     const char* symbol,
     addr_t* rva) NOEXCEPT;
-
+const char* drakvuf_get_struct_field_type_name(
+    drakvuf_t drakvuf,
+    const char* struct_name,
+    const char* field_name) NOEXCEPT;
 bool json_get_struct_members_array_rva(
     drakvuf_t drakvuf,
     json_object* json_profile,
