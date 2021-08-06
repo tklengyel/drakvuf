@@ -309,13 +309,17 @@ sources += hidsim/qmp/keymap_evdev_to_qapi.h
 sources += hidsim/hid_injection.cpp
 sources += hidsim/hid_injection.h
 
-sources += hidsim/gui_monitor.cpp
-sources += hidsim/gui_monitor.h
+sources += hidsim/gui/vmi_win_gui_parser.cpp
 sources += hidsim/gui/vmi_win_gui_parser.h
+sources += hidsim/gui/vmi_win_gui_utils.cpp
 sources += hidsim/gui/vmi_win_gui_utils.h
+sources += hidsim/gui/vmi_win_gui_offsets.cpp
 sources += hidsim/gui/vmi_win_gui_offsets.h
+sources += hidsim/gui/vmi_win_gui_atoms.cpp
 sources += hidsim/gui/vmi_win_gui_atoms.h
 sources += hidsim/gui/vmi_win_gui_filter_definitions.h
+sources += hidsim/gui_monitor.cpp
+sources += hidsim/gui_monitor.h
 endif
 
 ###############################################################################

@@ -151,4 +151,4 @@ const wchar_t* IRRELEVANT_ATOM_CLASSES [] =
     L"Shell_TrayWnd",
 };
 
-#endif //VMI_WIN_GUI_PARSER_H_
+#endif //VMI_WIN_GUI_PARSER_H
