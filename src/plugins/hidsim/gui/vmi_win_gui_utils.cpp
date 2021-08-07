@@ -182,6 +182,11 @@ char* retrieve_objhdr_name(vmi_instance_t vmi, addr_t addr)
 wchar_t* read_wchar_str_pid(vmi_instance_t vmi, addr_t start, size_t len, vmi_pid_t pid)
 {
     wchar_t* s = (wchar_t*) calloc(1, sizeof(wchar_t) * len);
+    if (!s)
+    {
+        printf("[HIDSIM][MONITOR] Memory allocation for wchar-string failed\n");
+        return NULL;
+    }
 
     for (size_t i = 0; i < len; i++)
     {

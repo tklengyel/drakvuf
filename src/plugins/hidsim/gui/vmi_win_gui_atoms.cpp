@@ -147,7 +147,13 @@ void print_atom(gpointer key, gpointer value, gpointer user_data )
 struct atom_entry* parse_atom_entry(vmi_instance_t vmi, addr_t atom_addr)
 {
     struct atom_entry* entry;
+
     entry = (struct atom_entry*) calloc(1, sizeof(struct atom_entry));
+    if (!entry)
+    {
+        printf("[HIDSIM][MONITOR] Memory allocation for atom entry failed\n");
+        return NULL;
+    }
 
     if (VMI_FAILURE == vmi_read_addr_va(vmi, atom_addr +
             symbol_offsets.atom_entry_hashlink_offset, 0, &entry->hashlink))
@@ -198,7 +204,13 @@ struct atom_entry* create_atom_entry(uint16_t atom, const wchar_t* name,
     uint8_t len, addr_t hashlink, uint16_t refcount)
 {
     struct atom_entry* entry;
+
     entry = (struct atom_entry*) calloc(1, sizeof(struct atom_entry));
+    if (!entry)
+    {
+        printf("[HIDSIM][MONITOR] Memory allocation for atom entry failed\n");
+        return NULL;
+    }
 
     entry->atom = atom;
     entry->name = wcsdup(name);

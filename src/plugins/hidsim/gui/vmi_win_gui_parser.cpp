@@ -279,7 +279,11 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
 
     /* Populate struct, if no failure occured */
     struct wnd* wc = (struct wnd*) calloc(1, sizeof(struct wnd));
-
+    if (!wc)
+    {
+        printf("[HIDSIM][MONITOR] Memory allocation for wnd-struct failed\n");
+        return NULL;
+    }
     wc->r.x0 = x0;
     wc->r.x1 = x1;
     wc->r.y0 = y0;
@@ -365,6 +369,11 @@ int find_button_to_click(vmi_instance_t vmi, struct desktop* desk,
     /* Keeping track of occupied screen locations with a bitmap */
     size_t n = ((w + w % 8) / 8) * h;
     char* map = (char*) calloc(1, sizeof(char) * n);
+    if (!map)
+    {
+        printf("[HIDSIM][MONITOR] Memory allocation pixel map failed\n");
+        return -1;
+    }
 
     size_t l = wins->len;
 
@@ -449,6 +458,11 @@ status_t traverse_windows_pid(vmi_instance_t vmi, addr_t win,
     vmi_pid_t pid, GHashTable* seen_windows, GArray* result_windows, int level)
 {
     addr_t* cur = (addr_t*) malloc(sizeof(addr_t));
+    if (!cur)
+    {
+        printf("[HIDSIM][MONITOR] Memory allocation failed\n");
+        return VMI_FAILURE;
+    }
     *cur = win;
 
     /* Needed for ordered traversal */
@@ -458,7 +472,7 @@ status_t traverse_windows_pid(vmi_instance_t vmi, addr_t win,
     {
         if (g_hash_table_contains(seen_windows, (gconstpointer)cur))
         {
-            printf("Cycle after %d siblings\n", g_hash_table_size(seen_windows));
+            printf("[HIDSIM][MONITOR] Cycle after %d siblings\n", g_hash_table_size(seen_windows));
             break;
         }
 
@@ -470,8 +484,15 @@ status_t traverse_windows_pid(vmi_instance_t vmi, addr_t win,
 
         /* Advances to next window */
         addr_t* next = (addr_t*) malloc(sizeof(addr_t));
-        *next = 0;
 
+        if (!next)
+        {
+            printf("[HIDSIM][MONITOR] Memory allocation failed\n");
+            g_array_free(wins, true);
+            return VMI_FAILURE;
+        }
+
+        *next = 0;
         if (VMI_FAILURE == vmi_read_addr_va(vmi, *cur + symbol_offsets.spwnd_next, pid, next))
         {
             free(next);
