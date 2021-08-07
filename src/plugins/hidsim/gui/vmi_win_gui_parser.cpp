@@ -134,7 +134,6 @@ struct rect* get_visible_rect_from_bitmask(
     {
         for (int x = r->x0; x < r->x1; x++)
         {
-
             byte = (y * scanline + x)/8;
 
             /* Parts of a wnd can be outside of the desktop's frame */
