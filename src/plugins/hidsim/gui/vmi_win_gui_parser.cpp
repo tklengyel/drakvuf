@@ -524,7 +524,13 @@ status_t traverse_windows_pid(vmi_instance_t vmi, addr_t win,
         g_array_append_val(result_windows, val);
 
         addr_t* child = (addr_t*) malloc(sizeof(uint64_t));
-
+        if (!child)
+        {
+            free(child);
+            g_array_free(wins, true);
+            printf("[HIDSIM][MONITOR] Memory allocation failed\n");
+            return VMI_FAILURE;
+        }
         /* Reads the window's child */
         if (VMI_FAILURE == vmi_read_addr_va(vmi, val + symbol_offsets.spwnd_child, pid, child))
         {
