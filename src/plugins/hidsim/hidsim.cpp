@@ -149,7 +149,7 @@ bool hidsim::prepare_gui_reconstruction(drakvuf_t drakvuf, const char* win32k_pr
     this->is_gui_support = this->check_platform_support(drakvuf);
 
     page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-    bool is_x86 = pm == VMI_PM_PAE ? true: false;
+    bool is_x86 = pm == VMI_PM_PAE;
 
     if (this->is_gui_support)
     {
