@@ -310,24 +310,35 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     return wc;
 }
 
-bool filter_wnd_text(wchar_t* c)
+bool filter_wnd_text(wchar_t* text)
 {
-    /* Checks, if a target text is present */
-    for (size_t j = 0; j < ARRAY_SIZE(BTN_TEXTS); j++)
+    size_t tlen, llen, max_disp;
+
+    if (text)
     {
-        if (c)
+        tlen = wcslen(text);
+
+        /* Checks, if target text is present within the maximum displacement */
+        for (size_t i = 0; i < ARRAY_SIZE(BTN_TEXTS); i++)
         {
-            const wchar_t* m = wcswcs(c, BTN_TEXTS[j]);
-            if (!m)
+            llen = wcslen(BTN_TEXTS[i]);
+            /* Discards, due to size */
+            if (tlen < llen)
                 continue;
 
-            if (m - c < BTN_THRESHOLD)
+            /* Calculates maximum possible displacement */
+            max_disp = tlen - (MAX_DISPLACEMENT * llen) < 0 ?
+                tlen - llen + 1 : MAX_DISPLACEMENT;
+
+            for (size_t j = 0; j < max_disp; j++)
             {
-                return true;
+                int m = wcsncasecmp(&text[j], BTN_TEXTS[i], llen);
+                /* Found a match */
+                if (m == 0)
+                    return true;
             }
         }
     }
-
     return false;
 }
 

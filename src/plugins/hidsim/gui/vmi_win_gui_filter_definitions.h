@@ -114,24 +114,34 @@
  * windows text. This is set to avoid false positive, when a relevant
  * BTN_TEXT is contained within a longe window text.
  */
-#define BTN_THRESHOLD 3
+#define MAX_DISPLACEMENT 3
 
 /*
- * Button texts to click on
+ * Case-insensitive button texts to click on
  * Add more labels, if needed
  */
 const wchar_t* BTN_TEXTS[] =
 {
-    L"Agree",
-    L"Continue",
-    L"Yes",
-    L"Ok",
-    L"OK",
-    L"Go",
-    L"Run",
-    L"Click",
-    L"Enable",
-    L"Try Again"
+    L"agree",
+    L"accept",
+    L"continue",
+    L"yes",
+    L"ok",
+    L"go",
+    L"run",
+    L"click",
+    L"enable",
+    L"try again",
+    L"next",
+    L"new",
+    L"install",
+    L"extract",
+    L"continue",
+    L"execute",
+    L"launch",
+    L"download",
+    L"load",
+    L"allow access"
 };
 /*
  * Ignores tagWND-structs of this window class
