@@ -169,6 +169,11 @@ struct rect* get_visible_rect_from_bitmask(
     if (x1 != -1 && y1 != -1)
     {
         result = (struct rect*) malloc(sizeof(struct rect));
+        if (!result)
+        {
+            printf("[HIDSIM][MONITOR] Memory allocation for result-wnd failed\n");
+            return NULL;
+        }
         result->x0 = x0;
         result->x1 = x1;
         result->y0 = y0;
