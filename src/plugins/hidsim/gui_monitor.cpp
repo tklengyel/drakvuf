@@ -104,8 +104,8 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#include <unistd.h>
-#include <sys/time.h>
+#include <sys/time.h>    /* timeval... */
+#include <unistd.h>      /* usleep... */
 
 #include <libdrakvuf/libdrakvuf.h>  /* eprint_current_time */
 #include <json-c/json_object.h>     /* json_object_put,... */

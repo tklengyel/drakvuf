@@ -181,8 +181,7 @@ char* retrieve_objhdr_name(vmi_instance_t vmi, addr_t addr)
  */
 wchar_t* read_wchar_str_pid(vmi_instance_t vmi, addr_t start, size_t len, vmi_pid_t pid)
 {
-    wchar_t* s = (wchar_t*) malloc(sizeof(wchar_t) * len);
-    memset(s, 0, sizeof(wchar_t) * len);
+    wchar_t* s = (wchar_t*) calloc(1, sizeof(wchar_t) * len);
 
     for (size_t i = 0; i < len; i++)
     {

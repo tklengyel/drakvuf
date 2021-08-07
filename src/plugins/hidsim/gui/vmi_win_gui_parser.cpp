@@ -278,8 +278,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
         return NULL;
 
     /* Populate struct, if no failure occured */
-    struct wnd* wc = (struct wnd*)malloc(sizeof(struct wnd));
-    memset(wc, 0, sizeof(struct wnd));
+    struct wnd* wc = (struct wnd*) calloc(1, sizeof(struct wnd));
 
     wc->r.x0 = x0;
     wc->r.x1 = x1;
@@ -365,8 +364,7 @@ int find_button_to_click(vmi_instance_t vmi, struct desktop* desk,
 
     /* Keeping track of occupied screen locations with a bitmap */
     size_t n = ((w + w % 8) / 8) * h;
-    char* map = (char*) malloc(sizeof(char) * n);
-    memset(map, 0, sizeof(char) * n);
+    char* map = (char*) calloc(1, sizeof(char) * n);
 
     size_t l = wins->len;
 
