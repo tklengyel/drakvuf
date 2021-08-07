@@ -712,13 +712,19 @@ status_t populate_winsta(vmi_instance_t vmi, struct winsta* winsta, addr_t addr,
     }
 
     size_t len = 0x10;
-    winsta->desktops = (addr_t*)malloc(len * sizeof(addr_t));
-    memset(winsta->desktops, 0, sizeof(addr_t) * len);
+    winsta->desktops = (addr_t*) calloc(len, sizeof(addr_t));
+
+    if (!winsta->desktops)
+    {
+        printf("[HIDSIM][MONITOR] Memory allocation for desktops failed\n");
+        winsta->len_desktops = 0;
+        return VMI_FAILURE;
+    }
 
     if (VMI_FAILURE == traverse_desktops(vmi, winsta->desktops, &len, desk))
     {
         printf("Failed to traverse desktops of winsta at %" PRIx64 "\n", winsta->addr);
-        winsta->len_desktops = len;
+        winsta->len_desktops = 0;
         return VMI_FAILURE;
     }
     winsta->len_desktops = len;
