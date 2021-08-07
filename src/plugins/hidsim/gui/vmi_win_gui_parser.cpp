@@ -194,7 +194,6 @@ void update_visibility_bitmask(char* map, size_t n, int scanline,
 
     for (int y = r->y0; y < r->y1; y++)
     {
-
         for (int x = r->x0; x < r->x1; x++)
         {
             byte = (y * scanline + x)/8;
