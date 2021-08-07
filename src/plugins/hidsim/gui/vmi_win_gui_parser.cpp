@@ -327,10 +327,10 @@ bool filter_wnd_text(wchar_t* text)
                 continue;
 
             /* Calculates maximum possible displacement */
-            max_disp = tlen - (MAX_DISPLACEMENT * llen) < 0 ?
-                tlen - llen + 1 : MAX_DISPLACEMENT;
+            max_disp = tlen - llen < MAX_DISPLACEMENT ?
+                tlen - llen : MAX_DISPLACEMENT;
 
-            for (size_t j = 0; j < max_disp; j++)
+            for (size_t j = 0; j < max_disp + 1; j++)
             {
                 int m = wcsncasecmp(&text[j], BTN_TEXTS[i], llen);
                 /* Found a match */

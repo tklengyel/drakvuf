@@ -114,7 +114,7 @@
  * windows text. This is set to avoid false positive, when a relevant
  * BTN_TEXT is contained within a longe window text.
  */
-#define MAX_DISPLACEMENT 3
+#define MAX_DISPLACEMENT 2
 
 /*
  * Case-insensitive button texts to click on
