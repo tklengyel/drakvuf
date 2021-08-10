@@ -110,8 +110,11 @@
 
 #include "linux_utils.h"
 
-void print_hex(char* shellcode, int len, int bytes_write_read);
-void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+// should be accompanied by PRINT_DEBUG statements
+// for information on what is being printed
+void print_hex(const char* array, size_t len);
+void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr);
+
 void print_registers(drakvuf_trap_info_t* info);
 
 #endif

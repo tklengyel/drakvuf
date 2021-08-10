@@ -130,8 +130,7 @@ addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "task_struct", "mm", &offset))
     {
         PRINT_DEBUG("Failed to get mm offset\n");
-        drakvuf_release_vmi(drakvuf);
-        return 0;
+        goto find_vdso_failure;
     }
 
     PRINT_DEBUG("mm offset: %ld\n", offset);
@@ -141,8 +140,7 @@ addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (VMI_SUCCESS != vmi_read_64(vmi, &ctx, &addr))
     {
         PRINT_DEBUG("Failed to read mm address\n");
-        drakvuf_release_vmi(drakvuf);
-        return 0;
+        goto find_vdso_failure;
     }
 
     PRINT_DEBUG("Got mm address: %lx\n", addr);
@@ -151,8 +149,7 @@ addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "mm_struct", "vdso", &offset))
     {
         PRINT_DEBUG("Failed to get vdso offset\n");
-        drakvuf_release_vmi(drakvuf);
-        return 0;
+        goto find_vdso_failure;
     }
 
     PRINT_DEBUG("vdso offset: %ld\n", offset);
@@ -162,14 +159,17 @@ addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (VMI_SUCCESS != vmi_read_64(vmi, &ctx, &addr))
     {
         PRINT_DEBUG("Failed to read vdso address\n");
-        drakvuf_release_vmi(drakvuf);
-        return 0;
+        goto find_vdso_failure;
     }
 
     PRINT_DEBUG("Got vdso address: %lx\n", addr);
     drakvuf_release_vmi(drakvuf);
 
     return addr;
+
+find_vdso_failure:
+    drakvuf_release_vmi(drakvuf);
+    return 0;
 }
 
 addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
@@ -184,14 +184,13 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
 
     size_t size = 4096;
     size_t bytes_read = 0;
-    void* vdso_memory = g_try_malloc(size);
+    void* vdso_memory = g_malloc(size);
 
     // read the vdso memory
     if (VMI_SUCCESS != vmi_read(vmi, &ctx, size, vdso_memory, &bytes_read))
     {
         fprintf(stderr, "Could not read vdso memory\n");
-        g_free(vdso_memory);
-        return 0;
+        goto find_syscall_failure;
     }
 
     PRINT_DEBUG("vdso memory read successful\n");
@@ -203,8 +202,7 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
     if (!syscall_substring_address)
     {
         PRINT_DEBUG("Failed to get syscall offset\n");
-        g_free(vdso_memory);
-        return 0;
+        goto find_syscall_failure;
     }
     syscall_offset = syscall_substring_address - vdso_memory;
     injector_t injector = info->trap->data;
@@ -212,15 +210,22 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
 
     PRINT_DEBUG("syscall offset: %d\n", syscall_offset);
     PRINT_DEBUG("syscall addr: %lx\n", injector->syscall_addr);
-    free(vdso_memory);
+    g_free(vdso_memory);
+
     return injector->syscall_addr;
+
+find_syscall_failure:
+    drakvuf_release_vmi(drakvuf);
+    g_free(vdso_memory);
+    return 0;
+
 }
 
 bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t syscall_addr)
 {
     injector_t injector = info->trap->data;
 
-    injector->bp = g_try_malloc0(sizeof(drakvuf_trap_t));
+    injector->bp = g_malloc0(sizeof(drakvuf_trap_t));
 
     injector->bp->type = BREAKPOINT;
     injector->bp->name = "injector_post_syscall_trap";

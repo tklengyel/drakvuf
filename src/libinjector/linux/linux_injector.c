@@ -199,7 +199,7 @@ static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvu
     // if rcx doesn't have it, TODO: try to extract it from stack
     addr_t bp_addr = info->regs->rcx;
 
-    injector->bp = g_try_malloc0(sizeof(drakvuf_trap_t));
+    injector->bp = g_malloc0(sizeof(drakvuf_trap_t));
 
     // setup int3 trap
     injector->bp->type = BREAKPOINT;
@@ -225,8 +225,9 @@ static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvu
         fprintf(stderr, "Failed to trap trapframe return address\n");
         PRINT_DEBUG("Will keep trying in next callback\n");
         print_registers(info);
-        print_stack(drakvuf, info);
+        print_stack(drakvuf, info, info->regs->rsp);
         g_free(injector->bp);
+        injector->bp = NULL;
     }
 
     return 0;
@@ -296,7 +297,7 @@ injector_status_t injector_start_app_on_linux(
     const char** args
 )
 {
-    injector_t injector = (injector_t)g_try_malloc0(sizeof(struct injector));
+    injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
     injector->drakvuf = drakvuf;
     injector->target_pid = pid;
     injector->target_tid = tid;
@@ -305,7 +306,7 @@ injector_status_t injector_start_app_on_linux(
         injector->target_tid = pid;
     injector->args_count = args_count;
 
-    injector->args = (const char**)g_try_malloc0(sizeof(const char*)*args_count);
+    injector->args = (const char**)g_new0(const char*, args_count);
 
     for ( int i = 0; i<args_count; i++ )
         injector->args[i] = args[i];

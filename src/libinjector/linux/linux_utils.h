@@ -181,7 +181,7 @@ struct injector
     struct
     {
         void* data;
-        int len;
+        size_t len;
     } buffer;
 
     // mmap

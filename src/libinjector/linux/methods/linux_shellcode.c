@@ -272,7 +272,7 @@ static bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
 
-    injector->bp = g_try_malloc0(sizeof(drakvuf_trap_t));
+    injector->bp = g_malloc0(sizeof(drakvuf_trap_t));
 
     injector->bp->type = BREAKPOINT;
     injector->bp->name = "injector_mmap_trap";
@@ -318,8 +318,9 @@ static bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_inf
         return false;
     }
 
-    PRINT_DEBUG("Shellcode write success in memory\n");
-    print_hex(injector->buffer.data, injector->buffer.len, bytes_write);
+    PRINT_DEBUG("Shellcode written in memory\n");
+    PRINT_DEBUG("Bytes processed: (%ld/%ld)\n", bytes_write, injector->buffer.len);
+    print_hex(injector->buffer.data, bytes_write);
 
     drakvuf_release_vmi(drakvuf);
 
@@ -336,7 +337,7 @@ bool load_shellcode_from_file(injector_t injector, const char* file)
     }
 
     fseek(fp, 0, SEEK_END);
-    if ( (injector->buffer.len = ftell (fp)) < 0 )
+    if ( (long int)(injector->buffer.len = ftell (fp)) < 0 )
     {
         fprintf(stderr, "ftell returned -1\n");
         fclose(fp);
@@ -345,14 +346,7 @@ bool load_shellcode_from_file(injector_t injector, const char* file)
     rewind(fp);
 
     // we are adding +1 as we will append ret instruction for restoring the state of the VM
-    injector->buffer.data = g_try_malloc0(injector->buffer.len + 1);
-    if ( !injector->buffer.data )
-    {
-        fprintf(stderr, "Could not malloc buffer for shellcode\n");
-        fclose(fp);
-        injector->buffer.len = 0;
-        return false;
-    }
+    injector->buffer.data = g_malloc0(injector->buffer.len + 1);
 
     if ( (size_t)injector->buffer.len != fread(injector->buffer.data, 1, injector->buffer.len, fp))
     {
@@ -367,7 +361,7 @@ bool load_shellcode_from_file(injector_t injector, const char* file)
     injector->buffer.len += 1;
 
     PRINT_DEBUG("Shellcode loaded to injector->buffer\n");
-    print_hex(injector->buffer.data, injector->buffer.len, -1);
+    print_hex(injector->buffer.data, injector->buffer.len);
 
     fclose(fp);
 
