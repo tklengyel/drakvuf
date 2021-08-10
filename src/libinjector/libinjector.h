@@ -181,7 +181,6 @@ struct argument
     void* data;
 };
 
-
 void init_argument(struct argument* arg,
     argument_type_t type,
     size_t size,

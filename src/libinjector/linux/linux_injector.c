@@ -4,7 +4,6 @@
 
 bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
 {
-
     // check CPL
     unsigned long int CPL = (info->regs->cs_sel & 3);
     PRINT_DEBUG("CPL 0x%lx\n", CPL);
@@ -41,12 +40,10 @@ bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
     }
 
     return true;
-
 }
 
 static event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-
     injector_t injector = info->trap->data;
 
     PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx. vcpu %i. TID %u\n",
@@ -54,6 +51,9 @@ static event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_tr
 
     if (!check_userspace_int3_trap(injector, info))
         return VMI_EVENT_RESPONSE_NONE;
+
+    // reset the override on every run
+    injector->step_override = false;
 
     event_response_t event;
     switch (injector->method)
@@ -69,6 +69,10 @@ static event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_tr
             assert(false);
         }
     }
+
+    // increase the step only if there is no manual override
+    if (!injector->step_override)
+        injector->step += 1;
 
     return event;
 }
@@ -129,7 +133,6 @@ static bool is_interrupted(drakvuf_t drakvuf, void* data __attribute__((unused))
 
 static bool inject(drakvuf_t drakvuf, injector_t injector)
 {
-
     drakvuf_trap_t trap =
     {
         .type = REGISTER,
@@ -169,7 +172,7 @@ bool init_injector(injector_t injector)
         }
         default:
         {
-            fprintf(stderr, "Method not supported for [LINUX]");
+            fprintf(stderr, "Method not supported for [LINUX]\n");
             return false;
         }
     }

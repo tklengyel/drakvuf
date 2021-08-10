@@ -16,5 +16,4 @@ bool setup_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size)
     injector->syscall_no = sys_mmap;
 
     return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
-
 }

@@ -62,7 +62,6 @@ addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     drakvuf_release_vmi(drakvuf);
 
     return addr;
-
 }
 
 /** src: https://www.geeksforgeeks.org/naive-algorithm-for-pattern-searching/ **/
@@ -102,6 +101,7 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
     if (VMI_SUCCESS != vmi_read(vmi, &ctx, size, (void*)vdso_memory, &bytes_read))
     {
         fprintf(stderr, "Could not read vdso memory\n");
+        g_free(vdso_memory);
         return 0;
     }
 
@@ -113,7 +113,7 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
     if (syscall_offset == -1)
     {
         PRINT_DEBUG("Failed to get syscall offset\n");
-        free(vdso_memory);
+        g_free(vdso_memory);
         return 0;
     }
     PRINT_DEBUG("syscall offset: %d\n", syscall_offset);
@@ -157,7 +157,6 @@ bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
         fprintf(stderr, "Couldn't trap next instruction after syscall\n");
         return false;
     }
-
 }
 
 bool save_rip_for_ret(drakvuf_t drakvuf, x86_registers_t* regs)
@@ -201,9 +200,7 @@ void free_injector(injector_t injector)
     if (injector->buffer.data)
         g_free((void*)injector->buffer.data);
 
-    if (injector)
-        g_free((void*)injector);
-
+    g_free((void*)injector);
 
     injector = NULL;
 }

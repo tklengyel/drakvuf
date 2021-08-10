@@ -69,6 +69,7 @@ struct injector
     syscall_t syscall_no;
     addr_t syscall_addr;
     injector_step_t step;
+    bool step_override; // set this as true for jumping to some arbitrary step
 
     // Buffer
     struct

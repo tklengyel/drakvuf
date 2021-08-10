@@ -2,9 +2,9 @@
 #include "linux_debug.h"
 #include "linux_syscalls.h"
 
-event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap);
-bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap);
+static bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+static bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 bool load_shellcode_from_file(injector_t injector, const char* file);
 
 /* This function handles the shellcode injection, it does so in total of 5 steps
@@ -134,12 +134,10 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
-    injector->step+=1;
-
     return event;
 }
 
-event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap)
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap)
 {
     PRINT_DEBUG("Doing premature cleanup\n");
     injector_t injector = (injector_t)info->trap->data;
@@ -150,13 +148,16 @@ event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clea
     if (clear_trap)
         free_bp_trap(drakvuf, injector, info->trap);
 
+    // since we are jumping to some arbitrary step, we will set this
+    injector->step_override = true;
+
     // give the last step
     injector->step = STEP5;
 
     return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
-bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
 
@@ -186,11 +187,9 @@ bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         fprintf(stderr, "Couldn't trap mmap location\n");
         return false;
     }
-
-
 }
 
-bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = (injector_t)info->trap->data;
 
@@ -218,7 +217,6 @@ bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* in
     drakvuf_release_vmi(drakvuf);
 
     return true;
-
 }
 
 bool load_shellcode_from_file(injector_t injector, const char* file)

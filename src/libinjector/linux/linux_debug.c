@@ -2,7 +2,6 @@
 
 void print_hex(char* array, int len, int bytes_write_read)
 {
-
     if (bytes_write_read != -1)
         PRINT_DEBUG("Bytes processed: %d/%d\n", bytes_write_read, len);
     else
@@ -57,7 +56,7 @@ void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     drakvuf_release_vmi(drakvuf);
 }
 
-static char* repeatStr (const char* str, size_t count)
+static char* repeat_str (const char* str, size_t count)
 {
     if (count == 0) return NULL;
     char* ret = malloc (strlen (str) * count + count);
@@ -74,7 +73,7 @@ static char* repeatStr (const char* str, size_t count)
 void print_registers(drakvuf_trap_info_t* info)
 {
     const char* fmt_base = "%s:\t%016lx\n";
-    char* fmt= repeatStr(fmt_base, 24);
+    char* fmt= repeat_str(fmt_base, 24);
     PRINT_DEBUG(fmt,
         "rax",    info->regs->rax,
         "rcx",    info->regs->rcx,
@@ -102,6 +101,4 @@ void print_registers(drakvuf_trap_info_t* info)
         "cr4",    info->regs->cr4
     );
     g_free((void*)fmt);
-
-
 }
