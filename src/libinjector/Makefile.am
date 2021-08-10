@@ -103,7 +103,7 @@
 #*************************************************************************#
 
 h_sources = libinjector.h private.h win_private.h \
-	linux/linux_utils.h linux/linux_debug.h linux/linux_syscalls.h \
+	linux/linux_injector.h linux/linux_utils.h linux/linux_debug.h linux/linux_syscalls.h \
 	linux/methods/linux_shellcode.h
 c_sources = injector.c win_injector.c injector_stack.c \
 	linux/linux_injector.c linux/linux_utils.c linux/linux_debug.c linux/linux_syscalls.c \
