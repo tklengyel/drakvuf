@@ -5,6 +5,7 @@
 event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap);
 bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+bool load_shellcode_from_file(injector_t injector, const char* file);
 
 /* This function handles the shellcode injection, it does so in total of 5 steps
  *
@@ -204,7 +205,7 @@ bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* in
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    if (vmi_write(vmi, &ctx, injector->shellcode.len, injector->shellcode.data, &bytes_write)!=VMI_SUCCESS)
+    if (vmi_write(vmi, &ctx, injector->buffer.len, injector->buffer.data, &bytes_write)!=VMI_SUCCESS)
     {
         drakvuf_release_vmi(drakvuf);
         fprintf(stderr, "Could not write the shellcode in memory\n");
@@ -212,10 +213,55 @@ bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* in
     }
 
     PRINT_DEBUG("Shellcode write success in memory\n");
-    print_hex(injector->shellcode.data, injector->shellcode.len, bytes_write);
+    print_hex(injector->buffer.data, injector->buffer.len, bytes_write);
 
     drakvuf_release_vmi(drakvuf);
 
     return true;
 
+}
+
+bool load_shellcode_from_file(injector_t injector, const char* file)
+{
+    FILE* fp = fopen(file, "rb");
+    if (!fp)
+    {
+        fprintf(stderr, "Shellcode file (%s) not existing\n", file);
+        return false;
+    }
+
+    fseek (fp, 0, SEEK_END);
+    if ( (injector->buffer.len = ftell (fp)) < 0 )
+    {
+        fclose(fp);
+        return false;
+    }
+    rewind (fp);
+
+    // we are adding +1 as we will append ret instruction for restoring the state of the VM
+    injector->buffer.data = g_try_malloc0(injector->buffer.len + 1);
+    if ( !injector->buffer.data )
+    {
+        fclose(fp);
+        injector->buffer.len = 0;
+        return false;
+    }
+
+    if ( (size_t)injector->buffer.len != fread(injector->buffer.data, 1, injector->buffer.len, fp))
+    {
+        g_free(injector->buffer.data);
+        injector->buffer.data = NULL;
+        injector->buffer.len = 0;
+        fclose(fp);
+        return false;
+    }
+    *(char*)(injector->buffer.data + injector->buffer.len ) = 0xc3;  //ret
+    injector->buffer.len += 1; // increase the length in variable
+
+    PRINT_DEBUG("Shellcode loaded to injector->buffer\n");
+    print_hex(injector->buffer.data, injector->buffer.len, -1);
+
+    fclose(fp);
+
+    return true;
 }

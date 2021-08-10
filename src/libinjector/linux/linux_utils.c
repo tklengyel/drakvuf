@@ -183,51 +183,6 @@ bool save_rip_for_ret(drakvuf_t drakvuf, x86_registers_t* regs)
     return success;
 }
 
-bool load_shellcode_from_file(injector_t injector, const char* file)
-{
-    FILE* fp = fopen(file, "rb");
-    if (!fp)
-    {
-        fprintf(stderr, "Shellcode file (%s) not existing\n", file);
-        return false;
-    }
-
-    fseek (fp, 0, SEEK_END);
-    if ( (injector->shellcode.len = ftell (fp)) < 0 )
-    {
-        fclose(fp);
-        return false;
-    }
-    rewind (fp);
-
-    // we are adding +1 as we will append ret instruction for restoring the state of the VM
-    injector->shellcode.data = g_try_malloc0(injector->shellcode.len + 1);
-    if ( !injector->shellcode.data )
-    {
-        fclose(fp);
-        injector->shellcode.len = 0;
-        return false;
-    }
-
-    if ( (size_t)injector->shellcode.len != fread(injector->shellcode.data, 1, injector->shellcode.len, fp))
-    {
-        g_free(injector->shellcode.data);
-        injector->shellcode.data = NULL;
-        injector->shellcode.len = 0;
-        fclose(fp);
-        return false;
-    }
-    *(char*)(injector->shellcode.data + injector->shellcode.len ) = 0xc3;  //ret
-    injector->shellcode.len += 1; // increase the length in variable
-
-    PRINT_DEBUG("Shellcode loaded to injector->shellcode\n");
-    print_hex(injector->shellcode.data, injector->shellcode.len, -1);
-
-    fclose(fp);
-
-    return true;
-}
-
 void free_bp_trap(drakvuf_t drakvuf, injector_t injector, drakvuf_trap_t* trap)
 {
     drakvuf_remove_trap(drakvuf, trap, (drakvuf_trap_free_t)g_free);
@@ -243,8 +198,8 @@ void free_injector(injector_t injector)
     if (injector->bp)
         g_free((void*)injector->bp);
 
-    if (injector->shellcode.data)
-        g_free((void*)injector->shellcode.data);
+    if (injector->buffer.data)
+        g_free((void*)injector->buffer.data);
 
     if (injector)
         g_free((void*)injector);
