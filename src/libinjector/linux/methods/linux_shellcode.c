@@ -2,12 +2,44 @@
 #include "linux_debug.h"
 #include "linux_syscalls.h"
 
+event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap);
 bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
+/* This function handles the shellcode injection, it does so in total of 5 steps
+ *
+ * STEP1:
+ * The job of this step is to find syscall instruction inside of vdso associated
+ * with the process, we will be using this to call mmap by jumping to the syscall
+ * after setting up the registers and trapping into the next instruction after syscall
+ * we won't be removing the initial trap in this step as that can be used
+ * for cleanup in the end i.e STEP5
+ *
+ * STEP2:
+ * This is the trap that we are reaching after the mmap is successful,
+ * now we can copy our shellcode to the mmapped location and jump to it,
+ * we will trap the mmap location so that we can track the shellcode execution
+ * and restore the state after it is done
+ *
+ * STEP3:
+ * Since we just jumped to it and mmap location was trapped, we hit this, now we will
+ * be saving rip on the stack as the user shellcode is being appended by ret internally
+ * so that we come back to the same trap for furthur processing down the line
+ *
+ * STEP4:
+ * We will reach this trap after the shellcode is executed and the ret at the end
+ * of the shellcode is executed, since rip was saved, we will come back to the same mmap trap
+ * and this will tell us that the shellcode has been successfully executed, now we will restore
+ * the state of the process as it was before all the injection
+ *
+ * STEP5:
+ * Now since we had kept the initial trap active in STEP1 and the registers are restored, we will hit
+ * the initial rip trap now. This time we can remove the trap and interrupt the drakvuf loop so that the
+ * injection can exit successfully, any failure step should just restore the registers
+ * and set the injector->step as this step for cleanup;
+ */
 event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-
     injector_t injector = (injector_t)info->trap->data;
 
     event_response_t event;
@@ -19,14 +51,22 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
             addr_t vdso = find_vdso(drakvuf, info);
+            if (!vdso)
+                return cleanup(drakvuf, info, false); // STEP1 trap is being cleared in STEP5
+
             addr_t syscall_addr = find_syscall(drakvuf, info, vdso);
+            if (!syscall_addr)
+                return cleanup(drakvuf, info, false);
 
             setup_post_syscall_trap(drakvuf, info, syscall_addr);
             // don't remove the initial trap
             // it is used for cleanup after restoring registers
 
             if (!setup_mmap_syscall(injector, info->regs, 4096))
+            {
                 PRINT_DEBUG("Failed to setup mmap syscall");
+                return cleanup(drakvuf, info, false);
+            }
 
             info->regs->rip = syscall_addr;
             info->regs->rax = injector->syscall_no;
@@ -37,16 +77,16 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
         case STEP2: // setup shellcode
         {
-            PRINT_DEBUG("mmap location is: %lx\n", info->regs->rax);
+            PRINT_DEBUG("memory address allocated using mmap: %lx\n", info->regs->rax);
 
             // save it for future use
             injector->virtual_memory_addr = info->regs->rax;
 
-            if (write_shellcode_to_mmap_location(drakvuf, info))
-            {
-                setup_mmap_trap(drakvuf, info);
-                info->regs->rip = injector->virtual_memory_addr;
-            }
+            if (!write_shellcode_to_mmap_location(drakvuf, info))
+                return cleanup(drakvuf, info, true);
+
+            setup_mmap_trap(drakvuf, info);
+            info->regs->rip = injector->virtual_memory_addr;
 
             free_bp_trap(drakvuf, injector, info->trap);
 
@@ -56,7 +96,9 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         case STEP3: //since mmap starting location is trapped, the first one will be this
         {
             PRINT_DEBUG("Shellcode begin\n");
-            save_rip_for_ret(drakvuf, info->regs);
+
+            if (!save_rip_for_ret(drakvuf, info->regs))
+                return cleanup(drakvuf, info, true);
 
             // rsp is being updated
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -93,8 +135,24 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     injector->step+=1;
 
-
     return event;
+}
+
+event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap)
+{
+    PRINT_DEBUG("Doing premature cleanup\n");
+    injector_t injector = (injector_t)info->trap->data;
+
+    // restore regs
+    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+
+    if (clear_trap)
+        free_bp_trap(drakvuf, injector, info->trap);
+
+    // give the last step
+    injector->step = STEP5;
+
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
 bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -103,7 +161,6 @@ bool setup_mmap_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     injector->bp = g_try_malloc0(sizeof(drakvuf_trap_t));
 
-    // setup int3 trap
     injector->bp->type = BREAKPOINT;
     injector->bp->name = "injector_mmap_trap";
     // cb will be set from previous call only
@@ -144,21 +201,21 @@ bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* in
     );
 
     size_t bytes_write = 0;
-    // lock vmi
+
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-    bool success = (VMI_SUCCESS == vmi_write(vmi, &ctx, injector->shellcode.len, injector->shellcode.data, &bytes_write));
-    if (!success)
-        fprintf(stderr, "Could not write the shellcode in memory\n");
-    else
+    if (vmi_write(vmi, &ctx, injector->shellcode.len, injector->shellcode.data, &bytes_write)!=VMI_SUCCESS)
     {
-        PRINT_DEBUG("Shellcode write success in memory\n");
+        drakvuf_release_vmi(drakvuf);
+        fprintf(stderr, "Could not write the shellcode in memory\n");
+        return false;
     }
+
+    PRINT_DEBUG("Shellcode write success in memory\n");
     print_hex(injector->shellcode.data, injector->shellcode.len, bytes_write);
 
-    // release vmi
     drakvuf_release_vmi(drakvuf);
 
-    return success;
+    return true;
 
 }

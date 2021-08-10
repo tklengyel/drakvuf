@@ -36,7 +36,6 @@ void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     PRINT_DEBUG("\n");
 
-    // print instruction in rip
     PRINT_DEBUG("\nRIP: %lx\n", info->regs->rip);
     PRINT_DEBUG("Stack");
     offset = 0;

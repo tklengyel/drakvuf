@@ -106,7 +106,7 @@ bool save_rip_for_ret(drakvuf_t drakvuf, x86_registers_t* regs);
 addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso);
 bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t syscall_addr);
-bool load_file_to_injector_shellcode(injector_t injector, const char* file);
+bool load_shellcode_from_file(injector_t injector, const char* file);
 bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info);
 
 #endif

@@ -164,7 +164,7 @@ bool init_injector(injector_t injector)
         case INJECT_METHOD_SHELLCODE:
         {
             // ret will be appended to shellcode here
-            return load_file_to_injector_shellcode(injector, injector->target_file);
+            return load_shellcode_from_file(injector, injector->target_file);
             break;
         }
         default:

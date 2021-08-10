@@ -20,48 +20,45 @@ addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     // task_struct to mm
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "task_struct", "mm", &offset))
+    {
         PRINT_DEBUG("Failed to get mm offset\n");
-    else
-        PRINT_DEBUG("mm offset: %ld\n", offset);
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
 
+    PRINT_DEBUG("mm offset: %ld\n", offset);
     ctx.addr = process_base + offset;
 
     // since mm is a pointer
     if (VMI_SUCCESS != vmi_read_64(vmi, &ctx, &addr))
+    {
         PRINT_DEBUG("Failed to read mm address\n");
-    else
-        PRINT_DEBUG("Got mm address: %lx\n", addr);
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
 
-    // mm_struct to unnamed_field_0
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "mm_struct", "unnamed_field_0", &offset))
-        PRINT_DEBUG("Failed to get unnamed_field_0 offset\n");
-    else
-        PRINT_DEBUG("unnamed_field_0 offset: %ld\n", offset);
+    PRINT_DEBUG("Got mm address: %lx\n", addr);
 
-    addr = addr + offset;
-
-    // unnamed_d740b18b8642642a to context
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "unnamed_d740b18b8642642a", "context", &offset))
-        PRINT_DEBUG("Failed to get context offset\n");
-    else
-        PRINT_DEBUG("context offset: %ld\n", offset);
-
-    addr = addr + offset;
-
-    // unnamed_1b032a1ce51217e5 to vdso
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "unnamed_1b032a1ce51217e5", "vdso", &offset))
+    // mm_struct to vdso ( it will directly parse the anonymous structure of context in between )
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "mm_struct", "vdso", &offset))
+    {
         PRINT_DEBUG("Failed to get vdso offset\n");
-    else
-        PRINT_DEBUG("vdso offset: %ld\n", offset);
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
 
+    PRINT_DEBUG("vdso offset: %ld\n", offset);
     ctx.addr = addr + offset;
 
     // since vdso is a pointer
     if (VMI_SUCCESS != vmi_read_64(vmi, &ctx, &addr))
+    {
         PRINT_DEBUG("Failed to read vdso address\n");
-    else
-        PRINT_DEBUG("Got vdso address: %lx\n", addr);
+        drakvuf_release_vmi(drakvuf);
+        return 0;
+    }
 
+    PRINT_DEBUG("Got vdso address: %lx\n", addr);
     drakvuf_release_vmi(drakvuf);
 
     return addr;
@@ -89,7 +86,6 @@ static size_t search(char* txt, char* pat, int N, int M)
 
 addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
 {
-    // lock vmi
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     ACCESS_CONTEXT(ctx,
@@ -103,20 +99,24 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
     char* vdso_memory = g_try_malloc(size);
 
     // read the vdso memory
-    bool success = (VMI_SUCCESS == vmi_read(vmi, &ctx, size, (void*)vdso_memory, &bytes_read));
-    if (!success)
-        fprintf(stderr, "Could not vdso memory\n");
-    else
+    if (VMI_SUCCESS != vmi_read(vmi, &ctx, size, (void*)vdso_memory, &bytes_read))
     {
-        PRINT_DEBUG("vdso memory read successful\n");
+        fprintf(stderr, "Could not read vdso memory\n");
+        return 0;
     }
 
-    // release vmi
+    PRINT_DEBUG("vdso memory read successful\n");
     drakvuf_release_vmi(drakvuf);
 
     char syscall[] = { 0xf, 0x5 };
-    size_t syscall_offset = search(vdso_memory, syscall, size, 2);
-    PRINT_DEBUG("syscall offset: %ld\n", syscall_offset);
+    int syscall_offset = search(vdso_memory, syscall, size, 2);
+    if (syscall_offset == -1)
+    {
+        PRINT_DEBUG("Failed to get syscall offset\n");
+        free(vdso_memory);
+        return 0;
+    }
+    PRINT_DEBUG("syscall offset: %d\n", syscall_offset);
     PRINT_DEBUG("syscall addr: %lx\n", vdso + syscall_offset);
 
     free(vdso_memory);
@@ -133,7 +133,6 @@ bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
 
     injector->bp = g_try_malloc0(sizeof(drakvuf_trap_t));
 
-    // setup int3 trap
     injector->bp->type = BREAKPOINT;
     injector->bp->name = "injector_post_syscall_trap";
     // cb will be set from previous call only
@@ -163,36 +162,28 @@ bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
 
 bool save_rip_for_ret(drakvuf_t drakvuf, x86_registers_t* regs)
 {
-
-    // lock vmi
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3
+        .dtb = regs->cr3,
+        .addr = regs->rsp - 0x8
     );
-    addr_t addr = regs->rsp;
 
-    // make space for storing rip
-    addr -= 0x8;
-    ctx.addr = addr;
-
-    if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &regs->rip))
+    bool success = false;
+    if (VMI_SUCCESS == vmi_write_64(vmi, &ctx, &regs->rip))
     {
-        // release before returning
-        drakvuf_release_vmi(drakvuf);
-        return false;
+        success = true;
+        regs->rsp -= 0x8;
     }
+    else
+        PRINT_DEBUG("Couldn't save rip for ret\n");
 
-    regs->rsp = addr;
-
-    // release vmi
     drakvuf_release_vmi(drakvuf);
-    return true;
-
+    return success;
 }
 
-bool load_file_to_injector_shellcode(injector_t injector, const char* file)
+bool load_shellcode_from_file(injector_t injector, const char* file)
 {
     FILE* fp = fopen(file, "rb");
     if (!fp)
