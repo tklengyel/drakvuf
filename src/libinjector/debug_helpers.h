@@ -105,10 +105,11 @@
  ***************************************************************************/
 
 
-#ifndef LINUX_DEBUG_H
-#define LINUX_DEBUG_H
+#ifndef DEBUG_HELPERS_H
+#define DEBUG_HELPERS_H
 
-#include "linux_utils.h"
+#include <libinjector/libinjector.h>
+#include <libinjector/private.h>
 
 // should be accompanied by PRINT_DEBUG statements
 // for information on what is being printed

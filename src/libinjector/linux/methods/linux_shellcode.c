@@ -104,9 +104,9 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
+#include <libinjector/debug_helpers.h>
 
 #include "linux_shellcode.h"
-#include "linux_debug.h"
 #include "linux_syscalls.h"
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap);

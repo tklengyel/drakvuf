@@ -106,8 +106,9 @@
 
 
 #define _GNU_SOURCE // required for memmem
+#include <libinjector/debug_helpers.h>
+
 #include "linux_injector.h"
-#include "linux_debug.h"
 #include <sys/mman.h>
 #include <fcntl.h>
 

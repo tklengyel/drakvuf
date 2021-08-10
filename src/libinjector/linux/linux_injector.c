@@ -104,8 +104,9 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
+#include <libinjector/debug_helpers.h>
+
 #include "linux_injector.h"
-#include "linux_debug.h"
 #include "methods/linux_shellcode.h"
 
 bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)

@@ -105,7 +105,7 @@
  ***************************************************************************/
 
 
-#include "linux_debug.h"
+#include <libinjector/debug_helpers.h>
 
 void print_hex(const char* array, size_t len)
 {
@@ -141,49 +141,31 @@ void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
     drakvuf_release_vmi(drakvuf);
 }
 
-static char* repeat_str (const char* str, size_t count)
-{
-    if (count == 0) return NULL;
-    char* ret = malloc (strlen (str) * count + count);
-    if (ret == NULL) return NULL;
-    strcpy (ret, str);
-    while (--count > 0)
-    {
-        strcat (ret, " ");
-        strcat (ret, str);
-    }
-    return ret;
-}
-
 void print_registers(drakvuf_trap_info_t* info)
 {
-    const char* fmt_base = "%s:\t%016lx\n";
-    char* fmt= repeat_str(fmt_base, 24);
-    PRINT_DEBUG(fmt,
-        "rax",    info->regs->rax,
-        "rcx",    info->regs->rcx,
-        "rdx",    info->regs->rdx,
-        "rbx",    info->regs->rbx,
-        "rsp",    info->regs->rsp,
-        "rbp",    info->regs->rbp,
-        "rsi",    info->regs->rsi,
-        "rdi",    info->regs->rdi,
-        "r8",     info->regs->r8,
-        "r9",     info->regs->r9,
-        "r10",    info->regs->r10,
-        "r11",    info->regs->r11,
-        "r12",    info->regs->r12,
-        "r13",    info->regs->r13,
-        "r14",    info->regs->r14,
-        "r15",    info->regs->r15,
-        "rflags", info->regs->rflags,
-        "dr6",    info->regs->dr6,
-        "dr7",    info->regs->dr7,
-        "rip",    info->regs->rip,
-        "cr0",    info->regs->cr0,
-        "cr2",    info->regs->cr2,
-        "cr3",    info->regs->cr3,
-        "cr4",    info->regs->cr4
-    );
-    g_free((void*)fmt);
+    const char* fmt = "%s:\t%016lx\n";
+    PRINT_DEBUG(fmt, "rax",    info->regs->rax);
+    PRINT_DEBUG(fmt, "rcx",    info->regs->rcx);
+    PRINT_DEBUG(fmt, "rdx",    info->regs->rdx);
+    PRINT_DEBUG(fmt, "rbx",    info->regs->rbx);
+    PRINT_DEBUG(fmt, "rsp",    info->regs->rsp);
+    PRINT_DEBUG(fmt, "rbp",    info->regs->rbp);
+    PRINT_DEBUG(fmt, "rsi",    info->regs->rsi);
+    PRINT_DEBUG(fmt, "rdi",    info->regs->rdi);
+    PRINT_DEBUG(fmt, "r8",     info->regs->r8);
+    PRINT_DEBUG(fmt, "r9",     info->regs->r9);
+    PRINT_DEBUG(fmt, "r10",    info->regs->r10);
+    PRINT_DEBUG(fmt, "r11",    info->regs->r11);
+    PRINT_DEBUG(fmt, "r12",    info->regs->r12);
+    PRINT_DEBUG(fmt, "r13",    info->regs->r13);
+    PRINT_DEBUG(fmt, "r14",    info->regs->r14);
+    PRINT_DEBUG(fmt, "r15",    info->regs->r15);
+    PRINT_DEBUG(fmt, "rflags", info->regs->rflags);
+    PRINT_DEBUG(fmt, "dr6",    info->regs->dr6);
+    PRINT_DEBUG(fmt, "dr7",    info->regs->dr7);
+    PRINT_DEBUG(fmt, "rip",    info->regs->rip);
+    PRINT_DEBUG(fmt, "cr0",    info->regs->cr0);
+    PRINT_DEBUG(fmt, "cr2",    info->regs->cr2);
+    PRINT_DEBUG(fmt, "cr3",    info->regs->cr3);
+    PRINT_DEBUG(fmt, "cr4",    info->regs->cr4);
 }
