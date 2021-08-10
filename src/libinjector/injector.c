@@ -152,6 +152,7 @@ injector_status_t injector_start_app(
                 pid,
                 tid,
                 app,
+                binary_path,
                 method,
                 OUTPUT_DEFAULT,
                 args_count,

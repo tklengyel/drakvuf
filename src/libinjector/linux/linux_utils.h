@@ -165,6 +165,7 @@ struct injector
     vmi_pid_t target_pid;
     uint32_t target_tid;
     const char* target_file;
+    const char* host_file;
     int args_count;
     const char** args;
     output_format_t format;

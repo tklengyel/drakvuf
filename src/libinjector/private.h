@@ -134,7 +134,8 @@ extern bool verbose;
 injector_status_t injector_start_app_on_linux(drakvuf_t drakvuf,
     vmi_pid_t pid,
     uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used i.e, tid = pid
-    const char* app,
+    const char* file,
+    const char* binary_path,
     injection_method_t method,
     output_format_t format,
     int args_count,
