@@ -404,19 +404,9 @@ err:
     return 0;
 }
 
-bool setup_linux_stack(vmi_instance_t vmi, x86_registers_t* regs, struct argument args[], int nb_args)
+static bool setup_linux_syscall(vmi_instance_t vmi, x86_registers_t* regs, struct argument args[], int nb_args)
 {
-    uint64_t nul64 = 0;
-
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = regs->cr3
-    );
-
     addr_t addr = regs->rsp;
-
-    // unsigned int cpl = regs->cs_sel & 3;
-    // PRINT_DEBUG("CPL value is : %d\n", cpl);
 
     if ( args )
     {
@@ -443,34 +433,14 @@ bool setup_linux_stack(vmi_instance_t vmi, x86_registers_t* regs, struct argumen
             }
         }
 
-        //  x86-64: Maintain 16-byte stack alignment
-        //  the stack pointer misaligned by 8 bytes on function entry
-        if (addr % 0x10 == 0)
-        {
-            addr -= 0x8;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
-                goto err;
-        }
-        // Stack aligned before settting up registers
-
-        // first 6 arguments are sent by registers
+        // First 6 arguments are sent by registers
+        // It follows system-call ABI instead of function-call ABI
         // 1: rdi
         // 2: rsi
         // 3: rdx
-        // 4: rcx
+        // 4: r10
         // 5: r8
         // 6: r9
-
-        // if number of arguments number > 6
-        // put them on stack
-        for (int i = nb_args-1; i > 5; i--)
-        {
-            addr -= 0x8;
-            ctx.addr = addr;
-            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &(args[i].data_on_stack)) )
-                goto err;
-        }
 
         switch (nb_args)
         {
@@ -481,7 +451,7 @@ bool setup_linux_stack(vmi_instance_t vmi, x86_registers_t* regs, struct argumen
                 regs->r8 = args[4].data_on_stack;
             // fall through
             case 4:
-                regs->rcx = args[3].data_on_stack;
+                regs->r10 = args[3].data_on_stack;
             // fall through
             case 3:
                 regs->rdx = args[2].data_on_stack;
@@ -496,16 +466,6 @@ bool setup_linux_stack(vmi_instance_t vmi, x86_registers_t* regs, struct argumen
                 break;
         }
     }
-
-    // save the return address
-    addr -= 0x8;
-    ctx.addr = addr;
-    if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &regs->rip))
-        goto err;
-
-    // grow the stack
-    regs->rsp = addr;
-    regs->rbp = addr;
 
     return true;
 
@@ -527,7 +487,8 @@ bool setup_stack_locked(
     }
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {
-        return setup_linux_stack(vmi, regs, args, nb_args);
+        // linux uses syscall interface for injecting
+        return setup_linux_syscall(vmi, regs, args, nb_args);
     }
     else
         return false;
