@@ -143,7 +143,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
 
     if (!drakvuf_add_trap(drakvuf, &trap))
     {
-        PRINT_DEBUG("Failed to set trap wait_for_target_process_cr3_cb callback");
+        fprintf(stderr, "Failed to set trap wait_for_target_process_cr3_cb callback");
         return false;
     }
 

@@ -65,7 +65,7 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             if (!setup_mmap_syscall(injector, info->regs, 4096))
             {
-                PRINT_DEBUG("Failed to setup mmap syscall");
+                fprintf(stderr, "Failed to setup mmap syscall");
                 return cleanup(drakvuf, info, false);
             }
 
@@ -139,7 +139,7 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap)
 {
-    PRINT_DEBUG("Doing premature cleanup\n");
+    fprintf(stderr, "Doing premature cleanup\n");
     injector_t injector = (injector_t)info->trap->data;
 
     // restore regs
@@ -193,7 +193,6 @@ static bool write_shellcode_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_inf
 {
     injector_t injector = (injector_t)info->trap->data;
 
-    // access rip location
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
@@ -231,6 +230,7 @@ bool load_shellcode_from_file(injector_t injector, const char* file)
     fseek (fp, 0, SEEK_END);
     if ( (injector->buffer.len = ftell (fp)) < 0 )
     {
+        fprintf(stderr, "ftell returned -1\n");
         fclose(fp);
         return false;
     }
@@ -240,6 +240,7 @@ bool load_shellcode_from_file(injector_t injector, const char* file)
     injector->buffer.data = g_try_malloc0(injector->buffer.len + 1);
     if ( !injector->buffer.data )
     {
+        fprintf(stderr, "Could not malloc buffer for shellcode\n");
         fclose(fp);
         injector->buffer.len = 0;
         return false;
@@ -247,6 +248,7 @@ bool load_shellcode_from_file(injector_t injector, const char* file)
 
     if ( (size_t)injector->buffer.len != fread(injector->buffer.data, 1, injector->buffer.len, fp))
     {
+        fprintf(stderr, "Could not read full shellcode from file\n");
         g_free(injector->buffer.data);
         injector->buffer.data = NULL;
         injector->buffer.len = 0;
