@@ -377,7 +377,7 @@ int find_button_to_click(vmi_instance_t vmi, struct desktop* desk,
 
     /* Frame of desktop */
     size_t w = root->r.x1;
-    size_t h =root->r.y1;
+    size_t h = root->r.y1;
     free_wnd_container(root);
 
     /* Keeping track of occupied screen locations with a bitmap */
