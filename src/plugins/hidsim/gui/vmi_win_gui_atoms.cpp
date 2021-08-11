@@ -134,7 +134,7 @@ void free_atom_entry(struct atom_entry* a)
 }
 
 /* Prints a single atom entry */
-void print_atom(gpointer key, gpointer value, gpointer user_data )
+void print_atom(gpointer key, gpointer value, gpointer user_data)
 {
     PRINT_DEBUG("Atom: %" PRIx16 " %ls\n", GPOINTER_TO_UINT(key),
         ((struct atom_entry*)value)->name);
