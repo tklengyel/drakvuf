@@ -229,52 +229,48 @@ bool is_wnd_visible(vmi_instance_t vmi, vmi_pid_t pid, addr_t wnd)
 
 struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t win)
 {
-
-    int32_t x0 = 0;
-    int32_t x1 = 0;
-    int32_t y0 = 0;
-    int32_t y1 = 0;
-
-    int32_t rx0 = 0;
-    int32_t rx1 = 0;
-    int32_t ry0 = 0;
-    int32_t ry1 = 0;
-
-    uint32_t style = 0;
-    uint32_t exstyle = 0;
-    addr_t pcls = 0;
-    uint16_t atom = 0;
-    wchar_t* wn = NULL;
+    /* Populate struct, if no failure occured */
+    struct wnd* wc = (struct wnd*) calloc(1, sizeof(struct wnd));
+    if (!wc)
+    {
+        printf("[HIDSIM][MONITOR] Memory allocation for wnd-struct failed\n");
+        return NULL;
+    }
 
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_left_offset, pid, (uint32_t*)&x0))
+            symbol_offsets.rc_left_offset, pid, (uint32_t*)&wc->r.x0))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
     }
 
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_right_offset, pid, (uint32_t*) &x1))
+            symbol_offsets.rc_right_offset, pid, (uint32_t*) &wc->r.x1))
+    {
+        printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        return NULL;
+    }
+    /* Calculate resulting width */
+    wc->r.w = wc->r.x1 - wc->r.x0;
+
+    if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
+            symbol_offsets.rc_top_offset, pid, (uint32_t*)&wc->r.y0))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_top_offset, pid, (uint32_t*)&y0))
+            symbol_offsets.rc_bottom_offset, pid, (uint32_t*)&wc->r.y1))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
     }
-    if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_bottom_offset, pid, (uint32_t*)&y1))
-    {
-        printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
-        return NULL;
-    }
+    /* Calculate resulting height */
+    wc->r.h = wc->r.y1 - wc->r.y0;
 
     /* Determine, if windows is visible */
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.wnd_style, pid,
-            &style))
+            &wc->style))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
@@ -282,13 +278,14 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
 
     /* Determine extended style attributes */
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.wnd_exstyle, pid,
-            &exstyle))
+            &wc->exstyle))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
     }
 
     /* Retrieves pointer to atom class */
+    addr_t pcls = 0;
     if (VMI_FAILURE == vmi_read_addr_va(vmi, win + symbol_offsets.pcls_offset,
             pid, &pcls))
     {
@@ -297,32 +294,33 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     }
     /* Reads atom value */
     if (VMI_FAILURE == vmi_read_16_va(vmi, pcls + symbol_offsets.cls_atom_offset,
-            pid, &atom))
+            pid, &wc->atom))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
     }
 
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
-            + symbol_offsets.rc_left_offset, pid, (uint32_t*)&rx0))
+            + symbol_offsets.rc_left_offset, pid, (uint32_t*)&wc->rclient.x0))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
-            + symbol_offsets.rc_right_offset, pid, (uint32_t*) &rx1))
+            + symbol_offsets.rc_right_offset, pid, (uint32_t*) &wc->rclient.x1))
+    {
+        printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        return NULL;
+    }
+
+    if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
+            + symbol_offsets.rc_top_offset, pid, (uint32_t*) &wc->rclient.y0))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
-            + symbol_offsets.rc_top_offset, pid, (uint32_t*) &ry0))
-    {
-        printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
-        return NULL;
-    }
-    if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
-            + symbol_offsets.rc_bottom_offset, pid, (uint32_t*) &ry1))
+            + symbol_offsets.rc_bottom_offset, pid, (uint32_t*) &wc->rclient.y1))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
@@ -335,35 +333,8 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
             symbol_offsets.large_unicode_buf_offset, pid, &str_name_off))
     {
         /* Length is always 0, therefore always read 255 chars */
-        wn = read_wchar_str_pid(vmi, str_name_off, (size_t)255, pid);
+        wc->text = read_wchar_str_pid(vmi, str_name_off, (size_t)255, pid);
     }
-
-    /* Populate struct, if no failure occured */
-    struct wnd* wc = (struct wnd*) calloc(1, sizeof(struct wnd));
-    if (!wc)
-    {
-        printf("[HIDSIM][MONITOR] Memory allocation for wnd-struct failed\n");
-        return NULL;
-    }
-    wc->r.x0 = x0;
-    wc->r.x1 = x1;
-    wc->r.y0 = y0;
-    wc->r.y1 = y1;
-    wc->r.w = x1 - x0;
-    wc->r.h = y1 - y0;
-
-    wc->rclient.x0 = rx0;
-    wc->rclient.x1 = rx1;
-    wc->rclient.y0 = ry0;
-    wc->rclient.y1 = ry1;
-    wc->rclient.w = rx1 - rx0;
-    wc->rclient.h = ry1 - ry0;
-
-    wc->style = style;
-    wc->exstyle = exstyle;
-    wc->spwnd_addr = win;
-    wc->text = wn;
-    wc->atom = atom;
 
     return wc;
 }
