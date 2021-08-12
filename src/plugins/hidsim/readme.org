@@ -12,7 +12,7 @@ If you want to see verbose output, to follow along, use the ~-v~-flag of course.
 sudo ./src/drakvuf -r <ISF-file.json> -d <domID> -a hidsim -v
 #+END_SRC
 
-If you are observing a Window 7 system, you can specify ~--hid-monitor-gui~ and supply a win32k-IST-file via ~-W~ like this:
+If you are observing a Windows 7 system, you can specify ~--hid-monitor-gui~ and supply a win32k-IST-file via ~-W~ like this:
 
 #+begin_src
 sudo ./src/drakvuf -r <ISF-file.json> -W <Win32K-ISF-file.json> -d <domID> -a hidsim --hid-monitor-gui
