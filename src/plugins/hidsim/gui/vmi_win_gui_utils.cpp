@@ -120,7 +120,7 @@ extern struct Offsets symbol_offsets;
 char* retrieve_objhdr_name(vmi_instance_t vmi, addr_t addr)
 {
     addr_t obj_hdr = 0;
-    addr_t obj_hdr_nameinfo_addr= 0;
+    addr_t obj_hdr_nameinfo_addr = 0;
     uint8_t im = 0;
     char* name = NULL;
     unicode_string_t* us = NULL;
