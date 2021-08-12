@@ -112,7 +112,7 @@
 /*
  * Maximum displacement of string of interest from the beginning of a
  * windows text. This is set to avoid false positive, when a relevant
- * BTN_TEXT is contained within a longe window text.
+ * BTN_TEXT is contained within a longer window text.
  */
 #define MAX_DISPLACEMENT 2
 
