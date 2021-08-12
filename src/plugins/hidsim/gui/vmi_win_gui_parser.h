@@ -172,14 +172,14 @@ struct desktop
 
 struct rect
 {
-    int16_t x0;
-    int16_t x1;
-    int16_t y0;
-    int16_t y1;
+    int32_t x0;
+    int32_t x1;
+    int32_t y0;
+    int32_t y1;
 
     /* For convenience */
-    uint16_t w;
-    uint16_t h;
+    uint32_t w;
+    uint32_t h;
 };
 
 struct wnd

@@ -230,15 +230,15 @@ bool is_wnd_visible(vmi_instance_t vmi, vmi_pid_t pid, addr_t wnd)
 struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t win)
 {
 
-    uint32_t x0 = 0;
-    uint32_t x1 = 0;
-    uint32_t y0 = 0;
-    uint32_t y1 = 0;
+    int32_t x0 = 0;
+    int32_t x1 = 0;
+    int32_t y0 = 0;
+    int32_t y1 = 0;
 
-    uint32_t rx0 = 0;
-    uint32_t rx1 = 0;
-    uint32_t ry0 = 0;
-    uint32_t ry1 = 0;
+    int32_t rx0 = 0;
+    int32_t rx1 = 0;
+    int32_t ry0 = 0;
+    int32_t ry1 = 0;
 
     uint32_t style = 0;
     uint32_t exstyle = 0;
@@ -247,25 +247,26 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     wchar_t* wn = NULL;
 
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_left_offset, pid, &x0))
+            symbol_offsets.rc_left_offset, pid, (uint32_t*)&x0))
+    {
+        printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        return NULL;
+    }
+
+    if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
+            symbol_offsets.rc_right_offset, pid, (uint32_t*) &x1))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_right_offset, pid, &x1))
+            symbol_offsets.rc_top_offset, pid, (uint32_t*)&y0))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_top_offset, pid, &y0))
-    {
-        printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
-        return NULL;
-    }
-    if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_bottom_offset, pid, &y1))
+            symbol_offsets.rc_bottom_offset, pid, (uint32_t*)&y1))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
@@ -303,25 +304,25 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     }
 
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
-            + symbol_offsets.rc_left_offset, pid, &rx0))
+            + symbol_offsets.rc_left_offset, pid, (uint32_t*)&rx0))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
-            + symbol_offsets.rc_right_offset, pid, &rx1))
+            + symbol_offsets.rc_right_offset, pid, (uint32_t*) &rx1))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
-            + symbol_offsets.rc_top_offset, pid, &ry0))
+            + symbol_offsets.rc_top_offset, pid, (uint32_t*) &ry0))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
-            + symbol_offsets.rc_bottom_offset, pid, &ry1))
+            + symbol_offsets.rc_bottom_offset, pid, (uint32_t*) &ry1))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
