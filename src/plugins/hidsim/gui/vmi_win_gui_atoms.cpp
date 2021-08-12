@@ -149,6 +149,7 @@ struct atom_entry* parse_atom_entry(vmi_instance_t vmi, addr_t atom_addr)
     struct atom_entry* entry;
 
     entry = (struct atom_entry*) calloc(1, sizeof(struct atom_entry));
+
     if (!entry)
     {
         printf("[HIDSIM][MONITOR] Memory allocation for atom entry failed\n");
@@ -160,6 +161,7 @@ struct atom_entry* parse_atom_entry(vmi_instance_t vmi, addr_t atom_addr)
     {
         printf("Error reading HashLink at %" PRIx64 "\n", atom_addr +
             symbol_offsets.atom_entry_hashlink_offset);
+        free(entry);
         return NULL;
     }
 
@@ -168,6 +170,7 @@ struct atom_entry* parse_atom_entry(vmi_instance_t vmi, addr_t atom_addr)
     {
         printf("Error reading Atom at %" PRIx64 "\n", atom_addr +
             symbol_offsets.atom_entry_atom_offset);
+        free(entry);
         return NULL;
     }
 
@@ -176,6 +179,7 @@ struct atom_entry* parse_atom_entry(vmi_instance_t vmi, addr_t atom_addr)
     {
         printf("Error reading ReferenceCount at %" PRIx64 "\n", atom_addr +
             symbol_offsets.atom_entry_ref_count_offset);
+        free(entry);
         return NULL;
     }
 
@@ -184,6 +188,7 @@ struct atom_entry* parse_atom_entry(vmi_instance_t vmi, addr_t atom_addr)
     {
         printf("Error reading NameLength at %" PRIx64 "\n", atom_addr +
             symbol_offsets.atom_entry_name_len_offset);
+        free(entry);
         return NULL;
     }
 
