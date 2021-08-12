@@ -219,6 +219,10 @@ struct atom_entry* create_atom_entry(uint16_t atom, const wchar_t* name,
 
     entry->atom = atom;
     entry->name = wcsdup(name);
+    if (!entry->name)
+        printf("[HIDSIM][MONITOR] Memory allocation for atom's name failed."
+            "Continueing anyway");
+
     entry->name_len = len;
     entry->hashlink = hashlink;
     entry->ref_count = refcount;
