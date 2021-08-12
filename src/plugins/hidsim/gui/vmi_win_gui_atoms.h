@@ -129,7 +129,7 @@ struct atom_entry
 
 void free_atom_entry(struct atom_entry* a);
 
-void print_atom(gpointer key, gpointer value, gpointer user_data );
+void print_atom(gpointer key, gpointer value, gpointer user_data);
 
 struct atom_entry* parse_atom_entry(vmi_instance_t vmi, addr_t atom_addr);
 
