@@ -146,10 +146,11 @@ struct plugins_options
     bool memdump_disable_shellcode_detect; // PLUGIN_MEMDUMP
     const char* dll_hooks_list;         // PLUGIN_MEMDUMP, PLUGIN_APIMON
     bool userhook_no_addr;              // PLUGIN_MEMDUMP, PLUGIN_APIMON
-    const char* procdump_dir;           // PLUGIN_PROCDUMP
-    bool compress_procdumps = false;    // PLUGIN_PROCDUMP
     const char* clr_profile;            // PLUGIN_MEMDUMP
     const char* mscorwks_profile;       // PLUGIN_MEMDUMP
+    const char* procdump_dir;           // PLUGIN_PROCDUMP
+    bool compress_procdumps = false;    // PLUGIN_PROCDUMP
+    vmi_pid_t procdump_on_terminate;    // PLUGIN_PROCDUMP
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes; // PLUGIN_PROCDUMP
     const char* codemon_dump_dir;       // PLUGIN_CODEMON
     const char* codemon_filter_executable;  // PLUGIN_CODEMON
@@ -192,6 +193,7 @@ typedef enum drakvuf_plugin
     PLUGIN_MEMDUMP,
     PLUGIN_APIMON,
     PLUGIN_PROCDUMP,
+    PLUGIN_PROCDUMP2,
     PLUGIN_RPCMON,
     PLUGIN_TLSMON,
     PLUGIN_CODEMON,
@@ -228,6 +230,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_MEMDUMP] = "memdump",
     [PLUGIN_APIMON] = "apimon",
     [PLUGIN_PROCDUMP] = "procdump",
+    [PLUGIN_PROCDUMP2] = "procdump2",
     [PLUGIN_RPCMON] = "rpcmon",
     [PLUGIN_TLSMON] = "tlsmon",
     [PLUGIN_CODEMON] = "codemon",
@@ -263,6 +266,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_MEMDUMP]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_APIMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_PROCDUMP]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_PROCDUMP2]    = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_RPCMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_TLSMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_CODEMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },

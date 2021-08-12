@@ -392,6 +392,16 @@ if test x$plugin_procdump = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PROCDUMP, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_procdump2],
+  [AS_HELP_STRING([--enable-plugin-procdump],
+    [Enable the windows experimental process dumping plugin @<:@no@:>@])],
+  [plugin_procdump2="$enableval"],
+  [plugin_procdump2="no"])
+AM_CONDITIONAL([PLUGIN_PROCDUMP2], [test x$plugin_procdump2 = xyes])
+if test x$plugin_procdump2 = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_PROCDUMP2, 1, "")
+fi
+
 AC_ARG_ENABLE([plugin_rpcmon],
   [AS_HELP_STRING([--disable-plugin-rpcmon],
     [Enable the RPC call tracing plugin @<:@yes@:>@])],
@@ -669,6 +679,8 @@ PKG_CHECK_MODULES([JSONC], [json-c >= 0.15], [AC_DEFINE([JSONC5], [1], [json-c5 
     [PKG_CHECK_MODULES([JSONC], [json-c], [], [AC_ERROR([libjson-c not found])])])
 AS_IF([test x$plugin_procdump == xyes],
     [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
+AS_IF([test x$plugin_procdump2 == xyes],
+    [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
 PKG_CHECK_MODULES([LIBXC], [xencontrol], [], [AC_ERROR([libxc not found])])
 PKG_CHECK_MODULES([LIBXL], [xenlight], [], [AC_ERROR([libxl not found])])
 PKG_CHECK_MODULES([XENFMEM], [xenforeignmemory], [], [AC_ERROR([xenforeignmemory not found])])
@@ -745,6 +757,7 @@ LibraryMon:   $plugin_librarymon
 DKOMmon:      $plugin_dkommon
 MEMDump:      $plugin_memdump
 ProcDump:     $plugin_procdump
+ProcDump2:    $plugin_procdump2
 APIMon:       $plugin_apimon
 RPCMon:       $plugin_rpcmon
 TLSMon:       $plugin_tlsmon

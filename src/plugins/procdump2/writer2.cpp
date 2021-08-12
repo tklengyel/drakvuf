@@ -101,153 +101,118 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#include "writer2.h"
 
-#ifndef WIN_OFFSETS_H
-#define WIN_OFFSETS_H
+#include "drakvuf.h"
 
-/*
- * Easy-to-use structure offsets to be loaded from the Rekall profile.
- * Define actual mapping in win-offsets-map.h
- */
-enum win_offsets
+#include <zlib.h>
+
+#include <string>
+#include <cstdio>
+#include <cstdint>
+
+namespace
 {
-    KIINITIALPCR,
 
-    EPROCESS_PID,
-    EPROCESS_PDBASE,
-    EPROCESS_PNAME,
-    EPROCESS_PROCCREATIONINFO,
-    EPROCESS_TASKS,
-    EPROCESS_THREADLISTHEAD,
-    EPROCESS_PEB,
-    EPROCESS_OBJECTTABLE,
-    EPROCESS_PCB,
-    EPROCESS_INHERITEDPID,
-    EPROCESS_WOW64PROCESS,
-    EPROCESS_WOW64PROCESS_WIN10,
+class BaseProcdumpWriter : public ProcdumpWriter
+{
+public:
+    explicit BaseProcdumpWriter(std::string const& path)
+        : file{fopen(path.c_str(), "w")}
+    {
+        if (!file) throw -1;
+    }
 
-    EPROCESS_VADROOT,
-    EPROCESS_LISTTHREADHEAD,
+    ~BaseProcdumpWriter()
+    {
+        fclose(file);
+    }
 
-    RTL_AVL_TREE_ROOT,
-    RTL_BALANCED_NODE_LEFT,
-    RTL_BALANCED_NODE_RIGHT,
-    RTL_BALANCED_NODE_PARENTVALUE,
-    MMVAD_CORE,
-    MMVAD_SHORT_STARTING_VPN,
-    MMVAD_SHORT_STARTING_VPN_HIGH,
-    MMVAD_SHORT_ENDING_VPN,
-    MMVAD_SHORT_ENDING_VPN_HIGH,
-    MMVAD_SHORT_FLAGS,
-    MMVAD_SHORT_FLAGS1,
+    bool append(uint8_t const* data, size_t size) override
+    {
+        return (size == 0 || fwrite(data, size, 1, file) == 1);
+    }
 
+    bool finish() override
+    {
+        return (fflush(file) == 0);
+    }
 
-    VADROOT_BALANCED_ROOT,
-
-    MMVAD_LEFT_CHILD,
-    MMVAD_RIGHT_CHILD,
-    MMVAD_STARTING_VPN,
-    MMVAD_ENDING_VPN,
-    MMVAD_FLAGS,
-    MMVAD_SUBSECTION,
-    SUBSECTION_CONTROL_AREA,
-    CONTROL_AREA_FILEPOINTER,
-    CONTROL_AREA_SEGMENT,
-    SEGMENT_TOTALNUMBEROFPTES,
-    SEGMENT_PROTOTYPEPTE,
-
-    KPROCESS_HEADER,
-
-    PEB_IMAGEBASADDRESS,
-    PEB_LDR,
-    PEB_PROCESSPARAMETERS,
-    PEB_SESSIONID,
-    PEB_CSDVERSION,
-
-    PEB_LDR_DATA_INLOADORDERMODULELIST,
-
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
-
-    HANDLE_TABLE_TABLECODE,
-
-    KPCR_PRCB,
-    KPCR_PRCBDATA,
-    KPCR_IRQL,
-    KPRCB_CURRENTTHREAD,
-
-    KTHREAD_APCSTATE,
-    KTHREAD_APCSTATEINDEX,
-    KTHREAD_PROCESS,
-    KTHREAD_PREVIOUSMODE,
-    KTHREAD_HEADER,
-    KTHREAD_TEB,
-    KTHREAD_STACKBASE,
-    KTHREAD_TRAPFRAME,
-    KTHREAD_STATE,
-    KAPC_STATE_PROCESS,
-    KTRAP_FRAME_RBP,
-    KTRAP_FRAME_RSP,
-
-    TEB_TLS_SLOTS,
-    TEB_LASTERRORVALUE,
-
-    ETHREAD_CID,
-    ETHREAD_TCB,
-    ETHREAD_WIN32STARTADDRESS,
-    ETHREAD_THREADLISTENTRY,
-    CLIENT_ID_UNIQUETHREAD,
-
-    OBJECT_HEADER_TYPEINDEX,
-    OBJECT_HEADER_BODY,
-
-    POOL_HEADER_BLOCKSIZE,
-    POOL_HEADER_POOLTYPE,
-    POOL_HEADER_POOLTAG,
-
-    DISPATCHER_TYPE,
-
-    CM_KEY_CONTROL_BLOCK,
-    CM_KEY_NAMEBLOCK,
-    CM_KEY_NAMEBUFFER,
-    CM_KEY_NAMELENGTH,
-    CM_KEY_PARENTKCB,
-    CM_KEY_PROCESSID,
-
-    PROCCREATIONINFO_IMAGEFILENAME,
-
-    OBJECTNAMEINFORMATION_NAME,
-
-    FILEOBJECT_NAME,
-
-    RTL_USER_PROCESS_PARAMETERS_COMMANDLINE,
-
-    EWOW64PROCESS_PEB,
-
-    LIST_ENTRY_FLINK,
-
-    __WIN_OFFSETS_MAX
+private:
+    FILE* file;
 };
 
-enum win_bitfields
+class GzippedProcdumpWriter : public BaseProcdumpWriter
 {
-    MMVAD_FLAGS_PROTECTION,
-    MMVAD_FLAGS_MEMCOMMIT,
-    MMVAD_FLAGS1_MEMCOMMIT,
-    MMVAD_FLAGS_VADTYPE,
-    MMVAD_FLAGS1_VADTYPE,
-    MMVAD_FLAGS_COMMITCHARGE,
-    MMVAD_FLAGS1_COMMITCHARGE,
-    __WIN_BITFIELDS_MAX
+public:
+    explicit GzippedProcdumpWriter(std::string const& path)
+        : BaseProcdumpWriter{path}
+        , z_file{}
+    {
+        z_file.zalloc = Z_NULL;
+        z_file.zfree = Z_NULL;
+        z_file.opaque = Z_NULL;
+        z_file.avail_in = 0;
+        z_file.next_in = Z_NULL;
+        int window_bits = 15 + 16; // Use gzip header format with windowbits of 15
+        int mem_level = 8;
+        auto ret = deflateInit2(&z_file, Z_BEST_SPEED, Z_DEFLATED, window_bits, mem_level, Z_DEFAULT_STRATEGY);
+        if (ret != Z_OK) throw -1;
+    }
+
+    ~GzippedProcdumpWriter()
+    {
+        deflateEnd(&z_file);
+    }
+
+    bool append(uint8_t const* data, size_t size) override
+    {
+        z_file.avail_in = size;
+        z_file.next_in = const_cast<uint8_t*>(data);
+        return write_impl(Z_NO_FLUSH);
+    }
+
+    bool finish() override
+    {
+        return write_impl(Z_FINISH) && BaseProcdumpWriter::finish();
+    }
+
+private:
+    bool write_impl(int flush);
+
+private:
+    z_stream z_file;
 };
 
-enum win_sizes
+bool GzippedProcdumpWriter::write_impl(int flush)
 {
-    HANDLE_TABLE_ENTRY,
+    do
+    {
+        uint8_t out[16 * 1024];
+        z_file.avail_out = sizeof(out);
+        z_file.next_out = out;
 
-    __WIN_SIZES_MAX
-};
+        auto ret = deflate(&z_file, flush);
+        if (ret == Z_STREAM_ERROR)
+        {
+            PRINT_DEBUG("[PROCDUMP] GZIP fail: deflate return Z_STREAM_ERROR");
+            return false;
+        }
 
-#endif
+        if (!BaseProcdumpWriter::append(out, sizeof(out) - z_file.avail_out)) return false;
+    } while (z_file.avail_out == 0);
+    if (z_file.avail_in != 0)
+    {
+        PRINT_DEBUG("[PROCDUMP] GZIP fail: z_file.avail_in != 0");
+        return false;
+    }
+    return true;
+}
+
+}
+
+std::unique_ptr<ProcdumpWriter> ProcdumpWriterFactory::build(std::string const& path, bool use_compression)
+{
+    if (use_compression) return std::make_unique<GzippedProcdumpWriter>(path);
+    return std::make_unique<BaseProcdumpWriter>(path);
+}

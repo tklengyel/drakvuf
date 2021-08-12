@@ -419,6 +419,9 @@ addr_t drakvuf_get_current_process(drakvuf_t drakvuf,
 addr_t drakvuf_get_current_attached_process(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info) NOEXCEPT;
 
+bool drakvuf_get_current_irql(drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info, uint8_t* irql) NOEXCEPT;
+
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info) NOEXCEPT;
 
@@ -450,6 +453,11 @@ bool drakvuf_get_process_pid(drakvuf_t drakvuf,
 bool drakvuf_get_process_by_handle(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     uint64_t handle,
+    addr_t* process,
+    addr_t* dtb);
+
+bool drakvuf_get_process_by_pid(drakvuf_t drakvuf,
+    vmi_pid_t pid,
     addr_t* process,
     addr_t* dtb);
 
@@ -545,6 +553,10 @@ bool drakvuf_is_thread(drakvuf_t drakvuf,
 bool drakvuf_is_process(drakvuf_t drakvuf,
     addr_t dtb,
     addr_t process_addr) NOEXCEPT;
+
+bool drakvuf_is_process_suspended(drakvuf_t drakvuf,
+    addr_t process,
+    bool* status) NOEXCEPT;
 
 bool drakvuf_find_process(drakvuf_t drakvuf,
     vmi_pid_t find_pid,

@@ -102,152 +102,202 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_OFFSETS_H
-#define WIN_OFFSETS_H
+#ifndef PROCDUMP2_PRIVATE_H
+#define PROCDUMP2_PRIVATE_H
 
-/*
- * Easy-to-use structure offsets to be loaded from the Rekall profile.
- * Define actual mapping in win-offsets-map.h
- */
-enum win_offsets
+#include "writer2.h"
+
+using std::string;
+
+enum pool_status
 {
-    KIINITIALPCR,
+    POOL_INVALID,
+    POOL_FREE,
+    POOL_USED,
+};
+using pool_status_t = pool_status;
+using pool_map_t = std::map<addr_t, int>;
 
-    EPROCESS_PID,
-    EPROCESS_PDBASE,
-    EPROCESS_PNAME,
-    EPROCESS_PROCCREATIONINFO,
-    EPROCESS_TASKS,
-    EPROCESS_THREADLISTHEAD,
-    EPROCESS_PEB,
-    EPROCESS_OBJECTTABLE,
-    EPROCESS_PCB,
-    EPROCESS_INHERITEDPID,
-    EPROCESS_WOW64PROCESS,
-    EPROCESS_WOW64PROCESS_WIN10,
+struct vad_info2
+{
+    uint32_t type; // TODO Use backed file name instead of type?
+    uint64_t total_number_of_ptes;
+    uint32_t idx;                       // index in prototype_ptes
+};
+using vads_t = std::map<addr_t, vad_info2>;
 
-    EPROCESS_VADROOT,
-    EPROCESS_LISTTHREADHEAD,
+static void free_trap(gpointer p)
+{
+    if ( !p )
+        return;
 
-    RTL_AVL_TREE_ROOT,
-    RTL_BALANCED_NODE_LEFT,
-    RTL_BALANCED_NODE_RIGHT,
-    RTL_BALANCED_NODE_PARENTVALUE,
-    MMVAD_CORE,
-    MMVAD_SHORT_STARTING_VPN,
-    MMVAD_SHORT_STARTING_VPN_HIGH,
-    MMVAD_SHORT_ENDING_VPN,
-    MMVAD_SHORT_ENDING_VPN_HIGH,
-    MMVAD_SHORT_FLAGS,
-    MMVAD_SHORT_FLAGS1,
+    drakvuf_trap_t* t = (drakvuf_trap_t*)p;
+    g_slice_free(drakvuf_trap_t, t);
+}
 
+struct procdump2_ctx
+{
+    /* Basic context */
+    drakvuf_trap_t* bp{nullptr};
+    drakvuf_t       drakvuf{nullptr};
+    procdump2*       plugin{nullptr};
 
-    VADROOT_BALANCED_ROOT,
+    /* Return context */
+    vmi_pid_t ret_pid{0};
+    vmi_pid_t ret_ppid{0};
+    addr_t    ret_rsp{0};
+    uint32_t  ret_tid{0};
 
-    MMVAD_LEFT_CHILD,
-    MMVAD_RIGHT_CHILD,
-    MMVAD_STARTING_VPN,
-    MMVAD_ENDING_VPN,
-    MMVAD_FLAGS,
-    MMVAD_SUBSECTION,
-    SUBSECTION_CONTROL_AREA,
-    CONTROL_AREA_FILEPOINTER,
-    CONTROL_AREA_SEGMENT,
-    SEGMENT_TOTALNUMBEROFPTES,
-    SEGMENT_PROTOTYPEPTE,
+    /* Restore state */
+    x86_registers_t saved_regs;
 
-    KPROCESS_HEADER,
+    /* Target process info */
+    addr_t    target_process_base{0};
+    string    target_process_name;
+    vmi_pid_t target_process_pid{0};
 
-    PEB_IMAGEBASADDRESS,
-    PEB_LDR,
-    PEB_PROCESSPARAMETERS,
-    PEB_SESSIONID,
-    PEB_CSDVERSION,
+    /* */
+    size_t         current_dump_size{0};
+    addr_t         pool{0};
+    const uint64_t POOL_SIZE_IN_PAGES{0x400};
+    size_t         size{0};
+    vads_t         vads;
 
-    PEB_LDR_DATA_INLOADORDERMODULELIST,
+    /* Backup file context */
+    string                          data_file_name;
+    const uint64_t                  idx{0};
+    std::unique_ptr<ProcdumpWriter> writer;
 
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
+    procdump2_ctx() = delete;
 
-    HANDLE_TABLE_TABLECODE,
+    procdump2_ctx(drakvuf_t drakvuf_,
+                 drakvuf_trap_info_t* info,
+                 procdump2* plugin_,
+                 uint64_t idx_)
+        : drakvuf(drakvuf_)
+        , plugin(plugin_)
+        , target_process_base(info->attached_proc_data.base_addr)
+        , target_process_name(std::string(info->attached_proc_data.name))
+        , target_process_pid(info->attached_proc_data.pid)
+        , idx(idx_)
+    {
+        memcpy(&saved_regs, info->regs, sizeof(x86_registers_t));
+    }
 
-    KPCR_PRCB,
-    KPCR_PRCBDATA,
-    KPCR_IRQL,
-    KPRCB_CURRENTTHREAD,
+    procdump2_ctx(drakvuf_t drakvuf_,
+                 drakvuf_trap_info_t* info,
+                 procdump2* plugin_,
+                 addr_t base,
+                 std::string name,
+                 vmi_pid_t pid,
+                 uint64_t idx_)
+        : drakvuf(drakvuf_)
+        , plugin(plugin_)
+        , target_process_base(base)
+        , target_process_name(name)
+        , target_process_pid(pid)
+        , idx(idx_)
+    {
+        memcpy(&saved_regs, info->regs, sizeof(x86_registers_t));
+    }
 
-    KTHREAD_APCSTATE,
-    KTHREAD_APCSTATEINDEX,
-    KTHREAD_PROCESS,
-    KTHREAD_PREVIOUSMODE,
-    KTHREAD_HEADER,
-    KTHREAD_TEB,
-    KTHREAD_STACKBASE,
-    KTHREAD_TRAPFRAME,
-    KTHREAD_STATE,
-    KAPC_STATE_PROCESS,
-    KTRAP_FRAME_RBP,
-    KTRAP_FRAME_RSP,
+    procdump2_ctx(drakvuf_t drakvuf_,
+                 procdump2* plugin_,
+                 addr_t base,
+                 std::string name,
+                 vmi_pid_t pid,
+                 uint64_t idx_)
+        : drakvuf(drakvuf_)
+        , plugin(plugin_)
+        , target_process_base(base)
+        , target_process_name(name)
+        , target_process_pid(pid)
+        , idx(idx_)
+    {
+    }
 
-    TEB_TLS_SLOTS,
-    TEB_LASTERRORVALUE,
+    // TODO Check if we could remove the method
+    bool add_trap(drakvuf_trap_info_t* info, event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*), addr_t va = 0)
+    {
+        g_assert(!bp);
 
-    ETHREAD_CID,
-    ETHREAD_TCB,
-    ETHREAD_WIN32STARTADDRESS,
-    ETHREAD_THREADLISTENTRY,
-    CLIENT_ID_UNIQUETHREAD,
+        ret_pid = info->attached_proc_data.pid;
+        ret_ppid = info->attached_proc_data.ppid;
+        ret_tid = info->attached_proc_data.tid;
 
-    OBJECT_HEADER_TYPEINDEX,
-    OBJECT_HEADER_BODY,
+        // Use `g_slice_new0` here to be able to pass `g_free` into libdrakvuf
+        bp = g_slice_new0(drakvuf_trap_t);
+        if (!bp)  throw -1;
+        bp->ah_cb = nullptr;
+        bp->breakpoint.addr = va ? va : info->regs->rip;
+        bp->breakpoint.addr_type = ADDR_VA;
+        bp->breakpoint.dtb = info->regs->cr3;
+        bp->breakpoint.lookup_type = LOOKUP_DTB;
+        bp->cb = cb;
+        bp->data = this;
+        bp->name = "procdump";
+        bp->type = BREAKPOINT;
+        bp->ttl = UNLIMITED_TTL;
+        if (!drakvuf_add_trap(drakvuf, bp))
+        {
+            PRINT_DEBUG("[PROCDUMP] Failed to setup breakpoint\n");
+            return false;
+        }
+        plugin->breakpoints.insert(bp);
+        return true;
+    }
 
-    POOL_HEADER_BLOCKSIZE,
-    POOL_HEADER_POOLTYPE,
-    POOL_HEADER_POOLTAG,
+    bool add_trap(event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*), addr_t va)
+    {
+        g_assert(!bp);
 
-    DISPATCHER_TYPE,
+        bp = g_slice_new0(drakvuf_trap_t);
+        if (!bp)  throw -1;
+        bp->ah_cb = nullptr;
+        bp->breakpoint.addr = va;
+        bp->breakpoint.addr_type = ADDR_VA;
+        bp->breakpoint.pid = 4;
+        bp->breakpoint.lookup_type = LOOKUP_PID;
+        bp->cb = cb;
+        bp->data = this;
+        bp->name = "procdump";
+        bp->type = BREAKPOINT;
+        bp->ttl = UNLIMITED_TTL;
+        if (!drakvuf_add_trap(drakvuf, bp))
+        {
+            PRINT_DEBUG("[PROCDUMP] Failed to setup breakpoint\n");
+            return false;
+        }
+        plugin->breakpoints.insert(bp);
+        return true;
+    }
 
-    CM_KEY_CONTROL_BLOCK,
-    CM_KEY_NAMEBLOCK,
-    CM_KEY_NAMEBUFFER,
-    CM_KEY_NAMELENGTH,
-    CM_KEY_PARENTKCB,
-    CM_KEY_PROCESSID,
+    void remove_trap()
+    {
+        g_assert(bp);
+        auto it = plugin->breakpoints.find(bp);
+        g_assert(it != plugin->breakpoints.end());
 
-    PROCCREATIONINFO_IMAGEFILENAME,
+        plugin->breakpoints.erase(it);
+        drakvuf_remove_trap(drakvuf, bp, (drakvuf_trap_free_t)free_trap);
+        bp = nullptr;
+    }
 
-    OBJECTNAMEINFORMATION_NAME,
-
-    FILEOBJECT_NAME,
-
-    RTL_USER_PROCESS_PARAMETERS_COMMANDLINE,
-
-    EWOW64PROCESS_PEB,
-
-    LIST_ENTRY_FLINK,
-
-    __WIN_OFFSETS_MAX
+    ~procdump2_ctx()
+    {
+        if (bp)
+            remove_trap();
+    }
 };
 
-enum win_bitfields
-{
-    MMVAD_FLAGS_PROTECTION,
-    MMVAD_FLAGS_MEMCOMMIT,
-    MMVAD_FLAGS1_MEMCOMMIT,
-    MMVAD_FLAGS_VADTYPE,
-    MMVAD_FLAGS1_VADTYPE,
-    MMVAD_FLAGS_COMMITCHARGE,
-    MMVAD_FLAGS1_COMMITCHARGE,
-    __WIN_BITFIELDS_MAX
-};
+#define VAD_TYPE_DLL 2
+#define IRQL_DISPATCH_LEVEL 2
 
-enum win_sizes
+enum inject_status
 {
-    HANDLE_TABLE_ENTRY,
-
-    __WIN_SIZES_MAX
+    INJECTION_FAILED,
+    INJECT_ERASE,
+    INJECT_CONTINUE,
 };
 
 #endif

@@ -102,152 +102,83 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_OFFSETS_H
-#define WIN_OFFSETS_H
+#ifndef PROCDUMP2_H
+#define PROCDUMP2_H
 
-/*
- * Easy-to-use structure offsets to be loaded from the Rekall profile.
- * Define actual mapping in win-offsets-map.h
- */
-enum win_offsets
+#include <map>
+#include <unordered_map>
+#include <set>
+#include <string>
+
+#include <libvmi/libvmi.h>
+
+#include "plugins/plugins_ex.h"
+#include "plugins/private.h"
+
+struct procdump2_config
 {
-    KIINITIALPCR,
-
-    EPROCESS_PID,
-    EPROCESS_PDBASE,
-    EPROCESS_PNAME,
-    EPROCESS_PROCCREATIONINFO,
-    EPROCESS_TASKS,
-    EPROCESS_THREADLISTHEAD,
-    EPROCESS_PEB,
-    EPROCESS_OBJECTTABLE,
-    EPROCESS_PCB,
-    EPROCESS_INHERITEDPID,
-    EPROCESS_WOW64PROCESS,
-    EPROCESS_WOW64PROCESS_WIN10,
-
-    EPROCESS_VADROOT,
-    EPROCESS_LISTTHREADHEAD,
-
-    RTL_AVL_TREE_ROOT,
-    RTL_BALANCED_NODE_LEFT,
-    RTL_BALANCED_NODE_RIGHT,
-    RTL_BALANCED_NODE_PARENTVALUE,
-    MMVAD_CORE,
-    MMVAD_SHORT_STARTING_VPN,
-    MMVAD_SHORT_STARTING_VPN_HIGH,
-    MMVAD_SHORT_ENDING_VPN,
-    MMVAD_SHORT_ENDING_VPN_HIGH,
-    MMVAD_SHORT_FLAGS,
-    MMVAD_SHORT_FLAGS1,
-
-
-    VADROOT_BALANCED_ROOT,
-
-    MMVAD_LEFT_CHILD,
-    MMVAD_RIGHT_CHILD,
-    MMVAD_STARTING_VPN,
-    MMVAD_ENDING_VPN,
-    MMVAD_FLAGS,
-    MMVAD_SUBSECTION,
-    SUBSECTION_CONTROL_AREA,
-    CONTROL_AREA_FILEPOINTER,
-    CONTROL_AREA_SEGMENT,
-    SEGMENT_TOTALNUMBEROFPTES,
-    SEGMENT_PROTOTYPEPTE,
-
-    KPROCESS_HEADER,
-
-    PEB_IMAGEBASADDRESS,
-    PEB_LDR,
-    PEB_PROCESSPARAMETERS,
-    PEB_SESSIONID,
-    PEB_CSDVERSION,
-
-    PEB_LDR_DATA_INLOADORDERMODULELIST,
-
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
-    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
-
-    HANDLE_TABLE_TABLECODE,
-
-    KPCR_PRCB,
-    KPCR_PRCBDATA,
-    KPCR_IRQL,
-    KPRCB_CURRENTTHREAD,
-
-    KTHREAD_APCSTATE,
-    KTHREAD_APCSTATEINDEX,
-    KTHREAD_PROCESS,
-    KTHREAD_PREVIOUSMODE,
-    KTHREAD_HEADER,
-    KTHREAD_TEB,
-    KTHREAD_STACKBASE,
-    KTHREAD_TRAPFRAME,
-    KTHREAD_STATE,
-    KAPC_STATE_PROCESS,
-    KTRAP_FRAME_RBP,
-    KTRAP_FRAME_RSP,
-
-    TEB_TLS_SLOTS,
-    TEB_LASTERRORVALUE,
-
-    ETHREAD_CID,
-    ETHREAD_TCB,
-    ETHREAD_WIN32STARTADDRESS,
-    ETHREAD_THREADLISTENTRY,
-    CLIENT_ID_UNIQUETHREAD,
-
-    OBJECT_HEADER_TYPEINDEX,
-    OBJECT_HEADER_BODY,
-
-    POOL_HEADER_BLOCKSIZE,
-    POOL_HEADER_POOLTYPE,
-    POOL_HEADER_POOLTAG,
-
-    DISPATCHER_TYPE,
-
-    CM_KEY_CONTROL_BLOCK,
-    CM_KEY_NAMEBLOCK,
-    CM_KEY_NAMEBUFFER,
-    CM_KEY_NAMELENGTH,
-    CM_KEY_PARENTKCB,
-    CM_KEY_PROCESSID,
-
-    PROCCREATIONINFO_IMAGEFILENAME,
-
-    OBJECTNAMEINFORMATION_NAME,
-
-    FILEOBJECT_NAME,
-
-    RTL_USER_PROCESS_PARAMETERS_COMMANDLINE,
-
-    EWOW64PROCESS_PEB,
-
-    LIST_ENTRY_FLINK,
-
-    __WIN_OFFSETS_MAX
+    const char* procdump_dir;
+    bool compress_procdumps;
+    vmi_pid_t procdump_on_terminate;
+    std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes;
 };
 
-enum win_bitfields
+class procdump2 : public pluginex
 {
-    MMVAD_FLAGS_PROTECTION,
-    MMVAD_FLAGS_MEMCOMMIT,
-    MMVAD_FLAGS1_MEMCOMMIT,
-    MMVAD_FLAGS_VADTYPE,
-    MMVAD_FLAGS1_VADTYPE,
-    MMVAD_FLAGS_COMMITCHARGE,
-    MMVAD_FLAGS1_COMMITCHARGE,
-    __WIN_BITFIELDS_MAX
-};
+public:
+    /* Config */
+    // This allows to inform main about processes been terminated
+    // TODO Remove this in flavor of `procdump_on_terminate`
+    std::string const                                    procdump_dir; // TODO Use `std::filesystem::path`
+    vmi_pid_t                                            procdump_on_terminate{0}; // TODO Rename
+    std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes;
+    std::set<drakvuf_trap_t*>                            breakpoints;
+    std::set<uint32_t>                                   active_working_threads;
+    bool const                                           use_compression{false};
 
-enum win_sizes
-{
-    HANDLE_TABLE_ENTRY,
+    /* Internal data */
+    drakvuf_t         drakvuf{nullptr};
+    // NtTerminateProcess callback is called after every injected function callback.
+    // This allows to avoid dumplicate injections.
+    uint64_t          last_event_uuid{0};
+    std::map<addr_t, int> pools;
+    uint64_t          procdumps_count{0};
 
-    __WIN_SIZES_MAX
+    /* VA of functions to be injected */
+    addr_t malloc_va{0};
+    addr_t suspend_process_va{0};
+    addr_t resume_process_va{0};
+    addr_t copy_virt_mem_va{0};
+    addr_t current_irql_va{0};
+    /* NOTE Used to capture context switch
+     *
+     * It have been noticed that usual CR3 switch hook leads to errors:
+     * - function call injection results in BSOD;
+     * - waiting for "IRQL < DISPATCH" takes too long.
+     *
+     * The syscall hook works better. We capture KiDeliverApc.
+     */
+    addr_t deliver_apc_va{0};
+
+    /* Minidump info */
+    uint32_t                amd_extended_cpu_features{0};
+    uint32_t                feature_information{0};
+    uint32_t                num_cpus{0};
+    uint16_t                win_build_number{0};
+    uint16_t                win_major{0};
+    uint16_t                win_minor{0};
+    std::array<uint32_t, 3> vendor{0};
+    uint32_t                version_information{0};
+
+    procdump2(drakvuf_t drakvuf, const procdump2_config* config, output_format_t output);
+    ~procdump2();
+
+    void insert_new_process(vmi_pid_t pid);
+    void set_process_finished(vmi_pid_t pid);
+    bool is_new_process(vmi_pid_t pid);
+    bool is_process_handled(vmi_pid_t pid);
+    bool is_plugin_active();
+    bool stop();
 };
 
 #endif
