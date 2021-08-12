@@ -109,6 +109,11 @@
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
+struct procmon_config
+{
+    vmi_pid_t injected_pid;
+};
+
 class procmon: public pluginex
 {
 public:
@@ -119,7 +124,7 @@ public:
     addr_t current_directory_dospath;
     addr_t cid_tid;
 
-    procmon(drakvuf_t drakvuf, output_format_t output);
+    procmon(drakvuf_t drakvuf, procmon_config* config, output_format_t output);
 };
 
 #endif

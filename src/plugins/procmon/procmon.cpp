@@ -167,6 +167,7 @@ struct process_create_ex_result_t: public call_result_t
 struct process_visitor_ctx
 {
     output_format_t format;
+    vmi_pid_t injected_pid;
 };
 
 } // namespace
@@ -752,6 +753,10 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx
         return;
     }
 
+    // Filter out injected process to get clean view of state before injection
+    if (ctx->injected_pid == data.pid)
+        return;
+
     gint64 t = g_get_real_time();
 
     fmt::print_running_process(ctx->format, "procmon", drakvuf, t, data);
@@ -759,10 +764,10 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx
     g_free(const_cast<char*>(data.name));
 }
 
-procmon::procmon(drakvuf_t drakvuf, output_format_t output)
+procmon::procmon(drakvuf_t drakvuf, procmon_config* config, output_format_t output)
     : pluginex(drakvuf, output)
 {
-    struct process_visitor_ctx ctx = { .format = output };
+    struct process_visitor_ctx ctx = { .format = output, .injected_pid = config->injected_pid };
     drakvuf_enumerate_processes(drakvuf, process_visitor, &ctx);
 
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "CommandLine", &this->command_line))

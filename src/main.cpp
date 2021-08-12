@@ -899,6 +899,7 @@ int main(int argc, char** argv)
 
     PRINT_DEBUG("Starting plugins\n");
 
+    options.injected_pid = injected_pid;
     if (drakvuf->start_plugins(plugin_list, &options) < 0)
         return drakvuf_exit_code_t::FAIL;
 

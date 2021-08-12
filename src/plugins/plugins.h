@@ -165,6 +165,7 @@ struct plugins_options
     bool objmon_disable_duplicate_hook; // PLUGIN_OBJMON
     const char* hidsim_template;        // PLUGIN_HIDSIM
     bool hidsim_monitor_gui;            // PLUGIN_HIDSIM
+    vmi_pid_t injected_pid;             // PLUGIN_PROCMON
 };
 
 typedef enum drakvuf_plugin
