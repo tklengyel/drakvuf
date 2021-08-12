@@ -218,7 +218,7 @@ bool is_wnd_visible(vmi_instance_t vmi, vmi_pid_t pid, addr_t wnd)
 {
     uint32_t style = 0;
 
-    if (VMI_FAILURE == vmi_read_32_va(vmi, wnd + symbol_offsets.wnd_style, pid, (uint32_t*)&style))
+    if (VMI_FAILURE == vmi_read_32_va(vmi, wnd + symbol_offsets.wnd_style, pid, &style))
         return false;
 
     if (style & WS_VISIBLE)
@@ -245,16 +245,16 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     uint32_t exstyle = 0;
     wchar_t* wn = NULL;
 
-    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset + symbol_offsets.rc_left_offset, pid, (uint32_t*)&x0);
-    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset + symbol_offsets.rc_right_offset, pid, (uint32_t*)&x1);
-    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset + symbol_offsets.rc_top_offset, pid, (uint32_t*)&y0);
-    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset + symbol_offsets.rc_bottom_offset, pid, (uint32_t*)&y1);
+    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset + symbol_offsets.rc_left_offset, pid, &x0);
+    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset + symbol_offsets.rc_right_offset, pid, &x1);
+    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset + symbol_offsets.rc_top_offset, pid, &y0);
+    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset + symbol_offsets.rc_bottom_offset, pid, &y1);
 
     /* Determine, if windows is visible */
-    ret = vmi_read_32_va(vmi, win + symbol_offsets.wnd_style, pid, (uint32_t*)&style);
+    ret = vmi_read_32_va(vmi, win + symbol_offsets.wnd_style, pid, &style);
 
     /* Determine extended style attributes */
-    ret = vmi_read_32_va(vmi, win + symbol_offsets.wnd_exstyle, pid, (uint32_t*)&exstyle);
+    ret = vmi_read_32_va(vmi, win + symbol_offsets.wnd_exstyle, pid, &exstyle);
 
     /* Retrieves atom value */
     addr_t pcls = 0;
@@ -262,10 +262,10 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     uint16_t atom = 0;
     ret = vmi_read_16_va(vmi, pcls + symbol_offsets.cls_atom_offset, pid, &atom);
 
-    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset + symbol_offsets.rc_left_offset, pid, (uint32_t*)&rx0);
-    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset + symbol_offsets.rc_right_offset, pid, (uint32_t*)&rx1);
-    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset + symbol_offsets.rc_top_offset, pid, (uint32_t*)&ry0);
-    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset + symbol_offsets.rc_bottom_offset, pid, (uint32_t*)&ry1);
+    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset + symbol_offsets.rc_left_offset, pid, &rx0);
+    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset + symbol_offsets.rc_right_offset, pid, &rx1);
+    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset + symbol_offsets.rc_top_offset, pid, &ry0);
+    ret = vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset + symbol_offsets.rc_bottom_offset, pid, &ry1);
 
     addr_t str_name_off;
 
