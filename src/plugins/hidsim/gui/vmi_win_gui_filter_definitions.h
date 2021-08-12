@@ -147,7 +147,7 @@ const wchar_t* BTN_TEXTS[] =
  * Ignores tagWND-structs of this window class
  * See https://docs.microsoft.com/en-us/windows/win32/winmsg/about-window-classes
  */
-const wchar_t* IRRELEVANT_ATOM_CLASSES [] =
+const wchar_t* IRRELEVANT_ATOM_CLASSES[] =
 {
     L"ComboLBox" 	/* The class for the list box contained in a combo box. */
     L"DDEMLEvent" 	/* The class for Dynamic Data Exchange Management Library (DDEML) events.*/
