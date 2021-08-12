@@ -141,7 +141,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_OBJECT_HEADER",
             &symbol_offsets.objhdr_length))
     {
-        printf("Error retrieving size of _OBJECT_HEADER-struct : %ld\n",
+        fprintf(stderr, "Error retrieving size of _OBJECT_HEADER-struct : %ld\n",
             symbol_offsets.objhdr_length);
         return VMI_FAILURE;
     }
@@ -151,7 +151,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_OBJECT_HEADER", "Body",
             &symbol_offsets.objhdr_body_offset))
     {
-        printf("Error retrieving offset to Body-field of _OBJECT_HEADER: %ld\n",
+        fprintf(stderr, "Error retrieving offset to Body-field of _OBJECT_HEADER: %ld\n",
             symbol_offsets.objhdr_body_offset);
         return VMI_FAILURE;
     }
@@ -161,7 +161,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_OBJECT_HEADER_CREATOR_INFO",
             &symbol_offsets.objhdr_creator_info_length))
     {
-        printf("Error retrieving size of -struct : %ld\n",
+        fprintf(stderr, "Error retrieving size of -struct : %ld\n",
             symbol_offsets.objhdr_creator_info_length);
         return VMI_FAILURE;
     }
@@ -171,7 +171,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_OBJECT_HEADER", "InfoMask",
             &symbol_offsets.objhdr_infomask_offset))
     {
-        printf("Error retrieving offset to InfoMask-field of _OBJECT_HEADER: %ld\n",
+        fprintf(stderr, "Error retrieving offset to InfoMask-field of _OBJECT_HEADER: %ld\n",
             symbol_offsets.objhdr_infomask_offset);
         return VMI_FAILURE;
     }
@@ -181,7 +181,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_OBJECT_HEADER_NAME_INFO",
             &symbol_offsets.objhdr_name_info_length))
     {
-        printf("Error retrieving size of _OBJECT_HEADER_NAME_INFO-struct : %ld\n",
+        fprintf(stderr, "Error retrieving size of _OBJECT_HEADER_NAME_INFO-struct : %ld\n",
             symbol_offsets.objhdr_name_info_length);
         return VMI_FAILURE;
     }
@@ -191,7 +191,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_OBJECT_HEADER_NAME_INFO", "Name",
             &symbol_offsets.objhdr_name_info_name_offset))
     {
-        printf("Error retrieving name-offset in _OBJECT_HEADER_NAME_INFO: %ld\n",
+        fprintf(stderr, "Error retrieving name-offset in _OBJECT_HEADER_NAME_INFO: %ld\n",
             symbol_offsets.objhdr_name_info_name_offset);
         return VMI_FAILURE;
     }
@@ -201,7 +201,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_EPROCESS", "ActiveProcessLinks",
             &symbol_offsets.active_proc_links_offset))
     {
-        printf("Error retrieving ActiveProcessLinks-offset : %ld\n",
+        fprintf(stderr, "Error retrieving ActiveProcessLinks-offset : %ld\n",
             symbol_offsets.active_proc_links_offset);
         return VMI_FAILURE;
     }
@@ -210,7 +210,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_EPROCESS", "UniqueProcessId",
             &symbol_offsets.pid_offset))
     {
-        printf("Error retrieving UniqueProcessId-offset : %ld\n", symbol_offsets.pid_offset);
+        fprintf(stderr, "Error retrieving UniqueProcessId-offset : %ld\n", symbol_offsets.pid_offset);
         return VMI_FAILURE;
     }
 
@@ -218,7 +218,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_EPROCESS", "ImageFileName",
             &symbol_offsets.name_offset))
     {
-        printf("Error retrieving ImageFileName-offset : %ld\n", symbol_offsets.name_offset);
+        fprintf(stderr, "Error retrieving ImageFileName-offset : %ld\n", symbol_offsets.name_offset);
         return VMI_FAILURE;
     }
 
@@ -226,7 +226,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_EPROCESS", "ThreadListHead",
             &symbol_offsets.thread_list_head_offset))
     {
-        printf("Error retrieving ThreadListHead-offset : %ld\n",
+        fprintf(stderr, "Error retrieving ThreadListHead-offset : %ld\n",
             symbol_offsets.thread_list_head_offset);
         return VMI_FAILURE;
     }
@@ -235,7 +235,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_ETHREAD", "ThreadListEntry",
             &symbol_offsets.thread_list_entry_offset))
     {
-        printf("Error retrieving ThreadListEntry-offset : %ld\n",
+        fprintf(stderr, "Error retrieving ThreadListEntry-offset : %ld\n",
             symbol_offsets.thread_list_entry_offset);
         return VMI_FAILURE;
     }
@@ -243,14 +243,14 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
     if (VMI_FAILURE == vmi_get_struct_member_offset_from_json(
             vmi, profile, "_ETHREAD", "Tcb", &symbol_offsets.tcb_offset))
     {
-        printf("Error retrieving Tcb-offset : %ld\n", symbol_offsets.tcb_offset);
+        fprintf(stderr, "Error retrieving Tcb-offset : %ld\n", symbol_offsets.tcb_offset);
         return VMI_FAILURE;
     }
 
     if (VMI_FAILURE == vmi_get_struct_member_offset_from_json(
             vmi, profile, "_ETHREAD", "Teb", &symbol_offsets.teb_offset))
     {
-        printf("Error retrieving TEB at offset %ld\n", symbol_offsets.tcb_offset);
+        fprintf(stderr, "Error retrieving TEB at offset %ld\n", symbol_offsets.tcb_offset);
         return VMI_FAILURE;
     }
 
@@ -258,7 +258,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_RTL_ATOM_TABLE", "Buckets",
             &symbol_offsets.atom_table_buckets_off))
     {
-        printf("Error retrieving Buckets-offset of _RTL_ATOM_TABLE\n");
+        fprintf(stderr, "Error retrieving Buckets-offset of _RTL_ATOM_TABLE\n");
         return VMI_FAILURE;
     }
 
@@ -266,7 +266,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_RTL_ATOM_TABLE", "NumberOfBuckets",
             &symbol_offsets.atom_table_num_buckets_off))
     {
-        printf("Error retrieving Number of Buckets of _RTL_ATOM_TABLE\n");
+        fprintf(stderr, "Error retrieving Number of Buckets of _RTL_ATOM_TABLE\n");
         return VMI_FAILURE;
     }
 
@@ -295,7 +295,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_RTL_ATOM_TABLE_ENTRY", "HashLink",
             &symbol_offsets.atom_entry_hashlink_offset))
     {
-        printf("Error retrieving offset toHashLink of _RTL_ATOM_TABLE_ENTRY\n");
+        fprintf(stderr, "Error retrieving offset toHashLink of _RTL_ATOM_TABLE_ENTRY\n");
         return VMI_FAILURE;
     }
 
@@ -303,7 +303,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_RTL_ATOM_TABLE_ENTRY", "Name",
             &symbol_offsets.atom_entry_name_offset))
     {
-        printf("Error retrieving offset to Name of _RTL_ATOM_TABLE_ENTRY\n");
+        fprintf(stderr, "Error retrieving offset to Name of _RTL_ATOM_TABLE_ENTRY\n");
         return VMI_FAILURE;
     }
 
@@ -311,7 +311,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_RTL_ATOM_TABLE_ENTRY", "NameLength",
             &symbol_offsets.atom_entry_name_len_offset))
     {
-        printf("Error retrieving offset to NameLength of _RTL_ATOM_TABLE_ENTRY\n");
+        fprintf(stderr, "Error retrieving offset to NameLength of _RTL_ATOM_TABLE_ENTRY\n");
         return VMI_FAILURE;
     }
 
@@ -319,7 +319,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_RTL_ATOM_TABLE_ENTRY", "Atom",
             &symbol_offsets.atom_entry_atom_offset))
     {
-        printf("Error retrieving offset to Atom of _RTL_ATOM_TABLE_ENTRY\n");
+        fprintf(stderr, "Error retrieving offset to Atom of _RTL_ATOM_TABLE_ENTRY\n");
         return VMI_FAILURE;
     }
 
@@ -600,7 +600,7 @@ status_t initialize_offsets(vmi_instance_t vmi, json_object* kernel_json, json_o
     if (VMI_FAILURE == vmi_read_addr_ksym(vmi, "PsActiveProcessHead",
             &symbol_offsets.ps_active_process_head))
     {
-        printf("Failed to find PsActiveProcessHead\n");
+        fprintf(stderr, "Failed to find PsActiveProcessHead\n");
         return VMI_FAILURE;
     }
 
