@@ -290,13 +290,11 @@ GHashTable* build_atom_table(vmi_instance_t vmi, addr_t table_addr)
             (GDestroyNotify) free_atom_entry);
     add_default_atoms(ht);
 
-
-    addr_t cur = 0;
-    struct atom_entry* a = NULL;
-
     /* Iterate the array of pointers to _RTL_ATOM_TABLE_ENTRY-structs at buckets */
     for (size_t i = 0; i < num_buckets; i++)
     {
+        addr_t cur = 0;
+
         if (VMI_FAILURE == vmi_read_addr_va(vmi, table_addr +
                 symbol_offsets.atom_table_buckets_off + i * 4, 0, &cur))
         {
@@ -306,11 +304,10 @@ GHashTable* build_atom_table(vmi_instance_t vmi, addr_t table_addr)
             return NULL;
         }
 
-
         if (!cur)
             continue;
 
-        a = parse_atom_entry(vmi, cur);
+        struct atom_entry* a = parse_atom_entry(vmi, cur);
 
         if (a)
         {
