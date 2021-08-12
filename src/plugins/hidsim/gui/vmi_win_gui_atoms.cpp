@@ -239,23 +239,28 @@ void add_default_atoms(GHashTable* atom_table)
     struct atom_entry* ae = NULL;
 
     ae = create_atom_entry(0x8000, L"PopupMenu", 9, 0, 0);
-    g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
+    if (ae)
+        g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
 
     ae = create_atom_entry(0x8001, L"Desktop", 7, 0, 0);
-    g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
+    if (ae)
+        g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
 
     ae = create_atom_entry(0x8002, L"Dialog", 6, 0, 0);
-    g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
+    if (ae)
+        g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
 
     ae = create_atom_entry(0x8003, L"WinSwitch", 9, 0, 0);
-    g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
+    if (ae)
+        g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
 
     ae = create_atom_entry(0x8004, L"IconTitle", 9, 0, 0);
-    g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
+    if (ae)
+        g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
 
     ae = create_atom_entry(0x8006, L"ToolTip", 9, 0, 0);
-    g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
-
+    if (ae)
+        g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
 }
 
 /*
