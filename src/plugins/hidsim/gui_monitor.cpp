@@ -152,6 +152,7 @@ static event_response_t on_draw(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
     return VMI_EVENT_RESPONSE_NONE;
 }
+
 /*
  * Registers a trap for the system call for NtUserShowWindow of win32k.sys by
  * utilizing the following routine:
@@ -344,6 +345,7 @@ int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_path, bool is_
 
     return 0;
 }
+
 /*
  * Worker function to monitors and reconstruct the GUIs, when NtUserShowWindow-
  * calls have occured
