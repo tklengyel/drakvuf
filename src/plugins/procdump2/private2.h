@@ -171,9 +171,9 @@ struct procdump2_ctx
     procdump2_ctx() = delete;
 
     procdump2_ctx(drakvuf_t drakvuf_,
-                 drakvuf_trap_info_t* info,
-                 procdump2* plugin_,
-                 uint64_t idx_)
+        drakvuf_trap_info_t* info,
+        procdump2* plugin_,
+        uint64_t idx_)
         : drakvuf(drakvuf_)
         , plugin(plugin_)
         , target_process_base(info->attached_proc_data.base_addr)
@@ -185,12 +185,12 @@ struct procdump2_ctx
     }
 
     procdump2_ctx(drakvuf_t drakvuf_,
-                 drakvuf_trap_info_t* info,
-                 procdump2* plugin_,
-                 addr_t base,
-                 std::string name,
-                 vmi_pid_t pid,
-                 uint64_t idx_)
+        drakvuf_trap_info_t* info,
+        procdump2* plugin_,
+        addr_t base,
+        std::string name,
+        vmi_pid_t pid,
+        uint64_t idx_)
         : drakvuf(drakvuf_)
         , plugin(plugin_)
         , target_process_base(base)
@@ -202,11 +202,11 @@ struct procdump2_ctx
     }
 
     procdump2_ctx(drakvuf_t drakvuf_,
-                 procdump2* plugin_,
-                 addr_t base,
-                 std::string name,
-                 vmi_pid_t pid,
-                 uint64_t idx_)
+        procdump2* plugin_,
+        addr_t base,
+        std::string name,
+        vmi_pid_t pid,
+        uint64_t idx_)
         : drakvuf(drakvuf_)
         , plugin(plugin_)
         , target_process_base(base)

@@ -194,7 +194,7 @@ bool win_get_current_irql(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint8_t*
     addr_t kpcr = 0;
 
     if ( !win_get_current_kpcr(drakvuf, info, &kpcr, &prcb) ||
-         (VMI_SUCCESS != vmi_read_8_va(vmi, kpcr + drakvuf->offsets[KPCR_IRQL], 0, irql)) )
+        (VMI_SUCCESS != vmi_read_8_va(vmi, kpcr + drakvuf->offsets[KPCR_IRQL], 0, irql)) )
         return false;
 
     return true;

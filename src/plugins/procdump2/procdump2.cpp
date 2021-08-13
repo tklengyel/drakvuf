@@ -863,12 +863,12 @@ static event_response_t wait_to_suspend_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     // FIXME If `trap_other_process` fails then the state would be broken
     if (inject_suspend_process(drakvuf, info, ctx) &&
         trap_other_process(drakvuf,
-                ctx->plugin,
-                ctx->target_process_base,
-                ctx->target_process_name,
-                ctx->target_process_pid,
-                ctx->idx,
-                false))
+            ctx->plugin,
+            ctx->target_process_base,
+            ctx->target_process_name,
+            ctx->target_process_pid,
+            ctx->idx,
+            false))
     {
         ctx->plugin->active_working_threads.insert(info->attached_proc_data.tid);
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -991,12 +991,12 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
         }
 
         ctx = new procdump2_ctx(drakvuf,
-                               info,
-                               plugin,
-                               target_process_base,
-                               std::string(drakvuf_get_process_name(drakvuf, target_process_base, true)),
-                               target_process_pid,
-                               plugin->procdumps_count++);
+            info,
+            plugin,
+            target_process_base,
+            std::string(drakvuf_get_process_name(drakvuf, target_process_base, true)),
+            target_process_pid,
+            plugin->procdumps_count++);
     }
 
     if ( !ctx->add_trap(info, suspend_process_cb) )
