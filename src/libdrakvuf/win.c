@@ -146,22 +146,21 @@ bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap,
         if (!dllbase)
             break;
 
-        unicode_string_t* us = vmi_read_unicode_str_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], pid);
-        unicode_string_t out = { .contents = NULL };
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_PID,
+            .addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME],
+            .pid = pid);
+
+        unicode_string_t* us = drakvuf_read_unicode_common(vmi, &ctx);
 
         if (us)
         {
-            status_t status = vmi_convert_str_encoding(us, &out, "UTF-8");
-            if (VMI_SUCCESS == status)
-                PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", out.contents, dllbase);
+            PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", us->contents, dllbase);
 
+            bool match = (us->contents && !strcasecmp((char*)us->contents, trap->breakpoint.module));
             vmi_free_unicode_str(us);
-        }
-
-        if (out.contents && !strcmp((char*)out.contents, trap->breakpoint.module))
-        {
-            g_free(out.contents);
-            return inject_trap(drakvuf, trap, dllbase, pid);
+            if (match)
+                return inject_trap(drakvuf, trap, dllbase, pid);
         }
 
         next_module = tmp_next;
@@ -197,17 +196,12 @@ bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, ac
         bool found = false;
 
         ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-        unicode_string_t* us = vmi_read_unicode_str(vmi, ctx);
+        unicode_string_t* us = drakvuf_read_unicode_common(vmi, ctx);
 
         if (us)
         {
-            unicode_string_t out = { .contents = NULL };
-            if (VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8"))
-            {
-                PRINT_DEBUG("Found module %s at 0x%lx\n", out.contents, dllbase);
-                found = !strcasecmp((char*) out.contents, module_name);
-            }
-            free(out.contents);
+            PRINT_DEBUG("Found module %s at 0x%lx\n", us->contents, dllbase);
+            found = !strcasecmp((char*) us->contents, module_name);
 
             vmi_free_unicode_str(us);
         }

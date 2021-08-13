@@ -209,24 +209,17 @@ bool get_dll_base(
 
             // Read dll base name.
             ctx.addr = act_module + offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-            unicode_string_t* dll_name_utf16 = vmi_read_unicode_str(lg.vmi, &ctx);
-            unicode_string_t dll_name_utf8;
-            if (dll_name_utf16)
+            unicode_string_t* dll_name_utf8 = drakvuf_read_unicode_common(lg.vmi, &ctx);
+            if (dll_name_utf8)
             {
-                if (VMI_SUCCESS != vmi_convert_str_encoding(dll_name_utf16, &dll_name_utf8, "UTF-8"))
-                {
-                    vmi_free_unicode_str(dll_name_utf16);
-                    return false;
-                }
-                vmi_free_unicode_str(dll_name_utf16);
+                bool found = !strncmp(dll_name.c_str(), (const char*)dll_name_utf8->contents, dll_name.size());
+                vmi_free_unicode_str(dll_name_utf8);
 
-                if (!strncmp(dll_name.c_str(), (const char*)dll_name_utf8.contents, dll_name.size()))
+                if (found)
                 {
-                    g_free(dll_name_utf8.contents);
                     *res_dll_base = dll_base;
                     return true;
                 }
-                g_free(dll_name_utf8.contents);
             }
 
             ctx.addr = act_module;
