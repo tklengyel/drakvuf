@@ -107,10 +107,14 @@
 #ifndef HID_INJECTION_H
 #define HID_INJECTION_H
 
+#include <signal.h>
+#include <atomic>
+#include <mutex>
+
 #include "../private.h" //  PRINT_DEBUG
 
 /* Injects random HID events or events specified in a template file */
 int hid_inject(const char* sock_path, const char* template_path,
-    sig_atomic_t* has_to_stop);
+    std::atomic<uint32_t>* coords, std::atomic<bool>* has_to_stop);
 
 #endif

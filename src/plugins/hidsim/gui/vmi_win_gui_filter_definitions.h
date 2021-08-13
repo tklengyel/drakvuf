@@ -104,55 +104,61 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef HIDSIM_H
-#define HIDSIM_H
+#ifndef VMI_WIN_BUTTON_DEFINTIONS_H
+#define VMI_WIN_BUTTON_DEFINTIONS_H
 
-#include <string>
-#include <thread>
-#include <atomic>
-#include <signal.h>
-#include <stdbool.h>
+#include <wchar.h>
 
-#include "../plugins.h"
+/*
+ * Maximum displacement of string of interest from the beginning of a
+ * windows text. This is set to avoid false positive, when a relevant
+ * BTN_TEXT is contained within a longer window text.
+ */
+#define MAX_DISPLACEMENT 2
 
-#define SOCK_STUB "/run/xen/qmp-libxl-"
-
-struct hidsim_config
+/*
+ * Case-insensitive button texts to click on
+ * Add more labels, if needed
+ */
+const wchar_t* BTN_TEXTS[] =
 {
-    const char* template_fp;
-    const char* win32k_profile;
-    bool is_monitor;
+    L"agree",
+    L"accept",
+    L"continue",
+    L"yes",
+    L"ok",
+    L"go",
+    L"run",
+    L"click",
+    L"enable",
+    L"try again",
+    L"next",
+    L"new",
+    L"install",
+    L"extract",
+    L"continue",
+    L"execute",
+    L"launch",
+    L"download",
+    L"load",
+    L"allow access"
+};
+/*
+ * Ignores tagWND-structs of this window class
+ * See https://docs.microsoft.com/en-us/windows/win32/winmsg/about-window-classes
+ */
+const wchar_t* IRRELEVANT_ATOM_CLASSES[] =
+{
+    L"ComboLBox" 	/* The class for the list box contained in a combo box. */
+    L"DDEMLEvent" 	/* The class for Dynamic Data Exchange Management Library (DDEML) events.*/
+    L"Message" 	/* The class for a message-only window.*/
+    L"#32768"   	/* The class for a menu.*/
+    L"#32769"  	/* The class for the desktop window.*/
+    L"#32770"  	/* The class for a dialog box.*/
+    L"#32771"  	/* The class for the task switch window.*/
+    L"#32772"  	/* The class for icon titles.*/
+    L"Shell",
+    L"Shell_TrayWnd",
 };
 
-class hidsim : public plugin
-{
-
-public:
-    void start();
-    bool stop() override;
-    hidsim(drakvuf_t drakvuf, const hidsim_config* config);
-    ~hidsim();
-
-private:
-    /* Configuration passed via CLI */
-    std::string sock_path;
-    std::string template_path;
-    std::string win32k_json_path;
-
-    bool is_monitor;
-    bool is_gui_support;
-
-    /* Worker threads */
-    std::thread thread_inject;
-    std::thread thread_reconstruct;
-
-    /* Thread communication */
-    std::atomic<bool> has_to_stop;
-    std::atomic<uint32_t> coords;
-
-    bool prepare_gui_reconstruction(drakvuf_t drakvuf,
-        const char* win32k_profile);
-    bool check_platform_support(drakvuf_t dv);
-};
-
-#endif
+#endif //VMI_WIN_GUI_PARSER_H

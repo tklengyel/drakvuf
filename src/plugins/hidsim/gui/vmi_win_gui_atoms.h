@@ -104,55 +104,47 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef HIDSIM_H
-#define HIDSIM_H
+#ifndef VMI_WIN_ATOM_TABLE_H
+#define VMI_WIN_ATOM_TABLE_H
 
-#include <string>
-#include <thread>
-#include <atomic>
-#include <signal.h>
-#include <stdbool.h>
+#include <wchar.h>
+#include <libvmi/libvmi.h>
 
-#include "../plugins.h"
+/* Data structures */
+#include <glib.h>
 
-#define SOCK_STUB "/run/xen/qmp-libxl-"
+#include "vmi_win_gui_offsets.h"
+#include "vmi_win_gui_utils.h"
 
-struct hidsim_config
+extern struct Offsets symbol_offsets;
+
+struct atom_entry
 {
-    const char* template_fp;
-    const char* win32k_profile;
-    bool is_monitor;
+    uint16_t atom;
+    uint16_t ref_count;
+    addr_t hashlink;
+    uint8_t name_len;
+    wchar_t* name;
 };
 
-class hidsim : public plugin
-{
+void free_atom_entry(struct atom_entry* a);
 
-public:
-    void start();
-    bool stop() override;
-    hidsim(drakvuf_t drakvuf, const hidsim_config* config);
-    ~hidsim();
+void print_atom(gpointer key, gpointer value, gpointer user_data);
 
-private:
-    /* Configuration passed via CLI */
-    std::string sock_path;
-    std::string template_path;
-    std::string win32k_json_path;
+struct atom_entry* parse_atom_entry(vmi_instance_t vmi, addr_t atom_addr);
 
-    bool is_monitor;
-    bool is_gui_support;
+struct atom_entry* create_atom_entry(uint16_t atom, const wchar_t* name,
+    uint8_t len, addr_t hashlink, uint16_t refcount);
 
-    /* Worker threads */
-    std::thread thread_inject;
-    std::thread thread_reconstruct;
+/* Adds the default _RTL_ATOM_ENTRY-structs to the atom-table */
+void add_default_atoms(GHashTable* atom_table);
 
-    /* Thread communication */
-    std::atomic<bool> has_to_stop;
-    std::atomic<uint32_t> coords;
-
-    bool prepare_gui_reconstruction(drakvuf_t drakvuf,
-        const char* win32k_profile);
-    bool check_platform_support(drakvuf_t dv);
-};
-
-#endif
+/*
+ * Builds up the atom table, which serves as a shared resource hosting class
+ * IDs and their name (regularily used by more than one process)
+ *
+ * Additional background information can be found at:
+ * https://bsodtutorials.wordpress.com/2015/11/11/understanding-atom-tables/
+ */
+GHashTable* build_atom_table(vmi_instance_t vmi, addr_t table_addr);
+#endif // VMI_WIN_ATOM_TABLE_H

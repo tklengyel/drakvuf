@@ -104,55 +104,31 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef HIDSIM_H
-#define HIDSIM_H
+#ifndef VMI_WIN_GUI_UTILS_H
+#define VMI_WIN_GUI_UTILS_H
 
-#include <string>
-#include <thread>
-#include <atomic>
-#include <signal.h>
-#include <stdbool.h>
+#include <wchar.h>
+#include <libvmi/libvmi.h>
+#include "vmi_win_gui_offsets.h"
 
-#include "../plugins.h"
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-#define SOCK_STUB "/run/xen/qmp-libxl-"
+extern struct Offsets symbol_offsets;
 
-struct hidsim_config
-{
-    const char* template_fp;
-    const char* win32k_profile;
-    bool is_monitor;
-};
+/*
+ * Checks, whether the _OBJECT_HEADER, which precedes every executive object,
+ * is preceded by an optional header of type _OBJECT_HEADER_NAME_INFO.
+ * If this is the case, the name of the executive object is read and returned.
+ *
+ */
+char* retrieve_objhdr_name(vmi_instance_t vmi, addr_t addr);
+/*
+ * Reads a Windows wchar-string into a wchar_t*, since vmi_read_unicode_str_va
+ * fails to parse _RTL_ATOM_ENTRY's name-string or _LARGE_UNICODE_STRINGs.
+ * Expansion is performed since Windows' wchar is 2 bytes versus 4 bytes on
+ * 64bit-Linux
+ */
+wchar_t* read_wchar_str_pid(vmi_instance_t vmi, addr_t start, size_t len, vmi_pid_t pid);
 
-class hidsim : public plugin
-{
-
-public:
-    void start();
-    bool stop() override;
-    hidsim(drakvuf_t drakvuf, const hidsim_config* config);
-    ~hidsim();
-
-private:
-    /* Configuration passed via CLI */
-    std::string sock_path;
-    std::string template_path;
-    std::string win32k_json_path;
-
-    bool is_monitor;
-    bool is_gui_support;
-
-    /* Worker threads */
-    std::thread thread_inject;
-    std::thread thread_reconstruct;
-
-    /* Thread communication */
-    std::atomic<bool> has_to_stop;
-    std::atomic<uint32_t> coords;
-
-    bool prepare_gui_reconstruction(drakvuf_t drakvuf,
-        const char* win32k_profile);
-    bool check_platform_support(drakvuf_t dv);
-};
-
-#endif
+wchar_t* read_wchar_str(vmi_instance_t vmi, addr_t start, size_t len);
+#endif // VMI_WIN_GUI_UTILS_H

@@ -104,55 +104,228 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef HIDSIM_H
-#define HIDSIM_H
+#include <stdio.h>
 
-#include <string>
-#include <thread>
-#include <atomic>
-#include <signal.h>
-#include <stdbool.h>
+/* For PRINT_DEBUG */
+#include "../../private.h"
+/* For eprint_current_time  */
+#include <libdrakvuf/libdrakvuf.h>
 
-#include "../plugins.h"
+#include "vmi_win_gui_offsets.h"
+#include "vmi_win_gui_utils.h"
 
-#define SOCK_STUB "/run/xen/qmp-libxl-"
+extern struct Offsets symbol_offsets;
 
-struct hidsim_config
+struct atom_entry
 {
-    const char* template_fp;
-    const char* win32k_profile;
-    bool is_monitor;
+    uint16_t atom;
+    uint16_t ref_count;
+    addr_t hashlink;
+    uint8_t name_len;
+    wchar_t* name;
 };
 
-class hidsim : public plugin
+void free_atom_entry(struct atom_entry* a)
 {
+    if (a)
+        free(a->name);
 
-public:
-    void start();
-    bool stop() override;
-    hidsim(drakvuf_t drakvuf, const hidsim_config* config);
-    ~hidsim();
+    free(a);
+}
 
-private:
-    /* Configuration passed via CLI */
-    std::string sock_path;
-    std::string template_path;
-    std::string win32k_json_path;
+/* Prints a single atom entry */
+void print_atom(gpointer key, gpointer value, gpointer user_data)
+{
+    PRINT_DEBUG("Atom: %" PRIx16 " %ls\n", GPOINTER_TO_UINT(key),
+        ((struct atom_entry*)value)->name);
+}
 
-    bool is_monitor;
-    bool is_gui_support;
+/*
+ * Parses the in memory kernel data structure representing an atom entry and
+ * stores the result in a struct of type atom_entry
+ */
+struct atom_entry* parse_atom_entry(vmi_instance_t vmi, addr_t atom_addr)
+{
+    struct atom_entry* entry;
 
-    /* Worker threads */
-    std::thread thread_inject;
-    std::thread thread_reconstruct;
+    entry = (struct atom_entry*) calloc(1, sizeof(struct atom_entry));
 
-    /* Thread communication */
-    std::atomic<bool> has_to_stop;
-    std::atomic<uint32_t> coords;
+    if (!entry)
+    {
+        printf("[HIDSIM][MONITOR] Memory allocation for atom entry failed\n");
+        return NULL;
+    }
 
-    bool prepare_gui_reconstruction(drakvuf_t drakvuf,
-        const char* win32k_profile);
-    bool check_platform_support(drakvuf_t dv);
-};
+    if (VMI_FAILURE == vmi_read_addr_va(vmi, atom_addr +
+            symbol_offsets.atom_entry_hashlink_offset, 0, &entry->hashlink))
+    {
+        printf("Error reading HashLink at %" PRIx64 "\n", atom_addr +
+            symbol_offsets.atom_entry_hashlink_offset);
+        free(entry);
+        return NULL;
+    }
 
-#endif
+    if (VMI_FAILURE == vmi_read_16_va(vmi, atom_addr +
+            symbol_offsets.atom_entry_atom_offset, 0, &entry->atom))
+    {
+        printf("Error reading Atom at %" PRIx64 "\n", atom_addr +
+            symbol_offsets.atom_entry_atom_offset);
+        free(entry);
+        return NULL;
+    }
+
+    if (VMI_FAILURE == vmi_read_16_va(vmi, atom_addr +
+            symbol_offsets.atom_entry_ref_count_offset, 0, &entry->ref_count))
+    {
+        printf("Error reading ReferenceCount at %" PRIx64 "\n", atom_addr +
+            symbol_offsets.atom_entry_ref_count_offset);
+        free(entry);
+        return NULL;
+    }
+
+    if (VMI_FAILURE == vmi_read_8_va(vmi, atom_addr +
+            symbol_offsets.atom_entry_name_len_offset, 0, &entry->name_len))
+    {
+        printf("Error reading NameLength at %" PRIx64 "\n", atom_addr +
+            symbol_offsets.atom_entry_name_len_offset);
+        free(entry);
+        return NULL;
+    }
+
+    entry->name = read_wchar_str(vmi, atom_addr +
+            symbol_offsets.atom_entry_name_offset, (size_t)entry->name_len);
+
+    if (!entry->name)
+    {
+        printf("Error reading wchar-string Name at %" PRIx64 "\n", atom_addr +
+            symbol_offsets.atom_entry_name_offset);
+    }
+
+    return entry;
+}
+
+/* Creates a single atom-entry struct */
+struct atom_entry* create_atom_entry(uint16_t atom, const wchar_t* name,
+    uint8_t len, addr_t hashlink, uint16_t refcount)
+{
+    struct atom_entry* entry;
+
+    entry = (struct atom_entry*) calloc(1, sizeof(struct atom_entry));
+    if (!entry)
+    {
+        printf("[HIDSIM][MONITOR] Memory allocation for atom entry failed\n");
+        return NULL;
+    }
+
+    entry->atom = atom;
+    entry->name = wcsdup(name);
+    if (!entry->name)
+        printf("[HIDSIM][MONITOR] Memory allocation for atom's name failed."
+            " Continuing anyway\n");
+
+    entry->name_len = len;
+    entry->hashlink = hashlink;
+    entry->ref_count = refcount;
+
+    return entry;
+}
+
+/*
+ * Adds the default _RTL_ATOM_ENTRY-structs to the atom-table
+ *
+ * Default _RTL_ATOM_ENTRY-structs
+ * See https://github.com/volatilityfoundation/volatility/blob/\
+ * a438e768194a9e05eb4d9ee9338b881c0fa25937/volatility/plugins/gui/\
+ * constants.py#L34
+ */
+void add_default_atoms(GHashTable* atom_table)
+{
+    struct atom_entry* ae = NULL;
+
+    ae = create_atom_entry(0x8000, L"PopupMenu", 9, 0, 0);
+    if (ae)
+        g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
+
+    ae = create_atom_entry(0x8001, L"Desktop", 7, 0, 0);
+    if (ae)
+        g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
+
+    ae = create_atom_entry(0x8002, L"Dialog", 6, 0, 0);
+    if (ae)
+        g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
+
+    ae = create_atom_entry(0x8003, L"WinSwitch", 9, 0, 0);
+    if (ae)
+        g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
+
+    ae = create_atom_entry(0x8004, L"IconTitle", 9, 0, 0);
+    if (ae)
+        g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
+
+    ae = create_atom_entry(0x8006, L"ToolTip", 9, 0, 0);
+    if (ae)
+        g_hash_table_insert(atom_table, GUINT_TO_POINTER(ae->atom), (gpointer)ae);
+}
+
+/*
+ * Builds up the atom table, which serves as a shared resource hosting class
+ * IDs and their name (regularily used by more than one process)
+ *
+ * Additional background information can be found at:
+ * https://bsodtutorials.wordpress.com/2015/11/11/understanding-atom-tables/
+ */
+GHashTable* build_atom_table(vmi_instance_t vmi, addr_t table_addr)
+{
+    uint32_t num_buckets = 0;
+
+    if (VMI_FAILURE == vmi_read_32_va(vmi, table_addr +
+            symbol_offsets.atom_table_num_buckets_off, 0, &num_buckets))
+    {
+        printf("Failed to read num buckets-value of _RTL_ATOM_TABLE at %" PRIx64
+            "\n", table_addr + symbol_offsets.atom_table_num_buckets_off);
+        return NULL;
+    }
+
+    GHashTable* ht = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL,
+            (GDestroyNotify) free_atom_entry);
+    add_default_atoms(ht);
+
+    /* Iterate the array of pointers to _RTL_ATOM_TABLE_ENTRY-structs at buckets */
+    for (size_t i = 0; i < num_buckets; i++)
+    {
+        addr_t cur = 0;
+
+        if (VMI_FAILURE == vmi_read_addr_va(vmi, table_addr +
+                symbol_offsets.atom_table_buckets_off + i * 4, 0, &cur))
+        {
+            printf("Failed to read pointer to buckets entry of _RTL_ATOM_TABLE at %"
+                PRIx64 "\n", table_addr + symbol_offsets.atom_table_buckets_off + i * 4);
+            g_hash_table_destroy(ht);
+            return NULL;
+        }
+
+        if (!cur)
+            continue;
+
+        struct atom_entry* a = parse_atom_entry(vmi, cur);
+
+        if (a)
+        {
+            g_hash_table_insert(ht, GUINT_TO_POINTER(a->atom), (gpointer)a);
+        }
+
+        /* Traverses the linked list of each top level _RTL_ATOM_TABLE_ENTRY */
+        while (a && a->hashlink)
+        {
+            cur = a->hashlink;
+            a = parse_atom_entry(vmi, cur);
+
+            if (a)
+            {
+                g_hash_table_insert(ht, GUINT_TO_POINTER(a->atom), (gpointer)a);
+            }
+        }
+    }
+
+    return ht;
+}

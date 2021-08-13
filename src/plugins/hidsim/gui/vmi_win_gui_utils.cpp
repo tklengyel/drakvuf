@@ -104,55 +104,108 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef HIDSIM_H
-#define HIDSIM_H
+#include <stdio.h>
+#include <inttypes.h>
 
-#include <string>
-#include <thread>
-#include <atomic>
-#include <signal.h>
-#include <stdbool.h>
+#include "vmi_win_gui_offsets.h"
 
-#include "../plugins.h"
+extern struct Offsets symbol_offsets;
 
-#define SOCK_STUB "/run/xen/qmp-libxl-"
-
-struct hidsim_config
+/*
+ * Checks, whether the _OBJECT_HEADER, which precedes every executive object,
+ * is preceded by an optional header of type _OBJECT_HEADER_NAME_INFO.
+ * If this is the case, the name of the executive object is read and returned.
+ *
+ */
+char* retrieve_objhdr_name(vmi_instance_t vmi, addr_t addr)
 {
-    const char* template_fp;
-    const char* win32k_profile;
-    bool is_monitor;
-};
+    addr_t obj_hdr = 0;
+    addr_t obj_hdr_nameinfo_addr = 0;
+    uint8_t im = 0;
+    char* name = NULL;
+    unicode_string_t* us = NULL;
+    unicode_string_t out = { .contents = NULL };
 
-class hidsim : public plugin
+    /*
+     * Retrieves the beginning of the _OBJECT_HEADER, to find it subtract the
+     * offset to the body from current address. Since the current executive
+     * object is _partly_ incorporated in the size of the _OBJECT_HEADER-struct
+     *
+     * See "The Art of Memory Forensics", p. 119 ff. for a description
+     */
+    obj_hdr = addr - symbol_offsets.objhdr_body_offset;
+    obj_hdr_nameinfo_addr = obj_hdr;
+
+    if (VMI_FAILURE == vmi_read_8_va(vmi, obj_hdr + symbol_offsets.objhdr_infomask_offset,
+            0, &im))
+    {
+        fprintf(stderr, "Error reading InfoMask from _OBJECT_HEADER at: %" PRIx64
+            "\n", obj_hdr);
+        return NULL;
+    }
+
+    /*
+     * Checks, if there comes an optional _OBJECT_HEADER_CREATOR_INFO after
+     * _OBJECT_HEADER_NAME_INFO, which has to added to the offset to subtract
+     * from the address signifying the start of the _OBJECT_HEADER
+     */
+    if (im & OBJ_HDR_INFOMASK_CREATOR_INFO)
+        obj_hdr_nameinfo_addr -= symbol_offsets.objhdr_creator_info_length;
+
+    /* Returns NULL immediately, if there is no _OBJECT_HEADER_NAME_INFO */
+    if (!(im & OBJ_HDR_INFOMASK_NAME))
+        return NULL;
+
+    obj_hdr_nameinfo_addr -= symbol_offsets.objhdr_name_info_length;
+
+    us = vmi_read_unicode_str_va(vmi, obj_hdr_nameinfo_addr +
+            symbol_offsets.objhdr_name_info_name_offset, 0);
+
+    if (us && VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8"))
+    {
+        name = strndup((char*) out.contents, out.length);
+        free(out.contents);
+    }
+
+    if (us)
+        vmi_free_unicode_str(us);
+
+    return name;
+}
+
+/*
+ * Reads a Windows wchar-string into a wchar_t*, since vmi_read_unicode_str_va
+ * fails to parse _RTL_ATOM_ENTRY's name-string or _LARGE_UNICODE_STRINGs.
+ * Expansion is performed since Windows' wchar is 2 bytes versus 4 bytes on
+ * 64bit-Linux
+ */
+wchar_t* read_wchar_str_pid(vmi_instance_t vmi, addr_t start, size_t len, vmi_pid_t pid)
 {
+    wchar_t* s = (wchar_t*) calloc(len, sizeof(wchar_t));
+    if (!s)
+    {
+        printf("[HIDSIM][MONITOR] Memory allocation for wchar-string failed\n");
+        return NULL;
+    }
 
-public:
-    void start();
-    bool stop() override;
-    hidsim(drakvuf_t drakvuf, const hidsim_config* config);
-    ~hidsim();
+    for (size_t i = 0; i < len; i++)
+    {
+        uint16_t c = 0;
+        if (VMI_FAILURE == vmi_read_16_va(vmi, start + i * 2, pid, &c))
+        {
+            free(s);
+            return NULL;
+        }
 
-private:
-    /* Configuration passed via CLI */
-    std::string sock_path;
-    std::string template_path;
-    std::string win32k_json_path;
+        s[i] = (wchar_t)c;
 
-    bool is_monitor;
-    bool is_gui_support;
+        if (s[i] == L'\0')
+            break;
+    }
+    return s;
+}
 
-    /* Worker threads */
-    std::thread thread_inject;
-    std::thread thread_reconstruct;
-
-    /* Thread communication */
-    std::atomic<bool> has_to_stop;
-    std::atomic<uint32_t> coords;
-
-    bool prepare_gui_reconstruction(drakvuf_t drakvuf,
-        const char* win32k_profile);
-    bool check_platform_support(drakvuf_t dv);
-};
-
-#endif
+wchar_t* read_wchar_str(vmi_instance_t vmi, addr_t start, size_t len)
+{
+    return read_wchar_str_pid(vmi, start, len, 0);
+}

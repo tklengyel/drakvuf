@@ -104,55 +104,115 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef HIDSIM_H
-#define HIDSIM_H
+#ifndef VMI_WIN_GUI_PARSER_H
+#define VMI_WIN_GUI_PARSER_H
 
-#include <string>
-#include <thread>
-#include <atomic>
-#include <signal.h>
-#include <stdbool.h>
+/* Datastructures */
+#include <glib.h>
 
-#include "../plugins.h"
+#include <libvmi/libvmi.h>
 
-#define SOCK_STUB "/run/xen/qmp-libxl-"
+/* Flags indicating window style */
+#define WS_MINIMIZE 0x20000000
+#define WS_VISIBLE 0x10000000
+#define WS_DISABLED 0x08000000
 
-struct hidsim_config
+/* Window extended style (exstyle) */
+#define WS_EX_DLGMODALFRAME 0x00000001
+#define WS_EX_NOPARENTNOTIFY 0x00000004
+#define WS_EX_TOPMOST 0x00000008
+#define WS_EX_ACCEPTFILES 0x00000010
+#define WS_EX_TRANSPARENT 0x00000020
+
+/* Factor of desktop - button, used for simple filtering */
+#define BTN_RATIO 4
+
+/* Holds struct-offsets, needed to access relevant fields */
+extern struct Offsets symbol_offsets;
+
+/*
+ * The following structs encapsulate only the information needed for the purpose
+ * of reconstructing the GUI to a level, where dialogs could be identified for
+ * clicking
+ */
+struct winsta
 {
-    const char* template_fp;
-    const char* win32k_profile;
-    bool is_monitor;
+    addr_t addr;
+    /*
+     * For each GUI thread, win32k maps, the associated desktop heap into
+     * usermode http://mista.nu/research/mandt-win32k-slides.pdf
+     *
+     * Therefore do it like volatility: Find a process with matching sessionID
+     * and take its VA as _MM_SESSION_SPACE for the WinSta
+     * https://github.com/volatilityfoundation/volatility/blob/\
+     * a438e768194a9e05eb4d9ee9338b881c0fa25937/volatility/plugins/\
+     * gui/sessions.py#L49
+     *
+     * To accomplish this, it's the most easy way to use vmi_read_xx_va
+     */
+    vmi_pid_t providing_pid;
+    uint32_t session_id;
+    addr_t atom_table;
+    bool is_interactive;
+    size_t len_desktops;
+    addr_t* desktops;
+    char* name;
 };
 
-class hidsim : public plugin
+/* Just the minimal information needed to retrieve windows */
+struct desktop
 {
-
-public:
-    void start();
-    bool stop() override;
-    hidsim(drakvuf_t drakvuf, const hidsim_config* config);
-    ~hidsim();
-
-private:
-    /* Configuration passed via CLI */
-    std::string sock_path;
-    std::string template_path;
-    std::string win32k_json_path;
-
-    bool is_monitor;
-    bool is_gui_support;
-
-    /* Worker threads */
-    std::thread thread_inject;
-    std::thread thread_reconstruct;
-
-    /* Thread communication */
-    std::atomic<bool> has_to_stop;
-    std::atomic<uint32_t> coords;
-
-    bool prepare_gui_reconstruction(drakvuf_t drakvuf,
-        const char* win32k_profile);
-    bool check_platform_support(drakvuf_t dv);
-};
-
+    addr_t addr;
+    vmi_pid_t providing_pid;
+    char* name;
+#ifndef DISABLE_ATOMS
+    GHashTable* atom_table;
 #endif
+};
+
+struct rect
+{
+    int32_t x0;
+    int32_t x1;
+    int32_t y0;
+    int32_t y1;
+
+    /* For convenience */
+    uint32_t w;
+    uint32_t h;
+};
+
+struct wnd
+{
+    addr_t spwnd_addr;
+    uint32_t style;
+    uint32_t exstyle;
+    int level;
+    uint16_t atom;
+    struct rect r;
+    struct rect rclient;
+    wchar_t* text;
+};
+
+void clear_wnd_container(struct wnd* w);
+void free_wnd_container(struct wnd* w);
+void clear_winsta_container(struct winsta** w);
+void free_winsta_container(struct winsta* w);
+void clear_desktop_container(struct desktop* d);
+
+/*
+ * Reads relevant data from tagWINDOWSTATION-structs and the children of
+ * type tagDESKTOP
+ */
+status_t populate_winsta(vmi_instance_t vmi, struct winsta* winsta, addr_t addr,
+    vmi_pid_t providing_pid);
+
+/* Iterates over process list an retrieves all tagWINDOWSTATION-structs */
+status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray** resulting_winstas);
+
+status_t find_first_active_desktop(vmi_instance_t vmi, struct desktop* d);
+
+int scan_for_clickable_button(vmi_instance_t vmi, struct desktop* d,
+    struct wnd* btn);
+
+#endif // VMI_WIN_GUI_PARSER_H
