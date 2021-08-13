@@ -124,7 +124,7 @@
 #define TRAP_FUNC "NtUserShowWindow"
 
 /* Signifies, whether a GUI update has occured */
-static volatile sig_atomic_t has_gui_update = false;
+static std::atomic<bool> has_gui_update(false);
 
 /* Timestamp of last drawing action */
 static struct timeval last;
@@ -144,7 +144,7 @@ static drakvuf_trap_t gui_trap =
 /* Callback triggered on NtUserShowWindow(...) */
 static event_response_t on_draw(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    has_gui_update = true;
+    has_gui_update.store(true);
     {
         std::lock_guard<std::mutex> guard(lock);
         /* Keeps track of the last event */
@@ -383,7 +383,7 @@ int gui_monitor(drakvuf_t drakvuf, std::atomic<uint32_t>* coords,
 
     while (!has_to_stop->load())
     {
-        if (!has_gui_update)
+        if (!has_gui_update.load())
         {
             usleep(DELAY);
             continue;
@@ -414,7 +414,7 @@ int gui_monitor(drakvuf_t drakvuf, std::atomic<uint32_t>* coords,
                 vmi = vmi_lock_guard(drakvuf);
                 res = scan_for_clickable_button(vmi, &d, &btn);
             }
-            has_gui_update = false;
+            has_gui_update.store(false);
 
             if (res > 0)
             {
