@@ -590,7 +590,7 @@ void translate(qmp_connection* qc, dimensions* dim, int time_frame,
 
 /* Injects random mouse movements */
 static int run_random_injection(qmp_connection* qc,
-    volatile sig_atomic_t* coords, volatile sig_atomic_t* has_to_stop)
+    volatile sig_atomic_t* coords, std::atomic<bool>* has_to_stop)
 {
     PRINT_DEBUG("[HIDSIM] [INJECTOR] Injecting random mouse movements\n");
     dimensions dim;
@@ -621,7 +621,7 @@ static int run_random_injection(qmp_connection* qc,
     bool is_click = false;
 
     /* Loops, until stopped */
-    while (!*has_to_stop)
+    while (!has_to_stop->load())
     {
 
         if (*coords)
@@ -680,7 +680,7 @@ static int run_random_injection(qmp_connection* qc,
  * given by a binary file
  */
 static int run_template_injection(qmp_connection* qc, FILE* f,
-    volatile sig_atomic_t* has_to_stop)
+    std::atomic<bool>* has_to_stop)
 {
     PRINT_DEBUG("[HIDSIM] [INJECTOR] Running template injection\n");
 
@@ -716,7 +716,7 @@ static int run_template_injection(qmp_connection* qc, FILE* f,
     sleep_sanitized = sleep > MAX_SLEEP ? MAX_SLEEP : sleep;
     usleep(sleep_sanitized);
 
-    while (!*has_to_stop)
+    while (!has_to_stop->load())
     {
         /* Handles the special case of the first event */
         if (was_last)
@@ -808,7 +808,7 @@ static int hid_cleanup(qmp_connection* qc, int fd, FILE* f)
 
 /* Worker thread function */
 int hid_inject(const char* sock_path, const char* template_path,
-    volatile sig_atomic_t* coords, volatile sig_atomic_t* has_to_stop)
+    volatile sig_atomic_t* coords, std::atomic<bool>* has_to_stop)
 {
     /* Initializes qmp connection */
     qmp_connection qc;

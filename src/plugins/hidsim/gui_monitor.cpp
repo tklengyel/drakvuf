@@ -350,7 +350,7 @@ int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_path, bool is_
  * calls have occured
  */
 int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
-    volatile sig_atomic_t* has_to_stop)
+    std::atomic<bool>* has_to_stop)
 {
     PRINT_DEBUG("[HIDSIM] [MONITOR] Started GUI reconstruction thread\n");
 
@@ -381,7 +381,7 @@ int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
 
     struct wnd btn = {};
 
-    while (!*has_to_stop)
+    while (!has_to_stop->load())
     {
         if (!has_gui_update)
         {

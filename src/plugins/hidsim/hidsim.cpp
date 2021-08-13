@@ -172,7 +172,8 @@ std::string construct_sock_path(drakvuf_t drakvuf)
 hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config)
 {
     /* Explicitly initialize thread communication primitives */
-    this->has_to_stop = false;
+    this->has_to_stop.store(false);
+
     this->coords = 0;
 
     /* Constructs path to Unix domain socket of Xen guest under investigation */

@@ -108,6 +108,7 @@
 #define GUI_RECONSTRUCTION_H
 
 #include <signal.h>
+#include <atomic>
 #include <mutex>
 
 #include <libdrakvuf/libdrakvuf.h>
@@ -120,6 +121,6 @@ int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_profile,
 
 /* Find button  */
 int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
-    volatile sig_atomic_t* has_to_stop);
+    std::atomic<bool>* has_to_stop);
 
 #endif // GUI_RECONSTRUCTION_H

@@ -109,6 +109,7 @@
 
 #include <string>
 #include <thread>
+#include <atomic>
 #include <signal.h>
 #include <stdbool.h>
 
@@ -146,7 +147,7 @@ private:
     std::thread thread_reconstruct;
 
     /* Thread communication */
-    volatile sig_atomic_t has_to_stop;
+    std::atomic<bool> has_to_stop;
     volatile sig_atomic_t coords;
 
     bool prepare_gui_reconstruction(drakvuf_t drakvuf,
