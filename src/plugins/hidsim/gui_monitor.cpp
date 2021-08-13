@@ -347,7 +347,7 @@ int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_path, bool is_
 }
 
 /*
- * Worker function to monitors and reconstruct the GUIs, when NtUserShowWindow-
+ * Worker function to monitor and reconstruct the GUIs, when NtUserShowWindow-
  * calls have occured
  */
 int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
