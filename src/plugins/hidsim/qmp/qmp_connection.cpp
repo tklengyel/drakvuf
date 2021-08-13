@@ -110,7 +110,7 @@
 #include <sys/socket.h>
 #include "qmp_connection.h"
 
-/* Checks a result string, it it matches a success response */
+/* Checks, if the given string matches a success response */
 int qmp_check_result_str(const char* s, size_t n)
 {
     if (strncmp(s, QMP_SUCCESS, n) != 0)
