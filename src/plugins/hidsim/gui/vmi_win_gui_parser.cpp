@@ -776,14 +776,8 @@ status_t populate_winsta(vmi_instance_t vmi, struct winsta* winsta, addr_t addr,
 }
 
 /* Iterates over process list an retrieves all tagWINDOWSTATION-structs */
-status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray** resulting_winstas)
+status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
 {
-    /* Workbench array */
-    GArray* winstas = g_array_new(true, true, sizeof(struct winsta*));
-    /* Clean up function to free all dynamically allocated member fields */
-    g_array_set_clear_func(winstas, (GDestroyNotify) clear_winsta_container);
-    /* Sets result to point to workbench */
-    *resulting_winstas = winstas;
 
     addr_t cur_list_entry = symbol_offsets.ps_active_process_head;
     addr_t next_list_entry = 0;
@@ -956,9 +950,12 @@ status_t find_first_active_desktop(vmi_instance_t vmi, struct desktop* d)
 {
     status_t ret = VMI_FAILURE;
     char* desk_name = NULL;
-    GArray* winstas = NULL;
+    GArray* winstas = g_array_new(true, true, sizeof(struct winsta*));
+    /* Clean up function to free all dynamically allocated member fields */
+    g_array_set_clear_func(winstas, (GDestroyNotify) clear_winsta_container);
+
     /* Gathers windows stations with all desktops by iterating over all procs */
-    ret = retrieve_winstas_from_procs(vmi, &winstas);
+    ret = retrieve_winstas_from_procs(vmi, winstas);
 
     if (!winstas || ret != VMI_SUCCESS)
     {
