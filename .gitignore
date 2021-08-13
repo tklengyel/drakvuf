@@ -32,6 +32,11 @@ stamp-h1
 **/*.swp
 **/*.rej
 
+# check unit tests files
+**/*.log
+**/*.trs
+check
+
 # drakvuf binaries
 drakvuf
 injector
