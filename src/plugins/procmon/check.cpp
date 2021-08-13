@@ -114,10 +114,10 @@ START_TEST(test_protection_attributes_stringify)
 }
 END_TEST
 
-Suite * protection_attributes_suite(void)
+Suite* protection_attributes_suite(void)
 {
-    Suite *s;
-    TCase *tc_core;
+    Suite* s;
+    TCase* tc_core;
 
     s = suite_create("Stringify protection attributes");
 
@@ -133,8 +133,8 @@ Suite * protection_attributes_suite(void)
 int main(void)
 {
     int number_failed;
-    Suite *s;
-    SRunner *sr;
+    Suite* s;
+    SRunner* sr;
 
     s = protection_attributes_suite();
     sr = srunner_create(s);
