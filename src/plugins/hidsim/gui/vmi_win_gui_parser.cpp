@@ -606,7 +606,7 @@ status_t traverse_windows_pid(vmi_instance_t vmi, addr_t win,
     return VMI_SUCCESS;
 }
 
-void free_data (gpointer data)
+void free_data(gpointer data)
 {
     free(data);
 }
