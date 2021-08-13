@@ -286,7 +286,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_RTL_ATOM_TABLE_ENTRY", "HashLink",
             &symbol_offsets.atom_entry_hashlink_offset))
     {
-        fprintf(stderr, "Error retrieving offset toHashLink-field of _RTL_ATOM_TABLE_ENTRY\n");
+        fprintf(stderr, "Error retrieving offset to HashLink-field of _RTL_ATOM_TABLE_ENTRY\n");
         return VMI_FAILURE;
     }
 
