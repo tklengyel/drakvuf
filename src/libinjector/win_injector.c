@@ -229,6 +229,11 @@ static void free_injector(injector_t injector)
     g_free((void*)injector);
 }
 
+void injector_free_win(injector_t injector)
+{
+    free_injector(injector);
+}
+
 #define SW_SHOWNORMAL   1
 #define MEM_COMMIT      0x00001000
 #define MEM_RESERVE     0x00002000

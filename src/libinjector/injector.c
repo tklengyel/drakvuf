@@ -174,3 +174,11 @@ void injector_terminate(drakvuf_t drakvuf,
     else
         PRINT_DEBUG("WARNING Unsupported OS!\n");
 }
+
+void injector_free(drakvuf_t drakvuf, injector_t injector)
+{
+    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
+        injector_free_win(injector);
+    else
+        injector_free_linux(injector);
+}

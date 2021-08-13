@@ -105,6 +105,8 @@
 #ifndef LIBDRAKVUF_H
 #define LIBDRAKVUF_H
 
+#include <glib.h>
+
 #ifdef __cplusplus
 extern "C" {
 #define NOEXCEPT noexcept
@@ -117,7 +119,6 @@ extern "C" {
 #define LIBVMI_EXTRA_GLIB
 #define LIBVMI_EXTRA_JSON
 
-#include <glib.h>
 #include <libvmi/libvmi.h>
 #include <libvmi/libvmi_extra.h>
 #include <libvmi/events.h>
