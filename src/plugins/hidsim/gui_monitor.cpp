@@ -233,7 +233,7 @@ static bool register_NtUserShowWindow_trap( drakvuf_t drakvuf, json_object* prof
 
         if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, pid, &trap->breakpoint.dtb))
         {
-            PRINT_DEBUG("[HIDSIM] [Init] Failed to get CR3 of \"explorer.exe\"\n");
+            PRINT_DEBUG("[HIDSIM] [Init] Failed to get DTB of \"explorer.exe\"\n");
             return false;
         }
 
