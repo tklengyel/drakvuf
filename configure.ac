@@ -464,7 +464,7 @@ fi
 
 AC_ARG_ENABLE([DISABLE_ATOMS],
   [AS_HELP_STRING([--disable-atoms],
-    [Disable atom table parsing in hidsim.plugin @<:@no@:>@])],
+    [Disable atom table parsing in hidsim plugin @<:@no@:>@])],
   [disable_atoms="$enableval"],
   [disable_atoms="no"])
 AM_CONDITIONAL([DISABLE_ATOMS], [test x$disable_atoms = xyes])
