@@ -104,55 +104,23 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef HIDSIM_H
-#define HIDSIM_H
+#ifndef GUI_RECONSTRUCTION_H
+#define GUI_RECONSTRUCTION_H
 
-#include <string>
-#include <thread>
-#include <atomic>
 #include <signal.h>
-#include <stdbool.h>
+#include <atomic>
+#include <mutex>
 
-#include "../plugins.h"
+#include <libdrakvuf/libdrakvuf.h>
 
-#define SOCK_STUB "/run/xen/qmp-libxl-"
+/* Delay in microsecs to wait until a draw event */
+#define DELAY 100000
 
-struct hidsim_config
-{
-    const char* template_fp;
-    const char* win32k_profile;
-    bool is_monitor;
-};
+int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_profile,
+    bool is_x86);
 
-class hidsim : public plugin
-{
+/* Find button  */
+int gui_monitor(drakvuf_t drakvuf, std::atomic<uint32_t>* coords,
+    std::atomic<bool>* has_to_stop);
 
-public:
-    void start();
-    bool stop() override;
-    hidsim(drakvuf_t drakvuf, const hidsim_config* config);
-    ~hidsim();
-
-private:
-    /* Configuration passed via CLI */
-    std::string sock_path;
-    std::string template_path;
-    std::string win32k_json_path;
-
-    bool is_monitor;
-    bool is_gui_support;
-
-    /* Worker threads */
-    std::thread thread_inject;
-    std::thread thread_reconstruct;
-
-    /* Thread communication */
-    std::atomic<bool> has_to_stop;
-    std::atomic<uint32_t> coords;
-
-    bool prepare_gui_reconstruction(drakvuf_t drakvuf,
-        const char* win32k_profile);
-    bool check_platform_support(drakvuf_t dv);
-};
-
-#endif
+#endif // GUI_RECONSTRUCTION_H

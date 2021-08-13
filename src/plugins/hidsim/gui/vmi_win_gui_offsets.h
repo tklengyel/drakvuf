@@ -104,55 +104,114 @@
  * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef HIDSIM_H
-#define HIDSIM_H
+#ifndef VMI_WIN_GUI_OFFSETS_H
+#define VMI_WIN_GUI_OFFSETS_H
 
-#include <string>
-#include <thread>
-#include <atomic>
-#include <signal.h>
-#include <stdbool.h>
+#include <json-c/json.h>
+#include <libvmi/libvmi.h>
+/*
+ * Flag in _OBJECT_HEADER InfoMask field, indicating the presence of the
+ * specified struct in fornt of the _OBJECT_HEADER
+ */
+#define OBJ_HDR_INFOMASK_CREATOR_INFO 0x01
+#define OBJ_HDR_INFOMASK_NAME 0x02
 
-#include "../plugins.h"
-
-#define SOCK_STUB "/run/xen/qmp-libxl-"
-
-struct hidsim_config
+struct Offsets
 {
-    const char* template_fp;
-    const char* win32k_profile;
-    bool is_monitor;
+    addr_t ps_active_process_head;
+
+    /* _OBJECT_HEADER_NAME_INFO  */
+    addr_t objhdr_name_info_length;
+    addr_t objhdr_name_info_name_offset;  /* _UNICODE_STRING */
+
+    /* _OBJECT_HEADER_CREATOR_INFO  */
+    addr_t objhdr_creator_info_length;
+
+    /* _OBJECT_HEADER */
+    addr_t objhdr_length; /* Nominal length */
+
+    /*
+     * Offset to the body, which resembles the effective length,
+     * as it is seen from the executive object
+     */
+    addr_t objhdr_body_offset;
+    addr_t objhdr_infomask_offset;
+
+    /* For _EPROCESS */
+    addr_t active_proc_links_offset;
+    addr_t pid_offset;
+    addr_t name_offset;
+    addr_t thread_list_head_offset;
+
+    /* For _ETRHEAD */
+    addr_t thread_list_entry_offset;
+    addr_t tcb_offset;
+
+    /* For _KTHREAD */
+    addr_t teb_offset;
+
+    /* For TEB */
+    addr_t teb_win32threadinfo_offset;
+    addr_t w32t_deskinfo_offset;
+    addr_t w32t_pwinsta_offset;
+
+    /* For tagWINDOWSTATION */
+    addr_t winsta_session_id_offset;
+    addr_t winsta_pglobal_atom_table_offset;
+    addr_t winsta_rpdesk_list_offset;
+    addr_t winsta_wsf_flags;
+
+    /* For _RTL_ATOM_TABLE */
+    addr_t atom_table_buckets_off;
+    addr_t atom_table_num_buckets_off;
+
+    /* For _RTL_ATOM_TABLE_ENTRY */
+    addr_t atom_entry_atom_offset;
+    addr_t atom_entry_name_offset;
+    addr_t atom_entry_name_len_offset;
+    addr_t atom_entry_ref_count_offset;
+    addr_t atom_entry_hashlink_offset;
+
+    /* For tagDESKTOP */
+    addr_t desk_pdeskinfo_off;
+    addr_t desk_rpdesk_next_off;
+    addr_t desk_pwinsta_parent;
+    addr_t desk_desktopid_off;
+
+    /* For tagDESKTOPINFO */
+    addr_t deskinfo_spwnd_offset;
+
+    /* For tagWND */
+    addr_t spwnd_next;
+    addr_t spwnd_child;
+    addr_t wnd_style;
+    addr_t wnd_exstyle;
+    addr_t pcls_offset;
+    /* tagRECT of window */
+    addr_t rc_wnd_offset;
+    /* tagRECT of clients within the window */
+    addr_t rc_client_offset;
+    /* Offset to _LARGE_UNICODE_STRING */
+    addr_t wnd_strname_offset;
+
+    addr_t large_unicode_buf_offset;
+
+    /* For tagRECT */
+    addr_t rc_left_offset;
+    addr_t rc_top_offset;
+    addr_t rc_right_offset;
+    addr_t rc_bottom_offset;
+
+    /* For tagCLS */
+    addr_t cls_atom_offset;
 };
 
-class hidsim : public plugin
-{
+/* Globally accesible struct, which holds all relevant symbol-offsets */
+extern Offsets symbol_offsets;
 
-public:
-    void start();
-    bool stop() override;
-    hidsim(drakvuf_t drakvuf, const hidsim_config* config);
-    ~hidsim();
-
-private:
-    /* Configuration passed via CLI */
-    std::string sock_path;
-    std::string template_path;
-    std::string win32k_json_path;
-
-    bool is_monitor;
-    bool is_gui_support;
-
-    /* Worker threads */
-    std::thread thread_inject;
-    std::thread thread_reconstruct;
-
-    /* Thread communication */
-    std::atomic<bool> has_to_stop;
-    std::atomic<uint32_t> coords;
-
-    bool prepare_gui_reconstruction(drakvuf_t drakvuf,
-        const char* win32k_profile);
-    bool check_platform_support(drakvuf_t dv);
-};
-
-#endif
+/*
+ * Kicks off the initializion of the globally accessible symbol_offsets_struct
+ */
+status_t initialize_offsets(vmi_instance_t vmi, json_object* kernel_json,
+    json_object* win32k_json, bool is_x86);
+#endif // VMI_WIN_GUI_OFFSETS_H

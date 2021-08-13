@@ -461,6 +461,17 @@ AM_CONDITIONAL([PLUGIN_HIDSIM], [test x$plugin_hidsim = xyes])
 if test x$plugin_hidsim = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_HIDSIM, 1, "")
 fi
+
+AC_ARG_ENABLE([DISABLE_ATOMS],
+  [AS_HELP_STRING([--disable-atoms],
+    [Disable atom table parsing in hidsim plugin @<:@no@:>@])],
+  [disable_atoms="$enableval"],
+  [disable_atoms="no"])
+AM_CONDITIONAL([DISABLE_ATOMS], [test x$disable_atoms = xyes])
+if test x$disable_atoms = xyes; then
+  AC_DEFINE_UNQUOTED(DISABLE_ATOMS, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
