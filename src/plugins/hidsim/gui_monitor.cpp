@@ -202,7 +202,7 @@ static bool register_NtUserShowWindow_trap( drakvuf_t drakvuf, json_object* prof
     addr_t sdt_va = 0;
     if (!(sdt_va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, "ntoskrnl.exe", sdt_rva)))
     {
-        PRINT_DEBUG("[HIDSIM] [Init] Failed to get VA of nt!KeServiceDescriptorTableShadow\n");
+        PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to get VA of nt!KeServiceDescriptorTableShadow\n");
         return false;
     }
 
@@ -233,7 +233,7 @@ static bool register_NtUserShowWindow_trap( drakvuf_t drakvuf, json_object* prof
 
         if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, pid, &trap->breakpoint.dtb))
         {
-            PRINT_DEBUG("[HIDSIM] [Init] Failed to get DTB of \"explorer.exe\"\n");
+            PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to get DTB of \"explorer.exe\"\n");
             return false;
         }
 
