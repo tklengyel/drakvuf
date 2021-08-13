@@ -324,7 +324,7 @@ static void print_usage()
 #endif
 #ifdef ENABLE_PLUGIN_HIDSIM
         "\t --hid-template <path to template>\n"
-        "\t                           The template specifying the HID events to simulate. If not specified, the mouse will be move randomly\n"
+        "\t                           The template specifying the HID events to simulate. If not specified, the mouse will move randomly\n"
         "\t                           The HID events in the template will be replayed in a loop.\n"
         "\t --hid-monitor-gui\n"
         "\t                           Monitor the GUI to try to detect clickable buttons. This requires the presence of a win32k-profile, which has to be specified via -W\n"
