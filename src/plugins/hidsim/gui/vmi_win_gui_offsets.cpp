@@ -141,8 +141,7 @@ status_t find_offsets_from_ntkr_json(vmi_instance_t vmi, json_object* profile,
             vmi, profile, "_OBJECT_HEADER",
             &symbol_offsets.objhdr_length))
     {
-        fprintf(stderr, "Error retrieving size of _OBJECT_HEADER-struct at %ld\n",
-            symbol_offsets.objhdr_length);
+        fprintf(stderr, "Error retrieving size of _OBJECT_HEADER-struct\n");
         return VMI_FAILURE;
     }
 
