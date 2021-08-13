@@ -440,7 +440,7 @@ int find_button_to_click(vmi_instance_t vmi, struct desktop* desk,
         }
 #ifndef DISABLE_ATOMS
         /* Refines selection by filtering based on window class */
-        if (cand && cand->atom )
+        if (cand && cand->atom)
         {
             struct atom_entry* a = (struct atom_entry*) g_hash_table_lookup(
                     desk->atom_table, GUINT_TO_POINTER(wnd->atom));
