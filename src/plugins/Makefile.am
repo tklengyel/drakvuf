@@ -363,3 +363,20 @@ noinst_LTLIBRARIES= libdrakvufplugins.la
 libdrakvufplugins_la_SOURCES= $(sources)
 libdrakvufplugins_la_LIBADD = ../xen_helper/libxenhelper.la
 libdrakvufplugins_la_LIBADD += ../libdrakvuf/libdrakvuf.la
+
+if MAKE_TESTS
+
+AM_DEFAULT_SOURCE_EXT = .cpp
+
+check_PROGRAMS =
+
+if PLUGIN_PROCMON
+check_PROGRAMS += procmon/check
+procmon_check_SOURCES = procmon/check.cpp
+procmon_check_CFLAGS = $(CHECK_CFLAGS)
+procmon_check_LDADD = $(CHECK_LIBS) procmon/winnt.lo
+endif
+
+TESTS = $(check_PROGRAMS)
+
+endif
