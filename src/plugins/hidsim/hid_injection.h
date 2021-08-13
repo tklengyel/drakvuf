@@ -115,6 +115,6 @@
 
 /* Injects random HID events or events specified in a template file */
 int hid_inject(const char* sock_path, const char* template_path,
-    volatile sig_atomic_t* coords, std::atomic<bool>* has_to_stop);
+    std::atomic<uint32_t>* coords, std::atomic<bool>* has_to_stop);
 
 #endif

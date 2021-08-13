@@ -590,7 +590,7 @@ void translate(qmp_connection* qc, dimensions* dim, int time_frame,
 
 /* Injects random mouse movements */
 static int run_random_injection(qmp_connection* qc,
-    volatile sig_atomic_t* coords, std::atomic<bool>* has_to_stop)
+    std::atomic<uint32_t>* coords, std::atomic<bool>* has_to_stop)
 {
     PRINT_DEBUG("[HIDSIM] [INJECTOR] Injecting random mouse movements\n");
     dimensions dim;
@@ -624,12 +624,13 @@ static int run_random_injection(qmp_connection* qc,
     while (!has_to_stop->load())
     {
 
-        if (*coords)
+        if (coords->load())
         {
+            uint32_t cur_coords = coords->load();
             /* Retrieves coords to click next */
-            dx = (uint16_t) ((*coords >> 16) * dim.dx) - ox ;
-            dy = (uint16_t) ((*coords & 0xFFFF) * dim.dy) - oy;
-            *coords = 0;
+            dx = (uint16_t) (( cur_coords >> 16) * dim.dx) - ox ;
+            dy = (uint16_t) (( cur_coords & 0xFFFF) * dim.dy) - oy;
+            coords->store(0);
 
             is_click = true;
         }
@@ -808,7 +809,7 @@ static int hid_cleanup(qmp_connection* qc, int fd, FILE* f)
 
 /* Worker thread function */
 int hid_inject(const char* sock_path, const char* template_path,
-    volatile sig_atomic_t* coords, std::atomic<bool>* has_to_stop)
+    std::atomic<uint32_t>* coords, std::atomic<bool>* has_to_stop)
 {
     /* Initializes qmp connection */
     qmp_connection qc;

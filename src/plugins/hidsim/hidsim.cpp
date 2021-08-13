@@ -173,8 +173,7 @@ hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config)
 {
     /* Explicitly initialize thread communication primitives */
     this->has_to_stop.store(false);
-
-    this->coords = 0;
+    this->coords.store(0);
 
     /* Constructs path to Unix domain socket of Xen guest under investigation */
     this->sock_path = construct_sock_path(drakvuf);

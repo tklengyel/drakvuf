@@ -120,7 +120,7 @@ int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_profile,
     bool is_x86);
 
 /* Find button  */
-int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
+int gui_monitor(drakvuf_t drakvuf, std::atomic<uint32_t>* coords,
     std::atomic<bool>* has_to_stop);
 
 #endif // GUI_RECONSTRUCTION_H

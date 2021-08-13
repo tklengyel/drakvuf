@@ -349,7 +349,7 @@ int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_path, bool is_
  * Worker function to monitor and reconstruct the GUIs, when NtUserShowWindow-
  * calls have occured
  */
-int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
+int gui_monitor(drakvuf_t drakvuf, std::atomic<uint32_t>* coords,
     std::atomic<bool>* has_to_stop)
 {
     PRINT_DEBUG("[HIDSIM] [MONITOR] Started GUI reconstruction thread\n");
@@ -370,7 +370,7 @@ int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
             return -1;
         }
     }
-    *coords = 0;
+    coords->store(0);
 
     /* Keeps track of time to meet delays */
     struct timeval curr;
@@ -421,7 +421,7 @@ int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
                 /* Sets coordinates to click next */
                 x = btn.r.x0 + btn.r.w/2;
                 y = btn.r.y0 + btn.r.h/2;
-                *coords = x << 16 | y;
+                coords->store(x << 16 | y);
 
                 PRINT_DEBUG("[HIDSIM] [MONITOR] Found \"%S\"-button to click at"
                     "(%d, %d)\n", btn.text, btn.r.x0, btn.r.y0);

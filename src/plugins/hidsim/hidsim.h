@@ -148,7 +148,7 @@ private:
 
     /* Thread communication */
     std::atomic<bool> has_to_stop;
-    volatile sig_atomic_t coords;
+    std::atomic<uint32_t> coords;
 
     bool prepare_gui_reconstruction(drakvuf_t drakvuf,
         const char* win32k_profile);
