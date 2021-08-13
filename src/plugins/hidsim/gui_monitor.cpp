@@ -216,7 +216,7 @@ static bool register_NtUserShowWindow_trap( drakvuf_t drakvuf, json_object* prof
     addr_t eprocess_base = 0;
     if (!drakvuf_find_process(drakvuf, ~0, "explorer.exe", &eprocess_base))
     {
-        PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to find EPROCESS of \"y.exe\"\n");
+        PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to find EPROCESS of \"explorer.exe\"\n");
         return false;
     }
 
