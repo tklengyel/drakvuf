@@ -902,9 +902,8 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
             if (cur_pwinsta && cur_pwinsta > 0x1000)
             {
                 bool is_known = false;
-                size_t i = 0;
 
-                for (; i < winstas->len; i++)
+                for (size_t i = 0; i < winstas->len; i++)
                 {
                     struct winsta* cand = g_array_index(winstas, struct winsta*, i);
 
