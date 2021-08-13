@@ -245,7 +245,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
     }
 
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
-            symbol_offsets.rc_right_offset, pid, (uint32_t*) &wc->r.x1))
+            symbol_offsets.rc_right_offset, pid, (uint32_t*)&wc->r.x1))
     {
         printf("[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
         return NULL;
