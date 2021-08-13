@@ -102,74 +102,45 @@
  *                                                                         *
  ***************************************************************************/
 
+#include <check.h>
+
 #include "winnt.h"
-#include <stdio.h>
-#include <libvmi/libvmi.h>
 
-std::string stringify_protection_attributes(uint32_t attributes, char sep)
+START_TEST(test_protection_attributes_stringify)
 {
-    if (attributes == 0)
-    {
-        return std::string("NONE");
-    }
+    ck_assert(stringify_protection_attributes(PAGE_NOACCESS) == std::string("PAGE_NOACCESS"));
+    ck_assert(stringify_protection_attributes(PAGE_EXECUTE_READWRITE) == std::string("PAGE_EXECUTE_READWRITE"));
+    ck_assert(stringify_protection_attributes(PAGE_GUARD | PAGE_NOCACHE) == std::string("PAGE_GUARD;PAGE_NOCACHE"));
+}
+END_TEST
 
-    std::string result;
+Suite* protection_attributes_suite(void)
+{
+    Suite* s;
+    TCase* tc_core;
 
-    int num = 0;
-    for (size_t i = 0; i < 8 * sizeof(attributes) && attributes; ++i)
-    {
-        uint32_t attr = attributes & (1UL << i);
-        if (attr == 0)
-            continue;
+    s = suite_create("Stringify protection attributes");
 
-        attributes &= ~attr;
-        ++num;
-        if (num > 1)
-            result.append(1, sep);
+    /* Core test case */
+    tc_core = tcase_create("Core");
 
-        switch (static_cast<page_access_t>(attr))
-        {
-            case PAGE_NOACCESS:
-                result.append("PAGE_NOACCESS");
-                break;
-            case PAGE_READONLY:
-                result.append("PAGE_READONLY");
-                break;
-            case PAGE_READWRITE:
-                result.append("PAGE_READWRITE");
-                break;
-            case PAGE_WRITECOPY:
-                result.append("PAGE_WRITECOPY");
-                break;
-            case PAGE_EXECUTE:
-                result.append("PAGE_EXECUTE");
-                break;
-            case PAGE_EXECUTE_READ:
-                result.append("PAGE_EXECUTE_READ");
-                break;
-            case PAGE_EXECUTE_READWRITE:
-                result.append("PAGE_EXECUTE_READWRITE");
-                break;
-            case PAGE_EXECUTE_WRITECOPY:
-                result.append("PAGE_EXECUTE_WRITECOPY");
-                break;
-            case PAGE_GUARD:
-                result.append("PAGE_GUARD");
-                break;
-            case PAGE_NOCACHE:
-                result.append("PAGE_NOCACHE");
-                break;
-            case PAGE_WRITECOMBINE:
-                result.append("PAGE_WRITECOMBINE");
-                break;
-            default:
-            {
-                char tmp[32] = {0};
-                snprintf(tmp, 32, "0x%" PRIx32, attr);
-                result.append(tmp);
-                break;
-            }
-        }
-    }
-    return result;
+    tcase_add_test(tc_core, test_protection_attributes_stringify);
+    suite_add_tcase(s, tc_core);
+
+    return s;
+}
+
+int main(void)
+{
+    int number_failed;
+    Suite* s;
+    SRunner* sr;
+
+    s = protection_attributes_suite();
+    sr = srunner_create(s);
+
+    srunner_run_all(sr, CK_NORMAL);
+    number_failed = srunner_ntests_failed(sr);
+    srunner_free(sr);
+    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

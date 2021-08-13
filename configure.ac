@@ -674,6 +674,9 @@ AH_VERBATIM([__STDC_FORMAT_MACROS],
 #define __STDC_FORMAT_MACROS 1
 #endif])
 
+PKG_CHECK_MODULES([CHECK], [check >= 0.9.4], [have_check="yes"], [have_check="no"])
+AM_CONDITIONAL([MAKE_TESTS], [test x$have_check = xyes])
+
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.28], [], [AC_ERROR([glib-2.0 (version 2.28+) has to be installed!])])
 PKG_CHECK_MODULES([VMI], [libvmi >= 0.11], [], [AC_ERROR([LibVMI not found])])
 PKG_CHECK_MODULES([JSONC], [json-c >= 0.15], [AC_DEFINE([JSONC5], [1], [json-c5 installed])],
