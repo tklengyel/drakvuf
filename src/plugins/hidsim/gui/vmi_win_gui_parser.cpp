@@ -679,13 +679,14 @@ status_t traverse_desktops(vmi_instance_t vmi, addr_t* desktops,
     addr_t next = 0;
     size_t i = 0;
 
-    while (cur)
+    for (i = 0; i < *max_len; i++, cur = next)
     {
-        if (i < *max_len - 1)
-        {
-            desktops[i] = cur;
-            i++;
-        }
+        /* Checks, if end of list is reached */
+        if (!cur)
+            break;
+
+        desktops[i] = cur;
+
         if (VMI_FAILURE == vmi_read_addr_va(vmi, cur + symbol_offsets.desk_rpdesk_next_off, 0, &next))
         {
             fprintf(stderr, "Failed to read pointer to next desktop at %" PRIx64 "\n",
@@ -693,11 +694,11 @@ status_t traverse_desktops(vmi_instance_t vmi, addr_t* desktops,
             *max_len = i;
             return VMI_FAILURE;
         }
-
+        /* Checks, if all desktops were enumerated */
         if (next == list_head)
             break;
-        cur = next;
     }
+
     *max_len = i;
 
     return VMI_SUCCESS;
