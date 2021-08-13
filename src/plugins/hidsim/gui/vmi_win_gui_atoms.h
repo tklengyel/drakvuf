@@ -110,7 +110,7 @@
 #include <wchar.h>
 #include <libvmi/libvmi.h>
 
-/* Datastructures */
+/* Data structures */
 #include <glib.h>
 
 #include "vmi_win_gui_offsets.h"
