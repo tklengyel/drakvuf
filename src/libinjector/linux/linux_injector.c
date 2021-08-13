@@ -328,6 +328,6 @@ injector_status_t injector_start_app_on_linux(
     }
 
     injector_status_t rc = injector->rc;
-    free_injector(injector);
+    injector_free_linux(injector);
     return rc;
 }

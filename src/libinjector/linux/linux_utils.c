@@ -280,7 +280,7 @@ void free_bp_trap(drakvuf_t drakvuf, injector_t injector, drakvuf_trap_t* trap)
     injector->bp = NULL;
 }
 
-void free_injector(injector_t injector)
+void injector_free_linux(injector_t injector)
 {
     if (!injector) return;
 

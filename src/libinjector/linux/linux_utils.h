@@ -208,7 +208,7 @@ struct injector
 };
 
 void free_bp_trap(drakvuf_t drakvuf, injector_t injector, drakvuf_trap_t* trap);
-void free_injector(injector_t injector);
+void injector_free_linux(injector_t injector);
 bool save_rip_for_ret(drakvuf_t drakvuf, x86_registers_t* regs);
 addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso);
