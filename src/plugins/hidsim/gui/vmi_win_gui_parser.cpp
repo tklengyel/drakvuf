@@ -624,7 +624,7 @@ status_t retrieve_window_addresses(vmi_instance_t vmi, struct desktop* d,
     /* Reads desktop ID */
     if (VMI_FAILURE == vmi_read_32_va(vmi, addr, pid, &desk_id))
     {
-        fprintf(stderr, "\t\tFailed to read desktop ID at %" PRIx64 "\n", desktop +
+        fprintf(stderr, "Failed to read desktop ID at %" PRIx64 "\n", desktop +
             symbol_offsets.desk_desktopid_off);
         return VMI_FAILURE;
     }
@@ -634,7 +634,7 @@ status_t retrieve_window_addresses(vmi_instance_t vmi, struct desktop* d,
     /* Retrieves pointer desktop info struct */
     if (VMI_FAILURE == vmi_read_addr_va(vmi, addr, pid, &desktop_info))
     {
-        fprintf(stderr, "\t\tFailed to read pointer to _DESKTOPINFO at %" PRIx64 "\n",
+        fprintf(stderr, "Failed to read pointer to _DESKTOPINFO at %" PRIx64 "\n",
             desktop + symbol_offsets.desk_pdeskinfo_off);
         return VMI_FAILURE;
     }
@@ -646,14 +646,14 @@ status_t retrieve_window_addresses(vmi_instance_t vmi, struct desktop* d,
     /* Retrieves pointer to struct pointer window */
     if (VMI_FAILURE == vmi_read_addr_va(vmi, addr, pid, &spwnd))
     {
-        fprintf(stderr, "\t\tFailed to read pointer to _WINDOW at %" PRIx64 "\n",
+        fprintf(stderr, "Failed to read pointer to _WINDOW at %" PRIx64 "\n",
             desktop_info + symbol_offsets.deskinfo_spwnd_offset);
         return VMI_FAILURE;
     }
 
     if (!spwnd)
     {
-        fprintf(stderr, "\t\tNo valid windows for _DESKTOPINFO %" PRIx64 "\n", desktop_info);
+        fprintf(stderr, "No valid windows for _DESKTOPINFO %" PRIx64 "\n", desktop_info);
         return VMI_FAILURE;
     }
 
@@ -899,7 +899,7 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray** resulting_wins
             if (VMI_FAILURE == vmi_read_addr_va(vmi, w32thrd_info +
                     symbol_offsets.w32t_pwinsta_offset, pid, &cur_pwinsta))
             {
-                fprintf(stderr, "\t\tFailed to read pointer to tagWINDOWSTATION at %" PRIx64
+                fprintf(stderr, "Failed to read pointer to tagWINDOWSTATION at %" PRIx64
                     "\n", w32thrd_info + symbol_offsets.w32t_pwinsta_offset);
                 continue;
             }
