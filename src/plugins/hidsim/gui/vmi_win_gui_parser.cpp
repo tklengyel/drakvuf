@@ -872,7 +872,7 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
             }
 
             /* Since not every thread has a THREADINFO-struct, skip thread in this case */
-            if (!w32thrd_info) //|| w32thrd_info < 0x8000000
+            if (!w32thrd_info)
             {
                 continue;
             }
