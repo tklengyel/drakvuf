@@ -118,7 +118,7 @@ std::string stringify_protection_attributes(uint32_t attributes, char sep)
     int num = 0;
     for (size_t i = 0; i < 8 * sizeof(attributes) && attributes; ++i)
     {
-        uint32_t attr = VMI_GET_BIT(attributes, i);
+        uint32_t attr = attributes & (1UL << i);
         if (attr == 0)
             continue;
 
