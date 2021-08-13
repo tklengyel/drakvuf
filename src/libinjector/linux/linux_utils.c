@@ -191,7 +191,9 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
     if (VMI_SUCCESS != vmi_read(vmi, &ctx, size, vdso_memory, &bytes_read))
     {
         fprintf(stderr, "Could not read vdso memory\n");
-        goto find_syscall_failure;
+        drakvuf_release_vmi(drakvuf);
+        g_free(vdso_memory);
+        return 0;
     }
 
     PRINT_DEBUG("vdso memory read successful\n");
@@ -203,7 +205,8 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
     if (!syscall_substring_address)
     {
         PRINT_DEBUG("Failed to get syscall offset\n");
-        goto find_syscall_failure;
+        g_free(vdso_memory);
+        return 0;
     }
     syscall_offset = syscall_substring_address - vdso_memory;
     injector_t injector = info->trap->data;
@@ -214,12 +217,6 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
     g_free(vdso_memory);
 
     return injector->syscall_addr;
-
-find_syscall_failure:
-    drakvuf_release_vmi(drakvuf);
-    g_free(vdso_memory);
-    return 0;
-
 }
 
 bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t syscall_addr)
