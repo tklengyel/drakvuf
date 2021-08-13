@@ -446,7 +446,7 @@ int find_button_to_click(vmi_instance_t vmi, struct desktop* desk,
                     desk->atom_table, GUINT_TO_POINTER(wnd->atom));
 
             if (a && a->name)
-                for (size_t j=0; j< ARRAY_SIZE(IRRELEVANT_ATOM_CLASSES); j++)
+                for (size_t j = 0; j < ARRAY_SIZE(IRRELEVANT_ATOM_CLASSES); j++)
                 {
                     if (wcscmp(a->name, IRRELEVANT_ATOM_CLASSES[j]) == 0)
                         cand = NULL;
