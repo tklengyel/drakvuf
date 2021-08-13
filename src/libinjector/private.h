@@ -140,7 +140,6 @@ injector_status_t injector_start_app_on_linux(drakvuf_t drakvuf,
     int args_count,
     const char* args[]);
 
-
 injector_status_t injector_start_app_on_win(drakvuf_t drakvuf,
     vmi_pid_t pid,
     uint32_t tid,

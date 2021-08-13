@@ -100,141 +100,205 @@
  * DRAKVUF, and also available from                                        *
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
+ * This file was created by Manorit Chawdhry.                              *
+ * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef LIBINJECTOR_H
-#define LIBINJECTOR_H
 
-#ifdef __cplusplus
-extern "C" {
-#define NOEXCEPT noexcept
-#else
-#define NOEXCEPT
-#endif
+#define _GNU_SOURCE // required for memmem
+#include <libinjector/debug_helpers.h>
 
-#pragma GCC visibility push(default)
+#include "linux_injector.h"
+#include <sys/mman.h>
+#include <fcntl.h>
 
-#include <libdrakvuf/libdrakvuf.h>
-
-typedef struct injector* injector_t;
-
-typedef enum
+addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    INJECTOR_FAILED,
-    INJECTOR_FAILED_WITH_ERROR_CODE,
-    INJECTOR_SUCCEEDED,
-    INJECTOR_TIMEOUTED,
-} injector_status_t;
+    addr_t process_base = drakvuf_get_current_process(drakvuf, info);
+    PRINT_DEBUG("Process base: %lx\n", process_base);
 
-typedef enum
-{
-    // win
-    INJECT_METHOD_CREATEPROC,
-    INJECT_METHOD_TERMINATEPROC,
-    INJECT_METHOD_SHELLEXEC,
-    INJECT_METHOD_SHELLCODE,
-    INJECT_METHOD_DOPP,
-    INJECT_METHOD_READ_FILE,
-    INJECT_METHOD_WRITE_FILE,
-    // linux
-    INJECT_METHOD_EXECPROC,
-    INJECT_METHOD_SHELLCODE_LINUX,
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = info->proc_data.pid
+    );
 
-    __INJECT_METHOD_MAX
+    addr_t addr = 0;
+    size_t offset = 0;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    // task_struct to mm
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "task_struct", "mm", &offset))
+    {
+        PRINT_DEBUG("Failed to get mm offset\n");
+        goto find_vdso_failure;
+    }
+
+    PRINT_DEBUG("mm offset: %ld\n", offset);
+    ctx.addr = process_base + offset;
+
+    // since mm is a pointer
+    if (VMI_SUCCESS != vmi_read_64(vmi, &ctx, &addr))
+    {
+        PRINT_DEBUG("Failed to read mm address\n");
+        goto find_vdso_failure;
+    }
+
+    PRINT_DEBUG("Got mm address: %lx\n", addr);
+
+    // mm_struct to vdso ( it will directly parse the anonymous structure of context in between )
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "mm_struct", "vdso", &offset))
+    {
+        PRINT_DEBUG("Failed to get vdso offset\n");
+        goto find_vdso_failure;
+    }
+
+    PRINT_DEBUG("vdso offset: %ld\n", offset);
+    ctx.addr = addr + offset;
+
+    // since vdso is a pointer
+    if (VMI_SUCCESS != vmi_read_64(vmi, &ctx, &addr))
+    {
+        PRINT_DEBUG("Failed to read vdso address\n");
+        goto find_vdso_failure;
+    }
+
+    PRINT_DEBUG("Got vdso address: %lx\n", addr);
+    drakvuf_release_vmi(drakvuf);
+
+    return addr;
+
+find_vdso_failure:
+    drakvuf_release_vmi(drakvuf);
+    return 0;
 }
-injection_method_t;
 
-typedef enum
+addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso)
 {
-    ARGUMENT_STRING,
-    ARGUMENT_STRUCT,
-    ARGUMENT_INT,
-    __ARGUMENT_MAX
-} argument_type_t;
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-typedef enum
-{
-    STATUS_NULL,
-    STATUS_ALLOC_OK,
-    STATUS_PHYS_ALLOC_OK,
-    STATUS_EXPAND_ENV_OK,
-    STATUS_WRITE_OK,
-    STATUS_EXEC_OK,
-    STATUS_BP_HIT,
-    STATUS_OPEN,
-    STATUS_TERMINATE,
-    STATUS_CREATE_OK,
-    STATUS_RESUME_OK,
-    STATUS_CREATE_FILE_OK,
-    STATUS_READ_FILE_OK,
-    STATUS_WRITE_FILE_OK,
-    STATUS_CLOSE_FILE_OK,
-    STATUS_GET_LAST_ERROR,
-    __STATUS_MAX
-} status_type_t;
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = info->proc_data.pid,
+        .addr = vdso
+    );
 
-struct argument
-{
-    uint32_t type;
-    uint32_t size;
-    uint64_t data_on_stack;
-    void* data;
-};
+    size_t size = 4096;
+    size_t bytes_read = 0;
+    void* vdso_memory = g_malloc(size);
 
-void init_argument(struct argument* arg,
-    argument_type_t type,
-    size_t size,
-    void* data) NOEXCEPT;
+    // read the vdso memory
+    if (VMI_SUCCESS != vmi_read(vmi, &ctx, size, vdso_memory, &bytes_read))
+    {
+        fprintf(stderr, "Could not read vdso memory\n");
+        goto find_syscall_failure;
+    }
 
-void init_int_argument(struct argument* arg,
-    uint64_t value) NOEXCEPT;
+    PRINT_DEBUG("vdso memory read successful\n");
+    drakvuf_release_vmi(drakvuf);
 
-void init_unicode_argument(struct argument* arg,
-    unicode_string_t* us) NOEXCEPT;
+    char syscall[] = { 0xf, 0x5 };
+    void* syscall_substring_address = memmem(vdso_memory, size, (void*)syscall, 2);
+    int syscall_offset = 0;
+    if (!syscall_substring_address)
+    {
+        PRINT_DEBUG("Failed to get syscall offset\n");
+        goto find_syscall_failure;
+    }
+    syscall_offset = syscall_substring_address - vdso_memory;
+    injector_t injector = info->trap->data;
+    injector->syscall_addr = vdso + syscall_offset;
 
-void init_string_argument(struct argument* arg,
-    const char* string) NOEXCEPT;
+    PRINT_DEBUG("syscall offset: %d\n", syscall_offset);
+    PRINT_DEBUG("syscall addr: %lx\n", injector->syscall_addr);
+    g_free(vdso_memory);
 
-#define init_struct_argument(arg, sv) \
-    init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
+    return injector->syscall_addr;
 
-bool setup_stack(drakvuf_t drakvuf,
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args) NOEXCEPT;
+find_syscall_failure:
+    drakvuf_release_vmi(drakvuf);
+    g_free(vdso_memory);
+    return 0;
 
-bool setup_stack_locked(drakvuf_t drakvuf,
-    vmi_instance_t vmi,
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args) NOEXCEPT;
-
-injector_status_t injector_start_app(drakvuf_t drakvuf,
-    vmi_pid_t pid,
-    uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-    const char* app,
-    const char* cwd,
-    injection_method_t method,
-    output_format_t format,
-    const char* binary_path,     // if -m = doppelganging
-    const char* target_process,  // if -m = doppelganging
-    bool break_loop_on_detection,
-    injector_t* injector_to_be_freed,
-    bool global_search, // out: iff break_loop_on_detection is set
-    bool wait_for_exit,
-    int args_count,
-    const char* args[],
-    vmi_pid_t* injected_pid) NOEXCEPT;
-
-void injector_terminate(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid,
-    vmi_pid_t pid);
-
-#pragma GCC visibility pop
-
-#ifdef __cplusplus
 }
-#endif
 
-#endif // LIBINJECTOR_H
+bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t syscall_addr)
+{
+    injector_t injector = info->trap->data;
+
+    injector->bp = g_malloc0(sizeof(drakvuf_trap_t));
+
+    injector->bp->type = BREAKPOINT;
+    injector->bp->name = "injector_post_syscall_trap";
+    injector->bp->cb = injector_int3_userspace_cb;
+    injector->bp->data = injector;
+    injector->bp->breakpoint.lookup_type = LOOKUP_DTB;
+    injector->bp->breakpoint.dtb = info->regs->cr3;
+    injector->bp->breakpoint.addr_type = ADDR_VA;
+    injector->bp->breakpoint.addr = syscall_addr + 2;
+    injector->bp->ttl = UNLIMITED_TTL;
+    injector->bp->ah_cb = NULL;
+
+    if ( drakvuf_add_trap(drakvuf, injector->bp) )
+    {
+        PRINT_DEBUG("Post syscall trap success\n");
+        return true;
+    }
+    else
+    {
+        fprintf(stderr, "Couldn't trap next instruction after syscall\n");
+        return false;
+    }
+}
+
+bool save_rip_for_ret(drakvuf_t drakvuf, x86_registers_t* regs)
+{
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = regs->cr3,
+        .addr = regs->rsp - 0x8
+    );
+
+    bool success = false;
+    if (VMI_SUCCESS == vmi_write_64(vmi, &ctx, &regs->rip))
+    {
+        success = true;
+        regs->rsp -= 0x8;
+    }
+    else
+        PRINT_DEBUG("Couldn't save rip for ret\n");
+
+    drakvuf_release_vmi(drakvuf);
+    return success;
+}
+
+void free_bp_trap(drakvuf_t drakvuf, injector_t injector, drakvuf_trap_t* trap)
+{
+    drakvuf_remove_trap(drakvuf, trap, (drakvuf_trap_free_t)g_free);
+    injector->bp = NULL;
+}
+
+void free_injector(injector_t injector)
+{
+    if (!injector) return;
+
+    PRINT_DEBUG("Injector freed\n");
+
+    g_free((void*)injector->bp);
+    g_free((void*)injector->buffer.data);
+    g_free((void*)injector);
+
+    injector = NULL;
+}
+
+bool is_syscall_error(addr_t rax)
+{
+    if (rax > -MAX_ERRNO)
+    {
+        fprintf(stderr, "syscall return code: %ld\n", (int64_t)rax);
+        return true;
+    }
+    return false;
+}

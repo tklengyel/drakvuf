@@ -100,141 +100,72 @@
  * DRAKVUF, and also available from                                        *
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
+ * This file was created by Manorit Chawdhry.                              *
+ * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef LIBINJECTOR_H
-#define LIBINJECTOR_H
 
-#ifdef __cplusplus
-extern "C" {
-#define NOEXCEPT noexcept
-#else
-#define NOEXCEPT
-#endif
+#include <libinjector/debug_helpers.h>
 
-#pragma GCC visibility push(default)
-
-#include <libdrakvuf/libdrakvuf.h>
-
-typedef struct injector* injector_t;
-
-typedef enum
+void print_hex(const char* array, size_t len)
 {
-    INJECTOR_FAILED,
-    INJECTOR_FAILED_WITH_ERROR_CODE,
-    INJECTOR_SUCCEEDED,
-    INJECTOR_TIMEOUTED,
-} injector_status_t;
-
-typedef enum
-{
-    // win
-    INJECT_METHOD_CREATEPROC,
-    INJECT_METHOD_TERMINATEPROC,
-    INJECT_METHOD_SHELLEXEC,
-    INJECT_METHOD_SHELLCODE,
-    INJECT_METHOD_DOPP,
-    INJECT_METHOD_READ_FILE,
-    INJECT_METHOD_WRITE_FILE,
-    // linux
-    INJECT_METHOD_EXECPROC,
-    INJECT_METHOD_SHELLCODE_LINUX,
-
-    __INJECT_METHOD_MAX
+    PRINT_DEBUG("Total length: %ld\n", len);
+    PRINT_DEBUG("Data: \n");
+    for (size_t i=0; i<len; i++)
+    {
+        PRINT_DEBUG("%02x ", *(array + i) & 0xff);
+    }
+    PRINT_DEBUG("\n");
 }
-injection_method_t;
 
-typedef enum
+void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
 {
-    ARGUMENT_STRING,
-    ARGUMENT_STRUCT,
-    ARGUMENT_INT,
-    __ARGUMENT_MAX
-} argument_type_t;
+    PRINT_DEBUG("Stack\n");
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
 
-typedef enum
-{
-    STATUS_NULL,
-    STATUS_ALLOC_OK,
-    STATUS_PHYS_ALLOC_OK,
-    STATUS_EXPAND_ENV_OK,
-    STATUS_WRITE_OK,
-    STATUS_EXEC_OK,
-    STATUS_BP_HIT,
-    STATUS_OPEN,
-    STATUS_TERMINATE,
-    STATUS_CREATE_OK,
-    STATUS_RESUME_OK,
-    STATUS_CREATE_FILE_OK,
-    STATUS_READ_FILE_OK,
-    STATUS_WRITE_FILE_OK,
-    STATUS_CLOSE_FILE_OK,
-    STATUS_GET_LAST_ERROR,
-    __STATUS_MAX
-} status_type_t;
+    for (int i=0; i < 16; i++)
+    {
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_PID,
+            .pid = info->proc_data.pid,
+            .addr = (addr + i*8)
+        );
+        addr_t val = 0;
+        vmi_read_64(vmi, &ctx, &val);
+        if ((i%4)==0)
+            PRINT_DEBUG("\n%016lx:", addr + (i/4)*32);
+        PRINT_DEBUG(" %016lx", val);
+    }
+    PRINT_DEBUG("\n");
 
-struct argument
-{
-    uint32_t type;
-    uint32_t size;
-    uint64_t data_on_stack;
-    void* data;
-};
-
-void init_argument(struct argument* arg,
-    argument_type_t type,
-    size_t size,
-    void* data) NOEXCEPT;
-
-void init_int_argument(struct argument* arg,
-    uint64_t value) NOEXCEPT;
-
-void init_unicode_argument(struct argument* arg,
-    unicode_string_t* us) NOEXCEPT;
-
-void init_string_argument(struct argument* arg,
-    const char* string) NOEXCEPT;
-
-#define init_struct_argument(arg, sv) \
-    init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
-
-bool setup_stack(drakvuf_t drakvuf,
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args) NOEXCEPT;
-
-bool setup_stack_locked(drakvuf_t drakvuf,
-    vmi_instance_t vmi,
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args) NOEXCEPT;
-
-injector_status_t injector_start_app(drakvuf_t drakvuf,
-    vmi_pid_t pid,
-    uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-    const char* app,
-    const char* cwd,
-    injection_method_t method,
-    output_format_t format,
-    const char* binary_path,     // if -m = doppelganging
-    const char* target_process,  // if -m = doppelganging
-    bool break_loop_on_detection,
-    injector_t* injector_to_be_freed,
-    bool global_search, // out: iff break_loop_on_detection is set
-    bool wait_for_exit,
-    int args_count,
-    const char* args[],
-    vmi_pid_t* injected_pid) NOEXCEPT;
-
-void injector_terminate(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid,
-    vmi_pid_t pid);
-
-#pragma GCC visibility pop
-
-#ifdef __cplusplus
+    drakvuf_release_vmi(drakvuf);
 }
-#endif
 
-#endif // LIBINJECTOR_H
+void print_registers(drakvuf_trap_info_t* info)
+{
+    const char* fmt = "%s:\t%016lx\n";
+    PRINT_DEBUG(fmt, "rax",    info->regs->rax);
+    PRINT_DEBUG(fmt, "rcx",    info->regs->rcx);
+    PRINT_DEBUG(fmt, "rdx",    info->regs->rdx);
+    PRINT_DEBUG(fmt, "rbx",    info->regs->rbx);
+    PRINT_DEBUG(fmt, "rsp",    info->regs->rsp);
+    PRINT_DEBUG(fmt, "rbp",    info->regs->rbp);
+    PRINT_DEBUG(fmt, "rsi",    info->regs->rsi);
+    PRINT_DEBUG(fmt, "rdi",    info->regs->rdi);
+    PRINT_DEBUG(fmt, "r8",     info->regs->r8);
+    PRINT_DEBUG(fmt, "r9",     info->regs->r9);
+    PRINT_DEBUG(fmt, "r10",    info->regs->r10);
+    PRINT_DEBUG(fmt, "r11",    info->regs->r11);
+    PRINT_DEBUG(fmt, "r12",    info->regs->r12);
+    PRINT_DEBUG(fmt, "r13",    info->regs->r13);
+    PRINT_DEBUG(fmt, "r14",    info->regs->r14);
+    PRINT_DEBUG(fmt, "r15",    info->regs->r15);
+    PRINT_DEBUG(fmt, "rflags", info->regs->rflags);
+    PRINT_DEBUG(fmt, "dr6",    info->regs->dr6);
+    PRINT_DEBUG(fmt, "dr7",    info->regs->dr7);
+    PRINT_DEBUG(fmt, "rip",    info->regs->rip);
+    PRINT_DEBUG(fmt, "cr0",    info->regs->cr0);
+    PRINT_DEBUG(fmt, "cr2",    info->regs->cr2);
+    PRINT_DEBUG(fmt, "cr3",    info->regs->cr3);
+    PRINT_DEBUG(fmt, "cr4",    info->regs->cr4);
+}

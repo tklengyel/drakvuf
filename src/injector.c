@@ -217,8 +217,6 @@ int main(int argc, char** argv)
                     injection_method = INJECT_METHOD_DOPP;
                 else if (!strncmp(optarg, "execproc", 8))
                     injection_method = INJECT_METHOD_EXECPROC;
-                else if (!strncmp(optarg, "linuxshellcode", 14))
-                    injection_method = INJECT_METHOD_SHELLCODE_LINUX;
                 else if (!strncmp(optarg, "readfile", 8))
                     injection_method = INJECT_METHOD_READ_FILE;
                 else if (!strncmp(optarg, "writefile", 9))
