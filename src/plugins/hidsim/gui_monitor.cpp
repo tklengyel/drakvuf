@@ -173,15 +173,14 @@ static event_response_t on_draw(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
  * investigating-memory-analysis-tools-ssdt-hooking-via-pointer-replacement/
  */
 static bool register_NtUserShowWindow_trap( drakvuf_t drakvuf, json_object* profile_json,
-    const char* function_name, drakvuf_trap_t* trap,
-    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info))
+    drakvuf_trap_t* trap, event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info))
 {
 
     addr_t func_rva = 0;
-    if (!json_get_symbol_rva(drakvuf, profile_json, function_name, &func_rva))
+    if (!json_get_symbol_rva(drakvuf, profile_json, TRAP_FUNC, &func_rva))
     {
         PRINT_DEBUG("[HIDSIM] [MONITOR] Failed to get RVA of win32k!%s\n",
-            function_name);
+            TRAP_FUNC);
         return false;
     }
 
@@ -251,7 +250,7 @@ static bool register_NtUserShowWindow_trap( drakvuf_t drakvuf, json_object* prof
         }
     }
 
-    trap->name = function_name;
+    trap->name = TRAP_FUNC;
     trap->cb   = hook_cb;
     trap->breakpoint.addr = ssdt_va - w32pst_rva + func_rva;
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
@@ -331,7 +330,7 @@ int gui_init_reconstruction(drakvuf_t drakvuf, const char* win32k_path, bool is_
      * https://www.coresecurity.com/sites/default/files/private-files/\
      * publications/2016/05/2x1MicrosoftBug-Economou.pdf, page 11
      */
-    bool success = register_NtUserShowWindow_trap(drakvuf, win32k_json, TRAP_FUNC,
+    bool success = register_NtUserShowWindow_trap(drakvuf, win32k_json,
             &gui_trap, on_draw);
     json_object_put(win32k_json);
 
