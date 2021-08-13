@@ -417,7 +417,7 @@ int gui_monitor(drakvuf_t drakvuf, volatile sig_atomic_t* coords,
             }
             has_gui_update = false;
 
-            if (res >  0)
+            if (res > 0)
             {
                 /* Sets coordinates to click next */
                 x = btn.r.x0 + btn.r.w/2;
