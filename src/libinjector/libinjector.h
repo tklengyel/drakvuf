@@ -231,6 +231,8 @@ void injector_terminate(drakvuf_t drakvuf,
     uint32_t injection_tid,
     vmi_pid_t pid);
 
+void injector_free(drakvuf_t drakvuf, injector_t injector);
+
 #pragma GCC visibility pop
 
 #ifdef __cplusplus

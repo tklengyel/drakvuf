@@ -160,6 +160,9 @@ void injector_terminate_on_win(drakvuf_t drakvuf,
     uint32_t injection_tid,
     vmi_pid_t pid);
 
+void injector_free_win(injector_t injector);
+void injector_free_linux(injector_t injector);
+
 static inline void copy_gprs(registers_t* dst, registers_t* src)
 {
     dst->x86.rip = src->x86.rip;

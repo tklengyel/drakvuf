@@ -233,7 +233,7 @@ drakvuf_c::~drakvuf_c()
     if ( !interrupted )
         interrupt(SIGDRAKVUFERROR);
 
-    g_free(injector_to_be_freed);
+    injector_free(drakvuf, injector_to_be_freed);
 
     delete plugins;
 
