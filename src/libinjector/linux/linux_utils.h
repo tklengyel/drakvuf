@@ -100,141 +100,120 @@
  * DRAKVUF, and also available from                                        *
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
+ * This file was created by Manorit Chawdhry.                              *
+ * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef LIBINJECTOR_H
-#define LIBINJECTOR_H
 
-#ifdef __cplusplus
-extern "C" {
-#define NOEXCEPT noexcept
-#else
-#define NOEXCEPT
-#endif
+#ifndef LINUX_UTILS_H
+#define LINUX_UTILS_H
 
-#pragma GCC visibility push(default)
-
+#include <errno.h>
+#include <glib.h>
+#include <inttypes.h>
+#include <json-c/json.h>
+#include <libinjector/libinjector.h>
+#include <libvmi/libvmi.h>
+#include <libvmi/x86.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <assert.h>
 #include <libdrakvuf/libdrakvuf.h>
+#include <libinjector/private.h>
 
-typedef struct injector* injector_t;
-
-typedef enum
-{
-    INJECTOR_FAILED,
-    INJECTOR_FAILED_WITH_ERROR_CODE,
-    INJECTOR_SUCCEEDED,
-    INJECTOR_TIMEOUTED,
-} injector_status_t;
+// syscall limit for error codes
+#define MAX_ERRNO 4096UL
 
 typedef enum
 {
-    // win
-    INJECT_METHOD_CREATEPROC,
-    INJECT_METHOD_TERMINATEPROC,
-    INJECT_METHOD_SHELLEXEC,
-    INJECT_METHOD_SHELLCODE,
-    INJECT_METHOD_DOPP,
-    INJECT_METHOD_READ_FILE,
-    INJECT_METHOD_WRITE_FILE,
-    // linux
-    INJECT_METHOD_EXECPROC,
-    INJECT_METHOD_SHELLCODE_LINUX,
-
-    __INJECT_METHOD_MAX
-}
-injection_method_t;
+    INJECT_RESULT_SUCCESS,
+    INJECT_RESULT_TIMEOUT,
+    INJECT_RESULT_CRASH,
+    INJECT_RESULT_ERROR_CODE,
+    INJECT_RESULT_METHOD_UNSUPPORTED,
+} inject_result_t;
 
 typedef enum
 {
-    ARGUMENT_STRING,
-    ARGUMENT_STRUCT,
-    ARGUMENT_INT,
-    __ARGUMENT_MAX
-} argument_type_t;
+    STEP1,
+    STEP2,
+    STEP3,
+    STEP4,
+    STEP5,
+} injector_step_t;
 
 typedef enum
 {
-    STATUS_NULL,
-    STATUS_ALLOC_OK,
-    STATUS_PHYS_ALLOC_OK,
-    STATUS_EXPAND_ENV_OK,
-    STATUS_WRITE_OK,
-    STATUS_EXEC_OK,
-    STATUS_BP_HIT,
-    STATUS_OPEN,
-    STATUS_TERMINATE,
-    STATUS_CREATE_OK,
-    STATUS_RESUME_OK,
-    STATUS_CREATE_FILE_OK,
-    STATUS_READ_FILE_OK,
-    STATUS_WRITE_FILE_OK,
-    STATUS_CLOSE_FILE_OK,
-    STATUS_GET_LAST_ERROR,
-    __STATUS_MAX
-} status_type_t;
+    sys_read = 0,
+    sys_write = 1,
+    sys_open = 2,
+    sys_close = 3,
+    sys_stat = 4,
+    sys_mmap = 9,
+    sys_mprotect = 10,
+    sys_munmap = 11,
+    sys_exit = 60,
+    sys_kill = 62,
+} syscall_t;
 
-struct argument
+struct injector
 {
-    uint32_t type;
-    uint32_t size;
-    uint64_t data_on_stack;
-    void* data;
+    // Inputs:
+    vmi_pid_t target_pid;
+    uint32_t target_tid;
+    const char* target_file;
+    int args_count;
+    const char** args;
+    output_format_t format;
+
+    // Internal:
+    drakvuf_t drakvuf;
+    injection_method_t method;
+    syscall_t syscall_no;
+    addr_t syscall_addr;
+    injector_step_t step;
+    bool step_override; // set this as true for jumping to some arbitrary step
+
+    // Buffer
+    struct
+    {
+        void* data;
+        size_t len;
+    } buffer;
+
+    // mmap
+    addr_t virtual_memory_addr;
+
+    // for restoring stack
+    x86_registers_t saved_regs;
+
+    // int3 trap
+    drakvuf_trap_t* bp;
+
+    // Traps
+    drakvuf_trap_t* cr3_trap;
+
+    // Results:
+    injector_status_t rc;
+    inject_result_t result;
+    struct
+    {
+        bool valid;
+        uint32_t code;
+        const char* string;
+    } error_code;
 };
 
-void init_argument(struct argument* arg,
-    argument_type_t type,
-    size_t size,
-    void* data) NOEXCEPT;
+void free_bp_trap(drakvuf_t drakvuf, injector_t injector, drakvuf_trap_t* trap);
+void free_injector(injector_t injector);
+bool save_rip_for_ret(drakvuf_t drakvuf, x86_registers_t* regs);
+addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso);
+bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t syscall_addr);
+bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info);
+bool is_syscall_error(addr_t rax);
 
-void init_int_argument(struct argument* arg,
-    uint64_t value) NOEXCEPT;
-
-void init_unicode_argument(struct argument* arg,
-    unicode_string_t* us) NOEXCEPT;
-
-void init_string_argument(struct argument* arg,
-    const char* string) NOEXCEPT;
-
-#define init_struct_argument(arg, sv) \
-    init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
-
-bool setup_stack(drakvuf_t drakvuf,
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args) NOEXCEPT;
-
-bool setup_stack_locked(drakvuf_t drakvuf,
-    vmi_instance_t vmi,
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args) NOEXCEPT;
-
-injector_status_t injector_start_app(drakvuf_t drakvuf,
-    vmi_pid_t pid,
-    uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-    const char* app,
-    const char* cwd,
-    injection_method_t method,
-    output_format_t format,
-    const char* binary_path,     // if -m = doppelganging
-    const char* target_process,  // if -m = doppelganging
-    bool break_loop_on_detection,
-    injector_t* injector_to_be_freed,
-    bool global_search, // out: iff break_loop_on_detection is set
-    bool wait_for_exit,
-    int args_count,
-    const char* args[],
-    vmi_pid_t* injected_pid) NOEXCEPT;
-
-void injector_terminate(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid,
-    vmi_pid_t pid);
-
-#pragma GCC visibility pop
-
-#ifdef __cplusplus
-}
 #endif
-
-#endif // LIBINJECTOR_H

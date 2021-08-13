@@ -100,141 +100,234 @@
  * DRAKVUF, and also available from                                        *
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
+ * This file was created by Manorit Chawdhry.                              *
+ * It is distributed as part of DRAKVUF under the same license             *
  ***************************************************************************/
 
-#ifndef LIBINJECTOR_H
-#define LIBINJECTOR_H
+#include <libinjector/debug_helpers.h>
 
-#ifdef __cplusplus
-extern "C" {
-#define NOEXCEPT noexcept
-#else
-#define NOEXCEPT
-#endif
+#include "linux_injector.h"
+#include "methods/linux_shellcode.h"
 
-#pragma GCC visibility push(default)
-
-#include <libdrakvuf/libdrakvuf.h>
-
-typedef struct injector* injector_t;
-
-typedef enum
+bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
 {
-    INJECTOR_FAILED,
-    INJECTOR_FAILED_WITH_ERROR_CODE,
-    INJECTOR_SUCCEEDED,
-    INJECTOR_TIMEOUTED,
-} injector_status_t;
+    // check CPL
+    short CPL = info->regs->cs_sel & 3;
+    PRINT_DEBUG("CPL 0x%x\n", CPL);
 
-typedef enum
-{
-    // win
-    INJECT_METHOD_CREATEPROC,
-    INJECT_METHOD_TERMINATEPROC,
-    INJECT_METHOD_SHELLEXEC,
-    INJECT_METHOD_SHELLCODE,
-    INJECT_METHOD_DOPP,
-    INJECT_METHOD_READ_FILE,
-    INJECT_METHOD_WRITE_FILE,
-    // linux
-    INJECT_METHOD_EXECPROC,
-    INJECT_METHOD_SHELLCODE_LINUX,
+    if ( CPL != 0)
+    {
+        PRINT_DEBUG("Inside INT3 userspace\n");
+    }
+    else
+    {
+        PRINT_DEBUG("INT3 received but CPL is not 0x3\n");
+        return false;
+    }
 
-    __INJECT_METHOD_MAX
+    if ( info->proc_data.pid != injector->target_pid )
+    {
+        PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
+            info->proc_data.name, info->proc_data.pid, injector->target_pid);
+        return false;
+    }
+
+    if (info->regs->rip != info->trap->breakpoint.addr)
+    {
+        PRINT_DEBUG("INT3 received but BP_ADDR (%lx) doesn't match RIP (%lx)",
+            info->trap->breakpoint.addr, info->regs->rip);
+        assert(false);
+    }
+
+    if (injector->target_tid && (uint32_t)info->proc_data.tid != injector->target_tid)
+    {
+        PRINT_DEBUG("INT3 received but '%s' TID (%u) doesn't match target process (%u)\n",
+            info->proc_data.name, info->proc_data.tid, injector->target_tid);
+        return false;
+    }
+
+    return true;
 }
-injection_method_t;
 
-typedef enum
+event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    ARGUMENT_STRING,
-    ARGUMENT_STRUCT,
-    ARGUMENT_INT,
-    __ARGUMENT_MAX
-} argument_type_t;
+    injector_t injector = info->trap->data;
 
-typedef enum
+    PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx. vcpu %i. TID %u\n",
+        info->regs->rip, info->regs->cr3, info->vcpu, info->proc_data.tid);
+
+    if (!check_userspace_int3_trap(injector, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    // reset the override on every run
+    injector->step_override = false;
+
+    event_response_t event;
+    switch (injector->method)
+    {
+        case INJECT_METHOD_SHELLCODE:
+        {
+            event = handle_shellcode(drakvuf, info);
+            break;
+        }
+        default:
+        {
+            PRINT_DEBUG("Should not be here\n");
+            assert(false);
+        }
+    }
+
+    // increase the step only if there is no manual override
+    if (!injector->step_override)
+        injector->step += 1;
+
+    return event;
+}
+
+static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    STATUS_NULL,
-    STATUS_ALLOC_OK,
-    STATUS_PHYS_ALLOC_OK,
-    STATUS_EXPAND_ENV_OK,
-    STATUS_WRITE_OK,
-    STATUS_EXEC_OK,
-    STATUS_BP_HIT,
-    STATUS_OPEN,
-    STATUS_TERMINATE,
-    STATUS_CREATE_OK,
-    STATUS_RESUME_OK,
-    STATUS_CREATE_FILE_OK,
-    STATUS_READ_FILE_OK,
-    STATUS_WRITE_FILE_OK,
-    STATUS_CLOSE_FILE_OK,
-    STATUS_GET_LAST_ERROR,
-    __STATUS_MAX
-} status_type_t;
+    injector_t injector = info->trap->data;
 
-struct argument
+    // right now we are in kernel space
+    PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". PID: %u PPID: %u TID: %u\n",
+        info->regs->cr3, info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid);
+
+    if (info->proc_data.pid != injector->target_pid && info->proc_data.tid != injector->target_tid)
+        return 0;
+
+    // rcx register should have the address for userspace rip
+    // for x64 systems
+    // if rcx doesn't have it, TODO: try to extract it from stack
+    addr_t bp_addr = info->regs->rcx;
+
+    injector->bp = g_malloc0(sizeof(drakvuf_trap_t));
+
+    // setup int3 trap
+    injector->bp->type = BREAKPOINT;
+    injector->bp->name = "injector_int3_userspace_cb";
+    injector->bp->cb = injector_int3_userspace_cb;
+    injector->bp->data = injector;
+    injector->bp->breakpoint.lookup_type = LOOKUP_DTB;
+    injector->bp->breakpoint.dtb = info->regs->cr3;
+    injector->bp->breakpoint.addr_type = ADDR_VA;
+    injector->bp->breakpoint.addr = bp_addr;
+    injector->bp->ttl = UNLIMITED_TTL;
+    injector->bp->ah_cb = NULL;
+
+    if ( drakvuf_add_trap(injector->drakvuf, injector->bp) )
+    {
+        PRINT_DEBUG("Usermode Trap Addr: %lx\n", info->regs->rcx);
+
+        // Unsubscribe from the CR3 trap
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    }
+    else
+    {
+        fprintf(stderr, "Failed to trap trapframe return address\n");
+        PRINT_DEBUG("Will keep trying in next callback\n");
+        print_registers(info);
+        print_stack(drakvuf, info, info->regs->rsp);
+        g_free(injector->bp);
+        injector->bp = NULL;
+    }
+
+    return 0;
+}
+
+static bool is_interrupted(drakvuf_t drakvuf, void* data __attribute__((unused)))
 {
-    uint32_t type;
-    uint32_t size;
-    uint64_t data_on_stack;
-    void* data;
-};
+    return drakvuf_is_interrupted(drakvuf);
+}
 
-void init_argument(struct argument* arg,
-    argument_type_t type,
-    size_t size,
-    void* data) NOEXCEPT;
+static bool inject(drakvuf_t drakvuf, injector_t injector)
+{
+    drakvuf_trap_t trap =
+    {
+        .type = REGISTER,
+        .reg = CR3,
+        .cb = wait_for_target_process_cr3_cb,
+        .data = injector,
+    };
 
-void init_int_argument(struct argument* arg,
-    uint64_t value) NOEXCEPT;
+    if (!drakvuf_add_trap(drakvuf, &trap))
+    {
+        fprintf(stderr, "Failed to set trap wait_for_target_process_cr3_cb callback");
+        return false;
+    }
 
-void init_unicode_argument(struct argument* arg,
-    unicode_string_t* us) NOEXCEPT;
+    if (!drakvuf_is_interrupted(drakvuf))
+    {
+        PRINT_DEBUG("Starting drakvuf loop\n");
+        drakvuf_loop(drakvuf, is_interrupted, NULL);
+        PRINT_DEBUG("Finished drakvuf loop\n");
+    }
 
-void init_string_argument(struct argument* arg,
-    const char* string) NOEXCEPT;
+    if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
+        injector->rc = INJECTOR_TIMEOUTED;
 
-#define init_struct_argument(arg, sv) \
-    init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
+    return true;
+}
 
-bool setup_stack(drakvuf_t drakvuf,
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args) NOEXCEPT;
+bool init_injector(injector_t injector)
+{
+    switch (injector->method)
+    {
+        case INJECT_METHOD_SHELLCODE:
+        {
+            // ret will be appended to shellcode here
+            return load_shellcode_from_file(injector, injector->target_file);
+            break;
+        }
+        default:
+        {
+            fprintf(stderr, "Method not supported for [LINUX]\n");
+            return false;
+        }
+    }
+    return true;
+}
 
-bool setup_stack_locked(drakvuf_t drakvuf,
-    vmi_instance_t vmi,
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args) NOEXCEPT;
-
-injector_status_t injector_start_app(drakvuf_t drakvuf,
+injector_status_t injector_start_app_on_linux(
+    drakvuf_t drakvuf,
     vmi_pid_t pid,
-    uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-    const char* app,
-    const char* cwd,
+    uint32_t tid,
+    const char* file,
     injection_method_t method,
     output_format_t format,
-    const char* binary_path,     // if -m = doppelganging
-    const char* target_process,  // if -m = doppelganging
-    bool break_loop_on_detection,
-    injector_t* injector_to_be_freed,
-    bool global_search, // out: iff break_loop_on_detection is set
-    bool wait_for_exit,
     int args_count,
-    const char* args[],
-    vmi_pid_t* injected_pid) NOEXCEPT;
+    const char** args
+)
+{
+    injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
+    injector->drakvuf = drakvuf;
+    injector->target_pid = pid;
+    injector->target_tid = tid;
+    injector->target_file = file;
+    if (!injector->target_tid)
+        injector->target_tid = pid;
+    injector->args_count = args_count;
 
-void injector_terminate(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid,
-    vmi_pid_t pid);
+    injector->args = (const char**)g_new0(const char*, args_count);
 
-#pragma GCC visibility pop
+    for ( int i = 0; i<args_count; i++ )
+        injector->args[i] = args[i];
+    injector->method = method;
+    injector->format = format;
+    injector->step = STEP1;
 
-#ifdef __cplusplus
+    if (init_injector(injector))
+    {
+        inject(drakvuf, injector);
+        injector->result = INJECT_RESULT_SUCCESS;
+        injector->rc = INJECTOR_SUCCEEDED;
+    }
+    else
+    {
+        injector->result = INJECT_RESULT_METHOD_UNSUPPORTED;
+        injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+    }
+
+    injector_status_t rc = injector->rc;
+    free_injector(injector);
+    return rc;
 }
-#endif
-
-#endif // LIBINJECTOR_H
