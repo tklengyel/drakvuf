@@ -241,6 +241,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
             symbol_offsets.rc_left_offset, pid, (uint32_t*)&wc->r.x0))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        free(wc);
         return NULL;
     }
 
@@ -248,6 +249,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
             symbol_offsets.rc_right_offset, pid, (uint32_t*)&wc->r.x1))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        free(wc);
         return NULL;
     }
     /* Calculate resulting width */
@@ -257,12 +259,14 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
             symbol_offsets.rc_top_offset, pid, (uint32_t*)&wc->r.y0))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        free(wc);
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_wnd_offset +
             symbol_offsets.rc_bottom_offset, pid, (uint32_t*)&wc->r.y1))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        free(wc);
         return NULL;
     }
     /* Calculate resulting height */
@@ -273,6 +277,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
             &wc->style))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        free(wc);
         return NULL;
     }
 
@@ -281,6 +286,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
             &wc->exstyle))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        free(wc);
         return NULL;
     }
 
@@ -290,6 +296,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
             pid, &pcls))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        free(wc);
         return NULL;
     }
     /* Reads atom value */
@@ -297,6 +304,7 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
             pid, &wc->atom))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        free(wc);
         return NULL;
     }
 
@@ -304,12 +312,14 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
             + symbol_offsets.rc_left_offset, pid, (uint32_t*)&wc->rclient.x0))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        free(wc);
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
             + symbol_offsets.rc_right_offset, pid, (uint32_t*)&wc->rclient.x1))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        free(wc);
         return NULL;
     }
 
@@ -317,12 +327,14 @@ struct wnd* construct_wnd_container(vmi_instance_t vmi, vmi_pid_t pid, addr_t wi
             + symbol_offsets.rc_top_offset, pid, (uint32_t*)&wc->rclient.y0))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        free(wc);
         return NULL;
     }
     if (VMI_FAILURE == vmi_read_32_va(vmi, win + symbol_offsets.rc_client_offset
             + symbol_offsets.rc_bottom_offset, pid, (uint32_t*)&wc->rclient.y1))
     {
         fprintf(stderr, "[HIDSIM][MONITOR] Error reading tagWINDOW-struct member\n");
+        free(wc);
         return NULL;
     }
 
@@ -797,7 +809,12 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
         /* Calculate offset to the start of _EPROCESS-struct */
         current_process = cur_list_entry - symbol_offsets.active_proc_links_offset;
 
-        vmi_read_32_va(vmi, current_process + symbol_offsets.pid_offset, 0, (uint32_t*)&pid);
+        if (VMI_FAILURE == vmi_read_32_va(vmi, current_process + symbol_offsets.pid_offset, 0, (uint32_t*)&pid))
+        {
+            fprintf(stderr, "Failed to read PID at %" PRIx64 "\n",
+                current_process + symbol_offsets.pid_offset);
+            continue;
+        }
 
         addr_t thrd_list_head = 0;
 
