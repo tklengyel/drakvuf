@@ -285,6 +285,10 @@ void injector_free_linux(injector_t injector)
 
     g_free((void*)injector->bp);
     g_free((void*)injector->buffer.data);
+
+    if (injector->fp)
+        fclose(injector->fp);
+
     g_free((void*)injector);
 
     injector = NULL;
