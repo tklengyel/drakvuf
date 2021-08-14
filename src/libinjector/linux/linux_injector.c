@@ -275,7 +275,7 @@ bool init_injector(injector_t injector)
         case INJECT_METHOD_SHELLCODE:
         {
             // ret will be appended to shellcode here
-            return load_shellcode_from_file(injector, injector->target_file);
+            return load_shellcode_from_file(injector, injector->host_file);
             break;
         }
         default:
@@ -292,6 +292,7 @@ injector_status_t injector_start_app_on_linux(
     vmi_pid_t pid,
     uint32_t tid,
     const char* file,
+    const char* binary_path,
     injection_method_t method,
     output_format_t format,
     int args_count,
@@ -302,7 +303,18 @@ injector_status_t injector_start_app_on_linux(
     injector->drakvuf = drakvuf;
     injector->target_pid = pid;
     injector->target_tid = tid;
-    injector->target_file = file;
+    if (method == INJECT_METHOD_WRITE_FILE || method == INJECT_METHOD_READ_FILE)
+    {
+        // since in these two, -B gives the path to host file
+        injector->host_file = binary_path;
+        injector->target_file = file;
+    }
+    else
+    {
+        // in other methods, -e gives the path to host file
+        injector->host_file = file;
+        injector->target_file = NULL;
+    }
     if (!injector->target_tid)
         injector->target_tid = pid;
     injector->args_count = args_count;
