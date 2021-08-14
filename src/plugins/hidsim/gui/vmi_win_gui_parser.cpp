@@ -797,7 +797,12 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
         /* Calculate offset to the start of _EPROCESS-struct */
         current_process = cur_list_entry - symbol_offsets.active_proc_links_offset;
 
-        vmi_read_32_va(vmi, current_process + symbol_offsets.pid_offset, 0, (uint32_t*)&pid);
+        if (VMI_FAILURE == vmi_read_32_va(vmi, current_process + symbol_offsets.pid_offset, 0, (uint32_t*)&pid))
+        {
+            fprintf(stderr, "Failed to read PID at %" PRIx64 "\n",
+                current_process + symbol_offsets.pid_offset);
+            continue;
+        }
 
         addr_t thrd_list_head = 0;
 
