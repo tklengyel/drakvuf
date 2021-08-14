@@ -124,3 +124,57 @@ bool setup_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size)
 
     return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
 }
+
+bool setup_open_syscall(injector_t injector, x86_registers_t* regs)
+{
+    // open(const char* file, int flags, int mode)
+    struct argument args[3] = { {0} };
+    init_string_argument(&args[0], injector->target_file);
+
+    switch (injector->method)
+    {
+        case INJECT_METHOD_WRITE_FILE:
+        {
+            init_int_argument(&args[1], O_WRONLY|O_CREAT|O_TRUNC);
+            break;
+        }
+        case INJECT_METHOD_READ_FILE:
+        {
+            init_int_argument(&args[1], O_RDONLY);
+            break;
+        }
+        default:
+        {
+            PRINT_DEBUG("Should not be here\n");
+            assert(false);
+        }
+    }
+
+    init_int_argument(&args[2], S_IRWXU | S_IRWXG | S_IRWXO);
+    regs->rax = sys_open;
+
+    return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
+}
+
+bool setup_close_syscall(injector_t injector, x86_registers_t* regs)
+{
+    struct argument args[1] = { {0} };
+    init_int_argument(&args[0], injector->fd);
+
+    regs->rax = sys_close;
+
+    return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
+}
+
+bool setup_write_syscall(injector_t injector, x86_registers_t* regs, size_t amount)
+{
+    // write(unsigned int fd, const char *buf, size_t count);
+    struct argument args[3] = { {0} };
+    init_int_argument(&args[0], injector->fd);
+    init_int_argument(&args[1], injector->virtual_memory_addr);
+    init_int_argument(&args[2], amount);
+
+    regs->rax = sys_write;
+
+    return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
+}
