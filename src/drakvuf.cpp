@@ -406,12 +406,6 @@ static bool is_terminated(drakvuf_t drakvuf, void* data)
             info->proc->at(info->pid));
 };
 
-/* FIXME This could break "procdump" plugin
- *
- * If "procdump" plugin was not stopped the termination of injected process
- * would lead to process dump. Though it would not wait for all breakpoints
- * been removed. This breaks the guest (BSOD on Windows).
- */
 void drakvuf_c::terminate(vmi_pid_t injection_pid,
     uint32_t injection_tid,
     vmi_pid_t pid,
