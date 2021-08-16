@@ -1994,7 +1994,7 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 
 static void print_injection_info(output_format_t format, const char* file, injector_t injector)
 {
-    static const char * inject_methods_win[] = {
+    static const char* inject_methods_win[] = {
         [INJECT_METHOD_CREATEPROC] = "createproc",
         [INJECT_METHOD_TERMINATEPROC] = "terminateproc",
         [INJECT_METHOD_SHELLEXEC] = "shellexec",
