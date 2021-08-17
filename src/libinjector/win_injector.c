@@ -1996,13 +1996,13 @@ static void print_injection_info(output_format_t format, const char* file, injec
 {
     static const char* inject_methods_win[] =
     {
-        [INJECT_METHOD_CREATEPROC] = "createproc",
-        [INJECT_METHOD_TERMINATEPROC] = "terminateproc",
-        [INJECT_METHOD_SHELLEXEC] = "shellexec",
-        [INJECT_METHOD_SHELLCODE] = "shellcode",
-        [INJECT_METHOD_DOPP] = "doppelganging",
-        [INJECT_METHOD_READ_FILE] = "readfile",
-        [INJECT_METHOD_WRITE_FILE] = "writefile",
+        [INJECT_METHOD_CREATEPROC] = "CreateProc",
+        [INJECT_METHOD_TERMINATEPROC] = "TerminateProc",
+        [INJECT_METHOD_SHELLEXEC] = "ShellExec",
+        [INJECT_METHOD_SHELLCODE] = "Shellcode",
+        [INJECT_METHOD_DOPP] = "Doppelganging",
+        [INJECT_METHOD_READ_FILE] = "ReadFile",
+        [INJECT_METHOD_WRITE_FILE] = "WriteFile",
     };
 
     gint64 t = g_get_real_time();
