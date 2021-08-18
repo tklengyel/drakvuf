@@ -106,6 +106,7 @@
 
 
 #include <libinjector/debug_helpers.h>
+#include <errno.h>
 
 #include "linux_read_file.h"
 #include "linux_syscalls.h"
@@ -118,7 +119,7 @@ bool init_read_file_method(injector_t injector, const char* file)
     FILE* fp = fopen(file, "wb");
     if (!fp)
     {
-        fprintf(stderr, "Could not open (%s) for writing\n", file);
+        fprintf(stderr, "Could not open (%s) for writing: %s\n", file, strerror(errno));
         return false;
     }
 
