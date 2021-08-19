@@ -176,25 +176,14 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
-            addr_t vdso = find_vdso(drakvuf, info);
-            if (!vdso)
-                return cleanup(drakvuf, info, false); // STEP1 trap is being cleared in the last step
-
-            addr_t syscall_addr = find_syscall(drakvuf, info, vdso);
-            if (!syscall_addr)
+            if (!init_syscalls(drakvuf, info))
                 return cleanup(drakvuf, info, false);
 
-            setup_post_syscall_trap(drakvuf, info, syscall_addr);
             // don't remove the initial trap
             // it is used for cleanup after restoring registers
 
-            if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
-            {
-                PRINT_DEBUG("Failed to setup mmap syscall");
+            if (!call_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
                 return cleanup(drakvuf, info, false);
-            }
-
-            info->regs->rip = injector->syscall_addr;
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
 
@@ -202,82 +191,54 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
         case STEP2: // open file handle
         {
-            if ( is_syscall_error(info->regs->rax) )
-            {
-                fprintf(stderr, "mmap syscall failed\n");
+            if (!call_mmap_syscall_cb(injector, info->regs))
                 return cleanup(drakvuf, info, true);
-            }
-            PRINT_DEBUG("memory address allocated using mmap: %lx\n", info->regs->rax);
-
-            // save it for future use
-            injector->virtual_memory_addr = info->regs->rax;
 
             PRINT_DEBUG("Opening file descriptor\n");
-            setup_open_syscall(injector, info->regs);
 
-            info->regs->rip = injector->syscall_addr;
+            if (!call_open_syscall(injector, info->regs))
+                return cleanup(drakvuf, info, true);
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
         }
         case STEP3: // verify fd and setups first read syscall
         {
-            if ( is_syscall_error(info->regs->rax) )
-            {
-                fprintf(stderr, "Could not open file in guest\n");
+            if (!call_open_syscall_cb(injector, info->regs))
                 return cleanup(drakvuf, info, true);
-            }
 
-            injector->fd = info->regs->rax;
-            PRINT_DEBUG("File descriptor: %ld\n", injector->fd);
-
-            if (!setup_read_syscall(injector, info->regs, FILE_BUF_SIZE))
-                PRINT_DEBUG("Failed to setup read syscall\n");
-
-            info->regs->rip = injector->syscall_addr;
+            if (!call_read_syscall(injector, info->regs, FILE_BUF_SIZE))
+                return cleanup(drakvuf, info, true);
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
         }
         case STEP4: // loop till all chunks are written and then close the fd
         {
-            if ( is_syscall_error(info->regs->rax) )
-            {
-                fprintf(stderr, "Could not read chunk from guest\n");
+            if (!call_read_syscall_cb(injector, info->regs))
                 return cleanup(drakvuf, info, true);
-            }
-            injector->buffer.len = info->regs->rax;
 
             if (!injector->buffer.len)
             {
                 PRINT_DEBUG("Read file successful\n");
                 PRINT_DEBUG("File size: (%ld)\n", injector->buffer.total_processed);
 
-                if (!setup_close_syscall(injector, info->regs))
-                {
-                    PRINT_DEBUG("Failed to setup close syscall\n");
+                if (!call_close_syscall(injector, info->regs))
                     return cleanup(drakvuf, info, true);
-                }
             }
             else
             {
-                PRINT_DEBUG("Chunk read successful (%ld)\n", injector->buffer.len);
                 injector->buffer.total_processed += injector->buffer.len;
 
                 if (!write_buffer_to_file(drakvuf, info, injector->buffer.len))
                     return cleanup(drakvuf, info, true);
 
-                if (!setup_read_syscall(injector, info->regs, FILE_BUF_SIZE))
-                {
-                    PRINT_DEBUG("Failed to setup read syscall\n");
+                if (!call_read_syscall(injector, info->regs, FILE_BUF_SIZE))
                     return cleanup(drakvuf, info, true);
-                }
 
                 injector->step_override = true;
                 injector->step = STEP4;
             }
-
-            info->regs->rip = injector->syscall_addr;
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;

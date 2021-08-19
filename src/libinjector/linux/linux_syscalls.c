@@ -109,6 +109,19 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 
+bool init_syscalls(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t vdso = find_vdso(drakvuf, info);
+    if (!vdso)
+        return false;
+
+    addr_t syscall_addr = find_syscall(drakvuf, info, vdso);
+    if (!syscall_addr)
+        return false;
+
+    return setup_post_syscall_trap(drakvuf, info, syscall_addr);
+}
+
 bool setup_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size)
 {
     // mmap(NULL, size, PROT_EXEC|PROT_WRITE|PROT_READ, MAP_SHARED|MAP_ANONYMOUS, -1, 0)
@@ -190,4 +203,95 @@ bool setup_read_syscall(injector_t injector, x86_registers_t* regs, size_t amoun
     regs->rax = sys_read;
 
     return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
+}
+
+bool call_close_syscall(injector_t injector, x86_registers_t* regs)
+{
+    if (!setup_close_syscall(injector, regs))
+    {
+        PRINT_DEBUG("Failed to setup close syscall\n");
+        return false;
+    }
+
+    regs->rip = injector->syscall_addr;
+    return true;
+}
+
+bool call_read_syscall(injector_t injector, x86_registers_t* regs, size_t amount)
+{
+    if (!setup_read_syscall(injector, regs, amount))
+    {
+        PRINT_DEBUG("Failed to setup close syscall\n");
+        return false;
+    }
+
+    regs->rip = injector->syscall_addr;
+    return true;
+}
+
+bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs)
+{
+    if ( is_syscall_error(regs->rax) )
+    {
+        fprintf(stderr, "Could not read chunk from guest\n");
+        return false;
+    }
+
+    injector->buffer.len = regs->rax;
+    PRINT_DEBUG("Chunk read successful (%ld)\n", injector->buffer.len);
+
+    return true;
+}
+
+bool call_open_syscall(injector_t injector, x86_registers_t* regs)
+{
+    if (!setup_open_syscall(injector, regs))
+    {
+        PRINT_DEBUG("Failed to setup open syscall\n");
+        return false;
+    }
+
+    regs->rip = injector->syscall_addr;
+    return true;
+}
+
+bool call_open_syscall_cb(injector_t injector, x86_registers_t* regs)
+{
+    if ( is_syscall_error(regs->rax) )
+    {
+        fprintf(stderr, "Could not open file in guest\n");
+        return false;
+    }
+
+    injector->fd = regs->rax;
+    PRINT_DEBUG("File descriptor: %ld\n", injector->fd);
+
+    return true;
+}
+
+bool call_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size)
+{
+    if (!setup_mmap_syscall(injector, regs, size))
+    {
+        PRINT_DEBUG("Failed to setup mmap syscall");
+        return false;
+    }
+
+    regs->rip = injector->syscall_addr;
+    return true;
+}
+
+bool call_mmap_syscall_cb(injector_t injector, x86_registers_t* regs)
+{
+    if ( is_syscall_error(regs->rax) )
+    {
+        fprintf(stderr, "mmap syscall failed\n");
+        return false;
+    }
+
+    // save it for future use
+    injector->virtual_memory_addr = regs->rax;
+    PRINT_DEBUG("memory address allocated using mmap: %lx\n", injector->virtual_memory_addr);
+
+    return true;
 }
