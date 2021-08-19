@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [ master ]
 jobs:
-  compile:
+  init:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -19,66 +19,162 @@ jobs:
           sudo apt-get update -q
           sudo apt-get remove -y clang
           sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
-      - name: Get Xen version
-        id: get-xen-hash
+      - name: Get submodule hashes version
+        id: get-hash
         run: |
           echo ::set-output name=XEN_HASH::$(git submodule | grep xen | awk '{ print $1 }')
+          echo ::set-output name=LIBVMI_HASH::$(git submodule | grep libvmi | awk '{ print $1 }')
+
       - name: Cache Xen debball
         id: cache-xen
         uses: actions/cache@v2
         with:
           path: xen/dist
-          key: ${{ steps.get-xen-hash.outputs.XEN_HASH }}
+          key: xen-${{ steps.get-hash.outputs.XEN_HASH }}
+
       - name: Create Xen debball
         if: steps.cache-xen.outputs.cache-hit != 'true'
         run: |
           sudo apt-get install -y wget git bcc bin86 gawk bridge-utils iproute2 libcurl4-openssl-dev bzip2 libpci-dev build-essential make gcc clang libc6-dev linux-libc-dev zlib1g-dev libncurses5-dev patch libvncserver-dev libssl-dev libsdl-dev iasl libbz2-dev e2fslibs-dev git-core uuid-dev ocaml libx11-dev bison flex ocaml-findlib xz-utils gettext libyajl-dev libpixman-1-dev libaio-dev libfdt-dev cabextract libfuse-dev liblzma-dev kpartx python3-dev python3-pip golang python-dev libsystemd-dev
+          rm -rfv xen
           git submodule update --init xen
           cd xen
           ./configure --enable-githttp --disable-pvshim
           make -j4 debball
           cd ..
+
       - name: Install Xen debball
         run: |
-          sudo dpkg -i xen/dist/xen-*.deb
-      - name: Install LibVMI
+          sudo apt-get install -f ./xen/dist/xen-*.deb
+
+      - name: Cache Libvmi files
+        id: cache-libvmi
+        uses: actions/cache@v2
+        with:
+          path: libvmi
+          key: libvmi-${{ steps.get-hash.outputs.LIBVMI_HASH }}
+
+      - name: Build LibVMI
+        if: steps.cache-libvmi.outputs.cache-hit != 'true'
         run: |
+          rm -rfv libvmi
           git submodule update --init libvmi
           cd libvmi
           autoreconf -vif
           ./configure --disable-kvm --disable-file --disable-bareflank --disable-examples --disable-vmifs
           make -j2
+          cd ..
+
+      - name: Install LibVMI
+        run: |
+          cd libvmi
           sudo make install
           sudo ldconfig
           cd ..
+
+    outputs:
+      XEN_HASH: ${{ steps.get-hash.outputs.XEN_HASH }}
+      LIBVMI_HASH: ${{ steps.get-hash.outputs.LIBVMI_HASH }}
+
+  compile:
+    runs-on: ${{ matrix.os }}
+    needs:
+      - init
+    strategy:
+        matrix:
+          os:
+            - 'ubuntu-20.04'
+          flags:
+            - ''
+            - '--enable-debug'
+            - '--enable-debug --disable-plugin-syscalls'
+            - '--enable-debug --enable-sanitize'
+            - '--enable-debug --enable-repl'
+    env:
+      CC: clang
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get remove -y clang
+          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo pip3 install ctypesgen ipython
+
+      - name: Cache Xen debball
+        uses: actions/cache@v2
+        with:
+          path: xen/dist
+          key: xen-${{ needs.init.outputs.XEN_HASH }}
+
+      - name: Cache Libvmi files
+        uses: actions/cache@v2
+        with:
+          path: libvmi
+          key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+
+      - name: Install Xen debball
+        run: |
+          sudo apt-get install -f ./xen/dist/xen-*.deb
+
+      - name: Install LibVMI
+        run: |
+          cd libvmi
+          sudo make install
+          sudo ldconfig
+          cd ..
+
       - name: autoreconf
         run: autoreconf -vif
-      - name: Compile
+
+      - name: Compile ${{ matrix.flags }}
         run: |
-          ./configure
-          make -j2
-          make -j2 clean
-      - name: Compile debug
+          ./configure ${{ matrix.flags }}
+          make -j4
+
+  build:
+    runs-on: ${{ matrix.os }}
+    needs:
+      - compile
+    strategy:
+        matrix:
+          os:
+            - 'ubuntu-20.04'
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
         run: |
-          ./configure --enable-debug
-          make -j2
-          make -j2 clean
-      - name: Compile with plugin disabled
+          sudo apt-get update -q
+          sudo apt-get remove -y clang
+          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+
+      - name: Cache Xen debball
+        uses: actions/cache@v2
+        with:
+          path: xen/dist
+          key: xen-${{ needs.init.outputs.XEN_HASH }}
+
+      - name: Cache Libvmi files
+        uses: actions/cache@v2
+        with:
+          path: libvmi
+          key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+
+      - name: Install Xen debball
         run: |
-          ./configure --enable-debug --disable-plugin-syscalls
-          make -j2
-          make -j2 clean
-      - name: Compile with sanitizer enabled
+          sudo apt-get install -f ./xen/dist/xen-*.deb
+
+      - name: Install LibVMI
         run: |
-          ./configure --enable-debug --enable-sanitize
-          make -j2
-          make -j2 clean
-      - name: Compile with REPL
-        run: |
-          sudo pip3 install ctypesgen ipython
-          ./configure --enable-debug --enable-repl
-          make -j2
-          make -j2 clean
+          cd libvmi
+          sudo make install
+          sudo ldconfig
+          cd ..
+
+      - name: autoreconf
+        run: autoreconf -vif
+
       - name: Compile from make dist tarball
         run: |
           ./configure
