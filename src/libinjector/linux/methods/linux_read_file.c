@@ -105,26 +105,232 @@
  ***************************************************************************/
 
 
-#ifndef LINUX_SYSCALLS_H
-#define LINUX_SYSCALLS_H
+#include <libinjector/debug_helpers.h>
+#include <errno.h>
 
-#include "linux_utils.h"
+#include "linux_read_file.h"
+#include "linux_syscalls.h"
 
-// use this in STEP1 for initializing the syscalls
-bool init_syscalls(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap);
+static bool write_buffer_to_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int amount);
 
-bool setup_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size);
-bool setup_open_syscall(injector_t injector, x86_registers_t* regs);
-bool setup_close_syscall(injector_t injector, x86_registers_t* regs);
-bool setup_write_syscall(injector_t injector, x86_registers_t* regs, size_t amount);
-bool setup_read_syscall(injector_t injector, x86_registers_t* regs, size_t amount);
+bool init_read_file_method(injector_t injector, const char* file)
+{
+    FILE* fp = fopen(file, "wb");
+    if (!fp)
+    {
+        fprintf(stderr, "Could not open (%s) for writing: %s\n", file, strerror(errno));
+        return false;
+    }
 
-bool call_close_syscall(injector_t injector, x86_registers_t* regs);
-bool call_read_syscall(injector_t injector, x86_registers_t* regs, size_t amount);
-bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs);
-bool call_open_syscall(injector_t injector, x86_registers_t* regs);
-bool call_open_syscall_cb(injector_t injector, x86_registers_t* regs);
-bool call_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size);
-bool call_mmap_syscall_cb(injector_t injector, x86_registers_t* regs);
+    injector->buffer.total_processed = 0;
+    injector->buffer.len = 0;
 
-#endif
+    injector->buffer.data = g_malloc0(FILE_BUF_SIZE);
+
+    PRINT_DEBUG("File init success\n");
+
+    injector->fp = fp;
+
+    return true;
+}
+
+/* This function handles reading file from guest OS, it does that in total of 6 steps
+ *
+ * STEP1:
+ * It initialises the syscalls ( it is used for jumping to syscall instruction )
+ * After that it calls mmap, mmap is used as a buffer for exchanging
+ * data between the guest VM and the host OS. The initial trap must not be removed here,
+ * it should be done in the last step as it will be used for cleanup
+ *
+ * STEP2:
+ * Handles the result from mmap call and opens the file handle inside guest VM
+ *
+ * STEP3:
+ * This step is the initialization before the while loop analogy, it will handle the open syscall result
+ * and set up read syscall for reading the initial chunk of file from the target file
+ *
+ * STEP4:
+ * We will reach this after the callback from STEP3, In the beginning of this step, we will
+ * handle read syscall result, we have the file chunk in injector buffer now.
+ * It will write that buffer to file and set up read syscall again for reading the next chunk
+ * it overrides the next step as STEP4 until the buffer read from target file is 0.
+ * When it reaches zero, it closes the file handle inside the guest OS which tells us that the
+ * read file operation is complete
+ *
+ * STEP5:
+ * It restores the state of the VM
+ *
+ * STEP6:
+ * It removes the initial trap and exits out of drakvuf loop
+ */
+event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = (injector_t)info->trap->data;
+
+    event_response_t event;
+
+    switch (injector->step)
+    {
+        case STEP1: // Finds vdso and sets up mmap
+        {
+            memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
+
+            if (!init_syscalls(drakvuf, info))
+                return cleanup(drakvuf, info, false);
+
+            // don't remove the initial trap
+            // it is used for cleanup after restoring registers
+
+            if (!call_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
+                return cleanup(drakvuf, info, false);
+
+            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+
+            break;
+        }
+        case STEP2: // open file handle
+        {
+            if (!call_mmap_syscall_cb(injector, info->regs))
+                return cleanup(drakvuf, info, true);
+
+            PRINT_DEBUG("Opening file descriptor\n");
+
+            if (!call_open_syscall(injector, info->regs))
+                return cleanup(drakvuf, info, true);
+
+            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            break;
+        }
+        case STEP3: // verify fd and setups first read syscall
+        {
+            if (!call_open_syscall_cb(injector, info->regs))
+                return cleanup(drakvuf, info, true);
+
+            if (!call_read_syscall(injector, info->regs, FILE_BUF_SIZE))
+                return cleanup(drakvuf, info, true);
+
+            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            break;
+        }
+        case STEP4: // loop till all chunks are written and then close the fd
+        {
+            if (!call_read_syscall_cb(injector, info->regs))
+                return cleanup(drakvuf, info, true);
+
+            if (!injector->buffer.len)
+            {
+                PRINT_DEBUG("Read file successful\n");
+                PRINT_DEBUG("File size: (%ld)\n", injector->buffer.total_processed);
+
+                if (!call_close_syscall(injector, info->regs))
+                    return cleanup(drakvuf, info, true);
+            }
+            else
+            {
+                injector->buffer.total_processed += injector->buffer.len;
+
+                if (!write_buffer_to_file(drakvuf, info, injector->buffer.len))
+                    return cleanup(drakvuf, info, true);
+
+                if (!call_read_syscall(injector, info->regs, FILE_BUF_SIZE))
+                    return cleanup(drakvuf, info, true);
+
+                injector->step_override = true;
+                injector->step = STEP4;
+            }
+
+            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            break;
+        }
+        case STEP5: // restore the registers
+        {
+            // We are not handling close syscall error codes yet as it won't break the injector
+            // or the target application working whatever the result comes
+
+            PRINT_DEBUG("Closed File descriptor\n");
+            PRINT_DEBUG("Restoring state\n");
+            free_bp_trap(drakvuf, injector, info->trap);
+
+            // restore regs
+            memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+
+            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            break;
+        }
+        case STEP6: // cleanup
+        {
+            PRINT_DEBUG("Removing traps and exiting\n");
+
+            // remove the initial trap here
+            free_bp_trap(drakvuf, injector, info->trap);
+            drakvuf_interrupt(drakvuf, SIGINT);
+
+            event = VMI_EVENT_RESPONSE_NONE;
+            break;
+        }
+        default:
+        {
+            PRINT_DEBUG("Should not be here\n");
+            assert(false);
+        }
+    }
+
+    return event;
+}
+
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap)
+{
+    PRINT_DEBUG("Doing premature cleanup\n");
+    injector_t injector = (injector_t)info->trap->data;
+
+    // restore regs
+    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+
+    if (clear_trap)
+        free_bp_trap(drakvuf, injector, info->trap);
+
+    // since we are jumping to some arbitrary step, we will set this
+    injector->step_override = true;
+
+    // give the last step for cleanup
+    injector->step = STEP6;
+
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
+}
+
+static bool write_buffer_to_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info, int size)
+{
+    injector_t injector = (injector_t)info->trap->data;
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = injector->virtual_memory_addr
+    );
+
+    size_t bytes_read = 0;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+
+    if ( vmi_read(vmi, &ctx, size, injector->buffer.data, &bytes_read) != VMI_SUCCESS )
+    {
+        fprintf(stderr, "Could not read buffer from mmap address\n");
+        goto err;
+    }
+
+    if (!fwrite( injector->buffer.data, 1, bytes_read, injector->fp ))
+    {
+        fprintf(stderr, "Could not write to file\n");
+        goto err;
+    }
+
+    PRINT_DEBUG("Buffer written to file\n");
+
+    drakvuf_release_vmi(drakvuf);
+    return true;
+
+err:
+    drakvuf_release_vmi(drakvuf);
+    return false;
+}
