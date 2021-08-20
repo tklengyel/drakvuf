@@ -1994,6 +1994,17 @@ static bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
 
 static void print_injection_info(output_format_t format, const char* file, injector_t injector)
 {
+    static const char* inject_methods_win[] =
+    {
+        [INJECT_METHOD_CREATEPROC] = "CreateProc",
+        [INJECT_METHOD_TERMINATEPROC] = "TerminateProc",
+        [INJECT_METHOD_SHELLEXEC] = "ShellExec",
+        [INJECT_METHOD_SHELLCODE] = "Shellcode",
+        [INJECT_METHOD_DOPP] = "Doppelganging",
+        [INJECT_METHOD_READ_FILE] = "ReadFile",
+        [INJECT_METHOD_WRITE_FILE] = "WriteFile",
+    };
+
     gint64 t = g_get_real_time();
 
     const char* process_name = "";
@@ -2001,6 +2012,8 @@ static void print_injection_info(output_format_t format, const char* file, injec
 
     const char* splitter = " ";
     const char* begin_proc_name = file;
+
+    const char* method = inject_methods_win[injector->method];
 
     if (file[0] == '"')
     {
@@ -2036,32 +2049,33 @@ static void print_injection_info(output_format_t format, const char* file, injec
             switch (format)
             {
                 case OUTPUT_CSV:
-                    printf("inject," FORMAT_TIMEVAL ",Success,%u,\"%s\",\"%s\",%u,%u\n",
-                        UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                    printf("inject," FORMAT_TIMEVAL ",%s,Success,%u,\"%s\",\"%s\",%u,%u\n",
+                        UNPACK_TIMEVAL(t), method, injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
                     break;
 
                 case OUTPUT_KV:
-                    printf("inject Time=" FORMAT_TIMEVAL ",Status=Success,PID=%u,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
-                        UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                    printf("inject Time=" FORMAT_TIMEVAL ",Method=%s,Status=Success,PID=%u,ProcessName=\"%s\",Arguments=\"%s\",InjectedPid=%u,InjectedTid=%u\n",
+                        UNPACK_TIMEVAL(t), method, injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
                     break;
 
                 case OUTPUT_JSON:
                     printf( "{"
                         "\"Plugin\": \"inject\", "
                         "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                        "\"Method\": \"%s\", "
                         "\"Status\": \"Success\", "
                         "\"ProcessName\": \"%s\", "
                         "\"Arguments\": \"%s\", "
                         "\"InjectedPid\": %d, "
                         "\"InjectedTid\": %d"
                         "}\n",
-                        UNPACK_TIMEVAL(t), escaped_pname, escaped_arguments, injector->pid, injector->tid);
+                        UNPACK_TIMEVAL(t), method, escaped_pname, escaped_arguments, injector->pid, injector->tid);
                     break;
 
                 default:
                 case OUTPUT_DEFAULT:
-                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:SUCCESS PID:%u FILE:\"%s\" ARGUMENTS:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
-                        UNPACK_TIMEVAL(t), injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " METHOD:%s  STATUS:SUCCESS PID:%u FILE:\"%s\" ARGUMENTS:\"%s\" INJECTED_PID:%u INJECTED_TID:%u\n",
+                        UNPACK_TIMEVAL(t), method, injector->target_pid, process_name, escaped_arguments, injector->pid, injector->tid);
                     break;
             }
             break;
@@ -2069,24 +2083,25 @@ static void print_injection_info(output_format_t format, const char* file, injec
             switch (format)
             {
                 case OUTPUT_CSV:
-                    printf("inject," FORMAT_TIMEVAL ",Timeout\n", UNPACK_TIMEVAL(t));
+                    printf("inject," FORMAT_TIMEVAL ",%s,Timeout\n", UNPACK_TIMEVAL(t), method);
                     break;
 
                 case OUTPUT_KV:
-                    printf("inject Time=" FORMAT_TIMEVAL ",Status=Timeout\n", UNPACK_TIMEVAL(t));
+                    printf("inject Time=" FORMAT_TIMEVAL ",Method=%s,Status=Timeout\n", UNPACK_TIMEVAL(t), method);
                     break;
 
                 case OUTPUT_JSON:
                     printf( "{"
                         "\"Plugin\": \"inject\", "
                         "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                        "\"Method\": \"%s\", "
                         "\"Status\": \"Timeout\""
-                        "}\n", UNPACK_TIMEVAL(t));
+                        "}\n", UNPACK_TIMEVAL(t), method);
                     break;
 
                 default:
                 case OUTPUT_DEFAULT:
-                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Timeout\n", UNPACK_TIMEVAL(t));
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " METHOD:%s STATUS:Timeout\n", UNPACK_TIMEVAL(t), method);
                     break;
             }
             break;
@@ -2094,24 +2109,25 @@ static void print_injection_info(output_format_t format, const char* file, injec
             switch (format)
             {
                 case OUTPUT_CSV:
-                    printf("inject," FORMAT_TIMEVAL ",Crash\n", UNPACK_TIMEVAL(t));
+                    printf("inject," FORMAT_TIMEVAL ",%s,Crash\n", UNPACK_TIMEVAL(t), method);
                     break;
 
                 case OUTPUT_KV:
-                    printf("inject Time=" FORMAT_TIMEVAL ",Status=Crash\n", UNPACK_TIMEVAL(t));
+                    printf("inject Time=" FORMAT_TIMEVAL ",Method=%s,Status=Crash\n", UNPACK_TIMEVAL(t), method);
                     break;
 
                 case OUTPUT_JSON:
                     printf( "{"
                         "\"Plugin\": \"inject\", "
                         "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                        "\"Method\": \"%s\", "
                         "\"Status\": \"Crash\""
-                        "}\n", UNPACK_TIMEVAL(t));
+                        "}\n", UNPACK_TIMEVAL(t), method);
                     break;
 
                 default:
                 case OUTPUT_DEFAULT:
-                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Crash\n", UNPACK_TIMEVAL(t));
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " METHOD: %s STATUS:Crash\n", UNPACK_TIMEVAL(t), method);
                     break;
             }
             break;
@@ -2119,24 +2135,25 @@ static void print_injection_info(output_format_t format, const char* file, injec
             switch (format)
             {
                 case OUTPUT_CSV:
-                    printf("inject," FORMAT_TIMEVAL ",PrematureBreak\n", UNPACK_TIMEVAL(t));
+                    printf("inject," FORMAT_TIMEVAL ",%s,PrematureBreak\n", UNPACK_TIMEVAL(t), method);
                     break;
 
                 case OUTPUT_KV:
-                    printf("inject Time=" FORMAT_TIMEVAL ",Status=PrematureBreak\n", UNPACK_TIMEVAL(t));
+                    printf("inject Time=" FORMAT_TIMEVAL ",Method=%s,Status=PrematureBreak\n", UNPACK_TIMEVAL(t), method);
                     break;
 
                 case OUTPUT_JSON:
                     printf( "{"
                         "\"Plugin\": \"inject\", "
                         "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                        "\"Method\": \"%s\", "
                         "\"Status\": \"PrematureBreak\""
-                        "}\n", UNPACK_TIMEVAL(t));
+                        "}\n", UNPACK_TIMEVAL(t), method);
                     break;
 
                 default:
                 case OUTPUT_DEFAULT:
-                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:PrematureBreak\n", UNPACK_TIMEVAL(t));
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " METHOD:%s STATUS:PrematureBreak\n", UNPACK_TIMEVAL(t), method);
                     break;
             }
             break;
@@ -2144,24 +2161,25 @@ static void print_injection_info(output_format_t format, const char* file, injec
             switch (format)
             {
                 case OUTPUT_CSV:
-                    printf("inject," FORMAT_TIMEVAL ",InitFail\n", UNPACK_TIMEVAL(t));
+                    printf("inject," FORMAT_TIMEVAL ",%s,InitFail\n", UNPACK_TIMEVAL(t), method);
                     break;
 
                 case OUTPUT_KV:
-                    printf("inject Time=" FORMAT_TIMEVAL ",Status=InitFail\n", UNPACK_TIMEVAL(t));
+                    printf("inject Time=" FORMAT_TIMEVAL ",Method=%s,Status=InitFail\n", UNPACK_TIMEVAL(t), method);
                     break;
 
                 case OUTPUT_JSON:
                     printf( "{"
                         "\"Plugin\": \"inject\", "
                         "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                        "\"Method\": \"%s\", "
                         "\"Status\": \"InitFail\""
-                        "}\n", UNPACK_TIMEVAL(t));
+                        "}\n", UNPACK_TIMEVAL(t), method);
                     break;
 
                 default:
                 case OUTPUT_DEFAULT:
-                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:InitFail\n", UNPACK_TIMEVAL(t));
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " METHOD:%s STATUS:InitFail\n", UNPACK_TIMEVAL(t), method);
                     break;
             }
             break;
@@ -2169,30 +2187,31 @@ static void print_injection_info(output_format_t format, const char* file, injec
             switch (format)
             {
                 case OUTPUT_CSV:
-                    printf("inject," FORMAT_TIMEVAL ",Error,%d,\"%s\"\n",
-                        UNPACK_TIMEVAL(t), injector->error_code.code, injector->error_code.string);
+                    printf("inject," FORMAT_TIMEVAL ",%s,Error,%d,\"%s\"\n",
+                        UNPACK_TIMEVAL(t), method, injector->error_code.code, injector->error_code.string);
                     break;
 
                 case OUTPUT_KV:
-                    printf("inject Time=" FORMAT_TIMEVAL ",Status=Error,ErrorCode=%d,Error=\"%s\"\n",
-                        UNPACK_TIMEVAL(t), injector->error_code.code, injector->error_code.string);
+                    printf("inject Time=" FORMAT_TIMEVAL ",Method=%s,Status=Error,ErrorCode=%d,Error=\"%s\"\n",
+                        UNPACK_TIMEVAL(t), method, injector->error_code.code, injector->error_code.string);
                     break;
 
                 case OUTPUT_JSON:
                     printf( "{"
                         "\"Plugin\": \"inject\", "
                         "\"TimeStamp\": \"" FORMAT_TIMEVAL "\", "
+                        "\"Method\": \"%s\", "
                         "\"Status\": \"Error\", "
                         "\"ErrorCode\": %d, "
                         "\"Error\": \"%s\""
                         "}\n",
-                        UNPACK_TIMEVAL(t), injector->error_code.code, injector->error_code.string);
+                        UNPACK_TIMEVAL(t), method, injector->error_code.code, injector->error_code.string);
                     break;
 
                 default:
                 case OUTPUT_DEFAULT:
-                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " STATUS:Error ERROR_CODE:%d ERROR:\"%s\"\n",
-                        UNPACK_TIMEVAL(t), injector->error_code.code, injector->error_code.string);
+                    printf("[INJECT] TIME:" FORMAT_TIMEVAL " METHOD:%s STATUS:Error ERROR_CODE:%d ERROR:\"%s\"\n",
+                        UNPACK_TIMEVAL(t), method, injector->error_code.code, injector->error_code.string);
                     break;
             }
             break;
