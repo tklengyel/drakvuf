@@ -109,6 +109,7 @@
 #include "linux_injector.h"
 #include "methods/linux_shellcode.h"
 #include "methods/linux_write_file.h"
+#include "methods/linux_read_file.h"
 
 bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
 {
@@ -174,6 +175,11 @@ event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info
         case INJECT_METHOD_WRITE_FILE:
         {
             event = handle_write_file(drakvuf, info);
+            break;
+        }
+        case INJECT_METHOD_READ_FILE:
+        {
+            event = handle_read_file(drakvuf, info);
             break;
         }
         default:
@@ -298,6 +304,20 @@ bool init_injector(injector_t injector)
             }
             return init_write_file_method(injector, injector->host_file);
             break;
+        }
+        case INJECT_METHOD_READ_FILE:
+        {
+            if (!injector->target_file)
+            {
+                fprintf(stderr, "Target File is missing");
+                return false;
+            }
+            if (!injector->host_file)
+            {
+                fprintf(stderr, "Host File is missing");
+                return false;
+            }
+            return init_read_file_method(injector, injector->host_file);
         }
         default:
         {
