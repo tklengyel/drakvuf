@@ -51,26 +51,27 @@ jobs:
         id: cache-libvmi
         uses: actions/cache@v2
         with:
-          path: libvmi
+          path: libvmi/dist
           key: libvmi-${{ steps.get-hash.outputs.LIBVMI_HASH }}
 
       - name: Build LibVMI
         if: steps.cache-libvmi.outputs.cache-hit != 'true'
         run: |
           rm -rfv libvmi
+          sudo apt-get install -y build-essential autoconf-archive flex bison libjson-c-dev libxen-dev debhelper
           git submodule update --init libvmi
           cd libvmi
-          autoreconf -vif
-          ./configure --disable-kvm --disable-file --disable-bareflank --disable-examples --disable-vmifs
-          make -j2
-          cd ..
+          sed -i 's/--disable-kvm/--disable-kvm --disable-file --disable-bareflank --disable-examples --disable-vmifs/g' debian/rules
+          dpkg-buildpackage -B
+          mkdir dist
+          mv ../*.deb dist/
 
       - name: Install LibVMI
         run: |
-          cd libvmi
-          sudo make install
+          cd libvmi/dist
+          sudo apt install -f ./*.deb
           sudo ldconfig
-          cd ..
+          cd ../..
 
     outputs:
       XEN_HASH: ${{ steps.get-hash.outputs.XEN_HASH }}
@@ -111,7 +112,7 @@ jobs:
       - name: Cache Libvmi files
         uses: actions/cache@v2
         with:
-          path: libvmi
+          path: libvmi/dist
           key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
 
       - name: Install Xen debball
@@ -120,10 +121,10 @@ jobs:
 
       - name: Install LibVMI
         run: |
-          cd libvmi
-          sudo make install
+          cd libvmi/dist
+          sudo apt install -f ./*.deb
           sudo ldconfig
-          cd ..
+          cd ../..
 
       - name: autoreconf
         run: autoreconf -vif
@@ -158,7 +159,7 @@ jobs:
       - name: Cache Libvmi files
         uses: actions/cache@v2
         with:
-          path: libvmi
+          path: libvmi/dist
           key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
 
       - name: Install Xen debball
@@ -167,10 +168,10 @@ jobs:
 
       - name: Install LibVMI
         run: |
-          cd libvmi
-          sudo make install
+          cd libvmi/dist
+          sudo apt install -f ./*.deb
           sudo ldconfig
-          cd ..
+          cd ../..
 
       - name: autoreconf
         run: autoreconf -vif
