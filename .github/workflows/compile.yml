@@ -137,7 +137,7 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     needs:
-      - compile
+      - init
     strategy:
         matrix:
           os:
