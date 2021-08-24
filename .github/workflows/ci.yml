@@ -1,4 +1,4 @@
-name: compile
+name: ci
 on:
   pull_request:
     branches: [ master ]
@@ -40,7 +40,7 @@ jobs:
           git submodule update --init xen
           cd xen
           ./configure --enable-githttp --disable-pvshim
-          make -j4 debball
+          make -j2 debball
           cd ..
 
       - name: Install Xen debball
@@ -132,9 +132,9 @@ jobs:
       - name: Compile ${{ matrix.flags }}
         run: |
           ./configure ${{ matrix.flags }}
-          make -j4
+          make -j2
 
-  build:
+  tarbuild:
     runs-on: ${{ matrix.os }}
     needs:
       - init
@@ -186,3 +186,119 @@ jobs:
           ./autogen.sh
           ./configure
           make -j2
+
+  codeql-analyze:
+    name: Code QL Analyze
+    runs-on: ${{ matrix.os }}
+    needs:
+      - init
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['cpp']
+        os:
+          - 'ubuntu-20.04'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+      with:
+        # We must fetch at least the immediate parents so that if this is
+        # a pull request then we can checkout the head.
+        fetch-depth: 2
+
+    # Initializes the CodeQL tools for scanning.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v1
+      with:
+        languages: ${{ matrix.language }}
+        queries: security-and-quality
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update -q
+        sudo apt-get remove -y clang
+        sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+
+    - name: Cache Xen debball
+      uses: actions/cache@v2
+      with:
+        path: xen/dist
+        key: xen-${{ needs.init.outputs.XEN_HASH }}
+
+    - name: Cache Libvmi files
+      uses: actions/cache@v2
+      with:
+        path: libvmi/dist
+        key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+
+    - name: Install Xen debball
+      run: |
+        sudo apt-get install -f ./xen/dist/xen-*.deb
+
+    - name: Install LibVMI
+      run: |
+        cd libvmi/dist
+        sudo apt install -f ./*.deb
+        sudo ldconfig
+        cd ../..
+
+    - name: Compile and install DRAKVUF
+      run: |
+        autoreconf -vif
+        ./configure
+        make -j2
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v1
+
+  scan-build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - 'ubuntu-20.04'
+    needs:
+      - init
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: |
+          # Install packages
+          sudo apt-get update -q
+          sudo apt-get install -y clang-10 clang-tools-10 autoconf-archive flex bison libjson-c-dev
+
+      - name: Cache Xen debball
+        uses: actions/cache@v2
+        with:
+          path: xen/dist
+          key: xen-${{ needs.init.outputs.XEN_HASH }}
+
+      - name: Cache Libvmi files
+        uses: actions/cache@v2
+        with:
+          path: libvmi/dist
+          key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
+
+      - name: Install Xen debball
+        run: |
+          sudo apt-get install -f ./xen/dist/xen-*.deb
+
+      - name: Install LibVMI
+        run: |
+          cd libvmi/dist
+          sudo apt install -f ./*.deb
+          sudo ldconfig
+          cd ../..
+
+      - name: Scan build
+        run: |
+          # Set Exports
+          export PATH=/usr/lib/llvm-10/bin:$PATH
+          export CC=clang-10
+          export CXX=clang++-10
+
+          # scan-build
+          autoreconf -vif
+          scan-build --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
+          scan-build --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores make -j2
