@@ -784,6 +784,86 @@ bool win_search_modules_wow( drakvuf_t drakvuf,
     return ret ;
 }
 
+struct enumerate_modules_visitor_ctx
+{
+    addr_t eprocess;
+    addr_t dtb;
+    vmi_pid_t pid;
+    bool is_wow_process;
+    bool is_wow;
+    process_const_module_visitor_t* inner_func;
+    void* inner_ctx;
+};
+
+static bool enumerate_modules_visitor(drakvuf_t drakvuf, module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx)
+{
+    struct enumerate_modules_visitor_ctx* ctx = (struct enumerate_modules_visitor_ctx*)visitor_ctx;
+
+    module_info->eprocess_addr  = ctx->eprocess;
+    module_info->dtb            = ctx->dtb;
+    module_info->pid            = ctx->pid;
+    module_info->is_wow_process = ctx->is_wow_process;
+    module_info->is_wow         = ctx->is_wow;
+
+    return ctx->inner_func(drakvuf, module_info, need_free, need_stop, ctx->inner_ctx);
+}
+
+bool win_enumerate_process_modules(drakvuf_t drakvuf, addr_t eprocess, process_const_module_visitor_t visitor_func, void* visitor_ctx)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    vmi_pid_t pid;
+    addr_t dtb;
+    if (win_get_process_pid(drakvuf, eprocess, &pid) &&
+        vmi_pid_to_dtb(vmi, pid, &dtb) == VMI_SUCCESS)
+    {
+        addr_t module_list_head;
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = dtb
+        );
+        addr_t wow_peb = win_get_wow_peb(drakvuf, &ctx, eprocess);
+
+        // List x64 modules...
+        if (win_get_module_list(drakvuf, eprocess, &module_list_head))
+        {
+            struct enumerate_modules_visitor_ctx enumeration_ctx =
+            {
+                .eprocess       = eprocess,
+                .dtb            = dtb,
+                .pid            = pid,
+                .is_wow_process = wow_peb,
+                .is_wow         = false,
+                .inner_func     = visitor_func,
+                .inner_ctx      = visitor_ctx,
+            };
+
+            if (!win_enumerate_module_info_ctx(drakvuf, module_list_head, &ctx, enumerate_modules_visitor, &enumeration_ctx))
+                return false;
+        }
+
+        // List WoW64 modules...
+        if (wow_peb && win_get_module_list_wow(drakvuf, &ctx, wow_peb, &module_list_head))
+        {
+            struct enumerate_modules_visitor_ctx enumeration_ctx =
+            {
+                .eprocess       = eprocess,
+                .dtb            = dtb,
+                .pid            = pid,
+                .is_wow_process = true,
+                .is_wow         = true,
+                .inner_func     = visitor_func,
+                .inner_ctx      = visitor_ctx,
+            };
+
+            if (!win_enumerate_module_info_ctx_wow(drakvuf, module_list_head, &ctx, enumerate_modules_visitor, &enumeration_ctx))
+                return false;
+        }
+    }
+
+    return true;
+}
+
 addr_t win_get_wow_peb( drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess )
 {
     // 'Wow64Process' could not be the first member of '_EPROCESS' so this is cheap check

@@ -118,8 +118,6 @@ enum offset
 {
     KTHREAD_TRAPFRAME,
     KTRAP_FRAME_RIP,
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
     __OFFSET_MAX
 };
 
@@ -127,8 +125,6 @@ static const char* offset_names[__OFFSET_MAX][2] =
 {
     [KTHREAD_TRAPFRAME] = { "_KTHREAD", "TrapFrame" },
     [KTRAP_FRAME_RIP] = {"_KTRAP_FRAME", "Rip"},
-    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
-    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
 };
 
 /**
