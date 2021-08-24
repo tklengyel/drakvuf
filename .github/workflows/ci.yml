@@ -2,6 +2,8 @@ name: ci
 on:
   pull_request:
     branches: [ master ]
+  push:
+    branches: [ master ]
 jobs:
   init:
     runs-on: ${{ matrix.os }}
@@ -79,6 +81,7 @@ jobs:
 
   compile:
     runs-on: ${{ matrix.os }}
+    if: ${{ github.event_name != 'push' }}
     needs:
       - init
     strategy:
@@ -138,6 +141,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs:
       - init
+    if: ${{ github.event_name == 'pull_request' }}
     strategy:
         matrix:
           os:
@@ -260,6 +264,7 @@ jobs:
           - 'ubuntu-20.04'
     needs:
       - init
+    if: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
