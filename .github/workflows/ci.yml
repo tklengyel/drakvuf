@@ -81,7 +81,7 @@ jobs:
 
   compile:
     runs-on: ${{ matrix.os }}
-    if: ${{ github.event_name != 'push' }}
+    if: ${{ github.event_name == 'pull_request' }}
     needs:
       - init
     strategy:
