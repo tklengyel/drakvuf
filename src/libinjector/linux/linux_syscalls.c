@@ -243,6 +243,30 @@ bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs)
     return true;
 }
 
+bool call_write_syscall(injector_t injector, x86_registers_t* regs, size_t amount)
+{
+    if (!setup_write_syscall(injector, regs, amount))
+    {
+        PRINT_DEBUG("Failed to setup write syscall\n");
+        return false;
+    }
+
+    regs->rip = injector->syscall_addr;
+    return true;
+}
+
+bool call_write_syscall_cb(injector_t injector, x86_registers_t* regs)
+{
+    if ( is_syscall_error(regs->rax) )
+    {
+        fprintf(stderr, "Could not write chunk to guest\n");
+        return false;
+    }
+
+    PRINT_DEBUG("Chunk write successful (%ld/%ld)\n", injector->buffer.total_processed, injector->buffer.total_len);
+    return true;
+}
+
 bool call_open_syscall(injector_t injector, x86_registers_t* regs)
 {
     if (!setup_open_syscall(injector, regs))
