@@ -141,20 +141,16 @@ typedef enum dispatcher_object
 bool win_search_modules( drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx, addr_t eprocess_addr, addr_t wow_process, vmi_pid_t pid, access_context_t* ctx );
 bool win_search_modules_wow( drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx, addr_t eprocess_addr, addr_t wow_peb, vmi_pid_t pid, access_context_t* ctx );
 
-addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static bool win_get_current_kpcr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* kpcr, addr_t* prcb)
 {
     vmi_instance_t vmi = drakvuf->vmi;
-    addr_t thread = 0;
-    addr_t prcb = 0;
-    addr_t kpcr = 0;
-
     // TODO: check whether we could use ss_arbytes here
     unsigned int cpl = info->regs->cs_sel & 3;
 
     if (VMI_PM_IA32E == drakvuf->pm)
     {
-        prcb = drakvuf->offsets[KPCR_PRCB];
-        kpcr = cpl ? info->regs->shadow_gs :
+        *prcb = drakvuf->offsets[KPCR_PRCB];
+        *kpcr = cpl ? info->regs->shadow_gs :
             /* if we are in kernel mode we might trap before swapgs */
             VMI_GET_BIT(info->regs->gs_base, 47) ? info->regs->gs_base : info->regs->shadow_gs;
     }
@@ -174,18 +170,46 @@ addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             addr_t gdt = info->regs->gdtr_base;
 
             if (VMI_FAILURE == vmi_read_16_va(vmi, gdt + 0x32, 0, &fs_low))
-                return 0;
+                return false;
             if (VMI_FAILURE == vmi_read_8_va(vmi, gdt + 0x34, 0, &fs_mid))
-                return 0;
+                return false;
             if (VMI_FAILURE == vmi_read_8_va(vmi, gdt + 0x37, 0, &fs_high))
-                return 0;
+                return false;
 
-            kpcr = ((uint32_t)fs_low) | ((uint32_t)fs_mid) << 16 | ((uint32_t)fs_high) << 24;
+            *kpcr = ((uint32_t)fs_low) | ((uint32_t)fs_mid) << 16 | ((uint32_t)fs_high) << 24;
         }
         else
-            kpcr = info->regs->fs_base;
+            *kpcr = info->regs->fs_base;
 
-        prcb = drakvuf->offsets[KPCR_PRCBDATA];
+        *prcb = drakvuf->offsets[KPCR_PRCBDATA];
+    }
+
+    return true;
+}
+
+bool win_get_current_irql(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint8_t* irql)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t prcb = 0;
+    addr_t kpcr = 0;
+
+    if ( !win_get_current_kpcr(drakvuf, info, &kpcr, &prcb) ||
+        (VMI_SUCCESS != vmi_read_8_va(vmi, kpcr + drakvuf->offsets[KPCR_IRQL], 0, irql)) )
+        return false;
+
+    return true;
+}
+
+addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t thread = 0;
+    addr_t prcb = 0;
+    addr_t kpcr = 0;
+
+    if (! win_get_current_kpcr(drakvuf, info, &kpcr, &prcb) )
+    {
+        return 0;
     }
 
     if (VMI_SUCCESS != vmi_read_addr_va(vmi, kpcr + prcb + drakvuf->offsets[KPRCB_CURRENTTHREAD], 0, &thread))
@@ -570,6 +594,63 @@ bool win_is_eprocess( drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr )
     }
 
     return false ;
+}
+
+bool win_is_process_suspended(drakvuf_t drakvuf, addr_t process, bool* status)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    addr_t list_head;
+    if ( VMI_SUCCESS != vmi_read_addr_va(vmi, process + drakvuf->offsets[EPROCESS_LISTTHREADHEAD], 0, &list_head) )
+        return false;
+
+    addr_t current_list_entry = list_head;
+    addr_t next_list_entry;
+    if ( VMI_SUCCESS != vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry) )
+    {
+        PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
+        return false;
+    }
+
+    do
+    {
+        addr_t current_thread = current_list_entry - drakvuf->offsets[ETHREAD_THREADLISTENTRY] ;
+        uint8_t thread_state;
+        if ( VMI_SUCCESS != vmi_read_8_va(vmi, current_thread + drakvuf->offsets[KTHREAD_STATE], 0, &thread_state) )
+        {
+            PRINT_DEBUG("Failed to read thread state of thread at %"PRIx64"\n", current_thread);
+            return false;
+        }
+        /*
+         * typedef enum _KTHREAD_STATE {
+         *     Initialized   = 0,
+         *     Ready         = 1,
+         *     Running       = 2,
+         *     Standby       = 3,
+         *     Terminated    = 4,
+         *     Waiting       = 5,
+         *     Transition    = 6,
+         *     DeferredReady = 7,
+         *     GateWait      = 8
+         * } KTHREAD_STATE;
+         */
+        if (thread_state == 2) // TODO Add value
+        {
+            *status = false;
+            return true;
+        }
+
+        current_list_entry = next_list_entry;
+
+        if ( VMI_SUCCESS != vmi_read_addr_va(vmi, current_list_entry, 0, &next_list_entry) )
+        {
+            PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
+            return false;
+        }
+    } while (next_list_entry != list_head);
+
+    *status = true;
+    return true;
 }
 
 bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module_list)

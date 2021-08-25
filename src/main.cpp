@@ -289,7 +289,7 @@ static void print_usage()
         "\t --userhook-no-addr\n"
         "\t                           Stop printing addresses of string arguments in apimon and memdump\n"
 #endif
-#ifdef ENABLE_PLUGIN_PROCDUMP
+#if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2)
         "\t --procdump-dir <directory>\n"
         "\t                           Where to store processes dumps\n"
         "\t --compress-procdumps\n"
@@ -734,7 +734,7 @@ int main(int argc, char** argv)
                 options.memdump_disable_shellcode_detect = true;
                 break;
 #endif
-#ifdef ENABLE_PLUGIN_PROCDUMP
+#if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2)
             case opt_procdump_dir:
                 options.procdump_dir = optarg;
                 break;
@@ -891,6 +891,7 @@ int main(int argc, char** argv)
 
         drakvuf->interrupt(0); // clear
     }
+    options.procdump_on_terminate = injected_pid;
 
     PRINT_DEBUG("Enabling context based interception.\n");
 
