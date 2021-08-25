@@ -114,10 +114,13 @@
 bool init_syscalls(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 bool setup_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size);
-bool setup_open_syscall(injector_t injector, x86_registers_t* regs);
-bool setup_close_syscall(injector_t injector, x86_registers_t* regs);
-bool setup_write_syscall(injector_t injector, x86_registers_t* regs, size_t amount);
-bool setup_read_syscall(injector_t injector, x86_registers_t* regs, size_t amount);
+bool setup_open_syscall(injector_t injector, x86_registers_t* regs,
+    const char* target_file, int flags, int mode);
+bool setup_close_syscall(injector_t injector, x86_registers_t* regs, int fd);
+bool setup_write_syscall(injector_t injector, x86_registers_t* regs,
+    int fd, addr_t buffer_addr, size_t amount);
+bool setup_read_syscall(injector_t injector, x86_registers_t* regs,
+    int fd, addr_t buffer_addr, size_t amount);
 
 bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs);
 bool call_write_syscall_cb(injector_t injector, x86_registers_t* regs);

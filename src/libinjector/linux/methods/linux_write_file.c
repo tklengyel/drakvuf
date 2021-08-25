@@ -107,6 +107,7 @@
 
 #include <libinjector/debug_helpers.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include "linux_write_file.h"
 #include "linux_syscalls.h"
@@ -205,7 +206,9 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             PRINT_DEBUG("Opening file descriptor\n");
 
-            if (!setup_open_syscall(injector, info->regs))
+            if (!setup_open_syscall(injector, info->regs, injector->target_file,
+                    O_WRONLY | O_CREAT | O_TRUNC,
+                    S_IRWXU | S_IRWXG | S_IRWXO))
                 return cleanup(drakvuf, info, true);
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -221,7 +224,8 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!write_buffer_to_mmap_location(drakvuf, info))
                 return cleanup(drakvuf, info, true);
 
-            if (!setup_write_syscall(injector, info->regs, injector->buffer.len))
+            if (!setup_write_syscall(injector, info->regs, injector->fd,
+                    injector->virtual_memory_addr, injector->buffer.len))
                 return cleanup(drakvuf, info, true);
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -238,7 +242,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             {
                 PRINT_DEBUG("Write file successful\n");
 
-                if (!setup_close_syscall(injector, info->regs))
+                if (!setup_close_syscall(injector, info->regs, injector->fd))
                     return cleanup(drakvuf, info, true);
             }
             else
@@ -246,7 +250,8 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 if (!write_buffer_to_mmap_location(drakvuf, info))
                     return cleanup(drakvuf, info, true);
 
-                if (!setup_write_syscall(injector, info->regs, injector->buffer.len))
+                if (!setup_write_syscall(injector, info->regs, injector->fd,
+                        injector->virtual_memory_addr, injector->buffer.len))
                     return cleanup(drakvuf, info, true);
 
                 injector->step_override = true;

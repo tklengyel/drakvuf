@@ -107,7 +107,6 @@
 
 #include "linux_syscalls.h"
 #include <sys/mman.h>
-#include <fcntl.h>
 
 bool init_syscalls(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -146,32 +145,15 @@ bool setup_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size)
 
 }
 
-bool setup_open_syscall(injector_t injector, x86_registers_t* regs)
+bool setup_open_syscall(injector_t injector, x86_registers_t* regs, const char* target_file, int flags, int mode)
 {
     // open(const char* file, int flags, int mode)
     struct argument args[3] = { {0} };
-    init_string_argument(&args[0], injector->target_file);
 
-    switch (injector->method)
-    {
-        case INJECT_METHOD_WRITE_FILE:
-        {
-            init_int_argument(&args[1], O_WRONLY|O_CREAT|O_TRUNC);
-            break;
-        }
-        case INJECT_METHOD_READ_FILE:
-        {
-            init_int_argument(&args[1], O_RDONLY);
-            break;
-        }
-        default:
-        {
-            PRINT_DEBUG("Should not be here\n");
-            assert(false);
-        }
-    }
+    init_string_argument(&args[0], target_file);
+    init_int_argument(&args[1], flags);
+    init_int_argument(&args[2], mode);
 
-    init_int_argument(&args[2], S_IRWXU | S_IRWXG | S_IRWXO);
     regs->rax = sys_open;
     regs->rip = injector->syscall_addr;
 
@@ -183,10 +165,10 @@ bool setup_open_syscall(injector_t injector, x86_registers_t* regs)
     return true;
 }
 
-bool setup_close_syscall(injector_t injector, x86_registers_t* regs)
+bool setup_close_syscall(injector_t injector, x86_registers_t* regs, int fd)
 {
     struct argument args[1] = { {0} };
-    init_int_argument(&args[0], injector->fd);
+    init_int_argument(&args[0], fd);
 
     regs->rax = sys_close;
     regs->rip = injector->syscall_addr;
@@ -199,12 +181,12 @@ bool setup_close_syscall(injector_t injector, x86_registers_t* regs)
     return true;
 }
 
-bool setup_write_syscall(injector_t injector, x86_registers_t* regs, size_t amount)
+bool setup_write_syscall(injector_t injector, x86_registers_t* regs, int fd, addr_t buffer_addr, size_t amount)
 {
     // write(unsigned int fd, const char *buf, size_t count);
     struct argument args[3] = { {0} };
-    init_int_argument(&args[0], injector->fd);
-    init_int_argument(&args[1], injector->virtual_memory_addr);
+    init_int_argument(&args[0], fd);
+    init_int_argument(&args[1], buffer_addr);
     init_int_argument(&args[2], amount);
 
     regs->rax = sys_write;
@@ -218,12 +200,12 @@ bool setup_write_syscall(injector_t injector, x86_registers_t* regs, size_t amou
     return true;
 }
 
-bool setup_read_syscall(injector_t injector, x86_registers_t* regs, size_t amount)
+bool setup_read_syscall(injector_t injector, x86_registers_t* regs, int fd, addr_t buffer_addr, size_t amount)
 {
     // read(unsigned int fd, char *buf, size_t count);
     struct argument args[3] = { {0} };
-    init_int_argument(&args[0], injector->fd);
-    init_int_argument(&args[1], injector->virtual_memory_addr);
+    init_int_argument(&args[0], fd);
+    init_int_argument(&args[1], buffer_addr);
     init_int_argument(&args[2], amount);
 
     regs->rax = sys_read;
