@@ -134,8 +134,16 @@ bool setup_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size)
     init_int_argument(&args[5], 0);
 
     regs->rax = sys_mmap;
+    regs->rip = injector->syscall_addr;
 
-    return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
+    if (!setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args)))
+    {
+        PRINT_DEBUG("Failed to setup mmap syscall\n");
+        return false;
+    }
+
+    return true;
+
 }
 
 bool setup_open_syscall(injector_t injector, x86_registers_t* regs)
@@ -165,8 +173,14 @@ bool setup_open_syscall(injector_t injector, x86_registers_t* regs)
 
     init_int_argument(&args[2], S_IRWXU | S_IRWXG | S_IRWXO);
     regs->rax = sys_open;
+    regs->rip = injector->syscall_addr;
 
-    return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
+    if (!setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args)))
+    {
+        PRINT_DEBUG("Failed to setup open syscall\n");
+        return false;
+    }
+    return true;
 }
 
 bool setup_close_syscall(injector_t injector, x86_registers_t* regs)
@@ -175,8 +189,14 @@ bool setup_close_syscall(injector_t injector, x86_registers_t* regs)
     init_int_argument(&args[0], injector->fd);
 
     regs->rax = sys_close;
+    regs->rip = injector->syscall_addr;
 
-    return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
+    if (!setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args)))
+    {
+        PRINT_DEBUG("Failed to setup close syscall\n");
+        return false;
+    }
+    return true;
 }
 
 bool setup_write_syscall(injector_t injector, x86_registers_t* regs, size_t amount)
@@ -188,8 +208,14 @@ bool setup_write_syscall(injector_t injector, x86_registers_t* regs, size_t amou
     init_int_argument(&args[2], amount);
 
     regs->rax = sys_write;
+    regs->rip = injector->syscall_addr;
 
-    return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
+    if (!setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args)))
+    {
+        PRINT_DEBUG("Failed to setup write syscall\n");
+        return false;
+    }
+    return true;
 }
 
 bool setup_read_syscall(injector_t injector, x86_registers_t* regs, size_t amount)
@@ -201,41 +227,20 @@ bool setup_read_syscall(injector_t injector, x86_registers_t* regs, size_t amoun
     init_int_argument(&args[2], amount);
 
     regs->rax = sys_read;
+    regs->rip = injector->syscall_addr;
 
-    return setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args));
-}
-
-bool call_close_syscall(injector_t injector, x86_registers_t* regs)
-{
-    if (!setup_close_syscall(injector, regs))
+    if (!setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args)))
     {
-        PRINT_DEBUG("Failed to setup close syscall\n");
+        PRINT_DEBUG("Failed to setup read syscall\n");
         return false;
     }
-
-    regs->rip = injector->syscall_addr;
-    return true;
-}
-
-bool call_read_syscall(injector_t injector, x86_registers_t* regs, size_t amount)
-{
-    if (!setup_read_syscall(injector, regs, amount))
-    {
-        PRINT_DEBUG("Failed to setup close syscall\n");
-        return false;
-    }
-
-    regs->rip = injector->syscall_addr;
     return true;
 }
 
 bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs)
 {
-    if ( is_syscall_error(regs->rax) )
-    {
-        fprintf(stderr, "Could not read chunk from guest\n");
+    if (is_syscall_error(regs->rax, "Could not read chunk from guest"))
         return false;
-    }
 
     injector->buffer.len = regs->rax;
     PRINT_DEBUG("Chunk read successful (%ld)\n", injector->buffer.len);
@@ -243,49 +248,19 @@ bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs)
     return true;
 }
 
-bool call_write_syscall(injector_t injector, x86_registers_t* regs, size_t amount)
-{
-    if (!setup_write_syscall(injector, regs, amount))
-    {
-        PRINT_DEBUG("Failed to setup write syscall\n");
-        return false;
-    }
-
-    regs->rip = injector->syscall_addr;
-    return true;
-}
-
 bool call_write_syscall_cb(injector_t injector, x86_registers_t* regs)
 {
-    if ( is_syscall_error(regs->rax) )
-    {
-        fprintf(stderr, "Could not write chunk to guest\n");
+    if (is_syscall_error(regs->rax, "Could not write chunk to guest"))
         return false;
-    }
 
     PRINT_DEBUG("Chunk write successful (%ld/%ld)\n", injector->buffer.total_processed, injector->buffer.total_len);
     return true;
 }
 
-bool call_open_syscall(injector_t injector, x86_registers_t* regs)
-{
-    if (!setup_open_syscall(injector, regs))
-    {
-        PRINT_DEBUG("Failed to setup open syscall\n");
-        return false;
-    }
-
-    regs->rip = injector->syscall_addr;
-    return true;
-}
-
 bool call_open_syscall_cb(injector_t injector, x86_registers_t* regs)
 {
-    if ( is_syscall_error(regs->rax) )
-    {
-        fprintf(stderr, "Could not open file in guest\n");
+    if (is_syscall_error(regs->rax, "Could not open file in guest"))
         return false;
-    }
 
     injector->fd = regs->rax;
     PRINT_DEBUG("File descriptor: %ld\n", injector->fd);
@@ -293,25 +268,10 @@ bool call_open_syscall_cb(injector_t injector, x86_registers_t* regs)
     return true;
 }
 
-bool call_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size)
-{
-    if (!setup_mmap_syscall(injector, regs, size))
-    {
-        PRINT_DEBUG("Failed to setup mmap syscall");
-        return false;
-    }
-
-    regs->rip = injector->syscall_addr;
-    return true;
-}
-
 bool call_mmap_syscall_cb(injector_t injector, x86_registers_t* regs)
 {
-    if ( is_syscall_error(regs->rax) )
-    {
-        fprintf(stderr, "mmap syscall failed\n");
+    if (is_syscall_error(regs->rax, "mmap syscall failed"))
         return false;
-    }
 
     // save it for future use
     injector->virtual_memory_addr = regs->rax;

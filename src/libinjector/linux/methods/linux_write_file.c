@@ -191,7 +191,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             // don't remove the initial trap
             // it is used for cleanup after restoring registers
 
-            if (!call_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
+            if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
                 return cleanup(drakvuf, info, false);
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -205,7 +205,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             PRINT_DEBUG("Opening file descriptor\n");
 
-            if (!call_open_syscall(injector, info->regs))
+            if (!setup_open_syscall(injector, info->regs))
                 return cleanup(drakvuf, info, true);
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -221,7 +221,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!write_buffer_to_mmap_location(drakvuf, info))
                 return cleanup(drakvuf, info, true);
 
-            if (!call_write_syscall(injector, info->regs, injector->buffer.len))
+            if (!setup_write_syscall(injector, info->regs, injector->buffer.len))
                 return cleanup(drakvuf, info, true);
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -238,7 +238,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             {
                 PRINT_DEBUG("Write file successful\n");
 
-                if (!call_close_syscall(injector, info->regs))
+                if (!setup_close_syscall(injector, info->regs))
                     return cleanup(drakvuf, info, true);
             }
             else
@@ -246,7 +246,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 if (!write_buffer_to_mmap_location(drakvuf, info))
                     return cleanup(drakvuf, info, true);
 
-                if (!call_write_syscall(injector, info->regs, injector->buffer.len))
+                if (!setup_write_syscall(injector, info->regs, injector->buffer.len))
                     return cleanup(drakvuf, info, true);
 
                 injector->step_override = true;

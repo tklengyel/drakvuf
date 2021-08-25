@@ -119,14 +119,9 @@ bool setup_close_syscall(injector_t injector, x86_registers_t* regs);
 bool setup_write_syscall(injector_t injector, x86_registers_t* regs, size_t amount);
 bool setup_read_syscall(injector_t injector, x86_registers_t* regs, size_t amount);
 
-bool call_close_syscall(injector_t injector, x86_registers_t* regs);
-bool call_read_syscall(injector_t injector, x86_registers_t* regs, size_t amount);
 bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs);
-bool call_write_syscall(injector_t injector, x86_registers_t* regs, size_t amount);
 bool call_write_syscall_cb(injector_t injector, x86_registers_t* regs);
-bool call_open_syscall(injector_t injector, x86_registers_t* regs);
 bool call_open_syscall_cb(injector_t injector, x86_registers_t* regs);
-bool call_mmap_syscall(injector_t injector, x86_registers_t* regs, size_t size);
 bool call_mmap_syscall_cb(injector_t injector, x86_registers_t* regs);
 
 #endif

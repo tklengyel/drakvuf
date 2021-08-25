@@ -182,7 +182,7 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             // don't remove the initial trap
             // it is used for cleanup after restoring registers
 
-            if (!call_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
+            if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
                 return cleanup(drakvuf, info, false);
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -196,7 +196,7 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             PRINT_DEBUG("Opening file descriptor\n");
 
-            if (!call_open_syscall(injector, info->regs))
+            if (!setup_open_syscall(injector, info->regs))
                 return cleanup(drakvuf, info, true);
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -207,7 +207,7 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!call_open_syscall_cb(injector, info->regs))
                 return cleanup(drakvuf, info, true);
 
-            if (!call_read_syscall(injector, info->regs, FILE_BUF_SIZE))
+            if (!setup_read_syscall(injector, info->regs, FILE_BUF_SIZE))
                 return cleanup(drakvuf, info, true);
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -223,7 +223,7 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 PRINT_DEBUG("Read file successful\n");
                 PRINT_DEBUG("File size: (%ld)\n", injector->buffer.total_processed);
 
-                if (!call_close_syscall(injector, info->regs))
+                if (!setup_close_syscall(injector, info->regs))
                     return cleanup(drakvuf, info, true);
             }
             else
@@ -233,7 +233,7 @@ event_response_t handle_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 if (!write_buffer_to_file(drakvuf, info, injector->buffer.len))
                     return cleanup(drakvuf, info, true);
 
-                if (!call_read_syscall(injector, info->regs, FILE_BUF_SIZE))
+                if (!setup_read_syscall(injector, info->regs, FILE_BUF_SIZE))
                     return cleanup(drakvuf, info, true);
 
                 injector->step_override = true;

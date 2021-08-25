@@ -164,7 +164,7 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             // don't remove the initial trap
             // it is used for cleanup after restoring registers
 
-            if (!call_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
+            if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
                 return cleanup(drakvuf, info, false);
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
