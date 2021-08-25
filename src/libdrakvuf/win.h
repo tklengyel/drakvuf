@@ -110,6 +110,8 @@
 #include "os.h"
 #include "win-exports.h"
 
+bool win_get_current_irql(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint8_t* irql);
+
 addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 addr_t win_get_current_thread_teb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
@@ -149,6 +151,7 @@ bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
 bool win_is_ethread(drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
 
 bool win_is_eprocess(drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
+bool win_is_process_suspended(drakvuf_t drakvuf, addr_t process, bool* status);
 
 bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module_list);
 bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list );

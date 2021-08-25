@@ -143,6 +143,13 @@ bool fill_kernel_bitfields(drakvuf_t drakvuf, size_t size, const char* names [][
     return 1;
 }
 
+bool drakvuf_get_current_irql(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint8_t* irql)
+{
+    if ( drakvuf->osi.get_current_irql )
+        return drakvuf->osi.get_current_irql(drakvuf, info, irql);
+    return false;
+}
+
 addr_t drakvuf_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     if ( drakvuf->osi.get_current_thread )
@@ -237,12 +244,12 @@ static void process_visitor(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ct
 
     if (!drakvuf_get_process_pid(drakvuf, eprocess, &temp_pid))
     {
-        PRINT_DEBUG("[MEMDUMP] Failed to get process pid\n");
+        PRINT_DEBUG("[LIBDRAKVUF] Failed to get process pid\n");
         return;
     }
     if (temp_pid == *ctx->pid)
     {
-        PRINT_DEBUG("[MEMDUMP] Found remote process base! Getting dtb..\n");
+        PRINT_DEBUG("[LIBDRAKVUF] Found remote process base! Getting dtb..\n");
         drakvuf_get_process_dtb(drakvuf, eprocess, ctx->dtb);
         *ctx->process = eprocess;
     }
@@ -256,7 +263,7 @@ bool drakvuf_get_process_by_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
         vmi_pid_t pid;
         if (!drakvuf_get_pid_from_handle(drakvuf, info, handle, &pid))
         {
-            PRINT_DEBUG("[MEMDUMP] Failed to get remote process pid\n");
+            PRINT_DEBUG("[LIBDRAKVUF] Failed to get remote process pid\n");
             return VMI_EVENT_RESPONSE_NONE;
         }
 
@@ -275,6 +282,22 @@ bool drakvuf_get_process_by_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
         *process = info->attached_proc_data.base_addr;
         *dtb     = info->regs->cr3;
     }
+
+    if (!*process || !*dtb)
+        return false;
+    return true;
+}
+
+bool drakvuf_get_process_by_pid(drakvuf_t drakvuf, vmi_pid_t pid, addr_t* process, addr_t* dtb)
+{
+    pass_context_t pctx =
+    {
+        .pid = &pid,
+        .process = process,
+        .dtb = dtb
+    };
+    // Get process by pid
+    drakvuf_enumerate_processes(drakvuf, process_visitor, (void*)(&pctx));
 
     if (!*process || !*dtb)
         return false;
@@ -370,6 +393,14 @@ bool drakvuf_is_process( drakvuf_t drakvuf, addr_t dtb, addr_t process_addr )
         return drakvuf->osi.is_process(drakvuf, dtb, process_addr);
 
     return 0;
+}
+
+bool drakvuf_is_process_suspended(drakvuf_t drakvuf, addr_t process, bool* status)
+{
+    if ( drakvuf->osi.is_process_suspended )
+        return drakvuf->osi.is_process_suspended(drakvuf, process, status);
+
+    return false;
 }
 
 bool drakvuf_get_module_list(drakvuf_t drakvuf, addr_t process_base, addr_t* module_list)

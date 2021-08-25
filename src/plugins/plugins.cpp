@@ -128,6 +128,7 @@
 #include "memdump/memdump.h"
 #include "apimon/apimon.h"
 #include "procdump/procdump.h"
+#include "procdump2/procdump2.h"
 #include "rpcmon/rpcmon.h"
 #include "tlsmon/tlsmon.h"
 #include "codemon/codemon.h"
@@ -372,6 +373,21 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     };
                     this->plugins[plugin_id] =
                         std::make_unique<procdump>(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_PROCDUMP2
+                case PLUGIN_PROCDUMP2 :
+                {
+                    procdump2_config config =
+                    {
+                        .procdump_dir = options->procdump_dir,
+                        .compress_procdumps = options->compress_procdumps,
+                        .procdump_on_terminate = options->procdump_on_terminate,
+                        .terminated_processes = options->terminated_processes
+                    };
+                    this->plugins[plugin_id] =
+                        std::make_unique<procdump2>(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif

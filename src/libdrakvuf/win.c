@@ -491,6 +491,7 @@ bool set_os_windows(drakvuf_t drakvuf)
         return 0;
     }
 
+    drakvuf->osi.get_current_irql = win_get_current_irql;
     drakvuf->osi.get_current_thread = win_get_current_thread;
     drakvuf->osi.get_current_thread_teb = win_get_current_thread_teb;
     drakvuf->osi.get_current_thread_stackbase = win_get_current_thread_stackbase;
@@ -510,6 +511,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_module_base_addr = win_get_module_base_addr;
     drakvuf->osi.get_module_base_addr_ctx = win_get_module_base_addr_ctx;
     drakvuf->osi.is_process = win_is_eprocess;
+    drakvuf->osi.is_process_suspended = win_is_process_suspended;
     drakvuf->osi.is_thread = win_is_ethread;
     drakvuf->osi.get_module_list = win_get_module_list;
     drakvuf->osi.get_module_list_wow = win_get_module_list_wow;

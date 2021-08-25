@@ -113,35 +113,45 @@ using std::endl;
 
 void dump_buffer(const uint8_t buffer[], const size_t count, const size_t columns, addr_t base_addr, std::string header, std::string footer)
 {
-    cout << header << endl;
+    if (!header.empty())
+    {
+        // cout << header << endl;
+        fprintf(stderr, "%s", header.data());
+    }
+    fprintf(stderr, "\n");
 
     for (size_t r = 0; r < count; r += columns)
     {
         // Print base address
-        printf("\n\t0x%08lX | +0x%04zX |", base_addr + r, r);
+        fprintf(stderr, "\n\t0x%08lX | +0x%04zX |", base_addr + r, r);
 
         // Print memory contents as bytes in hex format
         size_t c;
         for (c = 0; c != std::min(columns, count -r); ++c)
-            printf(" %02X", buffer[r + c]);
+            fprintf(stderr, " %02X", buffer[r + c]);
 
         // Print spaces if row is "short"
         for (size_t s = 0; s != columns - c; ++s)
-            printf("   ");
+            fprintf(stderr, "   ");
 
         // Print bytes as ASCII characters
-        printf(" | ");
+        fprintf(stderr, " | ");
         for (size_t a = 0; a != c; ++a)
         {
             auto v = buffer[r + a];
             if (std::isprint(v))
-                printf("%c", v);
+                fprintf(stderr, "%c", v);
             else
-                printf(".");
+                fprintf(stderr, ".");
         }
     }
 
-    cout << endl << footer << endl;
+    if (!footer.empty())
+    {
+        // cout << endl << footer << endl;
+        fprintf(stderr, "%s", footer.data());
+    }
+    fprintf(stderr, "\n");
 }
 
 void dump_va(vmi_instance_t vmi, access_context_t* ctx, const size_t count, const size_t columns, std::string header, std::string footer)
@@ -153,7 +163,7 @@ void dump_va(vmi_instance_t vmi, access_context_t* ctx, const size_t count, cons
 
 void dump_registers(const x86_registers_t* regs, string header, string footer)
 {
-    printf("%s\n"
+    fprintf(stderr, "%s\n"
         "rax 0x%016lx rbx 0x%016lx rcx 0x%016lx rdx 0x%016lx\n"
         "rsi 0x%016lx rdi 0x%016lx rbp 0x%016lx rsp 0x%016lx\n"
         "r8  0x%016lx r9  0x%016lx r10 0x%016lx r11 0x%016lx\n"
