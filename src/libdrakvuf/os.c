@@ -540,6 +540,14 @@ bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf, const char* modu
     return false;
 }
 
+bool drakvuf_enumerate_process_modules(drakvuf_t drakvuf, addr_t eprocess, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx), void* visitor_ctx)
+{
+    if ( drakvuf->osi.enumerate_process_modules )
+        return drakvuf->osi.enumerate_process_modules( drakvuf, eprocess, visitor_func, visitor_ctx );
+
+    return false;
+}
+
 bool drakvuf_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid)
 {
     *pid = 0;

@@ -123,56 +123,21 @@
 
 bool fill_wow_offsets(drakvuf_t drakvuf, size_t size, const char* names [][2]);
 
-bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap,
-    addr_t list_head, vmi_pid_t pid)
+static void free_module_info(module_info_t* module_info)
 {
-    vmi_instance_t vmi = drakvuf->vmi;
-    addr_t next_module = list_head;
-    addr_t tmp_next;
-    addr_t dllbase;
-
-    while (1)
-    {
-
-        if ( VMI_FAILURE == vmi_read_addr_va(vmi, next_module, pid, &tmp_next) )
-            break;
-
-        if (list_head == tmp_next)
-            break;
-
-        if ( VMI_FAILURE == vmi_read_addr_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid, &dllbase) )
-            break;
-
-        if (!dllbase)
-            break;
-
-        ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_PID,
-            .addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME],
-            .pid = pid);
-
-        unicode_string_t* us = drakvuf_read_unicode_common(vmi, &ctx);
-
-        if (us)
-        {
-            PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", us->contents, dllbase);
-
-            bool match = (us->contents && !strcasecmp((char*)us->contents, trap->breakpoint.module));
-            vmi_free_unicode_str(us);
-            if (match)
-                return inject_trap(drakvuf, trap, dllbase, pid);
-        }
-
-        next_module = tmp_next;
-    }
-
-    return 0;
+    if (!module_info) return;
+    if (module_info->base_name)
+        vmi_free_unicode_str(module_info->base_name);
+    if (module_info->full_name)
+        vmi_free_unicode_str(module_info->full_name);
+    g_slice_free(module_info_t, module_info);
 }
 
-bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out)
+bool win_enumerate_module_info_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, process_module_visitor_t visitor_func, void* visitor_ctx)
 {
     vmi_instance_t vmi = drakvuf->vmi;
     addr_t next_module = module_list_head;
+
     /* walk the module list */
     while (1)
     {
@@ -180,39 +145,189 @@ bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, ac
         addr_t tmp_next = 0;
         ctx->addr = next_module;
         if (VMI_FAILURE == vmi_read_addr(vmi, ctx, &tmp_next))
-            break;
+            return false;
 
         /* if we are back at the list head, we are done */
         if (module_list_head == tmp_next || !tmp_next)
-        {
             break;
-        }
 
-        addr_t dllbase;
         ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
-        if ( VMI_FAILURE == vmi_read_addr(vmi, ctx, &dllbase) )
-            break;
-
-        bool found = false;
-
-        ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-        unicode_string_t* us = drakvuf_read_unicode_common(vmi, ctx);
-
-        if (us)
+        addr_t base_addr;
+        if (vmi_read_addr(vmi, ctx, &base_addr) == VMI_SUCCESS)
         {
-            PRINT_DEBUG("Found module %s at 0x%lx\n", us->contents, dllbase);
-            found = !strcasecmp((char*) us->contents, module_name);
+            ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
+            unicode_string_t* base_name = drakvuf_read_unicode_common(vmi, ctx);
 
-            vmi_free_unicode_str(us);
-        }
+            if (base_name)
+            {
+                PRINT_DEBUG("Found module %s at 0x%lx\n", base_name->contents, base_addr);
 
-        if (found)
-        {
-            *base_addr_out = dllbase;
-            return true;
+                ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
+                unicode_string_t* full_name = drakvuf_read_unicode_common(vmi, ctx);
+
+                bool need_free = true;
+                bool need_stop = false;
+                bool success = true;
+                module_info_t* module_info = (module_info_t*)g_slice_alloc0( sizeof( module_info_t ) );
+                if (module_info)
+                {
+                    module_info->base_addr = base_addr;
+                    module_info->base_name = base_name;
+                    module_info->full_name = full_name;
+
+                    success = visitor_func(drakvuf, module_info, &need_free, &need_stop, visitor_ctx);
+
+                    if (need_free)
+                        free_module_info(module_info);
+                }
+                else
+                {
+                    vmi_free_unicode_str(base_name);
+                    if (full_name)
+                        vmi_free_unicode_str(full_name);
+                }
+
+                if (need_stop)
+                    break;
+
+                if (!success)
+                    return false;
+            }
         }
 
         next_module = tmp_next;
+    }
+
+    return true;
+}
+
+bool win_enumerate_module_info_ctx_wow(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, process_module_visitor_t visitor_func, void* visitor_ctx)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+    addr_t next_module = module_list_head;
+
+    /* walk the module list */
+    while (1)
+    {
+        /* follow the next pointer */
+        addr_t tmp_next = 0;
+        ctx->addr = next_module;
+        if (VMI_FAILURE == vmi_read_32(vmi, ctx, (uint32_t*)&tmp_next))
+            return false;
+
+        /* if we are back at the list head, we are done */
+        if (module_list_head == tmp_next || !tmp_next)
+            break;
+
+        ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_DLLBASE];
+        addr_t base_addr = 0;
+        if (vmi_read_32(vmi, ctx, (uint32_t*)&base_addr) == VMI_SUCCESS)
+        {
+            ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
+            unicode_string_t* base_name = drakvuf_read_unicode32_common(vmi, ctx);
+
+            if (base_name)
+            {
+                PRINT_DEBUG("Found WOW64 module %s at 0x%lx\n", base_name->contents, base_addr);
+
+                ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
+                unicode_string_t* full_name = drakvuf_read_unicode32_common(vmi, ctx);
+
+                bool need_free = true;
+                bool need_stop = false;
+                bool success = true;
+                module_info_t* module_info = (module_info_t*)g_slice_alloc0( sizeof( module_info_t ) );
+                if (module_info)
+                {
+                    module_info->base_addr = base_addr;
+                    module_info->base_name = base_name;
+                    module_info->full_name = full_name;
+
+                    success = visitor_func(drakvuf, module_info, &need_free, &need_stop, visitor_ctx);
+
+                    if (need_free)
+                        free_module_info(module_info);
+                }
+                else
+                {
+                    vmi_free_unicode_str(base_name);
+                    if (full_name)
+                        vmi_free_unicode_str(full_name);
+                }
+
+                if (need_stop)
+                    break;
+
+                if (!success)
+                    return false;
+            }
+        }
+
+        next_module = tmp_next;
+    }
+
+    return true;
+}
+
+
+struct find_module_visitor_ctx
+{
+    const char* module_name;
+    module_info_t* ret;
+};
+
+static bool find_module_visitor(drakvuf_t drakvuf, module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx)
+{
+    struct find_module_visitor_ctx* ctx = (struct find_module_visitor_ctx*)visitor_ctx;
+    UNUSED(drakvuf);
+
+    bool found = !strcasecmp((const char*)module_info->base_name->contents, ctx->module_name);
+
+    if (found)
+    {
+        ctx->ret = module_info;
+        if (need_free)
+            *need_free = false;
+    }
+
+    if (need_stop && found)
+        *need_stop = true;
+
+    return true;
+}
+
+bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = pid);
+
+    struct find_module_visitor_ctx visitor_ctx = { .module_name = trap->breakpoint.module, .ret = NULL };
+    if (!win_enumerate_module_info_ctx(drakvuf, list_head, &ctx, find_module_visitor, &visitor_ctx))
+        return false;
+
+    if (visitor_ctx.ret)
+    {
+        addr_t dllbase = visitor_ctx.ret->base_addr;
+        free_module_info(visitor_ctx.ret);
+        return inject_trap(drakvuf, trap, dllbase, pid);
+    }
+
+    return false;
+}
+
+bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out)
+{
+    struct find_module_visitor_ctx visitor_ctx = { .module_name = module_name, .ret = NULL };
+    if (!win_enumerate_module_info_ctx(drakvuf, module_list_head, ctx, find_module_visitor, &visitor_ctx))
+        return false;
+
+    if (visitor_ctx.ret)
+    {
+        if (base_addr_out)
+            *base_addr_out = visitor_ctx.ret->base_addr;
+        free_module_info(visitor_ctx.ret);
+        return true;
     }
 
     PRINT_DEBUG("Failed to find %s in list starting at 0x%lx\n", module_name, module_list_head);
@@ -229,57 +344,14 @@ bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const 
     return win_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, module_name, base_addr_out);
 }
 
-
 module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name )
 {
-    vmi_instance_t vmi = drakvuf->vmi;
-    addr_t next_module = module_list_head;
+    struct find_module_visitor_ctx visitor_ctx = { .module_name = module_name, .ret = NULL };
+    if (!win_enumerate_module_info_ctx(drakvuf, module_list_head, ctx, find_module_visitor, &visitor_ctx))
+        return NULL;
 
-    /* walk the module list */
-    while (1)
-    {
-        /* follow the next pointer */
-        addr_t tmp_next = 0;
-        ctx->addr = next_module;
-        if (VMI_FAILURE == vmi_read_addr(vmi, ctx, &tmp_next))
-            break;
-
-        /* if we are back at the list head, we are done */
-        if (module_list_head == tmp_next || !tmp_next)
-        {
-            break;
-        }
-
-        module_info_t* ret_module_info = (module_info_t*)g_slice_alloc0( sizeof( module_info_t ) );
-
-        if ( ret_module_info )
-        {
-            ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
-            if ( vmi_read_addr( vmi, ctx, &ret_module_info->base_addr ) == VMI_SUCCESS )
-            {
-                ctx->addr                  = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-                ret_module_info->base_name = drakvuf_read_unicode_common( vmi, ctx );
-
-                if ( ret_module_info->base_name )
-                {
-                    PRINT_DEBUG("Found module %s at 0x%lx\n", ret_module_info->base_name->contents, ret_module_info->base_addr );
-
-                    if ( !strcasecmp( (char*)ret_module_info->base_name->contents, module_name ) )
-                    {
-                        ctx->addr                  = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
-                        ret_module_info->full_name = drakvuf_read_unicode_common( vmi, ctx );
-
-                        return ret_module_info ;
-                    }
-
-                    vmi_free_unicode_str( ret_module_info->base_name );
-                }
-            }
-            g_slice_free(module_info_t, ret_module_info);
-        }
-
-        next_module = tmp_next;
-    }
+    if (visitor_ctx.ret)
+        return visitor_ctx.ret;
 
     PRINT_DEBUG("Failed to find %s in list starting at 0x%lx\n", module_name, module_list_head);
 
@@ -288,54 +360,12 @@ module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_he
 
 module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name )
 {
-    vmi_instance_t vmi = drakvuf->vmi;
-    addr_t next_module = module_list_head;
+    struct find_module_visitor_ctx visitor_ctx = { .module_name = module_name, .ret = NULL };
+    if (!win_enumerate_module_info_ctx_wow(drakvuf, module_list_head, ctx, find_module_visitor, &visitor_ctx))
+        return NULL;
 
-    /* walk the module list */
-    while (1)
-    {
-        /* follow the next pointer */
-        addr_t tmp_next = 0;
-        ctx->addr = next_module;
-        if (VMI_FAILURE == vmi_read_32(vmi, ctx, (uint32_t*)&tmp_next))
-            break;
-
-        /* if we are back at the list head, we are done */
-        if (module_list_head == tmp_next || !tmp_next)
-        {
-            break;
-        }
-
-        module_info_t* ret_module_info = (module_info_t*)g_slice_alloc0( sizeof( module_info_t ) );
-
-        if ( ret_module_info )
-        {
-            ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_DLLBASE];
-            if ( vmi_read_32( vmi, ctx, (uint32_t*)&ret_module_info->base_addr ) == VMI_SUCCESS )
-            {
-                ctx->addr                  = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-                ret_module_info->base_name = drakvuf_read_unicode32_common( vmi, ctx );
-
-                if ( ret_module_info->base_name )
-                {
-                    PRINT_DEBUG("Found WoW64 module %s at 0x%lx\n", ret_module_info->base_name->contents, ret_module_info->base_addr );
-
-                    if ( !strcasecmp( (char*)ret_module_info->base_name->contents, module_name ) )
-                    {
-                        ctx->addr                  = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
-                        ret_module_info->full_name = drakvuf_read_unicode32_common( vmi, ctx );
-
-                        return ret_module_info ;
-                    }
-
-                    vmi_free_unicode_str( ret_module_info->base_name );
-                }
-            }
-            g_slice_free(module_info_t, ret_module_info);
-        }
-
-        next_module = tmp_next;
-    }
+    if (visitor_ctx.ret)
+        return visitor_ctx.ret;
 
     PRINT_DEBUG("Failed to find %s in WoW64 list starting at 0x%lx\n", module_name, module_list_head);
 
@@ -529,6 +559,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_function_return_address = win_get_function_return_address;
     drakvuf->osi.enumerate_processes = win_enumerate_processes;
     drakvuf->osi.enumerate_processes_with_module = win_enumerate_processes_with_module;
+    drakvuf->osi.enumerate_process_modules = win_enumerate_process_modules;
     drakvuf->osi.is_crashreporter = win_is_crashreporter;
     drakvuf->osi.find_mmvad = win_find_mmvad;
     drakvuf->osi.traverse_mmvad = win_traverse_mmvad;
