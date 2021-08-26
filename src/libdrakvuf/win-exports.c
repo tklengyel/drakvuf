@@ -117,72 +117,31 @@
 #include <libvmi/peparse.h>
 
 #include "private.h"
+#include "win.h"
 #include "win-exports.h"
 #include "win-offsets.h"
 
 // search for the given module+symbol in the given module list
 static status_t
-modlist_sym2va(drakvuf_t drakvuf, addr_t list_head, access_context_t* ctx,
-    const char* mod_name, const char* symbol, addr_t* va)
+modlist_sym2va(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx,
+    const char* module_name, const char* symbol, addr_t* va)
 {
-
-    vmi_instance_t vmi = drakvuf->vmi;
-    addr_t next_module = list_head;
-    /* walk the module list */
-    while (1)
+    addr_t dllbase;
+    if (win_get_module_base_addr_ctx(drakvuf, module_list_head, ctx, module_name, &dllbase))
     {
+        ctx->addr = dllbase;
 
-        /* follow the next pointer */
-        addr_t tmp_next = 0;
+        status_t ret = vmi_translate_sym2v(drakvuf->vmi, ctx, symbol, va);
+        if ( ret == VMI_SUCCESS )
+            PRINT_DEBUG("\t%s @ 0x%lx\n", symbol, *va);
 
-        ctx->addr = next_module;
-        if (VMI_FAILURE==vmi_read_addr(vmi, ctx, &tmp_next))
-            break;
-
-        /* if we are back at the list head, we are done */
-        if (list_head == tmp_next || !tmp_next)
-        {
-            break;
-        }
-
-        ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-        unicode_string_t* us = drakvuf_read_unicode_common(vmi, ctx);
-
-        if ( us )
-        {
-            PRINT_DEBUG("Found module %s\n", us->contents);
-
-            bool match = !strcasecmp((char*) us->contents, mod_name);
-            vmi_free_unicode_str(us);
-
-            if (match)
-            {
-                status_t ret ;
-                addr_t dllbase;
-
-                ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
-                ret = vmi_read_addr(vmi, ctx, &dllbase);
-
-                if ( ret == VMI_SUCCESS )
-                {
-                    ctx->addr = dllbase;
-
-                    ret = vmi_translate_sym2v(vmi, ctx, symbol, va);
-                    if ( ret == VMI_SUCCESS )
-                        PRINT_DEBUG("\t%s @ 0x%lx\n", symbol, *va);
-                }
-
-                return ret ;
-            }
-        }
-
-        next_module = tmp_next;
+        return ret;
     }
 
     return VMI_FAILURE;
 }
 
-addr_t ksym2va(drakvuf_t drakvuf, vmi_pid_t pid, const char* proc_name, const char* mod_name, addr_t rva)
+addr_t ksym2va(drakvuf_t drakvuf, vmi_pid_t pid, const char* proc_name, const char* module_name, addr_t rva)
 {
     addr_t module_list = 0;
 
@@ -206,49 +165,13 @@ addr_t ksym2va(drakvuf_t drakvuf, vmi_pid_t pid, const char* proc_name, const ch
             return 0;
     }
 
-    vmi_instance_t vmi = drakvuf->vmi;
-    addr_t next_module = module_list;
-    addr_t tmp_next;
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = pid);
+
     addr_t dllbase;
-
-    while (1)
-    {
-
-        if ( VMI_FAILURE == vmi_read_addr_va(vmi, next_module, pid, &tmp_next) )
-            break;
-
-        if (module_list == tmp_next)
-            break;
-
-        if ( VMI_FAILURE == vmi_read_addr_va(vmi, next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE], pid, &dllbase) )
-            break;
-
-        if (!dllbase)
-            break;
-
-        ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_PID,
-            .addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME],
-            .pid = pid);
-
-        unicode_string_t* us = drakvuf_read_unicode_common(vmi, &ctx);
-
-        if (us)
-        {
-            PRINT_DEBUG("\t%s @ 0x%" PRIx64 "\n", us->contents, dllbase);
-
-            addr_t ret_addr = 0 ;
-            if ( !strcasecmp((char*)us->contents, mod_name) )
-                ret_addr =  dllbase + rva;
-
-            vmi_free_unicode_str(us);
-
-            if ( ret_addr )
-                return ret_addr;
-        }
-
-        next_module = tmp_next;
-    }
+    if (win_get_module_base_addr_ctx(drakvuf, module_list, &ctx, module_name, &dllbase))
+        return dllbase + rva;
 
     return 0;
 }

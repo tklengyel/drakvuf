@@ -176,7 +176,6 @@ bool userhook::add_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 static
 bool get_dll_base(
     drakvuf_t drakvuf,
-    const std::array<size_t, __OFFSET_MAX>& offsets,
     addr_t process_base,
     const std::string& dll_name,
     addr_t* res_dll_base)
@@ -190,46 +189,11 @@ bool get_dll_base(
         .dtb = process_dtb
     );
 
-    {
-        // Lock vmi.
-        vmi_lock_guard lg(drakvuf);
+    addr_t module_list_head = 0;
+    if (!drakvuf_get_module_list(drakvuf, process_base, &module_list_head))
+        return false;
 
-        addr_t module_list_head = 0;
-        if (!drakvuf_get_module_list(drakvuf, process_base, &module_list_head))
-            return false;
-        addr_t act_module = module_list_head;
-
-        do
-        {
-            // Read dll base.
-            addr_t dll_base;
-            ctx.addr = act_module + offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
-            if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &dll_base))
-                return false;
-
-            // Read dll base name.
-            ctx.addr = act_module + offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-            unicode_string_t* dll_name_utf8 = drakvuf_read_unicode_common(lg.vmi, &ctx);
-            if (dll_name_utf8)
-            {
-                bool found = !strncmp(dll_name.c_str(), (const char*)dll_name_utf8->contents, dll_name.size());
-                vmi_free_unicode_str(dll_name_utf8);
-
-                if (found)
-                {
-                    *res_dll_base = dll_base;
-                    return true;
-                }
-            }
-
-            ctx.addr = act_module;
-            if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &act_module))
-                return false;
-
-        } while (act_module != module_list_head);
-    } // Unlock vmi
-
-    return false;
+    return drakvuf_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, dll_name.c_str(), res_dll_base);
 }
 
 
@@ -265,7 +229,7 @@ bool get_func_addr(
         // And check the name.
         ctx.addr = dll_base + func_name_rva;
         char* act_func_name = vmi_read_str(lg.vmi, &ctx);
-        if (!strncmp(act_func_name, func_name.c_str(), func_name.size()))
+        if (act_func_name && !strncmp(act_func_name, func_name.c_str(), func_name.size()))
         {
             // We found function we have been looking for.
             free(act_func_name);
@@ -323,7 +287,7 @@ event_response_t hook_process_cb(
         // It finds target function virtual address and stores it in trap data, so we don't have to
         // calculate it again on retry.
         addr_t dll_base = 0;
-        if (!get_dll_base(drakvuf, userhook_plugin->offsets, rh_data->target_process, rh_data->dll_name, &dll_base))
+        if (!get_dll_base(drakvuf, rh_data->target_process, rh_data->dll_name, &dll_base))
         {
             userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
             return VMI_EVENT_RESPONSE_NONE;
