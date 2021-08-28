@@ -222,6 +222,6 @@ addr_t find_vdso(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso);
 bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t syscall_addr);
 bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info);
-bool is_syscall_error(addr_t rax);
+bool is_syscall_error(addr_t rax, const char* err);
 
 #endif
