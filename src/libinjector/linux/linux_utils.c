@@ -294,11 +294,12 @@ void injector_free_linux(injector_t injector)
     injector = NULL;
 }
 
-bool is_syscall_error(addr_t rax)
+bool is_syscall_error(addr_t rax, const char* err)
 {
     if (rax > -MAX_ERRNO)
     {
         fprintf(stderr, "syscall return code: %ld\n", (int64_t)rax);
+        fprintf(stderr, "%s\n", err);
         return true;
     }
     return false;

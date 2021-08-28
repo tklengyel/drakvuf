@@ -158,25 +158,14 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
-            addr_t vdso = find_vdso(drakvuf, info);
-            if (!vdso)
-                return cleanup(drakvuf, info, false); // STEP1 trap is being cleared in STEP5
-
-            addr_t syscall_addr = find_syscall(drakvuf, info, vdso);
-            if (!syscall_addr)
+            if (!init_syscalls(drakvuf, info))
                 return cleanup(drakvuf, info, false);
 
-            setup_post_syscall_trap(drakvuf, info, syscall_addr);
             // don't remove the initial trap
             // it is used for cleanup after restoring registers
 
-            if (!setup_mmap_syscall(injector, info->regs, 4096))
-            {
-                fprintf(stderr, "Failed to setup mmap syscall");
+            if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
                 return cleanup(drakvuf, info, false);
-            }
-
-            info->regs->rip = syscall_addr;
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
 
@@ -184,15 +173,8 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
         case STEP2: // setup shellcode
         {
-            if ( is_syscall_error(info->regs->rax) )
-            {
-                fprintf(stderr, "mmap syscall failed\n");
+            if (!call_mmap_syscall_cb(injector, info->regs))
                 return cleanup(drakvuf, info, true);
-            }
-            PRINT_DEBUG("memory address allocated using mmap: %lx\n", info->regs->rax);
-
-            // save it for future use
-            injector->virtual_memory_addr = info->regs->rax;
 
             if (!write_shellcode_to_mmap_location(drakvuf, info))
                 return cleanup(drakvuf, info, true);
