@@ -164,6 +164,14 @@ static uint64_t mask_value(const arg_t& arg, uint64_t val)
         return val & 0xffffffff;
     return val;
 }
+
+static uint64_t transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, uint64_t val)
+{
+    if ((arg.type == PPVOID) && val)
+        val = drakvuf_read_ptr(drakvuf, info, val);
+    return mask_value(arg, val);
+}
+
 void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
     bool syscall, drakvuf_trap_info_t* info,
     int nr, std::string module, const syscall_t* sc,
@@ -184,7 +192,10 @@ void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
                 if ( !str.empty() )
                     s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Qstr(str)));
                 else
-                    s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval( mask_value(sc->args[i], args[i]) )));
+                {
+                    uint64_t val = transform_value(drakvuf, info, sc->args[i], args[i]);
+                    s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(val)));
+                }
             }
 
         fmt::print(s->format, "syscall", drakvuf, info,

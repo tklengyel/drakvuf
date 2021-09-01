@@ -626,6 +626,8 @@ unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
 unicode_string_t* drakvuf_read_unicode32_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid) NOEXCEPT;
 
+addr_t drakvuf_read_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr) NOEXCEPT;
+
 bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
     addr_t module_list_head,
     const char* module_name,
