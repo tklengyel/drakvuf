@@ -824,28 +824,6 @@ unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_con
     return drakvuf_read_wchar_array(vmi, ctx, strlen);
 }
 
-addr_t drakvuf_read_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
-{
-    if (!addr)
-        return 0;
-
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = addr,
-    );
-
-    addr_t val;
-
-    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &val))
-    {
-        fprintf(stderr, "Failed to read address (%p)\n", (void*) addr);
-        return 0;
-    }
-
-    return val;
-}
-
 // Returns JSON-compliant copy of input string
 gchar* drakvuf_escape_str(const char* input)
 {

@@ -168,7 +168,24 @@ static uint64_t mask_value(const arg_t& arg, uint64_t val)
 static uint64_t transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, uint64_t val)
 {
     if ((arg.type == PPVOID) && val)
-        val = drakvuf_read_ptr(drakvuf, info, val);
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = val,
+        );
+
+        uint64_t _val;
+
+        if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &_val))
+        {
+            fprintf(stderr, "Failed to read address (%p)\n", (void*) val);
+            _val = 0;
+        }
+
+        val = _val;
+    }
     return mask_value(arg, val);
 }
 
