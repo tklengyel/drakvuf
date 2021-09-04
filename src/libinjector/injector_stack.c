@@ -136,6 +136,14 @@ void init_string_argument(struct argument* arg, const char* string)
     arg->data_on_stack = 0;
 }
 
+void init_array_argument(struct argument* arg, struct argument array[], int size)
+{
+    arg->type = ARGUMENT_ARRAY;
+    arg->size = size;
+    arg->data = array;
+    arg->data_on_stack = 0;
+}
+
 void init_unicode_argument(struct argument* arg, unicode_string_t* us)
 {
     if (us && us->length)
@@ -234,6 +242,142 @@ static addr_t place_struct_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
     return status == VMI_FAILURE ? 0 : addr;
 }
 
+static addr_t place_argument_on_addr_32(vmi_instance_t vmi, x86_registers_t* regs, struct argument* arg, addr_t addr)
+{
+    switch (arg->type)
+    {
+        case ARGUMENT_STRING:
+        {
+            addr = place_string_on_stack_32(vmi, regs, addr, arg->data, arg->size);
+            if ( !addr ) goto err;
+            arg->data_on_stack = addr;
+            break;
+        }
+        case ARGUMENT_STRUCT:
+        {
+            addr = place_struct_on_stack_32(vmi, regs, addr, arg->data, arg->size);
+            if ( !addr ) goto err;
+            arg->data_on_stack = addr;
+            break;
+        }
+        case ARGUMENT_INT:
+        {
+            arg->data_on_stack = (uint64_t)arg->data;
+            addr -= 0x4;
+
+            ACCESS_CONTEXT(ctx,
+                .translate_mechanism = VMI_TM_PROCESS_DTB,
+                .dtb = regs->cr3,
+                .addr = addr
+            );
+
+            if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*)&arg->data_on_stack))
+            {
+                fprintf(stderr, "vmi_write_32 failed\n");
+                goto err;
+            }
+
+            break;
+        }
+        default:
+            goto err;
+    }
+    return addr;
+err:
+    return 0;
+}
+
+static addr_t place_argument_on_addr_64(vmi_instance_t vmi, x86_registers_t* regs, struct argument* arg, addr_t addr)
+{
+    switch (arg->type)
+    {
+        case ARGUMENT_STRING:
+        {
+            addr = place_string_on_stack_64(vmi, regs, addr, arg->data, arg->size);
+            if ( !addr ) goto err;
+            arg->data_on_stack = addr;
+            break;
+        }
+        case ARGUMENT_STRUCT:
+        {
+            addr = place_struct_on_stack_64(vmi, regs, addr, arg->data, arg->size);
+            if ( !addr ) goto err;
+            arg->data_on_stack = addr;
+            break;
+        }
+        case ARGUMENT_INT:
+        {
+            arg->data_on_stack = (uint64_t)arg->data;
+            addr -= 0x8;
+
+            ACCESS_CONTEXT(ctx,
+                .translate_mechanism = VMI_TM_PROCESS_DTB,
+                .dtb = regs->cr3,
+                .addr = addr
+            );
+
+            if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &(arg->data_on_stack)) )
+            {
+                fprintf(stderr, "vmi_write_64 failed\n");
+                goto err;
+            }
+
+            break;
+        }
+        default:
+            goto err;
+    }
+    return addr;
+err:
+    return 0;
+}
+
+addr_t place_array_on_addr_64(vmi_instance_t vmi, x86_registers_t* regs, struct argument* arg, addr_t* data_addr, addr_t* array_addr)
+{
+    // fill bottom up as stack grows towards top
+    for (int i=arg->size - 1; i>=0; i--)
+    {
+        // put the argument on data_addr
+        struct argument data;
+        *data_addr = place_argument_on_addr_64(vmi, regs, &((struct argument*)arg->data)[i], *data_addr);
+        if (*data_addr == 0)
+            goto err;
+
+        // put the pointer to data on array_addr
+        init_int_argument(&data, *data_addr);
+        *array_addr = place_argument_on_addr_64(vmi, regs, &data, *array_addr);
+        if (*array_addr == 0)
+            goto err;
+    }
+    arg->data_on_stack = *array_addr;
+    return *array_addr;
+err:
+    return 0;
+}
+
+addr_t place_array_on_addr_32(vmi_instance_t vmi, x86_registers_t* regs, struct argument* arg, addr_t* data_addr, addr_t* array_addr)
+{
+    // fill bottom up as stack grows towards top
+    for (int i=arg->size - 1; i>=0; i--)
+    {
+        // put the argument on data_addr
+        struct argument data;
+        *data_addr = place_argument_on_addr_32(vmi, regs, &((struct argument*)arg->data)[i], *data_addr);
+        if (*data_addr == 0)
+            goto err;
+
+        // put the pointer to data on array_addr
+        init_int_argument(&data, *data_addr);
+        *array_addr = place_argument_on_addr_32(vmi, regs, &data, *array_addr);
+        if (*array_addr == 0)
+            goto err;
+    }
+    arg->data_on_stack = *array_addr;
+    return *array_addr;
+err:
+    return 0;
+}
+
 static bool setup_stack_32(vmi_instance_t vmi, x86_registers_t* regs, struct argument args[], int nb_args)
 {
     addr_t addr = regs->rsp;
@@ -255,6 +399,10 @@ static bool setup_stack_32(vmi_instance_t vmi, x86_registers_t* regs, struct arg
                 break;
             case ARGUMENT_INT:
                 args[i].data_on_stack = (uint64_t)args[i].data;
+                break;
+            case ARGUMENT_ARRAY:
+                // should be placed manually using place_array_on_addr_32
+                // which will set data_on_stack
                 break;
             default:
                 goto err;
@@ -320,6 +468,10 @@ static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct arg
                     break;
                 case ARGUMENT_INT:
                     args[i].data_on_stack = (uint64_t)args[i].data;
+                    break;
+                case ARGUMENT_ARRAY:
+                    // should be placed manually using place_array_on_addr_64
+                    // which will set data_on_stack
                     break;
                 default:
                     goto err;
@@ -427,6 +579,10 @@ static bool setup_linux_syscall(vmi_instance_t vmi, x86_registers_t* regs, struc
                     break;
                 case ARGUMENT_INT:
                     args[i].data_on_stack = (uint64_t)args[i].data;
+                    break;
+                case ARGUMENT_ARRAY:
+                    // should be placed manually using place_array_on_addr_64
+                    // which will set data_on_stack
                     break;
                 default:
                     goto err;

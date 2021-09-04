@@ -149,6 +149,7 @@ typedef enum
     ARGUMENT_STRING,
     ARGUMENT_STRUCT,
     ARGUMENT_INT,
+    ARGUMENT_ARRAY,
     __ARGUMENT_MAX
 } argument_type_t;
 
@@ -195,8 +196,24 @@ void init_unicode_argument(struct argument* arg,
 void init_string_argument(struct argument* arg,
     const char* string) NOEXCEPT;
 
+void init_array_argument(struct argument* arg,
+    struct argument array[],
+    int size) NOEXCEPT;
+
 #define init_struct_argument(arg, sv) \
     init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
+
+addr_t place_array_on_addr_64(vmi_instance_t vmi,
+    x86_registers_t* regs,
+    struct argument* arg,
+    addr_t* data_addr,
+    addr_t* array_addr) NOEXCEPT;
+
+addr_t place_array_on_addr_32(vmi_instance_t vmi,
+    x86_registers_t* regs,
+    struct argument* arg,
+    addr_t* data_addr,
+    addr_t* array_addr) NOEXCEPT;
 
 bool setup_stack(drakvuf_t drakvuf,
     x86_registers_t* regs,
