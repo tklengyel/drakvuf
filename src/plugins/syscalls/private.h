@@ -467,12 +467,12 @@ struct wrapper_t : public call_result_t
     uint16_t num;
 };
 
-#define SYSCALL(_name, _ret, _num_args, ...)                     \
+#define SYSCALL(_name, _ret, ...)                                \
    static const arg_t _name ## _arg[] = { __VA_ARGS__ };         \
    static const syscall_t _name = {                              \
      .name = #_name,                                             \
      .ret = _ret,                                                \
-     .num_args = _num_args,                                      \
+     .num_args = sizeof(_name ## _arg)/sizeof(arg_t),            \
      .args = (const arg_t*)&_name ## _arg                        \
    }
 
