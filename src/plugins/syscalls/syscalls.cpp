@@ -156,13 +156,25 @@ static std::string extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_i
 
 static uint64_t mask_value(const arg_t& arg, uint64_t val)
 {
-    if (arg.type == BYTE || arg.type == BOOLEAN)
-        return val & 0xff;
-    if (arg.type == SHORT || arg.type == USHORT || arg.type == WORD)
-        return val & 0xffff;
-    if (arg.type == DWORD || arg.type == INT || arg.type == UINT || arg.type == LONG || arg.type == ULONG)
-        return val & 0xffffffff;
-    return val;
+    switch (arg.type)
+    {
+        case BYTE:
+        case BOOLEAN:
+            return val & 0xff;
+        case SHORT:
+        case USHORT:
+        case WORD:
+            return val & 0xffff;
+        case DWORD:
+        case INT:
+        case UINT:
+        case LONG:
+        case ULONG:
+        case WIN32_PROTECTION_MASK:
+            return val & 0xffffffff;
+        default:
+            return val;
+    }
 }
 
 static uint64_t transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, uint64_t val)
