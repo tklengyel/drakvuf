@@ -229,7 +229,7 @@ bool setup_exit_syscall(injector_t injector, x86_registers_t* regs, uint64_t rc)
 
     if (!setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args)))
     {
-        PRINT_DEBUG("Failed to setup read syscall\n");
+        PRINT_DEBUG("Failed to setup exit syscall\n");
         return false;
     }
     return true;
