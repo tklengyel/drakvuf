@@ -219,6 +219,58 @@ bool setup_read_syscall(injector_t injector, x86_registers_t* regs, int fd, addr
     return true;
 }
 
+bool setup_exit_syscall(injector_t injector, x86_registers_t* regs, uint64_t rc)
+{
+    struct argument args[1] = { {0} };
+    init_int_argument(&args[0], rc);
+
+    regs->rax = sys_exit;
+    regs->rip = injector->syscall_addr;
+
+    if (!setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args)))
+    {
+        PRINT_DEBUG("Failed to setup read syscall\n");
+        return false;
+    }
+    return true;
+}
+
+void setup_vfork_syscall(injector_t injector, x86_registers_t* regs, char* proc_name, vmi_pid_t parent_pid)
+{
+    regs->rax = sys_vfork;
+    regs->rip = injector->syscall_addr;
+
+    // set the ppid and name info for the child process
+    // ( to be used in check_userspace_int3_trap )
+    injector->child_data.name = proc_name;
+    injector->child_data.ppid = parent_pid;
+
+    // this will loosen the checks in check_userspace_int3_trap
+    // till we get the pid of the child in the next step
+    injector->fork = true;
+}
+
+bool setup_execve_syscall(injector_t injector, x86_registers_t* regs, const char* binary_file, addr_t argv, addr_t envp)
+{
+    // execve(const char *filename, const char *const argv[], const char *const envp[])
+    struct argument args[3] = { {0} };
+
+    init_string_argument(&args[0], binary_file);
+    // create these arrays manually using place_array_on_addr_64
+    init_int_argument(&args[1], argv);
+    init_int_argument(&args[2], envp);
+
+    regs->rax = sys_execve;
+    regs->rip = injector->syscall_addr;
+
+    if (!setup_stack(injector->drakvuf, regs, args, ARRAY_SIZE(args)))
+    {
+        PRINT_DEBUG("Failed to setup execve syscall\n");
+        return false;
+    }
+    return true;
+}
+
 bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs)
 {
     if (is_syscall_error(regs->rax, "Could not read chunk from guest"))
@@ -227,6 +279,18 @@ bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs)
     injector->buffer.len = regs->rax;
     PRINT_DEBUG("Chunk read successful (%ld)\n", injector->buffer.len);
 
+    return true;
+}
+
+bool call_vfork_syscall_cb(injector_t injector, x86_registers_t* regs, vmi_pid_t pid, uint32_t tid)
+{
+    if (is_syscall_error(regs->rax, "vfork syscall failed"))
+        return false;
+
+    injector->child_data.pid = pid;
+    injector->child_data.tid = tid;
+
+    PRINT_DEBUG("Child process pid: %d\n", injector->child_data.pid);
     return true;
 }
 

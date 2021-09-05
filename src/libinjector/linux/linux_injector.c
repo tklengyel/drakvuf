@@ -110,6 +110,7 @@
 #include "methods/linux_shellcode.h"
 #include "methods/linux_write_file.h"
 #include "methods/linux_read_file.h"
+#include "methods/linux_execve.h"
 
 bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
 {
@@ -127,10 +128,28 @@ bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
         return false;
     }
 
-    if ( info->proc_data.pid != injector->target_pid )
+    if (injector->fork)
     {
-        PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
-            info->proc_data.name, info->proc_data.pid, injector->target_pid);
+        if ( injector->child_data.ppid != info->proc_data.ppid )
+        {
+            PRINT_DEBUG("INT3 received but forked process parent pid (%d) doesn't match the target pid (%d)\n",
+                info->proc_data.ppid, injector->child_data.ppid);
+            return false;
+        }
+        if ( strcmp(injector->child_data.name, info->proc_data.name))
+        {
+            PRINT_DEBUG("INT3 received but forked process name (%s) doesn't match the target process name (%s)\n",
+                info->proc_data.name, injector->child_data.name);
+            return false;
+        }
+        injector->fork = false;
+        return true;
+    }
+
+    if ( info->proc_data.pid != injector->target_pid && info->proc_data.pid != injector->child_data.pid )
+    {
+        PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u) or child process (%u)\n",
+            info->proc_data.name, info->proc_data.pid, injector->target_pid, injector->child_data.pid);
         return false;
     }
 
@@ -141,10 +160,12 @@ bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
         assert(false);
     }
 
-    if (injector->target_tid && (uint32_t)info->proc_data.tid != injector->target_tid)
+    if (injector->target_tid &&
+        (uint32_t)info->proc_data.tid != injector->target_tid &&
+        info->proc_data.tid != injector->child_data.tid )
     {
-        PRINT_DEBUG("INT3 received but '%s' TID (%u) doesn't match target process (%u)\n",
-            info->proc_data.name, info->proc_data.tid, injector->target_tid);
+        PRINT_DEBUG("INT3 received but '%s' TID (%u) doesn't match target process (%u) or child process (%u)\n",
+            info->proc_data.name, info->proc_data.tid, injector->target_tid, injector->child_data.tid);
         return false;
     }
 
@@ -180,6 +201,11 @@ event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info
         case INJECT_METHOD_READ_FILE:
         {
             event = handle_read_file(drakvuf, info);
+            break;
+        }
+        case INJECT_METHOD_EXECPROC:
+        {
+            event = handle_execve(drakvuf, info);
             break;
         }
         default:
@@ -288,6 +314,16 @@ bool init_injector(injector_t injector)
         {
             // ret will be appended to shellcode here
             return load_shellcode_from_file(injector, injector->host_file);
+            break;
+        }
+        case INJECT_METHOD_EXECPROC:
+        {
+            if (!injector->host_file)
+            {
+                fprintf(stderr, "Inject file is required\n");
+                return false;
+            }
+            return true;
             break;
         }
         case INJECT_METHOD_WRITE_FILE:
