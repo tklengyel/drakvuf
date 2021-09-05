@@ -111,6 +111,7 @@
 
 #include "libdrakvuf/libdrakvuf.h"
 #include <libinjector/libinjector.h>
+#include "private.h"
 
 void init_argument(struct argument* arg, argument_type_t type, size_t size, void* data)
 {
@@ -171,7 +172,10 @@ static addr_t place_string_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs
     );
 
     if (VMI_FAILURE == vmi_write(vmi, &ctx, len, (void*) str, NULL))
+    {
+        PRINT_DEBUG("Could not place string(%s) on stack\n", (char*)str);
         return 0;
+    }
 
     return addr;
 }
@@ -189,7 +193,11 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
 
     size_t buf_len = orig_addr - addr;
     void* buf = g_try_malloc0(buf_len);
-    if (!buf) return 0;
+    if (!buf)
+    {
+        PRINT_DEBUG("Could not allocate buffer\n");
+        return 0;
+    }
     memcpy(buf, str, str_len);
 
     ACCESS_CONTEXT(ctx,
@@ -198,10 +206,15 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
         .addr = addr
     );
 
-    status_t status = vmi_write(vmi, &ctx, buf_len, buf, NULL);
+    if (VMI_FAILURE == vmi_write(vmi, &ctx, buf_len, buf, NULL))
+    {
+        PRINT_DEBUG("Could not place string(%s) on stack\n", (char*)str);
+        g_free(buf);
+        return 0;
+    }
     g_free(buf);
 
-    return status == VMI_FAILURE ? 0 : addr;
+    return addr;
 }
 
 static addr_t place_struct_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, void* data, size_t size)
@@ -217,9 +230,13 @@ static addr_t place_struct_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs
         .addr = addr
     );
 
-    status_t status = vmi_write(vmi, &ctx, size, data, NULL);
+    if (VMI_FAILURE == vmi_write(vmi, &ctx, size, data, NULL))
+    {
+        PRINT_DEBUG("Could not place struct on stack\n");
+        return 0;
+    }
 
-    return status == VMI_FAILURE ? 0 : addr;
+    return addr;
 }
 
 static addr_t place_struct_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, void* data, size_t size)
@@ -237,9 +254,13 @@ static addr_t place_struct_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
         .addr = addr,
     );
 
-    status_t status = vmi_write(vmi, &ctx, size, data, NULL);
+    if (VMI_FAILURE == vmi_write(vmi, &ctx, size, data, NULL))
+    {
+        PRINT_DEBUG("Could not place struct on stack\n");
+        return 0;
+    }
 
-    return status == VMI_FAILURE ? 0 : addr;
+    return addr;
 }
 
 static addr_t place_argument_on_addr_32(vmi_instance_t vmi, x86_registers_t* regs, struct argument* arg, addr_t addr)
@@ -273,7 +294,7 @@ static addr_t place_argument_on_addr_32(vmi_instance_t vmi, x86_registers_t* reg
 
             if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*)&arg->data_on_stack))
             {
-                fprintf(stderr, "vmi_write_32 failed\n");
+                PRINT_DEBUG("Could not write int(%d) at address(%lx)\n", (uint32_t)arg->data_on_stack, addr);
                 goto err;
             }
 
@@ -284,6 +305,7 @@ static addr_t place_argument_on_addr_32(vmi_instance_t vmi, x86_registers_t* reg
     }
     return addr;
 err:
+    PRINT_DEBUG("Could not place argument on address specified\n");
     return 0;
 }
 
@@ -318,7 +340,7 @@ static addr_t place_argument_on_addr_64(vmi_instance_t vmi, x86_registers_t* reg
 
             if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &(arg->data_on_stack)) )
             {
-                fprintf(stderr, "vmi_write_64 failed\n");
+                PRINT_DEBUG("Could not write int(%ld) at address(%lx)\n", arg->data_on_stack, addr);
                 goto err;
             }
 
@@ -329,13 +351,15 @@ static addr_t place_argument_on_addr_64(vmi_instance_t vmi, x86_registers_t* reg
     }
     return addr;
 err:
+    PRINT_DEBUG("Could not place argument on address specified\n");
     return 0;
 }
 
 addr_t place_array_on_addr_64(vmi_instance_t vmi, x86_registers_t* regs, struct argument* arg, addr_t* data_addr, addr_t* array_addr)
 {
     // fill bottom up as stack grows towards top
-    for (int i=arg->size - 1; i>=0; i--)
+    int i;
+    for (i=arg->size - 1; i>=0; i--)
     {
         // put the argument on data_addr
         struct argument data;
@@ -352,13 +376,18 @@ addr_t place_array_on_addr_64(vmi_instance_t vmi, x86_registers_t* regs, struct 
     arg->data_on_stack = *array_addr;
     return *array_addr;
 err:
+    PRINT_DEBUG("Array could not be placed on address specified\n");
+    PRINT_DEBUG("Failure index: %d\n", i);
+    PRINT_DEBUG("Data addr: %lx\n", *data_addr);
+    PRINT_DEBUG("Array addr: %lx\n", *array_addr);
     return 0;
 }
 
 addr_t place_array_on_addr_32(vmi_instance_t vmi, x86_registers_t* regs, struct argument* arg, addr_t* data_addr, addr_t* array_addr)
 {
     // fill bottom up as stack grows towards top
-    for (int i=arg->size - 1; i>=0; i--)
+    int i;
+    for (i=arg->size - 1; i>=0; i--)
     {
         // put the argument on data_addr
         struct argument data;
@@ -375,6 +404,10 @@ addr_t place_array_on_addr_32(vmi_instance_t vmi, x86_registers_t* regs, struct 
     arg->data_on_stack = *array_addr;
     return *array_addr;
 err:
+    PRINT_DEBUG("Array could not be placed on address specified\n");
+    PRINT_DEBUG("Failure index: %d\n", i);
+    PRINT_DEBUG("Data addr: %lx\n", *data_addr);
+    PRINT_DEBUG("Array addr: %lx\n", *array_addr);
     return 0;
 }
 
@@ -383,7 +416,8 @@ static bool setup_stack_32(vmi_instance_t vmi, x86_registers_t* regs, struct arg
     addr_t addr = regs->rsp;
 
     // make room for strings and structs into guest's stack
-    for (int i = 0; i < nb_args; i++)
+    int i;
+    for (i = 0; i < nb_args; i++)
     {
         switch (args[i].type)
         {
@@ -405,6 +439,7 @@ static bool setup_stack_32(vmi_instance_t vmi, x86_registers_t* regs, struct arg
                 // which will set data_on_stack
                 break;
             default:
+                PRINT_DEBUG("Undefined argument type\n");
                 goto err;
         }
     }
@@ -415,7 +450,7 @@ static bool setup_stack_32(vmi_instance_t vmi, x86_registers_t* regs, struct arg
     );
 
     // write parameters into guest's stack
-    for (int i = nb_args-1; i >= 0; i--)
+    for (i = nb_args-1; i >= 0; i--)
     {
         addr -= 0x4;
         ctx.addr = addr;
@@ -427,7 +462,10 @@ static bool setup_stack_32(vmi_instance_t vmi, x86_registers_t* regs, struct arg
     addr -= 0x4;
     ctx.addr = addr;
     if (VMI_FAILURE == vmi_write_32(vmi, &ctx, (uint32_t*) &regs->rip))
+    {
+        PRINT_DEBUG("Could not write return address on stack\n");
         goto err;
+    }
 
     // grow the stack
     regs->rsp = addr;
@@ -435,6 +473,8 @@ static bool setup_stack_32(vmi_instance_t vmi, x86_registers_t* regs, struct arg
     return 1;
 
 err:
+    PRINT_DEBUG("Could not setup stack for 32 bit\n");
+    PRINT_DEBUG("Failure index: %d\n", i);
     return 0;
 }
 
@@ -449,10 +489,11 @@ static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct arg
 
     addr_t addr = regs->rsp;
 
+    int i = 0;
     if ( args )
     {
         // make room for strings and structs into guest's stack
-        for (int i = 0; i < nb_args; i++)
+        for (i = 0; i < nb_args; i++)
         {
             switch (args[i].type)
             {
@@ -474,6 +515,7 @@ static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct arg
                     // which will set data_on_stack
                     break;
                 default:
+                    PRINT_DEBUG("Undefined argument type\n");
                     goto err;
             }
         }
@@ -501,12 +543,15 @@ static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct arg
         // 5th parameter onwards (if any) passed via the stack
 
         // write parameters (5th onwards) into guest's stack
-        for (int i = nb_args-1; i > 3; i--)
+        for (i = nb_args-1; i > 3; i--)
         {
             addr -= 0x8;
             ctx.addr = addr;
             if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &(args[i].data_on_stack)) )
+            {
+                PRINT_DEBUG("Could not place parameter on stack\n");
                 goto err;
+            }
         }
 
         switch (nb_args)
@@ -538,14 +583,20 @@ static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct arg
         addr -= 0x8;
         ctx.addr = addr;
         if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &nul64))
+        {
+            PRINT_DEBUG("Could not allocate homing space\n");
             goto err;
+        }
     }
 
     // save the return address
     addr -= 0x8;
     ctx.addr = addr;
     if (VMI_FAILURE == vmi_write_64(vmi, &ctx, &regs->rip))
+    {
+        PRINT_DEBUG("Could not write return address on stack\n");
         goto err;
+    }
 
     // grow the stack
     regs->rsp = addr;
@@ -553,6 +604,8 @@ static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct arg
     return 1;
 
 err:
+    PRINT_DEBUG("Could not setup stack for 64 bit\n");
+    PRINT_DEBUG("Failure index: %d\n", i);
     return 0;
 }
 
@@ -585,6 +638,7 @@ static bool setup_linux_syscall(vmi_instance_t vmi, x86_registers_t* regs, struc
                     // which will set data_on_stack
                     break;
                 default:
+                    PRINT_DEBUG("Undefined argument type\n");
                     goto err;
             }
         }
@@ -647,7 +701,10 @@ bool setup_stack_locked(
         return setup_linux_syscall(vmi, regs, args, nb_args);
     }
     else
+    {
+        PRINT_DEBUG("setup_stack: unknown OS type\n");
         return false;
+    }
 }
 
 bool setup_stack(
