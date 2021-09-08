@@ -242,7 +242,7 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             if (is_child_process(injector, info))
             {
-                fprintf(stderr, "Fatal error: Could not cleanup properly\n");
+                fprintf(stderr, "Assertion: Should never happen, Child process alive\n");
                 drakvuf_interrupt(drakvuf, SIGINT);
                 return VMI_EVENT_RESPONSE_NONE;
             }
