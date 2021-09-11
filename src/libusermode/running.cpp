@@ -113,7 +113,6 @@
 #include <glib.h>
 #include <inttypes.h>
 #include <libvmi/libvmi.h>
-#include <libvmi/peparse.h>
 #include <libdrakvuf/libdrakvuf.h>
 #include <assert.h>
 
@@ -210,51 +209,9 @@ bool get_func_addr(
     const std::string& func_name,
     addr_t* res_func_addr)
 {
-    vmi_lock_guard lg(drakvuf);
-
-    export_table et;
+    auto vmi = vmi_lock_guard(drakvuf);
     ctx.addr = dll_base;
-    if (VMI_SUCCESS != peparse_get_export_table(lg.vmi, &ctx, &et, nullptr, nullptr))
-        return false;
-
-    uint32_t name_pos;
-    for (name_pos = 0; name_pos < et.number_of_functions; name_pos++)
-    {
-        // Read rva of exported function name.
-        uint32_t func_name_rva = 0;
-        ctx.addr = dll_base + et.address_of_names + name_pos * sizeof(uint32_t);
-        if (VMI_SUCCESS != vmi_read_32(lg.vmi, &ctx, &func_name_rva))
-            return false;
-
-        // And check the name.
-        ctx.addr = dll_base + func_name_rva;
-        char* act_func_name = vmi_read_str(lg.vmi, &ctx);
-        if (act_func_name && !strncmp(act_func_name, func_name.c_str(), func_name.size()))
-        {
-            // We found function we have been looking for.
-            free(act_func_name);
-            break;
-        }
-        free(act_func_name);
-    }
-    if (name_pos == et.number_of_functions)
-    {
-        // We havn't found the function with such name.
-        return false;
-    }
-
-    uint16_t ordinal_number = 0;
-    ctx.addr = dll_base + et.address_of_name_ordinals + sizeof(uint16_t) * name_pos;
-    if (VMI_SUCCESS != vmi_read_16(lg.vmi, &ctx, &ordinal_number))
-        return false;
-
-    uint32_t func_addr_rva = 0;
-    ctx.addr = dll_base + et.address_of_functions + ordinal_number * sizeof(uint32_t);
-    if (VMI_SUCCESS != vmi_read_32(lg.vmi, &ctx, &func_addr_rva))
-        return false;
-
-    *res_func_addr = dll_base + func_addr_rva;
-    return true;
+    return VMI_SUCCESS == vmi_translate_sym2v(vmi, &ctx, func_name.c_str(), res_func_addr);
 }
 
 
