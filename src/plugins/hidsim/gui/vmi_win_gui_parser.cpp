@@ -824,6 +824,7 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
         {
             fprintf(stderr, "Failed to read ThreadListHead-pointer at %" PRIx64 "\n",
                 current_process + symbol_offsets.thread_list_head_offset);
+            g_array_free(winstas, true);
             return VMI_FAILURE;
         }
 
@@ -843,6 +844,7 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
                 {
                     fprintf(stderr, "Failed to read ThreadListHead-pointer at %" PRIx64 "\n",
                         current_process + symbol_offsets.thread_list_head_offset);
+                    g_array_free(winstas, true);
                     return VMI_FAILURE;
                 }
 
@@ -944,6 +946,7 @@ status_t retrieve_winstas_from_procs(vmi_instance_t vmi, GArray* winstas)
         if (VMI_FAILURE == vmi_read_addr_va(vmi, cur_list_entry, 0, &next_list_entry))
         {
             fprintf(stderr, "Failed to read next pointer in loop at %" PRIx64 "\n", cur_list_entry);
+            g_array_free(winstas, true);
             return VMI_FAILURE;
         }
 
