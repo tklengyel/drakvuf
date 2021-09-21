@@ -121,8 +121,13 @@ bool setup_write_syscall(injector_t injector, x86_registers_t* regs,
     int fd, addr_t buffer_addr, size_t amount);
 bool setup_read_syscall(injector_t injector, x86_registers_t* regs,
     int fd, addr_t buffer_addr, size_t amount);
+bool setup_exit_syscall(injector_t injector, x86_registers_t* regs, uint64_t rc);
+// note: void return type for vfork syscall
+void setup_vfork_syscall(injector_t injector, x86_registers_t* regs, char* proc_name, vmi_pid_t parent_pid);
+bool setup_execve_syscall(injector_t injector, x86_registers_t* regs, const char* binary_file, addr_t argv, addr_t envp);
 
 bool call_read_syscall_cb(injector_t injector, x86_registers_t* regs);
+bool call_vfork_syscall_cb(injector_t injector, x86_registers_t* regs, vmi_pid_t pid, uint32_t tid);
 bool call_write_syscall_cb(injector_t injector, x86_registers_t* regs);
 bool call_open_syscall_cb(injector_t injector, x86_registers_t* regs);
 bool call_mmap_syscall_cb(injector_t injector, x86_registers_t* regs);
