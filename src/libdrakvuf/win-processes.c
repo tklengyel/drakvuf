@@ -732,6 +732,17 @@ static bool win_find_process_list(drakvuf_t drakvuf, addr_t* list_head)
     return true;
 }
 
+static bool win_find_driver_list(drakvuf_t drakvuf, addr_t* list_head)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    status_t status = vmi_read_addr_ksym(vmi, "PsLoadedModuleList", list_head);
+    if ( VMI_FAILURE == status )
+        return false;
+
+    return true;
+}
+
 static bool win_find_next_process_list_entry(drakvuf_t drakvuf, addr_t current_list_entry, addr_t* next_list_entry)
 {
     if ( VMI_SUCCESS == vmi_read_addr_va(drakvuf->vmi, current_list_entry, 0, next_list_entry) )
@@ -1112,6 +1123,36 @@ bool win_enumerate_processes( drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t 
         addr_t eprocess = win_process_list_entry_to_process(drakvuf, current_list_entry);
 
         visitor_func(drakvuf, eprocess, visitor_ctx);
+
+        current_list_entry = next_list_entry;
+
+        if (!win_find_next_process_list_entry(drakvuf, current_list_entry, &next_list_entry))
+        {
+            PRINT_DEBUG("Failed to read next pointer in loop at %"PRIx64"\n", current_list_entry);
+            return false;
+        }
+    } while (next_list_entry != list_head);
+
+    return true;
+}
+
+bool win_enumerate_drivers( drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx )
+{
+    addr_t list_head;
+    if (!win_find_driver_list(drakvuf, &list_head))
+        return false;
+    addr_t current_list_entry = list_head;
+    addr_t next_list_entry;
+
+    if (!win_find_next_process_list_entry(drakvuf, current_list_entry, &next_list_entry))
+    {
+        PRINT_DEBUG("Failed to read next pointer at 0x%"PRIx64" before entering loop\n", current_list_entry);
+        return false;
+    }
+
+    do
+    {
+        visitor_func(drakvuf, current_list_entry, visitor_ctx);
 
         current_list_entry = next_list_entry;
 

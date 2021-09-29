@@ -101,111 +101,63 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
+#pragma once
 
-#ifndef WIN_H
-#define WIN_H
+#include "plugins/plugins_ex.h"
+#include "private.h"
 
-#include <libvmi/libvmi.h>
-#include "libdrakvuf.h"
-#include "os.h"
-#include "win-exports.h"
+struct rootkitmon_config
+{
+    const char* fwpkclnt_profile;
+    const char* fltmgr_profile;
+};
 
-bool win_get_current_irql(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint8_t* irql);
+class rootkitmon : public pluginex
+{
+public:
+    rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, output_format_t output);
+    ~rootkitmon();
 
-addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t callback_hooks_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t final_check_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
-addr_t win_get_current_thread_teb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    std::unique_ptr<libhook::ManualHook> register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
+        const char* func_name, event_response_t (*callback)(drakvuf_t, drakvuf_trap_info_t*));
+    std::unique_ptr<libhook::ManualHook> register_reg_hook(event_response_t (*callback)(drakvuf_t, drakvuf_trap_info_t*), register_t reg);
+    std::unique_ptr<libhook::ManualHook> register_mem_hook(event_response_t (*callback)(drakvuf_t, drakvuf_trap_info_t*), addr_t pa,
+        vmi_mem_access_t access);
 
-addr_t win_get_current_thread_stackbase(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    std::set<driver_t> enumerate_driver_objects(vmi_instance_t vmi);
+    std::set<driver_t> enumerate_directory(vmi_instance_t vmi, addr_t addr);
+    unicode_string_t* get_object_type_name(vmi_instance_t vmi, addr_t object);
+    device_stack_t enumerate_driver_stacks(vmi_instance_t vmi, addr_t driver_object);
+    bool enumerate_cores(vmi_instance_t vmi);
 
-addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    bool stop();
 
-addr_t win_get_current_attached_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    const output_format_t format;
+    win_ver_t winver;
 
-bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
+    size_t* offsets;
+    size_t guest_ptr_size;
+    bool is32bit;
+    size_t object_header_size;
 
-char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
+    bool done_final_analysis;
+    bool not_supported;
 
-char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
+    addr_t halprivatetable;
+    addr_t type_idx_table;
+    uint8_t ob_header_cookie;
 
-bool win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
-
-char* win_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
-
-int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base);
-
-unicode_string_t* win_get_process_csdversion(drakvuf_t drakvuf, addr_t eprocess_base);
-
-int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-bool win_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb);
-
-bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
-
-bool win_get_thread_previous_mode(drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
-
-bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    privilege_mode_t* previous_mode);
-
-bool win_is_ethread(drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
-
-bool win_is_eprocess(drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
-bool win_is_process_suspended(drakvuf_t drakvuf, addr_t process, bool* status);
-
-bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module_list);
-bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list );
-
-bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
-bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
-module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );
-module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );
-
-typedef bool (process_module_visitor_t)(drakvuf_t drakvuf, module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx);
-bool win_enumerate_module_info_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, process_module_visitor_t visitor_func, void* visitor_ctx);
-bool win_enumerate_module_info_ctx_wow(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, process_module_visitor_t visitor_func, void* visitor_ctx);
-
-typedef bool (process_const_module_visitor_t)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx);
-bool win_enumerate_process_modules(drakvuf_t drakvuf, addr_t eprocess, process_const_module_visitor_t visitor_func, void* visitor_ctx);
-
-bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* eprocess_addr);
-
-bool win_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx);
-bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
-bool win_enumerate_drivers(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t driver, void* visitor_ctx), void* visitor_ctx);
-
-bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
-
-bool win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, int32_t* ppid );
-
-bool win_get_process_data( drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data );
-
-gchar* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle );
-
-char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
-
-bool win_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t argument_number);
-addr_t win_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
-
-bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
-
-bool win_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callback, void* callback_data);
-bool win_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad);
-uint64_t win_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width);
-uint32_t win_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad);
-
-bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
-bool win_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid);
-
-addr_t win_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
-bool win_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
-bool win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
-bool win_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
-
-bool win_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
-
-#endif
+    std::unordered_map<driver_t, std::vector<checksum_data_t>> driver_sections_checksums;
+    std::unordered_map<driver_t, sha256_checksum_t> driver_object_checksums;
+    // _DRIVER_OBJECT -> _DEVICE_OBJECT -> [_DEVICE_OBJECT, ...]
+    std::unordered_map<driver_t, device_stack_t> driver_stacks;
+    // VCPU -> Descriptor
+    std::unordered_map<unsigned int, descriptors_t> descriptors;
+    // VCPU -> MSR_LSTAR
+    std::unordered_map<unsigned int, addr_t> msr_lstar;
+    std::vector<std::unique_ptr<libhook::ManualHook>> manual_hooks;
+    std::vector<std::unique_ptr<libhook::SyscallHook>> syscall_hooks;
+};

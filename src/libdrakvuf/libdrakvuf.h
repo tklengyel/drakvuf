@@ -585,6 +585,10 @@ bool drakvuf_enumerate_processes_with_module(drakvuf_t drakvuf,
     bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx),
     void* visitor_ctx) NOEXCEPT;
 
+bool drakvuf_enumerate_drivers(drakvuf_t drakvuf,
+    void (*visitor_func)(drakvuf_t drakvuf, addr_t process, void* visitor_ctx),
+    void* visitor_ctx) NOEXCEPT;
+
 bool drakvuf_enumerate_process_modules(drakvuf_t drakvuf,
     addr_t eprocess,
     bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx),
