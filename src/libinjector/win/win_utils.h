@@ -276,6 +276,7 @@ addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib,
 void free_memtraps(injector_t injector);
 void free_injector(injector_t injector);
 void injector_free_win(injector_t injector);
+void print_injection_info(output_format_t format, const char* file, injector_t injector);
 
 struct module_context
 {
