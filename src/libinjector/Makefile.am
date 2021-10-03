@@ -102,14 +102,18 @@
 #                                                                         #
 #*************************************************************************#
 
-h_sources = libinjector.h private.h win_private.h debug_helpers.h \
+h_sources = libinjector.h private.h debug_helpers.h \
+	win/win_private.h win/win_injector.h win/win_utils.h win/win_functions.h \
+	win/methods/win_dopple.h \
 	linux/linux_injector.h linux/linux_utils.h linux/linux_syscalls.h \
 	linux/methods/linux_shellcode.h linux/methods/linux_write_file.h linux/methods/linux_read_file.h linux/methods/linux_execve.h
-c_sources = injector.c win_injector.c injector_stack.c debug_helpers.c \
+c_sources = injector.c  injector_stack.c debug_helpers.c \
+	win/win_injector.c win/win_utils.c win/win_functions.c \
+	win/methods/win_dopple.c \
 	linux/linux_injector.c linux/linux_utils.c linux/linux_syscalls.c \
 	linux/methods/linux_shellcode.c linux/methods/linux_write_file.c linux/methods/linux_read_file.c linux/methods/linux_execve.c
 
-AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir) -I$(srcdir)/linux
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir) -I$(srcdir)/linux -I$(srcdir)/win
 AM_CPPFLAGS += $(VMI_CFLAGS)
 AM_CPPFLAGS += $(GLIB_CFLAGS)
 
