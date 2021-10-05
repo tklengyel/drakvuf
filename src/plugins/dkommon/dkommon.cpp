@@ -225,7 +225,7 @@ static event_response_t driver_load_unload_return_cb(drakvuf_t drakvuf, drakvuf_
     drakvuf_remove_trap(drakvuf, info->trap, nullptr);
 
     // If call was successful (NTSTATUS STATUS_SUCCESS)
-    if(info->regs->rax == 0)
+    if (info->regs->rax == 0)
     {
         std::string drv = split_string({ (const char*)params->driver_name->contents }, "\\").back();
         vmi_free_unicode_str(params->driver_name);
@@ -250,9 +250,9 @@ static event_response_t driver_load_unload_return_cb(drakvuf_t drakvuf, drakvuf_
 static void hook_driver_return(drakvuf_t drakvuf, drakvuf_trap_info_t* info, dkommon* plugin, unicode_string_t* drvname, driver_call_type call_type)
 {
     auto trap = plugin->register_trap<driver_call_result>(
-        info,
-        driver_load_unload_return_cb,
-        breakpoint_by_pid_searcher());
+            info,
+            driver_load_unload_return_cb,
+            breakpoint_by_pid_searcher());
 
     auto params = get_trap_params<driver_call_result>(trap);
     params->set_result_call_params(info);

@@ -123,7 +123,8 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [LDR_DATA_TABLE_ENTRY_FULLDLLNAME] = {"_LDR_DATA_TABLE_ENTRY", "FullDllName"},
 };
 
-enum class driver_call_type {
+enum class driver_call_type
+{
     UNLOAD,
     LOAD,
 };
