@@ -105,6 +105,23 @@
 #ifndef SSDTMON_PRIVATE_H
 #define SSDTMON_PRIVATE_H
 
+enum offset
+{
+    LIST_ENTRY_FLINK,
+    LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS,
+    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
+    LDR_DATA_TABLE_ENTRY_DLLBASE,
+    __OFFSET_MAX
+};
+
+static const char* offset_names[__OFFSET_MAX][2] =
+{
+    [LIST_ENTRY_FLINK] = {"_LIST_ENTRY", "Flink"},
+    [LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS] = {"_LDR_DATA_TABLE_ENTRY", "InLoadOrderLinks"},
+    [LDR_DATA_TABLE_ENTRY_FULLDLLNAME] = {"_LDR_DATA_TABLE_ENTRY", "FullDllName"},
+    [LDR_DATA_TABLE_ENTRY_DLLBASE] = {"_LDR_DATA_TABLE_ENTRY", "DllBase"},
+};
+
 event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 #endif
