@@ -131,20 +131,167 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         int64_t table_index = (info->trap_pa - s->kiservicetable) / sizeof(uint32_t);
         fmt::print(s->format, "ssdtmon", drakvuf, info,
-            keyval("TableIndex", fmt::Nval(table_index))
+            keyval("TableIndex", fmt::Nval(table_index)),
+            keyval("Table", fmt::Qstr("SSDT"))
+        );
+    }
+    else if (info->trap_pa > s->w32pservicetable - 8 && info->trap_pa <= s->w32pservicetable + sizeof(uint32_t) * s->w32pservicelimit + sizeof(uint32_t) - 1 )
+    {
+        int64_t table_index = (info->trap_pa - s->w32pservicetable) / sizeof(uint32_t);
+        fmt::print(s->format, "ssdtmon", drakvuf, info,
+            keyval("TableIndex", fmt::Nval(table_index)),
+            keyval("Table", fmt::Qstr("SSDTShadow"))
         );
     }
     return 0;
 }
 
+static bool get_driver_base(vmi_instance_t vmi, ssdtmon* plugin, const char* driver_name, addr_t* base)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4,
+    );
+
+    addr_t list_head = 0;
+    if (VMI_SUCCESS != vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &list_head))
+    {
+        PRINT_DEBUG("[SSDTMON] Failed to read PsLoadedModuleList value\n");
+        return false;
+    }
+
+    list_head -= plugin->offsets[LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS];
+
+    addr_t entry = list_head;
+    do
+    {
+        ctx.addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS] + plugin->offsets[LIST_ENTRY_FLINK];
+        if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &entry))
+        {
+            PRINT_DEBUG("[SSDTMON] Failed to read next entry (VA 0x%lx)\n", ctx.addr);
+            return false;
+        }
+
+        ctx.addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
+        auto name = drakvuf_read_unicode_common(vmi, &ctx);
+        if (name && name->contents)
+        {
+            auto drvname = std::string(reinterpret_cast<char*>(name->contents));
+            vmi_free_unicode_str(name);
+            if (drvname.find(driver_name) != std::string::npos)
+            {
+                ctx.addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_DLLBASE];
+                if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, base))
+                    return false;
+                return true;
+            }
+
+        }
+    } while (entry != list_head);
+
+    return false;
+}
+
 /* ----------------------------------------------------- */
 
-ssdtmon::ssdtmon(drakvuf_t drakvuf, output_format_t output)
-    : format{output}
+ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_t output)
+    : format{output}, offsets(new size_t[__OFFSET_MAX])
 {
     addr_t kiservicetable_rva = 0;
     addr_t kiservicelimit_rva = 0;
     addr_t kernbase = 0;
+
+    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, this->offsets))
+    {
+        PRINT_DEBUG("[SSDTMON] Failed to get kernel struct member offsets\n");
+        throw -1;
+    }
+
+    if (config->win32k_profile)
+    {
+        addr_t gui_process = 0;
+        if (!drakvuf_find_process(drakvuf, ~0, "explorer.exe", &gui_process))
+        {
+            PRINT_DEBUG("[SSDTMON] Failed to find EPROCESS of \"explorer.exe\"\n");
+            throw -1;
+        }
+
+        vmi_pid_t gui_pid = 0;
+        if (!drakvuf_get_process_pid(drakvuf, gui_process, &gui_pid))
+        {
+            PRINT_DEBUG("[SSDTMON] Failed to get PID of \"explorer.exe\"\n");
+            throw -1;
+        }
+
+        json_object* profile_json = json_object_from_file(config->win32k_profile);
+        if (!profile_json)
+        {
+            PRINT_DEBUG("[SSDTMOD] Failed to load JSON debug info for win32k.sys\n");
+            throw -1;
+        }
+
+        addr_t w32pst_rva = 0;
+        if (!json_get_symbol_rva(drakvuf, profile_json, "W32pServiceTable", &w32pst_rva))
+        {
+            PRINT_DEBUG("[SSDTMON] Failed to get RVA of win32k!W32pServiceTable\n");
+            throw -1;
+        }
+
+        addr_t w32psl_rva = 0;
+        if (!json_get_symbol_rva(drakvuf, profile_json, "W32pServiceLimit", &w32psl_rva))
+        {
+            PRINT_DEBUG("[SSDTMON] Failed to get RVA of win32k!W32pServiceLimit\n");
+            throw -1;
+        }
+
+        {
+            addr_t w32k_base = 0;
+            vmi_lock_guard vmi(drakvuf);
+            // Locate Win32k.sys base address
+            if (!get_driver_base(vmi, this, "win32k.sys", &w32k_base))
+            {
+                PRINT_DEBUG("[SSDTMON] Failed to find win32k.sys in PsLoadedModuleList\n");
+                throw -1;
+            }
+            // Read ssdt shadow size
+            if (VMI_SUCCESS != vmi_read_32_va(vmi, w32k_base + w32psl_rva, gui_pid, &this->w32pservicelimit))
+            {
+                PRINT_DEBUG("[SSDTMON] Failed to read W32pServiceLimit\n");
+                throw -1;
+            }
+            // NOTE: We use vmi_translate_uv2p instead of vmi_translate_kv2p because Win32k.sys mapping is not present
+            // in system process, only in process with GUI dependencies, hence we use explorer.exe as a pid.
+            if (VMI_SUCCESS != vmi_translate_uv2p(vmi, w32k_base + w32pst_rva, gui_pid, &this->w32pservicetable))
+            {
+                PRINT_DEBUG("[SSDTMON] Failed to translate win32k!W32pServiceTable to physical address\n");
+                throw -1;
+            }
+        }
+
+        PRINT_DEBUG("[SSDTMON] SSDT shadow is at 0x%lx. Number of syscalls: %u. Size: %lu\n",
+            this->w32pservicetable,
+            this->w32pservicelimit,
+            sizeof(uint32_t)*this->w32pservicelimit);
+
+        this->ssdt_trap[0].memaccess.gfn = this->w32pservicetable >> 12;
+        this->ssdt_trap[0].cb = write_cb;
+
+        if (!drakvuf_add_trap(drakvuf, &this->ssdt_trap[0]))
+            throw -1;
+
+        addr_t ssdt_shadow_write_end = (this->w32pservicetable + sizeof(uint32_t) * this->w32pservicelimit) >> 12;
+
+        if ( ssdt_shadow_write_end != this->ssdt_trap[0].memaccess.gfn )
+        {
+            this->ssdt_trap[1].cb = write_cb;
+            this->ssdt_trap[1].memaccess.gfn = ssdt_shadow_write_end;
+
+            if (!drakvuf_add_trap(drakvuf, &this->ssdt_trap[1]))
+                throw -1;
+        }
+
+        json_object_put(profile_json);
+    }
 
     if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "KiServiceTable", &kiservicetable_rva) )
     {
@@ -187,32 +334,28 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, output_format_t output)
         this->kiservicelimit,
         sizeof(uint32_t)*this->kiservicelimit);
 
-    this->ssdtwrite.cb = write_cb;
-    this->ssdtwrite.data = (void*)this;
-    this->ssdtwrite.name = nullptr;
-    this->ssdtwrite.type = MEMACCESS;
-    this->ssdtwrite.ttl = UNLIMITED_TTL;
-    this->ssdtwrite.ah_cb = nullptr;
-    this->ssdtwrite.memaccess.gfn = this->kiservicetable >> 12;
-    this->ssdtwrite.memaccess.type = PRE;
-    this->ssdtwrite.memaccess.access = VMI_MEMACCESS_W;
+    this->ssdt_trap[2].cb = write_cb;
+    this->ssdt_trap[2].memaccess.gfn = this->kiservicetable >> 12;
 
     addr_t ssdtwrite_end = (this->kiservicetable + sizeof(uint32_t) * this->kiservicelimit) >> 12;
 
-    if ( !drakvuf_add_trap(drakvuf, &this->ssdtwrite) )
+    if ( !drakvuf_add_trap(drakvuf, &this->ssdt_trap[2]) )
     {
         PRINT_DEBUG("SSDT plugin failed to trap on \n");
         throw -1;
     }
 
-    if ( ssdtwrite_end != this->ssdtwrite.memaccess.gfn )
+    if ( ssdtwrite_end != this->ssdt_trap[2].memaccess.gfn )
     {
-        this->ssdtwrite2 = this->ssdtwrite;
-        this->ssdtwrite2.memaccess.gfn = ssdtwrite_end;
+        this->ssdt_trap[3].cb = write_cb;
+        this->ssdt_trap[3].memaccess.gfn = ssdtwrite_end;
 
-        if ( !drakvuf_add_trap(drakvuf, &this->ssdtwrite2) )
+        if ( !drakvuf_add_trap(drakvuf, &this->ssdt_trap[3]) )
             throw -1;
     }
 }
 
-ssdtmon::~ssdtmon() {}
+ssdtmon::~ssdtmon()
+{
+    delete[] offsets;
+}
