@@ -103,141 +103,82 @@
 ***************************************************************************/
 
 #include <libvmi/libvmi.h>
-
-#include "dkommon.h"
+#include "libdrakvuf/libdrakvuf.h"
 #include "plugins/output_format.h"
-
 #include <algorithm>
 
-enum offset
-{
-    EPROCESS_ACTIVEPROCESSLINKS,
-    LIST_ENTRY_BLINK,
-    LIST_ENTRY_FLINK,
-    LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS,
-    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
-    __OFFSET_MAX
-};
+#include "dkommon.h"
+#include "private.h"
 
-static const char* offset_names[__OFFSET_MAX][2] =
+static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_info_t* info, dkommon* plugin, vmi_pid_t pid)
 {
-    [EPROCESS_ACTIVEPROCESSLINKS] = {"_EPROCESS", "ActiveProcessLinks"},
-    [LIST_ENTRY_BLINK] = {"_LIST_ENTRY", "Blink"},
-    [LIST_ENTRY_FLINK] = {"_LIST_ENTRY", "Flink"},
-    [LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS] = {"_LDR_DATA_TABLE_ENTRY", "InLoadOrderLinks"},
-    [LDR_DATA_TABLE_ENTRY_FULLDLLNAME] = {"_LDR_DATA_TABLE_ENTRY", "FullDllName"},
-};
-
-static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    dkommon* d = static_cast<dkommon*>(info->trap->data);
-
-    fmt::print(d->format, "dkommon", drakvuf, info,
-        keyval("Message", fmt::Qstr("Hidden Process"))
+    fmt::print(plugin->format, "dkommon", drakvuf, info,
+        keyval("Message", fmt::Qstr("Hidden Process")),
+        keyval("HiddenPID", fmt::Nval(pid))
     );
 }
 
-static event_response_t check_hidden_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    dkommon* d = static_cast<dkommon*>(info->trap->data);
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3
-    );
-
-    addr_t list_entry_va = info->attached_proc_data.base_addr + d->offsets[EPROCESS_ACTIVEPROCESSLINKS];
-    addr_t flink = 0;
-    addr_t blink = 0;
-
-    ctx.addr = list_entry_va + d->offsets[LIST_ENTRY_FLINK];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &flink) )
-        goto err;
-
-    ctx.addr = list_entry_va + d->offsets[LIST_ENTRY_BLINK];
-    if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &blink) )
-        goto err;
-
-    if (list_entry_va == flink && flink == blink &&
-        std::find(d->processes_list.begin(), d->processes_list.end(), info->attached_proc_data.pid) == d->processes_list.end())
-    {
-        d->processes_list.push_back(info->attached_proc_data.pid);
-        print_hidden_process_information(drakvuf, info);
-    }
-    else
-    {
-        goto done;
-    }
-
-err:
-    PRINT_DEBUG("[DKOMmon] Error. Failed to read virtual address.\n");
-
-done:
-    drakvuf_release_vmi(drakvuf);
-
-    return 0;
-}
-
-static event_response_t notify_zero_page_write(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    dkommon* d = static_cast<dkommon*>(info->trap->data);
-
-    fmt::print(d->format, "dkommon", drakvuf, info,
-        keyval("Message", fmt::Qstr("Zero Page Write"))
-    );
-
-    return 0;
-}
-
-static void print_driver(drakvuf_t drakvuf, drakvuf_trap_info_t* info, output_format_t format, const char* message, const char* name)
+static void print_driver_information(drakvuf_t drakvuf, drakvuf_trap_info_t* info, output_format_t format, const char* message, const char* name)
 {
     fmt::print(format, "dkommon", drakvuf, info,
         keyval("Message", fmt::Qstr(message)),
         keyval("DriverName", fmt::Qstr(name))
     );
 }
-
-static std::vector<std::string> enumerate_drivers(dkommon* d, drakvuf_t drakvuf)
+static std::vector<std::string> split_string(std::string value, const std::string& delimiter)
 {
-    std::vector<std::string> drivers_list;
+    std::vector<std::string> splitted;
+    size_t pos = 0;
+    while ((pos = value.find(delimiter)) != std::string::npos)
+    {
+        splitted.push_back(value.substr(0, pos));
+        value.erase(0, pos + delimiter.size());
+    }
 
+    if (!value.empty())
+        splitted.push_back(value);
+
+    if (splitted.empty())
+        splitted.push_back(value);
+
+    return splitted;
+};
+
+static std::set<std::string> enumerate_drivers(dkommon* plugin, drakvuf_t drakvuf)
+{
+    std::set<std::string> drivers_list;
     vmi_lock_guard vmi(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4,
     );
 
-    if (VMI_SUCCESS != vmi_pid_to_dtb(vmi.vmi, 4, &ctx.dtb))
+    addr_t list_head = 0;
+    if (VMI_SUCCESS != vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &list_head))
     {
-        PRINT_DEBUG("dkommon:enumerate drivers: failed to get CR3 for System process\n");
+        PRINT_DEBUG("dkommon:enumerate drivers: failed to read PsLoadedModuleList value\n");
         return drivers_list;
     }
 
-    addr_t list_head = 0;
-    ctx.addr = d->modules_list_va;
-    if ( VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &list_head) )
-    {
-        PRINT_DEBUG("dkommon:enumerate drivers: failed to read PsLoadedModuleList (VA 0x%lx)\n", ctx.addr);
-        return drivers_list;
-    }
-    list_head -= d->offsets[LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS];
+    list_head -= plugin->offsets[LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS];
 
     addr_t entry = list_head;
     do
     {
-        ctx.addr = entry + d->offsets[LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS] + d->offsets[LIST_ENTRY_FLINK];
-        if ( VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &entry) )
+        ctx.addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS] + plugin->offsets[LIST_ENTRY_FLINK];
+        if (VMI_SUCCESS != vmi_read_addr(vmi.vmi, &ctx, &entry))
         {
             PRINT_DEBUG("dkommon:enumerate drivers: failed to read next entry (VA 0x%lx)\n", ctx.addr);
             return drivers_list;
         }
 
-        ctx.addr = entry + d->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
+        ctx.addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
         auto name = drakvuf_read_unicode_common(vmi.vmi, &ctx);
         if (name && name->contents)
         {
-            drivers_list.push_back(std::string(reinterpret_cast<char*>(name->contents)));
+            auto drv = std::string(reinterpret_cast<char*>(name->contents));
+            drivers_list.insert(split_string(drv, "\\").back());
             vmi_free_unicode_str(name);
         }
     } while (entry != list_head);
@@ -245,51 +186,242 @@ static std::vector<std::string> enumerate_drivers(dkommon* d, drakvuf_t drakvuf)
     return drivers_list;
 }
 
-static event_response_t check_hidden_drivers(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t notify_zero_page_write(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    dkommon* d = static_cast<dkommon*>(info->trap->data);
+    auto plugin = static_cast<dkommon*>(info->trap->data);
+    fmt::print(plugin->format, "dkommon", drakvuf, info,
+        keyval("Message", fmt::Qstr("Zero Page Write"))
+    );
+    return 0;
+}
 
-    auto list = enumerate_drivers(d, drakvuf);
+static void process_visitor(drakvuf_t drakvuf, addr_t process, void* pass_ctx)
+{
+    auto plugin = static_cast<dkommon*>(pass_ctx);
 
-    // Check for new drivers
-    for (auto i: list)
-        if (std::find(d->drivers_list.begin(), d->drivers_list.end(), i) == d->drivers_list.end())
-            print_driver(drakvuf, info, d->format, "Driver Added", i.c_str());
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4,
+        .addr = process + plugin->offsets[EPROCESS_UNIQUE_PROCESS_ID]
+    );
 
-    // Check for deleted drivers
-    for (auto i: d->drivers_list)
-        if (std::find(list.begin(), list.end(), i) == list.end())
-            print_driver(drakvuf, info, d->format, "Driver Removed", i.c_str());
+    addr_t pid = 0;
+    vmi_lock_guard vmi(drakvuf);
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &pid))
+    {
+        PRINT_DEBUG("[DKOMMON] Failed to read process pid\n");
+        return;
+    }
+    plugin->live_processes.insert(pid);
+}
 
-    d->drivers_list = list;
+static event_response_t driver_load_unload_return_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin = get_trap_plugin<dkommon>(info);
+    auto params = get_trap_params<driver_call_result>(info);
+    if (!params->verify_result_call_params(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+
+    // If call was successful (NTSTATUS STATUS_SUCCESS)
+    if(info->regs->rax == 0)
+    {
+        std::string drv = split_string({ (const char*)params->driver_name->contents }, "\\").back();
+        vmi_free_unicode_str(params->driver_name);
+
+        if (params->call_type == driver_call_type::LOAD)
+        {
+            plugin->loaded_drivers.insert(drv);
+            plugin->unloaded_drivers.erase(drv);
+        }
+        else if (params->call_type == driver_call_type::UNLOAD)
+        {
+            if (std::find(plugin->unloaded_drivers.begin(), plugin->unloaded_drivers.end(), drv) == plugin->unloaded_drivers.end())
+            {
+                plugin->loaded_drivers.erase(drv);
+                plugin->unloaded_drivers.insert(drv);
+            }
+        }
+    }
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static void hook_driver_return(drakvuf_t drakvuf, drakvuf_trap_info_t* info, dkommon* plugin, unicode_string_t* drvname, driver_call_type call_type)
+{
+    auto trap = plugin->register_trap<driver_call_result>(
+        info,
+        driver_load_unload_return_cb,
+        breakpoint_by_pid_searcher());
+
+    auto params = get_trap_params<driver_call_result>(trap);
+    params->set_result_call_params(info);
+    params->driver_name = drvname;
+    params->call_type = call_type;
+}
+
+static event_response_t load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin = get_trap_plugin<dkommon>(info);
+    addr_t drvname_ptr = drakvuf_get_function_argument(drakvuf, info, 1);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = drvname_ptr
+    );
+
+    vmi_lock_guard vmi(drakvuf);
+    unicode_string_t* drvname = drakvuf_read_unicode_common(vmi, &ctx);
+    if (drvname)
+        hook_driver_return(drakvuf, info, plugin, drvname, driver_call_type::LOAD);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t unload_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin = get_trap_plugin<dkommon>(info);
+    addr_t drvname_ptr = drakvuf_get_function_argument(drakvuf, info, 1);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = drvname_ptr
+    );
+
+    vmi_lock_guard vmi(drakvuf);
+    unicode_string_t* drvname = drakvuf_read_unicode_common(vmi, &ctx);
+    if (drvname)
+        hook_driver_return(drakvuf, info, plugin, drvname, driver_call_type::UNLOAD);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin = get_trap_plugin<dkommon>(info);
+    uint64_t process = drakvuf_get_function_argument(drakvuf, info, 1);
+    vmi_lock_guard vmi(drakvuf);
+    addr_t pid = 0;
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4,
+        .addr = process + plugin->offsets[EPROCESS_UNIQUE_PROCESS_ID]
+    );
+
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &pid))
+    {
+        PRINT_DEBUG("[DKOMMON] Failed to read process pid\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    // Skip if already dead
+    if (std::find(plugin->dead_processes.begin(), plugin->dead_processes.end(), (vmi_pid_t)pid) != plugin->dead_processes.end())
+        return VMI_EVENT_RESPONSE_NONE;
+
+    addr_t list_entry_va = process + plugin->offsets[EPROCESS_ACTIVEPROCESSLINKS];
+    addr_t flink = 0;
+    addr_t blink = 0;
+
+    ctx.addr = list_entry_va + plugin->offsets[LIST_ENTRY_FLINK];
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &flink))
+        goto done;
+
+    ctx.addr = list_entry_va + plugin->offsets[LIST_ENTRY_BLINK];
+    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &blink))
+        goto done;
+
+    if (list_entry_va == flink && flink == blink && flink && blink)
+    {
+        print_hidden_process_information(drakvuf, info, plugin, pid);
+    }
+
+done:
+    plugin->live_processes.erase(pid);
+    plugin->dead_processes.insert(pid);
+
+    PRINT_DEBUG("[DKOMMON] Terminating process %d\n", (vmi_pid_t)pid);
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t insert_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin = get_trap_plugin<dkommon>(info);
+    addr_t process = drakvuf_get_function_argument(drakvuf, info, 1);
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4,
+        .addr = process + plugin->offsets[EPROCESS_UNIQUE_PROCESS_ID]
+    );
+
+    addr_t pid = 0;
+    vmi_lock_guard vmi(drakvuf);
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &pid))
+    {
+        PRINT_DEBUG("[DKOMMON] Failed to read process pid\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    PRINT_DEBUG("[DKOMMON] Inserting process %lu\n", pid);
+    plugin->live_processes.insert(pid);
+    // In case new process is created with the same pid
+    plugin->dead_processes.erase(pid);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
-    : format(output)
-    , offsets(new size_t[__OFFSET_MAX])
+static event_response_t final_check_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets) )
+    // Process only first callback call
+    auto plugin = get_trap_plugin<dkommon>(info);
+    if (plugin->is_stopping() && !plugin->done_final_analysis)
+    {
+        // Check hidden processes
+        //
+        auto temp_processes = std::move(plugin->live_processes);
+        plugin->live_processes.clear();
+        drakvuf_enumerate_processes(drakvuf, process_visitor, static_cast<void*>(plugin));
+
+        for (vmi_pid_t pid : temp_processes)
+        {
+            if (std::find(plugin->live_processes.begin(), plugin->live_processes.end(), pid) == plugin->live_processes.end())
+            {
+                print_hidden_process_information(drakvuf, info, plugin, pid);
+            }
+        }
+
+        // Check hidden drivers
+        //
+        auto temp_drivers = enumerate_drivers(plugin, drakvuf);
+        for (const auto& drvname : plugin->loaded_drivers)
+        {
+            if (std::find(temp_drivers.begin(), temp_drivers.end(), drvname) == temp_drivers.end())
+                print_driver_information(drakvuf, info, plugin->format, "Hidden Driver", drvname.c_str());
+        }
+
+        plugin->done_final_analysis = true;
+    }
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
+    : pluginex(drakvuf, output), format(output), offsets(new size_t[__OFFSET_MAX])
+{
+    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets))
         throw -1;
 
-    addr_t ml_rva = 0;
-    if ( !drakvuf_get_kernel_symbol_rva( drakvuf, "PsLoadedModuleList", &ml_rva) )
+    drakvuf_enumerate_processes(drakvuf, process_visitor, static_cast<void*>(this));
+
+    this->loaded_drivers = enumerate_drivers(this, drakvuf);
+
+    breakpoint_in_system_process_searcher bp;
+    if (!register_trap(nullptr, delete_process_cb, bp.for_syscall_name("PspProcessDelete")) ||
+        !register_trap(nullptr, insert_process_cb, bp.for_syscall_name("PspInsertProcess")) ||
+        !register_trap(nullptr, load_driver_cb, bp.for_syscall_name("NtLoadDriver")) ||
+        !register_trap(nullptr, unload_driver_cb, bp.for_syscall_name("NtUnloadDriver")))
+    {
+        PRINT_DEBUG("[DKOMMON] Failed to setup critical traps\n");
         throw -1;
-
-    if (!(modules_list_va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, "ntoskrnl.exe", ml_rva)))
-        throw -1;
-
-    drivers_list = enumerate_drivers(this, drakvuf);
-    for (auto i: drivers_list)
-        PRINT_DEBUG("[DKOMmon] Found driver '%s'\n", i.c_str());
-
-    /* Setup trap for thread switch */
-    processes_trap.cb = check_hidden_process;
-    if (!drakvuf_add_trap(drakvuf, &processes_trap)) throw -1;
-
-    drivers_trap.cb = check_hidden_drivers;
-    if (!drakvuf_add_trap(drakvuf, &drivers_trap)) throw -1;
+    }
 
     zeropage_trap.cb = notify_zero_page_write;
     if (!drakvuf_add_trap(drakvuf, &zeropage_trap)) throw -1;
@@ -298,4 +430,19 @@ dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
 dkommon::~dkommon()
 {
     delete[] offsets;
+}
+
+bool dkommon::stop()
+{
+    if (!is_stopping() && !done_final_analysis)
+    {
+        m_is_stopping = true;
+        PRINT_DEBUG("[dkommon] Injecting KiDeliverApc\n");
+        // Hook dummy function so we could make final system analysis
+        breakpoint_in_system_process_searcher bp;
+        register_trap(nullptr, final_check_cb, bp.for_syscall_name("KiDeliverApc"));
+        // Return status `Pending`
+        return false;
+    }
+    return done_final_analysis;
 }
