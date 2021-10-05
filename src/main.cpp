@@ -237,7 +237,7 @@ static void print_usage()
 #endif
         "\t -w, --json-wow <path to json>\n"
         "\t                           The JSON profile for WoW64 NTDLL\n"
-#ifdef ENABLE_PLUGIN_CLIPBOARDMON
+#if defined(ENABLE_PLUGIN_CLIPBOARDMON) || defined(ENABLE_PLUGIN_SSDTMON)
         "\t -W, --json-win32k <path to json>\n"
         "\t                           The JSON profile for win32k.sys\n"
 #endif

@@ -108,17 +108,39 @@
 #include "plugins/private.h"
 #include "plugins/plugins.h"
 
+struct ssdtmon_config
+{
+    const char* win32k_profile;
+};
+
 class ssdtmon: public plugin
 {
 public:
     output_format_t format;
-    drakvuf_trap_t ssdtwrite{};
-    drakvuf_trap_t ssdtwrite2{};
+
+    size_t* offsets;
 
     addr_t kiservicetable;
     uint32_t kiservicelimit;
 
-    ssdtmon(drakvuf_t drakvuf, output_format_t output);
+    addr_t w32pservicetable;
+    uint32_t w32pservicelimit;
+
+    drakvuf_trap_t ssdt_trap[4] =
+    {
+        [0 ... 3] = {
+            .cb = nullptr,
+            .data = (void*)this,
+            .name = nullptr,
+            .ah_cb = nullptr,
+            .ttl = UNLIMITED_TTL,
+            .type = MEMACCESS,
+            .memaccess.type = PRE,
+            .memaccess.access = VMI_MEMACCESS_W
+        }
+    };
+
+    ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_t output);
     ~ssdtmon();
 };
 

@@ -212,8 +212,14 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #endif
 #ifdef ENABLE_PLUGIN_SSDTMON
                 case PLUGIN_SSDTMON:
-                    this->plugins[plugin_id] = std::make_unique<ssdtmon>(this->drakvuf, this->output);
+                {
+                    ssdtmon_config config =
+                    {
+                        .win32k_profile = options->win32k_profile,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<ssdtmon>(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_DEBUGMON
                 case PLUGIN_DEBUGMON:
