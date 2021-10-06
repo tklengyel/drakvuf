@@ -198,16 +198,8 @@ static event_response_t notify_zero_page_write(drakvuf_t drakvuf, drakvuf_trap_i
 static void process_visitor(drakvuf_t drakvuf, addr_t process, void* pass_ctx)
 {
     auto plugin = static_cast<dkommon*>(pass_ctx);
-
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4,
-        .addr = process + plugin->offsets[EPROCESS_UNIQUE_PROCESS_ID]
-    );
-
-    addr_t pid = 0;
-    vmi_lock_guard vmi(drakvuf);
-    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &pid))
+    vmi_pid_t pid;
+    if (!drakvuf_get_process_pid(drakvuf, process, &pid))
     {
         PRINT_DEBUG("[DKOMMON] Failed to read process pid\n");
         return;
@@ -298,28 +290,27 @@ static event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
 {
     auto plugin = get_trap_plugin<dkommon>(info);
     uint64_t process = drakvuf_get_function_argument(drakvuf, info, 1);
-    vmi_lock_guard vmi(drakvuf);
-    addr_t pid = 0;
 
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4,
-        .addr = process + plugin->offsets[EPROCESS_UNIQUE_PROCESS_ID]
-    );
-
-    if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &pid))
+    vmi_pid_t pid;
+    if (!drakvuf_get_process_pid(drakvuf, process, &pid))
     {
         PRINT_DEBUG("[DKOMMON] Failed to read process pid\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
     // Skip if already dead
-    if (std::find(plugin->dead_processes.begin(), plugin->dead_processes.end(), (vmi_pid_t)pid) != plugin->dead_processes.end())
+    if (std::find(plugin->dead_processes.begin(), plugin->dead_processes.end(), pid) != plugin->dead_processes.end())
         return VMI_EVENT_RESPONSE_NONE;
 
     addr_t list_entry_va = process + plugin->offsets[EPROCESS_ACTIVEPROCESSLINKS];
     addr_t flink = 0;
     addr_t blink = 0;
+
+    vmi_lock_guard vmi(drakvuf);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4,
+    );
 
     ctx.addr = list_entry_va + plugin->offsets[LIST_ENTRY_FLINK];
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &flink))
@@ -347,15 +338,8 @@ static event_response_t insert_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     auto plugin = get_trap_plugin<dkommon>(info);
     addr_t process = drakvuf_get_function_argument(drakvuf, info, 1);
 
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4,
-        .addr = process + plugin->offsets[EPROCESS_UNIQUE_PROCESS_ID]
-    );
-
-    addr_t pid = 0;
-    vmi_lock_guard vmi(drakvuf);
-    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &pid))
+    vmi_pid_t pid;
+    if (!drakvuf_get_process_pid(drakvuf, process, &pid))
     {
         PRINT_DEBUG("[DKOMMON] Failed to read process pid\n");
         return VMI_EVENT_RESPONSE_NONE;

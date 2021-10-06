@@ -105,7 +105,6 @@
 enum offset
 {
     EPROCESS_ACTIVEPROCESSLINKS,
-    EPROCESS_UNIQUE_PROCESS_ID,
     LIST_ENTRY_BLINK,
     LIST_ENTRY_FLINK,
     LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS,
@@ -116,7 +115,6 @@ enum offset
 static const char* offset_names[__OFFSET_MAX][2] =
 {
     [EPROCESS_ACTIVEPROCESSLINKS] = {"_EPROCESS", "ActiveProcessLinks"},
-    [EPROCESS_UNIQUE_PROCESS_ID] = {"_EPROCESS", "UniqueProcessId"},
     [LIST_ENTRY_BLINK] = {"_LIST_ENTRY", "Blink"},
     [LIST_ENTRY_FLINK] = {"_LIST_ENTRY", "Flink"},
     [LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS] = {"_LDR_DATA_TABLE_ENTRY", "InLoadOrderLinks"},
