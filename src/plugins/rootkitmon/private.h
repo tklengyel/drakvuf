@@ -227,8 +227,8 @@ struct nt_headers_t
     optional_header_t  optional_header;
 
     inline const section_header_t* get_section(int n) const
-    { 
-        return n >= file_header.num_sections ? nullptr : 
+    {
+        return n >= file_header.num_sections ? nullptr :
             reinterpret_cast<const section_header_t*>(
                 (const uint8_t*)&optional_header + file_header.size_optional_header) + n;
     }
@@ -256,10 +256,10 @@ struct dos_header_t
     uint16_t e_oeminfo;
     uint16_t e_res2[ 10 ];
     uint32_t e_lfanew;
-    
+
     inline const nt_headers_t* get_nt_headers() const
-    { 
-        return reinterpret_cast<const nt_headers_t*>((const uint8_t*)this + e_lfanew); 
+    {
+        return reinterpret_cast<const nt_headers_t*>((const uint8_t*)this + e_lfanew);
     }
 };
 static_assert(64 == sizeof(dos_header_t), "Dos header size mismatch");
@@ -274,14 +274,14 @@ struct checksum_data_t
 union gdt_entry_t
 {
     uint64_t entry;
-    struct 
+    struct
     {
         uint16_t limit_low;
         uint16_t base_low;
         uint8_t  base_mid;
         uint8_t  type : 4;
         uint8_t  s    : 1;
-        uint8_t  dpl  : 2; 
+        uint8_t  dpl  : 2;
         uint8_t  present : 1;
         uint8_t  limit_high : 4;
         uint8_t  avail: 1;

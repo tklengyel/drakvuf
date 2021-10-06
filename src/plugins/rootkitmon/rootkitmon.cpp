@@ -327,7 +327,8 @@ bool rootkitmon::enumerate_cores(vmi_instance_t vmi)
             auto gdt = enumerate_gdt(vmi, gdtr_base, gdtr_limit);
 
             // Save descriptor values
-            this->descriptors[vcpu] = {
+            this->descriptors[vcpu] =
+            {
                 idtr_base,
                 idtr_limit,
                 idt_checksum,
@@ -546,13 +547,13 @@ event_response_t rootkitmon::final_check_cb(drakvuf_t drakvuf, drakvuf_trap_info
             {
                 fmt::print(this->format, "rootkitmon", drakvuf, info,
                     keyval("Reason", fmt::Qstr("IDTR base modification")));
-                    break;
+                break;
             }
             if (desc_info.idt_checksum != t_desc_info.idt_checksum)
             {
                 fmt::print(this->format, "rootkitmon", drakvuf, info,
                     keyval("Reason", fmt::Qstr("IDT modification")));
-                    break;
+                break;
             }
         }
 
@@ -563,13 +564,13 @@ event_response_t rootkitmon::final_check_cb(drakvuf_t drakvuf, drakvuf_trap_info
             {
                 fmt::print(this->format, "rootkitmon", drakvuf, info,
                     keyval("Reason", fmt::Qstr("GDTR base modification")));
-                    break;
+                break;
             }
             if (desc_info.gdt.size() != t_desc_info.gdt.size())
             {
                 fmt::print(this->format, "rootkitmon", drakvuf, info,
                     keyval("Reason", fmt::Qstr("GDT modification")));
-                    break;
+                break;
             }
             else
             {
@@ -642,7 +643,10 @@ std::unique_ptr<libhook::ManualHook> rootkitmon::register_profile_hook(drakvuf_t
     trap->cb = callback;
     trap->ttl = UNLIMITED_TTL;
 
-    auto hook = createManualHook(trap, [](drakvuf_trap_t* trap_) { delete trap_; });
+    auto hook = createManualHook(trap, [](drakvuf_trap_t* trap_)
+    {
+        delete trap_;
+    });
     if (!hook)
     {
         PRINT_DEBUG("[ROOTKITMON] Failed to hook %s\n", func_name);
@@ -667,7 +671,10 @@ std::unique_ptr<libhook::ManualHook> rootkitmon::register_mem_hook(event_respons
     trap->ah_cb = nullptr;
     trap->cb = callback;
 
-    auto hook = createManualHook(trap, [](drakvuf_trap_t* trap_) { delete trap_; });
+    auto hook = createManualHook(trap, [](drakvuf_trap_t* trap_)
+    {
+        delete trap_;
+    });
     if (!hook)
     {
         PRINT_DEBUG("[ROOTKITMON] Failed to hook 0x%lx\n", pa >> 12);
@@ -690,7 +697,10 @@ std::unique_ptr<libhook::ManualHook> rootkitmon::register_reg_hook(event_respons
     trap->cb = callback;
     trap->ttl = UNLIMITED_TTL;
 
-    auto hook = createManualHook(trap, [](drakvuf_trap_t* trap_) { delete trap_; });
+    auto hook = createManualHook(trap, [](drakvuf_trap_t* trap_)
+    {
+        delete trap_;
+    });
     if (!hook)
     {
         PRINT_DEBUG("[ROOTKITMON] Failed to hook register\n");
