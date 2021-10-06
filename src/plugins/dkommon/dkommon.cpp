@@ -345,7 +345,7 @@ static event_response_t insert_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    PRINT_DEBUG("[DKOMMON] Inserting process %lu\n", pid);
+    PRINT_DEBUG("[DKOMMON] Inserting process %d\n", pid);
     plugin->live_processes.insert(pid);
     // In case new process is created with the same pid
     plugin->dead_processes.erase(pid);
