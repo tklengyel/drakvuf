@@ -120,6 +120,7 @@
 #include <inttypes.h>
 #include <glib.h>
 #include <json-c/json.h>
+#include <assert.h>
 
 #include "libdrakvuf/libdrakvuf.h"
 #include <libinjector/libinjector.h>
