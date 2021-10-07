@@ -102,44 +102,34 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef DKOMMON_H
-#define DKOMMON_H
-
-#include "plugins/private.h"
-#include "plugins/plugins_ex.h"
-
-#include <string>
-#include <set>
-
-class dkommon: public pluginex
+enum offset
 {
-public:
-    const output_format_t format;
-    size_t* offsets;
-
-    std::set<vmi_pid_t> live_processes;
-    std::set<vmi_pid_t> dead_processes;
-
-    std::set<std::string> loaded_drivers;
-    std::set<std::string> unloaded_drivers;
-
-    dkommon(drakvuf_t drakvuf, const void* config, output_format_t output);
-    ~dkommon();
-    bool stop();
-
-    bool done_final_analysis = false;
-private:
-    drakvuf_trap_t zeropage_trap =
-    {
-        .type = MEMACCESS,
-        .memaccess.gfn = 0,
-        .memaccess.type = PRE,
-        .memaccess.access = VMI_MEMACCESS_W,
-        .data = this,
-        .name = nullptr,
-        .ttl = UNLIMITED_TTL,
-        .ah_cb = nullptr
-    };
+    EPROCESS_ACTIVEPROCESSLINKS,
+    LIST_ENTRY_BLINK,
+    LIST_ENTRY_FLINK,
+    LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS,
+    LDR_DATA_TABLE_ENTRY_FULLDLLNAME,
+    __OFFSET_MAX
 };
 
-#endif
+static const char* offset_names[__OFFSET_MAX][2] =
+{
+    [EPROCESS_ACTIVEPROCESSLINKS] = {"_EPROCESS", "ActiveProcessLinks"},
+    [LIST_ENTRY_BLINK] = {"_LIST_ENTRY", "Blink"},
+    [LIST_ENTRY_FLINK] = {"_LIST_ENTRY", "Flink"},
+    [LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS] = {"_LDR_DATA_TABLE_ENTRY", "InLoadOrderLinks"},
+    [LDR_DATA_TABLE_ENTRY_FULLDLLNAME] = {"_LDR_DATA_TABLE_ENTRY", "FullDllName"},
+};
+
+enum class driver_call_type
+{
+    UNLOAD,
+    LOAD,
+};
+
+struct driver_call_result : call_result_t
+{
+    driver_call_result() : call_result_t() {}
+    unicode_string_t* driver_name = nullptr;
+    driver_call_type call_type;
+};
