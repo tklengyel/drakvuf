@@ -232,6 +232,7 @@ endif
 if PLUGIN_DKOMMON
 sources += dkommon/dkommon.cpp
 sources += dkommon/dkommon.h
+sources += dkommon/private.h
 endif
 
 if PLUGIN_WMIMON
