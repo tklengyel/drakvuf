@@ -122,16 +122,19 @@ public:
     event_response_t final_check_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     std::unique_ptr<libhook::ManualHook> register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
-        const char* func_name, event_response_t (*callback)(drakvuf_t, drakvuf_trap_info_t*));
-    std::unique_ptr<libhook::ManualHook> register_reg_hook(event_response_t (*callback)(drakvuf_t, drakvuf_trap_info_t*), register_t reg);
-    std::unique_ptr<libhook::ManualHook> register_mem_hook(event_response_t (*callback)(drakvuf_t, drakvuf_trap_info_t*), addr_t pa,
-        vmi_mem_access_t access);
+        const char* func_name, hook_cb_t callback);
+    std::unique_ptr<libhook::ManualHook> register_reg_hook(hook_cb_t callback, register_t reg);
+    std::unique_ptr<libhook::ManualHook> register_mem_hook(hook_cb_t callback, addr_t pa, vmi_mem_access_t access);
 
     std::set<driver_t> enumerate_driver_objects(vmi_instance_t vmi);
     std::set<driver_t> enumerate_directory(vmi_instance_t vmi, addr_t addr);
     unicode_string_t* get_object_type_name(vmi_instance_t vmi, addr_t object);
     device_stack_t enumerate_driver_stacks(vmi_instance_t vmi, addr_t driver_object);
     bool enumerate_cores(vmi_instance_t vmi);
+
+    void check_driver_integrity(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    void check_driver_objects(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    void check_descriptors(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
     bool stop();
 

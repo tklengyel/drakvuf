@@ -396,6 +396,196 @@ static void driver_visitor(drakvuf_t drakvuf, addr_t driver, void* ctx)
     munmap(module, VMI_PS_4KB);
 }
 
+
+void rootkitmon::check_driver_integrity(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto past_drivers_checksums = std::move(this->driver_sections_checksums);
+    this->driver_sections_checksums.clear();
+    // Collect new checksums
+    drakvuf_enumerate_drivers(drakvuf, driver_visitor, static_cast<void*>(this));
+    // Compare
+    for (const auto& [driver, infos] : this->driver_sections_checksums)
+    {
+        // Find driver object
+        if (past_drivers_checksums.find(driver) == past_drivers_checksums.end())
+            continue;
+
+        const auto& p_infos = past_drivers_checksums[driver];
+
+        for (const auto& checksum_data : infos)
+        {
+            for (const auto& p_checksum_data : p_infos)
+            {
+                if (checksum_data.virtual_address == p_checksum_data.virtual_address)
+                {
+                    if (checksum_data.checksum != p_checksum_data.checksum)
+                    {
+                        {
+                            vmi_lock_guard vmi(drakvuf);
+                            unicode_string_t* drvname = drakvuf_read_unicode_va(vmi, driver + this->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4);
+                            if (drvname)
+                            {
+                                fmt::print(this->format, "rootkitmon", drakvuf, info,
+                                    keyval("Reason", fmt::Qstr("Driver section modification")),
+                                    keyval("Driver", fmt::Qstr((const char*)drvname->contents)));
+                                vmi_free_unicode_str(drvname);
+                            }
+                            else
+                            {
+                                fmt::print(this->format, "rootkitmon", drakvuf, info,
+                                    keyval("Reason", fmt::Qstr("Driver section modification")),
+                                    keyval("Driver", fmt::Qstr("Unknown")));
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void rootkitmon::check_driver_objects(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto past_driver_object_checksums = std::move(this->driver_object_checksums);
+    auto past_driver_stacks = std::move(this->driver_stacks);
+    this->driver_object_checksums.clear();
+    this->driver_stacks.clear();
+    // Collect new info
+    {
+        vmi_lock_guard vmi(drakvuf);
+        if (!this->is32bit)
+            for (const auto& drv_object : this->enumerate_driver_objects(vmi))
+            {
+                this->driver_object_checksums[drv_object] = calc_checksum(vmi, drv_object + this->offsets[DRIVER_OBJECT_STARTIO], this->guest_ptr_size * 30);
+                this->driver_stacks[drv_object] = this->enumerate_driver_stacks(vmi, drv_object);
+            }
+    }
+    // Compare dispatch table checksums
+    for (const auto& [drv_object, checksum] : this->driver_object_checksums)
+    {
+        // Find driver object
+        if (past_driver_object_checksums.find(drv_object) == past_driver_object_checksums.end())
+            continue;
+
+        const auto& p_checksum = past_driver_object_checksums[drv_object];
+
+        if (checksum != p_checksum)
+        {
+            fmt::print(this->format, "rootkitmon", drakvuf, info,
+                keyval("Reason", fmt::Qstr("Driver object modification")));
+        }
+    }
+    // Compare driver stacks
+    for (const auto& [drv_object, dev_stacks] : this->driver_stacks)
+    {
+        // Find driver object
+        if (past_driver_stacks.find(drv_object) == past_driver_stacks.end())
+            continue;
+
+        auto& p_dev_stacks = past_driver_stacks[drv_object];
+
+        for (const auto& [dev_object, dev_stack] : dev_stacks)
+        {
+            // Find device object
+            if (p_dev_stacks.find(dev_object) == p_dev_stacks.end())
+                continue;
+
+            const auto& p_dev_stack = p_dev_stacks[dev_object];
+
+            // Size mismatch == stack modification
+            if (p_dev_stack.size() != dev_stack.size())
+            {
+                fmt::print(this->format, "rootkitmon", drakvuf, info,
+                    keyval("Reason", fmt::Qstr("Driver stack modification")));
+                continue;
+            }
+
+            for (size_t i = 0; i < dev_stack.size(); i++)
+            {
+                // Dev object hijack
+                if (dev_stack[i] != p_dev_stack[i])
+                {
+                    fmt::print(this->format, "rootkitmon", drakvuf, info,
+                        keyval("Reason", fmt::Qstr("Driver stack modification")));
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void rootkitmon::check_descriptors(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto past_descriptors = std::move(this->descriptors);
+    auto past_lstar = std::move(this->msr_lstar);
+    this->descriptors.clear();
+    this->msr_lstar.clear();
+    {
+        vmi_lock_guard vmi(drakvuf);
+        if (!enumerate_cores(vmi))
+        {
+            PRINT_DEBUG("[ROOTKITMON] Failed to enumerate descriptors\n");
+            throw -1;
+        }
+    }
+    for (const auto& [vcpu, desc_info] : this->descriptors)
+    {
+        const auto& t_desc_info = past_descriptors[vcpu];
+        if (desc_info.idtr_base != t_desc_info.idtr_base)
+        {
+            fmt::print(this->format, "rootkitmon", drakvuf, info,
+                keyval("Reason", fmt::Qstr("IDTR base modification")));
+            break;
+        }
+        if (desc_info.idt_checksum != t_desc_info.idt_checksum)
+        {
+            fmt::print(this->format, "rootkitmon", drakvuf, info,
+                keyval("Reason", fmt::Qstr("IDT modification")));
+            break;
+        }
+    }
+
+    for (const auto& [vcpu, desc_info] : this->descriptors)
+    {
+        const auto& t_desc_info = past_descriptors[vcpu];
+        if (desc_info.gdtr_base != t_desc_info.gdtr_base)
+        {
+            fmt::print(this->format, "rootkitmon", drakvuf, info,
+                keyval("Reason", fmt::Qstr("GDTR base modification")));
+            break;
+        }
+        if (desc_info.gdt.size() != t_desc_info.gdt.size())
+        {
+            fmt::print(this->format, "rootkitmon", drakvuf, info,
+                keyval("Reason", fmt::Qstr("GDT modification")));
+            break;
+        }
+        else
+        {
+            for (size_t i = 0; i < desc_info.gdt.size(); i++)
+            {
+                const auto& [addr, entry] = desc_info.gdt[i];
+                const auto& [t_addr, t_entry] = t_desc_info.gdt[i];
+
+                if (addr != t_addr)
+                {
+                    fmt::print(this->format, "rootkitmon", drakvuf, info,
+                        keyval("Reason", fmt::Qstr("GDT modification")));
+                    break;
+                }
+            }
+        }
+    }
+    for (const auto& [vcpu, lstar] : this->msr_lstar)
+    {
+        if (past_lstar[vcpu] != lstar)
+        {
+            fmt::print(this->format, "rootkitmon", drakvuf, info,
+                keyval("Reason", fmt::Qstr("LSTAR modification")));
+        }
+    }
+}
 /**
  * This trap is used to make final analysis.
 */
@@ -406,199 +596,9 @@ event_response_t rootkitmon::final_check_cb(drakvuf_t drakvuf, drakvuf_trap_info
     {
         PRINT_DEBUG("[ROOTKITMON] Making final analysis\n");
 
-        //=======================================
-        // Check driver sections checksum
-        // Save old checksums
-        auto past_drivers_checksums = std::move(this->driver_sections_checksums);
-        this->driver_sections_checksums.clear();
-        // Collect new checksums
-        drakvuf_enumerate_drivers(drakvuf, driver_visitor, static_cast<void*>(this));
-        // Compare
-        for (const auto& [driver, infos] : this->driver_sections_checksums)
-        {
-            // Find driver object
-            if (past_drivers_checksums.find(driver) == past_drivers_checksums.end())
-                continue;
-
-            const auto& p_infos = past_drivers_checksums[driver];
-
-            for (const auto& checksum_data : infos)
-            {
-                for (const auto& p_checksum_data : p_infos)
-                {
-                    if (checksum_data.virtual_address == p_checksum_data.virtual_address)
-                    {
-                        if (checksum_data.checksum != p_checksum_data.checksum)
-                        {
-                            {
-                                vmi_lock_guard vmi(drakvuf);
-                                unicode_string_t* drvname = drakvuf_read_unicode_va(vmi, driver + this->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4);
-                                if (drvname)
-                                {
-                                    fmt::print(this->format, "rootkitmon", drakvuf, info,
-                                        keyval("Reason", fmt::Qstr("Driver section modification")),
-                                        keyval("Driver", fmt::Qstr((const char*)drvname->contents)));
-                                    vmi_free_unicode_str(drvname);
-                                }
-                                else
-                                {
-                                    fmt::print(this->format, "rootkitmon", drakvuf, info,
-                                        keyval("Reason", fmt::Qstr("Driver section modification")),
-                                        keyval("Driver", fmt::Qstr("Unknown")));
-                                }
-                            }
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-
-        //=======================================
-        // Check driver object checksums and driver stacks
-        // Save old checksums and stacks
-        auto past_driver_object_checksums = std::move(this->driver_object_checksums);
-        auto past_driver_stacks = std::move(this->driver_stacks);
-        this->driver_object_checksums.clear();
-        this->driver_stacks.clear();
-        // Collect new info
-        {
-            vmi_lock_guard vmi(drakvuf);
-            if (!this->is32bit)
-                for (const auto& drv_object : this->enumerate_driver_objects(vmi))
-                {
-                    this->driver_object_checksums[drv_object] = calc_checksum(vmi, drv_object + this->offsets[DRIVER_OBJECT_STARTIO], this->guest_ptr_size * 30);
-                    this->driver_stacks[drv_object] = this->enumerate_driver_stacks(vmi, drv_object);
-                }
-        }
-        // Compare dispatch table checksums
-        for (const auto& [drv_object, checksum] : this->driver_object_checksums)
-        {
-            // Find driver object
-            if (past_driver_object_checksums.find(drv_object) == past_driver_object_checksums.end())
-                continue;
-
-            const auto& p_checksum = past_driver_object_checksums[drv_object];
-
-            if (checksum != p_checksum)
-            {
-                fmt::print(this->format, "rootkitmon", drakvuf, info,
-                    keyval("Reason", fmt::Qstr("Driver object modification")));
-            }
-        }
-        // Compare driver stacks
-        for (const auto& [drv_object, dev_stacks] : this->driver_stacks)
-        {
-            // Find driver object
-            if (past_driver_stacks.find(drv_object) == past_driver_stacks.end())
-                continue;
-
-            auto& p_dev_stacks = past_driver_stacks[drv_object];
-
-            for (const auto& [dev_object, dev_stack] : dev_stacks)
-            {
-                // Find device object
-                if (p_dev_stacks.find(dev_object) == p_dev_stacks.end())
-                    continue;
-
-                const auto& p_dev_stack = p_dev_stacks[dev_object];
-
-                // Size mismatch == stack modification
-                if (p_dev_stack.size() != dev_stack.size())
-                {
-                    fmt::print(this->format, "rootkitmon", drakvuf, info,
-                        keyval("Reason", fmt::Qstr("Driver stack modification")));
-                    continue;
-                }
-
-                for (size_t i = 0; i < dev_stack.size(); i++)
-                {
-                    // Dev object hijack
-                    if (dev_stack[i] != p_dev_stack[i])
-                    {
-                        fmt::print(this->format, "rootkitmon", drakvuf, info,
-                            keyval("Reason", fmt::Qstr("Driver stack modification")));
-                        break;
-                    }
-                }
-            }
-        }
-
-        //=======================================
-        // Check per core specific registers
-        auto past_descriptors = std::move(this->descriptors);
-        auto past_lstar = std::move(this->msr_lstar);
-        this->descriptors.clear();
-        this->msr_lstar.clear();
-
-        {
-            vmi_lock_guard vmi(drakvuf);
-            if (!enumerate_cores(vmi))
-            {
-                PRINT_DEBUG("[ROOTKITMON] Failed to enumerate descriptors\n");
-                throw -1;
-            }
-        }
-
-        for (const auto& [vcpu, desc_info] : this->descriptors)
-        {
-            const auto& t_desc_info = past_descriptors[vcpu];
-            if (desc_info.idtr_base != t_desc_info.idtr_base)
-            {
-                fmt::print(this->format, "rootkitmon", drakvuf, info,
-                    keyval("Reason", fmt::Qstr("IDTR base modification")));
-                break;
-            }
-            if (desc_info.idt_checksum != t_desc_info.idt_checksum)
-            {
-                fmt::print(this->format, "rootkitmon", drakvuf, info,
-                    keyval("Reason", fmt::Qstr("IDT modification")));
-                break;
-            }
-        }
-
-        for (const auto& [vcpu, desc_info] : this->descriptors)
-        {
-            const auto& t_desc_info = past_descriptors[vcpu];
-            if (desc_info.gdtr_base != t_desc_info.gdtr_base)
-            {
-                fmt::print(this->format, "rootkitmon", drakvuf, info,
-                    keyval("Reason", fmt::Qstr("GDTR base modification")));
-                break;
-            }
-            if (desc_info.gdt.size() != t_desc_info.gdt.size())
-            {
-                fmt::print(this->format, "rootkitmon", drakvuf, info,
-                    keyval("Reason", fmt::Qstr("GDT modification")));
-                break;
-            }
-            else
-            {
-                for (size_t i = 0; i < desc_info.gdt.size(); i++)
-                {
-                    const auto& [addr, entry] = desc_info.gdt[i];
-                    const auto& [t_addr, t_entry] = t_desc_info.gdt[i];
-
-                    if (addr != t_addr)
-                    {
-                        fmt::print(this->format, "rootkitmon", drakvuf, info,
-                            keyval("Reason", fmt::Qstr("GDT modification")));
-                        break;
-                    }
-                }
-            }
-        }
-
-        //=======================================
-        // Check msr lstar modification
-        for (const auto& [vcpu, lstar] : this->msr_lstar)
-        {
-            if (past_lstar[vcpu] != lstar)
-            {
-                fmt::print(this->format, "rootkitmon", drakvuf, info,
-                    keyval("Reason", fmt::Qstr("LSTAR modification")));
-            }
-        }
+        check_driver_integrity(drakvuf, info);
+        check_driver_objects(drakvuf, info);
+        check_descriptors(drakvuf, info);
 
         done_final_analysis = true;
     }
@@ -613,7 +613,7 @@ event_response_t rootkitmon::callback_hooks_cb(drakvuf_t drakvuf, drakvuf_trap_i
 }
 
 std::unique_ptr<libhook::ManualHook> rootkitmon::register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
-    const char* func_name, event_response_t (*callback)(drakvuf_t, drakvuf_trap_info_t*))
+    const char* func_name, hook_cb_t callback)
 {
     addr_t func_rva = 0;
     auto profile_json = json_object_from_file(profile);
@@ -658,7 +658,7 @@ std::unique_ptr<libhook::ManualHook> rootkitmon::register_profile_hook(drakvuf_t
     }
 }
 
-std::unique_ptr<libhook::ManualHook> rootkitmon::register_mem_hook(event_response_t (*callback)(drakvuf_t, drakvuf_trap_info_t*), addr_t pa, vmi_mem_access_t access)
+std::unique_ptr<libhook::ManualHook> rootkitmon::register_mem_hook(hook_cb_t callback, addr_t pa, vmi_mem_access_t access)
 {
     auto trap = new drakvuf_trap_t();
     trap->type = MEMACCESS;
@@ -686,7 +686,7 @@ std::unique_ptr<libhook::ManualHook> rootkitmon::register_mem_hook(event_respons
     }
 }
 
-std::unique_ptr<libhook::ManualHook> rootkitmon::register_reg_hook(event_response_t (*callback)(drakvuf_t, drakvuf_trap_info_t*), register_t reg)
+std::unique_ptr<libhook::ManualHook> rootkitmon::register_reg_hook(hook_cb_t callback, register_t reg)
 {
     auto trap = new drakvuf_trap_t();
     trap->type = REGISTER;
@@ -721,6 +721,9 @@ unicode_string_t* rootkitmon::get_object_type_name(vmi_instance_t vmi, addr_t ob
     if (VMI_SUCCESS != vmi_read_8_va(vmi, ob_header + this->offsets[OBJECT_HEADER_TYPEINDEX], 4, &type_index))
         return nullptr;
 
+    // https://medium.com/@ashabdalhalim/a-light-on-windows-10s-object-header-typeindex-value-e8f907e7073a
+    // Due to security mitigations type_index is no longer equals to index in ObTypeIndexTable array on win 10
+    // but calculated as following:
     if (this->winver == VMI_OS_WINDOWS_10)
         type_index = type_index ^ ((ob_header >> 8) & 0xff) ^ this->ob_header_cookie;
 
@@ -736,6 +739,11 @@ std::set<driver_t> rootkitmon::enumerate_directory(vmi_instance_t vmi, addr_t di
 {
     std::set<driver_t> out;
 
+    // There is only 37 _OBJECT_DIRECTORY_ENTRY entries in object directory:
+    // 0: kd> dt nt!_OBJECT_DIRECTORY
+    //    +0x000 HashBuckets      : [37] Ptr64 _OBJECT_DIRECTORY_ENTRY
+    //    +0x128 Lock             : _EX_PUSH_LOCK
+    //    ...
     for (int i = 0; i < 37; i++)
     {
         addr_t hashbucket = 0;

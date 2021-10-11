@@ -230,7 +230,7 @@ struct nt_headers_t
     {
         return n >= file_header.num_sections ? nullptr :
             reinterpret_cast<const section_header_t*>(
-                (const uint8_t*)&optional_header + file_header.size_optional_header) + n;
+                reinterpret_cast<const uint8_t*>(&optional_header) + file_header.size_optional_header) + n;
     }
 };
 static_assert(4 + 20 + 240 == sizeof(nt_headers_t), "NT headers size mismatch");
