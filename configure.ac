@@ -472,6 +472,16 @@ if test x$plugin_hidsim = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_HIDSIM, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_rootkitmon],
+  [AS_HELP_STRING([--disable-plugin-rootkitmon],
+    [Enable rootkitmon plugin @<:@yes@:>@])],
+  [plugin_rootkitmon="$enableval"],
+  [plugin_rootkitmon="yes"])
+AM_CONDITIONAL([PLUGIN_ROOTKITMON], [test x$plugin_rootkitmon = xyes])
+if test x$plugin_rootkitmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_ROOTKITMON, 1, "")
+fi
+
 AC_ARG_ENABLE([DISABLE_ATOMS],
   [AS_HELP_STRING([--disable-atoms],
     [Disable atom table parsing in hidsim plugin @<:@no@:>@])],
@@ -780,6 +790,7 @@ Exploitmon:   $plugin_exploitmon
 LibHookTest:  $plugin_libhooktest
 IPT:          $plugin_ipt
 HidSim:       $plugin_hidsim
+Rootkitmon:   $plugin_rootkitmon
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:       $plugin_wmimon
