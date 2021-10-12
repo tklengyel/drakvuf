@@ -228,7 +228,7 @@ struct nt_headers_t
 
     inline const section_header_t* get_section(int n) const
     {
-        if (n >= file_header.num_sections) 
+        if (n >= file_header.num_sections)
             return nullptr;
 
         auto data = reinterpret_cast<uint64_t>(&optional_header) + file_header.size_optional_header;
