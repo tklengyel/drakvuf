@@ -228,9 +228,12 @@ struct nt_headers_t
 
     inline const section_header_t* get_section(int n) const
     {
-        return n >= file_header.num_sections ? nullptr :
-            reinterpret_cast<const section_header_t*>(
-                reinterpret_cast<const uint8_t*>(&optional_header) + file_header.size_optional_header) + n;
+        if (n >= file_header.num_sections) 
+            return nullptr;
+
+        auto data = reinterpret_cast<uint64_t>(&optional_header) + file_header.size_optional_header;
+        auto sections = reinterpret_cast<const section_header_t*>(data);
+        return &sections[n];
     }
 };
 static_assert(4 + 20 + 240 == sizeof(nt_headers_t), "NT headers size mismatch");
@@ -259,7 +262,7 @@ struct dos_header_t
 
     inline const nt_headers_t* get_nt_headers() const
     {
-        return reinterpret_cast<const nt_headers_t*>((const uint8_t*)this + e_lfanew);
+        return reinterpret_cast<const nt_headers_t*>((uint64_t)this + e_lfanew);
     }
 };
 static_assert(64 == sizeof(dos_header_t), "Dos header size mismatch");
