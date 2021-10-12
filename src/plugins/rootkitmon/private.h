@@ -102,110 +102,209 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef WIN_H
-#define WIN_H
+#ifndef ROOTKITMON_PRIVATE_H
+#define ROOTKITMON_PRIVATE_H
 
-#include <libvmi/libvmi.h>
-#include "libdrakvuf.h"
-#include "os.h"
-#include "win-exports.h"
+// PDEVICE_OBJECT
+using device_t  = addr_t;
+// LDR_DATA_TABLE_ENTRY of the driver
+using driver_t  = addr_t;
+using device_stack_t = std::unordered_map<device_t, std::vector<device_t>>;
+using sha256_checksum_t = std::array<uint8_t, 32>;
 
-bool win_get_current_irql(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint8_t* irql);
+enum
+{
+    EPROCESS_UNIQUE_PROCESS_ID,
+    LDR_DATA_TABLE_ENTRY_DLLBASE,
+    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
+    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
+    OBJECT_DIRECTORY_ENTRY_CHAINLINK,
+    OBJECT_DIRECTORY_ENTRY_OBJECT,
+    OBJECT_HEADER_TYPEINDEX,
+    OBJECT_TYPE_NAME,
+    DRIVER_OBJECT_DEVICEOBJECT,
+    DRIVER_OBJECT_STARTIO,
+    DRIVER_OBJECT_DRIVERNAME,
+    DEVICE_OBJECT_ATTACHEDDEVICE,
+    DEVICE_OBJECT_DRIVEROBJECT,
+    DEVICE_OBJECT_NEXTDEVICE,
+    __OFFSET_MAX
+};
 
-addr_t win_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+static const char* offset_names[__OFFSET_MAX][2] =
+{
+    [EPROCESS_UNIQUE_PROCESS_ID] = {"_EPROCESS", "UniqueProcessId"},
+    [LDR_DATA_TABLE_ENTRY_DLLBASE] = { "_LDR_DATA_TABLE_ENTRY", "DllBase" },
+    [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE] = { "_LDR_DATA_TABLE_ENTRY", "SizeOfImage" },
+    [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = { "_LDR_DATA_TABLE_ENTRY", "BaseDllName" },
+    [OBJECT_DIRECTORY_ENTRY_CHAINLINK] = { "_OBJECT_DIRECTORY_ENTRY", "ChainLink" },
+    [OBJECT_DIRECTORY_ENTRY_OBJECT] = { "_OBJECT_DIRECTORY_ENTRY", "Object" },
+    [OBJECT_HEADER_TYPEINDEX] = { "_OBJECT_HEADER", "TypeIndex" },
+    [OBJECT_TYPE_NAME] = { "_OBJECT_TYPE", "Name" },
+    [DRIVER_OBJECT_DEVICEOBJECT] = { "_DRIVER_OBJECT", "DeviceObject" },
+    [DRIVER_OBJECT_STARTIO] = { "_DRIVER_OBJECT", "DriverStartIo" },
+    [DRIVER_OBJECT_DRIVERNAME] = { "_DRIVER_OBJECT", "DriverName" },
+    [DEVICE_OBJECT_ATTACHEDDEVICE] = { "_DEVICE_OBJECT", "AttachedDevice" },
+    [DEVICE_OBJECT_DRIVEROBJECT] = { "_DEVICE_OBJECT", "DriverObject" },
+    [DEVICE_OBJECT_NEXTDEVICE] = { "_DEVICE_OBJECT", "NextDevice" },
+};
 
-addr_t win_get_current_thread_teb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+static constexpr uint32_t mem_not_paged = 0x08000000;
+static constexpr uint32_t mem_execute = 0x20000000;
+static constexpr uint32_t mem_write = 0x80000000;
 
-addr_t win_get_current_thread_stackbase(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+struct section_header_t
+{
+    char     name[8];
+    uint32_t virtual_size;
+    uint32_t virtual_address;
+    uint32_t size_raw_data;
+    uint32_t ptr_raw_data;
+    uint32_t ptr_relocs;
+    uint32_t ptr_line_numbers;
+    uint16_t num_relocs;
+    uint16_t num_line_numbers;
+    uint32_t characteristics;
 
-addr_t win_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    inline std::string get_name() const
+    {
+        return { name, 8 };
+    }
+};
+static_assert(40 == sizeof(section_header_t), "Section header size mismatch");
 
-addr_t win_get_current_attached_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+struct file_header_t
+{
+    uint16_t machine;
+    uint16_t num_sections;
+    uint32_t timedatestamp;
+    uint32_t ptr_symbol_table;
+    uint32_t num_symbols;
+    uint16_t size_optional_header;
+    uint16_t characteristics;
+};
+static_assert(20 == sizeof(file_header_t), "File header size mismatch");
 
-bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* err, const char** err_str);
+struct optional_header_t
+{
+    uint16_t magic;
+    uint8_t  major_version;
+    uint8_t  minor_version;
+    uint32_t size_code;
+    uint32_t size_init_data;
+    uint32_t size_uninit_data;
+    uint32_t entry_point;
+    uint32_t base_code;
+    uint64_t image_base;
+    uint32_t section_alignment;
+    uint32_t file_alignment;
+    uint16_t major_os_version;
+    uint16_t minor_os_version;
+    uint16_t major_image_version;
+    uint16_t minor_image_version;
+    uint16_t major_subsystem_version;
+    uint16_t minor_subsystem_version;
+    uint32_t win32_version_value;
+    uint32_t size_image;
+    uint32_t size_headers;
+    uint32_t checksum;
+    uint16_t subsystem;
+    uint16_t dll_characteristics;
+    uint64_t size_stack_reserve;
+    uint64_t size_stack_commit;
+    uint64_t size_heap_reserve;
+    uint64_t size_heap_commit;
+    uint32_t loader_flags;
+    uint32_t num_rva_sizes;
+    uint64_t data_directories[16];
+};
+static_assert(240 == sizeof(optional_header_t), "Optional header size mismatch");
 
-char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath);
+struct nt_headers_t
+{
+    uint32_t           signature;
+    file_header_t      file_header;
+    optional_header_t  optional_header;
 
-char* win_get_process_commandline(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t eprocess_base);
+    inline const section_header_t* get_section(int n) const
+    {
+        if (n >= file_header.num_sections)
+            return nullptr;
 
-bool win_get_process_pid(drakvuf_t drakvuf, addr_t eprocess_base, int32_t* pid);
+        auto data = reinterpret_cast<uint64_t>(&optional_header) + file_header.size_optional_header;
+        auto sections = reinterpret_cast<const section_header_t*>(data);
+        return &sections[n];
+    }
+};
+static_assert(4 + 20 + 240 == sizeof(nt_headers_t), "NT headers size mismatch");
 
-char* win_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
+struct dos_header_t
+{
+    uint16_t e_magic;
+    uint16_t e_cblp;
+    uint16_t e_cp;
+    uint16_t e_crlc;
+    uint16_t e_cparhdr;
+    uint16_t e_minalloc;
+    uint16_t e_maxalloc;
+    uint16_t e_ss;
+    uint16_t e_sp;
+    uint16_t e_csum;
+    uint16_t e_ip;
+    uint16_t e_cs;
+    uint16_t e_lfarlc;
+    uint16_t e_ovno;
+    uint16_t e_res[ 4 ];
+    uint16_t e_oemid;
+    uint16_t e_oeminfo;
+    uint16_t e_res2[ 10 ];
+    uint32_t e_lfanew;
 
-int64_t win_get_process_userid(drakvuf_t drakvuf, addr_t eprocess_base);
+    inline const nt_headers_t* get_nt_headers() const
+    {
+        return reinterpret_cast<const nt_headers_t*>((uint64_t)this + e_lfanew);
+    }
+};
+static_assert(64 == sizeof(dos_header_t), "Dos header size mismatch");
 
-unicode_string_t* win_get_process_csdversion(drakvuf_t drakvuf, addr_t eprocess_base);
+struct checksum_data_t
+{
+    addr_t virtual_address;
+    addr_t virtual_size;
+    sha256_checksum_t checksum;
+};
 
-int64_t win_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+union gdt_entry_t
+{
+    uint64_t entry;
+    struct
+    {
+        uint16_t limit_low;
+        uint16_t base_low;
+        uint8_t  base_mid;
+        uint8_t  type : 4;
+        uint8_t  s    : 1;
+        uint8_t  dpl  : 2;
+        uint8_t  present : 1;
+        uint8_t  limit_high : 4;
+        uint8_t  avail: 1;
+        uint8_t  l    : 1;
+        uint8_t  d    : 1;
+        uint8_t  g    : 1;
+        uint8_t  base_high;
+    };
+};
+static_assert(8 == sizeof(gdt_entry_t), "Generic segment descriptor size mismatch");
 
-bool win_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb);
-
-bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
-
-bool win_get_thread_previous_mode(drakvuf_t drakvuf, addr_t kthread, privilege_mode_t* previous_mode);
-
-bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    privilege_mode_t* previous_mode);
-
-bool win_is_ethread(drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
-
-bool win_is_eprocess(drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
-bool win_is_process_suspended(drakvuf_t drakvuf, addr_t process, bool* status);
-
-bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module_list);
-bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list );
-
-bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
-bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
-module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );
-module_info_t* win_get_module_info_ctx_wow( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );
-
-typedef bool (process_module_visitor_t)(drakvuf_t drakvuf, module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx);
-bool win_enumerate_module_info_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, process_module_visitor_t visitor_func, void* visitor_ctx);
-bool win_enumerate_module_info_ctx_wow(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, process_module_visitor_t visitor_func, void* visitor_ctx);
-
-typedef bool (process_const_module_visitor_t)(drakvuf_t drakvuf, const module_info_t* module_info, bool* need_free, bool* need_stop, void* visitor_ctx);
-bool win_enumerate_process_modules(drakvuf_t drakvuf, addr_t eprocess, process_const_module_visitor_t visitor_func, void* visitor_ctx);
-
-bool win_find_eprocess(drakvuf_t drakvuf, vmi_pid_t find_pid, const char* find_procname, addr_t* eprocess_addr);
-
-bool win_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx);
-bool win_enumerate_processes_with_module(drakvuf_t drakvuf, const char* module_name, bool (*visitor_func)(drakvuf_t drakvuf, const module_info_t* module_info, void* visitor_ctx), void* visitor_ctx);
-bool win_enumerate_drivers(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t driver, void* visitor_ctx), void* visitor_ctx);
-
-bool win_is_crashreporter(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_pid_t* pid);
-
-bool win_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, int32_t* ppid );
-
-bool win_get_process_data( drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data );
-
-gchar* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle );
-
-char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
-
-bool win_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t argument_number);
-addr_t win_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t list_head, vmi_pid_t pid);
-
-bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info_t* out_mmvad);
-
-bool win_traverse_mmvad(drakvuf_t drakvuf, addr_t eprocess, mmvad_callback callback, void* callback_data);
-bool win_is_mmvad_commited(drakvuf_t drakvuf, mmvad_info_t* mmvad);
-uint64_t win_mmvad_commit_charge(drakvuf_t drakvuf, mmvad_info_t* mmvad, uint64_t* width);
-uint32_t win_mmvad_type(drakvuf_t drakvuf, mmvad_info_t* mmvad);
-
-bool win_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, vmi_pid_t* pid);
-bool win_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid);
-
-addr_t win_get_wow_peb(drakvuf_t drakvuf, access_context_t* ctx, addr_t eprocess);
-bool win_get_wow_context(drakvuf_t drakvuf, addr_t ethread, addr_t* wow_ctx);
-bool win_get_user_stack32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr, addr_t* frame_ptr);
-bool win_get_user_stack64(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t* stack_ptr);
-
-bool win_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
+struct descriptors_t
+{
+    addr_t idtr_base;
+    addr_t idtr_limit;
+    sha256_checksum_t idt_checksum;
+    addr_t gdtr_base;
+    addr_t gdtr_limit;
+    // Pair of descriptor entry VA and its parsed entry
+    std::vector<std::pair<addr_t, gdt_entry_t>> gdt;
+};
 
 #endif

@@ -136,6 +136,7 @@
 #include "exploitmon/exploitmon.h"
 #include "ipt/ipt.h"
 #include "hidsim/hidsim.h"
+#include "rootkitmon/rootkitmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -468,6 +469,18 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .win32k_profile = options->win32k_profile,
                     };
                     this->plugins[plugin_id] = std::make_unique<hidsim>(this->drakvuf, &config);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_ROOTKITMON
+                case PLUGIN_ROOTKITMON:
+                {
+                    rootkitmon_config config =
+                    {
+                        .fwpkclnt_profile = options->fwpkclnt_profile,
+                        .fltmgr_profile = options->fltmgr_profile,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<rootkitmon>(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif
