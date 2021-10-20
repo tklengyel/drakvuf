@@ -127,7 +127,7 @@ CXXFLAGS="-std=gnu++17"
 
 AC_LANG_PUSH([C++])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [[bool test[2] = { [1] = 1, [0] = 0 };]])], [],
-    [AC_ERROR(Your C++ compiler ($CXX) is not supported. Please use clang++ (clang-9 or clang-10)!)])
+    [AC_ERROR(Your C++ compiler ($CXX) is not supported. Please use clang++ (clang-9 or newer)!)])
 
 #Check requirement of lstdc++fs
 STDCPPFSLIB=""
