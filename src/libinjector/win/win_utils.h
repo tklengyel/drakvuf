@@ -126,6 +126,7 @@
 #include <libinjector/libinjector.h>
 #include "private.h"
 #include "win_private.h"
+#include "injector_utils.h"
 
 #define SW_SHOWNORMAL   1
 #define MEM_COMMIT      0x00001000
@@ -146,6 +147,11 @@ typedef enum
 
 struct injector
 {
+    // common in win and linux
+    // KEEP THESE IN TOP and in sync with the order in injector_utils.c
+    injector_step_t step;
+    bool step_override; // set this as true for jumping to some arbitrary step
+
     // Inputs:
     unicode_string_t* target_file_us;
     vmi_pid_t target_pid;
@@ -175,7 +181,7 @@ struct injector
     // For readfile/writefile
     addr_t create_file, read_file, write_file, close_handle, expand_env;
     size_t binary_size, payload_size;
-    uint32_t status;
+    uint32_t status; // will be replaced by step
     uint32_t file_handle;
     FILE* host_file;
     unicode_string_t* expanded_target;

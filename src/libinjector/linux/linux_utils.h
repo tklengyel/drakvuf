@@ -123,6 +123,7 @@
 #include <assert.h>
 #include <libdrakvuf/libdrakvuf.h>
 #include <libinjector/private.h>
+#include "injector_utils.h"
 
 // syscall limit for error codes
 #define MAX_ERRNO 4096UL
@@ -136,16 +137,6 @@ typedef enum
     INJECT_RESULT_ERROR_CODE,
     INJECT_RESULT_METHOD_UNSUPPORTED,
 } inject_result_t;
-
-typedef enum
-{
-    STEP1,
-    STEP2,
-    STEP3,
-    STEP4,
-    STEP5,
-    STEP6,
-} injector_step_t;
 
 typedef enum
 {
@@ -165,6 +156,11 @@ typedef enum
 
 struct injector
 {
+    // common in win and linux
+    // KEEP THESE IN TOP and in sync with the order in injector_utils.c
+    injector_step_t step;
+    bool step_override; // set this as true for jumping to some arbitrary step
+
     // Inputs:
     vmi_pid_t target_pid;
     uint32_t target_tid;
@@ -178,8 +174,6 @@ struct injector
     drakvuf_t drakvuf;
     injection_method_t method;
     addr_t syscall_addr;
-    injector_step_t step;
-    bool step_override; // set this as true for jumping to some arbitrary step
 
     // Buffer
     struct
