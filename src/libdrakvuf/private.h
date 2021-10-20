@@ -144,6 +144,12 @@ extern bool verbose;
 
 #define UNUSED(x) (void)(x)
 
+#if GLIB_CHECK_VERSION(2,67,3)
+#define g_memdup_compat(x,y) g_memdup2(x,y)
+#else
+#define g_memdup_compat(x,y) g_memdup(x,y)
+#endif
+
 /*
  * How often should the VMI caches be flushed?
  *
