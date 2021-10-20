@@ -974,7 +974,7 @@ void remove_trap(drakvuf_t drakvuf,
             if ( traps_on_gfn )
             {
                 // the list head may change so we force a reinsert
-                g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, g_memdup(&_current_gfn, sizeof(uint64_t)), traps_on_gfn);
+                g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, g_memdup_compat(&_current_gfn, sizeof(uint64_t)), traps_on_gfn);
             }
 
             if (!container->traps)
@@ -1182,7 +1182,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
             return 0;
         }
 
-        g_hash_table_insert(drakvuf->memaccess_lookup_gfn, g_memdup(&s->memaccess.gfn, sizeof(addr_t)), s);
+        g_hash_table_insert(drakvuf->memaccess_lookup_gfn, g_memdup_compat(&s->memaccess.gfn, sizeof(addr_t)), s);
         g_hash_table_insert(drakvuf->memaccess_lookup_trap, trap, s);
     }
 
@@ -1213,7 +1213,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         /* this should never happen but at least it makes some static analyzers happy */
         if ( 1 == g_slist_length(traps) )
             g_hash_table_insert(drakvuf->breakpoint_lookup_gfn,
-                g_memdup(&current_gfn, sizeof(xen_pfn_t)),
+                g_memdup_compat(&current_gfn, sizeof(xen_pfn_t)),
                 traps);
 
         return 1;
@@ -1386,8 +1386,8 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 
     // save trap location into lookup tree
     uint64_t _current_gfn = current_gfn;
-    g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, g_memdup(&_current_gfn, sizeof(uint64_t)), traps);
-    g_hash_table_insert(drakvuf->breakpoint_lookup_pa, g_memdup(&container->breakpoint.pa, sizeof(addr_t)), container);
+    g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, g_memdup_compat(&_current_gfn, sizeof(uint64_t)), traps);
+    g_hash_table_insert(drakvuf->breakpoint_lookup_pa, g_memdup_compat(&container->breakpoint.pa, sizeof(addr_t)), container);
     g_hash_table_insert(drakvuf->breakpoint_lookup_trap, trap, container);
 
     PRINT_DEBUG("\t\tTrap added @ PA 0x%" PRIx64 " RPA 0x%" PRIx64 " Page %" PRIu64 " for %s.\n",
