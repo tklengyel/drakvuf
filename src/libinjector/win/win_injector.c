@@ -601,10 +601,8 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     return 0;
 }
 
-event_response_t injector_int3_terminate_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+bool check_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
 {
-    injector_t injector = info->trap->data;
-
     PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx. vcpu %i. TID %u\n",
         info->regs->rip, info->regs->cr3, info->vcpu, info->proc_data.tid);
 
@@ -612,17 +610,17 @@ event_response_t injector_int3_terminate_cb(drakvuf_t drakvuf, drakvuf_trap_info
     {
         PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
             info->proc_data.name, info->proc_data.pid, injector->target_pid);
-        return 0;
+        return false;
     }
 
     if (info->regs->rip != info->trap->breakpoint.addr)
-        return 0;
+        return false;
 
     if (injector->target_tid && (uint32_t)info->proc_data.tid != injector->target_tid)
     {
         PRINT_DEBUG("INT3 received but '%s' TID (%u) doesn't match target process (%u)\n",
             info->proc_data.name, info->proc_data.tid, injector->target_tid);
-        return 0;
+        return false;
     }
     else if (!injector->target_tid)
     {
@@ -635,8 +633,17 @@ event_response_t injector_int3_terminate_cb(drakvuf_t drakvuf, drakvuf_trap_info
     {
         PRINT_DEBUG("INT3 received but RSP (0x%lx) doesn't match target rsp (0x%lx)\n",
             info->regs->rsp, injector->target_rsp);
-        return 0;
+        return false;
     }
+    return true;
+}
+
+event_response_t injector_int3_terminate_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+
+    if (!check_int3_trap(injector, info))
+        return VMI_EVENT_RESPONSE_NONE;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     registers_t regs;
@@ -750,38 +757,8 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
 
-    PRINT_DEBUG("INT3 Callback @ 0x%lx. CR3 0x%lx. vcpu %i. TID %u\n",
-        info->regs->rip, info->regs->cr3, info->vcpu, info->proc_data.tid);
-
-    if ( info->proc_data.pid != injector->target_pid )
-    {
-        PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u)\n",
-            info->proc_data.name, info->proc_data.pid, injector->target_pid);
-        return 0;
-    }
-
-    if (info->regs->rip != info->trap->breakpoint.addr)
-        return 0;
-
-    if (injector->target_tid && (uint32_t)info->proc_data.tid != injector->target_tid)
-    {
-        PRINT_DEBUG("INT3 received but '%s' TID (%u) doesn't match target process (%u)\n",
-            info->proc_data.name, info->proc_data.tid, injector->target_tid);
-        return 0;
-    }
-    else if (!injector->target_tid)
-    {
-        PRINT_DEBUG("Target TID not provided by the user, pinning TID to %u\n",
-            info->proc_data.tid);
-        injector->target_tid = info->proc_data.tid;
-    }
-
-    if (injector->target_rsp && info->regs->rsp <= injector->target_rsp)
-    {
-        PRINT_DEBUG("INT3 received but RSP (0x%lx) doesn't match target rsp (0x%lx)\n",
-            info->regs->rsp, injector->target_rsp);
-        return 0;
-    }
+    if (!check_int3_trap(injector, info))
+        return VMI_EVENT_RESPONSE_NONE;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
     registers_t regs;
@@ -1517,66 +1494,85 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
             PRINT_DEBUG("Failed to find _KTRAP_FRAME:Rip.\n");
     }
 
-    if (INJECT_METHOD_CREATEPROC == injector->method)
+    switch (injector->method)
     {
-        injector->resume_thread = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "ResumeThread", injector->global_search);
-        if (!injector->resume_thread) return false;
-        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateProcessW", injector->global_search);
-    }
-    else if (INJECT_METHOD_TERMINATEPROC == injector->method)
-    {
-        injector->open_process = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "OpenProcess", injector->global_search);
-        if (!injector->open_process) return false;
-        injector->exit_process = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "RtlExitUserProcess", injector->global_search);
-        if (!injector->exit_process) return false;
-        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateRemoteThread", injector->global_search);
-    }
-    else if (INJECT_METHOD_SHELLEXEC == injector->method)
-    {
-        injector->exec_func = get_function_va(drakvuf, eprocess_base, "shell32.dll", "ShellExecuteW", injector->global_search);
-    }
-    else if (INJECT_METHOD_SHELLCODE == injector->method || INJECT_METHOD_DOPP == injector->method)
-    {
-        // Read shellcode from a file
-        if ( !load_file_to_memory(&injector->payload, &injector->payload_size, file) )
-            return false;
-
-        if (INJECT_METHOD_DOPP == injector->method)
+        case INJECT_METHOD_CREATEPROC:
+        {
+            injector->resume_thread = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "ResumeThread", injector->global_search);
+            if (!injector->resume_thread) return false;
+            injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateProcessW", injector->global_search);
+            break;
+        }
+        case INJECT_METHOD_TERMINATEPROC:
+        {
+            injector->open_process = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "OpenProcess", injector->global_search);
+            if (!injector->open_process) return false;
+            injector->exit_process = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "RtlExitUserProcess", injector->global_search);
+            if (!injector->exit_process) return false;
+            injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateRemoteThread", injector->global_search);
+            break;
+        }
+        case INJECT_METHOD_SHELLEXEC:
+        {
+            injector->exec_func = get_function_va(drakvuf, eprocess_base, "shell32.dll", "ShellExecuteW", injector->global_search);
+            break;
+        }
+        case INJECT_METHOD_DOPP:
         {
             // Read binary to inject from a file
             if ( !load_file_to_memory(&injector->binary, &injector->binary_size, binary_path) )
                 return false;
+#ifndef ENABLE_DOPPELGANGING
+            fprintf(stderr, "Please build DRAKVUF with --enable-doppleganging-injection");
+            return false;
+#endif
         }
+        // fall through
+        case INJECT_METHOD_SHELLCODE:
+        {
+            // Read shellcode from a file
+            if ( !load_file_to_memory(&injector->payload, &injector->payload_size, file) )
+                return false;
 
-        injector->memset = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "memset", injector->global_search);
-        if (!injector->memset) return false;
-        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc", injector->global_search);
-    }
-    else if (INJECT_METHOD_WRITE_FILE == injector->method || INJECT_METHOD_READ_FILE == injector->method)
-    {
-        injector->payload_size = FILE_BUF_SIZE;
-
-        injector->memset = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "memset", injector->global_search);
-        if (!injector->memset) return false;
-        injector->create_file = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateFileW", injector->global_search);
-        if (!injector->create_file) return false;
-        injector->expand_env = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "ExpandEnvironmentStringsW", injector->global_search);
-        if (!injector->expand_env) return false;
-
-        if (INJECT_METHOD_WRITE_FILE == injector->method)
+            injector->memset = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "memset", injector->global_search);
+            if (!injector->memset) return false;
+            injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc", injector->global_search);
+            break;
+        }
+        case INJECT_METHOD_WRITE_FILE:
         {
             injector->write_file = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "WriteFile", injector->global_search);
             if (!injector->write_file) return false;
+            goto file_methods_init;
         }
-        else if (INJECT_METHOD_READ_FILE == injector->method)
+        case INJECT_METHOD_READ_FILE:
         {
             injector->read_file = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "ReadFile", injector->global_search);
             if (!injector->read_file) return false;
+            goto file_methods_init;
         }
+file_methods_init:
+        {
+            injector->payload_size = FILE_BUF_SIZE;
 
-        injector->close_handle = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CloseHandle", injector->global_search);
-        if (!injector->close_handle) return false;
-        injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc", injector->global_search);
+            injector->memset = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "memset", injector->global_search);
+            if (!injector->memset) return false;
+            injector->create_file = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CreateFileW", injector->global_search);
+            if (!injector->create_file) return false;
+            injector->expand_env = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "ExpandEnvironmentStringsW", injector->global_search);
+            if (!injector->expand_env) return false;
+
+
+            injector->close_handle = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "CloseHandle", injector->global_search);
+            if (!injector->close_handle) return false;
+            injector->exec_func = get_function_va(drakvuf, eprocess_base, "kernel32.dll", "VirtualAlloc", injector->global_search);
+            break;
+        }
+        default:
+        {
+            PRINT_DEBUG("Should not be here");
+            assert(false);
+        }
     }
 
     return injector->exec_func != 0;
