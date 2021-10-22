@@ -214,9 +214,6 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         case INJECT_METHOD_SHELLEXEC:
             success = setup_shell_execute_stack(injector, &regs.x86);
             break;
-        case INJECT_METHOD_WRITE_FILE:
-            success = setup_virtual_alloc_stack(injector, &regs.x86);
-            break;
         default:
             // TODO Implement
             break;
@@ -241,6 +238,35 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     PRINT_DEBUG("Stack setup finished and return trap added @ 0x%" PRIx64 "\n",
         regs.x86.rip);
 
+    // tidied up
+    event_response_t event;
+    switch (injector->method)
+    {
+        case INJECT_METHOD_READ_FILE: // UNTESTED on 32bit
+        {
+            event = handle_readfile_x64(drakvuf, info);
+            goto tidied;
+        }
+        case INJECT_METHOD_WRITE_FILE: // UNTESTED on 32bit
+        {
+            event = handle_writefile_x64(drakvuf, info);
+            goto tidied;
+        }
+tidied:  // tidy up later
+        {
+            if (!injector->step_override)
+                injector->step+=1;
+
+            injector->step_override = false;
+            return event;
+        }
+        default:
+        {
+            PRINT_DEBUG("This method needs to be tidied up\n");
+            break;
+        }
+    }
+
     regs.x86.rip = injector->exec_func;
 
     switch (injector->method)
@@ -248,9 +274,6 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         case INJECT_METHOD_CREATEPROC:
         case INJECT_METHOD_SHELLEXEC:
             injector->status = STATUS_CREATE_OK;
-            break;
-        case INJECT_METHOD_WRITE_FILE:
-            injector->status = STATUS_ALLOC_OK;
             break;
         default:
             // TODO Implement
@@ -886,7 +909,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return 0;
     }
 
-    if (!injector->is32bit && !injector->hijacked)
+    if (!injector->hijacked)
     {
         event_response_t event;
         switch (injector->method)
