@@ -330,4 +330,3 @@ static bool process_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint
 
     return true;
 }
-
