@@ -162,3 +162,20 @@ bool is_fun_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* err)
     }
     return false;
 }
+
+bool open_host_file(injector_t injector, const char* mode)
+{
+    injector->host_file = fopen(injector->binary_path, mode);
+
+    if (!injector->host_file)
+    {
+        PRINT_DEBUG("Failed to open host file\n");
+        injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+        injector->error_code.code = errno;
+        injector->error_code.string = "HOST_FAILED_FOPEN";
+        injector->error_code.valid = true;
+
+        return false;
+    }
+    return true;
+}

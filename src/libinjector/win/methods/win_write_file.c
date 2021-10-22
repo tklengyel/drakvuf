@@ -189,18 +189,10 @@ event_response_t handle_writefile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* in
                 return cleanup(injector, info);
 
             injector->file_handle = info->regs->rax;
-            injector->host_file = fopen(injector->binary_path, "rb");
 
-            if (!injector->host_file)
-            {
-                PRINT_DEBUG("Failed to open host file\n");
-                injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
-                injector->error_code.code = errno;
-                injector->error_code.string = "HOST_FAILED_FOPEN";
-                injector->error_code.valid = true;
-
+            if (!open_host_file(injector, "rb"))
                 return cleanup(injector, info);
-            }
+
         }
         // fall through
         case STEP6: // read chunk from host and write to guest

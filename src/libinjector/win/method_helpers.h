@@ -108,6 +108,7 @@
 #include "win_utils.h"
 
 bool setup_create_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+bool open_host_file(injector_t injector, const char* mode);
 bool is_fun_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* err);
 
 #endif
