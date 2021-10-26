@@ -248,13 +248,6 @@ bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
     }
 }
 
-event_response_t override_step(injector_t injector, const injector_step_t step, event_response_t event)
-{
-    injector->step_override = true;
-    injector->step = step;
-    return event;
-}
-
 bool save_rip_for_ret(drakvuf_t drakvuf, x86_registers_t* regs)
 {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);

@@ -102,197 +102,80 @@
  *                                                                         *
 ***************************************************************************/
 
-#ifndef WIN_UTILS_H
-#define WIN_UTILS_H
+#include "method_helpers.h"
+#include "win_functions.h"
 
-#define LIBVMI_EXTRA_GLIB
-#define LIBVMI_EXTRA_JSON
-
-#include <libvmi/libvmi.h>
-#include <libvmi/libvmi_extra.h>
-#include <libvmi/x86.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <sys/mman.h>
-#include <stdio.h>
-#include <signal.h>
-#include <inttypes.h>
-#include <glib.h>
-#include <json-c/json.h>
-#include <assert.h>
-
-#include "libdrakvuf/libdrakvuf.h"
-#include <libinjector/libinjector.h>
-#include "private.h"
-#include "win_private.h"
-#include "injector_utils.h"
-
-#define SW_SHOWNORMAL   1
-#define MEM_COMMIT      0x00001000
-#define MEM_RESERVE     0x00002000
-#define MEM_PHYSICAL    0x00400000
-#define PAGE_EXECUTE_READWRITE  0x40
-#define CREATE_SUSPENDED 0x00000004
-
-typedef enum
+bool setup_create_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    INJECT_RESULT_SUCCESS,
-    INJECT_RESULT_TIMEOUT,
-    INJECT_RESULT_CRASH,
-    INJECT_RESULT_PREMATURE,
-    INJECT_RESULT_ERROR_CODE,
-    INJECT_RESULT_INIT_FAIL
-} inject_result_t;
+    injector_t injector = (injector_t)info->trap->data;
+    uint8_t buf[FILE_BUF_SIZE] = {0};
+    unicode_string_t in;
 
-struct injector
-{
-    // common in win and linux
-    // KEEP THESE IN TOP and in sync with the order in injector_utils.c
-    injector_step_t step;
-    bool step_override; // set this as true for jumping to some arbitrary step
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = injector->payload_addr,
+    );
 
-    // Inputs:
-    unicode_string_t* target_file_us;
-    vmi_pid_t target_pid;
-    uint32_t target_tid;
-    unicode_string_t* cwd_us;
-    bool break_loop_on_detection;
-
-    // Internal:
-    drakvuf_t drakvuf;
-    bool is32bit, hijacked, resumed, detected;
-    injection_method_t method;
-    bool global_search;
-    bool wait_for_exit;
-    addr_t exec_func;
-    reg_t target_rsp;
-
-    // For create process
-    addr_t resume_thread;
-
-    // For terminate process
-    vmi_pid_t terminate_pid;
-    addr_t open_process;
-    addr_t exit_process;
-
-    // For shellcode execution
-    addr_t payload, payload_addr, memset;
-    // For readfile/writefile
-    addr_t create_file, read_file, write_file, close_handle, expand_env;
-    size_t binary_size, payload_size;
-    uint32_t status; // will be replaced by step
-    uint32_t file_handle;
-    FILE* host_file;
-    unicode_string_t* expanded_target;
-
-    // For process doppelganging shellcode
-    addr_t binary, binary_addr, saved_bp;
-    addr_t process_notify;
-
-    const char* binary_path;
-    const char* target_process;
-
-    addr_t process_info;
-    registers_t saved_regs;
-
-    drakvuf_trap_t bp;
-    GSList* memtraps;
-
-    // Used only on x64
-    size_t offsets[OFFSET_MAX];
-
-    // Results:
-    injector_status_t rc;
-    inject_result_t result;
-    struct
+    PRINT_DEBUG("Reading expanded variable\n");
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    if (VMI_SUCCESS != vmi_read(vmi, &ctx, info->regs->rax * 2, buf, NULL))
     {
-        bool valid;
-        uint32_t code;
-        const char* string;
-    } error_code;
+        drakvuf_release_vmi(drakvuf);
+        PRINT_DEBUG("Failed to read buffer at %lx\n", info->regs->rax * 2);
+        return false;
+    }
+    drakvuf_release_vmi(drakvuf);
+    in.contents = buf;
+    in.length = info->regs->rax * 2;
+    in.encoding = "UTF-16";
 
-    uint32_t pid, tid;
-    uint64_t hProc, hThr;
-};
+    PRINT_DEBUG("Converting target to UTF-8\n");
+    injector->expanded_target = (unicode_string_t*)g_try_malloc0(sizeof(unicode_string_t));
+    if (VMI_SUCCESS != vmi_convert_str_encoding(&in, injector->expanded_target, "UTF-8"))
+    {
+        PRINT_DEBUG("Failed to convert buffer\n");
+        return false;
+    }
 
+    PRINT_DEBUG("Expanded: %s\n", injector->expanded_target->contents);
+    PRINT_DEBUG("Opening file...\n");
 
-struct startup_info_32
+    if (!setup_create_file_stack(injector, info->regs))
+    {
+        PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+        return false;
+    }
+    return true;
+}
+
+bool is_fun_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const char* err)
 {
-    uint32_t cb;
-    uint32_t lpReserved;
-    uint32_t lpDesktop;
-    uint32_t lpTitle;
-    uint32_t dwX;
-    uint32_t dwY;
-    uint32_t dwXSize;
-    uint32_t dwYSize;
-    uint32_t dwXCountChars;
-    uint32_t dwYCountChars;
-    uint32_t dwFillAttribute;
-    uint32_t dwFlags;
-    uint16_t wShowWindow;
-    uint16_t cbReserved2;
-    uint32_t lpReserved2;
-    uint32_t hStdInput;
-    uint32_t hStdOutput;
-    uint32_t hStdError;
-};
+    if (info->regs->rax == (~0ULL) || !info->regs->rax)
+    {
+        injector_t injector = (injector_t)info->trap->data;
+        fprintf(stderr, "%s\n", err);
+        injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+        injector->error_code.valid = true;
+        drakvuf_get_last_error(drakvuf, info, &injector->error_code.code, &injector->error_code.string);
+        return true;
+    }
+    return false;
+}
 
-struct startup_info_64
+bool open_host_file(injector_t injector, const char* mode)
 {
-    uint32_t cb;
-    addr_t lpReserved;
-    addr_t lpDesktop;
-    addr_t lpTitle;
-    uint32_t dwX;
-    uint32_t dwY;
-    uint32_t dwXSize;
-    uint32_t dwYSize;
-    uint32_t dwXCountChars;
-    uint32_t dwYCountChars;
-    uint32_t dwFillAttribute;
-    uint32_t dwFlags;
-    uint16_t wShowWindow;
-    uint16_t cbReserved2;
-    addr_t lpReserved2;
-    addr_t hStdInput;
-    addr_t hStdOutput;
-    addr_t hStdError;
-};
+    injector->host_file = fopen(injector->binary_path, mode);
 
-struct process_information_32
-{
-    uint32_t hProcess;
-    uint32_t hThread;
-    uint32_t dwProcessId;
-    uint32_t dwThreadId;
-} __attribute__ ((packed));
+    if (!injector->host_file)
+    {
+        PRINT_DEBUG("Failed to open host file\n");
+        injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+        injector->error_code.code = errno;
+        injector->error_code.string = "HOST_FAILED_FOPEN";
+        injector->error_code.valid = true;
 
-struct process_information_64
-{
-    addr_t hProcess;
-    addr_t hThread;
-    uint32_t dwProcessId;
-    uint32_t dwThreadId;
-} __attribute__ ((packed));
-
-unicode_string_t* convert_utf8_to_utf16(char const* str);
-bool load_file_to_memory(addr_t* output, size_t* size, const char* file);
-addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib, char const* fun, bool global_search);
-void free_memtraps(injector_t injector);
-void free_injector(injector_t injector);
-void injector_free_win(injector_t injector);
-void print_injection_info(output_format_t format, const char* file, injector_t injector);
-
-struct module_context
-{
-    const char* lib;
-    const char* fun;
-    addr_t module_addr;
-    addr_t addr;
-};
-
-bool module_visitor(drakvuf_t drakvuf, const module_info_t* module_info, void* ctx );
-
-#endif
+        return false;
+    }
+    return true;
+}

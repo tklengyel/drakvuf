@@ -120,6 +120,18 @@ typedef struct injector* injector_t;
 
 typedef enum
 {
+    STEP1,
+    STEP2,
+    STEP3,
+    STEP4,
+    STEP5,
+    STEP6,
+    STEP7,
+    STEP8,
+} injector_step_t;
+
+typedef enum
+{
     INJECTOR_FAILED,
     INJECTOR_FAILED_WITH_ERROR_CODE,
     INJECTOR_SUCCEEDED,
