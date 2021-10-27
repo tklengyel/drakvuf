@@ -337,11 +337,15 @@ fail:
 
 static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta)
 {
+    proc_data_t proc_data = get_proc_data(drakvuf, info);
+
     auto vmi = vmi_lock_guard(drakvuf);
 
     // we have to make sure that addresses between [pf_current_addr, pf_max_addr]
     // are available for reading otherwise vmi_translate_sym2v will fail unconditionally
     // and we will be unable to add hooks
+
+    plugin->pf_in_progress.erase(std::make_pair(proc_data.pid, proc_data.tid));
 
     while (dll_meta->pf_current_addr <= dll_meta->pf_max_addr)
     {
@@ -359,6 +363,7 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
         if (vmi_request_page_fault(vmi, info->vcpu, dll_meta->pf_current_addr, 0) == VMI_SUCCESS)
         {
             PRINT_DEBUG("[USERHOOK] Export info not accessible, page fault %llx\n", (unsigned long long)dll_meta->pf_current_addr);
+            plugin->pf_in_progress.insert(std::make_pair(proc_data.pid, proc_data.tid));
             dll_meta->pf_current_addr += VMI_PS_4KB;
         }
         else
@@ -408,6 +413,13 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
                     if (vmi_request_page_fault(vmi, info->vcpu, exec_func, 0) == VMI_SUCCESS)
                     {
                         target.state = HOOK_PAGEFAULT_RETRY;
+                        plugin->pf_in_progress.insert(std::make_pair(proc_data.pid, proc_data.tid));
+                        return VMI_EVENT_RESPONSE_NONE;
+                    }
+                    else
+                    {
+                        PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n",
+                            (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
                         return VMI_EVENT_RESPONSE_NONE;
                     }
                 }
@@ -579,22 +591,7 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    bool our_fault = false;
-
-    auto vec_it = plugin->loaded_dlls.find(proc_data.pid);
-
-    if (vec_it != plugin->loaded_dlls.end())
-    {
-        for (auto const& dll_meta : vec_it->second)
-        {
-            if (!dll_meta.v.is_hooked && dll_meta.v.dtb == info->regs->cr3 && dll_meta.v.thread_id == thread_id)
-            {
-                our_fault = true;
-                break;
-            }
-        }
-    }
-
+    bool our_fault = plugin->pf_in_progress.find(std::make_pair(proc_data.pid, proc_data.tid)) != plugin->pf_in_progress.end();
     if (!our_fault)
     {
         PRINT_DEBUG("[USERHOOK] Not suppressing service exception - not our fault\n");
