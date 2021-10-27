@@ -119,7 +119,7 @@ struct procdump2_config
 {
     const char* procdump_dir;
     bool compress_procdumps;
-    vmi_pid_t procdump_on_terminate;
+    vmi_pid_t procdump_on_finish;
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes;
 };
 
@@ -128,9 +128,9 @@ class procdump2 : public pluginex
 public:
     /* Config */
     // This allows to inform main about processes been terminated
-    // TODO Remove this in flavor of `procdump_on_terminate`
+    // TODO Remove this in flavor of `procdump_on_finish`
     std::string const                                    procdump_dir; // TODO Use `std::filesystem::path`
-    vmi_pid_t                                            procdump_on_terminate{0}; // TODO Rename
+    vmi_pid_t                                            procdump_on_finish{0};
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes;
     std::set<drakvuf_trap_t*>                            breakpoints;
     std::set<uint32_t>                                   active_working_threads;

@@ -1052,7 +1052,7 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
     output_format_t output)
     : pluginex(drakvuf, output)
     , procdump_dir{config->procdump_dir ?: ""}
-    , procdump_on_terminate(config->procdump_on_terminate)
+    , procdump_on_finish(config->procdump_on_finish)
     , terminated_processes(config->terminated_processes)
     , use_compression{config->compress_procdumps}
     , drakvuf(drakvuf)
@@ -1100,15 +1100,15 @@ procdump2::~procdump2()
 bool procdump2::stop()
 {
     destroy_all_traps();
-    if (procdump_on_terminate && is_new_process(procdump_on_terminate))
+    if (procdump_on_finish && is_new_process(procdump_on_finish))
     {
-        addr_t target_process_pid = procdump_on_terminate;
+        addr_t target_process_pid = procdump_on_finish;
         /* NOTE This prevents errors on subsequent calls to the stop method
          *
          * If "wait stop plugins" option been used then multiple calls to stop
          * method would occur.
          */
-        procdump_on_terminate = 0;
+        procdump_on_finish = 0;
         addr_t target_process_base = 0;
         addr_t dtb = 0;
         if ( !drakvuf_get_process_by_pid(drakvuf, target_process_pid, &target_process_base, &dtb) )
