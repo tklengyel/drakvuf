@@ -2439,6 +2439,9 @@ SYSCALL(NtUnmapViewOfSectionEx, NTSTATUS,
     "BaseAddress", "", DIR_IN, PVOID,
     "Flags", "", DIR_IN, ULONG,
 );
+SYSCALL(NtUserBlockInput, NTSTATUS,
+    "BlockIt", "", DIR_IN, BOOLEAN
+);
 SYSCALL(NtUserCallNextHookEx, NTSTATUS,
     "Code", "", DIR_IN, INT,
     "wParam", "", DIR_IN, WPARAM,
@@ -3529,7 +3532,6 @@ SYSCALL(NtUserAutoRotateScreen, NTSTATUS);
 SYSCALL(NtUserBeginLayoutUpdate, NTSTATUS);
 SYSCALL(NtUserBeginPaint, NTSTATUS);
 SYSCALL(NtUserBitBltSysBmp, NTSTATUS);
-SYSCALL(NtUserBlockInput, NTSTATUS);
 SYSCALL(NtUserBroadcastThemeChangeEvent, NTSTATUS);
 SYSCALL(NtUserBuildHimcList, NTSTATUS);
 SYSCALL(NtUserBuildHwndList, NTSTATUS);
