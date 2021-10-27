@@ -150,7 +150,7 @@ struct plugins_options
     const char* mscorwks_profile;       // PLUGIN_MEMDUMP
     const char* procdump_dir;           // PLUGIN_PROCDUMP
     bool compress_procdumps = false;    // PLUGIN_PROCDUMP
-    vmi_pid_t procdump_on_terminate;    // PLUGIN_PROCDUMP
+    vmi_pid_t procdump_on_finish;       // PLUGIN_PROCDUMP2
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes; // PLUGIN_PROCDUMP
     const char* codemon_dump_dir;       // PLUGIN_CODEMON
     const char* codemon_filter_executable;  // PLUGIN_CODEMON

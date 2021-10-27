@@ -390,7 +390,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     {
                         .procdump_dir = options->procdump_dir,
                         .compress_procdumps = options->compress_procdumps,
-                        .procdump_on_terminate = options->procdump_on_terminate,
+                        .procdump_on_finish = options->procdump_on_finish,
                         .terminated_processes = options->terminated_processes
                     };
                     this->plugins[plugin_id] =

@@ -295,6 +295,10 @@ static void print_usage()
         "\t --compress-procdumps\n"
         "\t                           Controls compression of processes dumps on disk\n"
 #endif
+#ifdef ENABLE_PLUGIN_PROCDUMP2
+        "\t --procdump-disable-dump-on-finish\n"
+        "\t                           Disable dumping of injected process memory upon completion of monitoring\n"
+#endif
 #ifdef ENABLE_PLUGIN_CODEMON
         "\t --codemon-dump-dir <directory>\n"
         "\t                           Folder where to store page/vad dumps (path)\n"
@@ -375,6 +379,7 @@ int main(int argc, char** argv)
     int termination_timeout = 20;
     bool context_based_interception = false;
     GSList* context_processes = NULL;
+    bool procdump_on_finish = true;
 
     eprint_current_time();
 
@@ -412,6 +417,7 @@ int main(int argc, char** argv)
         opt_dll_hooks_list,
         opt_procdump_dir,
         opt_compress_procdumps,
+        opt_procdump_disable_dump_on_finish,
         opt_json_clr,
         opt_json_mscorwks,
         opt_disable_sysret,
@@ -472,6 +478,7 @@ int main(int argc, char** argv)
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
+        {"procdump-disable-dump-on-finish", no_argument, NULL, opt_procdump_disable_dump_on_finish},
         {"json-clr", required_argument, NULL, opt_json_clr},
         {"json-mscorwks", required_argument, NULL, opt_json_mscorwks},
         {"syscall-hooks-list", required_argument, NULL, 'S'},
@@ -752,6 +759,11 @@ int main(int argc, char** argv)
                 options.compress_procdumps = true;
                 break;
 #endif
+#ifdef ENABLE_PLUGIN_PROCDUMP2
+            case opt_procdump_disable_dump_on_finish:
+                procdump_on_finish = false;
+                break;
+#endif
 #ifdef ENABLE_PLUGIN_CODEMON
             case opt_codemon_dump_dir:
                 options.codemon_dump_dir = optarg;
@@ -909,7 +921,8 @@ int main(int argc, char** argv)
 
         drakvuf->interrupt(0); // clear
     }
-    options.procdump_on_terminate = injected_pid;
+    if (procdump_on_finish)
+        options.procdump_on_finish = injected_pid;
 
     PRINT_DEBUG("Enabling context based interception.\n");
 
