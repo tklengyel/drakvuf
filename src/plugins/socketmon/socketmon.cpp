@@ -521,7 +521,8 @@ static event_response_t trap_DnsQuery_W_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 }
 
 // Works on Windows 7
-static event_response_t trap_DnsQueryExW_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+template <typename dns_query_ex_w_string_t>
+static event_response_t trap_DnsQueryExW_impl(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     unicode_string_t* domain_name_us = nullptr;
     socketmon* sm = (socketmon*)info->trap->data;
@@ -562,6 +563,16 @@ static event_response_t trap_DnsQueryExW_cb(drakvuf_t drakvuf, drakvuf_trap_info
     vmi_free_unicode_str(domain_name_us);
 
     return 0;
+}
+
+static event_response_t trap_DnsQueryExW_x64_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    return trap_DnsQueryExW_impl<dns_query_ex_w_string_x64_t>(drakvuf, info);
+}
+
+static event_response_t trap_DnsQueryExW_x86_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    return trap_DnsQueryExW_impl<dns_query_ex_w_string_x86_t>(drakvuf, info);
 }
 
 // Works on Windows 7
@@ -648,6 +659,7 @@ namespace
 
 struct module_trap_context_t
 {
+    bool is_wow;
     const char* module_name;
     const char* function_name;
     drakvuf_trap_t* trap;
@@ -670,6 +682,9 @@ static bool module_trap_visitor(drakvuf_t drakvuf, const module_info_t* module_i
 
     PRINT_DEBUG("[SOCKETMON] trap_visitor: CR3[0x%lX] pid[0x%X %d] is_wow_process[%d]  is_wow_module[%d] base_name[%s] load_address[0x%lX] full_name[%s]\n",
         module_info->dtb, module_info->pid, module_info->pid, module_info->is_wow_process, module_info->is_wow, module_info->base_name->contents, module_info->base_addr, module_info->full_name->contents );
+
+    if (data->is_wow && !module_info->is_wow)
+        return false;
 
     vmi = drakvuf_lock_and_get_vmi( drakvuf );
 
@@ -697,9 +712,11 @@ static bool module_trap_visitor(drakvuf_t drakvuf, const module_info_t* module_i
 
 static void register_module_trap( drakvuf_t drakvuf, drakvuf_trap_t* trap,
     const char* module_name, const char* function_name,
-    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
+    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ),
+    event_response_t(*wow_hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) = nullptr )
 {
     struct module_trap_context_t visitor_ctx = {};
+    visitor_ctx.is_wow = false;
     visitor_ctx.module_name = module_name;
     visitor_ctx.function_name = function_name;
     visitor_ctx.trap = trap;
@@ -710,14 +727,27 @@ static void register_module_trap( drakvuf_t drakvuf, drakvuf_trap_t* trap,
         PRINT_DEBUG("[SOCKETMON] Failed to trap function %s!%s\n", module_name, function_name);
         throw -1;
     }
+
+    if (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E)
+    {
+        visitor_ctx.is_wow = true;
+        if (wow_hook_cb)
+            visitor_ctx.hook_cb = wow_hook_cb;
+        if (!drakvuf_enumerate_processes_with_module(drakvuf, module_name, module_trap_visitor, &visitor_ctx))
+        {
+            PRINT_DEBUG("[SOCKETMON] Failed to trap function SysWOW64 %s!%s\n", module_name, function_name);
+            throw -1;
+        }
+    }
 }
 
 static void register_dnsapi_trap( drakvuf_t drakvuf, drakvuf_trap_t* trap,
     const char* function_name,
-    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) )
+    event_response_t(*hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ),
+    event_response_t(*wow_hook_cb)( drakvuf_t drakvuf, drakvuf_trap_info_t* info ) = nullptr )
 {
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
-    register_module_trap(drakvuf, trap, "dnsapi.dll", function_name, hook_cb);
+    register_module_trap(drakvuf, trap, "dnsapi.dll", function_name, hook_cb, wow_hook_cb);
 }
 
 socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format_t output)
@@ -755,7 +785,10 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
 
     if (this->winver == VMI_OS_WINDOWS_7)
     {
-        register_dnsapi_trap(drakvuf, &this->dnsapi_traps[3], "DnsQueryExW", trap_DnsQueryExW_cb);
+        if (pm == VMI_PM_IA32E)
+            register_dnsapi_trap(drakvuf, &this->dnsapi_traps[3], "DnsQueryExW", trap_DnsQueryExW_x64_cb, trap_DnsQueryExW_x86_cb);
+        else
+            register_dnsapi_trap(drakvuf, &this->dnsapi_traps[3], "DnsQueryExW", trap_DnsQueryExW_x86_cb);
         register_dnsapi_trap(drakvuf, &this->dnsapi_traps[4], "DnsQueryExA", trap_DnsQueryExA_cb);
     }
 

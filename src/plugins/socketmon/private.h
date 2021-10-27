@@ -313,13 +313,19 @@ struct udp_endpoint_win10_x64
 
 // This is yet another type of Windows string representation
 // specific for undocumented DnsQueryExW(...) function.
-// Same type for 64 and 32 bit versions.
-struct dns_query_ex_w_string_t
+struct dns_query_ex_w_string_x64_t
 {
     uint32_t length = 0;
     uint32_t unknown = 0; // maybe type of bytes in string, was equal to 1 in my case of wchars?
     uint64_t pBuffer = 0; // pointer to a null-terminated string of wchars
     //uint64_t unknown2 = 0; // maybe type of bytes in string, was equal to 1 in my case of wchars, commented out, since not needed yet
-};
+} __attribute__ ((packed));
+
+struct dns_query_ex_w_string_x86_t
+{
+    uint32_t length = 0;
+    uint32_t unknown = 0;
+    uint32_t pBuffer = 0;
+} __attribute__ ((packed));
 
 #endif
