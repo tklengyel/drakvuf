@@ -107,6 +107,8 @@
 
 #include <vector>
 #include <memory>
+#include <set>
+#include <map>
 
 #include <glib.h>
 #include "plugins/private.h"
@@ -211,6 +213,8 @@ public:
     std::vector<usermode_cb_registration> plugins;
     // map pid -> list of hooked dlls
     std::map<vmi_pid_t, std::vector<dll_t>> loaded_dlls;
+
+    std::set<std::pair<vmi_pid_t, uint32_t /*thread_id*/>> pf_in_progress;
 
     static userhook& get_instance(drakvuf_t drakvuf)
     {

@@ -267,12 +267,14 @@ event_response_t hook_process_cb(
         }
     }
 
+    userhook_plugin->pf_in_progress.erase(std::make_pair(info->proc_data.pid, info->proc_data.tid));
+
     // Now let's try to resolve physical address of the target function.
     addr_t func_pa = 0;
     {
         // Lock vmi.
-        vmi_lock_guard lg(drakvuf);
-        if (VMI_SUCCESS != vmi_pagetable_lookup(lg.vmi, rh_data->target_process_dtb, rh_data->func_addr, &func_pa))
+        auto vmi = vmi_lock_guard(drakvuf);
+        if (VMI_SUCCESS != vmi_pagetable_lookup(vmi, rh_data->target_process_dtb, rh_data->func_addr, &func_pa))
         {
             if (rh_data->state == HOOK_PAGEFAULT_RETRY)
             {
@@ -282,13 +284,18 @@ event_response_t hook_process_cb(
             }
 
             // Otherwise request page fault, exit and wait for hook_process_cb to be hit again.
-            if (VMI_SUCCESS != vmi_request_page_fault(lg.vmi, info->vcpu, rh_data->func_addr, 0))
+            if (VMI_SUCCESS == vmi_request_page_fault(vmi, info->vcpu, rh_data->func_addr, 0))
+            {
+                rh_data->state = HOOK_PAGEFAULT_RETRY;
+                userhook_plugin->pf_in_progress.insert(std::make_pair(info->proc_data.pid, info->proc_data.tid));
+                return VMI_EVENT_RESPONSE_NONE;
+            }
+            else
             {
                 userhook_plugin->remove_running_rh_trap(drakvuf, info->trap);
                 return VMI_EVENT_RESPONSE_NONE;
             }
-            rh_data->state = HOOK_PAGEFAULT_RETRY;
-            return VMI_EVENT_RESPONSE_NONE;
+
         }
     } // Unlock Vmi.
 
