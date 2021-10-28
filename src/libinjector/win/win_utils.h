@@ -151,6 +151,7 @@ struct injector
     // KEEP THESE IN TOP and in sync with the order in injector_utils.c
     injector_step_t step;
     bool step_override; // set this as true for jumping to some arbitrary step
+    bool set_gprs_only;
 
     // Inputs:
     unicode_string_t* target_file_us;

@@ -164,25 +164,25 @@ void injector_terminate_on_win(drakvuf_t drakvuf,
 void injector_free_win(injector_t injector);
 void injector_free_linux(injector_t injector);
 
-static inline void copy_gprs(registers_t* dst, registers_t* src)
+static inline void copy_gprs(x86_registers_t* dst, x86_registers_t* src)
 {
-    dst->x86.rip = src->x86.rip;
-    dst->x86.rsp = src->x86.rsp;
-    dst->x86.rbp = src->x86.rbp;
-    dst->x86.rax = src->x86.rax;
-    dst->x86.rbx = src->x86.rbx;
-    dst->x86.rcx = src->x86.rcx;
-    dst->x86.rdx = src->x86.rdx;
-    dst->x86.rdi = src->x86.rdi;
-    dst->x86.rsi = src->x86.rsi;
-    dst->x86.r8 = src->x86.r8;
-    dst->x86.r9 = src->x86.r9;
-    dst->x86.r10 = src->x86.r10;
-    dst->x86.r11 = src->x86.r11;
-    dst->x86.r12 = src->x86.r12;
-    dst->x86.r13 = src->x86.r13;
-    dst->x86.r14 = src->x86.r14;
-    dst->x86.r15 = src->x86.r15;
+    dst->rip = src->rip;
+    dst->rsp = src->rsp;
+    dst->rbp = src->rbp;
+    dst->rax = src->rax;
+    dst->rbx = src->rbx;
+    dst->rcx = src->rcx;
+    dst->rdx = src->rdx;
+    dst->rdi = src->rdi;
+    dst->rsi = src->rsi;
+    dst->r8 = src->r8;
+    dst->r9 = src->r9;
+    dst->r10 = src->r10;
+    dst->r11 = src->r11;
+    dst->r12 = src->r12;
+    dst->r13 = src->r13;
+    dst->r14 = src->r14;
+    dst->r15 = src->r15;
 }
 
 #endif /* LIBINJECTOR_PRIVATE_H */

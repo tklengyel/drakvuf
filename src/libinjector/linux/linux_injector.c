@@ -219,7 +219,7 @@ event_response_t injector_int3_userspace_cb(drakvuf_t drakvuf, drakvuf_trap_info
     if (!injector->step_override)
         injector->step += 1;
 
-    return event;
+    return handle_gprs_registers(drakvuf, info, event);
 }
 
 static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -403,6 +403,7 @@ injector_status_t injector_start_app_on_linux(
     injector->method = method;
     injector->format = format;
     injector->step = STEP1;
+    injector->set_gprs_only = true;
 
     if (init_injector(injector))
     {
