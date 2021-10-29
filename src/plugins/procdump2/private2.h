@@ -107,16 +107,51 @@
 
 #include "writer2.h"
 
+using namespace std::string_literals;
+
 using std::string;
 
-enum pool_status
+class pool_manager
 {
-    POOL_INVALID,
-    POOL_FREE,
-    POOL_USED,
+public:
+    void add(addr_t base)
+    {
+        if (unused.find(base) != unused.end() ||
+            used.find(base) != used.end())
+        {
+            PRINT_DEBUG("[PROCDUMP] Re-add pool %#lx\n", base);
+            throw -1;
+        }
+
+        unused.insert(base);
+    }
+
+    void free(addr_t base)
+    {
+        if (used.find(base) == used.end())
+        {
+            PRINT_DEBUG("[PROCDUMP] Free unused pool %#lx\n", base);
+            throw -1;
+        }
+        used.erase(base);
+        unused.insert(base);
+    }
+
+    addr_t get()
+    {
+        if (unused.empty())
+            return 0;
+        auto it = unused.begin();
+        auto base = *it;
+        unused.erase(it);
+        used.insert(base);
+        return base;
+    }
+
+private:
+    std::set<addr_t> unused;
+    std::set<addr_t> used;
 };
-using pool_status_t = pool_status;
-using pool_map_t = std::map<addr_t, int>;
 
 struct vad_info2
 {
@@ -126,40 +161,49 @@ struct vad_info2
 };
 using vads_t = std::map<addr_t, vad_info2>;
 
-static void free_trap(gpointer p)
+enum class procdump_stage
 {
-    if ( !p )
-        return;
+    need_suspend,  // 0
+    suspend,       // 1
+    pending,       // 2
+    allocate_pool, // 3
+    get_irql,      // 4
+    copy_memory,   // 5
+    resume,        // 6
+    awaken,        // 7
+    finished       // 8
+};
 
-    drakvuf_trap_t* t = (drakvuf_trap_t*)p;
-    g_slice_free(drakvuf_trap_t, t);
-}
+struct return_ctx
+{
+    vmi_pid_t ret_pid{0};
+    addr_t    ret_rsp{0};
+    uint32_t  ret_tid{0};
+    x86_registers_t regs;
+};
 
+// TODO Rename into "task"
+// TODO Move stage transition logic here
 struct procdump2_ctx
 {
     /* Basic context */
-    drakvuf_trap_t* bp{nullptr};
-    drakvuf_t       drakvuf{nullptr};
-    procdump2*       plugin{nullptr};
-
-    /* Return context */
-    vmi_pid_t ret_pid{0};
-    vmi_pid_t ret_ppid{0};
-    addr_t    ret_rsp{0};
-    uint32_t  ret_tid{0};
-
-    /* Restore state */
-    x86_registers_t saved_regs;
+    /* For self-terminating process working thread injects PsSuspendProcess.
+     * Thus it should remove task.
+     */
+    bool is_self_terminating = false;
+    procdump_stage stage{procdump_stage::pending};
+    return_ctx suspend;
+    return_ctx working;
 
     /* Target process info */
     addr_t    target_process_base{0};
     string    target_process_name;
     vmi_pid_t target_process_pid{0};
 
-    /* */
+    /* Data */
     size_t         current_dump_size{0};
-    addr_t         pool{0};
-    const uint64_t POOL_SIZE_IN_PAGES{0x400};
+    addr_t         pool{0}; // TODO Use "class pool" here
+    const uint64_t POOL_SIZE_IN_PAGES{0x400}; // TODO Move into "class pool"
     size_t         size{0};
     vads_t         vads;
 
@@ -168,125 +212,21 @@ struct procdump2_ctx
     const uint64_t                  idx{0};
     std::unique_ptr<ProcdumpWriter> writer;
 
-    procdump2_ctx() = delete;
-
-    procdump2_ctx(drakvuf_t drakvuf_,
-        drakvuf_trap_info_t* info,
-        procdump2* plugin_,
-        uint64_t idx_)
-        : drakvuf(drakvuf_)
-        , plugin(plugin_)
-        , target_process_base(info->attached_proc_data.base_addr)
-        , target_process_name(std::string(info->attached_proc_data.name))
-        , target_process_pid(info->attached_proc_data.pid)
-        , idx(idx_)
-    {
-        memcpy(&saved_regs, info->regs, sizeof(x86_registers_t));
-    }
-
-    procdump2_ctx(drakvuf_t drakvuf_,
-        drakvuf_trap_info_t* info,
-        procdump2* plugin_,
-        addr_t base,
+    procdump2_ctx(addr_t base,
         std::string name,
         vmi_pid_t pid,
-        uint64_t idx_)
-        : drakvuf(drakvuf_)
-        , plugin(plugin_)
-        , target_process_base(base)
+        uint64_t idx_,
+        std::string procdump_dir,
+        bool use_compression)
+        : target_process_base(base)
         , target_process_name(name)
         , target_process_pid(pid)
         , idx(idx_)
     {
-        memcpy(&saved_regs, info->regs, sizeof(x86_registers_t));
-    }
-
-    procdump2_ctx(drakvuf_t drakvuf_,
-        procdump2* plugin_,
-        addr_t base,
-        std::string name,
-        vmi_pid_t pid,
-        uint64_t idx_)
-        : drakvuf(drakvuf_)
-        , plugin(plugin_)
-        , target_process_base(base)
-        , target_process_name(name)
-        , target_process_pid(pid)
-        , idx(idx_)
-    {
-    }
-
-    // TODO Check if we could remove the method
-    bool add_trap(drakvuf_trap_info_t* info, event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*), addr_t va = 0)
-    {
-        g_assert(!bp);
-
-        ret_pid = info->attached_proc_data.pid;
-        ret_ppid = info->attached_proc_data.ppid;
-        ret_tid = info->attached_proc_data.tid;
-
-        // Use `g_slice_new0` here to be able to pass `g_free` into libdrakvuf
-        bp = g_slice_new0(drakvuf_trap_t);
-        if (!bp)  throw -1;
-        bp->ah_cb = nullptr;
-        bp->breakpoint.addr = va ? va : info->regs->rip;
-        bp->breakpoint.addr_type = ADDR_VA;
-        bp->breakpoint.dtb = info->regs->cr3;
-        bp->breakpoint.lookup_type = LOOKUP_DTB;
-        bp->cb = cb;
-        bp->data = this;
-        bp->name = "procdump";
-        bp->type = BREAKPOINT;
-        bp->ttl = UNLIMITED_TTL;
-        if (!drakvuf_add_trap(drakvuf, bp))
-        {
-            PRINT_DEBUG("[PROCDUMP] Failed to setup breakpoint\n");
-            return false;
-        }
-        plugin->breakpoints.insert(bp);
-        return true;
-    }
-
-    bool add_trap(event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*), addr_t va)
-    {
-        g_assert(!bp);
-
-        bp = g_slice_new0(drakvuf_trap_t);
-        if (!bp)  throw -1;
-        bp->ah_cb = nullptr;
-        bp->breakpoint.addr = va;
-        bp->breakpoint.addr_type = ADDR_VA;
-        bp->breakpoint.pid = 4;
-        bp->breakpoint.lookup_type = LOOKUP_PID;
-        bp->cb = cb;
-        bp->data = this;
-        bp->name = "procdump";
-        bp->type = BREAKPOINT;
-        bp->ttl = UNLIMITED_TTL;
-        if (!drakvuf_add_trap(drakvuf, bp))
-        {
-            PRINT_DEBUG("[PROCDUMP] Failed to setup breakpoint\n");
-            return false;
-        }
-        plugin->breakpoints.insert(bp);
-        return true;
-    }
-
-    void remove_trap()
-    {
-        g_assert(bp);
-        auto it = plugin->breakpoints.find(bp);
-        g_assert(it != plugin->breakpoints.end());
-
-        plugin->breakpoints.erase(it);
-        drakvuf_remove_trap(drakvuf, bp, (drakvuf_trap_free_t)free_trap);
-        bp = nullptr;
-    }
-
-    ~procdump2_ctx()
-    {
-        if (bp)
-            remove_trap();
+        data_file_name = "procdump."s + std::to_string(idx);
+        writer = ProcdumpWriterFactory::build(
+                procdump_dir + "/"s + data_file_name,
+                use_compression);
     }
 };
 

@@ -121,28 +121,35 @@ struct procdump2_config
     bool compress_procdumps;
     vmi_pid_t procdump_on_finish;
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes;
+    const char* hal_profile;
 };
+
+struct procdump2_ctx;
+class pool_manager;
+struct return_ctx;
 
 class procdump2 : public pluginex
 {
 public:
+    procdump2(drakvuf_t drakvuf, const procdump2_config* config, output_format_t output);
+    ~procdump2();
+    bool stop();
+
+private:
     /* Config */
-    // This allows to inform main about processes been terminated
-    // TODO Remove this in flavor of `procdump_on_finish`
     std::string const                                    procdump_dir; // TODO Use `std::filesystem::path`
-    vmi_pid_t                                            procdump_on_finish{0};
-    std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes;
-    std::set<drakvuf_trap_t*>                            breakpoints;
-    std::set<uint32_t>                                   active_working_threads;
+    vmi_pid_t                                            procdump_on_finish{0}; // TODO Rename
     bool const                                           use_compression{false};
 
     /* Internal data */
-    drakvuf_t         drakvuf{nullptr};
-    // NtTerminateProcess callback is called after every injected function callback.
-    // This allows to avoid dumplicate injections.
-    uint64_t          last_event_uuid{0};
-    std::map<addr_t, int> pools;
-    uint64_t          procdumps_count{0};
+    drakvuf_t                                            drakvuf{nullptr};
+    uint64_t                                             procdumps_count{0};
+    std::unique_ptr<pool_manager>                        pools;
+    std::unique_ptr<libhook::SyscallHook>                terminate_process_hook;
+    std::unique_ptr<libhook::SyscallHook>                deliver_apc_hook;
+    std::map<vmi_pid_t, std::shared_ptr<procdump2_ctx>>  active;
+    std::set<vmi_pid_t>                                  finished;
+    std::set<vmi_pid_t>                                  working_threads; // TODO Add manager
 
     /* VA of functions to be injected */
     addr_t malloc_va{0};
@@ -150,17 +157,9 @@ public:
     addr_t resume_process_va{0};
     addr_t copy_virt_mem_va{0};
     addr_t current_irql_va{0};
-    /* NOTE Used to capture context switch
-     *
-     * It have been noticed that usual CR3 switch hook leads to errors:
-     * - function call injection results in BSOD;
-     * - waiting for "IRQL < DISPATCH" takes too long.
-     *
-     * The syscall hook works better. We capture KiDeliverApc.
-     */
-    addr_t deliver_apc_va{0};
 
     /* Minidump info */
+    // TODO Move to function
     uint32_t                amd_extended_cpu_features{0};
     uint32_t                feature_information{0};
     uint32_t                num_cpus{0};
@@ -170,15 +169,36 @@ public:
     std::array<uint32_t, 3> vendor{0};
     uint32_t                version_information{0};
 
-    procdump2(drakvuf_t drakvuf, const procdump2_config* config, output_format_t output);
-    ~procdump2();
+    /* Hook handlers */
+    event_response_t deliver_apc_cb(drakvuf_t, drakvuf_trap_info_t*);
+    event_response_t terminate_process_cb(drakvuf_t, drakvuf_trap_info_t*);
 
-    void insert_new_process(vmi_pid_t pid);
-    void set_process_finished(vmi_pid_t pid);
-    bool is_new_process(vmi_pid_t pid);
+    /* Dispatchers */
+    void dispatch_active(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    void dispatch_new(drakvuf_trap_info_t*);
+    bool dispatch_pending(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    bool dispatch_wakeup(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+
+    /* Injection helpers */
+    void allocate_pool(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    void copy_memory(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>, addr_t, size_t);
+    void get_irql(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    void resume(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    void suspend(drakvuf_trap_info_t*, addr_t, return_ctx&);
+
+    /* Routines */
+    void finish_task(std::shared_ptr<procdump2_ctx>);
+    addr_t get_function_va(std::string_view, std::string_view);
+    std::pair<addr_t, size_t> get_memory_region(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    void inject_function_return(drakvuf_trap_info_t* info);
+    bool is_active_process(vmi_pid_t pid);
     bool is_process_handled(vmi_pid_t pid);
     bool is_plugin_active();
-    bool stop();
+    bool prepare_minidump(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    void print_failure(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>, const std::string& message);
+    void read_vm(addr_t, std::shared_ptr<procdump2_ctx> procdump_ctx, bool);
+    void restore(drakvuf_trap_info_t*, x86_registers_t&);
+    void save_file_metadata(std::shared_ptr<procdump2_ctx>, proc_data_t*);
 };
 
 #endif
