@@ -258,7 +258,7 @@ tidied:  // tidy up later
                 injector->step+=1;
 
             injector->step_override = false;
-            return event;
+            return handle_gprs_registers(drakvuf, info, event);
         }
         default:
         {
@@ -831,7 +831,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
             }
 
-            copy_gprs(&regs, &injector->saved_regs);
+            copy_gprs(&regs.x86, &injector->saved_regs.x86);
 
             if (injector->pid && injector->tid)
             {
@@ -930,7 +930,7 @@ tidied:  // tidy up later
                     injector->step+=1;
 
                 injector->step_override = false;
-                return event;
+                return handle_gprs_registers(drakvuf, info, event);
             }
             default:
             {
@@ -1343,6 +1343,7 @@ injector_status_t injector_start_app_on_win(
     injector->error_code.string = "<UNKNOWN>";
     injector->step = STEP1;
     injector->step_override = false;
+    injector->set_gprs_only = true;
 
     if (!initialize_injector_functions(drakvuf, injector, file, binary_path))
     {
