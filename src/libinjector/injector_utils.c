@@ -111,11 +111,39 @@ struct injector
 {
     injector_step_t step;
     bool step_override;
+    bool set_gprs_only;
 };
 
 event_response_t override_step(injector_t injector, const injector_step_t step, event_response_t event)
 {
     injector->step_override = true;
     injector->step = step;
+    return event;
+}
+
+// One could not set all registers at once because the kernel structures could be affected.
+// For example on Windows 7 x64 GS BASE stores pointer to KPCR. If save
+// GS BASE on vCPU0 and start injections Windows scheduler could switch
+// thread to other vCPU1. After restoring all registers vCPU1's GS BASE
+// would point to KPCR of vCPU0.
+// Hence, the safe way is to only modify the general purpose registers
+// which won't affect the kernel structures
+event_response_t handle_gprs_registers(drakvuf_t drakvuf, drakvuf_trap_info_t* info, event_response_t event)
+{
+    injector_t injector = info->trap->data;
+
+    if (injector->set_gprs_only && event == VMI_EVENT_RESPONSE_SET_REGISTERS)
+    {
+        vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+        registers_t regs;
+        vmi_get_vcpuregs(vmi, &regs, info->vcpu);
+        drakvuf_release_vmi(drakvuf);
+
+        copy_gprs(&regs.x86, info->regs);
+        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
+
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
     return event;
 }
