@@ -139,17 +139,8 @@
 #include "socketmon.h"
 #include "plugins/output_format.h"
 
-struct wrapper
-{
-    socketmon* s;
-    addr_t obj;
-};
-
-static void free_wrapper (drakvuf_trap_t* trap)
-{
-    g_free(trap->data);
-    g_free(trap);
-}
+#define IPV4_ADDR_OFFSET 4
+#define IPV6_ADDR_OFFSET 8
 
 static char* ipv4_to_str(uint8_t ipv4[4])
 {
@@ -221,7 +212,7 @@ static char const* tcp_state_string(int tcp_state)
     return tcp_state_str[tcp_state];
 }
 
-static void print_udpa_ret(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data, int addressfamily, char const* lip, int port)
+static void print_udp_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* s, proc_data_t const& owner_proc_data, int addressfamily, char const* lip, int port)
 {
     fmt::print(s->format, "socketmon", drakvuf, info,
         keyval("Owner", fmt::Qstr(owner_proc_data.name)),
@@ -251,82 +242,6 @@ static void print_tcpe(drakvuf_t drakvuf, drakvuf_trap_info_t* info, socketmon* 
     );
 }
 
-template<typename udp_endpoint_struct, typename inetaf_struct, typename local_address_struct>
-static event_response_t udpa_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    struct wrapper* w = (struct wrapper*)info->trap->data;
-    socketmon* s = w->s;
-
-    ACCESS_CONTEXT(ctx);
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-
-    addr_t p1 = 0;
-    char* lip = NULL;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    proc_data_t owner_proc_data = {};
-    udp_endpoint_struct udpa = {};
-    inetaf_struct inetaf = {};
-    local_address_struct local = {};
-
-    ctx.addr = w->obj;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(udpa), &udpa, NULL) )
-        goto done;
-
-    // Convert port to little endian
-    udpa.port = __bswap_16(udpa.port);
-
-    if ( !udpa.port )
-        goto done;
-
-    ctx.addr = udpa.inetaf;
-    if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(inetaf), &inetaf, NULL) )
-        goto done;
-
-    if ( udpa.localaddr )
-    {
-        ctx.addr = udpa.localaddr;
-        if ( VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(local), &local, NULL) )
-            goto done;
-
-        ctx.addr = local.pdata;
-        if ( VMI_FAILURE == vmi_read_addr(vmi, &ctx, &p1) )
-            goto done;
-    }
-
-    lip = read_ip_string(vmi, ctx, p1, inetaf.addressfamily);
-    if (!lip) goto done;
-
-    if (!drakvuf_get_process_data(drakvuf, udpa.owner, &owner_proc_data))
-        goto done;
-
-    print_udpa_ret(drakvuf, info, s, owner_proc_data, inetaf.addressfamily, lip, udpa.port);
-
-done:
-    g_free(const_cast<char*>(owner_proc_data.name));
-    g_free(lip);
-    drakvuf_release_vmi(drakvuf);
-    drakvuf_remove_trap(drakvuf, info->trap, free_wrapper);
-    return 0;
-}
-
-static event_response_t udpa_x86_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    return udpa_ret_cb<udp_endpoint_x86, inetaf_x86, local_address_x86>(drakvuf, info);
-}
-
-static event_response_t udpa_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    return udpa_ret_cb<udp_endpoint_x64, inetaf_x64, local_address_x64>(drakvuf, info);
-}
-
-static event_response_t udpa_win10_x64_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    return udpa_ret_cb<udp_endpoint_win10_x64, inetaf_win10_x64, local_address_x64>(drakvuf, info);
-}
-
 template<typename tcp_endpoint_struct, typename inetaf_struct, typename addr_info_struct, typename local_address_struct>
 static event_response_t tcpe_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -352,7 +267,10 @@ static event_response_t tcpe_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         goto done;
 
     if ( tcpe.state >= __TCP_STATE_MAX )
+    {
+        PRINT_DEBUG("[SOCKETMON] tcpe.state >= __TCP_STATE_MAX\n");
         goto done;
+    }
 
     // Convert ports to little endian
     tcpe.localport = __bswap_16(tcpe.localport);
@@ -419,43 +337,105 @@ static event_response_t tcpe_win10_x64_1803_cb(drakvuf_t drakvuf, drakvuf_trap_i
     return tcpe_cb<tcp_endpoint_win10_x64_1803, inetaf_win10_x64, addr_info_x64, local_address_x64>(drakvuf, info);
 }
 
-// TODO Return static qualifier after fixing UDP monitor
-event_response_t udpb_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static proc_data_t* udp_get_process_data(drakvuf_t drakvuf, vmi_instance_t vmi, addr_t udp_info)
 {
-    struct wrapper* w = (struct wrapper*)g_try_malloc0(sizeof(struct wrapper));
-    w->s = (socketmon*)info->trap->data;
-
-    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
-
-    w->obj = drakvuf_get_function_argument(drakvuf, info, 1);
-
-    if ( !w->obj )
+    proc_data_t* data = new proc_data_t();
+    addr_t process_ptr;
+    // 0x28 offset - EPROCESS* of a calling process
+    // Tested on Win 10 x64 21H1 and Win 7 SP1 x64
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, udp_info + 0x28, 4, &process_ptr))
     {
-        g_free(w);
-        return 0;
+        PRINT_DEBUG("[SOCKETMON] Failed to read process ptr\n");
+        delete data;
+        return nullptr;
     }
 
-    drakvuf_trap_t* trap = (drakvuf_trap_t*)g_try_malloc0(sizeof(drakvuf_trap_t));
-    trap->breakpoint.lookup_type = LOOKUP_PID;
-    trap->breakpoint.pid = 4;
-    trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = ret_addr;
-    trap->type = BREAKPOINT;
-    trap->data = w;
-    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
-
-    if ( w->s->winver == VMI_OS_WINDOWS_7 || w->s->winver == VMI_OS_WINDOWS_8 )
-        trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_x64_ret_cb : udpa_x86_ret_cb;
-    else
-        trap->cb = ( w->s->pm == VMI_PM_IA32E ) ? udpa_win10_x64_ret_cb : NULL;
-
-    if ( !drakvuf_add_trap(drakvuf, trap) )
+    if (!drakvuf_get_process_data(drakvuf, process_ptr, data))
     {
-        printf("Failed to trap return at 0x%lx\n", ret_addr);
-        g_free(w);
+        PRINT_DEBUG("[SOCKETMON] Failed to get process data\n");
+        delete data;
+        return nullptr;
+    }
+    return data;
+}
+
+static event_response_t udp_send_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    socketmon* s = (socketmon*)info->trap->data;
+    // Undocumented
+    addr_t udp_info = drakvuf_get_function_argument(drakvuf, info, 1);
+    // Undocumented
+    addr_t message = drakvuf_get_function_argument(drakvuf, info, 2);
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = message + 0x20 // struct sockaddr_in*, tested on Win7 sp1 x64 and Win10 21H1 x64
+    );
+
+    sockaddr_in6 sockaddr = {};
+    vmi_lock_guard vmi(drakvuf);
+    addr_t sockaddr_ptr;
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &sockaddr_ptr))
+    {
+        PRINT_DEBUG("[SOCKETMON] UdpSendMessages failed to read sockaddr ptr\n");
+        return VMI_EVENT_RESPONSE_NONE;
     }
 
-    return 0;
+    if (!sockaddr_ptr)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    ctx.addr = sockaddr_ptr;
+    if (VMI_SUCCESS != vmi_read(vmi, &ctx, sizeof(sockaddr_in6), &sockaddr, NULL))
+    {
+        PRINT_DEBUG("[SOCKETMON] UdpSendMessages failed to read sockaddr\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    sockaddr.sin6_port = __bswap_16(sockaddr.sin6_port);
+
+    char* rip = nullptr;
+    if (sockaddr.sin6_family == AF_INET)
+    {
+        // 0: kd> dt SOCKADDR_IN
+        // ndis!sockaddr_in
+        //    +0x000 sin_family       : Uint2B
+        //    +0x002 sin_port         : Uint2B
+        //    +0x004 sin_addr         : in_addr
+        //    +0x008 sin_zero         : [8] Char
+        rip = read_ip_string(vmi, ctx, sockaddr_ptr + IPV4_ADDR_OFFSET, sockaddr.sin6_family);
+        if (!rip)
+        {
+            PRINT_DEBUG("[SOCKETMON] Failed to read remote ip string\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+    }
+    else if (sockaddr.sin6_family == AF_INET6)
+    {
+        // 0: kd> dt SOCKADDR_IN6
+        // ndis!sockaddr_in6
+        //    +0x000 sin6_family      : Uint2B
+        //    +0x002 sin6_port        : Uint2B
+        //    +0x004 sin6_flowinfo    : Uint4B
+        //    +0x008 sin6_addr        : in6_addr
+        //    +0x018 sin6_scope_id    : Uint4B
+        //    +0x018 sin6_scope_struct : SCOPE_ID
+        rip = read_ip_string(vmi, ctx, sockaddr_ptr + IPV6_ADDR_OFFSET, sockaddr.sin6_family);
+        if (!rip)
+        {
+            PRINT_DEBUG("[SOCKETMON] Failed to read remote ip string\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+    }
+
+    proc_data_t* data = udp_get_process_data(drakvuf, vmi, udp_info);
+    if (data)
+    {
+        print_udp_info(drakvuf, info, s, *data, sockaddr.sin6_family, rip, sockaddr.sin6_port);
+        delete data;
+    }
+    g_free(rip);
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 /* ----------------------------------------------------- */
@@ -833,13 +813,11 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
         tcpe_cb = tcpe_x86_cb;
     }
 
-    // TODO Test and fix UDP monitor
-    // register_tcpip_trap(drakvuf, tcpip_profile_json, "UdpSetSockOptEndpoint", &this->tcpip_traps[5], udpb_cb);
-    register_tcpip_trap(drakvuf, tcpip_profile_json, "TcpCreateAndConnectTcbComplete", &this->tcpip_trap, tcpe_cb);
+    register_tcpip_trap(drakvuf, tcpip_profile_json, "TcpCreateAndConnectTcbComplete", &this->tcpip_trap[0], tcpe_cb);
+    if (this->pm == VMI_PM_IA32E)
+        register_tcpip_trap(drakvuf, tcpip_profile_json, "UdpSendMessages", &this->tcpip_trap[1], udp_send_cb);
 
     json_object_put(tcpip_profile_json);
-
-    PRINT_DEBUG("[SOCKETMON] Socketmon constructor end.\n");
 }
 
 socketmon::~socketmon()
