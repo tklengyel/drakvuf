@@ -104,12 +104,12 @@
 
 h_sources = libinjector.h private.h debug_helpers.h injector_utils.h \
 	win/win_private.h win/win_injector.h win/win_utils.h win/win_functions.h \
-	win/method_helpers.h win/methods/win_dopple.h win/methods/win_read_file.h win/methods/win_write_file.h \
+	win/method_helpers.h win/methods/win_dopple.h win/methods/win_read_file.h win/methods/win_write_file.h win/methods/win_createproc.h \
 	linux/linux_injector.h linux/linux_utils.h linux/linux_syscalls.h \
 	linux/methods/linux_shellcode.h linux/methods/linux_write_file.h linux/methods/linux_read_file.h linux/methods/linux_execve.h
 c_sources = injector.c  injector_stack.c debug_helpers.c injector_utils.c \
 	win/win_injector.c win/win_utils.c win/win_functions.c \
-	win/method_helpers.c win/methods/win_dopple.c win/methods/win_read_file.c win/methods/win_write_file.c \
+	win/method_helpers.c win/methods/win_dopple.c win/methods/win_read_file.c win/methods/win_write_file.c win/methods/win_createproc.c \
 	linux/linux_injector.c linux/linux_utils.c linux/linux_syscalls.c \
 	linux/methods/linux_shellcode.c linux/methods/linux_write_file.c linux/methods/linux_read_file.c linux/methods/linux_execve.c
 

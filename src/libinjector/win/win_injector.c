@@ -109,6 +109,7 @@
 #endif
 #include "methods/win_read_file.h"
 #include "methods/win_write_file.h"
+#include "methods/win_createproc.h"
 
 static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info)
 {
@@ -124,41 +125,6 @@ static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info
     injector->hijacked = true;
 
     return true;
-}
-
-static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info)
-{
-    ACCESS_CONTEXT(ctx);
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-    ctx.addr = injector->process_info;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
-
-    if (injector->is32bit)
-    {
-        struct process_information_32 pip = { 0 };
-        if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct process_information_32), &pip, NULL) )
-        {
-            injector->pid = pip.dwProcessId;
-            injector->tid = pip.dwThreadId;
-            injector->hProc = pip.hProcess;
-            injector->hThr = pip.hThread;
-        }
-    }
-    else
-    {
-        struct process_information_64 pip = { 0 };
-        if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct process_information_64), &pip, NULL) )
-        {
-            injector->pid = pip.dwProcessId;
-            injector->tid = pip.dwThreadId;
-            injector->hProc = pip.hProcess;
-            injector->hThr = pip.hThread;
-        }
-    }
-
-    drakvuf_release_vmi(injector->drakvuf);
 }
 
 static bool setup_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr_t bp_addr)
@@ -207,10 +173,6 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     bool success = false;
     switch (injector->method)
     {
-        case INJECT_METHOD_CREATEPROC:
-            success = setup_create_process_stack(injector, &regs.x86);
-            injector->target_rsp = regs.x86.rsp;
-            break;
         case INJECT_METHOD_SHELLEXEC:
             success = setup_shell_execute_stack(injector, &regs.x86);
             break;
@@ -252,6 +214,11 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             event = handle_writefile_x64(drakvuf, info);
             goto tidied;
         }
+        case INJECT_METHOD_CREATEPROC:
+        {
+            event = handle_createproc(drakvuf, info);
+            goto tidied;
+        }
 tidied:  // tidy up later
         {
             if (!injector->step_override)
@@ -271,7 +238,6 @@ tidied:  // tidy up later
 
     switch (injector->method)
     {
-        case INJECT_METHOD_CREATEPROC:
         case INJECT_METHOD_SHELLEXEC:
             injector->status = STATUS_CREATE_OK;
             break;
@@ -412,113 +378,6 @@ static event_response_t wait_for_target_process_cb(drakvuf_t drakvuf, drakvuf_tr
 done:
     drakvuf_release_vmi(drakvuf);
     return 0;
-}
-
-static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    injector_t injector = info->trap->data;
-    addr_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    uint64_t exit_code = drakvuf_get_function_argument(drakvuf, info, 2);
-    exit_code &= 0xFFFFFFFF;
-
-    vmi_pid_t exit_pid;
-    if (!drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &exit_pid))
-        exit_pid = info->proc_data.pid;
-
-    if ((int)injector->pid != exit_pid)
-        return 0;
-
-    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
-
-    if (!exit_code)
-    {
-        injector->rc = INJECTOR_SUCCEEDED;
-    }
-    else
-    {
-        injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
-        injector->error_code.valid = true;
-        injector->error_code.code = exit_code;
-        injector->error_code.string = "PROGRAM_FAILED";
-    }
-
-    injector->detected = true;
-
-    if ( injector->break_loop_on_detection )
-        drakvuf_interrupt(drakvuf, SIGINT);
-    else if ( injector->resumed )
-        drakvuf_interrupt(drakvuf, SIGINT);
-
-    return 0;
-}
-
-static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    injector_t injector = info->trap->data;
-
-    if (injector->pid != (uint32_t)info->proc_data.pid || injector->tid != (uint32_t)info->proc_data.tid)
-        return 0;
-
-    PRINT_DEBUG("Process start detected %i -> 0x%lx\n", injector->pid, info->regs->cr3);
-    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
-
-    if (injector->wait_for_exit)
-    {
-        addr_t rva;
-
-        if (!drakvuf_get_kernel_symbol_rva(drakvuf, "NtTerminateProcess", &rva))
-        {
-            PRINT_DEBUG("Failed to find NtTerminateProcess RVA!\n");
-            return 0;
-        }
-
-        drakvuf_trap_t* trap = g_try_malloc0(sizeof(drakvuf_trap_t));
-        trap->type = BREAKPOINT;
-        trap->name = "terminate_proc";
-        trap->cb = wait_for_termination_cb;
-        trap->data = injector;
-        trap->breakpoint.lookup_type = LOOKUP_PID;
-        trap->breakpoint.pid = 4;
-        trap->breakpoint.addr_type = ADDR_RVA;
-        trap->breakpoint.module = "ntoskrnl.exe";
-        trap->breakpoint.rva = rva;
-        trap->ttl = UNLIMITED_TTL;
-
-        if (!drakvuf_add_trap(injector->drakvuf, trap))
-        {
-            PRINT_DEBUG("Failed to setup wait_for_termination_cb trap!\n");
-            return 0;
-        }
-    }
-    else
-    {
-        injector->rc = INJECTOR_SUCCEEDED;
-        injector->detected = true;
-
-        if ( injector->break_loop_on_detection )
-            drakvuf_interrupt(drakvuf, SIGINT);
-        else if ( injector->resumed )
-            drakvuf_interrupt(drakvuf, SIGINT);
-    }
-
-    return 0;
-}
-
-// Setup callback for waiting for first occurence of resumed thread
-static bool setup_wait_for_injected_process_trap(injector_t injector)
-{
-    drakvuf_trap_t* trap = g_try_malloc0(sizeof(drakvuf_trap_t));
-    trap->type = REGISTER;
-    trap->reg = CR3;
-    trap->cb = wait_for_injected_process_cb;
-    trap->data = injector;
-    if (!drakvuf_add_trap(injector->drakvuf, trap))
-    {
-        PRINT_DEBUG("Failed to setup wait_for_injected_process trap!\n");
-        return false;
-    }
-    PRINT_DEBUG("Waiting for injected process\n");
-    return true;
 }
 
 static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info, registers_t* regs)
@@ -815,97 +674,6 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             return 0;
         }
 
-        if (INJECT_METHOD_CREATEPROC == injector->method)
-        {
-            // We are now in the return path from CreateProcessW called from mem_callback
-
-            if (regs.x86.rax)
-            {
-                injector->rc = INJECTOR_SUCCEEDED;
-                fill_created_process_info(injector, info);
-            }
-            else
-            {
-                injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
-                injector->error_code.valid = true;
-                drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
-            }
-
-            copy_gprs(&regs.x86, &injector->saved_regs.x86);
-
-            if (injector->pid && injector->tid)
-            {
-                PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
-
-                if (!setup_resume_thread_stack(injector, &regs.x86))
-                {
-                    PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-                    return 0;
-                }
-
-                injector->target_rsp = regs.x86.rsp;
-
-                if (!setup_wait_for_injected_process_trap(injector))
-                    return 0;
-
-                regs.x86.rip = injector->resume_thread;
-                injector->status = STATUS_RESUME_OK;
-            }
-            else
-            {
-                PRINT_DEBUG("Failed to inject\n");
-
-                drakvuf_remove_trap(drakvuf, info->trap, NULL);
-                drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
-            }
-
-            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
-        }
-
-        return 0;
-    }
-
-    if (injector->status == STATUS_RESUME_OK)
-    {
-        PRINT_DEBUG("Resume RAX: 0x%lx\n", info->regs->rax);
-
-        // We are now in the return path from ResumeThread
-
-        drakvuf_remove_trap(drakvuf, info->trap, NULL);
-
-        if (info->regs->rax == 1)
-            injector->rc = INJECTOR_SUCCEEDED;
-        else
-            injector->rc = INJECTOR_FAILED;
-
-        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
-
-        if (injector->rc == INJECTOR_SUCCEEDED)
-        {
-            PRINT_DEBUG("Resumed\n");
-        }
-        else
-        {
-            PRINT_DEBUG("Failed to resume\n");
-            injector->rc = INJECTOR_FAILED;
-
-            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
-        }
-
-        // If the injected process was already detected to be running but
-        // the loop is not broken on detection, that means that resumethread
-        // was the last remaining trap we were waiting for and it's time
-        // to break the loop now
-        //
-        // If the injected processwas already detected to be running and
-        // the loop is broken on detected, then we are now in a loop
-        // outside the normal injection loop (ie. main drakvuf)
-        // so we don't break the loop
-        if ( injector->detected && !injector->break_loop_on_detection )
-            drakvuf_interrupt(drakvuf, SIGINT);
-
-        injector->resumed = true;
-
         return 0;
     }
 
@@ -922,6 +690,11 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             case INJECT_METHOD_WRITE_FILE:
             {
                 event = handle_writefile_x64(drakvuf, info);
+                goto tidied;
+            }
+            case INJECT_METHOD_CREATEPROC:
+            {
+                event = handle_createproc(drakvuf, info);
                 goto tidied;
             }
 tidied:  // tidy up later
@@ -950,10 +723,6 @@ tidied:  // tidy up later
         bool success = false;
         switch (injector->method)
         {
-            case INJECT_METHOD_CREATEPROC:
-                success = setup_create_process_stack(injector, &regs.x86);
-                injector->target_rsp = regs.x86.rsp;
-                break;
             case INJECT_METHOD_SHELLEXEC:
                 success = setup_shell_execute_stack(injector, &regs.x86);
                 break;
@@ -1063,52 +832,9 @@ tidied:  // tidy up later
 
     PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
 
-    if (INJECT_METHOD_CREATEPROC == injector->method && injector->status == STATUS_CREATE_OK)
-    {
-        // We are now in the return path from CreateProcessW
-
-        if (info->regs->rax)
-        {
-            injector->rc = INJECTOR_SUCCEEDED;
-            fill_created_process_info(injector, info);
-        }
-        else
-        {
-            injector->error_code.valid = true;
-            injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
-            drakvuf_get_last_error(injector->drakvuf, info, &injector->error_code.code, &injector->error_code.string);
-        }
-
-        if (injector->pid && injector->tid)
-        {
-            PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
-
-            if (!setup_resume_thread_stack(injector, &regs.x86))
-            {
-                PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-                return 0;
-            }
-
-            injector->target_rsp = regs.x86.rsp;
-
-            if (!setup_wait_for_injected_process_trap(injector))
-                return 0;
-
-            regs.x86.rip = injector->resume_thread;
-            injector->status = STATUS_RESUME_OK;
-
-            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
-
-            return 0;
-        }
-        else
-        {
-            PRINT_DEBUG("Failed to inject\n");
-        }
-    }
     // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND while
     // successfully opening file. So check only for out of resources (0) error.
-    else if (INJECT_METHOD_SHELLEXEC == injector->method && info->regs->rax)
+    if (INJECT_METHOD_SHELLEXEC == injector->method && info->regs->rax)
     {
         // TODO Retrieve PID and TID
         PRINT_DEBUG("Injected\n");
