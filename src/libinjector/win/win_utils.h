@@ -196,6 +196,7 @@ struct injector
 
     addr_t process_info;
     registers_t saved_regs;
+    x86_registers_t x86_saved_regs;
 
     drakvuf_trap_t bp;
     GSList* memtraps;

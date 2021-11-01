@@ -123,7 +123,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             // save registers
             PRINT_DEBUG("Saving registers\n");
-            memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
+            memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
 
             if (!setup_create_process_stack(injector, info->regs))
             {
@@ -155,13 +155,13 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!setup_resume_thread_stack(injector, info->regs))
             {
                 PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-                return 0;
+                return cleanup(injector, info);
             }
 
             injector->target_rsp = info->regs->rsp;
 
             if (!setup_wait_for_injected_process_trap(injector))
-                return 0;
+                return cleanup(injector, info);
 
             info->regs->rip = injector->resume_thread;
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -171,7 +171,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             PRINT_DEBUG("Resume RAX: 0x%lx\n", info->regs->rax);
 
-            injector->rc = (info->regs->rax == 1)?INJECTOR_SUCCEEDED : INJECTOR_FAILED;
+            injector->rc = (info->regs->rax == 1) ? INJECTOR_SUCCEEDED : INJECTOR_FAILED;
 
             if (injector->rc == INJECTOR_FAILED)
             {
@@ -179,25 +179,28 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 return cleanup(injector, info);
             }
             PRINT_DEBUG("Resume successful\n");
-            memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
-
-            // If the injected process was already detected to be running but
-            // the loop is not broken on detection, that means that resumethread
-            // was the last remaining trap we were waiting for and it's time
-            // to break the loop now
-            //
-            // If the injected processwas already detected to be running and
-            // the loop is broken on detected, then we are now in a loop
-            // outside the normal injection loop (ie. main drakvuf)
-            // so we don't break the loop
-            if ( injector->detected && !injector->break_loop_on_detection )
-                drakvuf_interrupt(drakvuf, SIGINT);
+            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
 
             injector->resumed = true;
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
         }
         case STEP4: // exit loop
+        {
+            PRINT_DEBUG("Detected: %d\n", injector->detected);
+            PRINT_DEBUG("Break on detection: %d\n", injector->break_loop_on_detection);
+            // It will keep running until the injected process is detected
+            // It ensures that we don't get in the main drakvuf loop somehow
+            if (injector->detected)
+            {
+                PRINT_DEBUG("Removing traps and exiting injector\n");
+                drakvuf_remove_trap(drakvuf, info->trap, NULL);
+                drakvuf_interrupt(drakvuf, SIGINT);
+            }
+            return override_step(injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
+            break;
+        }
+        case STEP5: // cleanup
         {
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
             drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
@@ -217,8 +220,12 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
 {
     PRINT_DEBUG("Exiting prematurely\n");
-    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
-    return override_step(injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
+
+    if (injector->rc == INJECTOR_SUCCEEDED)
+        injector->rc = INJECTOR_FAILED;
+
+    memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+    return override_step(injector, STEP5, VMI_EVENT_RESPONSE_SET_REGISTERS);
 }
 
 
@@ -271,6 +278,7 @@ static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_
     if ((int)injector->pid != exit_pid)
         return 0;
 
+    PRINT_DEBUG("Termination of process detected\n");
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
 
     if (!exit_code)
@@ -286,11 +294,6 @@ static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_
     }
 
     injector->detected = true;
-
-    if ( injector->break_loop_on_detection )
-        drakvuf_interrupt(drakvuf, SIGINT);
-    else if ( injector->resumed )
-        drakvuf_interrupt(drakvuf, SIGINT);
 
     return 0;
 }
@@ -337,11 +340,6 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
     {
         injector->rc = INJECTOR_SUCCEEDED;
         injector->detected = true;
-
-        if ( injector->break_loop_on_detection )
-            drakvuf_interrupt(drakvuf, SIGINT);
-        else if ( injector->resumed )
-            drakvuf_interrupt(drakvuf, SIGINT);
     }
 
     return 0;
