@@ -232,6 +232,7 @@ static sha256_checksum_t calc_checksum(vmi_instance_t vmi, addr_t address, size_
         throw -1;
     }
 
+    g_checksum_free(checksum);
     return out;
 }
 
