@@ -476,7 +476,7 @@ AC_ARG_ENABLE([plugin_rootkitmon],
   [AS_HELP_STRING([--disable-plugin-rootkitmon],
     [Enable rootkitmon plugin @<:@yes@:>@])],
   [plugin_rootkitmon="$enableval"],
-  [plugin_rootkitmon="yes"])
+  [plugin_rootkitmon="no"])
 AM_CONDITIONAL([PLUGIN_ROOTKITMON], [test x$plugin_rootkitmon = xyes])
 if test x$plugin_rootkitmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_ROOTKITMON, 1, "")
