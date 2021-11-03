@@ -121,16 +121,18 @@ public:
     output_format_t format;
     win_ver_t winver;
 
-    drakvuf_trap_t tcpip_trap =
+    drakvuf_trap_t tcpip_trap[2] =
     {
-        .breakpoint.lookup_type = LOOKUP_PID,
-        .breakpoint.pid = 4,
-        .breakpoint.addr_type = ADDR_RVA,
-        .breakpoint.module = "tcpip.sys",
-        .type = BREAKPOINT,
-        .data = (void*)this,
-        .name = nullptr,
-        .ah_cb = nullptr
+        [0 ... 1] = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 4,
+            .breakpoint.addr_type = ADDR_RVA,
+            .breakpoint.module = "tcpip.sys",
+            .type = BREAKPOINT,
+            .data = (void*)this,
+            .name = nullptr,
+            .ah_cb = nullptr
+        }
     };
 
     drakvuf_trap_t dnsapi_traps[6] =
