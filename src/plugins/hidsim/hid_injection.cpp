@@ -210,6 +210,13 @@ static int get_display_dimensions(qmp_connection* qc, dimensions* dims)
 
     /* Extracts display size from .ppm-file created by screendump */
     FILE* f = fopen(tmp_path, "r");
+    if (!f)
+    {
+        fprintf(stderr, "[HIDSIM] [INJECTOR] Error extracting display size from"
+            " %s\n", tmp_path);
+        return -1;
+    }
+
     char ppm_hdr[3];
     int matches = 0;
 
