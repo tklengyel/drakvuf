@@ -106,7 +106,7 @@
 #include "win_functions.h"
 #include "method_helpers.h"
 
-static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info);
+static bool fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info);
 static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 static bool setup_wait_for_injected_process_trap(injector_t injector);
@@ -127,7 +127,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             if (!setup_create_process_stack(injector, info->regs))
             {
-                PRINT_DEBUG("Failed to setup create process stack\n");
+                fprintf(stderr, "Failed to setup create process stack\n");
                 return cleanup(injector, info);
             }
 
@@ -142,7 +142,8 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (is_fun_error(drakvuf, info, "CreateProcessW Failed"))
                 return cleanup(injector, info);
 
-            fill_created_process_info(injector, info);
+            if (!fill_created_process_info(injector, info))
+                return cleanup(injector, info);
 
             if (!injector->pid || !injector->tid)
             {
@@ -156,7 +157,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             if (!setup_resume_thread_stack(injector, info->regs))
             {
-                PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+                fprintf(stderr, "Failed to setup stack for passing inputs!\n");
                 return cleanup(injector, info);
             }
 
@@ -177,7 +178,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             if (injector->rc == INJECTOR_FAILED)
             {
-                PRINT_DEBUG("Failed to resume\n");
+                fprintf(stderr, "Failed to resume\n");
                 return cleanup(injector, info);
             }
             PRINT_DEBUG("Resume successful\n");
@@ -221,7 +222,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
 {
-    PRINT_DEBUG("Exiting prematurely\n");
+    fprintf(stderr, "Exiting prematurely\n");
 
     if (injector->rc == INJECTOR_SUCCEEDED)
         injector->rc = INJECTOR_FAILED;
@@ -231,12 +232,13 @@ static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
 }
 
 
-static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info)
+static bool fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info)
 {
     ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
     ctx.addr = injector->process_info;
+    bool success = false;
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
 
@@ -249,7 +251,9 @@ static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* 
             injector->tid = pip.dwThreadId;
             injector->hProc = pip.hProcess;
             injector->hThr = pip.hThread;
+            success = true;
         }
+
     }
     else
     {
@@ -260,10 +264,16 @@ static void fill_created_process_info(injector_t injector, drakvuf_trap_info_t* 
             injector->tid = pip.dwThreadId;
             injector->hProc = pip.hProcess;
             injector->hThr = pip.hThread;
+            success = true;
         }
     }
 
     drakvuf_release_vmi(injector->drakvuf);
+
+    if(!success)
+        fprintf(stderr, "Failed to fill created process info\n");
+
+    return success;
 }
 
 static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -316,7 +326,7 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
 
         if (!drakvuf_get_kernel_symbol_rva(drakvuf, "NtTerminateProcess", &rva))
         {
-            PRINT_DEBUG("Failed to find NtTerminateProcess RVA!\n");
+            fprintf(stderr, "Failed to find NtTerminateProcess RVA!\n");
             return 0;
         }
 
@@ -334,7 +344,7 @@ static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_
 
         if (!drakvuf_add_trap(injector->drakvuf, trap))
         {
-            PRINT_DEBUG("Failed to setup wait_for_termination_cb trap!\n");
+            fprintf(stderr, "Failed to setup wait_for_termination_cb trap!\n");
             return 0;
         }
     }
@@ -357,7 +367,7 @@ static bool setup_wait_for_injected_process_trap(injector_t injector)
     trap->data = injector;
     if (!drakvuf_add_trap(injector->drakvuf, trap))
     {
-        PRINT_DEBUG("Failed to setup wait_for_injected_process trap!\n");
+        fprintf(stderr, "Failed to setup wait_for_injected_process trap!\n");
         return false;
     }
     PRINT_DEBUG("Waiting for injected process\n");
