@@ -311,6 +311,23 @@ struct udp_endpoint_win10_x64
     addr_t localaddr; // local_address_win10_udp_x64
 } __attribute__ ((packed));
 
+struct sockaddr_in
+{
+    uint16_t sin_family;
+    uint16_t sin_port;
+    uint32_t sin_addr;
+    uint8_t  sin_zero[8];
+} __attribute__ ((packed));
+
+struct sockaddr_in6
+{
+    uint16_t sin6_family;
+    uint16_t sin6_port;
+    uint32_t sin6_flowinfo;
+    uint8_t  sin6_addr[16];
+    uint32_t sin6_scope_id;
+} __attribute__ ((packed));
+
 // This is yet another type of Windows string representation
 // specific for undocumented DnsQueryExW(...) function.
 struct dns_query_ex_w_string_x64_t
