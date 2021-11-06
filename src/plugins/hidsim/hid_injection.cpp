@@ -144,6 +144,7 @@
 #define MAX_SLEEP 10 * 1000000
 #define CLK_MEAN 6
 #define CLK_SIGMA 6
+#define DISPLAY_BORDER 0.2
 /*
  * Replaces the flawed rand()-function of C's standard library with the
  * Mersenne Twister implementation
@@ -621,8 +622,8 @@ static int run_random_injection(qmp_connection* qc, bool is_rand_clicks,
     int MAX_DIST_Y = (1<<15)/4;
     int MIN_DIST_Y = -1 * MAX_DIST_Y;
     /* Spare areas (probably taskbar and icons) */
-    int LEFT_THRES = (1<<16) * 0.2;
-    int BOTTOM_THRES = (1<<16) - ((1<<16) * 0.2);
+    int LEFT_THRES = (1<<16) * DISPLAY_BORDER;
+    int BOTTOM_THRES = (1<<16) * (1.0 - DISPLAY_BORDER);
 
     int sleep = 0;
     int time_frame = 0;
@@ -659,6 +660,7 @@ static int run_random_injection(qmp_connection* qc, bool is_rand_clicks,
                 if (moves_next_click <= 0
                     && (oy + dy) < BOTTOM_THRES && (ox + dx) > LEFT_THRES)
                     is_click = true;
+
             }
         }
         /* Calculates the actual distance to cover */
