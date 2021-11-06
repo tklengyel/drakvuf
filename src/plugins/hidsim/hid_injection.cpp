@@ -142,8 +142,11 @@
 /* Throttle injection down to 50 microsecond intervals */
 #define TIME_BIN 50
 #define MAX_SLEEP 10 * 1000000
-#define CLK_MEAN 6
-#define CLK_SIGMA 6
+/* Mean move count for injecting random clicks */
+#define CLK_MEAN 5
+/* Sigma of the distribution of moves for injecting random clicks */
+#define CLK_SIGMA 5
+/* Screen area to spare for clicking in percent  */
 #define DISPLAY_BORDER 0.2
 /*
  * Replaces the flawed rand()-function of C's standard library with the
