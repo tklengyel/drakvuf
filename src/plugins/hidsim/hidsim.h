@@ -122,6 +122,7 @@ struct hidsim_config
     const char* template_fp;
     const char* win32k_profile;
     bool is_monitor;
+    bool is_rand_clicks;
 };
 
 class hidsim : public plugin
@@ -141,6 +142,7 @@ private:
 
     bool is_monitor;
     bool is_gui_support;
+    bool is_rand_clicks;
 
     /* Worker threads */
     std::thread thread_inject;

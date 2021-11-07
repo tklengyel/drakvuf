@@ -142,7 +142,12 @@
 /* Throttle injection down to 50 microsecond intervals */
 #define TIME_BIN 50
 #define MAX_SLEEP 10 * 1000000
-
+/* Mean move count for injecting random clicks */
+#define CLK_MEAN 5
+/* Sigma of the distribution of moves for injecting random clicks */
+#define CLK_SIGMA 5
+/* Screen area to spare for clicking in percent  */
+#define DISPLAY_BORDER 0.2
 /*
  * Replaces the flawed rand()-function of C's standard library with the
  * Mersenne Twister implementation
@@ -596,7 +601,7 @@ void translate(qmp_connection* qc, dimensions* dim, int time_frame,
 }
 
 /* Injects random mouse movements */
-static int run_random_injection(qmp_connection* qc,
+static int run_random_injection(qmp_connection* qc, bool is_rand_clicks,
     std::atomic<uint32_t>* coords, std::atomic<bool>* has_to_stop)
 {
     PRINT_DEBUG("[HIDSIM] [INJECTOR] Injecting random mouse movements\n");
@@ -619,6 +624,9 @@ static int run_random_injection(qmp_connection* qc,
     int MIN_DIST_X = -1 * MAX_DIST_X;
     int MAX_DIST_Y = (1<<15)/4;
     int MIN_DIST_Y = -1 * MAX_DIST_Y;
+    /* Spare areas (probably taskbar and icons) */
+    int LEFT_THRES = (1<<16) * DISPLAY_BORDER;
+    int BOTTOM_THRES = (1<<16) * (1.0 - DISPLAY_BORDER);
 
     int sleep = 0;
     int time_frame = 0;
@@ -626,6 +634,7 @@ static int run_random_injection(qmp_connection* qc,
     int s = _rand()%512;
 
     bool is_click = false;
+    int moves_next_click = gaussian_rand(CLK_MEAN, CLK_SIGMA);
 
     /* Loops, until stopped */
     while (!has_to_stop->load())
@@ -646,7 +655,16 @@ static int run_random_injection(qmp_connection* qc,
             /* Calculates the random displacement of the mouse cursor */
             dx = rand_approx_uniform(MIN_DIST_X, MAX_DIST_X);
             dy = rand_approx_uniform(MIN_DIST_Y, MAX_DIST_Y);
+            if (is_rand_clicks)
+            {
+                moves_next_click--;
 
+                /* Inject clicks, if CLICK_THRESHOLD moves, since last click */
+                if (moves_next_click <= 0
+                    && (oy + dy) < BOTTOM_THRES && (ox + dx) > LEFT_THRES)
+                    is_click = true;
+
+            }
         }
         /* Calculates the actual distance to cover */
         int dist = (int) hypot(dx, dy);
@@ -672,11 +690,24 @@ static int run_random_injection(qmp_connection* qc,
             PRINT_DEBUG("[HIDSIM] [INJECTOR] Clicking now at %d x %d\n", ox, oy);
             is_click = false;
             click(qc, left);
+
+            if (is_rand_clicks)
+            {
+                moves_next_click = gaussian_rand(CLK_MEAN, CLK_SIGMA);
+
+                /* Simple heuristic for employing double clicks and keypresses */
+                if (moves_next_click % 2 == 0)
+                {
+                    click(qc, left);
+                }
+            }
         }
         /* Gaussian distributed waiting between smooth movements */
         sleep = (int) gaussian_rand(0, 10000);
+
         if (sleep>0)
             usleep(sleep);
+
         s++;
     }
 
@@ -815,7 +846,7 @@ static int hid_cleanup(qmp_connection* qc, int fd, FILE* f)
 }
 
 /* Worker thread function */
-int hid_inject(const char* sock_path, const char* template_path,
+int hid_inject(const char* sock_path, const char* template_path, bool is_rand_clicks,
     std::atomic<uint32_t>* coords, std::atomic<bool>* has_to_stop)
 {
     /* Initializes qmp connection */
@@ -870,7 +901,7 @@ int hid_inject(const char* sock_path, const char* template_path,
     }
     else
     {
-        sc = run_random_injection(&qc, coords, has_to_stop);
+        sc = run_random_injection(&qc, is_rand_clicks, coords, has_to_stop);
     }
     if (sc != 0)
         fprintf(stderr, "[HIDSIM] [INJECTOR] Error performing HID injection\n");
