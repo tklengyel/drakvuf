@@ -151,8 +151,6 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 return cleanup(injector, info);
             }
 
-            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-
             PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
 
             if (!setup_resume_thread_stack(injector, info->regs))
