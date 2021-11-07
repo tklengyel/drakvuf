@@ -186,6 +186,13 @@ hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config)
             this->template_path.c_str());
     }
 
+    if (config->is_rand_clicks)
+    {
+        this->is_rand_clicks = config->is_rand_clicks;
+    }
+    else
+        this->is_rand_clicks = false;
+
     /* Prepares monitoring, if requested */
     if (config->is_monitor)
     {
@@ -198,7 +205,7 @@ hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config)
 
     /* Starts injection thread */
     this->thread_inject = std::thread(hid_inject, sock_path.c_str(),
-            template_path.c_str(), &coords, &has_to_stop);
+            template_path.c_str(), is_rand_clicks, &coords, &has_to_stop);
 
     /* GUI Reconstruction thread */
     if (this->is_monitor && this->is_gui_support)

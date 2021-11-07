@@ -332,6 +332,8 @@ static void print_usage()
         "\t                           The HID events in the template will be replayed in a loop.\n"
         "\t --hid-monitor-gui\n"
         "\t                           Monitor the GUI to try to detect clickable buttons. This requires the presence of a win32k-profile, which has to be specified via -W\n"
+        "\t --hid-random-clicks\n"
+        "\t                           Inject random clicks and double clicks, if no template is specified. Spares the bottom-left 20 percent of the screen\n"
 #endif
 #ifdef ENABLE_PLUGIN_ROOTKITMON
         "\t --json-fwpkclnt <path to json>\n"
@@ -443,6 +445,7 @@ int main(int argc, char** argv)
         opt_objmon_disable_duplicate_hook,
         opt_hidsim_template,
         opt_hidsim_monitor_gui,
+        opt_hidsim_random_clicks,
         opt_rootkitmon_json_fwpkclnt,
         opt_rootkitmon_json_fltmgr,
     };
@@ -505,6 +508,7 @@ int main(int argc, char** argv)
         {"objmon-disable-duplicate-hook", no_argument, NULL, opt_objmon_disable_duplicate_hook},
         {"hid-template", required_argument, NULL, opt_hidsim_template},
         {"hid-monitor-gui", no_argument, NULL, opt_hidsim_monitor_gui},
+        {"hid-random-clicks", no_argument, NULL, opt_hidsim_random_clicks},
         {"json-fwpkclnt", required_argument, NULL, opt_rootkitmon_json_fwpkclnt},
         {"json-fltmgr", required_argument, NULL, opt_rootkitmon_json_fltmgr},
         {NULL, 0, NULL, 0}
@@ -814,6 +818,9 @@ int main(int argc, char** argv)
                 break;
             case opt_hidsim_monitor_gui:
                 options.hidsim_monitor_gui = true;
+                break;
+            case opt_hidsim_random_clicks:
+                options.hidsim_random_clicks = true;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_ROOTKITMON

@@ -285,7 +285,7 @@ bool check_platform_support(drakvuf_t drakvuf)
     if (wbi.version == VMI_OS_WINDOWS_7)
     {
 
-        PRINT_DEBUG("[HIDSIM] GUI reconstruction supported"
+        PRINT_DEBUG("[HIDSIM] GUI reconstruction supported "
             "on Windows 7\n");
         return true;
     }

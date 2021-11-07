@@ -166,6 +166,7 @@ struct plugins_options
     bool objmon_disable_duplicate_hook; // PLUGIN_OBJMON
     const char* hidsim_template;        // PLUGIN_HIDSIM
     bool hidsim_monitor_gui;            // PLUGIN_HIDSIM
+    bool hidsim_random_clicks;          // PLUGIN_HIDSIM
     const char* fwpkclnt_profile;       // PLUGIN_ROOTKITMON
     const char* fltmgr_profile;         // PLUGIN_ROOTKITMON
 };
