@@ -270,7 +270,7 @@ static bool fill_created_process_info(injector_t injector, drakvuf_trap_info_t* 
 
     drakvuf_release_vmi(injector->drakvuf);
 
-    if(!success)
+    if (!success)
         fprintf(stderr, "Failed to fill created process info\n");
 
     return success;
