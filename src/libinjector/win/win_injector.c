@@ -176,6 +176,10 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         case INJECT_METHOD_SHELLEXEC:
             success = setup_shell_execute_stack(injector, &regs.x86);
             break;
+        case INJECT_METHOD_READ_FILE:
+        case INJECT_METHOD_WRITE_FILE:
+        case INJECT_METHOD_CREATEPROC:
+            success = true;
         default:
             // TODO Implement
             break;
@@ -677,42 +681,39 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return 0;
     }
 
-    if (!injector->hijacked)
+    event_response_t event;
+    switch (injector->method)
     {
-        event_response_t event;
-        switch (injector->method)
+        case INJECT_METHOD_READ_FILE:
         {
-            case INJECT_METHOD_READ_FILE:
-            {
-                event = handle_readfile_x64(drakvuf, info);
-                goto tidied;
-            }
-            case INJECT_METHOD_WRITE_FILE:
-            {
-                event = handle_writefile_x64(drakvuf, info);
-                goto tidied;
-            }
-            case INJECT_METHOD_CREATEPROC:
-            {
-                event = handle_createproc(drakvuf, info);
-                goto tidied;
-            }
-tidied:  // tidy up later
-            {
-                if (!injector->step_override)
-                    injector->step+=1;
-
-                injector->step_override = false;
-                return handle_gprs_registers(drakvuf, info, event);
-            }
-            default:
-            {
-                PRINT_DEBUG("This method needs to be tidied up\n");
-                break;
-            }
+            event = handle_readfile_x64(drakvuf, info);
+            goto tidied;
         }
+        case INJECT_METHOD_WRITE_FILE:
+        {
+            event = handle_writefile_x64(drakvuf, info);
+            goto tidied;
+        }
+        case INJECT_METHOD_CREATEPROC:
+        {
+            event = handle_createproc(drakvuf, info);
+            goto tidied;
+        }
+tidied:  // tidy up later
+        {
+            if (!injector->step_override)
+                injector->step+=1;
 
+            injector->step_override = false;
+            return handle_gprs_registers(drakvuf, info, event);
+        }
+        default:
+        {
+            PRINT_DEBUG("This method needs to be tidied up\n");
+            break;
+        }
     }
+
 
     if (!injector->is32bit && !injector->hijacked && injector->status == STATUS_NULL)
     {
@@ -909,7 +910,10 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
 {
     addr_t eprocess_base = 0;
     if ( !drakvuf_find_process(drakvuf, injector->target_pid, NULL, &eprocess_base) )
+    {
+        fprintf(stderr, "Process not found\n");
         return false;
+    }
 
     if (!injector->is32bit)
     {
@@ -921,6 +925,7 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
             PRINT_DEBUG("Failed to find _KTRAP_FRAME:Rip.\n");
     }
 
+    PRINT_DEBUG("Initializing function addresses\n");
     switch (injector->method)
     {
         case INJECT_METHOD_CREATEPROC:
