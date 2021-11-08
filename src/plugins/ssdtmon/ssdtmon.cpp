@@ -122,6 +122,57 @@
 #include "private.h"
 #include "ssdtmon.h"
 #include "plugins/output_format.h"
+#include "plugins/plugins_ex.h"
+
+static std::array<uint8_t, 32> ssdtmon_sha256_calc(vmi_instance_t vmi, addr_t addr, size_t size)
+{
+    std::array<uint8_t, 32> out{ 0 };
+
+    addr_t aligned_size = size & ~(VMI_PS_4KB - 1);
+    if (size & (VMI_PS_4KB - 1))
+        aligned_size += VMI_PS_4KB;
+
+    auto intra_page_offset = addr & (VMI_PS_4KB - 1);
+    auto num_pages = aligned_size / VMI_PS_4KB;
+
+    std::vector<void*> access_ptrs(num_pages, nullptr);
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4,
+        .addr = addr
+    );
+
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, num_pages, access_ptrs.data()))
+        return out;
+
+    auto checksum = g_checksum_new(G_CHECKSUM_SHA256);
+
+    for (size_t i = 0; i < num_pages; i++)
+    {
+        size_t write_size = size;
+        if (write_size > VMI_PS_4KB - intra_page_offset)
+            write_size = VMI_PS_4KB - intra_page_offset;
+
+        if (access_ptrs[i])
+        {
+            g_checksum_update(checksum, (const uint8_t*)access_ptrs[i] + intra_page_offset, write_size);
+            munmap(access_ptrs[i], VMI_PS_4KB);
+        }
+
+        intra_page_offset = 0;
+        size -= write_size;
+    }
+
+    size_t buffer_size = out.size();
+    g_checksum_get_digest(checksum, out.data(), &buffer_size);
+
+    if (buffer_size != out.size())
+        throw -1;
+
+    g_checksum_free(checksum);
+    return out;
+}
 
 event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -144,6 +195,26 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         );
     }
     return 0;
+}
+
+static event_response_t sdt_check_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto s = get_trap_plugin<ssdtmon>(info);
+    if (s->is_stopping() && !s->done_sdt_check)
+    {
+        bool is64 = (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E);
+        vmi_lock_guard vmi(drakvuf);
+        if (s->sdt_crc != ssdtmon_sha256_calc(vmi, s->sdt_va, is64 ? 32 : 16))
+        {
+            fmt::print(s->format, "ssdtmon", drakvuf, info, keyval("Table", fmt::Qstr("SDT")));
+        }
+        if (s->sdt_shadow_crc != ssdtmon_sha256_calc(vmi, s->sdt_shadow_va, is64 ? 64 : 32))
+        {
+            fmt::print(s->format, "ssdtmon", drakvuf, info, keyval("Table", fmt::Qstr("SDTShadow")));
+        }
+        s->done_sdt_check = true;
+    }
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static bool get_driver_base(vmi_instance_t vmi, ssdtmon* plugin, const char* driver_name, addr_t* base)
@@ -195,7 +266,7 @@ static bool get_driver_base(vmi_instance_t vmi, ssdtmon* plugin, const char* dri
 /* ----------------------------------------------------- */
 
 ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_t output)
-    : format{output}, offsets(new size_t[__OFFSET_MAX])
+    : pluginex(drakvuf, output), format{output}, offsets(new size_t[__OFFSET_MAX])
 {
     addr_t kiservicetable_rva = 0;
     addr_t kiservicelimit_rva = 0;
@@ -311,12 +382,11 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
         throw -1;
     }
 
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    vmi_lock_guard vmi(drakvuf);
     if ( VMI_FAILURE == vmi_translate_kv2p(vmi, kernbase + kiservicetable_rva, &this->kiservicetable) )
         throw -1;
 
     vmi_read_32_va(vmi, kernbase + kiservicelimit_rva, 0, &this->kiservicelimit);
-    drakvuf_release_vmi(drakvuf);
 
     if ( !this->kiservicetable )
     {
@@ -353,6 +423,43 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
         if ( !drakvuf_add_trap(drakvuf, &this->ssdt_trap[3]) )
             throw -1;
     }
+
+    addr_t sdt_rva, sdt_shadow_rva;
+
+    if (!drakvuf_get_kernel_symbol_rva( drakvuf, "KeServiceDescriptorTable", &sdt_rva) ||
+        !drakvuf_get_kernel_symbol_rva( drakvuf, "KeServiceDescriptorTableShadow", &sdt_shadow_rva))
+    {
+        PRINT_DEBUG("[SSDTMON] Failed to get RVA of nt!KeServiceDescriptorTableShadow or nt!KeServiceDescriptorTable\n");
+        throw -1;
+    }
+
+    if (!(this->sdt_va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, "ntoskrnl.exe", sdt_rva)) ||
+        !(this->sdt_shadow_va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, "ntoskrnl.exe", sdt_shadow_rva)))
+    {
+        throw -1;
+    }
+
+    bool is64 = (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E);
+    // SDT - 4 pointers long
+    this->sdt_crc = ssdtmon_sha256_calc(vmi, this->sdt_va, is64 ? 32 : 16);
+    // SDT shadow - 8 pointers long
+    this->sdt_shadow_crc = ssdtmon_sha256_calc(vmi, this->sdt_shadow_va, is64 ? 64 : 32);
+}
+
+bool ssdtmon::stop()
+{
+    if (!is_stopping() && !done_sdt_check)
+    {
+        m_is_stopping = true;
+        breakpoint_in_system_process_searcher bp;
+        if (!register_trap(nullptr, sdt_check_cb, bp.for_syscall_name("KiDeliverApc")))
+        {
+            done_sdt_check = true;
+            return true;
+        }
+        return false;
+    }
+    return done_sdt_check;
 }
 
 ssdtmon::~ssdtmon()
