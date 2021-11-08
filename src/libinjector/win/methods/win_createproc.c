@@ -102,168 +102,106 @@
  *                                                                         *
 ***************************************************************************/
 
-#include "win_read_file.h"
+#include "win_createproc.h"
 #include "win_functions.h"
-#include <libinjector/win/method_helpers.h>
+#include "method_helpers.h"
 
-static bool process_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* num_bytes);
+static bool fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info);
+static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+static bool setup_wait_for_injected_process_trap(injector_t injector);
 static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
 
-event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
     event_response_t event;
 
     switch (injector->step)
     {
-        case STEP1: // allocate virtual memory
+        case STEP1:
         {
             // save registers
             PRINT_DEBUG("Saving registers\n");
             memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
 
-            if (!setup_virtual_alloc_stack(injector, info->regs))
+            if (!setup_create_process_stack(injector, info->regs))
             {
-                PRINT_DEBUG("Failed to setup virtual alloc for passing inputs!\n");
+                fprintf(stderr, "Failed to setup create process stack\n");
                 return cleanup(injector, info);
             }
 
+            injector->target_rsp = info->regs->rsp;
             info->regs->rip = injector->exec_func;
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
         }
-        case STEP2: // write payload to virtual memory
+        case STEP2:
         {
-            // any error checks?
-            PRINT_DEBUG("Writing to allocated virtual memory to allocate physical memory..\n");
-            injector->payload_addr = info->regs->rax;
-            PRINT_DEBUG("Payload is at: 0x%lx\n", injector->payload_addr);
+            // We are now in the return path from CreateProcessW
+            if (is_fun_error(drakvuf, info, "CreateProcessW Failed"))
+                return cleanup(injector, info);
 
-            if (!setup_memset_stack(injector, info->regs))
+            if (!fill_created_process_info(injector, info))
+                return cleanup(injector, info);
+
+            if (!injector->pid || !injector->tid)
             {
-                PRINT_DEBUG("Failed to setup memset stack for passing inputs!\n");
+                fprintf(stderr, "Failed to inject\n");
                 return cleanup(injector, info);
             }
 
-            info->regs->rip = injector->memset;
+            PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
+
+            if (!setup_resume_thread_stack(injector, info->regs))
+            {
+                fprintf(stderr, "Failed to setup stack for passing inputs!\n");
+                return cleanup(injector, info);
+            }
+
+            injector->target_rsp = info->regs->rsp;
+
+            if (!setup_wait_for_injected_process_trap(injector))
+                return cleanup(injector, info);
+
+            info->regs->rip = injector->resume_thread;
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
         }
-        case STEP3: // expand env in memory
+        case STEP3: // We are now in the return path from ResumeThread
         {
-            PRINT_DEBUG("Expanding shell...\n");
-            if (!setup_expand_env_stack(injector, info->regs))
+            PRINT_DEBUG("Resume RAX: 0x%lx\n", info->regs->rax);
+
+            injector->rc = (info->regs->rax == 1) ? INJECTOR_SUCCEEDED : INJECTOR_FAILED;
+
+            if (injector->rc == INJECTOR_FAILED)
             {
-                PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+                fprintf(stderr, "Failed to resume\n");
                 return cleanup(injector, info);
             }
-
-            info->regs->rip = injector->expand_env;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP4: // open file handle
-        {
-            if (!info->regs->rax)
-            {
-                PRINT_DEBUG("Failed to expand environment variables!\n");
-                return cleanup(injector, info);
-            }
-            PRINT_DEBUG("Env expand status: %lx\n", info->regs->rax);
-
-            if (info->regs->rax * 2 > FILE_BUF_SIZE)
-            {
-                PRINT_DEBUG("Env expand reported more than the buffer can carry.\n");
-                return cleanup(injector, info);
-            }
-
-            if (!setup_create_file(drakvuf, info))
-                return cleanup(injector, info);
-
-            info->regs->rip = injector->create_file;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP5: // verify file handle and open host file
-        {
-            PRINT_DEBUG("File create result %lx\n", info->regs->rax);
-
-            if (is_fun_error(drakvuf, info, "Couldn't open guest file"))
-                return cleanup(injector, info);
-
-            injector->file_handle = info->regs->rax;
-
-            if (!open_host_file(injector, "wb"))
-                return cleanup(injector, info);
-
-            PRINT_DEBUG("Reading file...\n");
-
-            if (!setup_read_file_stack(injector, info->regs))
-            {
-                PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-                return 0;
-            }
-
-            info->regs->rip = injector->read_file;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP6: // read chunk from guest and write to host
-        {
-            PRINT_DEBUG("File read result: %lx\n", info->regs->rax);
-
-            if (is_fun_error(drakvuf, info, "Failed to read guest file"))
-                return cleanup(injector, info);
-
-            uint32_t num_bytes;
-
-            if (!process_read_file(drakvuf, info, &num_bytes))
-                return cleanup(injector, info);
-
-            if (num_bytes != 0)
-            {
-                PRINT_DEBUG("Reading next chunk\n");
-                if (!setup_read_file_stack(injector, info->regs))
-                {
-                    PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-                    return cleanup(injector, info);
-                }
-
-                info->regs->rip = injector->read_file;
-                return override_step(injector, STEP6, VMI_EVENT_RESPONSE_SET_REGISTERS);
-            }
-            else
-            {
-                PRINT_DEBUG("Finishing\n");
-
-                if (!setup_close_handle_stack(injector, info->regs))
-                {
-                    PRINT_DEBUG("Failed to setup stack for closing handle\n");
-                    return cleanup(injector, info);
-                }
-                info->regs->rip = injector->close_handle;
-            }
-
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP7: // close file handle
-        {
-            PRINT_DEBUG("Close handle RAX: 0x%lx\n", info->regs->rax);
-            fclose(injector->host_file);
-
-            if (is_fun_error(drakvuf, info, "Could not close File handle"))
-                return cleanup(injector, info);
-
+            PRINT_DEBUG("Resume successful\n");
             memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
 
-            PRINT_DEBUG("File operation executed OK\n");
-            injector->rc = INJECTOR_SUCCEEDED;
-
+            injector->resumed = true;
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
         }
-        case STEP8: // exit loop
+        case STEP4: // exit loop
+        {
+            PRINT_DEBUG("Detected: %d\n", injector->detected);
+            PRINT_DEBUG("Break on detection: %d\n", injector->break_loop_on_detection);
+            // It will keep running until the injected process is detected
+            // It ensures that we don't get in the main drakvuf loop somehow
+            if (injector->detected)
+            {
+                PRINT_DEBUG("Removing traps and exiting injector\n");
+                drakvuf_remove_trap(drakvuf, info->trap, NULL);
+                drakvuf_interrupt(drakvuf, SIGINT);
+            }
+            return override_step(injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
+            break;
+        }
+        case STEP5: // cleanup
         {
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
             drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
@@ -282,42 +220,154 @@ event_response_t handle_readfile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
 static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
 {
-    PRINT_DEBUG("Exiting prematurely\n");
+    fprintf(stderr, "Exiting prematurely\n");
+
+    if (injector->rc == INJECTOR_SUCCEEDED)
+        injector->rc = INJECTOR_FAILED;
+
     memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-    return override_step(injector, STEP8, VMI_EVENT_RESPONSE_SET_REGISTERS);
+    return override_step(injector, STEP5, VMI_EVENT_RESPONSE_SET_REGISTERS);
 }
 
-static bool process_read_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* num_bytes)
+
+static bool fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info)
 {
-    injector_t injector = (injector_t)info->trap->data;
-    uint8_t buf[FILE_BUF_SIZE];
+    ACCESS_CONTEXT(ctx);
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+    ctx.addr = injector->process_info;
+    bool success = false;
 
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = injector->payload_addr
-    );
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
 
-    PRINT_DEBUG("Reading Payload chunk\n");
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    bool success = (VMI_SUCCESS == vmi_read(vmi, &ctx, FILE_BUF_SIZE, buf, NULL));
-    drakvuf_release_vmi(drakvuf);
+    if (injector->is32bit)
+    {
+        struct process_information_32 pip = { 0 };
+        if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct process_information_32), &pip, NULL) )
+        {
+            injector->pid = pip.dwProcessId;
+            injector->tid = pip.dwThreadId;
+            injector->hProc = pip.hProcess;
+            injector->hThr = pip.hThread;
+            success = true;
+        }
+
+    }
+    else
+    {
+        struct process_information_64 pip = { 0 };
+        if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct process_information_64), &pip, NULL) )
+        {
+            injector->pid = pip.dwProcessId;
+            injector->tid = pip.dwThreadId;
+            injector->hProc = pip.hProcess;
+            injector->hThr = pip.hThread;
+            success = true;
+        }
+    }
+
+    drakvuf_release_vmi(injector->drakvuf);
 
     if (!success)
-    {
-        PRINT_DEBUG("Failed to read payload chunk!\n");
+        fprintf(stderr, "Failed to fill created process info\n");
+
+    return success;
+}
+
+static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+    addr_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    uint64_t exit_code = drakvuf_get_function_argument(drakvuf, info, 2);
+    exit_code &= 0xFFFFFFFF;
+
+    vmi_pid_t exit_pid;
+    if (!drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &exit_pid))
+        exit_pid = info->proc_data.pid;
+
+    if ((int)injector->pid != exit_pid)
         return 0;
-    }
 
-    *num_bytes = *(uint32_t*)buf;
+    PRINT_DEBUG("Termination of process detected\n");
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
 
-    if (*num_bytes > FILE_BUF_SIZE)
+    if (!exit_code)
     {
-        *num_bytes = FILE_BUF_SIZE;
-        PRINT_DEBUG("Number of bytes read by ReadFile is greater than the buffer size, truncating.\n");
+        injector->rc = INJECTOR_SUCCEEDED;
+    }
+    else
+    {
+        injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+        injector->error_code.valid = true;
+        injector->error_code.code = exit_code;
+        injector->error_code.string = "PROGRAM_FAILED";
     }
 
-    fwrite(buf + FILE_BUF_RESERVED, *num_bytes, 1, injector->host_file);
+    injector->detected = true;
 
+    return 0;
+}
+
+static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+
+    if (injector->pid != (uint32_t)info->proc_data.pid || injector->tid != (uint32_t)info->proc_data.tid)
+        return 0;
+
+    PRINT_DEBUG("Process start detected %i -> 0x%lx\n", injector->pid, info->regs->cr3);
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+
+    if (injector->wait_for_exit)
+    {
+        addr_t rva;
+
+        if (!drakvuf_get_kernel_symbol_rva(drakvuf, "NtTerminateProcess", &rva))
+        {
+            fprintf(stderr, "Failed to find NtTerminateProcess RVA!\n");
+            return 0;
+        }
+
+        drakvuf_trap_t* trap = g_try_malloc0(sizeof(drakvuf_trap_t));
+        trap->type = BREAKPOINT;
+        trap->name = "terminate_proc";
+        trap->cb = wait_for_termination_cb;
+        trap->data = injector;
+        trap->breakpoint.lookup_type = LOOKUP_PID;
+        trap->breakpoint.pid = 4;
+        trap->breakpoint.addr_type = ADDR_RVA;
+        trap->breakpoint.module = "ntoskrnl.exe";
+        trap->breakpoint.rva = rva;
+        trap->ttl = UNLIMITED_TTL;
+
+        if (!drakvuf_add_trap(injector->drakvuf, trap))
+        {
+            fprintf(stderr, "Failed to setup wait_for_termination_cb trap!\n");
+            return 0;
+        }
+    }
+    else
+    {
+        injector->rc = INJECTOR_SUCCEEDED;
+        injector->detected = true;
+    }
+
+    return 0;
+}
+
+// Setup callback for waiting for first occurence of resumed thread
+static bool setup_wait_for_injected_process_trap(injector_t injector)
+{
+    drakvuf_trap_t* trap = g_try_malloc0(sizeof(drakvuf_trap_t));
+    trap->type = REGISTER;
+    trap->reg = CR3;
+    trap->cb = wait_for_injected_process_cb;
+    trap->data = injector;
+    if (!drakvuf_add_trap(injector->drakvuf, trap))
+    {
+        fprintf(stderr, "Failed to setup wait_for_injected_process trap!\n");
+        return false;
+    }
+    PRINT_DEBUG("Waiting for injected process\n");
     return true;
 }
