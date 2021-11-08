@@ -426,18 +426,15 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
 
     addr_t sdt_rva, sdt_shadow_rva;
 
-    if (!drakvuf_get_kernel_symbol_rva( drakvuf, "KeServiceDescriptorTable", &sdt_rva) ||
-        !drakvuf_get_kernel_symbol_rva( drakvuf, "KeServiceDescriptorTableShadow", &sdt_shadow_rva))
+    if (!drakvuf_get_kernel_symbol_rva(drakvuf, "KeServiceDescriptorTable", &sdt_rva) ||
+        !drakvuf_get_kernel_symbol_rva(drakvuf, "KeServiceDescriptorTableShadow", &sdt_shadow_rva))
     {
         PRINT_DEBUG("[SSDTMON] Failed to get RVA of nt!KeServiceDescriptorTableShadow or nt!KeServiceDescriptorTable\n");
         throw -1;
     }
 
-    if (!(this->sdt_va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, "ntoskrnl.exe", sdt_rva)) ||
-        !(this->sdt_shadow_va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, "ntoskrnl.exe", sdt_shadow_rva)))
-    {
-        throw -1;
-    }
+    this->sdt_va = drakvuf_get_kernel_base(drakvuf) + sdt_rva;
+    this->sdt_shadow_va = drakvuf_get_kernel_base(drakvuf) + sdt_shadow_rva;
 
     bool is64 = (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E);
     // SDT - 4 pointers long
