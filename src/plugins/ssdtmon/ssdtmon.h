@@ -128,7 +128,6 @@ public:
 
     addr_t sdt_va, sdt_shadow_va;
     std::array<uint8_t, 32> sdt_crc, sdt_shadow_crc;
-    bool done_sdt_check = false;
 
     drakvuf_trap_t ssdt_trap[4] =
     {

@@ -197,26 +197,6 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
-static event_response_t sdt_check_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto s = get_trap_plugin<ssdtmon>(info);
-    if (s->is_stopping() && !s->done_sdt_check)
-    {
-        bool is64 = (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E);
-        vmi_lock_guard vmi(drakvuf);
-        if (s->sdt_crc != ssdtmon_sha256_calc(vmi, s->sdt_va, is64 ? 32 : 16))
-        {
-            fmt::print(s->format, "ssdtmon", drakvuf, info, keyval("Table", fmt::Qstr("SDT")));
-        }
-        if (s->sdt_shadow_crc != ssdtmon_sha256_calc(vmi, s->sdt_shadow_va, is64 ? 64 : 32))
-        {
-            fmt::print(s->format, "ssdtmon", drakvuf, info, keyval("Table", fmt::Qstr("SDTShadow")));
-        }
-        s->done_sdt_check = true;
-    }
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
 static bool get_driver_base(vmi_instance_t vmi, ssdtmon* plugin, const char* driver_name, addr_t* base)
 {
     ACCESS_CONTEXT(ctx,
@@ -445,18 +425,21 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
 
 bool ssdtmon::stop()
 {
-    if (!is_stopping() && !done_sdt_check)
+    if (!is_stopping())
     {
         m_is_stopping = true;
-        breakpoint_in_system_process_searcher bp;
-        if (!register_trap(nullptr, sdt_check_cb, bp.for_syscall_name("KiDeliverApc")))
+        bool is64 = (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E);
+        vmi_lock_guard vmi(drakvuf);
+        if (sdt_crc != ssdtmon_sha256_calc(vmi, sdt_va, is64 ? 32 : 16))
         {
-            done_sdt_check = true;
-            return true;
+            fmt::print(format, "ssdtmon", drakvuf, nullptr, keyval("Table", fmt::Qstr("SDT")));
         }
-        return false;
+        if (sdt_shadow_crc != ssdtmon_sha256_calc(vmi, sdt_shadow_va, is64 ? 64 : 32))
+        {
+            fmt::print(format, "ssdtmon", drakvuf, nullptr, keyval("Table", fmt::Qstr("SDTShadow")));
+        }
     }
-    return done_sdt_check;
+    return true;
 }
 
 ssdtmon::~ssdtmon()
