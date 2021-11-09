@@ -114,7 +114,7 @@
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap);
 static bool write_buffer_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-static size_t read_chunk(injector_t injector, FILE* fp);
+static bool read_chunk(injector_t injector);
 
 bool init_write_file_method(injector_t injector, const char* file)
 {
@@ -219,7 +219,8 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!call_open_syscall_cb(injector, info->regs))
                 return cleanup(drakvuf, info, true);
 
-            read_chunk(injector, injector->fp);
+            if (!read_chunk(injector))
+                return cleanup(drakvuf, info, true);
 
             if (!write_buffer_to_mmap_location(drakvuf, info))
                 return cleanup(drakvuf, info, true);
@@ -236,12 +237,12 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!call_write_syscall_cb(injector, info->regs))
                 return cleanup(drakvuf, info, true);
 
-            size_t size = read_chunk(injector, injector->fp);
+            if (!read_chunk(injector))
+                return cleanup(drakvuf, info, true);
 
-            if (!size)
+            if (!injector->buffer.len)
             {
                 PRINT_DEBUG("Write file successful\n");
-
                 if (!setup_close_syscall(injector, info->regs, injector->fd))
                     return cleanup(drakvuf, info, true);
             }
@@ -298,13 +299,20 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
 }
 
-static size_t read_chunk(injector_t injector, FILE* fp)
+static bool read_chunk(injector_t injector)
 {
-    injector->buffer.len = fread(injector->buffer.data, 1, FILE_BUF_SIZE, fp);
+    injector->buffer.len = fread(injector->buffer.data, 1, FILE_BUF_SIZE, injector->fp);
+    if (ferror(injector->fp))
+    {
+        fprintf(stderr, "Failed to read from file\n");
+
+        injector->buffer.len = 0;
+        return false;
+    }
     injector->buffer.total_processed += injector->buffer.len;
     PRINT_DEBUG("Chunk read successful (%ld/%ld)\n", injector->buffer.total_processed, injector->buffer.total_len);
 
-    return injector->buffer.len;
+    return true;
 }
 
 static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap)
