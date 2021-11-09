@@ -207,8 +207,15 @@ event_response_t handle_writefile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* in
             amount = fread(buf + FILE_BUF_RESERVED, 1, FILE_BUF_SIZE - FILE_BUF_RESERVED, injector->host_file);
             PRINT_DEBUG("Amount: %lx\n", amount);
 
-            if (!amount) // close if file has finished writing
+            if (ferror(injector->host_file))
             {
+                fprintf(stderr, "Failed to read the chunk of file.\n");
+                return cleanup(injector, info);
+            }
+
+            if (!amount)
+            {
+                // close if file has finished writing
                 PRINT_DEBUG("Finishing\n");
 
                 if (!setup_close_handle_stack(injector, info->regs))
