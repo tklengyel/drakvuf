@@ -107,6 +107,7 @@
 
 #include "plugins/private.h"
 #include "plugins/plugins.h"
+#include <vector>
 
 struct ssdtmon_config
 {
@@ -123,12 +124,11 @@ public:
     addr_t kiservicetable;
     uint32_t kiservicelimit;
 
-    addr_t w32pservicetable;
-    uint32_t w32pservicelimit;
+    std::vector<std::pair<addr_t, addr_t>> w32p_ssdt;
 
-    drakvuf_trap_t ssdt_trap[4] =
+    drakvuf_trap_t ssdt_trap[3] =
     {
-        [0 ... 3] = {
+        [0 ... 2] = {
             .cb = nullptr,
             .data = (void*)this,
             .name = nullptr,
