@@ -1,4 +1,4 @@
-/*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
+/*********************IMPORTANT DRAKVUF LICENSE TERMS**********************
  *                                                                         *
  * DRAKVUF (C) 2014-2021 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
@@ -100,191 +100,111 @@
  * DRAKVUF, and also available from                                        *
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
- * This file was created by Manorit Chawdhry.                              *
- * It is distributed as part of DRAKVUF under the same license             *
- ***************************************************************************/
+***************************************************************************/
 
+#include "win_createproc.h"
+#include "win_functions.h"
+#include "method_helpers.h"
 
-#include <libinjector/debug_helpers.h>
-#include <errno.h>
-#include <fcntl.h>
+static bool fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info);
+static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+static bool setup_wait_for_injected_process_trap(injector_t injector);
+static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
 
-#include "linux_write_file.h"
-#include "linux_syscalls.h"
-
-static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap);
-static bool write_buffer_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-static bool read_chunk(injector_t injector);
-
-bool init_write_file_method(injector_t injector, const char* file)
+event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    FILE* fp = fopen(file, "rb");
-    if (!fp)
-    {
-        fprintf(stderr, "Could not open (%s) for writing: %s\n", file, strerror(errno));
-        return false;
-    }
-
-    fseek (fp, 0, SEEK_END);
-    if ( (long int)(injector->buffer.total_len = ftell(fp)) < 0 )
-    {
-        PRINT_DEBUG("File size < 0\n");
-        fclose(fp);
-        return false;
-    }
-    rewind(fp);
-
-    injector->buffer.data = g_malloc0(FILE_BUF_SIZE);
-
-    PRINT_DEBUG("File init success\n");
-    PRINT_DEBUG("Total File size: %ld\n", injector->buffer.total_len);
-
-    injector->fp = fp;
-
-    return true;
-}
-
-/* This function handles writing file to guest OS, it does that in total of 6 steps
- *
- * STEP1:
- * It finds the location of syscall present inside vdso, it is used for jumping
- * to syscall instruction, After that it calls mmap, mmap is used as a buffer for exchanging
- * data between the guest VM and the host OS. The initial trap must not be removed here,
- * it should be done in the last step as it will be used for cleanup
- *
- * STEP2:
- * Saves the mmap address and opens the file handle inside guest VM
- *
- * STEP3:
- * This step is the initialization before the while loop analogy, it will verify the file descriptor
- * and write the initial chunk, it first writes the buffer to mmap location and in write file syscall,
- * the mmap address is given for the pointer to buffer.
- *
- * STEP4:
- * We will reach this after the callback from STEP3, In the beginning of this step, we know that the previous
- * write is done. This is the step which will happen in loop, it reads the next chunk of file from the host OS,
- * if that is not empty, it executes similarly to STEP3 and writes that chunk to the file
- * but it overries the next step as this one only until the buffer read from host OS file is 0.
- * When it reaches zero, it closes the file handle inside the guest OS which tells us that the
- * write file operation is complete
- *
- * STEP5:
- * It restores the state of the VM
- *
- * STEP6:
- * It removes the initial trap and exits out of drakvuf loop
- */
-event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    injector_t injector = (injector_t)info->trap->data;
-
+    injector_t injector = info->trap->data;
     event_response_t event;
 
     switch (injector->step)
     {
-        case STEP1: // Finds vdso and sets up mmap
+        case STEP1:
         {
-            memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
+            // save registers
+            PRINT_DEBUG("Saving registers\n");
+            memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
 
-            if (!init_syscalls(drakvuf, info))
-                return cleanup(drakvuf, info, false);
-
-            // don't remove the initial trap
-            // it is used for cleanup after restoring registers
-
-            if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
-                return cleanup(drakvuf, info, false);
-
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-
-            break;
-        }
-        case STEP2: // open file handle
-        {
-            if (!call_mmap_syscall_cb(injector, info->regs))
-                return cleanup(drakvuf, info, true);
-
-            PRINT_DEBUG("Opening file descriptor\n");
-
-            if (!setup_open_syscall(injector, info->regs, injector->target_file,
-                    O_WRONLY | O_CREAT | O_TRUNC,
-                    S_IRWXU | S_IRWXG | S_IRWXO))
-                return cleanup(drakvuf, info, true);
-
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP3: // verify fd and write the first chunk
-        {
-            if (!call_open_syscall_cb(injector, info->regs))
-                return cleanup(drakvuf, info, true);
-
-            if (!read_chunk(injector))
-                return cleanup(drakvuf, info, true);
-
-            if (!write_buffer_to_mmap_location(drakvuf, info))
-                return cleanup(drakvuf, info, true);
-
-            if (!setup_write_syscall(injector, info->regs, injector->fd,
-                    injector->virtual_memory_addr, injector->buffer.len))
-                return cleanup(drakvuf, info, true);
-
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP4: // loop till all chunks are written and then close the fd
-        {
-            if (!call_write_syscall_cb(injector, info->regs))
-                return cleanup(drakvuf, info, true);
-
-            if (!read_chunk(injector))
-                return cleanup(drakvuf, info, true);
-
-            if (!injector->buffer.len)
+            if (!setup_create_process_stack(injector, info->regs))
             {
-                PRINT_DEBUG("Write file successful\n");
-                if (!setup_close_syscall(injector, info->regs, injector->fd))
-                    return cleanup(drakvuf, info, true);
-            }
-            else
-            {
-                if (!write_buffer_to_mmap_location(drakvuf, info))
-                    return cleanup(drakvuf, info, true);
-
-                if (!setup_write_syscall(injector, info->regs, injector->fd,
-                        injector->virtual_memory_addr, injector->buffer.len))
-                    return cleanup(drakvuf, info, true);
-
-                injector->step_override = true;
-                injector->step = STEP4;
+                fprintf(stderr, "Failed to setup create process stack\n");
+                return cleanup(injector, info);
             }
 
+            injector->target_rsp = info->regs->rsp;
+            info->regs->rip = injector->exec_func;
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
         }
-        case STEP5: // restore the registers
+        case STEP2:
         {
-            // We are not handling close syscall error codes yet as it won't break the injector
-            // or the target application working whatever the result comes
+            // We are now in the return path from CreateProcessW
+            if (is_fun_error(drakvuf, info, "CreateProcessW Failed"))
+                return cleanup(injector, info);
 
-            PRINT_DEBUG("Closed File descriptor\n");
-            PRINT_DEBUG("Restoring state\n");
-            free_bp_trap(drakvuf, injector, info->trap);
+            if (!fill_created_process_info(injector, info))
+                return cleanup(injector, info);
 
-            // restore regs
-            memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+            if (!injector->pid || !injector->tid)
+            {
+                fprintf(stderr, "Failed to inject\n");
+                return cleanup(injector, info);
+            }
 
+            PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
+
+            if (!setup_resume_thread_stack(injector, info->regs))
+            {
+                fprintf(stderr, "Failed to setup stack for passing inputs!\n");
+                return cleanup(injector, info);
+            }
+
+            injector->target_rsp = info->regs->rsp;
+
+            if (!setup_wait_for_injected_process_trap(injector))
+                return cleanup(injector, info);
+
+            info->regs->rip = injector->resume_thread;
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
         }
-        case STEP6: // cleanup
+        case STEP3: // We are now in the return path from ResumeThread
         {
-            PRINT_DEBUG("Removing traps and exiting\n");
+            PRINT_DEBUG("Resume RAX: 0x%lx\n", info->regs->rax);
 
-            // remove the initial trap here
-            free_bp_trap(drakvuf, injector, info->trap);
-            drakvuf_interrupt(drakvuf, SIGINT);
+            injector->rc = (info->regs->rax == 1) ? INJECTOR_SUCCEEDED : INJECTOR_FAILED;
 
+            if (injector->rc == INJECTOR_FAILED)
+            {
+                fprintf(stderr, "Failed to resume\n");
+                return cleanup(injector, info);
+            }
+            PRINT_DEBUG("Resume successful\n");
+            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+
+            injector->resumed = true;
+            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            break;
+        }
+        case STEP4: // exit loop
+        {
+            PRINT_DEBUG("Detected: %d\n", injector->detected);
+            PRINT_DEBUG("Break on detection: %d\n", injector->break_loop_on_detection);
+            // It will keep running until the injected process is detected
+            // It ensures that we don't get in the main drakvuf loop somehow
+            if (injector->detected)
+            {
+                PRINT_DEBUG("Removing traps and exiting injector\n");
+                drakvuf_remove_trap(drakvuf, info->trap, NULL);
+                drakvuf_interrupt(drakvuf, SIGINT);
+            }
+            return override_step(injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
+            break;
+        }
+        case STEP5: // cleanup
+        {
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
             event = VMI_EVENT_RESPONSE_NONE;
             break;
         }
@@ -296,70 +216,158 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     return event;
-
 }
 
-static bool read_chunk(injector_t injector)
+static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
 {
-    injector->buffer.len = fread(injector->buffer.data, 1, FILE_BUF_SIZE, injector->fp);
-    if (ferror(injector->fp))
-    {
-        fprintf(stderr, "Failed to read from file\n");
+    fprintf(stderr, "Exiting prematurely\n");
 
-        injector->buffer.len = 0;
-        return false;
+    if (injector->rc == INJECTOR_SUCCEEDED)
+        injector->rc = INJECTOR_FAILED;
+
+    memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+    return override_step(injector, STEP5, VMI_EVENT_RESPONSE_SET_REGISTERS);
+}
+
+
+static bool fill_created_process_info(injector_t injector, drakvuf_trap_info_t* info)
+{
+    ACCESS_CONTEXT(ctx);
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+    ctx.addr = injector->process_info;
+    bool success = false;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
+
+    if (injector->is32bit)
+    {
+        struct process_information_32 pip = { 0 };
+        if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct process_information_32), &pip, NULL) )
+        {
+            injector->pid = pip.dwProcessId;
+            injector->tid = pip.dwThreadId;
+            injector->hProc = pip.hProcess;
+            injector->hThr = pip.hThread;
+            success = true;
+        }
+
     }
-    injector->buffer.total_processed += injector->buffer.len;
-    PRINT_DEBUG("Chunk read successful (%ld/%ld)\n", injector->buffer.total_processed, injector->buffer.total_len);
-
-    return true;
-}
-
-static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool clear_trap)
-{
-    PRINT_DEBUG("Doing premature cleanup\n");
-    injector_t injector = (injector_t)info->trap->data;
-
-    // restore regs
-    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
-
-    if (clear_trap)
-        free_bp_trap(drakvuf, injector, info->trap);
-
-    // since we are jumping to some arbitrary step, we will set this
-    injector->step_override = true;
-
-    // give the last step for cleanup
-    injector->step = STEP6;
-
-    return VMI_EVENT_RESPONSE_SET_REGISTERS;
-}
-
-static bool write_buffer_to_mmap_location(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    injector_t injector = (injector_t)info->trap->data;
-
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = injector->virtual_memory_addr
-    );
-
-    size_t bytes_write = 0;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-
-    if ( vmi_write(vmi, &ctx, injector->buffer.len, injector->buffer.data, &bytes_write) != VMI_SUCCESS )
+    else
     {
-        drakvuf_release_vmi(drakvuf);
-        fprintf(stderr, "Could not write the buffer in mmap address\n");
-        return false;
+        struct process_information_64 pip = { 0 };
+        if ( VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(struct process_information_64), &pip, NULL) )
+        {
+            injector->pid = pip.dwProcessId;
+            injector->tid = pip.dwThreadId;
+            injector->hProc = pip.hProcess;
+            injector->hThr = pip.hThread;
+            success = true;
+        }
     }
 
-    PRINT_DEBUG("Buffer written to mmap address\n");
+    drakvuf_release_vmi(injector->drakvuf);
 
-    drakvuf_release_vmi(drakvuf);
+    if (!success)
+        fprintf(stderr, "Failed to fill created process info\n");
 
+    return success;
+}
+
+static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+    addr_t process_handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    uint64_t exit_code = drakvuf_get_function_argument(drakvuf, info, 2);
+    exit_code &= 0xFFFFFFFF;
+
+    vmi_pid_t exit_pid;
+    if (!drakvuf_get_pid_from_handle(drakvuf, info, process_handle, &exit_pid))
+        exit_pid = info->proc_data.pid;
+
+    if ((int)injector->pid != exit_pid)
+        return 0;
+
+    PRINT_DEBUG("Termination of process detected\n");
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+
+    if (!exit_code)
+    {
+        injector->rc = INJECTOR_SUCCEEDED;
+    }
+    else
+    {
+        injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+        injector->error_code.valid = true;
+        injector->error_code.code = exit_code;
+        injector->error_code.string = "PROGRAM_FAILED";
+    }
+
+    injector->detected = true;
+
+    return 0;
+}
+
+static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+
+    if (injector->pid != (uint32_t)info->proc_data.pid || injector->tid != (uint32_t)info->proc_data.tid)
+        return 0;
+
+    PRINT_DEBUG("Process start detected %i -> 0x%lx\n", injector->pid, info->regs->cr3);
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free);
+
+    if (injector->wait_for_exit)
+    {
+        addr_t rva;
+
+        if (!drakvuf_get_kernel_symbol_rva(drakvuf, "NtTerminateProcess", &rva))
+        {
+            fprintf(stderr, "Failed to find NtTerminateProcess RVA!\n");
+            return 0;
+        }
+
+        drakvuf_trap_t* trap = g_try_malloc0(sizeof(drakvuf_trap_t));
+        trap->type = BREAKPOINT;
+        trap->name = "terminate_proc";
+        trap->cb = wait_for_termination_cb;
+        trap->data = injector;
+        trap->breakpoint.lookup_type = LOOKUP_PID;
+        trap->breakpoint.pid = 4;
+        trap->breakpoint.addr_type = ADDR_RVA;
+        trap->breakpoint.module = "ntoskrnl.exe";
+        trap->breakpoint.rva = rva;
+        trap->ttl = UNLIMITED_TTL;
+
+        if (!drakvuf_add_trap(injector->drakvuf, trap))
+        {
+            fprintf(stderr, "Failed to setup wait_for_termination_cb trap!\n");
+            return 0;
+        }
+    }
+    else
+    {
+        injector->rc = INJECTOR_SUCCEEDED;
+        injector->detected = true;
+    }
+
+    return 0;
+}
+
+// Setup callback for waiting for first occurence of resumed thread
+static bool setup_wait_for_injected_process_trap(injector_t injector)
+{
+    drakvuf_trap_t* trap = g_try_malloc0(sizeof(drakvuf_trap_t));
+    trap->type = REGISTER;
+    trap->reg = CR3;
+    trap->cb = wait_for_injected_process_cb;
+    trap->data = injector;
+    if (!drakvuf_add_trap(injector->drakvuf, trap))
+    {
+        fprintf(stderr, "Failed to setup wait_for_injected_process trap!\n");
+        return false;
+    }
+    PRINT_DEBUG("Waiting for injected process\n");
     return true;
-
 }

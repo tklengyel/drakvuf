@@ -1,4 +1,4 @@
-/*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
+/*********************IMPORTANT DRAKVUF LICENSE TERMS**********************
  *                                                                         *
  * DRAKVUF (C) 2014-2021 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
@@ -100,52 +100,12 @@
  * DRAKVUF, and also available from                                        *
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
- ***************************************************************************/
+***************************************************************************/
 
-#ifndef SSDTMON_H
-#define SSDTMON_H
+#ifndef WIN_METHOD_CREATEPROC
+#define WIN_METHOD_CREATEPROC
 
-#include "plugins/private.h"
-#include "plugins/plugins_ex.h"
+#include "win_utils.h"
 
-struct ssdtmon_config
-{
-    const char* win32k_profile;
-};
-
-class ssdtmon: public pluginex
-{
-public:
-    output_format_t format;
-
-    size_t* offsets;
-
-    addr_t kiservicetable;
-    uint32_t kiservicelimit;
-
-    addr_t w32pservicetable;
-    uint32_t w32pservicelimit;
-
-    addr_t sdt_va, sdt_shadow_va;
-    std::array<uint8_t, 32> sdt_crc, sdt_shadow_crc;
-
-    drakvuf_trap_t ssdt_trap[4] =
-    {
-        [0 ... 3] = {
-            .cb = nullptr,
-            .data = (void*)this,
-            .name = nullptr,
-            .ah_cb = nullptr,
-            .ttl = UNLIMITED_TTL,
-            .type = MEMACCESS,
-            .memaccess.type = PRE,
-            .memaccess.access = VMI_MEMACCESS_W
-        }
-    };
-
-    ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_t output);
-    ~ssdtmon();
-    bool stop() override;
-};
-
+event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 #endif
