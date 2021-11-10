@@ -297,7 +297,7 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
             }
             else
             {
-                this->w32p_ssdt.emplace_back(w32pservicetable, w32pservicelimit);
+                this->w32p_ssdt.emplace_back(w32pservicetable, w32pservicelimit * sizeof(uint32_t));
             }
 
             PRINT_DEBUG("[SSDTMON] SSDT shadow is at 0x%lx. Number of syscalls: %u. Size: %lu\n",
