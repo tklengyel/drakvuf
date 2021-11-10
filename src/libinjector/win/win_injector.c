@@ -110,6 +110,7 @@
 #include "methods/win_read_file.h"
 #include "methods/win_write_file.h"
 #include "methods/win_createproc.h"
+#include "methods/win_shellexec.h"
 
 static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info)
 {
@@ -166,43 +167,15 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     free_memtraps(injector);
 
-    registers_t regs;
-    memcpy(&regs.x86, info->regs, sizeof(x86_registers_t));
-    memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
-
-    bool success = false;
-    switch (injector->method)
-    {
-        case INJECT_METHOD_SHELLEXEC:
-            success = setup_shell_execute_stack(injector, &regs.x86);
-            break;
-        case INJECT_METHOD_READ_FILE:
-        case INJECT_METHOD_WRITE_FILE:
-        case INJECT_METHOD_CREATEPROC:
-            success = true;
-        default:
-            // TODO Implement
-            break;
-    }
-
-    if (!success)
-    {
-        PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-        return 0;
-    }
-
-    if (!setup_int3_trap(injector, info, regs.x86.rip))
+    if (!setup_int3_trap(injector, info, info->regs->rip))
     {
         fprintf(stderr, "Failed to trap return location of injected function call @ 0x%lx!\n",
-            regs.x86.rip);
+            info->regs->rip);
         return 0;
     }
 
     if (!injector_set_hijacked(injector, info))
         return 0;
-
-    PRINT_DEBUG("Stack setup finished and return trap added @ 0x%" PRIx64 "\n",
-        regs.x86.rip);
 
     // tidied up
     event_response_t event;
@@ -211,48 +184,37 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         case INJECT_METHOD_READ_FILE: // UNTESTED on 32bit
         {
             event = handle_readfile_x64(drakvuf, info);
-            goto tidied;
+            break;
         }
         case INJECT_METHOD_WRITE_FILE: // UNTESTED on 32bit
         {
             event = handle_writefile_x64(drakvuf, info);
-            goto tidied;
+            break;
         }
         case INJECT_METHOD_CREATEPROC:
         {
             event = handle_createproc(drakvuf, info);
-            goto tidied;
-        }
-tidied:  // tidy up later
-        {
-            if (!injector->step_override)
-                injector->step+=1;
-
-            injector->step_override = false;
-            return handle_gprs_registers(drakvuf, info, event);
-        }
-        default:
-        {
-            PRINT_DEBUG("This method needs to be tidied up\n");
             break;
         }
-    }
-
-    regs.x86.rip = injector->exec_func;
-
-    switch (injector->method)
-    {
         case INJECT_METHOD_SHELLEXEC:
-            injector->status = STATUS_CREATE_OK;
+        {
+            event = handle_shellexec(drakvuf, info);
             break;
+        }
         default:
-            // TODO Implement
+        {
+            fprintf(stderr, "This method is not implemented for 32bit\n");
+            event = VMI_EVENT_RESPONSE_NONE;
+            drakvuf_interrupt(drakvuf, SIGINT);
             break;
+        }
     }
 
-    drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
+    if (!injector->step_override)
+        injector->step+=1;
 
-    return 0;
+    injector->step_override = false;
+    return handle_gprs_registers(drakvuf, info, event);
 }
 
 static event_response_t wait_for_crash_of_target_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -653,33 +615,8 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     vmi_get_vcpuregs(vmi, &regs, info->vcpu);
     drakvuf_release_vmi(drakvuf);
 
-    if (injector->is32bit && injector->status == STATUS_CREATE_OK)
-    {
-        PRINT_DEBUG("32-bit RAX: 0x%lx\n", info->regs->rax);
-
-        if (INJECT_METHOD_SHELLEXEC == injector->method)
-        {
-            // We are now in the return path from ShellExecuteW called from mem_callback
-
-            drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
-
-            // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND while
-            // successfully opening file. So check only for out of resources (0) error.
-            if (info->regs->rax)
-            {
-                // TODO Retrieve PID and TID
-                PRINT_DEBUG("Injected\n");
-                injector->rc = INJECTOR_SUCCEEDED;
-            }
-
-            drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
-
-            return 0;
-        }
-
+    if (!injector_set_hijacked(injector, info))
         return 0;
-    }
 
     event_response_t event;
     switch (injector->method)
@@ -699,6 +636,12 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             event = handle_createproc(drakvuf, info);
             goto tidied;
         }
+        case INJECT_METHOD_SHELLEXEC:
+        {
+            event = handle_shellexec(drakvuf, info);
+            goto tidied;
+        }
+
 tidied:  // tidy up later
         {
             if (!injector->step_override)
@@ -724,9 +667,6 @@ tidied:  // tidy up later
         bool success = false;
         switch (injector->method)
         {
-            case INJECT_METHOD_SHELLEXEC:
-                success = setup_shell_execute_stack(injector, &regs.x86);
-                break;
             case INJECT_METHOD_SHELLCODE:
             case INJECT_METHOD_DOPP:
                 success = setup_virtual_alloc_stack(injector, &regs.x86);
@@ -742,18 +682,7 @@ tidied:  // tidy up later
             return 0;
         }
 
-        if (INJECT_METHOD_SHELLCODE == injector->method ||
-            INJECT_METHOD_DOPP == injector->method
-        )
-        {
-            injector->status = STATUS_ALLOC_OK;
-        }
-        else
-        {
-            if (!injector_set_hijacked(injector, info))
-                return 0;
-            injector->status = STATUS_CREATE_OK;
-        }
+        injector->status = STATUS_ALLOC_OK;
 
         regs.x86.rip = injector->exec_func;
 
@@ -833,17 +762,7 @@ tidied:  // tidy up later
 
     PRINT_DEBUG("RAX: 0x%lx\n", info->regs->rax);
 
-    // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND while
-    // successfully opening file. So check only for out of resources (0) error.
-    if (INJECT_METHOD_SHELLEXEC == injector->method && info->regs->rax)
-    {
-        // TODO Retrieve PID and TID
-        PRINT_DEBUG("Injected\n");
-        injector->rc = INJECTOR_SUCCEEDED;
-    }
-    else if ( (INJECT_METHOD_SHELLCODE == injector->method ||
-            INJECT_METHOD_DOPP == injector->method) &&
-        STATUS_EXEC_OK == injector->status)
+    if (STATUS_EXEC_OK == injector->status)
     {
         PRINT_DEBUG("Shellcode executed\n");
         injector->rc = INJECTOR_SUCCEEDED;
