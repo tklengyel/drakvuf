@@ -771,6 +771,11 @@ static int run_template_injection(qmp_connection* qc, FILE* f,
 
         /* Reads the follow-up event */
         nr = fread(&ie_next, sizeof(ie_next), 1, f);
+        if (ferror(f)) /* Error happened on reading */
+        {
+            fprintf(stderr, "[HIDSIM] [INJECTOR] Error reading file");
+            return 1;
+        }
 
         if (nr == 0) /* EOF was reached */
         {

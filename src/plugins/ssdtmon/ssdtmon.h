@@ -106,15 +106,14 @@
 #define SSDTMON_H
 
 #include "plugins/private.h"
-#include "plugins/plugins.h"
-#include <vector>
+#include "plugins/plugins_ex.h"
 
 struct ssdtmon_config
 {
     const char* win32k_profile;
 };
 
-class ssdtmon: public plugin
+class ssdtmon: public pluginex
 {
 public:
     output_format_t format;
@@ -125,6 +124,9 @@ public:
     uint32_t kiservicelimit;
 
     std::vector<std::pair<addr_t, addr_t>> w32p_ssdt;
+
+    addr_t sdt_va, sdt_shadow_va;
+    std::array<uint8_t, 32> sdt_crc, sdt_shadow_crc;
 
     drakvuf_trap_t ssdt_trap[3] =
     {
@@ -142,6 +144,7 @@ public:
 
     ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_t output);
     ~ssdtmon();
+    bool stop() override;
 };
 
 #endif

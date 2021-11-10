@@ -119,7 +119,7 @@ event_response_t handle_writefile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* in
         case STEP1: // allocate virtual memory
         {
             // save registers
-            memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
+            memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
 
             if (!setup_virtual_alloc_stack(injector, info->regs))
             {
@@ -207,8 +207,15 @@ event_response_t handle_writefile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* in
             amount = fread(buf + FILE_BUF_RESERVED, 1, FILE_BUF_SIZE - FILE_BUF_RESERVED, injector->host_file);
             PRINT_DEBUG("Amount: %lx\n", amount);
 
-            if (!amount) // close if file has finished writing
+            if (ferror(injector->host_file))
             {
+                fprintf(stderr, "Failed to read the chunk of file.\n");
+                return cleanup(injector, info);
+            }
+
+            if (!amount)
+            {
+                // close if file has finished writing
                 PRINT_DEBUG("Finishing\n");
 
                 if (!setup_close_handle_stack(injector, info->regs))
@@ -246,7 +253,7 @@ event_response_t handle_writefile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* in
             if (is_fun_error(drakvuf, info, "Could not close File handle"))
                 return cleanup(injector, info);
 
-            memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
 
             PRINT_DEBUG("File operation executed OK\n");
             injector->rc = INJECTOR_SUCCEEDED;
@@ -274,7 +281,7 @@ event_response_t handle_writefile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* in
 static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
 {
     PRINT_DEBUG("Exiting prematurely\n");
-    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+    memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
     return override_step(injector, STEP8, VMI_EVENT_RESPONSE_SET_REGISTERS);
 }
 
