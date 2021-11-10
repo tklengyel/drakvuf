@@ -500,10 +500,10 @@ public:
     void destroy_trap(drakvuf_trap_t* target);
 
     const output_format_t m_output_format;
+    drakvuf_t drakvuf;
 
 private:
     std::vector<drakvuf_trap_t*> traps;
-    drakvuf_t drakvuf;
 
     void delete_trap(drakvuf_trap_t* target);
 };

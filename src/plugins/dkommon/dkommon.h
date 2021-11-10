@@ -121,13 +121,11 @@ public:
     std::set<vmi_pid_t> dead_processes;
 
     std::set<std::string> loaded_drivers;
-    std::set<std::string> unloaded_drivers;
 
     dkommon(drakvuf_t drakvuf, const void* config, output_format_t output);
     ~dkommon();
     bool stop();
 
-    bool done_final_analysis = false;
 private:
     drakvuf_trap_t zeropage_trap =
     {
