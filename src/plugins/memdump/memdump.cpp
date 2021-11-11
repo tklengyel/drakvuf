@@ -911,22 +911,18 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
 
 bool dotnet_assembly_native_load_image_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plugin)
 {
+    const auto ptr_size = drakvuf_get_process_address_width(drakvuf, info);
+
     auto vmi = vmi_lock_guard(drakvuf);
     vmi_v2pcache_flush(vmi, info->regs->cr3);
-
-    bool is_syswow = drakvuf_is_wow64(drakvuf, info);
-
-    addr_t data_size = 0;
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = info->regs->rcx
+        .addr = info->regs->rcx + ptr_size
     );
 
-    const auto ptr_size = is_syswow ? sizeof(uint32_t) : sizeof(addr_t);
-    ctx.addr += ptr_size;
-
+    addr_t data_size = 0;
     if (vmi_read(vmi, &ctx, ptr_size, &data_size, nullptr) != VMI_SUCCESS)
     {
         PRINT_DEBUG("[MEMDUMP.NET] failed to read size of dump from memory.");
