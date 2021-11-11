@@ -123,15 +123,14 @@ public:
     addr_t kiservicetable;
     uint32_t kiservicelimit;
 
-    addr_t w32pservicetable;
-    uint32_t w32pservicelimit;
+    std::vector<std::pair<addr_t, addr_t>> w32p_ssdt;
 
     addr_t sdt_va, sdt_shadow_va;
     std::array<uint8_t, 32> sdt_crc, sdt_shadow_crc;
 
-    drakvuf_trap_t ssdt_trap[4] =
+    drakvuf_trap_t ssdt_trap[3] =
     {
-        [0 ... 3] = {
+        [0 ... 2] = {
             .cb = nullptr,
             .data = (void*)this,
             .name = nullptr,
