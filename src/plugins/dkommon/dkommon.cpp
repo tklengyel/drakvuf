@@ -125,24 +125,6 @@ static void print_driver_information(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         keyval("DriverName", fmt::Qstr(name))
     );
 }
-static std::vector<std::string> split_string(std::string value, const std::string& delimiter)
-{
-    std::vector<std::string> splitted;
-    size_t pos = 0;
-    while ((pos = value.find(delimiter)) != std::string::npos)
-    {
-        splitted.push_back(value.substr(0, pos));
-        value.erase(0, pos + delimiter.size());
-    }
-
-    if (!value.empty())
-        splitted.push_back(value);
-
-    if (splitted.empty())
-        splitted.push_back(value);
-
-    return splitted;
-};
 
 static std::set<std::string> enumerate_drivers(dkommon* plugin, drakvuf_t drakvuf)
 {
@@ -173,12 +155,12 @@ static std::set<std::string> enumerate_drivers(dkommon* plugin, drakvuf_t drakvu
             return drivers_list;
         }
 
-        ctx.addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
+        ctx.addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
         auto name = drakvuf_read_unicode_common(vmi.vmi, &ctx);
         if (name && name->contents)
         {
             auto drv = std::string(reinterpret_cast<char*>(name->contents));
-            drivers_list.insert(split_string(drv, "\\").back());
+            drivers_list.insert(std::move(drv));
             vmi_free_unicode_str(name);
         }
     } while (entry != list_head);
@@ -207,82 +189,36 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* pass_ctx)
     plugin->live_processes.insert(pid);
 }
 
-static event_response_t driver_load_unload_return_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static event_response_t load_unload_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto plugin = get_trap_plugin<dkommon>(info);
-    auto params = get_trap_params<driver_call_result>(info);
-    if (!params->verify_result_call_params(drakvuf, info))
-        return VMI_EVENT_RESPONSE_NONE;
+    addr_t entry = drakvuf_get_function_argument(drakvuf, info, 1);
+    bool i_insert = drakvuf_get_function_argument(drakvuf, info, 2);
 
-    drakvuf_remove_trap(drakvuf, info->trap, nullptr);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4,
+        .addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME]
+    );
 
-    // If call was successful (NTSTATUS STATUS_SUCCESS)
-    if (info->regs->rax == 0)
+    vmi_lock_guard vmi(drakvuf);
+    unicode_string_t* drvname = drakvuf_read_unicode_common(vmi, &ctx);
+    if (drvname && drvname->contents)
     {
-        std::string drv = split_string({ (const char*)params->driver_name->contents }, "\\").back();
-        vmi_free_unicode_str(params->driver_name);
-
-        if (params->call_type == driver_call_type::LOAD)
+        std::string drvname_str{ reinterpret_cast<char*>(drvname->contents) };
+        if (i_insert)
         {
-            plugin->loaded_drivers.insert(drv);
-            plugin->unloaded_drivers.erase(drv);
+            PRINT_DEBUG("[DKOMMON] Loading %s\n", drvname_str.c_str());
+            plugin->loaded_drivers.insert(drvname_str);
         }
-        else if (params->call_type == driver_call_type::UNLOAD)
+        else
         {
-            if (std::find(plugin->unloaded_drivers.begin(), plugin->unloaded_drivers.end(), drv) == plugin->unloaded_drivers.end())
-            {
-                plugin->loaded_drivers.erase(drv);
-                plugin->unloaded_drivers.insert(drv);
-            }
+            PRINT_DEBUG("[DKOMMON] Unloading %s\n", drvname_str.c_str());
+            plugin->loaded_drivers.erase(drvname_str);
         }
+        vmi_free_unicode_str(drvname);
     }
-    return VMI_EVENT_RESPONSE_NONE;
-}
 
-static void hook_driver_return(drakvuf_t drakvuf, drakvuf_trap_info_t* info, dkommon* plugin, unicode_string_t* drvname, driver_call_type call_type)
-{
-    auto trap = plugin->register_trap<driver_call_result>(
-            info,
-            driver_load_unload_return_cb,
-            breakpoint_by_pid_searcher());
-
-    auto params = get_trap_params<driver_call_result>(trap);
-    params->set_result_call_params(info);
-    params->driver_name = drvname;
-    params->call_type = call_type;
-}
-
-static event_response_t load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto plugin = get_trap_plugin<dkommon>(info);
-    addr_t drvname_ptr = drakvuf_get_function_argument(drakvuf, info, 1);
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = drvname_ptr
-    );
-
-    vmi_lock_guard vmi(drakvuf);
-    unicode_string_t* drvname = drakvuf_read_unicode_common(vmi, &ctx);
-    if (drvname)
-        hook_driver_return(drakvuf, info, plugin, drvname, driver_call_type::LOAD);
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-static event_response_t unload_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto plugin = get_trap_plugin<dkommon>(info);
-    addr_t drvname_ptr = drakvuf_get_function_argument(drakvuf, info, 1);
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = drvname_ptr
-    );
-
-    vmi_lock_guard vmi(drakvuf);
-    unicode_string_t* drvname = drakvuf_read_unicode_common(vmi, &ctx);
-    if (drvname)
-        hook_driver_return(drakvuf, info, plugin, drvname, driver_call_type::UNLOAD);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -353,40 +289,6 @@ static event_response_t insert_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static event_response_t final_check_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    // Process only first callback call
-    auto plugin = get_trap_plugin<dkommon>(info);
-    if (plugin->is_stopping() && !plugin->done_final_analysis)
-    {
-        // Check hidden processes
-        //
-        auto temp_processes = std::move(plugin->live_processes);
-        plugin->live_processes.clear();
-        drakvuf_enumerate_processes(drakvuf, process_visitor, static_cast<void*>(plugin));
-
-        for (vmi_pid_t pid : temp_processes)
-        {
-            if (std::find(plugin->live_processes.begin(), plugin->live_processes.end(), pid) == plugin->live_processes.end())
-            {
-                print_hidden_process_information(drakvuf, info, plugin, pid);
-            }
-        }
-
-        // Check hidden drivers
-        //
-        auto temp_drivers = enumerate_drivers(plugin, drakvuf);
-        for (const auto& drvname : plugin->loaded_drivers)
-        {
-            if (std::find(temp_drivers.begin(), temp_drivers.end(), drvname) == temp_drivers.end())
-                print_driver_information(drakvuf, info, plugin->format, "Hidden Driver", drvname.c_str());
-        }
-
-        plugin->done_final_analysis = true;
-    }
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
 dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
     : pluginex(drakvuf, output), format(output), offsets(new size_t[__OFFSET_MAX])
 {
@@ -400,8 +302,7 @@ dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
     breakpoint_in_system_process_searcher bp;
     if (!register_trap(nullptr, delete_process_cb, bp.for_syscall_name("PspProcessDelete")) ||
         !register_trap(nullptr, insert_process_cb, bp.for_syscall_name("PspInsertProcess")) ||
-        !register_trap(nullptr, load_driver_cb, bp.for_syscall_name("NtLoadDriver")) ||
-        !register_trap(nullptr, unload_driver_cb, bp.for_syscall_name("NtUnloadDriver")))
+        !register_trap(nullptr, load_unload_driver_cb, bp.for_syscall_name("MiProcessLoaderEntry")))
     {
         PRINT_DEBUG("[DKOMMON] Failed to setup critical traps\n");
         throw -1;
@@ -418,15 +319,29 @@ dkommon::~dkommon()
 
 bool dkommon::stop()
 {
-    if (!is_stopping() && !done_final_analysis)
+    if (!is_stopping())
     {
         m_is_stopping = true;
-        PRINT_DEBUG("[dkommon] Injecting KiDeliverApc\n");
-        // Hook dummy function so we could make final system analysis
-        breakpoint_in_system_process_searcher bp;
-        register_trap(nullptr, final_check_cb, bp.for_syscall_name("KiDeliverApc"));
-        // Return status `Pending`
-        return false;
+        auto temp_processes = std::move(this->live_processes);
+        this->live_processes.clear();
+        drakvuf_enumerate_processes(drakvuf, process_visitor, static_cast<void*>(this));
+
+        for (vmi_pid_t pid : temp_processes)
+        {
+            if (std::find(this->live_processes.begin(), this->live_processes.end(), pid) == this->live_processes.end())
+            {
+                print_hidden_process_information(drakvuf, nullptr, this, pid);
+            }
+        }
+
+        // Check hidden drivers
+        //
+        auto temp_drivers = enumerate_drivers(this, drakvuf);
+        for (const auto& drvname : this->loaded_drivers)
+        {
+            if (std::find(temp_drivers.begin(), temp_drivers.end(), drvname) == temp_drivers.end())
+                print_driver_information(drakvuf, nullptr, this->format, "Hidden Driver", drvname.c_str());
+        }
     }
-    return done_final_analysis;
+    return true;
 }
