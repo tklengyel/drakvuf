@@ -204,8 +204,9 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
         default:
         {
             fprintf(stderr, "This method is not implemented for 32bit\n");
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
             event = VMI_EVENT_RESPONSE_NONE;
-            drakvuf_interrupt(drakvuf, SIGINT);
             break;
         }
     }
