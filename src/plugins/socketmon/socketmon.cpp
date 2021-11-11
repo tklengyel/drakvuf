@@ -585,26 +585,25 @@ static event_response_t trap_DnsQueryEx_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     socketmon* sm = (socketmon*)info->trap->data;
 
     unicode_string_t* domain_name_us = nullptr;
-
     addr_t query_request_addr = drakvuf_get_function_argument(drakvuf, info, 1);
-    addr_t query_name_addr = 0;
+    int query_name_offset = drakvuf_get_process_address_width(drakvuf, info);
 
     ACCESS_CONTEXT(ctx);
     ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     ctx.dtb = info->regs->cr3;
-    ctx.addr = query_request_addr + drakvuf_get_address_width(drakvuf);
+    ctx.addr = query_request_addr + query_name_offset;
 
+    addr_t query_name_addr = 0;
+    if (VMI_FAILURE == drakvuf_read_addr(drakvuf, info, &ctx, &query_name_addr))
     {
-        vmi_lock_guard vmi_lg(drakvuf);
+        PRINT_DEBUG("[SOCKETMON] Couldn't read query_name_addr in %s(...) trap. Unsupported.\n", info->trap->name);
+        return 0;
+    }
 
-        if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &query_name_addr) )
-        {
-            PRINT_DEBUG("[SOCKETMON] Couldn't read query_name_addr in %s(...) trap. Unsupported.\n", info->trap->name);
-            return 0;
-        }
-
-        ctx.addr = query_name_addr;
-        domain_name_us = drakvuf_read_wchar_string(vmi_lg.vmi, &ctx);
+    ctx.addr = query_name_addr;
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+        domain_name_us = drakvuf_read_wchar_string(vmi, &ctx);
     }
 
     if (domain_name_us)
