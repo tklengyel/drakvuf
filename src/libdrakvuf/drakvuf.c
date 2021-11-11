@@ -623,6 +623,25 @@ int drakvuf_get_address_width(drakvuf_t drakvuf)
     return drakvuf->address_width;
 }
 
+bool drakvuf_process_is32bit(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    return (drakvuf_get_address_width(drakvuf) == 4) || drakvuf_is_wow64(drakvuf, info);
+}
+
+int drakvuf_get_process_address_width(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    return drakvuf_process_is32bit(drakvuf, info) ? 4 : 8;
+}
+
+int drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const access_context_t* ctx, addr_t* value)
+{
+    bool is32bit = drakvuf_process_is32bit(drakvuf, info);
+    if (is32bit)
+        return vmi_read_32(drakvuf->vmi, ctx, (uint32_t*)value);
+    else
+        return vmi_read_64(drakvuf->vmi, ctx, value);
+}
+
 bool drakvuf_get_current_process_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info, proc_data_priv_t* proc_data)
 {
     addr_t process_base = drakvuf_get_current_process(drakvuf, info);
