@@ -151,7 +151,6 @@ public:
     size_t mmpte_size = 0;
 
     const char* dump_folder;
-    page_mode_t pm;
     uint32_t domid = 0;
     output_format_t format;
     bool use_injector = false;
