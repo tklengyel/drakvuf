@@ -331,8 +331,7 @@ typedef enum
 
 static arch_t get_arch(drakvuf_t drakvuf)
 {
-    vmi_lock_guard vmi(drakvuf);
-    switch (vmi_get_address_width(vmi.vmi))
+    switch (drakvuf_get_address_width(drakvuf))
     {
         case 8:
             return ARCH_X64;
