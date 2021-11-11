@@ -186,13 +186,17 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             keyval("Table", fmt::Qstr("SSDT"))
         );
     }
-    else if (info->trap_pa > s->w32pservicetable - 8 && info->trap_pa <= s->w32pservicetable + sizeof(uint32_t) * s->w32pservicelimit + sizeof(uint32_t) - 1 )
+    for (size_t i = 0; i < s->w32p_ssdt.size(); i++)
     {
-        int64_t table_index = (info->trap_pa - s->w32pservicetable) / sizeof(uint32_t);
-        fmt::print(s->format, "ssdtmon", drakvuf, info,
-            keyval("TableIndex", fmt::Nval(table_index)),
-            keyval("Table", fmt::Qstr("SSDTShadow"))
-        );
+        const auto& [base, size] = s->w32p_ssdt[i];
+        if (info->trap_pa >= base && info->trap_pa < base + size)
+        {
+            int64_t table_index = (info->trap_pa - base + i * VMI_PS_4KB) / sizeof(uint32_t);
+            fmt::print(s->format, "ssdtmon", drakvuf, info,
+                keyval("TableIndex", fmt::Nval(table_index)),
+                keyval("Table", fmt::Qstr("SSDTShadow"))
+            );
+        }
     }
     return 0;
 }
@@ -305,42 +309,51 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
                 throw -1;
             }
             // Read ssdt shadow size
-            if (VMI_SUCCESS != vmi_read_32_va(vmi, w32k_base + w32psl_rva, gui_pid, &this->w32pservicelimit))
+            uint32_t w32pservicelimit;
+            if (VMI_SUCCESS != vmi_read_32_va(vmi, w32k_base + w32psl_rva, gui_pid, &w32pservicelimit))
             {
                 PRINT_DEBUG("[SSDTMON] Failed to read W32pServiceLimit\n");
                 throw -1;
             }
             // NOTE: We use vmi_translate_uv2p instead of vmi_translate_kv2p because Win32k.sys mapping is not present
             // in system process, only in process with GUI dependencies, hence we use explorer.exe as a pid.
-            if (VMI_SUCCESS != vmi_translate_uv2p(vmi, w32k_base + w32pst_rva, gui_pid, &this->w32pservicetable))
+            addr_t w32pservicetable;
+            if (VMI_SUCCESS != vmi_translate_uv2p(vmi, w32k_base + w32pst_rva, gui_pid, &w32pservicetable))
             {
                 PRINT_DEBUG("[SSDTMON] Failed to translate win32k!W32pServiceTable to physical address\n");
                 throw -1;
             }
-        }
 
-        PRINT_DEBUG("[SSDTMON] SSDT shadow is at 0x%lx. Number of syscalls: %u. Size: %lu\n",
-            this->w32pservicetable,
-            this->w32pservicelimit,
-            sizeof(uint32_t)*this->w32pservicelimit);
-
-        this->ssdt_trap[0].memaccess.gfn = this->w32pservicetable >> 12;
-        this->ssdt_trap[0].cb = write_cb;
-
-        if (!drakvuf_add_trap(drakvuf, &this->ssdt_trap[0]))
-            throw -1;
-
-        addr_t ssdt_shadow_write_end = (this->w32pservicetable + sizeof(uint32_t) * this->w32pservicelimit) >> 12;
-
-        if ( ssdt_shadow_write_end != this->ssdt_trap[0].memaccess.gfn )
-        {
-            this->ssdt_trap[1].cb = write_cb;
-            this->ssdt_trap[1].memaccess.gfn = ssdt_shadow_write_end;
-
-            if (!drakvuf_add_trap(drakvuf, &this->ssdt_trap[1]))
+            this->ssdt_trap[0].memaccess.gfn = w32pservicetable >> 12;
+            this->ssdt_trap[0].cb = write_cb;
+            if (!drakvuf_add_trap(drakvuf, &this->ssdt_trap[0]))
                 throw -1;
-        }
 
+            // On Win10 1803 x64 SSDT Shadow is 1226 elements long
+            if (sizeof(uint32_t) * w32pservicelimit > VMI_PS_4KB)
+            {
+                addr_t w32pservicetable_p2;
+                if (VMI_SUCCESS != vmi_translate_uv2p(vmi, w32k_base + w32pst_rva + sizeof(uint32_t) * w32pservicelimit, gui_pid, &w32pservicetable_p2))
+                {
+                    PRINT_DEBUG("[SSDTMON] Failed to translate second page of win32k!W32pServiceTable to physical address\n");
+                    throw -1;
+                }
+                this->ssdt_trap[1].memaccess.gfn = w32pservicetable_p2 >> 12;
+                this->ssdt_trap[1].cb = write_cb;
+                if (!drakvuf_add_trap(drakvuf, &this->ssdt_trap[1]))
+                    throw -1;
+
+                this->w32p_ssdt.emplace_back(w32pservicetable, VMI_PS_4KB);
+                this->w32p_ssdt.emplace_back(w32pservicetable_p2, w32pservicelimit * sizeof(uint32_t) - VMI_PS_4KB);
+            }
+            else
+            {
+                this->w32p_ssdt.emplace_back(w32pservicetable, w32pservicelimit * sizeof(uint32_t));
+            }
+
+            PRINT_DEBUG("[SSDTMON] SSDT shadow is at 0x%lx. Number of syscalls: %u. Size: %lu\n",
+                w32pservicetable, w32pservicelimit, sizeof(uint32_t) * w32pservicelimit);
+        }
         json_object_put(profile_json);
     }
 
@@ -387,21 +400,10 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
     this->ssdt_trap[2].cb = write_cb;
     this->ssdt_trap[2].memaccess.gfn = this->kiservicetable >> 12;
 
-    addr_t ssdtwrite_end = (this->kiservicetable + sizeof(uint32_t) * this->kiservicelimit) >> 12;
-
     if ( !drakvuf_add_trap(drakvuf, &this->ssdt_trap[2]) )
     {
         PRINT_DEBUG("SSDT plugin failed to trap on \n");
         throw -1;
-    }
-
-    if ( ssdtwrite_end != this->ssdt_trap[2].memaccess.gfn )
-    {
-        this->ssdt_trap[3].cb = write_cb;
-        this->ssdt_trap[3].memaccess.gfn = ssdtwrite_end;
-
-        if ( !drakvuf_add_trap(drakvuf, &this->ssdt_trap[3]) )
-            throw -1;
     }
 
     addr_t sdt_rva, sdt_shadow_rva;
