@@ -409,7 +409,7 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
 {
     g_assert(narg > 0);
 
-    bool is32 = drakvuf->pm != VMI_PM_IA32E || win_is_wow64(drakvuf, info);
+    bool is32 = drakvuf_process_is32bit(drakvuf, info);
     if (!is32)
     {
         switch (narg)
@@ -446,7 +446,7 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
 
 addr_t win_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    bool is32 = drakvuf->pm != VMI_PM_IA32E || win_is_wow64(drakvuf, info);
+    bool is32 = drakvuf_process_is32bit(drakvuf, info);
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
