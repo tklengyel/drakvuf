@@ -294,6 +294,8 @@ static void print_usage()
         "\t                           Where to store processes dumps\n"
         "\t --compress-procdumps\n"
         "\t                           Controls compression of processes dumps on disk\n"
+        "\t --json-hal <path to json>\n"
+        "\t                           The JSON profile for hal.dll\n"
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP2
         "\t --procdump-disable-dump-on-finish\n"
@@ -448,6 +450,7 @@ int main(int argc, char** argv)
         opt_hidsim_random_clicks,
         opt_rootkitmon_json_fwpkclnt,
         opt_rootkitmon_json_fltmgr,
+        opt_json_hal
     };
     const option long_opts[] =
     {
@@ -511,6 +514,7 @@ int main(int argc, char** argv)
         {"hid-random-clicks", no_argument, NULL, opt_hidsim_random_clicks},
         {"json-fwpkclnt", required_argument, NULL, opt_rootkitmon_json_fwpkclnt},
         {"json-fltmgr", required_argument, NULL, opt_rootkitmon_json_fltmgr},
+        {"json-hal", required_argument, NULL, opt_json_hal},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF:C";
@@ -761,6 +765,9 @@ int main(int argc, char** argv)
                 break;
             case opt_compress_procdumps:
                 options.compress_procdumps = true;
+                break;
+            case opt_json_hal:
+                options.hal_profile = optarg;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_PROCDUMP2
