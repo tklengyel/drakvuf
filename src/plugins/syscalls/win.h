@@ -923,7 +923,7 @@ SYSCALL(NtDrawText, NTSTATUS,
 );
 SYSCALL(NtDuplicateObject, NTSTATUS,
     "SourceProcessHandle", "", DIR_IN, HANDLE,
-    "SourceHandle", "", DIR_IN, HANDLE,
+    "SourceHandle", "", DIR_IN, PHANDLE,
     "TargetProcessHandle", "opt", DIR_IN, HANDLE,
     "TargetHandle", "opt", DIR_OUT, PHANDLE,
     "DesiredAccess", "", DIR_IN, ACCESS_MASK,
