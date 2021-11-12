@@ -784,12 +784,11 @@ wmimon::wmimon(drakvuf_t drakvuf, const wmimon_config* c, output_format_t output
         return;
     }
 
-    uint8_t addr_width = 0;
+    int addr_width = drakvuf_get_address_width(drakvuf);
     win_ver_t winver;
     {
         vmi_lock_guard guard(drakvuf);
         winver = vmi_get_winver(guard);
-        addr_width = vmi_get_address_width(guard);
     }
 
     if (!c->ole32_profile)

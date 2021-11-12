@@ -229,40 +229,14 @@ std::string Binary16StringPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* i
 
 std::string UnicodePrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
-    bool is32bit = drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E || drakvuf_is_wow64(drakvuf, info);
+    bool is32bit = drakvuf_process_is32bit(drakvuf, info);
 
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = argument,
-    );
-    std::string str;
-    auto vmi = vmi_lock_guard(drakvuf);
-    if (is32bit)
-    {
-        struct
-        {
-            uint16_t length;
-            uint16_t max_length;
-            uint32_t buffer;
-        } __attribute__((packed)) us;
+    unicode_string_t* str_us = is32bit ? drakvuf_read_unicode32(drakvuf, info, argument)
+        : drakvuf_read_unicode(drakvuf, info, argument);
 
-        if (VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(us), &us, nullptr))
-        {
-            ctx.addr = us.buffer;
-            auto str_obj = drakvuf_read_wchar_string(vmi, &ctx);
-            str = str_obj == NULL ? "" : (char*)str_obj->contents;
-            if (str_obj)
-                vmi_free_unicode_str(str_obj);
-        }
-    }
-    else
-    {
-        auto str_obj = drakvuf_read_unicode_common(vmi, &ctx);
-        str = str_obj == NULL ? "" : (char*)str_obj->contents;
-        if (str_obj)
-            vmi_free_unicode_str(str_obj);
-    }
+    std::string str = str_us ? (char*)str_us->contents : "";
+    if (str_us)
+        vmi_free_unicode_str(str_us);
 
     std::stringstream stream;
     stream << name << "=";

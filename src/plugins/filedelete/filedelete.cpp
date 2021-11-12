@@ -177,7 +177,7 @@ static const flags_str_t fo_flags_map =
     REGISTER_FLAG(FO_SECTION_MINSTORE_TREATMENT),
 };
 
-static bool get_file_object_handle_count(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, filedelete* f, handle_t handle, uint64_t* handle_count)
+static bool get_file_object_handle_count(drakvuf_t drakvuf, drakvuf_trap_info_t* info, filedelete* f, handle_t handle, uint64_t* handle_count)
 {
     if (!handle_count)
         return false;
@@ -193,13 +193,8 @@ static bool get_file_object_handle_count(drakvuf_t drakvuf, drakvuf_trap_info_t*
     ctx.addr = handles;
     ctx.dtb = info->regs->cr3;
 
-    bool is32bit = (f->pm != VMI_PM_IA32E);
     uint64_t handles_value = 0;
-    bool success = false;
-    if (is32bit)
-        success = (VMI_SUCCESS == vmi_read_32(vmi, &ctx, (uint32_t*)&handles_value));
-    else
-        success = (VMI_SUCCESS == vmi_read_64(vmi, &ctx, &handles_value));
+    bool success = (VMI_SUCCESS == drakvuf_read_addr(drakvuf, info, &ctx, &handles_value));
     if (success)
         *handle_count = handles_value;
 
@@ -1049,7 +1044,7 @@ static start_readfile_t start_readfile(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     injector->bp->name = info->trap->name;
     injector->handle = handle;
     injector->fo_flags = fo_flags;
-    injector->is32bit = (f->pm != VMI_PM_IA32E);
+    injector->is32bit = drakvuf_process_is32bit(drakvuf, info);
     injector->curr_sequence_number = -1;
     injector->eprocess_base = info->attached_proc_data.base_addr;
     injector->target_pid = info->attached_proc_data.pid;
@@ -1290,7 +1285,7 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         return VMI_EVENT_RESPONSE_NONE;
 
     uint64_t handle_count = 1;
-    if (get_file_object_handle_count(drakvuf, info, vmi.vmi, f, handle, &handle_count))
+    if (get_file_object_handle_count(drakvuf, info, f, handle, &handle_count))
     {
         if (handle_count > 1) return VMI_EVENT_RESPONSE_NONE;
     }
@@ -1305,7 +1300,7 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         if (filename.empty())
             goto done;
 
-        if ( START_READFILE_SUCCEED == start_readfile(drakvuf, info, vmi.vmi, handle, filename.c_str(), &response) )
+        if ( START_READFILE_SUCCEED == start_readfile(drakvuf, info, vmi, handle, filename.c_str(), &response) )
             goto done;
     }
 
@@ -1315,7 +1310,7 @@ static event_response_t close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             return VMI_EVENT_RESPONSE_NONE;
 
         // We detect the fact of closing of the previously modified file.
-        grab_file_by_handle(f, drakvuf, vmi.vmi, info, handle, reason);
+        grab_file_by_handle(f, drakvuf, vmi, info, handle, reason);
     }
 
 done:
@@ -1398,7 +1393,6 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
     : drakvuf(drakvuf)
     , offsets(new size_t[__OFFSET_MAX])
     , dump_folder(c->dump_folder)
-    , pm(drakvuf_get_page_mode(drakvuf))
     , format(output)
     , use_injector(c->filedelete_use_injector)
     , sequence_number()
@@ -1446,7 +1440,7 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
     if ( !drakvuf_get_kernel_struct_size(drakvuf, "_CONTROL_AREA", &this->control_area_size) )
         throw -1;
 
-    if ( VMI_PM_LEGACY == this->pm )
+    if ( VMI_PM_LEGACY == drakvuf_get_page_mode(drakvuf) )
         this->mmpte_size = 4;
     else
         this->mmpte_size = 8;

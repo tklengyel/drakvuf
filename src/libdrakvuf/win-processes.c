@@ -1293,7 +1293,6 @@ bool win_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv_t
 static bool win_parse_mmvad(drakvuf_t drakvuf, addr_t node_addr, addr_t* left_child, addr_t* right_child, uint64_t* starting_vpn, uint64_t* ending_vpn, uint64_t* mmvad_core)
 {
     bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
-    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -1336,35 +1335,12 @@ static bool win_parse_mmvad(drakvuf_t drakvuf, addr_t node_addr, addr_t* left_ch
     if (is_win7)
     {
         ctx.addr = node_addr + drakvuf->offsets[MMVAD_STARTING_VPN];
+        if (vmi_read_addr(drakvuf->vmi, &ctx, starting_vpn) != VMI_SUCCESS)
+            return false;
 
-        if (!is32bit)
-        {
-            if (vmi_read_64(drakvuf->vmi, &ctx, starting_vpn) != VMI_SUCCESS)
-            {
-                return false;
-            }
-
-            ctx.addr = node_addr + drakvuf->offsets[MMVAD_ENDING_VPN];
-
-            if (vmi_read_64(drakvuf->vmi, &ctx, ending_vpn) != VMI_SUCCESS)
-            {
-                return false;
-            }
-        }
-        else
-        {
-            if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)starting_vpn) != VMI_SUCCESS)
-            {
-                return false;
-            }
-
-            ctx.addr = node_addr + drakvuf->offsets[MMVAD_ENDING_VPN];
-
-            if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)ending_vpn) != VMI_SUCCESS)
-            {
-                return false;
-            }
-        }
+        ctx.addr = node_addr + drakvuf->offsets[MMVAD_ENDING_VPN];
+        if (vmi_read_addr(drakvuf->vmi, &ctx, ending_vpn) != VMI_SUCCESS)
+            return false;
     }
     else
     {
@@ -1414,6 +1390,8 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
     int depth = 0;
     bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
     bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+
+    int pool_tag_delta = is32bit ? POOL_TAG_SIZE_X86 : POOL_TAG_SIZE_X64;
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
@@ -1465,7 +1443,6 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
         }
         else if (starting_vpn * VMI_PS_4KB <= vaddr && (ending_vpn + 1) * VMI_PS_4KB > vaddr)
         {
-            addr_t pool_tag_delta = is32bit ? POOL_TAG_SIZE_X86 : POOL_TAG_SIZE_X64;
             uint32_t pool_tag;
             addr_t subsection;
             addr_t control_area;
@@ -1579,6 +1556,8 @@ static bool win_traverse_mmvad_node(drakvuf_t drakvuf, addr_t node_addr, mmvad_c
     bool is_win7 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_7;
     bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
 
+    int pool_tag_delta = is32bit ? POOL_TAG_SIZE_X86 : POOL_TAG_SIZE_X64;
+
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
         .pid = 4
@@ -1601,7 +1580,6 @@ static bool win_traverse_mmvad_node(drakvuf_t drakvuf, addr_t node_addr, mmvad_c
         return win_traverse_mmvad_node(drakvuf, right_child, callback, callback_data);
     }
 
-    addr_t pool_tag_delta = is32bit ? POOL_TAG_SIZE_X86 : POOL_TAG_SIZE_X64;
     uint32_t pool_tag;
     addr_t subsection;
     addr_t control_area;
