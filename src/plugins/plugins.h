@@ -152,6 +152,7 @@ struct plugins_options
     bool compress_procdumps = false;    // PLUGIN_PROCDUMP
     vmi_pid_t procdump_on_finish;       // PLUGIN_PROCDUMP2
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes; // PLUGIN_PROCDUMP
+    const char* hal_profile;            // PLUGIN_PROCDUMP2
     const char* codemon_dump_dir;       // PLUGIN_CODEMON
     const char* codemon_filter_executable;  // PLUGIN_CODEMON
     bool codemon_log_everything;        // PLUGIN_CODEMON
