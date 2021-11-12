@@ -294,13 +294,8 @@ std::string PointerToPointerPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info*
         .addr = argument
     );
 
-    auto vmi = vmi_lock_guard(drakvuf);
     addr_t value = 0;
-    int ret;
-    if (drakvuf_is_wow64(drakvuf, info))
-        ret = vmi_read_32(vmi, &ctx, reinterpret_cast<uint32_t*>(&value));
-    else
-        ret = vmi_read_64(vmi, &ctx, &value);
+    int ret = drakvuf_read_addr(drakvuf, info, &ctx, &value);
     if (ret != VMI_SUCCESS)
         value = 0;
 
