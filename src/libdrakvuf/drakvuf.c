@@ -635,6 +635,8 @@ int drakvuf_get_process_address_width(drakvuf_t drakvuf, drakvuf_trap_info_t* in
 
 int drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const access_context_t* ctx, addr_t* value)
 {
+    if (value)
+        *value = 0;
     bool is32bit = drakvuf_process_is32bit(drakvuf, info);
     if (is32bit)
         return vmi_read_32(drakvuf->vmi, ctx, (uint32_t*)value);

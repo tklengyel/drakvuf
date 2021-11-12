@@ -453,16 +453,8 @@ static event_response_t trap_DnsQuery_A_cb(drakvuf_t drakvuf, drakvuf_trap_info_
 
     addr_t domain_name_addr = drakvuf_get_function_argument(drakvuf, info, 1);
 
-    ACCESS_CONTEXT(ctx);
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-    ctx.addr = domain_name_addr;
+    char* dns_name = drakvuf_read_ascii_str(drakvuf, info, domain_name_addr);
 
-    char* dns_name = [&]
-    {
-        vmi_lock_guard vmi_lg(drakvuf);
-        return vmi_read_str(vmi_lg.vmi, &ctx);
-    }();
     print_dns_info(drakvuf, info, sm, dns_name);
     g_free(dns_name);
 
@@ -562,16 +554,7 @@ static event_response_t trap_DnsQueryExA_cb(drakvuf_t drakvuf, drakvuf_trap_info
 
     addr_t domain_name_addr = drakvuf_get_function_argument(drakvuf, info, 1);
 
-    ACCESS_CONTEXT(ctx);
-    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
-    ctx.dtb = info->regs->cr3;
-    ctx.addr = domain_name_addr;
-
-    char* dns_name = [&]
-    {
-        vmi_lock_guard vmi_lg(drakvuf);
-        return vmi_read_str(vmi_lg.vmi, &ctx);
-    }();
+    char* dns_name = drakvuf_read_ascii_str(drakvuf, info, domain_name_addr);
 
     print_dns_info(drakvuf, info, sm, dns_name);
     g_free(dns_name);
