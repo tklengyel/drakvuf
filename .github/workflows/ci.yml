@@ -94,6 +94,7 @@ jobs:
             - '--enable-debug --disable-plugin-syscalls'
             - '--enable-debug --enable-sanitize'
             - '--enable-debug --enable-repl'
+            - '--enable-debug --enable-doppelganging'
     env:
       CC: clang
       CXX: clang++
