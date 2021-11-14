@@ -523,7 +523,7 @@ AC_ARG_ENABLE([sanitize],
 AM_CONDITIONAL([SANITIZE], [test x$sanitize = xyes])
 
 AC_ARG_ENABLE([doppelganging],
-  [AS_HELP_STRING([--enable-doppelganging-injection],
+  [AS_HELP_STRING([--enable-doppelganging],
     [Enable doppelganging injection @<:@no@:>@])],
   [doppelganging="$enableval"],
   [doppelganging="no"])
