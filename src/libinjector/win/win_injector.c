@@ -186,9 +186,9 @@ static event_response_t mem_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             event = handle_readfile_x64(drakvuf, info);
             break;
         }
-        case INJECT_METHOD_WRITE_FILE: // UNTESTED on 32bit
+        case INJECT_METHOD_WRITE_FILE:
         {
-            event = handle_writefile_x64(drakvuf, info);
+            event = handle_writefile(drakvuf, info);
             break;
         }
         case INJECT_METHOD_CREATEPROC:
@@ -629,7 +629,7 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
         case INJECT_METHOD_WRITE_FILE:
         {
-            event = handle_writefile_x64(drakvuf, info);
+            event = handle_writefile(drakvuf, info);
             goto tidied;
         }
         case INJECT_METHOD_CREATEPROC:
@@ -659,7 +659,7 @@ tidied:  // tidy up later
     }
 
 
-    if (!injector->is32bit && !injector->hijacked && injector->status == STATUS_NULL)
+    if (!injector->hijacked && injector->status == STATUS_NULL)
     {
         /* We just hit the RIP from the trapframe */
 
@@ -721,7 +721,7 @@ tidied:  // tidy up later
         return inject_payload(drakvuf, info, &regs);
 
     // Handle breakpoint on PspCallProcessNotifyRoutines()
-    if ( !injector->is32bit && STATUS_BP_HIT == injector->status)
+    if ( STATUS_BP_HIT == injector->status)
     {
         addr_t saved_rip = 0;
 

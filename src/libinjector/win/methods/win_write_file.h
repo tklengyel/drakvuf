@@ -107,5 +107,5 @@
 
 #include "win_utils.h"
 
-event_response_t handle_writefile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 #endif

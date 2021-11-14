@@ -109,7 +109,7 @@
 static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
 static bool write_chunk_to_buffer(injector_t injector, x86_registers_t* regs, uint8_t* buf, size_t amount);
 
-event_response_t handle_writefile_x64(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
     event_response_t event;
