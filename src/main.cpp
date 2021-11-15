@@ -208,10 +208,6 @@ static void print_usage()
         "\t -p                        Leave domain paused after DRAKVUF exits\n"
         "\t -F                        Enable fast singlestepping (requires Xen 4.14+)\n"
         "\t --traps-ttl <ttl value>   Maximum number of times trap can be triggered in 10sec period. Protects against api hammering.\n"
-#ifdef ENABLE_DOPPELGANGING
-        "\t -B <path>                 The host path of the windows binary to inject (requires -m doppelganging)\n"
-        "\t -P <target>               The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
-#endif
 #ifdef ENABLE_PLUGIN_FILEDELETE
         "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
         "\t -M                        Dump new or modified files also (requires -D)\n"
@@ -566,19 +562,8 @@ int main(int argc, char** argv)
                     injection_method = INJECT_METHOD_CREATEPROC;
                 if (!strncmp(optarg, "shellcode", 9))
                     injection_method = INJECT_METHOD_SHELLCODE;
-                if (!strncmp(optarg, "doppelganging", 13))
-#ifdef ENABLE_DOPPELGANGING
-                    injection_method = INJECT_METHOD_DOPP;
-#else
-                {
-                    fprintf(stderr, "Doppelganging is not available, you need to re-run ./configure!\n");
-                    return drakvuf_exit_code_t::FAIL;
-                }
-#endif
                 if (!strncmp(optarg, "execproc", 8))
                     injection_method = INJECT_METHOD_EXECPROC;
-                if (!strncmp(optarg, "linuxshellcode", 14))
-                    injection_method = INJECT_METHOD_SHELLCODE_LINUX;
                 break;
             case opt_write_file:
                 if (optind >= argc || *argv[optind] == '-')
@@ -598,14 +583,6 @@ int main(int argc, char** argv)
             case opt_write_file_timeout:
                 write_file_timeout = atoi(optarg);
                 break;
-#ifdef ENABLE_DOPPELGANGING
-            case 'B':
-                binary_path = optarg;
-                break;
-            case 'P':
-                target_process = optarg;
-                break;
-#endif
             case 't':
                 timeout = atoi(optarg);
                 break;
@@ -861,12 +838,6 @@ int main(int argc, char** argv)
     if (!json_kernel_path)
     {
         fprintf(stderr, "No kernel JSON profile specified (-r)!\n");
-        return drakvuf_exit_code_t::FAIL;
-    }
-
-    if (INJECT_METHOD_DOPP == injection_method && (!binary_path || !target_process))
-    {
-        fprintf(stderr, "Missing parameters for process doppelganging injection (-B and -P)!\n");
         return drakvuf_exit_code_t::FAIL;
     }
 
