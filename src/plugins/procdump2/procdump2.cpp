@@ -178,6 +178,8 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
         }
 
         this->current_irql_va = hal_base + func_rva;
+
+        json_object_put(hal_profile);
     }
     else
     {
