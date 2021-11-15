@@ -42,7 +42,5 @@ If you would like a full-featured DRAKVUF GUI to setup as automated analysis san
 
 More information can be found on the project website: https://drakvuf.com
 
-[![Build Status](https://travis-ci.org/tklengyel/drakvuf.svg?branch=master)](https://travis-ci.org/tklengyel/drakvuf)
+[![ci](https://github.com/tklengyel/drakvuf/actions/workflows/ci.yml/badge.svg)](https://github.com/tklengyel/drakvuf/actions/workflows/ci.yml)
 <a href="https://scan.coverity.com/projects/tklengyel-drakvuf"><img alt="Coverity Scan Build Status" src="https://scan.coverity.com/projects/3238/badge.svg"/></a>
-
-[![](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/images/0)](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/links/0)[![](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/images/1)](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/links/1)[![](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/images/2)](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/links/2)[![](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/images/3)](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/links/3)[![](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/images/4)](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/links/4)[![](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/images/5)](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/links/5)[![](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/images/6)](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/links/6)[![](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/images/7)](https://sourcerer.io/fame/tklengyel/tklengyel/drakvuf/links/7)
