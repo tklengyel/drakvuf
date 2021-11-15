@@ -147,7 +147,9 @@ static inline void print_help(void)
         "\t -f <args for execproc>    [LINUX] - Arguments specified for exec to include (requires -m execproc)\n"
         "\t                           [LINUX] (execproc -> execve(const char *file, const char *argv[], const char* envp[]); 64bit only)\n"
         "\t [-B] <path>               The host path of the binary:\n"
+#ifdef ENABLE_DOPPELGANGING
         "\t                             [WIN] for -m doppelganging: to inject into the guest VM\n"
+#endif
         "\t                             for -m readfile: where to store the file read out from VM\n"
         "\t                             for -m writefile: to write into the guest VM\n"
         "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
