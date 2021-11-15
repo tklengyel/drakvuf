@@ -377,7 +377,7 @@ static event_response_t inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* i
         }
 
         // Get address of PspCallProcessNotifyRoutines() from the JSON debug info
-        if ( !drakvuf_get_function_rva(drakvuf, "PspCallProcessNotifyRoutines", &process_notify_rva) )
+        if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "PspCallProcessNotifyRoutines", &process_notify_rva) )
         {
             PRINT_DEBUG("[-] Error getting PspCallProcessNotifyRoutines RVA\n");
             return 0;
