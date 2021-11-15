@@ -262,4 +262,6 @@ windowmon::windowmon(drakvuf_t drakvuf, const windowmon_config* c, output_format
     assert(sizeof(traps) / sizeof(traps[0]) >= 1);
     if ( !register_trap(drakvuf, profile_json, "NtUserFindWindowEx", &traps[0], cb) )
         throw -1;
+
+    json_object_put(profile_json);
 }
