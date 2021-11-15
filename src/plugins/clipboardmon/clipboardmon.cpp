@@ -230,4 +230,6 @@ clipboardmon::clipboardmon(drakvuf_t drakvuf, const clipboardmon_config* c, outp
         throw -1;
     if ( !register_trap(drakvuf, profile_json, "NtUserSetClipboardData", &traps[3], cb) )
         throw -1;
+
+    json_object_put(profile_json);
 }

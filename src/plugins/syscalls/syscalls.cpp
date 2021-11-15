@@ -335,4 +335,6 @@ syscalls::~syscalls()
         g_hash_table_destroy(this->filter);
 
     g_free(this->offsets);
+
+    json_object_put(this->win32k_json);
 }
