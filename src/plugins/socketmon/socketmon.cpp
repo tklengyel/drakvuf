@@ -805,3 +805,8 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
 socketmon::~socketmon()
 {
 }
+
+bool socketmon::stop_impl()
+{
+    return true;
+}

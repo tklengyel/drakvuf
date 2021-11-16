@@ -24,4 +24,5 @@ public:
 
     delaymon(drakvuf_t drakvuf, output_format_t output);
     ~delaymon();
+    virtual bool stop_impl() override;
 };

@@ -251,3 +251,8 @@ poolmon::~poolmon()
     if (this->pooltag_tree)
         g_tree_destroy(this->pooltag_tree);
 }
+
+bool poolmon::stop_impl()
+{
+    return true;
+}

@@ -118,6 +118,7 @@ public:
 
     cpuidmon(drakvuf_t drakvuf, bool stealth, output_format_t output);
     ~cpuidmon();
+    virtual bool stop_impl() override;
 };
 
 #endif

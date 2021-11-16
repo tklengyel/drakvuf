@@ -117,6 +117,7 @@ public:
 
     poolmon(drakvuf_t drakvuf, output_format_t output);
     ~poolmon();
+    virtual bool stop_impl() override;
 };
 
 #endif

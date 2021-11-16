@@ -176,3 +176,8 @@ debugmon::debugmon(drakvuf_t _drakvuf, output_format_t _output)
 }
 
 debugmon::~debugmon(void) {}
+
+bool debugmon::stop_impl()
+{
+    return true;
+}

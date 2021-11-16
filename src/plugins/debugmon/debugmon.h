@@ -117,6 +117,8 @@ public:
 
     debugmon(drakvuf_t drakvuf, output_format_t output);
     ~debugmon();
+
+    virtual bool stop_impl() override;
 };
 
 #endif

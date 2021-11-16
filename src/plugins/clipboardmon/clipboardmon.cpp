@@ -233,3 +233,8 @@ clipboardmon::clipboardmon(drakvuf_t drakvuf, const clipboardmon_config* c, outp
 
     json_object_put(profile_json);
 }
+
+bool clipboardmon::stop_impl()
+{
+    return true;
+}

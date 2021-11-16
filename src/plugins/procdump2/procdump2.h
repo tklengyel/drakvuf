@@ -133,7 +133,7 @@ class procdump2 : public pluginex
 public:
     procdump2(drakvuf_t drakvuf, const procdump2_config* config, output_format_t output);
     ~procdump2();
-    bool stop();
+    virtual bool stop_impl() override;
 
 private:
     /* Config */

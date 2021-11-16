@@ -65,3 +65,8 @@ delaymon::delaymon(drakvuf_t drakvuf, output_format_t output)
 delaymon::~delaymon()
 {
 }
+
+bool delaymon::stop_impl()
+{
+    return true;
+}

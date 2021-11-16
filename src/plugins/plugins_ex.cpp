@@ -131,10 +131,9 @@ pluginex::~pluginex()
     stop();
 };
 
-bool pluginex::stop()
+bool pluginex::stop_impl()
 {
     destroy_all_traps();
-    m_is_stopping = true;
     return true;
 }
 

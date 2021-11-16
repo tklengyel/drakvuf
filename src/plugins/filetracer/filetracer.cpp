@@ -137,3 +137,8 @@ filetracer::~filetracer()
         delete this->lf;
     }
 }
+
+bool filetracer::stop_impl()
+{
+    return true;
+}

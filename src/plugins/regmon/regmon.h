@@ -131,6 +131,7 @@ public:
 
     regmon(drakvuf_t drakvuf, output_format_t output);
     ~regmon();
+    virtual bool stop_impl() override;
 };
 
 #endif

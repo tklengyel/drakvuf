@@ -344,3 +344,8 @@ exmon::~exmon()
 {
     g_free(this->offsets);
 }
+
+bool exmon::stop_impl()
+{
+    return true;
+}
