@@ -102,13 +102,199 @@
  *                                                                         *
 ***************************************************************************/
 
-#ifndef WIN_METHOD_DOPPLEGANGING
-#define WIN_METHOD_DOPPLEGANGING
-
-#include "win_utils.h"
-
-int patch_payload(injector_t injector, unsigned char* addr);
-bool write_binary_to_memory(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-bool trap_process_notify_routines(drakvuf_t drakvuf, injector_t injector);
-
+#include "win_shellcode.h"
+#include <win/win_functions.h>
+#include <win/method_helpers.h>
+#ifdef ENABLE_DOPPELGANGING
+#include "win_dopple.h"
 #endif
+
+static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
+static bool inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
+event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+    event_response_t event;
+
+    switch (injector->step)
+    {
+        case STEP1: // allocate virtual memory
+        {
+            // save registers
+            PRINT_DEBUG("Saving registers\n");
+            memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
+
+            if (!setup_virtual_alloc_stack(injector, info->regs))
+            {
+                PRINT_DEBUG("Failed to setup virtual alloc for passing inputs!\n");
+                return cleanup(injector, info);
+            }
+
+            info->regs->rip = injector->exec_func;
+            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            break;
+        }
+        case STEP2: // write payload to virtual memory
+        {
+            // any error checks?
+            PRINT_DEBUG("Writing to allocated virtual memory to allocate physical memory..\n");
+            injector->payload_addr = info->regs->rax;
+            PRINT_DEBUG("Payload is at: 0x%lx\n", injector->payload_addr);
+
+            if (!setup_memset_stack(injector, info->regs))
+            {
+                PRINT_DEBUG("Failed to setup memset stack for passing inputs!\n");
+                return cleanup(injector, info);
+            }
+
+            info->regs->rip = injector->memset;
+            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            break;
+        }
+        case STEP3: // inject payload
+        {
+            if (!inject_payload(drakvuf, info))
+                return cleanup(injector, info);
+
+#ifdef ENABLE_DOPPELGANGING
+            if (injector->method != INJECT_METHOD_DOPP)
+#endif
+                return override_step(injector, STEP5, VMI_EVENT_RESPONSE_SET_REGISTERS);
+
+            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            break;
+        }
+#ifdef ENABLE_DOPPELGANGING
+        case STEP4: // Handle breakpoint on PspCallProcessNotifyRoutines()
+        {
+            addr_t saved_rip = 0;
+
+            // Get saved RIP from the stack
+            ACCESS_CONTEXT(ctx,
+                .translate_mechanism = VMI_TM_PROCESS_DTB,
+                .dtb = info->regs->cr3,
+                .addr = info->regs->rsp
+            );
+
+            vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+            bool success = (VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(addr_t), &saved_rip, NULL));
+            drakvuf_release_vmi(drakvuf);
+
+            if ( !success )
+            {
+                PRINT_DEBUG("[-] Error while reading the saved RIP\n");
+                return cleanup(injector, info);
+            }
+
+            // Bypass call to the function
+            info->regs->rip = saved_rip;
+            info->regs->rsp += 0x8;
+
+            // Restore original value of the breakpoint
+            injector->bp.breakpoint.addr = injector->saved_bp;
+            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            break;
+        }
+#endif
+        case STEP5:
+        {
+            PRINT_DEBUG("Shellcode executed\n");
+            injector->rc = INJECTOR_SUCCEEDED;
+
+            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+            break;
+        }
+        case STEP6:
+        {
+            drakvuf_remove_trap(drakvuf, info->trap, NULL);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+            event = VMI_EVENT_RESPONSE_NONE;
+            break;
+        }
+        default:
+        {
+            PRINT_DEBUG("Should not be here\n");
+            assert(false);
+        }
+
+    }
+    return event;
+}
+
+static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
+{
+    fprintf(stderr, "Exiting prematurely\n");
+
+    if (injector->rc == INJECTOR_SUCCEEDED)
+        injector->rc = INJECTOR_FAILED;
+
+    memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+    return override_step(injector, STEP6, VMI_EVENT_RESPONSE_SET_REGISTERS);
+}
+
+static bool write_payload_to_guest_memory(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = (injector_t)info->trap->data;
+
+    // Write payload into guest's memory
+    ACCESS_CONTEXT(ctx);
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+    ctx.addr = injector->payload_addr;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    bool success = ( VMI_SUCCESS == vmi_write(vmi, &ctx, injector->payload_size, (void*)injector->payload, NULL) );
+    drakvuf_release_vmi(drakvuf);
+
+    if ( !success )
+    {
+        PRINT_DEBUG("Failed to write the payload into memory!\n");
+        return false;
+    }
+    return true;
+}
+
+static bool inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+
+#ifdef ENABLE_DOPPELGANGING
+    // If we are doing process doppelganging we need to write the binary to
+    // inject in memory too (in addition to the shellcode), since it is not
+    // present in the guest's filesystem.
+    if (INJECT_METHOD_DOPP == injector->method)
+    {
+        if (!write_binary_to_memory(drakvuf, info))
+            return false;
+
+        // Patch payload
+        PRINT_DEBUG("Patching the shellcode with user inputs..\n");
+        patch_payload(injector, (unsigned char*)injector->payload);
+    }
+#endif
+    if (!write_payload_to_guest_memory(drakvuf, info))
+        return false;
+
+    if (!setup_stack(injector->drakvuf, info->regs, NULL, 4))
+    {
+        PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
+        return 0;
+    }
+
+    info->regs->rip = injector->payload_addr;
+
+#ifdef ENABLE_DOPPELGANGING
+    // At some point the shellcode will call NtCreateThreadEx() which in turn
+    // will cause a call to PspCallProcessNotifyRoutines(). In our case,
+    // this function will make NtCreateThreadEx() to fail and the binary we
+    // want to inject will never run. We want to place a breakpoint on it to
+    // bypass this call.
+    if (INJECT_METHOD_DOPP == injector->method && !trap_process_notify_routines(drakvuf, injector))
+        return false;
+#endif
+
+    PRINT_DEBUG("Executing the payload..\n");
+    return true;
+}

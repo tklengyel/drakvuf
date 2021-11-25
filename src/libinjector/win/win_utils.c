@@ -144,12 +144,16 @@ bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
     FILE* fp = fopen(file, "rb");
 
     if (!fp)
+    {
+        fprintf(stderr, "Could not open file\n");
         return false;
+    }
 
     // obtain file size:
     fseek (fp, 0, SEEK_END);
     if ( (payload_size = ftell (fp)) < 0 )
     {
+        fprintf(stderr, "File length error\n");
         fclose(fp);
         return false;
     }
@@ -158,12 +162,14 @@ bool load_file_to_memory(addr_t* output, size_t* size, const char* file)
     data = g_try_malloc0(payload_size);
     if ( !data )
     {
+        fprintf(stderr, "Could not allocate memory\n");
         fclose(fp);
         return false;
     }
 
-    if ( (size_t)payload_size != fread(data, payload_size, 1, fp) )
+    if ( (size_t)payload_size != fread(data, 1, payload_size, fp) )
     {
+        fprintf(stderr, "Could not read file\n");
         g_free(data);
         fclose(fp);
         return false;
