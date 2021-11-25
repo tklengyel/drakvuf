@@ -161,13 +161,11 @@ bsodmon::bsodmon(drakvuf_t drakvuf, bool _abort_on_bsod, output_format_t output)
 
 bsodmon::~bsodmon()
 {
-    if (!m_is_stopping)
-        stop();
+    stop();
 }
 
-bool bsodmon::stop()
+bool bsodmon::stop_impl()
 {
     drakvuf_remove_trap(drakvuf, &trap, nullptr);
-    m_is_stopping = true;
     return true;
 }

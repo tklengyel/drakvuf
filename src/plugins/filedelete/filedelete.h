@@ -161,7 +161,7 @@ public:
     filedelete(drakvuf_t drakvuf, const filedelete_config* config, output_format_t output);
     ~filedelete();
 
-    bool stop();
+    virtual bool stop_impl() override;
 
     // For `filedelete2`
     addr_t queryvolumeinfo_va = 0;

@@ -121,6 +121,8 @@ public:
     windowmon(drakvuf_t drakvuf, const windowmon_config* config, output_format_t output);
 
 private:
+    virtual bool stop_impl() override;
+
     drakvuf_trap_t traps[1] =
     {
         [0] = {

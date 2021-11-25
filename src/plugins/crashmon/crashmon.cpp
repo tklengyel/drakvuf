@@ -155,3 +155,8 @@ crashmon::crashmon(drakvuf_t drakvuf, output_format_t output)
     if (!drakvuf_add_trap(drakvuf, &trap))
         throw -1;
 }
+
+bool crashmon::stop_impl()
+{
+    return true;
+}

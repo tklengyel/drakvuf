@@ -118,6 +118,7 @@ public:
     linux_filetracer* lf;
     filetracer(drakvuf_t drakvuf, output_format_t output);
     ~filetracer();
+    virtual bool stop_impl() override;
 };
 
 #endif

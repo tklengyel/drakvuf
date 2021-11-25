@@ -962,11 +962,10 @@ rootkitmon::~rootkitmon()
     delete[] offsets;
 }
 
-bool rootkitmon::stop()
+bool rootkitmon::stop_impl()
 {
     if (!is_stopping() && !done_final_analysis)
     {
-        m_is_stopping = true;
         PRINT_DEBUG("[ROOTKITMON] Injecting KiDeliverApc\n");
         // Hook dummy function so we could make final system analysis
         auto hook = createSyscallHook("KiDeliverApc", &rootkitmon::final_check_cb);
@@ -975,12 +974,14 @@ bool rootkitmon::stop()
             // Skip final analysis
             PRINT_DEBUG("[ROOTKITMON] Failed to hook KiDeliverApc\n");
             done_final_analysis = true;
-            return true;
+            return pluginex::stop_impl();
         }
         this->syscall_hooks.push_back(std::move(hook));
         // Return status `Pending`
         return false;
     }
+    if (done_final_analysis)
+        return pluginex::stop_impl();
     // Return status `Pending`
-    return done_final_analysis;
+    return false;
 }

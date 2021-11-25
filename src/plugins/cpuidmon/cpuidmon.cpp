@@ -180,3 +180,8 @@ cpuidmon::cpuidmon(drakvuf_t _drakvuf, bool _stealth, output_format_t _output)
 }
 
 cpuidmon::~cpuidmon(void) {}
+
+bool cpuidmon::stop_impl()
+{
+    return true;
+}

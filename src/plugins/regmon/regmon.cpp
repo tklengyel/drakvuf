@@ -661,3 +661,8 @@ regmon::regmon(drakvuf_t drakvuf, output_format_t output)
 }
 
 regmon::~regmon(void) {}
+
+bool regmon::stop_impl()
+{
+    return true;
+}

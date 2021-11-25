@@ -317,11 +317,10 @@ dkommon::~dkommon()
     delete[] offsets;
 }
 
-bool dkommon::stop()
+bool dkommon::stop_impl()
 {
     if (!is_stopping())
     {
-        m_is_stopping = true;
         auto temp_processes = std::move(this->live_processes);
         this->live_processes.clear();
         drakvuf_enumerate_processes(drakvuf, process_visitor, static_cast<void*>(this));
@@ -343,5 +342,5 @@ bool dkommon::stop()
                 print_driver_information(drakvuf, nullptr, this->format, "Hidden Driver", drvname.c_str());
         }
     }
-    return true;
+    return pluginex::stop_impl();
 }

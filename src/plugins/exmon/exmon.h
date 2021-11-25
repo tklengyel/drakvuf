@@ -129,6 +129,7 @@ public:
 
     exmon(drakvuf_t drakvuf, output_format_t output);
     ~exmon();
+    virtual bool stop_impl() override;
 };
 
 #endif

@@ -115,6 +115,7 @@ public:
 
     crashmon(drakvuf_t drakvuf, output_format_t output);
 
+    virtual bool stop_impl() override;
 private:
     drakvuf_trap_t trap =
     {

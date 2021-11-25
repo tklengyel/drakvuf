@@ -1448,15 +1448,13 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
 
 filedelete::~filedelete()
 {
-    if (!m_is_stopping)
-        stop();
+    stop();
     delete[] offsets;
 }
 
-bool filedelete::stop()
+bool filedelete::stop_impl()
 {
     for (unsigned long i = 0; i < sizeof(traps)/sizeof(traps[0]); ++i)
         drakvuf_remove_trap(drakvuf, &traps[i], nullptr);
-    m_is_stopping = true;
     return closing_handles.empty();
 }

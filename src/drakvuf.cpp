@@ -179,7 +179,7 @@ struct stop_plugins_data
 
 static bool is_stopped(drakvuf_t drakvuf, void* data)
 {
-    auto d = (struct stop_plugins_data*)data;
+    auto d = reinterpret_cast<struct stop_plugins_data*>(data);
     auto rc = drakvuf_is_interrupted(drakvuf);
     if (SIGDRAKVUFTIMEOUT == rc)
     {
@@ -189,7 +189,6 @@ static bool is_stopped(drakvuf_t drakvuf, void* data)
     else
     {
         rc = d->_drakvuf_c->stop_plugins(d->plugin_list);
-        PRINT_DEBUG("[STOP] Check plugins %d\n", rc);
         return rc == 0;
     }
 }
@@ -202,7 +201,7 @@ void drakvuf_c::plugin_stop_loop(int timeout, const bool* plugin_list)
     struct stop_plugins_data data;
     data._drakvuf_c = this;
     data.plugin_list = plugin_list;
-    drakvuf_loop(drakvuf, ::is_stopped, (void*)&data);
+    drakvuf_loop(drakvuf, ::is_stopped, reinterpret_cast<void*>(&data));
     cleanup_timer();
 }
 
