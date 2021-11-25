@@ -135,7 +135,7 @@ public:
 
     ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_t output);
     ~ssdtmon();
-    bool stop() override;
+    virtual bool stop_impl() override;
 };
 
 #endif

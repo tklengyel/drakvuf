@@ -265,3 +265,8 @@ windowmon::windowmon(drakvuf_t drakvuf, const windowmon_config* c, output_format
 
     json_object_put(profile_json);
 }
+
+bool windowmon::stop_impl()
+{
+    return true;
+}

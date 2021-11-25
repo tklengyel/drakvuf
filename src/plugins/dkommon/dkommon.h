@@ -124,7 +124,7 @@ public:
 
     dkommon(drakvuf_t drakvuf, const void* config, output_format_t output);
     ~dkommon();
-    bool stop();
+    bool stop_impl() override;
 
 private:
     drakvuf_trap_t zeropage_trap =

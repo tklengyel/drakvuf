@@ -121,7 +121,7 @@ public:
     bsodmon(drakvuf_t drakvuf, bool abort_on_bsod, output_format_t output);
     ~bsodmon();
 
-    bool stop();
+    virtual bool stop_impl() override;
 
 private:
     drakvuf_trap_t trap =

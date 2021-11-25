@@ -161,7 +161,7 @@ public:
     procdump(drakvuf_t drakvuf, const procdump_config* config, output_format_t output);
     ~procdump();
 
-    bool stop();
+    virtual bool stop_impl() override;
 };
 
 #endif

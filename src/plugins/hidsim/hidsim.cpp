@@ -169,12 +169,9 @@ std::string construct_sock_path(drakvuf_t drakvuf)
     return sock_path;
 }
 
-hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config)
+hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config) :
+    has_to_stop{false}, coords{0}
 {
-    /* Explicitly initialize thread communication primitives */
-    this->has_to_stop.store(false);
-    this->coords.store(0);
-
     /* Constructs path to Unix domain socket of Xen guest under investigation */
     this->sock_path = construct_sock_path(drakvuf);
     PRINT_DEBUG("[HIDSIM] Using Unix domain socket: %s\n", this->sock_path.c_str());
@@ -186,12 +183,7 @@ hidsim::hidsim(drakvuf_t drakvuf, const hidsim_config* config)
             this->template_path.c_str());
     }
 
-    if (config->is_rand_clicks)
-    {
-        this->is_rand_clicks = config->is_rand_clicks;
-    }
-    else
-        this->is_rand_clicks = false;
+    this->is_rand_clicks = config->is_rand_clicks;
 
     /* Prepares monitoring, if requested */
     if (config->is_monitor)
@@ -220,14 +212,12 @@ hidsim::~hidsim()
     this->stop();
 };
 
-bool hidsim::stop()
+bool hidsim::stop_impl()
 {
     PRINT_DEBUG("[HIDSIM] Stopping HID injection\n");
 
-    if (!this->m_is_stopping)
+    if (!is_stopping())
     {
-
-        this->m_is_stopping = true;
         this->has_to_stop = true;
 
         if (this->thread_inject.joinable())

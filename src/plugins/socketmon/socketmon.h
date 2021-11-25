@@ -150,6 +150,7 @@ public:
 
     socketmon(drakvuf_t drakvuf, const socketmon_config* config, output_format_t output);
     ~socketmon();
+    virtual bool stop_impl() override;
 };
 
 #endif

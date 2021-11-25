@@ -130,7 +130,7 @@ class hidsim : public plugin
 
 public:
     void start();
-    bool stop() override;
+    virtual bool stop_impl() override;
     hidsim(drakvuf_t drakvuf, const hidsim_config* config);
     ~hidsim();
 

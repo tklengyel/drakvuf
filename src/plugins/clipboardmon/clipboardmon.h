@@ -120,6 +120,7 @@ public:
 
     clipboardmon(drakvuf_t drakvuf, const clipboardmon_config* config, output_format_t output);
 
+    virtual bool stop_impl() override;
 private:
     drakvuf_trap_t traps[4] =
     {

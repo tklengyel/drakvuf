@@ -435,11 +435,10 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
     this->sdt_shadow_crc = ssdtmon_sha256_calc(vmi, this->sdt_shadow_va, is64 ? 64 : 32);
 }
 
-bool ssdtmon::stop()
+bool ssdtmon::stop_impl()
 {
     if (!is_stopping())
     {
-        m_is_stopping = true;
         bool is64 = (drakvuf_get_page_mode(drakvuf) == VMI_PM_IA32E);
         vmi_lock_guard vmi(drakvuf);
         if (sdt_crc != ssdtmon_sha256_calc(vmi, sdt_va, is64 ? 32 : 16))
@@ -451,7 +450,7 @@ bool ssdtmon::stop()
             fmt::print(format, "ssdtmon", drakvuf, nullptr, keyval("Table", fmt::Qstr("SDTShadow")));
         }
     }
-    return true;
+    return pluginex::stop_impl();
 }
 
 ssdtmon::~ssdtmon()

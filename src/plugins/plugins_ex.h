@@ -415,7 +415,7 @@ public:
 
     pluginex(drakvuf_t drakvuf, output_format_t output);
     virtual ~pluginex();
-    virtual bool stop();
+    virtual bool stop_impl() override;
     void destroy_all_traps();
 
     /**********************************
