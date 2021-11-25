@@ -159,3 +159,55 @@ int patch_payload(injector_t injector, unsigned char* addr)
 
     return 0;
 }
+
+bool write_binary_to_memory(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+
+    injector->binary_addr = injector->payload_addr + injector->payload_size;
+
+    ACCESS_CONTEXT(ctx);
+    ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+    ctx.dtb = info->regs->cr3;
+    ctx.addr = injector->binary_addr;
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    bool success = ( VMI_SUCCESS == vmi_write(vmi, &ctx, injector->binary_size, (void*)injector->binary, NULL) );
+    drakvuf_release_vmi(drakvuf);
+
+    if (!success)
+        PRINT_DEBUG("Failed to write the binary into memory!\n");
+
+    return success;
+}
+
+// PspCallProcessNotifyRoutines
+bool trap_process_notify_routines(drakvuf_t drakvuf, injector_t injector)
+{
+    addr_t kernbase = 0, process_notify_rva = 0;
+
+    // Get address of PspCallProcessNotifyRoutines() from the JSON debug info
+    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "PspCallProcessNotifyRoutines", &process_notify_rva) )
+    {
+        PRINT_DEBUG("[-] Error getting PspCallProcessNotifyRoutines RVA\n");
+        return false;
+    }
+
+    kernbase = drakvuf_get_kernel_base(drakvuf);
+    injector->process_notify = kernbase + process_notify_rva;
+
+    // Save breakpoint address to restore it later
+    injector->saved_bp = injector->bp.breakpoint.addr;
+    injector->bp.breakpoint.addr = injector->process_notify;
+    injector->bp.ttl = UNLIMITED_TTL;
+    injector->bp.ah_cb = NULL;
+
+    if ( !drakvuf_add_trap(drakvuf, &injector->bp) )
+    {
+        PRINT_DEBUG("Could not place breakpoint on PspCallProcessNotifyRoutines() at: 0x%lx", injector->bp.breakpoint.addr);
+        return false;
+    }
+
+    PRINT_DEBUG("BP placed on PspCallProcessNotifyRoutines() at: 0x%lx\n", injector->bp.breakpoint.addr);
+    return true;
+}
