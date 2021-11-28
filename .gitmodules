@@ -6,10 +6,6 @@
 	path = libvmi
 	url = https://github.com/tklengyel/libvmi
 	ignore = dirty
-[submodule "drakvuf-doppelganging"]
-	path = drakvuf-doppelganging
-	url = https://github.com/tklengyel/drakvuf-doppelganging.git
-	ignore = dirty
 [submodule "volatility3"]
 	path = volatility3
 	url = https://github.com/tklengyel/volatility3

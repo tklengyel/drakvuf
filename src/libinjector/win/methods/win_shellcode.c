@@ -105,9 +105,6 @@
 #include "win_shellcode.h"
 #include <win/win_functions.h>
 #include <win/method_helpers.h>
-#ifdef ENABLE_DOPPELGANGING
-#include "win_dopple.h"
-#endif
 
 static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
 static bool inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
@@ -157,47 +154,10 @@ event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* in
             if (!inject_payload(drakvuf, info))
                 return cleanup(injector, info);
 
-#ifdef ENABLE_DOPPELGANGING
-            if (injector->method != INJECT_METHOD_DOPP)
-#endif
-                return override_step(injector, STEP5, VMI_EVENT_RESPONSE_SET_REGISTERS);
-
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
         }
-#ifdef ENABLE_DOPPELGANGING
-        case STEP4: // Handle breakpoint on PspCallProcessNotifyRoutines()
-        {
-            addr_t saved_rip = 0;
-
-            // Get saved RIP from the stack
-            ACCESS_CONTEXT(ctx,
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3,
-                .addr = info->regs->rsp
-            );
-
-            vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-            bool success = (VMI_SUCCESS == vmi_read(vmi, &ctx, sizeof(addr_t), &saved_rip, NULL));
-            drakvuf_release_vmi(drakvuf);
-
-            if ( !success )
-            {
-                PRINT_DEBUG("[-] Error while reading the saved RIP\n");
-                return cleanup(injector, info);
-            }
-
-            // Bypass call to the function
-            info->regs->rip = saved_rip;
-            info->regs->rsp += 0x8;
-
-            // Restore original value of the breakpoint
-            injector->bp.breakpoint.addr = injector->saved_bp;
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-#endif
-        case STEP5:
+        case STEP4:
         {
             PRINT_DEBUG("Shellcode executed\n");
             injector->rc = INJECTOR_SUCCEEDED;
@@ -206,7 +166,7 @@ event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* in
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
         }
-        case STEP6:
+        case STEP5:
         {
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
             drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
@@ -231,7 +191,7 @@ static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
         injector->rc = INJECTOR_FAILED;
 
     memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-    return override_step(injector, STEP6, VMI_EVENT_RESPONSE_SET_REGISTERS);
+    return override_step(injector, STEP5, VMI_EVENT_RESPONSE_SET_REGISTERS);
 }
 
 static bool write_payload_to_guest_memory(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -260,20 +220,6 @@ static bool inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
 
-#ifdef ENABLE_DOPPELGANGING
-    // If we are doing process doppelganging we need to write the binary to
-    // inject in memory too (in addition to the shellcode), since it is not
-    // present in the guest's filesystem.
-    if (INJECT_METHOD_DOPP == injector->method)
-    {
-        if (!write_binary_to_memory(drakvuf, info))
-            return false;
-
-        // Patch payload
-        PRINT_DEBUG("Patching the shellcode with user inputs..\n");
-        patch_payload(injector, (unsigned char*)injector->payload);
-    }
-#endif
     if (!write_payload_to_guest_memory(drakvuf, info))
         return false;
 
@@ -284,16 +230,6 @@ static bool inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     }
 
     info->regs->rip = injector->payload_addr;
-
-#ifdef ENABLE_DOPPELGANGING
-    // At some point the shellcode will call NtCreateThreadEx() which in turn
-    // will cause a call to PspCallProcessNotifyRoutines(). In our case,
-    // this function will make NtCreateThreadEx() to fail and the binary we
-    // want to inject will never run. We want to place a breakpoint on it to
-    // bypass this call.
-    if (INJECT_METHOD_DOPP == injector->method && !trap_process_notify_routines(drakvuf, injector))
-        return false;
-#endif
 
     PRINT_DEBUG("Executing the payload..\n");
     return true;

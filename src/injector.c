@@ -137,7 +137,7 @@ static inline void print_help(void)
         "\t                           [WIN]\n"
         "\t                             createproc (32 and 64-bit) - Spawn a windows process using CreateProcessW ( use -e for specifying the program )\n"
         "\t                             shellexec (32 and 64-bit) - Spawn a process using ShellExecute ( use -e for specifying the program )\n"
-        "\t                             shellcode or doppelganging (Win10) (64bit)\n"
+        "\t                             shellcode (Win10) (64bit)\n"
         "\t                           [LINUX] (64 bit support only)\n"
         "\t                             shellcode  - Execute shellcode binary ( use -e for specifying the shellcode binary )\n"
         "\t                             execproc - Run any process using vfork and execve ( -e for specifying the program, -f for args )\n"
@@ -147,9 +147,6 @@ static inline void print_help(void)
         "\t -f <args for execproc>    [LINUX] - Arguments specified for exec to include (requires -m execproc)\n"
         "\t                           [LINUX] (execproc -> execve(const char *file, const char *argv[], const char* envp[]); 64bit only)\n"
         "\t [-B] <path>               The host path of the binary:\n"
-#ifdef ENABLE_DOPPELGANGING
-        "\t                             [WIN] for -m doppelganging: to inject into the guest VM\n"
-#endif
         "\t                             for -m readfile: where to store the file read out from VM\n"
         "\t                             for -m writefile: to write into the guest VM\n"
         "\t [-P] <target>             The guest path of the clean guest process to use as a cover (requires -m doppelganging)\n"
@@ -222,8 +219,6 @@ int main(int argc, char** argv)
                     injection_method = INJECT_METHOD_CREATEPROC;
                 else if (!strncmp(optarg, "shellcode", 9))
                     injection_method = INJECT_METHOD_SHELLCODE;
-                else if (!strncmp(optarg, "doppelganging", 13))
-                    injection_method = INJECT_METHOD_DOPP;
                 else if (!strncmp(optarg, "execproc", 8))
                     injection_method = INJECT_METHOD_EXECPROC;
                 else if (!strncmp(optarg, "readfile", 8))
@@ -277,11 +272,6 @@ int main(int argc, char** argv)
         }
 
     if ( !json_kernel_path || !domain || !injection_pid || !inject_file )
-    {
-        print_help();
-        return 1;
-    }
-    if ( INJECT_METHOD_DOPP == injection_method && (!binary_path || !target_process) )
     {
         print_help();
         return 1;
