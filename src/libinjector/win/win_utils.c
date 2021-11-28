@@ -278,7 +278,6 @@ void print_injection_info(output_format_t format, const char* file, injector_t i
         [INJECT_METHOD_TERMINATEPROC] = "TerminateProc",
         [INJECT_METHOD_SHELLEXEC] = "ShellExec",
         [INJECT_METHOD_SHELLCODE] = "Shellcode",
-        [INJECT_METHOD_DOPP] = "Doppelganging",
         [INJECT_METHOD_READ_FILE] = "ReadFile",
         [INJECT_METHOD_WRITE_FILE] = "WriteFile",
     };

@@ -535,7 +535,6 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             break;
         }
         case INJECT_METHOD_SHELLCODE:
-        case INJECT_METHOD_DOPP:
         {
             event = handle_win_shellcode(drakvuf, info);
             break;
@@ -610,7 +609,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     return true;
 }
 
-static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector, const char* file, const char* binary_path)
+static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector, const char* file)
 {
     addr_t eprocess_base = 0;
     if ( !drakvuf_find_process(drakvuf, injector->target_pid, NULL, &eprocess_base) )
@@ -653,17 +652,6 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
             injector->exec_func = get_function_va(drakvuf, eprocess_base, "shell32.dll", "ShellExecuteW", injector->global_search);
             break;
         }
-        case INJECT_METHOD_DOPP:
-        {
-            // Read binary to inject from a file
-            if ( !load_file_to_memory(&injector->binary, &injector->binary_size, binary_path) )
-                return false;
-#ifndef ENABLE_DOPPELGANGING
-            fprintf(stderr, "Please build DRAKVUF with --enable-doppleganging-injection");
-            return false;
-#endif
-        }
-        // fall through
         case INJECT_METHOD_SHELLCODE:
         {
             // Read shellcode from a file
@@ -783,7 +771,7 @@ injector_status_t injector_start_app_on_win(
     injector->step_override = false;
     injector->set_gprs_only = true;
 
-    if (!initialize_injector_functions(drakvuf, injector, file, binary_path))
+    if (!initialize_injector_functions(drakvuf, injector, file))
     {
         PRINT_DEBUG("Unable to initialize injector functions\n");
         injector->result = INJECT_RESULT_INIT_FAIL;
@@ -873,7 +861,7 @@ void injector_terminate_on_win(drakvuf_t drakvuf,
     injector->terminate_pid = pid;
     injector->status = STATUS_NULL;
 
-    if (!initialize_injector_functions(drakvuf, injector, NULL, NULL))
+    if (!initialize_injector_functions(drakvuf, injector, NULL))
     {
         PRINT_DEBUG("Unable to initialize injector functions\n");
         free_injector(injector);
