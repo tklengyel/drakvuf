@@ -168,15 +168,6 @@ static std::set<std::string> enumerate_drivers(dkommon* plugin, drakvuf_t drakvu
     return drivers_list;
 }
 
-static event_response_t notify_zero_page_write(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto plugin = static_cast<dkommon*>(info->trap->data);
-    fmt::print(plugin->format, "dkommon", drakvuf, info,
-        keyval("Message", fmt::Qstr("Zero Page Write"))
-    );
-    return 0;
-}
-
 static void process_visitor(drakvuf_t drakvuf, addr_t process, void* pass_ctx)
 {
     auto plugin = static_cast<dkommon*>(pass_ctx);
@@ -307,9 +298,6 @@ dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
         PRINT_DEBUG("[DKOMMON] Failed to setup critical traps\n");
         throw -1;
     }
-
-    zeropage_trap.cb = notify_zero_page_write;
-    if (!drakvuf_add_trap(drakvuf, &zeropage_trap)) throw -1;
 }
 
 dkommon::~dkommon()
