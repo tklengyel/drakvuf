@@ -17,7 +17,7 @@ else
     apt-get update
 fi
 
-apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive clang python3-dev libsystemd-dev nasm bc libx11-dev
+apt-get --quiet --yes install build-essential git wget curl cmake flex bison libjson-c-dev autoconf-archive clang python3-dev libsystemd-dev nasm bc libx11-dev ninja-build
 
 wget -O /usr/local/go1.15.3.linux-amd64.tar.gz https://golang.org/dl/go1.15.3.linux-amd64.tar.gz
 tar -C /usr/local -xzf /usr/local/go1.15.3.linux-amd64.tar.gz
