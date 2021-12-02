@@ -776,7 +776,7 @@ socketmon::socketmon(drakvuf_t drakvuf, const socketmon_config* c, output_format
                 tcpe_cb = tcpe_win81_x64_cb;
                 break;
             case VMI_OS_WINDOWS_10:
-                if (build < 1734)
+                if (build < 17134)
                     // Tested on Windows 10 x64 before 1803
                     tcpe_cb = tcpe_win10_x64_cb;
                 else
