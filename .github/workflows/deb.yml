@@ -37,6 +37,15 @@ jobs:
       with:
         name: release-url
         path: release-url.txt
+    - name: Delete old release
+      uses: dev-drprasad/delete-older-releases@v0.2.0
+      if: github.ref == 'refs/heads/master'
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      with:
+        repo: tklengyel/drakvuf-builds
+        keep_latest: 1
+        delete_tags: true
   deb:
     needs: [release]
     runs-on: ubuntu-18.04
