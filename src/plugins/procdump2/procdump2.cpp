@@ -336,13 +336,13 @@ event_response_t procdump2::terminate_process_cb(drakvuf_t,
     for (auto& [pid, ctx]: this->active)
     {
         bool is_target = drakvuf_check_return_context(drakvuf, info,
-            ctx->target.ret_pid,
-            ctx->target.ret_tid,
-            ctx->target.ret_rsp);
+                ctx->target.ret_pid,
+                ctx->target.ret_tid,
+                ctx->target.ret_rsp);
         bool is_host = drakvuf_check_return_context(drakvuf, info,
-            ctx->host.ret_pid,
-            ctx->host.ret_tid,
-            ctx->host.ret_rsp);
+                ctx->host.ret_pid,
+                ctx->host.ret_tid,
+                ctx->host.ret_rsp);
         if (is_target || is_host)
         {
             if (dispatch_wakeup(info, ctx, is_target))
@@ -1374,16 +1374,16 @@ bool procdump2::start_copy_memory(drakvuf_trap_info_t* info, std::shared_ptr<pro
         auto [base, size] = get_memory_region(info, ctx);
         if (base && size)
         {
-        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-            "Copy memory region [%#lx;%#lx]\n"
-            , info->event_uid
-            , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, static_cast<int>(ctx->stage)
-            , base, size
-        );
-        copy_memory(info, ctx, base, size);
+            PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                "Copy memory region [%#lx;%#lx]\n"
+                , info->event_uid
+                , info->attached_proc_data.pid, info->attached_proc_data.tid
+                , ctx->target_process_pid, static_cast<int>(ctx->stage)
+                , base, size
+            );
+            copy_memory(info, ctx, base, size);
             return true;
-    }
+        }
     }
 
     return false;
