@@ -166,12 +166,13 @@ enum class procdump_stage
     need_suspend,  // 0
     suspend,       // 1
     pending,       // 2
-    allocate_pool, // 3
-    get_irql,      // 4
+    get_irql,      // 3
+    allocate_pool, // 4
     copy_memory,   // 5
     resume,        // 6
     awaken,        // 7
-    finished       // 8
+    finished,      // 8
+    invalid        // 9
 };
 
 struct return_ctx
@@ -190,12 +191,34 @@ struct procdump2_ctx
     /* For self-terminating process working thread injects PsSuspendProcess.
      * Thus it should remove task.
      */
-    bool is_self_terminating = false;
+    bool is_hosted = false;
+    /* Processes targeted on analysys finish are not self-terminating neither
+     * hosted. So after resuming such a target should be finished.
+     */
+    bool wait_awaken = true;
     procdump_stage stage{procdump_stage::pending};
-    return_ctx suspend;
+    return_ctx host;
+    return_ctx target;
     return_ctx working;
 
-    /* Target process info */
+    /* Host process info.
+     *
+     * The process which terminates other process is "host" one.
+     * One should suspend such a process and target process.
+     * After task finishes one should resume host process. The host process
+     * would continue terminating target process.
+     */
+    addr_t    host_process_base{0};
+
+    /* Target process info.
+     *
+     * Target process which would be terminated.
+     * The process could self terminate. Or it could be terminated by other
+     * process (aka "host process").
+     *
+     * Target process should be suspended to avoid memory modification while
+     * processing.
+     */
     addr_t    target_process_base{0};
     string    target_process_name;
     vmi_pid_t target_process_pid{0};
@@ -212,13 +235,15 @@ struct procdump2_ctx
     const uint64_t                  idx{0};
     std::unique_ptr<ProcdumpWriter> writer;
 
-    procdump2_ctx(addr_t base,
+    procdump2_ctx(bool is_hosted,
+        addr_t base,
         std::string name,
         vmi_pid_t pid,
         uint64_t idx_,
         std::string procdump_dir,
         bool use_compression)
-        : target_process_base(base)
+        : is_hosted(is_hosted)
+        , target_process_base(base)
         , target_process_name(name)
         , target_process_pid(pid)
         , idx(idx_)
