@@ -71,6 +71,8 @@ If target process not been suspended one have to inject `PsSuspendProcess`.
 
 ## The tasks state machine
 
+**TODO** Switch "allocate_pool" and "get_irql".
+
 ```
 ┌────────────┐     ┌───────┬───────────┐
 │need_suspend│ ┌──►│pending│           │
