@@ -1056,5 +1056,5 @@ procdump::~procdump()
 bool procdump::stop_impl()
 {
     destroy_all_traps();
-    return terminating.empty();
+    return true;
 }
