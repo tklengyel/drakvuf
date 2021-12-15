@@ -122,6 +122,8 @@ struct procdump2_config
     vmi_pid_t procdump_on_finish;
     std::shared_ptr<std::unordered_map<vmi_pid_t, bool>> terminated_processes;
     const char* hal_profile;
+    bool disable_kideliverapc_hook;
+    bool disable_kedelayexecutionthread_hook;
 };
 
 struct procdump2_ctx;
@@ -137,19 +139,43 @@ public:
 
 private:
     /* Config */
-    std::string const                                    procdump_dir; // TODO Use `std::filesystem::path`
-    vmi_pid_t                                            procdump_on_finish{0}; // TODO Rename
+    // TODO Use `std::filesystem::path`
+    std::string const                                    procdump_dir;
+    // TODO Rename
+    vmi_pid_t                                            procdump_on_finish{0};
     bool const                                           use_compression{false};
 
     /* Internal data */
     drakvuf_t                                            drakvuf{nullptr};
     uint64_t                                             procdumps_count{0};
     std::unique_ptr<pool_manager>                        pools;
-    std::unique_ptr<libhook::SyscallHook>                terminate_process_hook;
-    std::unique_ptr<libhook::SyscallHook>                deliver_apc_hook;
     std::map<vmi_pid_t, std::shared_ptr<procdump2_ctx>>  active;
-    std::set<vmi_pid_t>                                  finished;
-    std::set<vmi_pid_t>                                  working_threads; // TODO Add manager
+    /* Set of finished tasks.
+     *
+     * Prevents process dump on second call of NtTerminateProcess.
+     *
+     * kernel32!ExitProcess calls NtTerminateProcess twice with handle 0
+     * and 0xffffffff. Thus we should avoid to dumping process's memory on
+     * second call.
+     *
+     * // FIXME Hook process creation and remove from finished list reused PIDs.
+     * // TODO Move this long description into README at the end of development.
+     */
+    std::set<vmi_pid_t> finished;
+    /* Set of used working threads.
+     *
+     * This set is used in dispatcher routines to check if current thread is
+     * working thread already. If not then current thread could be used to
+     * process new task.
+     *
+     * // TODO Move this long description into README at the end of development.
+     */
+    std::set<uint32_t> working_threads;
+
+    /* Hooks */
+    std::unique_ptr<libhook::SyscallHook> terminate_process_hook;
+    std::unique_ptr<libhook::SyscallHook> deliver_apc_hook;
+    std::unique_ptr<libhook::SyscallHook> delay_execution_hook;
 
     /* VA of functions to be injected */
     addr_t malloc_va{0};
@@ -172,12 +198,14 @@ private:
     /* Hook handlers */
     event_response_t deliver_apc_cb(drakvuf_t, drakvuf_trap_info_t*);
     event_response_t terminate_process_cb(drakvuf_t, drakvuf_trap_info_t*);
+    event_response_t delay_execution_cb(drakvuf_t, drakvuf_trap_info_t*);
 
     /* Dispatchers */
+    event_response_t dispatcher(drakvuf_trap_info_t*);
     void dispatch_active(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
-    void dispatch_new(drakvuf_trap_info_t*);
+    bool dispatch_new(drakvuf_trap_info_t*);
     bool dispatch_pending(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
-    bool dispatch_wakeup(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    bool dispatch_wakeup(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>, bool);
 
     /* Injection helpers */
     void allocate_pool(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
@@ -187,18 +215,21 @@ private:
     void suspend(drakvuf_trap_info_t*, addr_t, return_ctx&);
 
     /* Routines */
+    std::shared_ptr<procdump2_ctx> continues_task(drakvuf_trap_info_t*);
     void finish_task(std::shared_ptr<procdump2_ctx>);
     addr_t get_function_va(std::string_view, std::string_view);
     std::pair<addr_t, size_t> get_memory_region(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
-    void inject_function_return(drakvuf_trap_info_t* info);
     bool is_active_process(vmi_pid_t pid);
     bool is_process_handled(vmi_pid_t pid);
     bool is_plugin_active();
     bool prepare_minidump(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     void print_failure(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>, const std::string& message);
+    void print_failure(drakvuf_trap_info_t*, vmi_pid_t, const std::string& message);
+    void print_failure(drakvuf_trap_info_t*, const std::string& message);
     void read_vm(addr_t, std::shared_ptr<procdump2_ctx> procdump_ctx, bool);
     void restore(drakvuf_trap_info_t*, x86_registers_t&);
     void save_file_metadata(std::shared_ptr<procdump2_ctx>, proc_data_t*);
+    bool start_copy_memory(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
 };
 
 #endif
