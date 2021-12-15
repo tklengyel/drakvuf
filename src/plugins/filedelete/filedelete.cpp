@@ -1449,12 +1449,21 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
 filedelete::~filedelete()
 {
     stop();
+    /* NOTE One should rund drakvuf loop to restore VM state.
+     *
+     * The plug-in injects syscalls thuns changes the state. So to avoid BSOD
+     * one should restore state here. This requires to allow VM to live for a
+     * while.
+     *
+     * Hint: there is no need to waite all files read finish. Just waite every
+     * hook and restore state.
+     */
+    for (unsigned long i = 0; i < sizeof(traps)/sizeof(traps[0]); ++i)
+        drakvuf_remove_trap(drakvuf, &traps[i], nullptr);
     delete[] offsets;
 }
 
 bool filedelete::stop_impl()
 {
-    for (unsigned long i = 0; i < sizeof(traps)/sizeof(traps[0]); ++i)
-        drakvuf_remove_trap(drakvuf, &traps[i], nullptr);
     return closing_handles.empty();
 }
