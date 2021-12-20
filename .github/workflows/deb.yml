@@ -53,7 +53,8 @@ jobs:
       fail-fast: false
       matrix:
         container:
-          - "debian:buster"
+          - "debian:10-slim"
+          - "debian:11-slim"
           - "ubuntu:focal"
     steps:
       - uses: actions/checkout@v2
