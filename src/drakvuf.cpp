@@ -236,8 +236,7 @@ drakvuf_c::~drakvuf_c()
 
     delete plugins;
 
-    if (drakvuf)
-        drakvuf_close(drakvuf, leave_paused);
+    drakvuf_close(drakvuf, leave_paused);
 }
 
 void drakvuf_c::interrupt(int signal)
