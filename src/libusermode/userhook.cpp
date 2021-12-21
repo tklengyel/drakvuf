@@ -350,15 +350,12 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
     while (dll_meta->pf_current_addr <= dll_meta->pf_max_addr)
     {
         page_info_t pinfo;
-        addr_t pa;
         if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, dll_meta->pf_current_addr, &pinfo) == VMI_SUCCESS)
         {
             PRINT_DEBUG("[USERHOOK] Export info accessible OK %llx\n", (unsigned long long)dll_meta->pf_current_addr);
             dll_meta->pf_current_addr += VMI_PS_4KB;
             continue;
         }
-
-        pa = pinfo.paddr;
 
         if (vmi_request_page_fault(vmi, info->vcpu, dll_meta->pf_current_addr, 0) == VMI_SUCCESS)
         {
