@@ -675,9 +675,6 @@ AC_TYPE_SIZE_T
 AC_HEADER_TIME
 AC_STRUCT_TM
 
-# Checks for library functions.
-AC_FUNC_MALLOC
-
 # Make sure we get standard PRI... definitions.
 AH_VERBATIM([__STDC_FORMAT_MACROS],
             [/* C99 says: define this to get the PRI... macros from stdint.h */
