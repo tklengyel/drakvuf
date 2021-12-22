@@ -109,7 +109,9 @@ AC_INIT([DRAKVUF],
         [tamas@tklengyel.com], [],
         [https://drakvuf.com])
 AM_INIT_AUTOMAKE([1.10 no-define foreign subdir-objects])
-LT_INIT
+
+LT_INIT([disable-shared])
+
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
