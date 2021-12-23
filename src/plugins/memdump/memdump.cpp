@@ -889,22 +889,22 @@ static event_response_t set_information_thread_hook_cb(drakvuf_t drakvuf, drakvu
         .dtb = info->regs->cr3,
         .addr = wow64_context + plugin->wow64context_eax_rva
     );
-    addr_t eax = 0;
-    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&eax))
+    uint32_t wow_eax = 0;
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &wow_eax))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to read eax field from wow64_context\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
-    addr_t eip = 0;
+    uint32_t wow_eip = 0;
     ctx.addr = wow64_context + plugin->wow64context_eip_rva;
-    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, (uint32_t*)&eip))
+    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &wow_eip))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to read eip field from wow64_context\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    dump_if_points_to_executable_memory(drakvuf, info, vmi, resumed_eprocess, eax, "SetThreadContext heuristic", nullptr);
-    dump_if_points_to_executable_memory(drakvuf, info,  vmi, resumed_eprocess, eip, "SetThreadContext heuristic", nullptr);
+    dump_if_points_to_executable_memory(drakvuf, info, vmi, resumed_eprocess, wow_eax, "SetThreadContext heuristic", nullptr);
+    dump_if_points_to_executable_memory(drakvuf, info, vmi, resumed_eprocess, wow_eip, "SetThreadContext heuristic", nullptr);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
