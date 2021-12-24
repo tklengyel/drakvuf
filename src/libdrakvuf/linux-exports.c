@@ -340,6 +340,8 @@ next:
         char* symbol_name;
         ctx.addr = dynstr_offset + symbol_offset;
         symbol_name = vmi_read_str(vmi, &ctx);
+        if (!symbol_name)
+            return -1;
         addr_t symbol_size = strlen(symbol_name);
         if (strcmp(symbol_name, sym) == 0)
         {

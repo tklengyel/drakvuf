@@ -689,33 +689,32 @@ bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module
     return true;
 }
 
-bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list )
+bool win_get_module_list_wow(drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list)
 {
-    if ( wow_peb && drakvuf->wow_offsets)
-    {
-        vmi_instance_t vmi = drakvuf->vmi;
-        addr_t ldr=0;
-        addr_t modlist=0;
+    if (!wow_peb || !drakvuf->wow_offsets)
+        return false;
 
-        ctx->addr = wow_peb + drakvuf->wow_offsets[WOW_PEB_LDR];
+    vmi_instance_t vmi = drakvuf->vmi;
 
-        if (VMI_FAILURE == vmi_read_32( vmi, ctx, (uint32_t*)&ldr ) )
-            return false;
+    ctx->addr = wow_peb + drakvuf->wow_offsets[WOW_PEB_LDR];
 
-        ctx->addr = ldr + drakvuf->wow_offsets[WOW_PEB_LDR_DATA_INLOADORDERMODULELIST];
+    uint32_t ldr = 0;
+    if (VMI_FAILURE == vmi_read_32(vmi, ctx, &ldr))
+        return false;
 
-        if (VMI_FAILURE == vmi_read_32( vmi, ctx, (uint32_t*)&modlist ) )
-            return false;
+    ctx->addr = (addr_t)ldr + drakvuf->wow_offsets[WOW_PEB_LDR_DATA_INLOADORDERMODULELIST];
 
-        if (!modlist)
-            return false;
+    uint32_t modlist = 0;
+    if (VMI_FAILURE == vmi_read_32(vmi, ctx, &modlist))
+        return false;
 
+    if (!modlist)
+        return false;
+
+    if (module_list)
         *module_list = modlist;
 
-        return true;
-    }
-
-    return false ;
+    return true;
 }
 
 
@@ -1451,7 +1450,7 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
             uint32_t ptes;
             addr_t prototype_pte;
             uint64_t flags = 0;
-            uint64_t flags1 = 0;
+            uint32_t flags1 = 0;
 
             out_mmvad->file_name_ptr = 0;
 
@@ -1466,12 +1465,14 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
             else
             {
                 ctx.addr = node_addr + drakvuf->offsets[MMVAD_SHORT_FLAGS];
-                if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&flags) != VMI_SUCCESS)
+                uint32_t flags32 = 0;
+                if (vmi_read_32(drakvuf->vmi, &ctx, &flags32) != VMI_SUCCESS)
                 {
                     return false;
                 }
+                flags = flags32;
                 ctx.addr = mmvad_core + drakvuf->offsets[MMVAD_SHORT_FLAGS1];
-                if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&flags1) != VMI_SUCCESS)
+                if (vmi_read_32(drakvuf->vmi, &ctx, &flags1) != VMI_SUCCESS)
                 {
                     return false;
                 }
@@ -1588,7 +1589,7 @@ static bool win_traverse_mmvad_node(drakvuf_t drakvuf, addr_t node_addr, mmvad_c
     uint32_t ptes;
     addr_t prototype_pte;
     uint64_t flags = 0;
-    uint64_t flags1 = 0;
+    uint32_t flags1 = 0;
 
     mmvad_info_t mmvad;
     mmvad.file_name_ptr = 0;
@@ -1606,12 +1607,14 @@ static bool win_traverse_mmvad_node(drakvuf_t drakvuf, addr_t node_addr, mmvad_c
     else
     {
         ctx.addr = node_addr + drakvuf->offsets[MMVAD_SHORT_FLAGS];
-        if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&flags) != VMI_SUCCESS)
+        uint32_t flags32 = 0;
+        if (vmi_read_32(drakvuf->vmi, &ctx, &flags32) != VMI_SUCCESS)
         {
             return false;
         }
+        flags = flags32;
         ctx.addr = mmvad_core + drakvuf->offsets[MMVAD_SHORT_FLAGS1];
-        if (vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&flags1) != VMI_SUCCESS)
+        if (vmi_read_32(drakvuf->vmi, &ctx, &flags1) != VMI_SUCCESS)
         {
             return false;
         }

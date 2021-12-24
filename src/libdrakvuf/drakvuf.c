@@ -639,7 +639,13 @@ int drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const access
         *value = 0;
     bool is32bit = drakvuf_process_is32bit(drakvuf, info);
     if (is32bit)
-        return vmi_read_32(drakvuf->vmi, ctx, (uint32_t*)value);
+    {
+        uint32_t value32 = 0;
+        int status = vmi_read_32(drakvuf->vmi, ctx, &value32);
+        if (value)
+            *value = value32;
+        return status;
+    }
     else
         return vmi_read_64(drakvuf->vmi, ctx, value);
 }

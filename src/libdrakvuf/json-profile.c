@@ -188,7 +188,10 @@ symbols_t* json_get_symbols(json_object* json)
         if (!json_object_object_get_ex(json, "$FUNCTIONS", &symbols))
         {
             if (!json_object_object_get_ex(json, "$CONSTANTS", &symbols))
-                goto err_exit;
+            {
+                g_free(ret);
+                return NULL;
+            }
         }
     }
 
@@ -210,7 +213,9 @@ symbols_t* json_get_symbols(json_object* json)
             if (!json_object_object_get_ex(json_object_iter_peek_value(&it), "address", &address))
             {
                 PRINT_DEBUG("No address found for %s section found\n", json_object_iter_peek_name(&it));
-                goto err_exit;
+                g_free(ret->symbols);
+                g_free(ret);
+                return NULL;
             }
 
             ret->symbols[i].name = g_strdup(json_object_iter_peek_name(&it));
@@ -240,10 +245,6 @@ symbols_t* json_get_symbols(json_object* json)
     }
 
     return ret;
-
-err_exit:
-    free(ret);
-    return NULL;
 }
 
 void drakvuf_free_symbols(symbols_t* symbols)

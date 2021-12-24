@@ -980,6 +980,12 @@ void remove_trap(drakvuf_t drakvuf,
             if (!container->traps)
             {
                 struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &current_gfn);
+                if ( !remapped_gfn )
+                {
+                    fprintf(stderr, "Critical error in removing int3\n");
+                    drakvuf->interrupted = -1;
+                    break;
+                }
                 uint8_t backup;
 
                 if ( VMI_FAILURE == vmi_read_8_pa(drakvuf->vmi, container->breakpoint.pa, &backup) )
