@@ -210,9 +210,9 @@ bool win_enumerate_module_info_ctx_wow(drakvuf_t drakvuf, addr_t module_list_hea
     while (1)
     {
         /* follow the next pointer */
-        addr_t tmp_next = 0;
+        uint32_t tmp_next = 0;
         ctx->addr = next_module;
-        if (VMI_FAILURE == vmi_read_32(vmi, ctx, (uint32_t*)&tmp_next))
+        if (VMI_FAILURE == vmi_read_32(vmi, ctx, &tmp_next))
             return false;
 
         /* if we are back at the list head, we are done */
@@ -220,15 +220,15 @@ bool win_enumerate_module_info_ctx_wow(drakvuf_t drakvuf, addr_t module_list_hea
             break;
 
         ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_DLLBASE];
-        addr_t base_addr = 0;
-        if (vmi_read_32(vmi, ctx, (uint32_t*)&base_addr) == VMI_SUCCESS)
+        uint32_t base_addr = 0;
+        if (vmi_read_32(vmi, ctx, &base_addr) == VMI_SUCCESS)
         {
             ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
             unicode_string_t* base_name = drakvuf_read_unicode32_common(vmi, ctx);
 
             if (base_name)
             {
-                PRINT_DEBUG("Found WOW64 module %s at 0x%lx\n", base_name->contents, base_addr);
+                PRINT_DEBUG("Found WOW64 module %s at 0x%x\n", base_name->contents, base_addr);
 
                 ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
                 unicode_string_t* full_name = drakvuf_read_unicode32_common(vmi, ctx);
@@ -431,37 +431,22 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
         .addr = info->regs->rsp + narg * (is32 ? 4 : 8),
     );
 
-    if (is32)
-    {
-        uint32_t ret;
-        if (VMI_FAILURE == vmi_read_32(drakvuf->vmi, &ctx, &ret))
-            return 0;
-        return ret;
-    }
-    uint64_t ret;
-    if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
+    addr_t ret;
+    if (VMI_FAILURE == drakvuf_read_addr(drakvuf, info, &ctx, &ret))
         return 0;
     return ret;
 }
 
 addr_t win_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    bool is32 = drakvuf_process_is32bit(drakvuf, info);
-
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
         .addr = info->regs->rsp,
     );
 
-    int status;
-    addr_t ret_addr = 0;
-    if (is32)
-        status = vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)&ret_addr);
-    else
-        status = vmi_read_64(drakvuf->vmi, &ctx, &ret_addr);
-
-    if (status != VMI_SUCCESS)
+    addr_t ret_addr;
+    if (VMI_FAILURE == drakvuf_read_addr(drakvuf, info, &ctx, &ret_addr))
     {
         PRINT_DEBUG("Failed to read return address from the stack.\n");
         return 0;
