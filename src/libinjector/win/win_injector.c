@@ -109,6 +109,7 @@
 #include "methods/win_write_file.h"
 #include "methods/win_createproc.h"
 #include "methods/win_shellexec.h"
+#include "methods/win_terminate.h"
 
 static bool injector_set_hijacked(injector_t injector, drakvuf_trap_info_t* info)
 {
@@ -130,10 +131,7 @@ static bool setup_int3_trap(injector_t injector, drakvuf_trap_info_t* info, addr
 {
     injector->bp.type = BREAKPOINT;
     injector->bp.name = "entry";
-    if (INJECT_METHOD_TERMINATEPROC == injector->method)
-        injector->bp.cb = injector_int3_terminate_cb;
-    else
-        injector->bp.cb = injector_int3_cb;
+    injector->bp.cb = injector_int3_cb;
     injector->bp.data = injector;
     injector->bp.breakpoint.lookup_type = LOOKUP_DTB;
     injector->bp.breakpoint.dtb = info->regs->cr3;
@@ -381,132 +379,12 @@ bool check_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
     return true;
 }
 
-event_response_t injector_int3_terminate_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    injector_t injector = info->trap->data;
-
-    if (!check_int3_trap(injector, info))
-        return VMI_EVENT_RESPONSE_NONE;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    registers_t regs;
-    vmi_get_vcpuregs(vmi, &regs, info->vcpu);
-    drakvuf_release_vmi(drakvuf);
-
-    if (injector->status == STATUS_NULL)
-    {
-        /* We just hit the RIP from the trapframe */
-        PRINT_DEBUG("Open process %d to terminate it.\n", injector->terminate_pid);
-
-        memcpy(&injector->saved_regs, &regs, sizeof(x86_registers_t));
-
-        struct argument args[3] = { {0} };
-
-        enum
-        {
-            PROCESS_TERMINATE = 0x1,
-            PROCESS_CREATE_THREAD = 0x2,
-            PROCESS_VM_OPERATION = 0x8,
-            PROCESS_VM_WRITE = 0x10,
-            PROCESS_VM_READ = 0x20,
-            PROCESS_QUERY_INFORMATION = 0x400,
-        };
-
-        // OpenProcess(PROCESS_TERMINATE, false, PID)
-        init_int_argument(&args[0], PROCESS_TERMINATE | PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION | PROCESS_VM_WRITE | PROCESS_VM_READ | PROCESS_QUERY_INFORMATION);
-        init_int_argument(&args[1], 0);
-        init_int_argument(&args[2], injector->terminate_pid);
-
-        if (!setup_stack(injector->drakvuf, &regs.x86, args, ARRAY_SIZE(args)))
-        {
-            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-            return 0;
-        }
-
-        regs.x86.rip = injector->open_process;
-
-        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
-
-        injector->status = STATUS_OPEN;
-
-        return 0;
-    }
-    else if (injector->status == STATUS_OPEN)
-    {
-        PRINT_DEBUG("Process %d opened with handle %#lx. Terminate it!\n", injector->terminate_pid, regs.x86.rax);
-        struct argument args[7] = { {0} };
-
-        // CreateRemoteThread(handle, NULL, NULL, ExitProcess, 0, NULL, NULL)
-        init_int_argument(&args[0], regs.x86.rax);
-        init_int_argument(&args[1], 0);
-        init_int_argument(&args[2], 0);
-        init_int_argument(&args[3], injector->exit_process);
-        init_int_argument(&args[4], 0);
-        init_int_argument(&args[5], 0);
-        init_int_argument(&args[6], 0);
-
-        if (!setup_stack(injector->drakvuf, &regs.x86, args, ARRAY_SIZE(args)))
-        {
-            PRINT_DEBUG("Failed to setup stack for passing inputs!\n");
-            return 0;
-        }
-
-        regs.x86.rip = injector->exec_func;
-
-        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &regs);
-
-        injector->status = STATUS_TERMINATE;
-
-        return 0;
-    }
-    else if (injector->status == STATUS_TERMINATE)
-    {
-        if (info->regs->rax)
-            injector->rc = INJECTOR_SUCCEEDED;
-        else
-            injector->rc = INJECTOR_FAILED;
-
-        PRINT_DEBUG("Process %d terminated %ssuccessfully!\n", injector->terminate_pid, regs.x86.rax ? " " : "un");
-
-        drakvuf_remove_trap(drakvuf, info->trap, NULL);
-        drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
-
-        if (injector->rc == INJECTOR_SUCCEEDED)
-        {
-            PRINT_DEBUG("Terminated\n");
-        }
-        else
-        {
-            PRINT_DEBUG("Failed to terminate\n");
-            injector->rc = INJECTOR_FAILED;
-
-            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
-        }
-
-        drakvuf_interrupt(drakvuf, SIGINT);
-
-        return 0;
-    }
-
-    drakvuf_remove_trap(drakvuf, info->trap, NULL);
-    drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
-
-    drakvuf_set_vcpu_gprs(drakvuf, info->vcpu, &injector->saved_regs);
-
-    return 0;
-}
-
 event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
 
     if (!check_int3_trap(injector, info))
         return VMI_EVENT_RESPONSE_NONE;
-
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    registers_t regs;
-    vmi_get_vcpuregs(vmi, &regs, info->vcpu);
-    drakvuf_release_vmi(drakvuf);
 
     if (!injector_set_hijacked(injector, info))
         return 0;
@@ -539,6 +417,11 @@ event_response_t injector_int3_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             event = handle_win_shellcode(drakvuf, info);
             break;
         }
+        case INJECT_METHOD_TERMINATEPROC:
+        {
+            event = handle_win_terminate(drakvuf, info);
+            break;
+        }
         default:
         {
             fprintf(stderr, "This method is not implemented for 64bit\n");
@@ -568,7 +451,6 @@ static bool is_interrupted(drakvuf_t drakvuf, void* data __attribute__((unused))
 static bool inject(drakvuf_t drakvuf, injector_t injector)
 {
     injector->hijacked = 0;
-    injector->status = STATUS_NULL;
 
     drakvuf_trap_t trap =
     {
@@ -761,7 +643,6 @@ injector_status_t injector_start_app_on_win(
     injector->wait_for_exit = wait_for_exit;
     injector->binary_path = binary_path;
     injector->target_process = target_process;
-    injector->status = STATUS_NULL;
     injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     injector->break_loop_on_detection = break_loop_on_detection;
     injector->error_code.valid = false;
@@ -859,7 +740,8 @@ void injector_terminate_on_win(drakvuf_t drakvuf,
     injector->target_tid = injection_tid;
     injector->is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
     injector->terminate_pid = pid;
-    injector->status = STATUS_NULL;
+    injector->step_override = false;
+    injector->step = STEP1;
 
     if (!initialize_injector_functions(drakvuf, injector, NULL))
     {
@@ -870,4 +752,6 @@ void injector_terminate_on_win(drakvuf_t drakvuf,
 
     inject(drakvuf, injector);
     PRINT_DEBUG("Finished with termination. Ret: %i.\n", injector->rc);
+
+    free_injector(injector);
 }
