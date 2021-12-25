@@ -105,7 +105,10 @@
 #ifndef DRAKVUF_H
 #define DRAKVUF_H
 
+#ifdef HAVE_CONFIG_H
 #include <config.h>
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>

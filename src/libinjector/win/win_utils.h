@@ -182,7 +182,6 @@ struct injector
     // For readfile/writefile
     addr_t create_file, read_file, write_file, close_handle, expand_env;
     size_t binary_size, payload_size;
-    uint32_t status; // will be replaced by step
     uint32_t file_handle;
     FILE* host_file;
     unicode_string_t* expanded_target;
@@ -195,7 +194,6 @@ struct injector
     const char* target_process;
 
     addr_t process_info;
-    registers_t saved_regs;
     x86_registers_t x86_saved_regs;
 
     drakvuf_trap_t bp;
