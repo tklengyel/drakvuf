@@ -113,7 +113,7 @@ namespace libhook
 struct CallResult
 {
     CallResult()
-        : target_pid(), target_tid(), target_rsp()
+        : target_pid(), target_tid(), target_rsp(), hook_()
     {}
 
     virtual ~CallResult() = default;

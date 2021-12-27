@@ -236,7 +236,7 @@ struct drakvuf
     addr_t kernbase;
     addr_t kpgd;
 
-    int address_width;
+    size_t address_width;
 
     GHashTable* remapped_gfns; // Key: gfn
     // val: remapped gfn

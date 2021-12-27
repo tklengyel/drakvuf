@@ -150,7 +150,8 @@ SyscallHook& SyscallHook::operator=(SyscallHook&& rhs) noexcept
 SyscallHook::SyscallHook(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb)
     : BaseHook(drakvuf),
       syscall_name_(syscall_name),
-      callback_(cb)
+      callback_(cb),
+      trap_()
 {}
 
 } // namespace libhook

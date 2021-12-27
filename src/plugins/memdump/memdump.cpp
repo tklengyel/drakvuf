@@ -398,7 +398,8 @@ static bool dump_if_points_to_executable_memory(
 
 bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* plugin, bool is_32bit, addr_t stack_ptr)
 {
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
+
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
@@ -477,7 +478,6 @@ bool inspect_stack_ptr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, memdump* pl
 
     PRINT_DEBUG("[MEMDUMP] Done stack walk\n");
 
-    drakvuf_release_vmi(drakvuf);
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -540,7 +540,7 @@ static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
 
     auto plugin = get_trap_plugin<memdump>(info);
 
-    vmi_lock_guard lg(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
@@ -548,7 +548,7 @@ static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     );
 
     addr_t base_address;
-    if (VMI_SUCCESS != vmi_read_addr(lg.vmi, &ctx, &base_address))
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &base_address))
     {
         PRINT_DEBUG("[MEMDUMP] Failed to read base address in NtFreeVirtualMemory\n");
         return VMI_EVENT_RESPONSE_NONE;
@@ -562,7 +562,7 @@ static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     }
 
     page_info_t p_info = {};
-    if (vmi_pagetable_lookup_extended(lg.vmi, dtb, base_address, &p_info) == VMI_SUCCESS)
+    if (vmi_pagetable_lookup_extended(vmi, dtb, base_address, &p_info) == VMI_SUCCESS)
     {
         bool pte_valid       = (p_info.x86_ia32e.pte_value & (1UL << 0))  != 0;
         bool page_writeable  = (p_info.x86_ia32e.pte_value & (1UL << 1))  != 0;
@@ -574,7 +574,10 @@ static event_response_t shellcode_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
             PRINT_DEBUG("[MEMDUMP] Dumping RWX vad\n");
             ctx.addr = mmvad.starting_vpn << 12;
             ctx.dtb  = dtb;
-            dump_memory_region(drakvuf, lg.vmi, info, plugin, &ctx, len_bytes, "Possible shellcode detected", nullptr, false);
+            if (!dump_memory_region(drakvuf, vmi, info, plugin, &ctx, len_bytes, "Possible shellcode detected", nullptr, false))
+            {
+                PRINT_DEBUG("[MEMDUMP] Failed to store memory dump due to an internal error\n");
+            }
         }
     }
     return VMI_EVENT_RESPONSE_NONE;

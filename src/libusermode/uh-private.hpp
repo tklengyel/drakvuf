@@ -207,6 +207,7 @@ public:
     drakvuf_t m_drakvuf = nullptr;
 
     userhook(userhook const&) = delete;
+    userhook& operator=(userhook const&) = delete;
 
     std::array<size_t, __OFFSET_MAX> offsets;
 

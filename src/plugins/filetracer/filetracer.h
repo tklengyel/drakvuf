@@ -117,6 +117,8 @@ public:
     win_filetracer* wf;
     linux_filetracer* lf;
     filetracer(drakvuf_t drakvuf, output_format_t output);
+    filetracer(const filetracer&) = delete;
+    filetracer& operator=(const filetracer&) = delete;
     ~filetracer();
     virtual bool stop_impl() override;
 };

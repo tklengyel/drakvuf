@@ -679,17 +679,17 @@ static event_response_t copy_on_write_ret_cb(drakvuf_t drakvuf, drakvuf_trap_inf
 
     for (auto& hook : params->hooks)
     {
-        addr_t hook_va = ((params->vaddr >> 12) << 12) + (hook->trap->breakpoint.addr & 0xFFF);
-        PRINT_DEBUG("adding hook at %lx\n", hook_va);
-
         if (hook->trap)
         {
+            addr_t hook_va = ((params->vaddr >> 12) << 12) + (hook->trap->breakpoint.addr & 0xFFF);
+            PRINT_DEBUG("adding hook at %lx\n", hook_va);
+
             drakvuf_remove_trap(drakvuf, hook->trap, wrap_delete);
             hook->state = HOOK_FAILED;
             hook->trap = nullptr;
-        }
 
-        make_trap(vmi, drakvuf, info, hook, hook_va);
+            make_trap(vmi, drakvuf, info, hook, hook_va);
+        }
     }
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -804,7 +804,11 @@ userhook::userhook(drakvuf_t drakvuf): pluginex(drakvuf, OUTPUT_DEFAULT), m_drak
     if (!is_supported(drakvuf))
         throw -1;
 
-    drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets.data());
+    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets.data()))
+    {
+        PRINT_DEBUG("[USERHOOK] Failed to get kernel struct member offsets\n");
+        throw -1;
+    }
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory"), nullptr, UNLIMITED_TTL) ||
