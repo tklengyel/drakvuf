@@ -362,7 +362,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     }
 
     addr_t start_addr = vad_start + idx * VMI_PS_4KB;
-    ctx->current_dump_size = ptes_to_dump * VMI_PS_4KB;
+    ctx->current_dump_size = static_cast<size_t>(ptes_to_dump) * VMI_PS_4KB;
 
     if (!inject_copy_memory(drakvuf, info, ctx, start_addr, ctx->current_dump_size))
     {

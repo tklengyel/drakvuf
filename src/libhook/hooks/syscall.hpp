@@ -118,7 +118,7 @@ public:
      */
     template<typename Params = CallResult>
     [[nodiscard]]
-    static auto create(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb, int ttl)
+    static auto create(drakvuf_t, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl)
     -> std::unique_ptr<SyscallHook>;
 
     /**
@@ -160,7 +160,7 @@ protected:
 };
 
 template<typename Params>
-auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb, int ttl)
+auto SyscallHook::create(drakvuf_t drakvuf, const std::string& syscall_name, cb_wrapper_t cb, uint64_t ttl)
 -> std::unique_ptr<SyscallHook>
 {
     PRINT_DEBUG("[LIBHOOK] creating syscall hook\n");

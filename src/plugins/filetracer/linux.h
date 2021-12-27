@@ -129,6 +129,8 @@ public:
     };
 
     linux_filetracer(drakvuf_t drakvuf, output_format_t output);
+    linux_filetracer(const linux_filetracer&) = delete;
+    linux_filetracer& operator=(const linux_filetracer&) = delete;
     ~linux_filetracer();
 };
 

@@ -144,6 +144,8 @@ public:
     wanted_hooks_t wanted_hooks;
 
     memdump(drakvuf_t drakvuf, const memdump_config* config, output_format_t output);
+    memdump(const memdump&) = delete;
+    memdump& operator=(const memdump&) = delete;
     ~memdump();
 
     void userhook_init(drakvuf_t drakvuf, const memdump_config* c, output_format_t output);

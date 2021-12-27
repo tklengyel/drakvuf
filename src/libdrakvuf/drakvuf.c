@@ -618,7 +618,7 @@ page_mode_t drakvuf_get_page_mode(drakvuf_t drakvuf)
     return drakvuf->pm;
 }
 
-int drakvuf_get_address_width(drakvuf_t drakvuf)
+size_t drakvuf_get_address_width(drakvuf_t drakvuf)
 {
     return drakvuf->address_width;
 }
@@ -628,7 +628,7 @@ bool drakvuf_process_is32bit(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return (drakvuf_get_address_width(drakvuf) == 4) || drakvuf_is_wow64(drakvuf, info);
 }
 
-int drakvuf_get_process_address_width(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+size_t drakvuf_get_process_address_width(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     return drakvuf_process_is32bit(drakvuf, info) ? 4 : 8;
 }
@@ -1051,10 +1051,7 @@ bool drakvuf_disable_ipt(drakvuf_t drakvuf, unsigned int vcpu)
     if ( !is_valid_vcpu(drakvuf, vcpu) )
         return false;
 
-    if ( !xen_disable_ipt(drakvuf->xen, drakvuf->domID, vcpu, &drakvuf->ipt_state[vcpu]) )
-        return false;
-
-    return true;
+    return xen_disable_ipt(drakvuf->xen, drakvuf->domID, vcpu, &drakvuf->ipt_state[vcpu]);
 }
 
 void drakvuf_intercept_process_add(drakvuf_t drakvuf, char* process_name, vmi_pid_t pid, context_match_t strict)
