@@ -123,6 +123,8 @@ public:
     std::set<std::string> loaded_drivers;
 
     dkommon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    dkommon(const dkommon&) = delete;
+    dkommon& operator=(const dkommon&) = delete;
     ~dkommon();
     bool stop_impl() override;
 };

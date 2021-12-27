@@ -135,6 +135,8 @@ public:
     };
 
     win_filetracer(drakvuf_t drakvuf, output_format_t output);
+    win_filetracer(const win_filetracer&) = delete;
+    win_filetracer& operator=(const win_filetracer&) = delete;
     ~win_filetracer();
 };
 

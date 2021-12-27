@@ -116,6 +116,8 @@ class rootkitmon : public pluginex
 {
 public:
     rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, output_format_t output);
+    rootkitmon(const rootkitmon&) = delete;
+    rootkitmon& operator=(const rootkitmon&) = delete;
     ~rootkitmon();
 
     event_response_t callback_hooks_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);

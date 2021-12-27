@@ -159,6 +159,8 @@ public:
     int sequence_number = 0;
 
     filedelete(drakvuf_t drakvuf, const filedelete_config* config, output_format_t output);
+    filedelete(const filedelete&) = delete;
+    filedelete& operator=(const filedelete&) = delete;
     ~filedelete();
 
     virtual bool stop_impl() override;

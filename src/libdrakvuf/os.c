@@ -250,7 +250,11 @@ static void process_visitor(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ct
     if (temp_pid == *ctx->pid)
     {
         PRINT_DEBUG("[LIBDRAKVUF] Found remote process base! Getting dtb..\n");
-        drakvuf_get_process_dtb(drakvuf, eprocess, ctx->dtb);
+        if (!drakvuf_get_process_dtb(drakvuf, eprocess, ctx->dtb))
+        {
+            PRINT_DEBUG("[LIBDRAKVUF] Failed to get process dtb\n");
+            return;
+        }
         *ctx->process = eprocess;
     }
 }

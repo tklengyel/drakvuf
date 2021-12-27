@@ -155,7 +155,8 @@ public:
     std::unordered_map<std::string, std::string> dumped_memory_map;
 
     codemon(drakvuf_t drakvuf, const codemon_config_struct* config, output_format_t output);
-
+    codemon(const codemon&) = delete;
+    codemon& operator=(const codemon&) = delete;
     ~codemon();
 };
 

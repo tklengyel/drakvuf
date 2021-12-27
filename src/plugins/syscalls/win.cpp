@@ -144,18 +144,8 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
-static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static std::vector<uint64_t> extract_args(drakvuf_t drakvuf, drakvuf_trap_info_t const* info, size_t reg_size, size_t nargs)
 {
-    auto vmi = vmi_lock_guard(drakvuf);
-
-    //Loads a pointer to the plugin, which is responsible for the trap
-    auto s = get_trap_plugin<syscalls>(info);
-
-    //get_trap_params reinterprets the pointer of info->trap->data as a pointer to duplicate_result_t
-    auto w = get_trap_params<wrapper_t>(info);
-    const syscall_t* sc = w->sc;
-
-    unsigned int nargs = sc ? sc->num_args : 0;
     std::vector<uint64_t> args(nargs);
 
     ACCESS_CONTEXT(ctx);
@@ -164,18 +154,21 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     if (nargs)
     {
+        auto vmi = vmi_lock_guard(drakvuf);
+
         // get arguments only if we know how many to get
 
-        if ( 4 == s->reg_size )
+        if ( 4 == reg_size )
         {
             // 32 bit os
-            ctx.addr = info->regs->rsp + s->reg_size;  // jump over base pointer
+            ctx.addr = info->regs->rsp + reg_size;  // jump over base pointer
 
             // multiply num args by 4 for 32 bit systems to get the number of bytes we need
             // to read from the stack.  assumes standard calling convention (cdecl) for the
             // visual studio compile.
             std::vector<uint32_t> tmp_args(nargs);
-            if ( VMI_FAILURE == vmi_read(vmi, &ctx, s->reg_size * nargs, &tmp_args[0], NULL) )
+            size_t sp_size = reg_size * nargs;
+            if ( VMI_FAILURE == vmi_read(vmi, &ctx, sp_size, &tmp_args[0], NULL) )
                 nargs = 0;
 
             for (size_t i = 0; i < nargs; ++i)
@@ -196,16 +189,26 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             {
                 // first 4 agrs passed via rcx, rdx, r8, and r9
                 ctx.addr = info->regs->rsp+0x28;  // jump over homing space + base pointer
-                size_t sp_size = s->reg_size * (nargs-4);
+                size_t sp_size = reg_size * (nargs - 4);
                 if ( VMI_FAILURE == vmi_read(vmi, &ctx, sp_size, &args[4], NULL) )
                     nargs = 0;
             }
         }
     }
+    args.resize(nargs);
 
-    vmi.unlock();
+    return args;
+}
+
+static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto s = get_trap_plugin<syscalls>(info);
+    auto w = get_trap_params<wrapper_t>(info);
+    const syscall_t* sc = w->sc;
+
+    std::vector<uint64_t> args = extract_args(drakvuf, info, s->reg_size, sc ? sc->num_args : 0);
+
     print_syscall(s, drakvuf, VMI_OS_WINDOWS, true, info, w->num, std::string(w->type), sc, args, 0, NULL);
-    vmi.lock();
 
     if ( s->disable_sysret || s->is_stopping() )
         return 0;
@@ -247,10 +250,8 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, syscalls* s,
     addr_t cr3, bool ntos, addr_t base, addr_t* sst)
 {
-    bool ret = false;
     unsigned int syscall_count = ntos ? NUM_SYSCALLS_NT : NUM_SYSCALLS_WIN32K;
     const syscall_t** definitions = ntos ? nt : win32k;
-    int error = -1;
 
     json_object* json = ntos ? vmi_get_kernel_json(vmi) : s->win32k_json;
     symbols_t* symbols = json ? json_get_symbols(json) : NULL;
@@ -259,7 +260,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
     if ( !table )
     {
         drakvuf_free_symbols(symbols);
-        return ret;
+        return false;
     }
 
     ACCESS_CONTEXT(ctx);
@@ -270,7 +271,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
     {
         drakvuf_free_symbols(symbols);
         g_free(table);
-        return ret;
+        return false;
     }
 
     for ( addr_t syscall_num = 0; syscall_num < sst[1]; syscall_num++ )
@@ -356,16 +357,10 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
         w->sc = definition;
     }
 
-    error = 0;
-    ret = true;
-
     drakvuf_free_symbols(symbols);
     g_free(table);
 
-    if ( error )
-        throw -1;
-
-    return ret;
+    return true;
 }
 
 void setup_windows(drakvuf_t drakvuf, syscalls* s)

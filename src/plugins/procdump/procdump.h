@@ -159,6 +159,8 @@ public:
     uint32_t amd_extended_cpu_features;
 
     procdump(drakvuf_t drakvuf, const procdump_config* config, output_format_t output);
+    procdump(const procdump&) = delete;
+    procdump& operator=(const procdump&) = delete;
     ~procdump();
 
     virtual bool stop_impl() override;

@@ -123,6 +123,9 @@ public:
         if (!file) throw -1;
     }
 
+    BaseProcdumpWriter(const BaseProcdumpWriter&) = delete;
+    BaseProcdumpWriter& operator=(const BaseProcdumpWriter&) = delete;
+
     ~BaseProcdumpWriter()
     {
         fclose(file);
@@ -159,6 +162,9 @@ public:
         auto ret = deflateInit2(&z_file, Z_BEST_SPEED, Z_DEFLATED, window_bits, mem_level, Z_DEFAULT_STRATEGY);
         if (ret != Z_OK) throw -1;
     }
+
+    GzippedProcdumpWriter(const GzippedProcdumpWriter&) = delete;
+    GzippedProcdumpWriter& operator=(const GzippedProcdumpWriter&) = delete;
 
     ~GzippedProcdumpWriter()
     {

@@ -228,7 +228,7 @@ bool procdump2::stop_impl()
         !is_active_process(procdump_on_finish) &&
         !is_process_handled(procdump_on_finish))
     {
-        addr_t target_process_pid = procdump_on_finish;
+        vmi_pid_t target_process_pid = procdump_on_finish;
         addr_t target_process_base = 0;
         addr_t dtb = 0;
         if ( !drakvuf_get_process_by_pid(drakvuf, target_process_pid, &target_process_base, &dtb) )
@@ -1108,7 +1108,7 @@ std::pair<addr_t, size_t> procdump2::get_memory_region(drakvuf_trap_info_t* info
     }
 
     addr_t start_addr = vad_start + vad.idx * VMI_PS_4KB;
-    ctx->current_dump_size = ptes_to_dump * VMI_PS_4KB;
+    ctx->current_dump_size = static_cast<size_t>(ptes_to_dump) * VMI_PS_4KB;
 
     if (vad.idx + ptes_to_dump == total_number_of_ptes)
         ctx->vads.erase(it);

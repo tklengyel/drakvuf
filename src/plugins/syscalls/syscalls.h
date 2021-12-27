@@ -140,6 +140,8 @@ public:
     std::vector<std::pair<char const*, fmt::Aarg>> fmt_args; // cache
 
     syscalls(drakvuf_t drakvuf, const syscalls_config* config, output_format_t output);
+    syscalls(const syscalls&) = delete;
+    syscalls& operator=(const syscalls&) = delete;
     ~syscalls();
 };
 
