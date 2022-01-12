@@ -576,7 +576,7 @@ bool json_get_struct_members_array_rva(
     drakvuf_t drakvuf,
     json_object* json,
     const char* struct_name_symbol_array[][2],
-    addr_t array_size,
+    size_t array_size,
     addr_t* rva)
 {
     return json_lookup_array(

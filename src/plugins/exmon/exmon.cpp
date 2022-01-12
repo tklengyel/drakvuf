@@ -322,9 +322,8 @@ exmon::exmon(drakvuf_t drakvuf, output_format_t output)
 
     this->pm = drakvuf_get_page_mode(drakvuf);
 
-    for (int i=0; i<__OFFSET_MAX; i++)
-        if (!drakvuf_get_kernel_struct_member_rva(drakvuf, offset_names[i][0], offset_names[i][1], &this->offsets[i]))
-            PRINT_DEBUG("Failed to find kernel struct member rva.\n");
+    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, this->offsets))
+        PRINT_DEBUG("Failed to find all kernel struct member rvas for exmon.\n");
 
     if ( !drakvuf_get_kernel_struct_size(drakvuf, "_KTRAP_FRAME", &this->ktrap_frame_size) )
     {
