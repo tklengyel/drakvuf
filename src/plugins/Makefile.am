@@ -269,8 +269,8 @@ if PLUGIN_PROCDUMP2
 sources += procdump2/procdump2.cpp
 sources += procdump2/procdump2.h
 sources += procdump2/private2.h
-sources += procdump2/writer2.cpp
-sources += procdump2/writer2.h
+sources += procdump2/writer.cpp
+sources += procdump2/writer.h
 sources += procdump2/minidump2.h
 endif
 
