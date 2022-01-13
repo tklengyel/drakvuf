@@ -119,16 +119,14 @@ bool json_lookup_array(
     drakvuf_t drakvuf,
     json_object* json,
     const char* symbol_subsymbol_array[][2],
-    addr_t array_size,
+    size_t array_size,
     addr_t* rva,
     addr_t* size)
 {
-    bool ret = false;
-
     if (!json)
     {
         fprintf(stderr, "JSON profile is NULL!\n");
-        return ret;
+        return false;
     }
 
     int errors = 0;
@@ -161,10 +159,7 @@ bool json_lookup_array(
         }
     }
 
-    if (errors == 0)
-        ret = true;
-
-    return ret;
+    return (errors == 0);
 }
 
 symbols_t* json_get_symbols(json_object* json)
