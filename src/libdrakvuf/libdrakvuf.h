@@ -356,13 +356,13 @@ bool json_get_struct_members_array_rva(
     drakvuf_t drakvuf,
     json_object* json_profile,
     const char* struct_name_subsymbol_array[][2],
-    addr_t array_size,
+    size_t array_size,
     addr_t* rva) NOEXCEPT;
 static inline
 bool drakvuf_get_kernel_struct_members_array_rva(
     drakvuf_t drakvuf,
     const char* struct_name_subsymbol_array[][2],
-    addr_t array_size,
+    size_t array_size,
     addr_t* rva)
 {
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);

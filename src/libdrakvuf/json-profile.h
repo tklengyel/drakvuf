@@ -109,7 +109,7 @@ bool json_lookup_array(
     drakvuf_t drakvuf,
     json_object* json,
     const char* symbol_subsymbol_array[][2],
-    addr_t array_size,
+    size_t array_size,
     addr_t* address,
     addr_t* size);
 
