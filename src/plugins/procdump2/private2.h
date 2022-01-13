@@ -105,7 +105,7 @@
 #ifndef PROCDUMP2_PRIVATE_H
 #define PROCDUMP2_PRIVATE_H
 
-#include "writer2.h"
+#include "writer.h"
 
 using namespace std::string_literals;
 

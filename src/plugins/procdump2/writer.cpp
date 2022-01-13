@@ -101,7 +101,7 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-#include "writer2.h"
+#include "writer.h"
 
 #include "drakvuf.h"
 
@@ -111,14 +111,24 @@
 #include <cstdio>
 #include <cstdint>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 namespace
 {
+
+static FILE* create_file(char const* path)
+{
+    int fd = creat(path, S_IWUSR | S_IRUSR);
+    return fdopen(fd, "w");
+}
 
 class BaseProcdumpWriter : public ProcdumpWriter
 {
 public:
     explicit BaseProcdumpWriter(std::string const& path)
-        : file{fopen(path.c_str(), "w")}
+        : file{create_file(path.c_str())}
     {
         if (!file) throw -1;
     }
