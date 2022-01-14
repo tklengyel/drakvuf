@@ -109,22 +109,6 @@
 #include "rootkitmon.h"
 #include "private.h"
 
-std::vector<const char*> hook_targets =
-{
-    "PspSetCreateProcessNotifyRoutine",
-    "PsSetCreateThreadNotifyRoutine",
-    "PsSetLoadImageNotifyRoutine",
-    "CmpRegisterCallbackInternal",
-    "ObRegisterCallbacks",
-    "FsRtlRegisterFileSystemFilterCallbacks",
-    "IoRegisterContainerNotification",
-    "IoRegisterFsRegistrationChange",
-    "IoRegisterPlugPlayNotification",
-    "IoWMISetNotificationCallback",
-    "KeRegisterBugCheckCallback",
-    "SeRegisterLogonSessionTerminatedRoutine",
-};
-
 static bool translate_ksym2p(vmi_instance_t vmi, const char* symbol, addr_t* addr)
 {
     addr_t temp_va;
@@ -606,13 +590,6 @@ event_response_t rootkitmon::final_check_cb(drakvuf_t drakvuf, drakvuf_trap_info
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-event_response_t rootkitmon::callback_hooks_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    fmt::print(this->format, "rootkitmon", drakvuf, info,
-        keyval("Reason", fmt::Qstr(info->trap->name)));
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
 std::unique_ptr<libhook::ManualHook> rootkitmon::register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
     const char* func_name, hook_cb_t callback)
 {
@@ -868,20 +845,6 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
             throw -1;
 
         this->winver = build_info.version;
-    }
-
-    for (const auto& target : hook_targets)
-    {
-        auto hook = createSyscallHook(target, &rootkitmon::callback_hooks_cb);
-        if (!hook)
-        {
-            PRINT_DEBUG("[ROOTKITMON] Failed to hook %s\n", target);
-        }
-        else
-        {
-            hook->trap_->name = target;
-            this->syscall_hooks.push_back(std::move(hook));
-        }
     }
 
     if (!config->fwpkclnt_profile)
