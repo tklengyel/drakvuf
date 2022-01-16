@@ -137,6 +137,7 @@
 #include "ipt/ipt.h"
 #include "hidsim/hidsim.h"
 #include "rootkitmon/rootkitmon.h"
+#include "callbackmon/callbackmon.h"
 
 drakvuf_plugins::drakvuf_plugins(const drakvuf_t _drakvuf, output_format_t _output, os_t _os)
     : drakvuf{ _drakvuf }, output{ _output }, os{ _os }
@@ -485,6 +486,17 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .fltmgr_profile = options->fltmgr_profile,
                     };
                     this->plugins[plugin_id] = std::make_unique<rootkitmon>(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_CALLBACKMON
+                case PLUGIN_CALLBACKMON:
+                {
+                    callbackmon_config config =
+                    {
+                        .netio_profile = options->netio_profile,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<callbackmon>(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif
