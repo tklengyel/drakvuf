@@ -484,6 +484,16 @@ if test x$plugin_rootkitmon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_ROOTKITMON, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_callbackmon],
+  [AS_HELP_STRING([--disable-plugin-callbackmon],
+    [Enable callbackmon plugin @<:@yes@:>@])],
+  [plugin_callbackmon="$enableval"],
+  [plugin_callbackmon="yes"])
+AM_CONDITIONAL([PLUGIN_CALLBACKMON], [test x$plugin_callbackmon = xyes])
+if test x$plugin_rootkitmon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_CALLBACKMON, 1, "")
+fi
+
 AC_ARG_ENABLE([DISABLE_ATOMS],
   [AS_HELP_STRING([--disable-atoms],
     [Disable atom table parsing in hidsim plugin @<:@no@:>@])],
@@ -781,6 +791,7 @@ LibHookTest:  $plugin_libhooktest
 IPT:          $plugin_ipt
 HidSim:       $plugin_hidsim
 Rootkitmon:   $plugin_rootkitmon
+Callbackmon:  $plugin_callbackmon
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:       $plugin_wmimon

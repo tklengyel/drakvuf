@@ -343,6 +343,10 @@ static void print_usage()
         "\t --json-fltmgr <path to json>\n"
         "\t                           The JSON profile for fltmgr.sys\n"
 #endif
+#ifdef ENABLE_PLUGIN_CALLBACKMON
+        "\t --json-netio <path to json>\n"
+        "\t                           The JSON profile for netio.sys\n"
+#endif
         "\t -h, --help                Show this help\n"
     );
 }
@@ -453,6 +457,7 @@ int main(int argc, char** argv)
         opt_hidsim_random_clicks,
         opt_rootkitmon_json_fwpkclnt,
         opt_rootkitmon_json_fltmgr,
+        opt_callbackmon_json_netio,
         opt_json_hal
     };
     const option long_opts[] =
@@ -519,6 +524,7 @@ int main(int argc, char** argv)
         {"hid-random-clicks", no_argument, NULL, opt_hidsim_random_clicks},
         {"json-fwpkclnt", required_argument, NULL, opt_rootkitmon_json_fwpkclnt},
         {"json-fltmgr", required_argument, NULL, opt_rootkitmon_json_fltmgr},
+        {"json-netio", required_argument, NULL, opt_callbackmon_json_netio},
         {"json-hal", required_argument, NULL, opt_json_hal},
         {NULL, 0, NULL, 0}
     };
@@ -829,6 +835,11 @@ int main(int argc, char** argv)
                 break;
             case opt_rootkitmon_json_fltmgr:
                 options.fltmgr_profile = optarg;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_CALLBACKMON
+            case opt_callbackmon_json_netio:
+                options.netio_profile = optarg;
                 break;
 #endif
 

@@ -106,62 +106,110 @@
 #include "plugins/plugins_ex.h"
 #include "private.h"
 
-struct rootkitmon_config
+struct callbackmon_config
 {
-    const char* fwpkclnt_profile;
-    const char* fltmgr_profile;
+    const char* netio_profile = nullptr;
 };
 
-class rootkitmon : public pluginex
+class callbackmon : public pluginex
 {
 public:
-    rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, output_format_t output);
-    rootkitmon(const rootkitmon&) = delete;
-    rootkitmon& operator=(const rootkitmon&) = delete;
-    ~rootkitmon();
+    callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, output_format_t output);
 
-    event_response_t final_check_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    const callbackmon_config config;
+    const output_format_t format;
 
-    std::unique_ptr<libhook::ManualHook> register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
-        const char* func_name, hook_cb_t callback);
-    std::unique_ptr<libhook::ManualHook> register_reg_hook(hook_cb_t callback, register_t reg);
-    std::unique_ptr<libhook::ManualHook> register_mem_hook(hook_cb_t callback, addr_t pa, vmi_mem_access_t access);
-
-    std::set<driver_t> enumerate_driver_objects(vmi_instance_t vmi);
-    std::set<driver_t> enumerate_directory(vmi_instance_t vmi, addr_t addr);
-    unicode_string_t* get_object_type_name(vmi_instance_t vmi, addr_t object);
-    device_stack_t enumerate_driver_stacks(vmi_instance_t vmi, addr_t driver_object);
-    bool enumerate_cores(vmi_instance_t vmi);
-
-    void check_driver_integrity(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-    void check_driver_objects(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-    void check_descriptors(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    std::vector<addr_t> process_cb;
+    std::vector<addr_t> thread_cb;
+    std::vector<addr_t> image_cb;
+    std::vector<addr_t> bugcheck_cb;
+    std::vector<addr_t> bcreason_cb;
+    std::vector<addr_t> registry_cb;
+    std::vector<addr_t> logon_cb;
+    std::vector<addr_t> power_cb;
+    std::vector<addr_t> shtdwn_cb;
+    std::vector<addr_t> shtdwn_lst_cb;
+    std::vector<addr_t> dbgprint_cb;
+    std::vector<addr_t> fschange_cb;
+    std::vector<addr_t> drvreinit_cb;
+    std::vector<addr_t> drvreinit2_cb;
+    std::vector<addr_t> nmi_cb;
+    std::vector<addr_t> priority_cb;
+    std::vector<addr_t> emp_cb;
+    std::vector<addr_t> pnp_prof_cb;
+    std::vector<addr_t> pnp_class_cb;
+    std::vector<addr_t> w32callouts;
+    std::vector<addr_t> wfpcallouts;
 
     virtual bool stop_impl() override;
-
-    const output_format_t format;
-    win_ver_t winver;
-
-    size_t* offsets;
-    size_t guest_ptr_size;
-    bool is32bit;
-    size_t object_header_size;
-
-    bool done_final_analysis;
-    bool not_supported;
-
-    addr_t halprivatetable;
-    addr_t type_idx_table;
-    uint8_t ob_header_cookie;
-
-    std::unordered_map<driver_t, std::vector<checksum_data_t>> driver_sections_checksums;
-    std::unordered_map<driver_t, sha256_checksum_t> driver_object_checksums;
-    // _DRIVER_OBJECT -> _DEVICE_OBJECT -> [_DEVICE_OBJECT, ...]
-    std::unordered_map<driver_t, device_stack_t> driver_stacks;
-    // VCPU -> Descriptor
-    std::unordered_map<unsigned int, descriptors_t> descriptors;
-    // VCPU -> MSR_LSTAR
-    std::unordered_map<unsigned int, addr_t> msr_lstar;
-    std::vector<std::unique_ptr<libhook::ManualHook>> manual_hooks;
-    std::vector<std::unique_ptr<libhook::SyscallHook>> syscall_hooks;
 };
+
+/*
+process, thread, image:
+typedef struct _EX_CALLBACK_ROUTINE_BLOCK {
+    EX_RUNDOWN_REF RundownProtect;
+    PEX_CALLBACK_FUNCTION Function;
+    PVOID Context;
+} EX_CALLBACK_ROUTINE_BLOCK, *PEX_CALLBACK_ROUTINE_BLOCK;
+
+bugcheck:
+typedef struct _KBUGCHECK_CALLBACK_RECORD {
+    LIST_ENTRY Entry;
+    PKBUGCHECK_CALLBACK_ROUTINE CallbackRoutine;
+    __field_bcount_opt(Length) PVOID Buffer;
+    ULONG Length;
+    PUCHAR Component;
+    ULONG_PTR Checksum;
+    UCHAR State;
+} KBUGCHECK_CALLBACK_RECORD, *PKBUGCHECK_CALLBACK_RECORD;
+
+bugcheckreason:
+typedef struct _KBUGCHECK_REASON_CALLBACK_RECORD {
+    LIST_ENTRY Entry;
+    PKBUGCHECK_REASON_CALLBACK_ROUTINE CallbackRoutine;
+    PUCHAR Component;
+    ULONG_PTR Checksum;
+    KBUGCHECK_CALLBACK_REASON Reason;
+    UCHAR State;
+} KBUGCHECK_REASON_CALLBACK_RECORD, *PKBUGCHECK_REASON_CALLBACK_RECORD;
+
+registry:
+typedef struct _CM_CALLBACK_CONTEXT_BLOCK {
+    LIST_ENTRY CallbackListEntry;
+    LONG PreCallListCount;
+    LARGE_INTEGER Cookie;
+    PVOID CallerContext;
+    PEX_CALLBACK_FUNCTION Function;
+    UNICODE_STRING Altitude;
+    LIST_ENTRY ObjectContextListHead;
+} CM_CALLBACK_CONTEXT_BLOCK, *PCM_CALLBACK_CONTEXT_BLOCK;
+
+fschange:
+typedef struct _NOTIFICATION_PACKET {
+    LIST_ENTRY ListEntry;
+    PDRIVER_OBJECT DriverObject;
+    PDRIVER_FS_NOTIFICATION NotificationRoutine;
+} NOTIFICATION_PACKET, *PNOTIFICATION_PACKET;
+
+drvreinit, drvreinit2:
+typedef struct _REINIT_PACKET {
+    LIST_ENTRY ListEntry;
+    PDRIVER_OBJECT DriverObject;
+    PDRIVER_REINITIALIZE DriverReinitializationRoutine;
+    PVOID Context;
+} REINIT_PACKET, *PREINIT_PACKET;
+
+NMI:
+typedef struct _NMI_CALLBACK_BLOCK {
+    _NMI_CALLBACK_BLOCK* Next;
+    NMI_CALLBACK* CallbackRoutine;
+    PVOID Context;
+    _NMI_CALLBACK_BLOCK* Prev;
+};
+
+logon:
+typedef struct _SEP_LOGON_SESSION_TERMINATED_NOTIFICATION {
+    struct _SEP_LOGON_SESSION_TERMINATED_NOTIFICATION *Next;
+    PSE_LOGON_SESSION_TERMINATED_ROUTINE CallbackRoutine;
+} SEP_LOGON_SESSION_TERMINATED_NOTIFICATION, *PSEP_LOGON_SESSION_TERMINATED_NOTIFICATION;
+*/
