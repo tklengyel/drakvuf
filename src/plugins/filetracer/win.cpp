@@ -398,7 +398,7 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
     dst_file_name_length /= 2;
 
     ctx.addr = fileinfo + f->newfile_name_offset;
-    unicode_string_t* dst_file_name_us = drakvuf_read_wchar_array(vmi, &ctx, dst_file_name_length);
+    unicode_string_t* dst_file_name_us = drakvuf_read_wchar_array(drakvuf, &ctx, dst_file_name_length);
     if ( !dst_file_name_us )
         return;
 

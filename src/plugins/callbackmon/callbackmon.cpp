@@ -230,7 +230,7 @@ static void driver_visitor(drakvuf_t drakvuf, addr_t ldr_table, void* ctx)
 
     if (data->cb_va >= base && data->cb_va < base + size)
     {
-        unicode_string_t* module_name = drakvuf_read_unicode_va(vmi, ldr_table + name_rva, 4);
+        unicode_string_t* module_name = drakvuf_read_unicode_va(drakvuf, ldr_table + name_rva, 4);
         if (module_name && module_name->contents)
         {
             data->name.assign(reinterpret_cast<char*>(module_name->contents));

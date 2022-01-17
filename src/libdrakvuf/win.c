@@ -156,14 +156,14 @@ bool win_enumerate_module_info_ctx(drakvuf_t drakvuf, addr_t module_list_head, a
         if (vmi_read_addr(vmi, ctx, &base_addr) == VMI_SUCCESS)
         {
             ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-            unicode_string_t* base_name = drakvuf_read_unicode_common(vmi, ctx);
+            unicode_string_t* base_name = drakvuf_read_unicode_common(drakvuf, ctx);
 
             if (base_name)
             {
                 PRINT_DEBUG("Found module %s at 0x%lx\n", base_name->contents, base_addr);
 
                 ctx->addr = next_module + drakvuf->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
-                unicode_string_t* full_name = drakvuf_read_unicode_common(vmi, ctx);
+                unicode_string_t* full_name = drakvuf_read_unicode_common(drakvuf, ctx);
 
                 bool need_free = true;
                 bool need_stop = false;
@@ -224,14 +224,14 @@ bool win_enumerate_module_info_ctx_wow(drakvuf_t drakvuf, addr_t module_list_hea
         if (vmi_read_32(vmi, ctx, &base_addr) == VMI_SUCCESS)
         {
             ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-            unicode_string_t* base_name = drakvuf_read_unicode32_common(vmi, ctx);
+            unicode_string_t* base_name = drakvuf_read_unicode32_common(drakvuf, ctx);
 
             if (base_name)
             {
                 PRINT_DEBUG("Found WOW64 module %s at 0x%x\n", base_name->contents, base_addr);
 
                 ctx->addr = next_module + drakvuf->wow_offsets[WOW_LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
-                unicode_string_t* full_name = drakvuf_read_unicode32_common(vmi, ctx);
+                unicode_string_t* full_name = drakvuf_read_unicode32_common(drakvuf, ctx);
 
                 bool need_free = true;
                 bool need_stop = false;

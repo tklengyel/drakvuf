@@ -496,7 +496,7 @@ typedef struct _mmvad_info
     uint64_t flags1;
 
     /* Pointer to the file name, if this MMVAD is backed by some file on disk.
-     * If not null, read with: drakvuf_read_unicode_va(drakvuf->vmi, mmvad->file_name_ptr, 0) */
+     * If not null, read with: drakvuf_read_unicode_va(drakvuf, mmvad->file_name_ptr, 0) */
     addr_t file_name_ptr;
     uint32_t total_number_of_ptes;
     addr_t prototype_pte;
@@ -625,17 +625,17 @@ bool drakvuf_obj_ref_by_handle(drakvuf_t drakvuf,
 
 char* drakvuf_read_ascii_str(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr) NOEXCEPT;
 
-unicode_string_t* drakvuf_read_unicode_common(vmi_instance_t vmi, const access_context_t* ctx) NOEXCEPT;
+unicode_string_t* drakvuf_read_unicode_common(drakvuf_t drakvuf, const access_context_t* ctx) NOEXCEPT;
 
 unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr) NOEXCEPT;
 
-unicode_string_t* drakvuf_read_unicode_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid) NOEXCEPT;
+unicode_string_t* drakvuf_read_unicode_va(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid) NOEXCEPT;
 
-unicode_string_t* drakvuf_read_unicode32_common(vmi_instance_t vmi, const access_context_t* ctx) NOEXCEPT;
+unicode_string_t* drakvuf_read_unicode32_common(drakvuf_t drakvuf, const access_context_t* ctx) NOEXCEPT;
 
 unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr) NOEXCEPT;
 
-unicode_string_t* drakvuf_read_unicode32_va(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid) NOEXCEPT;
+unicode_string_t* drakvuf_read_unicode32_va(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid) NOEXCEPT;
 
 bool drakvuf_get_module_base_addr( drakvuf_t drakvuf,
     addr_t module_list_head,
@@ -665,14 +665,14 @@ char* drakvuf_get_filename_from_object_attributes( drakvuf_t drakvuf,
     addr_t attrs ) NOEXCEPT;
 
 // Reads 'length' characters from array of UTF_16 charachters into unicode_string_t object with UTF_8 encoding
-unicode_string_t* drakvuf_read_wchar_array(vmi_instance_t vmi, const access_context_t* ctx, size_t length) NOEXCEPT;
+unicode_string_t* drakvuf_read_wchar_array(drakvuf_t drakvuf, const access_context_t* ctx, size_t length) NOEXCEPT;
 
 
 // Determines length of null-terminated array of UTF_16 charachters
-size_t drakvuf_wchar_string_length(vmi_instance_t vmi, const access_context_t* ctx) NOEXCEPT;
+size_t drakvuf_wchar_string_length(drakvuf_t drakvuf, const access_context_t* ctx) NOEXCEPT;
 
 // Reads null-terminated string of UTF_16 charachters, automatically determining length, into unicode_string_t object with UTF_8 encoding
-unicode_string_t* drakvuf_read_wchar_string(vmi_instance_t vmi, const access_context_t* ctx) NOEXCEPT;
+unicode_string_t* drakvuf_read_wchar_string(drakvuf_t drakvuf, const access_context_t* ctx) NOEXCEPT;
 
 // Returns JSON-compliant copy of input string. User must free the result.
 gchar* drakvuf_escape_str(const char* input) NOEXCEPT;
