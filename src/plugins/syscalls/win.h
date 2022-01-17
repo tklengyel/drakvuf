@@ -137,19 +137,6 @@ typedef struct sst_x86
     uint32_t ArgumentTable;
 } __attribute__((packed)) system_service_table_x86;
 
-enum windows_structs_offsets
-{
-    _OBJECT_ATTRIBUTES_ObjectName,
-    _OBJECT_ATTRIBUTES_RootDirectory,
-    _WINDOWS_STRUCTS_OFFSETS_MAX
-};
-
-static const char* windows_structs_offsets_names[_WINDOWS_STRUCTS_OFFSETS_MAX][2] =
-{
-    [_OBJECT_ATTRIBUTES_ObjectName] = {"_OBJECT_ATTRIBUTES", "ObjectName"},
-    [_OBJECT_ATTRIBUTES_RootDirectory] = {"_OBJECT_ATTRIBUTES", "RootDirectory"},
-};
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-braces"
 

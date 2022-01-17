@@ -178,8 +178,6 @@ struct pool_header_x64
 
 enum
 {
-    _OBJECT_ATTRIBUTES_ObjectName,
-    _OBJECT_ATTRIBUTES_RootDirectory,
     _OBJECT_ATTRIBUTES_Attributes,
     _OBJECT_ATTRIBUTES_SecurityDescriptor,
     _SECURITY_DESCRIPTOR_Control,
@@ -356,8 +354,6 @@ enum
 
 static const char* offset_names[__OFFSET_MAX][2] =
 {
-    [_OBJECT_ATTRIBUTES_ObjectName] = {"_OBJECT_ATTRIBUTES", "ObjectName"},
-    [_OBJECT_ATTRIBUTES_RootDirectory] = {"_OBJECT_ATTRIBUTES", "RootDirectory"},
     [_OBJECT_ATTRIBUTES_Attributes] = {"_OBJECT_ATTRIBUTES", "Attributes"},
     [_OBJECT_ATTRIBUTES_SecurityDescriptor] = {"_OBJECT_ATTRIBUTES", "SecurityDescriptor"},
     [_SECURITY_DESCRIPTOR_Control] = {"_SECURITY_DESCRIPTOR", "Control"},

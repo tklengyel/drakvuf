@@ -125,3 +125,42 @@ char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
 
     return filename;
 }
+
+char* win_get_filename_from_object_attributes(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs)
+{
+    vmi_instance_t vmi = drakvuf->vmi;
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3
+    );
+
+    addr_t file_root_handle = 0;
+    ctx.addr = attrs + drakvuf->offsets[OBJECT_ATTRIBUTES_ROOTDIRECTORY];
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &file_root_handle))
+        return NULL;
+
+    ctx.addr = attrs + drakvuf->offsets[OBJECT_ATTRIBUTES_OBJECTNAME];
+    addr_t file_name_addr = 0;
+    if (VMI_SUCCESS != vmi_read_addr(vmi, &ctx, &file_name_addr))
+        return NULL;
+
+    char* file_root = drakvuf_get_filename_from_handle(drakvuf, info, file_root_handle);
+    unicode_string_t* file_name_us = drakvuf_read_unicode(drakvuf, info, file_name_addr);
+
+    if (!file_name_us)
+    {
+        g_free(file_root);
+        return NULL;
+    }
+
+    char* file_path = g_strdup_printf("%s%s%s",
+            file_root ?: "",
+            file_root ? "\\" : "",
+            file_name_us->contents);
+
+    vmi_free_unicode_str(file_name_us);
+    g_free(file_root);
+
+    return file_path;
+}

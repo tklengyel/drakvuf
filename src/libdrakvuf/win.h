@@ -183,6 +183,7 @@ bool win_get_process_data( drakvuf_t drakvuf, addr_t process_base, proc_data_pri
 gchar* win_reg_keyhandle_path( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t key_handle );
 
 char* win_get_filename_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle);
+char* win_get_filename_from_object_attributes(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs);
 
 bool win_is_wow64(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
