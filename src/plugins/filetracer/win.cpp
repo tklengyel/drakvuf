@@ -186,7 +186,7 @@ static string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t 
 
     win_filetracer* f = (win_filetracer*)info->trap->data;
 
-    vmi_lock_guard vmi_lg(drakvuf);
+    auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
@@ -206,98 +206,68 @@ static string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t 
     // Get address of security descriptor
     addr_t security_descriptor = 0;
     ctx.addr = attrs + f->offsets[_OBJECT_ATTRIBUTES_SecurityDescriptor];
-    if ( VMI_SUCCESS == vmi_read_addr(vmi_lg.vmi, &ctx, &security_descriptor)
+    if ( VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &security_descriptor)
         && security_descriptor )
     {
         // Get flags of security descriptor
         uint16_t se_ctrl = 0;
         ctx.addr = security_descriptor + f->offsets[_SECURITY_DESCRIPTOR_Control];
-        if ( VMI_SUCCESS == vmi_read_16(vmi_lg.vmi, &ctx, &se_ctrl) )
+        if ( VMI_SUCCESS == vmi_read_16(vmi, &ctx, &se_ctrl) )
             security_flags_str = parse_flags(se_ctrl, security_controls, f->format, "SecurityControl=0");
 
         // Get owner SID
         addr_t powner = 0;
         ctx.addr = security_descriptor + f->offsets[_SECURITY_DESCRIPTOR_Owner];
-        if ( VMI_SUCCESS == vmi_read_addr(vmi_lg.vmi, &ctx, &powner) && powner)
+        if ( VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &powner) && powner)
         {
             ctx.addr = powner;
-            owner = read_sid(vmi_lg.vmi, &ctx, f->offsets);
+            owner = read_sid(vmi, &ctx, f->offsets);
         }
 
         // Get group SID
         addr_t pgroup = 0;
         ctx.addr = security_descriptor + f->offsets[_SECURITY_DESCRIPTOR_Group];
-        if ( VMI_SUCCESS == vmi_read_addr(vmi_lg.vmi, &ctx, &pgroup) && pgroup)
+        if ( VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &pgroup) && pgroup)
         {
             ctx.addr = pgroup;
-            group = read_sid(vmi_lg.vmi, &ctx, f->offsets);
+            group = read_sid(vmi, &ctx, f->offsets);
         }
 
         // Get DACL
         addr_t pdacl = 0;
         ctx.addr = security_descriptor + f->offsets[_SECURITY_DESCRIPTOR_Dacl];
-        if ( VMI_SUCCESS == vmi_read_addr(vmi_lg.vmi, &ctx, &pdacl) && pdacl)
+        if ( VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &pdacl) && pdacl)
         {
             ctx.addr = pdacl;
-            dacl = read_acl(vmi_lg.vmi, &ctx, f->offsets, "Dacl", f->format);
+            dacl = read_acl(vmi, &ctx, f->offsets, "Dacl", f->format);
         }
 
         // Get SACL
         addr_t psacl = 0;
         ctx.addr = security_descriptor + f->offsets[_SECURITY_DESCRIPTOR_Sacl];
-        if ( VMI_SUCCESS == vmi_read_addr(vmi_lg.vmi, &ctx, &psacl) && psacl)
+        if ( VMI_SUCCESS == vmi_read_addr(vmi, &ctx, &psacl) && psacl)
         {
             ctx.addr = psacl;
-            sacl = read_acl(vmi_lg.vmi, &ctx, f->offsets, "Sacl", f->format);
+            sacl = read_acl(vmi, &ctx, f->offsets, "Sacl", f->format);
         }
     }
 
-    //==========================
-    // Get file name
-    //==========================
-    addr_t file_root_handle = 0;
-    ctx.addr = attrs + f->offsets[_OBJECT_ATTRIBUTES_RootDirectory];
-    if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &file_root_handle) )
+    char* file_path = drakvuf_get_filename_from_object_attributes(drakvuf, info, attrs);
+    if (!file_path)
         return string();
-
-    char* file_root = drakvuf_get_filename_from_handle(drakvuf, info, file_root_handle);
-
-    ctx.addr = attrs + f->offsets[_OBJECT_ATTRIBUTES_ObjectName];
-    if ( VMI_FAILURE == vmi_read_addr(vmi_lg.vmi, &ctx, &ctx.addr) )
-    {
-        g_free(file_root);
-        return string();
-    }
-
-    unicode_string_t* file_name_us = drakvuf_read_unicode(drakvuf, info, ctx.addr);
-
-    if ( !file_name_us )
-    {
-        g_free(file_root);
-        return string();
-    }
 
     uint32_t obj_attr = 0;
     ctx.addr = attrs + f->offsets[_OBJECT_ATTRIBUTES_Attributes];
-    if ( VMI_FAILURE == vmi_read_32(vmi_lg.vmi, &ctx, &obj_attr) )
+    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &obj_attr) )
     {
-        g_free(file_root);
         return string();
     }
-
-    char* file_path = g_strdup_printf("%s%s%s",
-            file_root ?: "",
-            file_root ? "\\" : "",
-            file_name_us->contents);
-    string ret{file_path};
-
-    vmi_free_unicode_str(file_name_us);
-    g_free(file_root);
 
     auto a = parse_flags(obj_attr, object_attrs, f->format, "Attributes=0");
 
     print_file_obj_info(drakvuf, info, file_path, handle, a, security_flags_str, owner, group, sacl, dacl);
 
+    string ret{file_path};
     g_free(file_path);
 
     return ret;
@@ -479,15 +449,16 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     const char* is_success = info->regs->rax ? "FAIL" : "SUCCESS";
 
     uint32_t handle = 0;
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = w->handle
-    );
-    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &handle))
-        PRINT_DEBUG("filetracer: Failed to read pHandle at 0x%lx (PID %d, TID %d)\n", w->handle, w->pid, w->tid);
-    drakvuf_release_vmi(drakvuf);
+    {
+        auto vmi = vmi_lock_guard(drakvuf);
+        ACCESS_CONTEXT(ctx,
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = info->regs->cr3,
+            .addr = w->handle
+        );
+        if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &handle))
+            PRINT_DEBUG("filetracer: Failed to read pHandle at 0x%lx (PID %d, TID %d)\n", w->handle, w->pid, w->tid);
+    }
 
     string file_path;
 
@@ -550,21 +521,21 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
       IN ULONG              EaLength
     );
     */
+    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    if (!handle)
+    {
+        printf("filetracer: Null pointer pHandle in CreateFile\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
     win_filetracer* f = (win_filetracer*)info->trap->data;
     struct wrapper* w = new (std::nothrow) wrapper;
     if (!w) return 0;
     w->f = f;
+    w->handle = handle;
     w->rsp = info->regs->rsp;
     w->pid = info->attached_proc_data.pid;
     w->tid = info->attached_proc_data.tid;
-
-    w->handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    if ( !w->handle )
-    {
-        printf("filetracer: Null pointer pHandle in CreateFile\n");
-        delete w;
-        return VMI_EVENT_RESPONSE_NONE;
-    }
     w->obj_attr = drakvuf_get_function_argument(drakvuf, info, 3);
     auto attrs_value = drakvuf_get_function_argument(drakvuf, info, 6);
     w->attrs = parse_flags(attrs_value, file_flags_and_attrs, f->format);

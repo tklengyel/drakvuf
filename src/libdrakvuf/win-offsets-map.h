@@ -210,6 +210,9 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [EWOW64PROCESS_PEB] = { "_EWOW64PROCESS", "Peb" },
 
     [LIST_ENTRY_FLINK] = { "_LIST_ENTRY", "Flink" },
+
+    [OBJECT_ATTRIBUTES_OBJECTNAME] = {"_OBJECT_ATTRIBUTES", "ObjectName"},
+    [OBJECT_ATTRIBUTES_ROOTDIRECTORY] = {"_OBJECT_ATTRIBUTES", "RootDirectory"},
 };
 
 static const char* win_bitfields_names[__WIN_OFFSETS_MAX][2] =
