@@ -129,62 +129,111 @@
 
 extern const flags_str_t generic_ar;
 
-using std::string;
-
-static void print_file_obj_info(drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    char const* file_path,
-    uint32_t handle,
-    string file_attr = string(),
-    string security_flags = string(),
-    string owner = string(),
-    string group = string(),
-    string sacl = string(),
-    string dacl = string())
+static auto build_security_descriptor(const win_objattrs_t& attrs)
 {
-    win_filetracer* f = (win_filetracer*)info->trap->data;
+    std::vector<std::pair<std::string, fmt::Rstr<std::string>>> security_descriptor;
+    if (!attrs.security_flags.empty())
+        security_descriptor.emplace_back("Control", attrs.security_flags);
+    if (!attrs.owner.empty())
+        security_descriptor.emplace_back("Owner", attrs.owner);
+    if (!attrs.group.empty())
+        security_descriptor.emplace_back("Group", attrs.group);
+    if (!attrs.sacl.empty())
+        security_descriptor.emplace_back("Sacl", attrs.sacl);
+    if (!attrs.dacl.empty())
+        security_descriptor.emplace_back("Dacl", attrs.dacl);
+    return security_descriptor;
+}
 
+static void print_file_obj_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win_filetracer* f, const win_objattrs_t& attrs)
+{
     if (f->format == OUTPUT_KV)
     {
         kvfmt::print("filetracer", drakvuf, info,
-            keyval("FileName", fmt::Qstr(file_path)),
-            keyval("FileHandle", fmt::Xval(handle)),
-            fmt::Rstr(file_attr),
-            fmt::Rstr(security_flags),
-            fmt::Rstr(owner),
-            fmt::Rstr(group),
-            fmt::Rstr(sacl),
-            fmt::Rstr(dacl)
+            keyval("FileName", fmt::Qstr(attrs.file_path)),
+            fmt::Rstr(attrs.obj_attrs),
+            fmt::Rstr(attrs.security_flags),
+            fmt::Rstr(attrs.owner),
+            fmt::Rstr(attrs.group),
+            fmt::Rstr(attrs.sacl),
+            fmt::Rstr(attrs.dacl)
         );
     }
     else
     {
-        std::vector<std::pair<std::string, fmt::Rstr<std::string>>> security_descriptor;
-        if (!security_flags.empty())
-            security_descriptor.emplace_back("Control", security_flags);
-        if (!owner.empty())
-            security_descriptor.emplace_back("Owner", owner);
-        if (!group.empty())
-            security_descriptor.emplace_back("Group", group);
-        if (!sacl.empty())
-            security_descriptor.emplace_back("Sacl", sacl);
-        if (!dacl.empty())
-            security_descriptor.emplace_back("Dacl", dacl);
+        auto security_descriptor = build_security_descriptor(attrs);
 
         fmt::print(f->format, "filetracer", drakvuf, info,
-            keyval("FileName", fmt::Qstr(file_path)),
-            keyval("FileHandle", fmt::Xval(handle)),
-            keyval("ObjectAttributes", fmt::Qstr(file_attr)),
+            keyval("FileName", fmt::Qstr(attrs.file_path)),
+            keyval("ObjectAttributes", fmt::Qstr(attrs.obj_attrs)),
             keyval("SecurityDescriptor", security_descriptor)
         );
     }
 }
 
-static string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t attrs, uint32_t handle = 0)
+static void print_create_file_obj_info(drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    win_filetracer* f,
+    uint32_t handle,
+    const win_objattrs_t& attrs,
+    const wrapper* w,
+    bool is_success)
 {
-    if (!attrs) return string();
 
-    win_filetracer* f = (win_filetracer*)info->trap->data;
+    auto status = is_success ? "SUCCESS" : "FAIL";
+    auto file_attrs = parse_flags(w->file_attrs, file_flags_and_attrs, f->format);
+    auto share_access = parse_flags(w->share_access, share_mode, f->format);
+    auto create_disposition = parse_flags(w->create_disposition, disposition, f->format);
+    auto create_opts = parse_flags(w->create_opts, create_options, f->format);
+    auto desired_access = w->create_opts & FILE_DIRECTORY_FILE
+        ? parse_flags(w->desired_access, directory_ar, f->format)
+        : parse_flags(w->desired_access, file_ar, f->format);
+
+    if (f->format == OUTPUT_KV)
+    {
+        kvfmt::print("filetracer", drakvuf, info,
+            keyval("FileName", fmt::Qstr(attrs.file_path)),
+            keyval("FileHandle", fmt::Xval(handle)),
+            fmt::Rstr(attrs.obj_attrs),
+            fmt::Rstr(attrs.security_flags),
+            fmt::Rstr(attrs.owner),
+            fmt::Rstr(attrs.group),
+            fmt::Rstr(attrs.sacl),
+            fmt::Rstr(attrs.dacl),
+            fmt::Rstr(desired_access),
+            fmt::Rstr(file_attrs),
+            fmt::Rstr(share_access),
+            fmt::Rstr(create_disposition),
+            fmt::Rstr(create_opts),
+            keyval("Status", fmt::Qstr(status))
+        );
+    }
+    else
+    {
+        auto security_descriptor = build_security_descriptor(attrs);
+
+        fmt::print(f->format, "filetracer", drakvuf, info,
+            keyval("FileName", fmt::Qstr(attrs.file_path)),
+            keyval("FileHandle", fmt::Xval(handle)),
+            keyval("ObjectAttributes", fmt::Qstr(attrs.obj_attrs)),
+            keyval("SecurityDescriptor", security_descriptor),
+            keyval("DesiredAccess", fmt::Qstr(desired_access)),
+            keyval("FileAttributes", fmt::Qstr(file_attrs)),
+            keyval("ShareAccess", fmt::Qstr(share_access)),
+            keyval("CreateDisposition", fmt::Qstr(create_disposition)),
+            keyval("CreateOptions", fmt::Qstr(create_opts)),
+            keyval("Status", fmt::Qstr(status))
+        );
+    }
+}
+
+static std::tuple<bool, win_objattrs_t> objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, win_filetracer* f, addr_t attrs)
+{
+    if (!attrs) return {};
+
+    char* file_path = drakvuf_get_filename_from_object_attributes(drakvuf, info, attrs);
+    if (!file_path)
+        return {};
 
     auto vmi = vmi_lock_guard(drakvuf);
 
@@ -197,11 +246,11 @@ static string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t 
     // Read security descriptor
     //==========================
 
-    string security_flags_str;
-    string owner;
-    string group;
-    string sacl;
-    string dacl;
+    std::string security_flags;
+    std::string owner;
+    std::string group;
+    std::string sacl;
+    std::string dacl;
 
     // Get address of security descriptor
     addr_t security_descriptor = 0;
@@ -213,7 +262,7 @@ static string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t 
         uint16_t se_ctrl = 0;
         ctx.addr = security_descriptor + f->offsets[_SECURITY_DESCRIPTOR_Control];
         if ( VMI_SUCCESS == vmi_read_16(vmi, &ctx, &se_ctrl) )
-            security_flags_str = parse_flags(se_ctrl, security_controls, f->format, "SecurityControl=0");
+            security_flags = parse_flags(se_ctrl, security_controls, f->format, "SecurityControl=0");
 
         // Get owner SID
         addr_t powner = 0;
@@ -252,40 +301,33 @@ static string objattr_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t 
         }
     }
 
-    char* file_path = drakvuf_get_filename_from_object_attributes(drakvuf, info, attrs);
-    if (!file_path)
-        return string();
-
     uint32_t obj_attr = 0;
     ctx.addr = attrs + f->offsets[_OBJECT_ATTRIBUTES_Attributes];
-    if ( VMI_FAILURE == vmi_read_32(vmi, &ctx, &obj_attr) )
-    {
-        return string();
-    }
+    if ( VMI_SUCCESS != vmi_read_32(vmi, &ctx, &obj_attr) )
+        return {};
 
-    auto a = parse_flags(obj_attr, object_attrs, f->format, "Attributes=0");
+    auto file_attr = parse_flags(obj_attr, object_attrs, f->format, "Attributes=0");
 
-    print_file_obj_info(drakvuf, info, file_path, handle, a, security_flags_str, owner, group, sacl, dacl);
-
-    string ret{file_path};
+    win_objattrs_t ret{file_path, file_attr, security_flags, owner, group, sacl, dacl};
     g_free(file_path);
 
-    return ret;
+    return std::make_tuple(true, std::move(ret));
 }
 
-static event_response_t handle_read(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint64_t handle)
+static void print_file_read_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle)
 {
-    if (!handle) return 0;
+    win_filetracer* f = (win_filetracer*)info->trap->data;
+    char* file = drakvuf_get_filename_from_handle(drakvuf, info, handle);
+    if ( !file )
+        return;
 
-    char* file_path = drakvuf_get_filename_from_handle(drakvuf, info, handle);
+    fmt::print(f->format, "filetracer", drakvuf, info,
+        keyval("FileName", fmt::Qstr(file)),
+        keyval("FileHandle", fmt::Xval(handle))
+    );
 
-    print_file_obj_info(drakvuf, info, file_path, handle);
-
-    g_free(file_path);
-
-    return 0;
+    g_free(file);
 }
-
 
 static bool is_absolute_path(char const* file_name)
 {
@@ -306,7 +348,7 @@ static char* get_parent_folder(char const* file_name)
 }
 
 
-static void print_delete_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, addr_t fileinfo)
+static void print_delete_file_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t handle, addr_t fileinfo)
 {
     const char* operation_name = "FileDispositionInformation";
     win_filetracer* f = (win_filetracer*)info->trap->data;
@@ -371,8 +413,7 @@ static void print_basic_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf
         keyval("FileAttributes", fmt::Qstr(parse_flags(attributes, file_flags_and_attrs, f->format)))
     );
 
-    if (filename_)
-        g_free(filename_);
+    g_free(filename_);
 }
 
 static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t src_file_handle, addr_t fileinfo)
@@ -442,11 +483,12 @@ static void print_rename_file_info(vmi_instance_t vmi, drakvuf_t drakvuf, drakvu
 static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     struct wrapper* w = (struct wrapper*)info->trap->data;
+    win_filetracer* f = w->f;
 
     if (!drakvuf_check_return_context(drakvuf, info, w->pid, w->tid, w->rsp))
         return VMI_EVENT_RESPONSE_NONE;
 
-    const char* is_success = info->regs->rax ? "FAIL" : "SUCCESS";
+    bool is_success = (info->regs->rax == 0);
 
     uint32_t handle = 0;
     {
@@ -460,46 +502,14 @@ static event_response_t create_file_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
             PRINT_DEBUG("filetracer: Failed to read pHandle at 0x%lx (PID %d, TID %d)\n", w->handle, w->pid, w->tid);
     }
 
-    string file_path;
+    auto [succ, file_attrs] = objattr_read(drakvuf, info, f, w->obj_attr);
 
-    info->trap->data = w->f;
-    file_path = objattr_read(drakvuf, info, w->obj_attr, handle);
-
-    switch (w->f->format)
-    {
-        case OUTPUT_KV:
-            kvfmt::print("filetracer", drakvuf, info,
-                keyval("FileName", fmt::Qstr(file_path)),
-                keyval("FileHandle", fmt::Xval(handle)),
-                fmt::Rstr(w->access),
-                fmt::Rstr(w->attrs),
-                fmt::Rstr(w->share),
-                fmt::Rstr(w->disp),
-                fmt::Rstr(w->opts),
-                keyval("Status", fmt::Qstr(is_success))
-            );
-            break;
-
-        default:
-        case OUTPUT_CSV:
-        case OUTPUT_JSON:
-        case OUTPUT_DEFAULT:
-            fmt::print(w->f->format, "filetracer", drakvuf, info,
-                keyval("FileName", fmt::Qstr(file_path)),
-                keyval("Handle", fmt::Xval(handle)),
-                keyval("DesiredAccess", fmt::Qstr(w->access)),
-                keyval("FileAttributes", fmt::Qstr(w->attrs)),
-                keyval("ShareAccess", fmt::Qstr(w->share)),
-                keyval("CreateDisposition", fmt::Qstr(w->disp)),
-                keyval("CreateOptions", fmt::Qstr(w->opts)),
-                keyval("Status", fmt::Qstr(is_success))
-            );
-            break;
-    }
-
-    w->f->traps_to_free = g_slist_remove(w->f->traps_to_free, info->trap);
-    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)g_free);
+    if (succ)
+        print_create_file_obj_info(drakvuf, info, f, handle, file_attrs, w, is_success);
     delete w;
+
+    f->traps_to_free = g_slist_remove(f->traps_to_free, info->trap);
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)g_free);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -521,14 +531,23 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
       IN ULONG              EaLength
     );
     */
+    win_filetracer* f = (win_filetracer*)info->trap->data;
     addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
+    auto desired_access = drakvuf_get_function_argument(drakvuf, info, 2);
+    auto attrs = drakvuf_get_function_argument(drakvuf, info, 3);
+    auto file_attrs = drakvuf_get_function_argument(drakvuf, info, 6);
+    auto share_access = drakvuf_get_function_argument(drakvuf, info, 7);
+    auto create_disposition = drakvuf_get_function_argument(drakvuf, info, 8);
+    auto create_opts = drakvuf_get_function_argument(drakvuf, info, 9);
+
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+
     if (!handle)
     {
-        printf("filetracer: Null pointer pHandle in CreateFile\n");
+        PRINT_DEBUG("filetracer: Null pointer pHandle in CreateFile\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    win_filetracer* f = (win_filetracer*)info->trap->data;
     struct wrapper* w = new (std::nothrow) wrapper;
     if (!w) return 0;
     w->f = f;
@@ -536,21 +555,12 @@ static event_response_t create_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     w->rsp = info->regs->rsp;
     w->pid = info->attached_proc_data.pid;
     w->tid = info->attached_proc_data.tid;
-    w->obj_attr = drakvuf_get_function_argument(drakvuf, info, 3);
-    auto attrs_value = drakvuf_get_function_argument(drakvuf, info, 6);
-    w->attrs = parse_flags(attrs_value, file_flags_and_attrs, f->format);
-    auto share_value = drakvuf_get_function_argument(drakvuf, info, 7);
-    w->share = parse_flags(share_value, share_mode, f->format);
-    auto disp_value = drakvuf_get_function_argument(drakvuf, info, 8);
-    w->disp = parse_flags(disp_value, disposition, f->format);
-    auto opts_value = drakvuf_get_function_argument(drakvuf, info, 9);
-    w->opts = parse_flags(opts_value, create_options, f->format);
-    auto access_value = drakvuf_get_function_argument(drakvuf, info, 2);
-    w->access = opts_value & FILE_DIRECTORY_FILE
-        ? parse_flags(access_value, directory_ar, f->format)
-        : parse_flags(access_value, file_ar, f->format);
-
-    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+    w->obj_attr = attrs;
+    w->file_attrs = file_attrs;
+    w->share_access = share_access;
+    w->create_disposition = create_disposition;
+    w->create_opts = create_opts;
+    w->desired_access = desired_access;
 
     drakvuf_trap_t* trap = (drakvuf_trap_t*)g_malloc0(sizeof(drakvuf_trap_t));
     trap->breakpoint.lookup_type = LOOKUP_KERNEL;
@@ -586,8 +596,12 @@ static event_response_t open_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
       IN ULONG              OpenOptions
     );
     */
+    win_filetracer* f = (win_filetracer*)info->trap->data;
     addr_t attrs = drakvuf_get_function_argument(drakvuf, info, 3);
-    objattr_read(drakvuf, info, attrs);
+
+    auto [succ, file_attrs] = objattr_read(drakvuf, info, f, attrs);
+    if (succ)
+        print_file_obj_info(drakvuf, info, f, file_attrs);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -601,8 +615,12 @@ static event_response_t open_directory_object_cb(drakvuf_t drakvuf, drakvuf_trap
       _In_  POBJECT_ATTRIBUTES ObjectAttributes
     );
     */
+    win_filetracer* f = (win_filetracer*)info->trap->data;
     addr_t attrs = drakvuf_get_function_argument(drakvuf, info, 3);
-    objattr_read(drakvuf, info, attrs);
+
+    auto [succ, file_attrs] = objattr_read(drakvuf, info, f, attrs);
+    if (succ)
+        print_file_obj_info(drakvuf, info, f, file_attrs);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -615,8 +633,12 @@ static event_response_t query_attributes_file_cb(drakvuf_t drakvuf, drakvuf_trap
       _Out_ PFILE_BASIC_INFORMATION FileInformation
     );
     */
+    win_filetracer* f = (win_filetracer*)info->trap->data;
     addr_t attrs = drakvuf_get_function_argument(drakvuf, info, 1);
-    objattr_read(drakvuf, info, attrs);
+
+    auto [succ, file_attrs] = objattr_read(drakvuf, info, f, attrs);
+    if (succ)
+        print_file_obj_info(drakvuf, info, f, file_attrs);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
@@ -646,8 +668,7 @@ static event_response_t set_information_file_cb(drakvuf_t drakvuf, drakvuf_trap_
 
     if (fileinfoclass == FILE_DISPOSITION_INFORMATION)
     {
-        auto vmi = vmi_lock_guard(drakvuf);
-        print_delete_file_info(vmi, drakvuf, info, handle, fileinfo);
+        print_delete_file_info(drakvuf, info, handle, fileinfo);
     }
 
     return 0;
@@ -669,7 +690,9 @@ static event_response_t read_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* inf
     );
     */
     uint64_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    return handle_read(drakvuf, info, handle);
+    if (handle)
+        print_file_read_info(drakvuf, info, handle);
+    return 0;
 }
 
 static event_response_t write_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -688,7 +711,9 @@ static event_response_t write_file_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* in
     );
     */
     uint64_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
-    return handle_read(drakvuf, info, handle);
+    if (handle)
+        print_file_read_info(drakvuf, info, handle);
+    return 0;
 }
 
 /* ----------------------------------------------------- */
