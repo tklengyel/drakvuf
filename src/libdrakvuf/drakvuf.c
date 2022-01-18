@@ -153,10 +153,10 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
         g_free(drakvuf->wow_offsets);
     }
 
+    g_rec_mutex_clear(&drakvuf->vmi_lock);
     g_free(drakvuf->offsets);
     g_free(drakvuf->bitfields);
     g_free(drakvuf->sizes);
-    g_mutex_clear(&drakvuf->vmi_lock);
     g_free(drakvuf->dom_name);
     g_free(drakvuf->json_kernel_path);
     g_free(drakvuf->json_wow_path);
@@ -192,7 +192,7 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
     else
         PRINT_DEBUG("drakvuf_init: Rekall WoW64 profile not used\n");
 
-    g_mutex_init(&(*drakvuf)->vmi_lock);
+    g_rec_mutex_init(&(*drakvuf)->vmi_lock);
 
     if ( !xen_init_interface(&(*drakvuf)->xen) )
         goto err;
@@ -543,13 +543,13 @@ void drakvuf_unhook_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
 vmi_instance_t drakvuf_lock_and_get_vmi(drakvuf_t drakvuf)
 {
-    g_mutex_lock(&drakvuf->vmi_lock);
+    g_rec_mutex_lock(&drakvuf->vmi_lock);
     return drakvuf->vmi;
 }
 
 void drakvuf_release_vmi(drakvuf_t drakvuf)
 {
-    g_mutex_unlock(&drakvuf->vmi_lock);
+    g_rec_mutex_unlock(&drakvuf->vmi_lock);
 }
 
 void drakvuf_pause (drakvuf_t drakvuf)
