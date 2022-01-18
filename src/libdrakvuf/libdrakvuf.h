@@ -660,6 +660,10 @@ char* drakvuf_get_filename_from_handle( drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     addr_t handle ) NOEXCEPT;
 
+char* drakvuf_get_filename_from_object_attributes( drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    addr_t attrs ) NOEXCEPT;
+
 // Reads 'length' characters from array of UTF_16 charachters into unicode_string_t object with UTF_8 encoding
 unicode_string_t* drakvuf_read_wchar_array(vmi_instance_t vmi, const access_context_t* ctx, size_t length) NOEXCEPT;
 

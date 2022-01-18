@@ -539,6 +539,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_process_data = win_get_process_data;
     drakvuf->osi.get_registry_keyhandle_path = win_reg_keyhandle_path;
     drakvuf->osi.get_filename_from_handle = win_get_filename_from_handle;
+    drakvuf->osi.get_filename_from_object_attributes = win_get_filename_from_object_attributes;
     drakvuf->osi.is_wow64 = win_is_wow64;
     drakvuf->osi.get_function_argument = win_get_function_argument;
     drakvuf->osi.get_function_return_address = win_get_function_return_address;
