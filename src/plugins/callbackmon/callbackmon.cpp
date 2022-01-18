@@ -442,7 +442,7 @@ bool callbackmon::stop_impl()
         auto walk_list = [&](const auto& previous, const auto& current, const auto& action)
         {
             for (const auto& cb : current)
-                if (std::find(previous.begin(), previous.end(), cb) != previous.end())
+                if (std::find(previous.begin(), previous.end(), cb) == previous.end())
                     report(list_name, cb, action);
         };
         walk_list(previous, current, "Added");
