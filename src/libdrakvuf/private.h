@@ -204,7 +204,7 @@ struct drakvuf
 
     // VMI
     unsigned long flush_counter;
-    GMutex vmi_lock;
+    GRecMutex vmi_lock;
     vmi_instance_t vmi;
 
     vmi_event_t cr3_event;
