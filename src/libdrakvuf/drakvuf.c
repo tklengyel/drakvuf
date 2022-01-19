@@ -125,6 +125,8 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     if (!drakvuf)
         return;
 
+    drakvuf_lock_and_get_vmi(drakvuf);
+
     if (drakvuf->vmi)
         close_vmi(drakvuf);
 
@@ -232,7 +234,7 @@ err:
     return 0;
 }
 
-bool drakvuf_init_os(drakvuf_t drakvuf)
+static bool _drakvuf_init_os(drakvuf_t drakvuf)
 {
     /*
      * We want to make sure paging is initialized with the actual state. LibVMI
@@ -278,6 +280,14 @@ bool drakvuf_init_os(drakvuf_t drakvuf)
     return drakvuf->os != VMI_OS_UNKNOWN;
 }
 
+bool drakvuf_init_os(drakvuf_t drakvuf)
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+    bool ret = _drakvuf_init_os(drakvuf);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
+}
+
 void drakvuf_interrupt(drakvuf_t drakvuf, int sig)
 {
     drakvuf->interrupted = sig;
@@ -288,7 +298,7 @@ int drakvuf_is_interrupted(drakvuf_t drakvuf)
     return drakvuf->interrupted;
 }
 
-bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+static bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     if (trap->breakpoint.lookup_type == LOOKUP_NONE)
     {
@@ -415,7 +425,7 @@ bool inject_trap_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
     return 0;
 }
 
-bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+static bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     if (CR3 == trap->reg)
     {
@@ -439,13 +449,13 @@ bool inject_trap_reg(drakvuf_t drakvuf, drakvuf_trap_t* trap)
     return 0;
 }
 
-bool inject_trap_catchall_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+static bool inject_trap_catchall_breakpoint(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     drakvuf->catchall_breakpoint = g_slist_prepend(drakvuf->catchall_breakpoint, trap);
     return 1;
 };
 
-bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+static bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     if ( !drakvuf->debug && !control_debug_trap(drakvuf, 1) )
         return 0;
@@ -454,7 +464,7 @@ bool inject_trap_debug(drakvuf_t drakvuf, drakvuf_trap_t* trap)
     return 1;
 };
 
-bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+static bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     if ( !drakvuf->cpuid && !control_cpuid_trap(drakvuf, 1) )
         return 0;
@@ -463,7 +473,7 @@ bool inject_trap_cpuid(drakvuf_t drakvuf, drakvuf_trap_t* trap)
     return 1;
 };
 
-bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+static bool _drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     bool ret;
 
@@ -511,8 +521,15 @@ bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
     return ret;
 }
 
-void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap,
-    drakvuf_trap_free_t free_routine)
+bool drakvuf_add_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+    bool ret = _drakvuf_add_trap(drakvuf, trap);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
+}
+
+static void _drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
 {
     if ( drakvuf->in_callback)
     {
@@ -536,6 +553,13 @@ void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap,
     }
 }
 
+void drakvuf_remove_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap, drakvuf_trap_free_t free_routine)
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+    _drakvuf_remove_trap(drakvuf, trap, free_routine);
+    drakvuf_release_vmi(drakvuf);
+}
+
 void drakvuf_unhook_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 {
     drakvuf_remove_trap(drakvuf, trap, NULL);
@@ -543,13 +567,19 @@ void drakvuf_unhook_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap)
 
 vmi_instance_t drakvuf_lock_and_get_vmi(drakvuf_t drakvuf)
 {
+#ifdef ENABLE_THREADSAFETY
     g_rec_mutex_lock(&drakvuf->vmi_lock);
+#endif
     return drakvuf->vmi;
 }
 
 void drakvuf_release_vmi(drakvuf_t drakvuf)
 {
+#ifdef ENABLE_THREADSAFETY
     g_rec_mutex_unlock(&drakvuf->vmi_lock);
+#else
+    UNUSED(drakvuf);
+#endif
 }
 
 void drakvuf_pause (drakvuf_t drakvuf)
@@ -633,7 +663,7 @@ size_t drakvuf_get_process_address_width(drakvuf_t drakvuf, drakvuf_trap_info_t*
     return drakvuf_process_is32bit(drakvuf, info) ? 4 : 8;
 }
 
-int drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const access_context_t* ctx, addr_t* value)
+static int _drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const access_context_t* ctx, addr_t* value)
 {
     if (value)
         *value = 0;
@@ -650,15 +680,27 @@ int drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const access
         return vmi_read_64(drakvuf->vmi, ctx, value);
 }
 
+int drakvuf_read_addr(drakvuf_t drakvuf, drakvuf_trap_info_t* info, const access_context_t* ctx, addr_t* value)
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+    int ret = _drakvuf_read_addr(drakvuf, info, ctx, value);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
+}
+
 bool drakvuf_get_current_process_data(drakvuf_t drakvuf, drakvuf_trap_info_t* info, proc_data_priv_t* proc_data)
 {
+    drakvuf_lock_and_get_vmi(drakvuf);
     addr_t process_base = drakvuf_get_current_process(drakvuf, info);
     // TODO - Windows version of get process tid needed.
-    return drakvuf_get_process_data_priv(drakvuf, process_base, proc_data) && drakvuf_get_current_thread_id(drakvuf, info, (uint32_t*)&proc_data->tid);
+    bool ret = drakvuf_get_process_data_priv(drakvuf, process_base, proc_data) && drakvuf_get_current_thread_id(drakvuf, info, (uint32_t*)&proc_data->tid);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
 }
 
 bool drakvuf_get_process_data(drakvuf_t drakvuf, addr_t process_base, proc_data_t* proc_data)
 {
+    drakvuf_lock_and_get_vmi(drakvuf);
     proc_data_priv_t proc_data_priv = { 0 };
     bool success = drakvuf_get_process_data_priv(drakvuf, process_base, &proc_data_priv);
     proc_data->name = proc_data_priv.name;
@@ -667,21 +709,28 @@ bool drakvuf_get_process_data(drakvuf_t drakvuf, addr_t process_base, proc_data_
     proc_data->base_addr = proc_data_priv.base_addr;
     proc_data->userid = proc_data_priv.userid;
     proc_data->tid = proc_data_priv.tid;
+    drakvuf_release_vmi(drakvuf);
     return success;
 }
 
 char* drakvuf_read_ascii_str(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
 {
+    drakvuf_lock_and_get_vmi(drakvuf);
+
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
         .addr = addr,
     );
 
-    return vmi_read_str(drakvuf->vmi, &ctx);
+    char* ret = vmi_read_str(drakvuf->vmi, &ctx);
+
+    drakvuf_release_vmi(drakvuf);
+
+    return ret;
 }
 
-unicode_string_t* drakvuf_read_unicode_common(drakvuf_t drakvuf, const access_context_t* ctx)
+static unicode_string_t* _drakvuf_read_unicode_common(drakvuf_t drakvuf, const access_context_t* ctx)
 {
     vmi_instance_t vmi = drakvuf->vmi;
 
@@ -705,6 +754,14 @@ unicode_string_t* drakvuf_read_unicode_common(drakvuf_t drakvuf, const access_co
 
     g_free(out);
     return NULL;
+}
+
+unicode_string_t* drakvuf_read_unicode_common(drakvuf_t drakvuf, const access_context_t* ctx)
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+    unicode_string_t* ret = _drakvuf_read_unicode_common(drakvuf, ctx);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
 }
 
 unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
@@ -732,7 +789,7 @@ unicode_string_t* drakvuf_read_unicode_va(drakvuf_t drakvuf, addr_t vaddr, vmi_p
     return drakvuf_read_unicode_common(drakvuf, &ctx);
 }
 
-unicode_string_t* drakvuf_read_unicode32_common(drakvuf_t drakvuf, const access_context_t* ctx)
+static unicode_string_t* _drakvuf_read_unicode32_common(drakvuf_t drakvuf, const access_context_t* ctx)
 {
     vmi_instance_t vmi = drakvuf->vmi;
 
@@ -756,6 +813,14 @@ unicode_string_t* drakvuf_read_unicode32_common(drakvuf_t drakvuf, const access_
 
     g_free(out);
     return NULL;
+}
+
+unicode_string_t* drakvuf_read_unicode32_common(drakvuf_t drakvuf, const access_context_t* ctx)
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+    unicode_string_t* ret = _drakvuf_read_unicode32_common(drakvuf, ctx);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
 }
 
 unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
@@ -785,6 +850,7 @@ unicode_string_t* drakvuf_read_unicode32_va(drakvuf_t drakvuf, addr_t vaddr, vmi
 
 size_t drakvuf_wchar_string_length(drakvuf_t drakvuf, const access_context_t* ctx)
 {
+    drakvuf_lock_and_get_vmi(drakvuf);
     vmi_instance_t vmi = drakvuf->vmi;
     access_context_t mutable_ctx = *ctx;
 
@@ -801,10 +867,11 @@ size_t drakvuf_wchar_string_length(drakvuf_t drakvuf, const access_context_t* ct
     }
 
 end:
+    drakvuf_release_vmi(drakvuf);
     return (str_len / 2);
 }
 
-unicode_string_t* drakvuf_read_wchar_array(drakvuf_t drakvuf, const access_context_t* ctx, size_t length)
+static unicode_string_t* _drakvuf_read_wchar_array(drakvuf_t drakvuf, const access_context_t* ctx, size_t length)
 {
     vmi_instance_t vmi = drakvuf->vmi;
 
@@ -848,6 +915,14 @@ unicode_string_t* drakvuf_read_wchar_array(drakvuf_t drakvuf, const access_conte
     }
 
     return out;
+}
+
+unicode_string_t* drakvuf_read_wchar_array(drakvuf_t drakvuf, const access_context_t* ctx, size_t length)
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+    unicode_string_t* ret = _drakvuf_read_wchar_array(drakvuf, ctx, length);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
 }
 
 unicode_string_t* drakvuf_read_wchar_string(drakvuf_t drakvuf, const access_context_t* ctx)
