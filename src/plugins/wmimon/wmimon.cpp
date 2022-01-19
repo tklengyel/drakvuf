@@ -384,7 +384,7 @@ event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_
     };
 
     vmi_lock_guard wmi_lock(drakvuf);
-    auto object = drakvuf_read_wchar_string(wmi_lock, &ctx);
+    auto object = drakvuf_read_wchar_string(drakvuf, &ctx);
     if (!object)
     {
         PRINT_DEBUG("[WMIMon] ExecMethodReturn failed to receive a name of object!\n");
@@ -392,7 +392,7 @@ event_response_t ExecMethod_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_
     }
 
     ctx.addr = data->m_method;
-    auto method = drakvuf_read_wchar_string(wmi_lock, &ctx);
+    auto method = drakvuf_read_wchar_string(drakvuf, &ctx);
     if (!method)
     {
         PRINT_DEBUG("[WMIMon] ExecMethodReturn failed to receive a name of method!\n");
@@ -470,7 +470,7 @@ event_response_t GetObject_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
     };
 
     auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    auto object = drakvuf_read_wchar_string(vmi, &ctx);
+    auto object = drakvuf_read_wchar_string(drakvuf, &ctx);
     drakvuf_release_vmi(drakvuf);
 
     if (!object)
@@ -544,7 +544,7 @@ event_response_t ExecQuery_return_handler(drakvuf_t drakvuf, drakvuf_trap_info_t
     };
 
     auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    auto command = drakvuf_read_wchar_string(vmi, &ctx);
+    auto command = drakvuf_read_wchar_string(drakvuf, &ctx);
     drakvuf_release_vmi(drakvuf);
 
     if (!command)
@@ -618,7 +618,7 @@ event_response_t ConnectServer_return_handler(drakvuf_t drakvuf, drakvuf_trap_in
     };
 
     auto vmi = drakvuf_lock_and_get_vmi(drakvuf);
-    auto resource = drakvuf_read_wchar_string(vmi, &ctx);
+    auto resource = drakvuf_read_wchar_string(drakvuf, &ctx);
     drakvuf_release_vmi(drakvuf);
 
     if (!resource)

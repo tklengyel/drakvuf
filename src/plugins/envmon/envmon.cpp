@@ -221,13 +221,13 @@ static event_response_t trap_DefineDosDeviceW_cb(drakvuf_t drakvuf, drakvuf_trap
 
     vmi_lock_guard wmi_lock(drakvuf);
 
-    auto device_name_us = drakvuf_read_wchar_string(wmi_lock, &ctx);
+    auto device_name_us = drakvuf_read_wchar_string(drakvuf, &ctx);
     const char* device_name = device_name_us ?
         reinterpret_cast<char*>(device_name_us->contents) :
         "<UNKNOWN>";
 
     ctx.addr = target_path_va;
-    auto target_path_us = drakvuf_read_wchar_string(wmi_lock, &ctx);
+    auto target_path_us = drakvuf_read_wchar_string(drakvuf, &ctx);
     const char* target_path = target_path_us ?
         reinterpret_cast<char*>(target_path_us->contents) :
         "<UNKNOWN>";

@@ -142,7 +142,7 @@ static std::string drakvuf_read_unicode(drakvuf_t drakvuf, addr_t addr)
 {
     std::string str;
     auto vmi = vmi_lock_guard(drakvuf);
-    unicode_string_t* us = drakvuf_read_unicode_va(vmi, addr, 0);
+    unicode_string_t* us = drakvuf_read_unicode_va(drakvuf, addr, 0);
     if (us && us->contents)
         str.assign(reinterpret_cast<const char*>(us->contents));
     if (us)

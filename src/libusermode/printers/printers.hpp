@@ -141,7 +141,7 @@ public:
 class StringPrinterInterface : public ArgumentPrinter
 {
 protected:
-    virtual std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const = 0;
+    virtual std::string getBuffer(drakvuf_t drakvuf, const access_context_t* ctx) const = 0;
 public:
     using ArgumentPrinter::ArgumentPrinter;
 
@@ -151,7 +151,7 @@ public:
 class AsciiPrinter : public StringPrinterInterface
 {
 private:
-    std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const;
+    std::string getBuffer(drakvuf_t drakvuf, const access_context_t* ctx) const;
 
 public:
     using StringPrinterInterface::StringPrinterInterface;
@@ -160,7 +160,7 @@ public:
 class WideStringPrinter : public StringPrinterInterface
 {
 private:
-    std::string getBuffer(vmi_instance_t vmi, const access_context_t* ctx) const;
+    std::string getBuffer(drakvuf_t drakvuf, const access_context_t* ctx) const;
 
 public:
     using StringPrinterInterface::StringPrinterInterface;
