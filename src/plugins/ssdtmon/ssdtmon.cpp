@@ -201,12 +201,14 @@ event_response_t write_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return 0;
 }
 
-static bool get_driver_base(vmi_instance_t vmi, ssdtmon* plugin, const char* driver_name, addr_t* base)
+static bool get_driver_base(drakvuf_t drakvuf, ssdtmon* plugin, const char* driver_name, addr_t* base)
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
         .pid = 4,
     );
+
+    vmi_lock_guard vmi(drakvuf);
 
     addr_t list_head = 0;
     if (VMI_SUCCESS != vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &list_head))
@@ -228,7 +230,7 @@ static bool get_driver_base(vmi_instance_t vmi, ssdtmon* plugin, const char* dri
         }
 
         ctx.addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_FULLDLLNAME];
-        auto name = drakvuf_read_unicode_common(vmi, &ctx);
+        auto name = drakvuf_read_unicode_common(drakvuf, &ctx);
         if (name && name->contents)
         {
             auto drvname = std::string(reinterpret_cast<char*>(name->contents));
@@ -329,14 +331,14 @@ ssdtmon::ssdtmon(drakvuf_t drakvuf, const ssdtmon_config* config, output_format_
 
         {
             addr_t w32k_base = 0;
-            vmi_lock_guard vmi(drakvuf);
             // Locate Win32k.sys base address
-            if (!get_driver_base(vmi, this, "win32k.sys", &w32k_base))
+            if (!get_driver_base(drakvuf, this, "win32k.sys", &w32k_base))
             {
                 PRINT_DEBUG("[SSDTMON] Failed to find win32k.sys in PsLoadedModuleList\n");
                 throw -1;
             }
             // Read ssdt shadow size
+            vmi_lock_guard vmi(drakvuf);
             uint32_t w32pservicelimit;
             if (VMI_SUCCESS != vmi_read_32_va(vmi, w32k_base + w32psl_rva, gui_pid, &w32pservicelimit))
             {

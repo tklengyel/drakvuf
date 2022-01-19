@@ -156,7 +156,7 @@ static std::set<std::string> enumerate_drivers(dkommon* plugin, drakvuf_t drakvu
         }
 
         ctx.addr = entry + plugin->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME];
-        auto name = drakvuf_read_unicode_common(vmi.vmi, &ctx);
+        auto name = drakvuf_read_unicode_common(drakvuf, &ctx);
         if (name && name->contents)
         {
             auto drv = std::string(reinterpret_cast<char*>(name->contents));
@@ -193,7 +193,7 @@ static event_response_t load_unload_driver_cb(drakvuf_t drakvuf, drakvuf_trap_in
     );
 
     vmi_lock_guard vmi(drakvuf);
-    unicode_string_t* drvname = drakvuf_read_unicode_common(vmi, &ctx);
+    unicode_string_t* drvname = drakvuf_read_unicode_common(drakvuf, &ctx);
     if (drvname && drvname->contents)
     {
         std::string drvname_str{ reinterpret_cast<char*>(drvname->contents) };

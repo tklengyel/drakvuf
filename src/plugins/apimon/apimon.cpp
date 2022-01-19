@@ -259,7 +259,7 @@ static void print_addresses(drakvuf_t drakvuf, apimon* plugin, const dll_view_t*
     vmi_pid_t pid;
     vmi_lock_guard lg(drakvuf);
 
-    dll_name = drakvuf_read_unicode_va(lg.vmi, dll->mmvad.file_name_ptr, 0);
+    dll_name = drakvuf_read_unicode_va(drakvuf, dll->mmvad.file_name_ptr, 0);
 
     if (plugin->m_output_format != OUTPUT_JSON)
         goto out;

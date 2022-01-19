@@ -407,7 +407,7 @@ void rootkitmon::check_driver_integrity(drakvuf_t drakvuf, drakvuf_trap_info_t* 
                     {
                         {
                             vmi_lock_guard vmi(drakvuf);
-                            unicode_string_t* drvname = drakvuf_read_unicode_va(vmi, driver + this->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4);
+                            unicode_string_t* drvname = drakvuf_read_unicode_va(drakvuf, driver + this->offsets[LDR_DATA_TABLE_ENTRY_BASEDLLNAME], 4);
                             if (drvname)
                             {
                                 fmt::print(this->format, "rootkitmon", drakvuf, info,
@@ -709,7 +709,7 @@ unicode_string_t* rootkitmon::get_object_type_name(vmi_instance_t vmi, addr_t ob
     if (VMI_SUCCESS != vmi_read_addr_va(vmi, this->type_idx_table + type_index * this->guest_ptr_size, 4, &ob_type))
         return nullptr;
 
-    return drakvuf_read_unicode_va(vmi, ob_type + this->offsets[OBJECT_TYPE_NAME], 4);
+    return drakvuf_read_unicode_va(drakvuf, ob_type + this->offsets[OBJECT_TYPE_NAME], 4);
 }
 
 

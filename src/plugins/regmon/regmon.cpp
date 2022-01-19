@@ -285,7 +285,7 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
     vmi_lock_guard vmi_lg(drakvuf);
 
     if ((type == REG_SZ) || (type == REG_LINK) || (type == REG_EXPAND_SZ))
-        return drakvuf_read_wchar_string(vmi_lg.vmi, &ctx);
+        return drakvuf_read_wchar_string(drakvuf, &ctx);
 
     std::vector<uint8_t> data_bytes(data_size, 0);
 
@@ -309,7 +309,7 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
             if (value_word == 0)
             {
                 // Read current wchar string
-                unicode_string_t* us = drakvuf_read_wchar_string(vmi_lg.vmi, &ctx);
+                unicode_string_t* us = drakvuf_read_wchar_string(drakvuf, &ctx);
                 if (us)
                 {
                     rs << "'" << us->contents << "',";
