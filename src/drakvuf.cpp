@@ -212,13 +212,14 @@ drakvuf_c::drakvuf_c(const char* domain,
     bool verbose,
     bool leave_paused,
     bool libvmi_conf,
+    const char* libvmi_conf_path,
     addr_t kpgd,
     bool fast_singlestep,
     uint64_t limited_traps_ttl)
     : leave_paused{ leave_paused }
     , format{ output }
 {
-    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, verbose, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl))
+    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, verbose, libvmi_conf, libvmi_conf_path, kpgd, fast_singlestep, limited_traps_ttl))
     {
         drakvuf_close(drakvuf, leave_paused);
         throw std::runtime_error("drakvuf_init() failed");

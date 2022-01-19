@@ -383,6 +383,7 @@ bool drakvuf_init (drakvuf_t* drakvuf,
     const char* json_wow_profile,
     const bool verbose,
     const bool libvmi_conf,
+    const char* libvmi_conf_path,
     const addr_t kpgd,
     const bool fast_singlestep,
     uint64_t limited_traps_ttl) NOEXCEPT;

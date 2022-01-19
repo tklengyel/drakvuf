@@ -179,6 +179,7 @@ static void print_usage()
         "\t -d <domain ID or name>    The domain's ID or name\n"
         "Optional inputs:\n"
         "\t -l                        Use libvmi.conf\n"
+        "\t --libvmi-conf <path>      Use libvmi config file\n"
         "\t -k <kpgd value>           Use provided KPGD value for faster and more robust startup (advanced)\n"
         "\t -i <injection pid>        The PID of the process to hijack for injection\n"
         "\t -I <injection thread>     The ThreadID in the process to hijack for injection (requires -i)\n"
@@ -377,6 +378,7 @@ int main(int argc, char** argv)
     bool verbose = false;
     bool leave_paused = false;
     bool libvmi_conf = false;
+    const char* libvmi_conf_path = nullptr;
     bool fast_singlestep = false;
     addr_t kpgd = 0;
     auto terminated_processes = std::make_shared<std::unordered_map<vmi_pid_t, bool>>();
@@ -458,10 +460,12 @@ int main(int argc, char** argv)
         opt_rootkitmon_json_fwpkclnt,
         opt_rootkitmon_json_fltmgr,
         opt_callbackmon_json_netio,
-        opt_json_hal
+        opt_json_hal,
+        opt_libvmi_conf
     };
     const option long_opts[] =
     {
+        {"libvmi-conf", required_argument, NULL, opt_libvmi_conf},
         {"json-kernel", required_argument, NULL, 'r'},
         {"json-kernel32", required_argument, NULL, opt_json_kernel32},
         {"json-kernelbase", required_argument, NULL, opt_json_kernelbase},
@@ -670,6 +674,10 @@ int main(int argc, char** argv)
             case 'l':
                 libvmi_conf = true;
                 break;
+            case opt_libvmi_conf:
+                libvmi_conf = true;
+                libvmi_conf_path = optarg;
+                break;
             case 'F':
                 fast_singlestep = true;
                 break;
@@ -870,7 +878,19 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = std::make_unique<drakvuf_c>(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl);
+        drakvuf = std::make_unique<drakvuf_c>(
+                domain,
+                json_kernel_path,
+                json_wow_path,
+                output,
+                verbose,
+                leave_paused,
+                libvmi_conf,
+                libvmi_conf_path,
+                kpgd,
+                fast_singlestep,
+                limited_traps_ttl
+            );
     }
     catch (const std::exception& e)
     {

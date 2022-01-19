@@ -159,6 +159,7 @@ public:
         bool verbose,
         bool leave_paused,
         bool libvmi_conf,
+        const char* libvmi_conf_path,
         addr_t kpgd,
         bool fast_singlestep,
         uint64_t limited_traps_ttl);

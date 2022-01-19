@@ -160,10 +160,22 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     g_free(drakvuf->dom_name);
     g_free(drakvuf->json_kernel_path);
     g_free(drakvuf->json_wow_path);
+    g_free(drakvuf->libvmi_conf_path);
     g_free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool _verbose, bool libvmi_conf, addr_t kpgd, bool fast_singlestep, uint64_t limited_traps_ttl)
+bool drakvuf_init(
+    drakvuf_t* drakvuf,
+    const char* domain,
+    const char* json_kernel_path,
+    const char* json_wow_path,
+    bool _verbose,
+    bool libvmi_conf,
+    const char* libvmi_conf_path,
+    addr_t kpgd,
+    bool fast_singlestep,
+    uint64_t limited_traps_ttl
+)
 {
 
     if ( !domain )
@@ -179,6 +191,8 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
     (*drakvuf)->context_switch_intercept_processes = NULL;
     (*drakvuf)->enable_cr3_based_interception = false;
     (*drakvuf)->libvmi_conf = libvmi_conf;
+    if ( libvmi_conf_path )
+        (*drakvuf)->libvmi_conf_path = g_strdup(libvmi_conf_path);
     (*drakvuf)->kpgd = kpgd;
 
     if ( json_kernel_path )
@@ -245,7 +259,9 @@ bool drakvuf_init_os(drakvuf_t drakvuf)
 
     drakvuf->address_width = vmi_get_address_width(drakvuf->vmi);
 
-    if (drakvuf->libvmi_conf)
+    if (drakvuf->libvmi_conf && drakvuf->libvmi_conf_path)
+        drakvuf->os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_FILE_PATH, drakvuf->libvmi_conf_path, NULL);
+    else if (drakvuf->libvmi_conf)
         drakvuf->os = vmi_init_os(drakvuf->vmi, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL);
     else if ( drakvuf->json_kernel_path )
     {

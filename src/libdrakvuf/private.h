@@ -192,6 +192,7 @@ struct drakvuf
     char* json_wow_path;
     json_object* json_wow;
     bool libvmi_conf;
+    char* libvmi_conf_path;
 
     xen_interface_t* xen;
     os_interface_t osi;
