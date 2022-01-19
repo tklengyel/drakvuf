@@ -110,21 +110,34 @@
 #include "win.h"
 #include "linux.h"
 
+struct win_objattrs_t
+{
+    std::string file_path;
+    std::string obj_attrs;
+
+    std::string security_flags;
+    std::string owner;
+    std::string group;
+    std::string sacl;
+    std::string dacl;
+};
+
 struct wrapper
 {
+    win_filetracer* f;
+
     vmi_pid_t pid;
     uint32_t tid;
     uint64_t rsp;
 
     addr_t handle;
 
-    win_filetracer* f;
     addr_t obj_attr;
-    std::string attrs;
-    std::string share;
-    std::string disp;
-    std::string opts;
-    std::string access;
+    uint64_t file_attrs;
+    uint64_t share_access;
+    uint64_t create_disposition;
+    uint64_t create_opts;
+    uint64_t desired_access;
 };
 
 struct linux_wrapper
