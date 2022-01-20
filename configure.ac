@@ -554,6 +554,15 @@ AC_ARG_ENABLE([xtf],
   [xtf="no"])
 AM_CONDITIONAL([XTF], [test x$xtf = xyes])
 
+AC_ARG_ENABLE([threadsafety],
+  [AS_HELP_STRING([--enable-threadsafety],
+    [Compile libdrakvuf to be thread safe @<:@no@:>@])],
+  [threadsafety="$enableval"],
+  [threadsafety="no"])
+if test x$threadsafety = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_THREADSAFETY, 1, "")
+fi
+
 #####################################################
 # AUTOHARDEN START
 # We want to check for compiler flag support, but there is no way to make
@@ -797,4 +806,5 @@ Deprecated Plugins
 WMIMon:       $plugin_wmimon
 -------------------------------------------------------------------------------
 REPL:         $repl
+Thread safe:  $threadsafety
 -------------------------------------------------------------------------------])

@@ -272,12 +272,10 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
 }
 
 /* Here we are in singlestep mode already and this is a singlstep cb */
-event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
+static event_response_t _post_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
 {
-    UNUSED(vmi);
     event_response_t rsp = 0;
     struct memcb_pass* pass = (struct memcb_pass*)event->data;
-    drakvuf_t drakvuf = pass->drakvuf;
 
     flush_vmi(drakvuf);
 
@@ -342,7 +340,7 @@ event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
      * We need to copy the newly written page to the remapped gfn
      * and reapply all traps
      */
-    if ( pass->traps && !refresh_shadow_copy(vmi, pass) )
+    if ( pass->traps && !refresh_shadow_copy(drakvuf->vmi, pass) )
     {
         fprintf(stderr, "Failed to refresh shadow copy\n");
         drakvuf->interrupted = 1;
@@ -369,19 +367,33 @@ done:
         VMI_EVENT_RESPONSE_SLAT_ID;
 }
 
+static event_response_t post_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
+{
+    UNUSED(vmi);
+    struct memcb_pass* pass = (struct memcb_pass*)event->data;
+    drakvuf_t drakvuf = (drakvuf_t)pass->drakvuf;
+    drakvuf_lock_and_get_vmi(drakvuf);
+    event_response_t ret = _post_mem_cb(drakvuf, event);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
+}
+
 /*
  * Refresh the shadow copy of a remapped page when in idrx view.
  */
-event_response_t post_mem_idrx_cb(vmi_instance_t vmi, vmi_event_t* event)
+static event_response_t post_mem_idrx_cb(vmi_instance_t vmi, vmi_event_t* event)
 {
     struct memcb_pass* pass = (struct memcb_pass*)event->data;
     drakvuf_t drakvuf = pass->drakvuf;
+    drakvuf_lock_and_get_vmi(drakvuf);
 
     if ( !refresh_shadow_copy(vmi, pass) )
     {
         fprintf(stderr, "Failed to refresh shadow copy in IDRX cb\n");
         drakvuf->interrupted = -1;
     }
+
+    drakvuf_release_vmi(drakvuf);
 
     g_slice_free(struct memcb_pass, pass);
 
@@ -440,11 +452,9 @@ static void fill_common_event_trap_info(drakvuf_t drakvuf, drakvuf_trap_info_t* 
 }
 
 /* This hits on the first access on a page, so not in singlestep yet */
-event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
+static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
 {
-    UNUSED(vmi);
     event_response_t rsp = 0;
-    drakvuf_t drakvuf = (drakvuf_t)event->data;
     addr_t pa = (event->mem_event.gfn<<12) + event->mem_event.offset;
 
     flush_vmi(drakvuf);
@@ -622,16 +632,23 @@ event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
     return rsp;
 }
 
-event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
+static event_response_t pre_mem_cb(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
-    event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
+    drakvuf_lock_and_get_vmi(drakvuf);
+    event_response_t ret = _pre_mem_cb(drakvuf, event);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
+}
 
-    flush_vmi(drakvuf);
-
+static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
+{
+    event_response_t rsp = 0;
     addr_t pa = (event->interrupt_event.gfn << 12)
         + event->interrupt_event.offset + event->interrupt_event.insn_length - 1;
+
+    flush_vmi(drakvuf);
 
 #ifdef DEBUG
     reg_t cr3 = event->x86_regs->cr3;
@@ -649,7 +666,8 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
          * removed.
          */
         uint8_t test = 0;
-        if ( VMI_FAILURE == vmi_read_8_pa(vmi, pa, &test) )
+
+        if ( VMI_FAILURE == vmi_read_8_pa(drakvuf->vmi, pa, &test) )
         {
             fprintf(stderr, "Critical error in int3 callback, can't read page\n");
             drakvuf->interrupted = -1;
@@ -750,11 +768,19 @@ event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
     return rsp;
 }
 
-event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
+static event_response_t int3_cb(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
-    event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
+    drakvuf_lock_and_get_vmi(drakvuf);
+    event_response_t ret = _int3_cb(drakvuf, event);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
+}
+
+static event_response_t _cr3_cb(drakvuf_t drakvuf, vmi_event_t* event)
+{
+    event_response_t rsp = 0;
 
     flush_vmi(drakvuf);
 
@@ -829,11 +855,19 @@ event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
     return rsp;
 }
 
-event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
+static event_response_t cr3_cb(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
-    event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
+    drakvuf_lock_and_get_vmi(drakvuf);
+    event_response_t ret = _cr3_cb(drakvuf, event);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
+}
+
+static event_response_t _debug_cb(drakvuf_t drakvuf, vmi_event_t* event)
+{
+    event_response_t rsp = 0;
 
     flush_vmi(drakvuf);
 
@@ -869,11 +903,19 @@ event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
     return rsp;
 }
 
-event_response_t msr_cb(vmi_instance_t vmi, vmi_event_t* event)
+static event_response_t debug_cb(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
-    event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
+    drakvuf_lock_and_get_vmi(drakvuf);
+    event_response_t ret = _debug_cb(drakvuf, event);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
+}
+
+static event_response_t _msr_cb(drakvuf_t drakvuf, vmi_event_t* event)
+{
+    event_response_t rsp = 0;
 
     flush_vmi(drakvuf);
 #ifdef DEBUG
@@ -903,11 +945,19 @@ event_response_t msr_cb(vmi_instance_t vmi, vmi_event_t* event)
     return rsp;
 }
 
-event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
+static event_response_t msr_cb(vmi_instance_t vmi, vmi_event_t* event)
 {
     UNUSED(vmi);
-    event_response_t rsp = 0;
     drakvuf_t drakvuf = (drakvuf_t)event->data;
+    drakvuf_lock_and_get_vmi(drakvuf);
+    event_response_t ret = _msr_cb(drakvuf, event);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
+}
+
+static event_response_t _cpuid_cb(drakvuf_t drakvuf, vmi_event_t* event)
+{
+    event_response_t rsp = 0;
 
     flush_vmi(drakvuf);
 
@@ -941,6 +991,16 @@ event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
         event->x86_regs->rip += event->cpuid_event.insn_length;
 
     return rsp | VMI_EVENT_RESPONSE_SET_REGISTERS;
+}
+
+static event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t* event)
+{
+    UNUSED(vmi);
+    drakvuf_t drakvuf = (drakvuf_t)event->data;
+    drakvuf_lock_and_get_vmi(drakvuf);
+    event_response_t ret = _cpuid_cb(drakvuf, event);
+    drakvuf_release_vmi(drakvuf);
+    return ret;
 }
 
 void remove_trap(drakvuf_t drakvuf,
