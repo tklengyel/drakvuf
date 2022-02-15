@@ -105,6 +105,8 @@
 #ifndef FILEDELETE_PRIVATE_H
 #define FILEDELETE_PRIVATE_H
 
+#include "../plugin_utils.h"
+
 #define FILE_DISPOSITION_INFORMATION 13
 #define FILE_DELETE_ON_CLOSE 0x1000
 
@@ -131,8 +133,6 @@ enum offset
     __OFFSET_MAX
 };
 
-extern const char* offset_names[__OFFSET_MAX][2];
-
 struct createfile_ret_info
 {
     vmi_pid_t pid;
@@ -143,10 +143,6 @@ struct createfile_ret_info
 
     filedelete* f;
 };
-
-/************************
- * # For filedelete 2
- ************************/
 
 enum file_object_flags
 {
@@ -181,65 +177,152 @@ enum file_object_flags
     FO_SECTION_MINSTORE_TREATMENT   = 0x20000000,
 };
 
-struct wrapper_t
+static const char* offset_names[__OFFSET_MAX][2] =
 {
-    filedelete* f;
-    bool is32bit;
+    [FILE_OBJECT_TYPE] = {"_FILE_OBJECT", "Type"},
+    [FILE_OBJECT_FLAGS] = {"_FILE_OBJECT", "Flags"},
+    [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
+    [FILE_OBJECT_SECTIONOBJECTPOINTER] = {"_FILE_OBJECT", "SectionObjectPointer"},
+    [SECTIONOBJECTPOINTER_DATASECTIONOBJECT] = {"_SECTION_OBJECT_POINTERS", "DataSectionObject"},
+    [SECTIONOBJECTPOINTER_SHAREDCACHEMAP] = {"_SECTION_OBJECT_POINTERS", "SharedCacheMap"},
+    [SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT] = {"_SECTION_OBJECT_POINTERS", "ImageSectionObject"},
+    [CONTROL_AREA_SEGMENT] = {"_CONTROL_AREA", "Segment"},
+    [SEGMENT_CONTROLAREA] = {"_SEGMENT", "ControlArea"},
+    [SEGMENT_SIZEOFSEGMENT] = {"_SEGMENT", "SizeOfSegment"},
+    [SEGMENT_TOTALNUMBEROFPTES] = {"_SEGMENT", "TotalNumberOfPtes"},
+    [SUBSECTION_NEXTSUBSECTION] = {"_SUBSECTION", "NextSubsection"},
+    [SUBSECTION_SUBSECTIONBASE] = {"_SUBSECTION", "SubsectionBase"},
+    [SUBSECTION_PTESINSUBSECTION] = {"_SUBSECTION", "PtesInSubsection"},
+    [SUBSECTION_CONTROLAREA] = {"_SUBSECTION", "ControlArea"},
+    [SUBSECTION_STARTINGSECTOR] = {"_SUBSECTION", "StartingSector"},
+    [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
+    [OBJECT_HEADER_HANDLE_COUNT] = { "_OBJECT_HEADER", "HandleCount" },
+};
+
+static const flags_str_t fo_flags_map =
+{
+    REGISTER_FLAG(FO_FILE_OPEN),
+    REGISTER_FLAG(FO_SYNCHRONOUS_IO),
+    REGISTER_FLAG(FO_ALERTABLE_IO),
+    REGISTER_FLAG(FO_NO_INTERMEDIATE_BUFFERING),
+    REGISTER_FLAG(FO_WRITE_THROUGH),
+    REGISTER_FLAG(FO_SEQUENTIAL_ONLY),
+    REGISTER_FLAG(FO_CACHE_SUPPORTED),
+    REGISTER_FLAG(FO_NAMED_PIPE),
+    REGISTER_FLAG(FO_STREAM_FILE),
+    REGISTER_FLAG(FO_MAILSLOT),
+    REGISTER_FLAG(FO_GENERATE_AUDIT_ON_CLOSE),
+    REGISTER_FLAG(FO_DIRECT_DEVICE_OPEN),
+    REGISTER_FLAG(FO_FILE_MODIFIED),
+    REGISTER_FLAG(FO_FILE_SIZE_CHANGED),
+    REGISTER_FLAG(FO_CLEANUP_COMPLETE),
+    REGISTER_FLAG(FO_TEMPORARY_FILE),
+    REGISTER_FLAG(FO_DELETE_ON_CLOSE),
+    REGISTER_FLAG(FO_OPENED_CASE_SENSITIVE),
+    REGISTER_FLAG(FO_HANDLE_CREATED),
+    REGISTER_FLAG(FO_FILE_FAST_IO_READ),
+    REGISTER_FLAG(FO_RANDOM_ACCESS),
+    REGISTER_FLAG(FO_FILE_OPEN_CANCELLED),
+    REGISTER_FLAG(FO_VOLUME_OPEN),
+    REGISTER_FLAG(FO_REMOTE_ORIGIN),
+    REGISTER_FLAG(FO_DISALLOW_EXCLUSIVE),
+    REGISTER_FLAG(FO_SKIP_SET_EVENT),
+    REGISTER_FLAG(FO_SKIP_SET_FAST_IO),
+    REGISTER_FLAG(FO_INDIRECT_WAIT_OBJECT),
+    REGISTER_FLAG(FO_SECTION_MINSTORE_TREATMENT),
+};
+
+struct task_t
+{
+    enum class stage_t
+    {
+        pending,
+        queryvolumeinfo,
+        queryinfo,
+        createsection,
+        mapview,
+        allocate_pool,
+        unmapview,
+        close_handle,
+        memcpy,
+        finished,
+    };
+
+    struct return_ctx
+    {
+        vmi_pid_t ret_pid{0};
+        addr_t    ret_rsp{0};
+        uint32_t  ret_tid{0};
+        x86_registers_t regs;
+    };
+
+    enum class task_reason
+    {
+        write,
+        del,
+        invalid,
+    };
 
     handle_t handle;
-    uint64_t fo_flags;
-    uint64_t file_size;
-    uint64_t file_offset;
-    uint64_t bytes_to_read;
-    handle_t section_handle;
-    addr_t view_base;
-    bool finish_status;
-    void* buffer;
+    std::string filename;
+    const task_reason reason{task_reason::invalid};
+    stage_t stage{stage_t::pending};
 
-    vmi_pid_t target_pid;
-    uint32_t target_tid;
-    addr_t target_rsp;
+    return_ctx target;
+    addr_t target_process_base{0};
 
-    addr_t eprocess_base;
+    const addr_t file_obj{0};
+    uint64_t fo_flags{0};
+    uint64_t file_size{0};
+    uint64_t file_offset{0};
+    uint64_t bytes_to_read{0};
+    handle_t section_handle{0};
+    addr_t view_base{0};
 
-    x86_registers_t saved_regs;
-
-    int curr_sequence_number;
+    int idx{0};
 
     union
     {
         struct
         {
-            addr_t out;
+            addr_t out{0};
         } queryvolumeinfo;
 
         struct
         {
             addr_t out;
-        } queryinfo;
+        } queryinfo{0};
 
         struct
         {
-            addr_t handle;
+            addr_t handle{0};
         } createsection;
 
         struct
         {
-            addr_t base;
-            addr_t size;
+            addr_t base{0};
+            addr_t size{0};
         } mapview;
 
         struct
         {
-            size_t bytes_read;
-            addr_t out;
-            addr_t io_status_block;
+            size_t bytes_read{0};
+            addr_t out{0};
+            addr_t io_status_block{0};
         } readfile;
     };
 
-    drakvuf_trap_t* bp;
-
     addr_t pool;
+
+    task_t(handle_t handle_,
+        std::string filename_,
+        task_reason reason_,
+        addr_t file_obj_)
+        : handle(handle_)
+        , filename(filename_)
+        , reason(reason_)
+        , file_obj(file_obj_)
+    {}
 };
 
 struct IO_STATUS_BLOCK_32
@@ -282,41 +365,7 @@ struct FILE_FS_DEVICE_INFORMATION
     uint32_t characteristics;
 } __attribute__((packed));
 
+// TODO Move into "task_t" as "MAX_READ_BYTES"
 static const uint64_t BYTES_TO_READ = 0x10000;
-
-/**************************************
- * ## Callbacks for injected functions
- *************************************/
-event_response_t exfreepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t waitobject_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t exallocatepool_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t queryinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t close_handle_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t mapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t unmapview_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-event_response_t memcpy_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-/***************************
- * ## Helpers for injection
- ***************************/
-bool inject_free_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_allocate_pool(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_waitobject(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_queryvolumeinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_queryinfo(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_createsection(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_close_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_mapview(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_unmapview(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-bool inject_memcpy(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t vmi, wrapper_t* injector);
-
-/********************
- *  ## Other helpers
- ********************/
-void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-void free_pool(std::map<addr_t, bool>& pools, addr_t va);
-addr_t find_pool(std::map<addr_t, bool>& pools);
 
 #endif // FILEDELETE_PRIVATE_H
