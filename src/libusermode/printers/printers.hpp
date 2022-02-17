@@ -190,6 +190,14 @@ public:
     std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
 };
 
+class UlongLongPrinter : public ArgumentPrinter
+{
+public:
+    using ArgumentPrinter::ArgumentPrinter;
+
+    std::string print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const;
+};
+
 class GuidPrinter : public ArgumentPrinter
 {
 public:
