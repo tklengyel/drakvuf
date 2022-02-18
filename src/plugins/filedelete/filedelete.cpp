@@ -198,13 +198,13 @@ filedelete::filedelete(drakvuf_t drakvuf,
     }
 }
 
-/* NOTE One should rund drakvuf loop to restore VM state.
+/* NOTE One should run drakvuf loop to restore VM state.
  *
- * The plug-in injects syscalls thuns changes the state. So to avoid BSOD
+ * The plug-in injects syscalls thus changes the state. So to avoid BSOD
  * one should restore state here. This requires to allow VM to live for a
  * while.
  *
- * Hint: there is no need to waite all files read finish. Just waite every
+ * Hint: there is no need to wait all files read finish. Just waite every
  * hook and restore state.
  */
 filedelete::~filedelete()
