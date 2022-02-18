@@ -208,7 +208,7 @@ static void print_usage()
         "\t -p                        Leave domain paused after DRAKVUF exits\n"
         "\t -F                        Enable fast singlestepping (requires Xen 4.14+)\n"
         "\t --traps-ttl <ttl value>   Maximum number of times trap can be triggered in 10sec period. Protects against api hammering.\n"
-#ifdef ENABLE_PLUGIN_FILEDELETE
+#if defined(ENABLE_PLUGIN_FILEDELETE) || defined(ENABLE_PLUGIN_FILEEXTRACTOR)
         "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
         "\t -M                        Dump new or modified files also (requires -D)\n"
         "\t -n                        Use extraction method based on function injection (requires -D)\n"

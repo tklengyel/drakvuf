@@ -185,13 +185,23 @@ if test x$plugin_filetracer = xyes; then
 fi
 
 AC_ARG_ENABLE([plugin_filedelete],
-  [AS_HELP_STRING([--disable-plugin-filedelete],
-    [Enable the file delete catching plugin @<:@yes@:>@])],
+  [AS_HELP_STRING([--enable-plugin-filedelete],
+    [Enable the file delete catching plugin @<:@no@:>@])],
   [plugin_filedelete="$enableval"],
-  [plugin_filedelete="yes"])
+  [plugin_filedelete="no"])
 AM_CONDITIONAL([PLUGIN_FILEDELETE], [test x$plugin_filedelete = xyes])
 if test x$plugin_filedelete = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_FILEDELETE, 1, "")
+fi
+
+AC_ARG_ENABLE([plugin_fileextractor],
+  [AS_HELP_STRING([--disable-plugin-fileextractor],
+    [Enable the file extractor (aka filedelete2) catching plugin @<:@yes@:>@])],
+  [plugin_fileextractor="$enableval"],
+  [plugin_fileextractor="yes"])
+AM_CONDITIONAL([PLUGIN_FILEEXTRACTOR], [test x$plugin_fileextractor = xyes])
+if test x$plugin_fileextractor = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_FILEEXTRACTOR, 1, "")
 fi
 
 AC_ARG_ENABLE([plugin_objmon],
@@ -355,7 +365,7 @@ if test x$plugin_dkommon = xyes; then
 fi
 
 AC_ARG_ENABLE([plugin_wmimon],
-  [AS_HELP_STRING([--disable-plugin-wmimon],
+  [AS_HELP_STRING([--enable-plugin-wmimon],
     [Enable the WMI monitor plugin @<:@no@:>@])],
   [plugin_wmimon="$enableval"],
   [plugin_wmimon="no"])
@@ -769,42 +779,43 @@ Build system type: $build
 Installation prefix: $prefix
 -------------------------------------------------------------------------------
 DRAKVUF Plugins
-Syscalls:     $plugin_syscalls
-Poolmon:      $plugin_poolmon
-Filetracer:   $plugin_filetracer
-Filedelete:   $plugin_filedelete
-Objmon:       $plugin_objmon
-Exmon:        $plugin_exmon
-SSDTmon:      $plugin_ssdtmon
-CPUIDmon:     $plugin_cpuidmon
-Debugmon:     $plugin_debugmon
-Socketmon:    $plugin_socketmon
-Regmon:       $plugin_regmon
-Procmon:      $plugin_procmon
-BSODmon:      $plugin_bsodmon
-EnvMon:       $plugin_envmon
-CrashMon:     $plugin_crashmon
-ClipboardMon: $plugin_clipboardmon
-WindowMon:    $plugin_windowmon
-LibraryMon:   $plugin_librarymon
-DKOMmon:      $plugin_dkommon
-MEMDump:      $plugin_memdump
-ProcDump:     $plugin_procdump
-ProcDump2:    $plugin_procdump2
-APIMon:       $plugin_apimon
-RPCMon:       $plugin_rpcmon
-TLSMon:       $plugin_tlsmon
-Codemon:      $plugin_codemon
-Exploitmon:   $plugin_exploitmon
-LibHookTest:  $plugin_libhooktest
-IPT:          $plugin_ipt
-HidSim:       $plugin_hidsim
-Rootkitmon:   $plugin_rootkitmon
-Callbackmon:  $plugin_callbackmon
+Syscalls:      $plugin_syscalls
+Poolmon:       $plugin_poolmon
+Filetracer:    $plugin_filetracer
+Fileextractor: $plugin_fileextractor
+Objmon:        $plugin_objmon
+Exmon:         $plugin_exmon
+SSDTmon:       $plugin_ssdtmon
+CPUIDmon:      $plugin_cpuidmon
+Debugmon:      $plugin_debugmon
+Socketmon:     $plugin_socketmon
+Regmon:        $plugin_regmon
+Procmon:       $plugin_procmon
+BSODmon:       $plugin_bsodmon
+EnvMon:        $plugin_envmon
+CrashMon:      $plugin_crashmon
+ClipboardMon:  $plugin_clipboardmon
+WindowMon:     $plugin_windowmon
+LibraryMon:    $plugin_librarymon
+DKOMmon:       $plugin_dkommon
+MEMDump:       $plugin_memdump
+ProcDump:      $plugin_procdump
+ProcDump2:     $plugin_procdump2
+APIMon:        $plugin_apimon
+RPCMon:        $plugin_rpcmon
+TLSMon:        $plugin_tlsmon
+Codemon:       $plugin_codemon
+Exploitmon:    $plugin_exploitmon
+LibHookTest:   $plugin_libhooktest
+IPT:           $plugin_ipt
+HidSim:        $plugin_hidsim
+Rootkitmon:    $plugin_rootkitmon
+Callbackmon:   $plugin_callbackmon
 -------------------------------------------------------------------------------
 Deprecated Plugins
-WMIMon:       $plugin_wmimon
+WMIMon:        $plugin_wmimon
+Filedelete:    $plugin_filedelete
 -------------------------------------------------------------------------------
-REPL:         $repl
-Thread safe:  $threadsafety
+REPL:          $repl
+Thread safe:   $threadsafety
 -------------------------------------------------------------------------------])

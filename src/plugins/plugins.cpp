@@ -108,6 +108,7 @@
 #include "poolmon/poolmon.h"
 #include "filetracer/filetracer.h"
 #include "filedelete/filedelete.h"
+#include "fileextractor/fileextractor.h"
 #include "objmon/objmon.h"
 #include "exmon/exmon.h"
 #include "ssdtmon/ssdtmon.h"
@@ -192,6 +193,19 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .filedelete_use_injector = options->filedelete_use_injector,
                     };
                     this->plugins[plugin_id] = std::make_unique<filedelete>(this->drakvuf, &config, this->output);
+                    break;
+                }
+#endif
+#ifdef ENABLE_PLUGIN_FILEEXTRACTOR
+                case PLUGIN_FILEEXTRACTOR:
+                {
+                    fileextractor_config config =
+                    {
+                        .dump_folder = options->dump_folder,
+                        .dump_modified_files = options->dump_modified_files,
+                        .filedelete_use_injector = options->filedelete_use_injector,
+                    };
+                    this->plugins[plugin_id] = std::make_unique<fileextractor>(this->drakvuf, &config, this->output);
                     break;
                 }
 #endif

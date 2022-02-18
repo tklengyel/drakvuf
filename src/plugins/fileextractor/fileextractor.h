@@ -102,8 +102,8 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef FILEDELETE_H
-#define FILEDELETE_H
+#ifndef FILEEXTRACTOR_H
+#define FILEEXTRACTOR_H
 
 #include "plugins/private.h"
 #include "plugins/plugins.h"
@@ -113,59 +113,65 @@
 #include <utility>
 #include <cstdint>
 
-// For `filedelete2`
 using handle_t = uint64_t;
-using handled_t = bool;
-using file_name_t = std::string;
+using task_id = uint64_t;
 
-enum file_extraction_reason
-{
-    FILEEXTR_WRITE,
-    FILEEXTR_DELETE,
-};
-using file_extraction_reason_t = file_extraction_reason;
-
-struct filedelete_config
+struct fileextractor_config
 {
     const char* dump_folder;
     bool dump_modified_files;
     bool filedelete_use_injector;
 };
 
-class filedelete: public plugin
+struct task_t;
+
+class fileextractor: public pluginex
 {
 public:
-    drakvuf_trap_t traps[6] =
+    fileextractor(drakvuf_t drakvuf, const fileextractor_config* config, output_format_t output);
+    fileextractor(const fileextractor&) = delete;
+    fileextractor& operator=(const fileextractor&) = delete;
+    ~fileextractor();
+
+    virtual bool stop_impl() override;
+
+private:
+    enum class error
     {
-        [0 ... 5] = {
-            .breakpoint.lookup_type = LOOKUP_KERNEL,
-            .breakpoint.addr_type = ADDR_RVA,
-            .type = BREAKPOINT,
-            .data = (void*)this,
-            .ah_cb = nullptr
-        }
+        success,
+        none,
+        error,
     };
-    drakvuf_t drakvuf = nullptr;
+
+    /* Internal data */
+    drakvuf_t drakvuf{nullptr};
+    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
+    std::unordered_map<task_id, std::unique_ptr<task_t>> tasks;
+    bool is32bit{false};
+    // Maps virtual address of buffer to free flag:
+    // * `true` means pools is free;
+    // * `false` otherwise.
+    std::map<addr_t, bool> pools;
+
     size_t* offsets;
     size_t control_area_size = 0;
     size_t mmpte_size = 0;
 
     const char* dump_folder;
-    uint32_t domid = 0;
     output_format_t format;
     bool use_injector = false;
 
-    std::map<std::pair<vmi_pid_t, handle_t>, std::pair<file_name_t, file_extraction_reason_t>> files;
     int sequence_number = 0;
 
-    filedelete(drakvuf_t drakvuf, const filedelete_config* config, output_format_t output);
-    filedelete(const filedelete&) = delete;
-    filedelete& operator=(const filedelete&) = delete;
-    ~filedelete();
+    /* Hooks */
+    std::unique_ptr<libhook::SyscallHook> setinformation_hook;
+    std::unique_ptr<libhook::SyscallHook> writefile_hook;
+    std::unique_ptr<libhook::SyscallHook> close_hook;
+    std::unique_ptr<libhook::SyscallHook> createsection_hook;
+    std::unique_ptr<libhook::SyscallHook> createfile_hook;
+    std::unique_ptr<libhook::SyscallHook> openfile_hook;
 
-    virtual bool stop_impl() override;
-
-    // For `filedelete2`
+    /* VA of functions to be injected */
     addr_t queryvolumeinfo_va = 0;
     addr_t queryinfo_va = 0;
     addr_t createsection_va = 0;
@@ -178,11 +184,78 @@ public:
     addr_t exfreepool_va = 0;
     addr_t memcpy_va = 0;
 
-    // Maps virtual address of buffer to free flag:
-    // * `true` means pools is free;
-    // * `false` otherwise.
-    std::map<addr_t, bool> pools;
-    std::map<std::pair<addr_t, uint32_t>, handled_t> closing_handles;
+    /* Hook handlers */
+    event_response_t setinformation_cb(drakvuf_t, drakvuf_trap_info_t*);
+    event_response_t writefile_cb(drakvuf_t, drakvuf_trap_info_t*);
+    event_response_t close_cb(drakvuf_t, drakvuf_trap_info_t*);
+    event_response_t createsection_cb (drakvuf_t, drakvuf_trap_info_t*);
+    event_response_t createfile_cb (drakvuf_t, drakvuf_trap_info_t*);
+    event_response_t openfile_cb (drakvuf_t, drakvuf_trap_info_t*);
+    event_response_t createfile_ret_cb(drakvuf_t, drakvuf_trap_info_t*);
+    void createfile_cb_impl(drakvuf_t, drakvuf_trap_info_t*, addr_t handle);
+
+    /* Dispatchers */
+    // TODO Maybe remove "response" in flavor of "error"?
+    error dispatch_pending(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
+    error dispatch_queryvolumeinfo(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
+    error dispatch_queryinfo(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
+    error dispatch_createsection(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
+    error dispatch_mapview(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
+    error dispatch_allocate_pool(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
+    error dispatch_memcpy(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
+    error dispatch_unmapview(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
+    error dispatch_close_handle(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
+
+    /* Injection helpers */
+    bool inject_queryvolumeinfo(drakvuf_trap_info_t*, vmi_instance_t, task_t&);
+    bool inject_queryinfo(drakvuf_trap_info_t*, vmi_instance_t, task_t&);
+    bool inject_createsection(drakvuf_trap_info_t*, vmi_instance_t, task_t&);
+    bool inject_mapview(drakvuf_trap_info_t*, vmi_instance_t, task_t&);
+    bool inject_allocate_pool(drakvuf_trap_info_t*, vmi_instance_t, task_t&);
+    bool inject_memcpy(drakvuf_trap_info_t*, vmi_instance_t, task_t&);
+    bool inject_unmapview(drakvuf_trap_info_t*, vmi_instance_t, task_t&);
+    bool inject_close_handle(drakvuf_trap_info_t*, vmi_instance_t, task_t&);
+
+    /* Routines */
+    bool get_file_object_handle_count(drakvuf_trap_info_t*,
+        handle_t,
+        uint64_t* handle_count);
+
+    bool get_file_object_flags(drakvuf_trap_info_t*,
+        vmi_instance_t,
+        handle_t,
+        uint64_t* flags);
+    std::string get_file_name(vmi_instance_t,
+        drakvuf_trap_info_t*,
+        addr_t handle,
+        addr_t* out_file,
+        addr_t* out_filetype);
+    void print_filedelete_information(drakvuf_trap_info_t*, task_t&);
+    void print_extraction_failure(drakvuf_trap_info_t*,
+        const std::string& filename,
+        const std::string& message);
+    void save_file_metadata(drakvuf_trap_info_t*, addr_t control_area, task_t&);
+    bool save_file_chunk(int file_sequence_number,
+        void* buffer,
+        size_t size);
+    addr_t get_function_va(const char* lib, const char* func_name);
+    uint64_t make_hook_id(drakvuf_trap_info_t*);
+    uint64_t make_task_id(vmi_pid_t pid, handle_t handle);
+    uint64_t make_task_id(task_t&);
+    void free_pool(addr_t va);
+    addr_t find_pool();
+    void free_resources(drakvuf_trap_info_t*, task_t&);
+    void read_vm(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
+
+    void grab_file_by_handle(vmi_instance_t, drakvuf_trap_info_t*, task_t&);
+    void extract_file(drakvuf_trap_info_t*, vmi_instance_t, task_t&);
+    void extract_ca_file(drakvuf_trap_info_t*,
+        vmi_instance_t,
+        addr_t control_area,
+        task_t&);
+    event_response_t close_cb_injector(drakvuf_trap_info_t*);
+    event_response_t close_cb_no_injector(drakvuf_trap_info_t*);
+    bool is_handle_valid(handle_t);
 };
 
 #endif

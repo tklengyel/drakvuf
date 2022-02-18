@@ -138,6 +138,13 @@ if PLUGIN_FILEDELETE
 sources += filedelete/filedelete.cpp
 sources += filedelete/filedelete.h
 sources += filedelete/private.h
+sources += filedelete/filedelete2_helpers.cpp
+endif
+
+if PLUGIN_FILEEXTRACTOR
+sources += fileextractor/fileextractor.cpp
+sources += fileextractor/fileextractor.h
+sources += fileextractor/private.h
 endif
 
 if PLUGIN_OBJMON
