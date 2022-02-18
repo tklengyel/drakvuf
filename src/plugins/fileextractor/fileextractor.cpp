@@ -122,105 +122,6 @@ using std::ostringstream;
 using std::string;
 
 /*****************************************************************************
- *                             Public interface                              *
- *****************************************************************************/
-fileextractor::fileextractor(drakvuf_t drakvuf,
-    const fileextractor_config* c,
-    output_format_t output)
-    : pluginex(drakvuf, output)
-    , drakvuf(drakvuf)
-    , is32bit(drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E)
-    , offsets(new size_t[__OFFSET_MAX])
-    , dump_folder(c->dump_folder)
-    , format(output)
-    , use_injector(c->filedelete_use_injector)
-    , sequence_number()
-{
-    if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf,
-            offset_names, __OFFSET_MAX, this->offsets) )
-        throw -1;
-
-    if ( !drakvuf_get_kernel_struct_size(drakvuf,
-            "_CONTROL_AREA", &this->control_area_size) )
-        throw -1;
-
-    if ( VMI_PM_LEGACY == drakvuf_get_page_mode(drakvuf) )
-        this->mmpte_size = 4;
-    else
-        this->mmpte_size = 8;
-
-    if (!this->use_injector)
-    {
-        this->setinformation_hook = createSyscallHook("NtSetInformationFile",
-                &fileextractor::setinformation_cb);
-        this->writefile_hook = createSyscallHook("NtWriteFile",
-                &fileextractor::writefile_cb);
-        this->close_hook = createSyscallHook("NtClose",
-                &fileextractor::close_cb);
-    }
-    else
-    {
-        this->queryvolumeinfo_va = get_function_va("ntoskrnl.exe",
-                "ZwQueryVolumeInformationFile");
-        this->queryinfo_va = get_function_va("ntoskrnl.exe",
-                "ZwQueryInformationFile");
-        this->createsection_va = get_function_va("ntoskrnl.exe",
-                "ZwCreateSection");
-        this->close_handle_va = get_function_va("ntoskrnl.exe",
-                "ZwClose");
-        this->mapview_va = get_function_va("ntoskrnl.exe",
-                "ZwMapViewOfSection");
-        this->unmapview_va = get_function_va("ntoskrnl.exe",
-                "ZwUnmapViewOfSection");
-        this->readfile_va = get_function_va("ntoskrnl.exe",
-                "ZwReadFile");
-        this->waitobject_va = get_function_va("ntoskrnl.exe",
-                "ZwWaitForSingleObject");
-        this->exallocatepool_va = get_function_va("ntoskrnl.exe",
-                "ExAllocatePoolWithTag");
-        this->exfreepool_va = get_function_va("ntoskrnl.exe",
-                "ExFreePoolWithTag");
-        this->memcpy_va = get_function_va("ntoskrnl.exe",
-                "RtlCopyMemoryNonTemporal");
-
-        this->setinformation_hook = createSyscallHook("NtSetInformationFile",
-                &fileextractor::setinformation_cb);
-        this->writefile_hook = createSyscallHook("NtWriteFile",
-                &fileextractor::writefile_cb);
-        this->close_hook = createSyscallHook("NtClose",
-                &fileextractor::close_cb);
-        this->createsection_hook = createSyscallHook("ZwCreateSection",
-                &fileextractor::createsection_cb);
-        this->createfile_hook = createSyscallHook("NtCreateFile",
-                &fileextractor::createfile_cb);
-        this->openfile_hook = createSyscallHook("NtOpenFile",
-                &fileextractor::openfile_cb);
-    }
-}
-
-/* NOTE One should run drakvuf loop to restore VM state.
- *
- * The plug-in injects syscalls thus changes the state. So to avoid BSOD
- * one should restore state here. This requires to allow VM to live for a
- * while.
- *
- * Hint: there is no need to wait all files read finish. Just waite every
- * hook and restore state.
- */
-fileextractor::~fileextractor()
-{
-    delete[] offsets;
-}
-
-bool fileextractor::stop_impl()
-{
-    for (auto& i: tasks)
-        if (i.second->stage != task_t::stage_t::pending)
-            return false;
-    return true;
-}
-
-/*****************************************************************************
  *                               Hook handlers                               *
  *****************************************************************************/
 
@@ -1631,4 +1532,103 @@ void fileextractor::read_vm(vmi_instance_t vmi,
 bool fileextractor::is_handle_valid(handle_t handle)
 {
     return handle && !VMI_GET_BIT(handle, 31);
+}
+
+/*****************************************************************************
+ *                             Public interface                              *
+ *****************************************************************************/
+fileextractor::fileextractor(drakvuf_t drakvuf,
+    const fileextractor_config* c,
+    output_format_t output)
+    : pluginex(drakvuf, output)
+    , drakvuf(drakvuf)
+    , is32bit(drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E)
+    , offsets(new size_t[__OFFSET_MAX])
+    , dump_folder(c->dump_folder)
+    , format(output)
+    , use_injector(c->filedelete_use_injector)
+    , sequence_number()
+{
+    if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf,
+            offset_names, __OFFSET_MAX, this->offsets) )
+        throw -1;
+
+    if ( !drakvuf_get_kernel_struct_size(drakvuf,
+            "_CONTROL_AREA", &this->control_area_size) )
+        throw -1;
+
+    if ( VMI_PM_LEGACY == drakvuf_get_page_mode(drakvuf) )
+        this->mmpte_size = 4;
+    else
+        this->mmpte_size = 8;
+
+    if (!this->use_injector)
+    {
+        this->setinformation_hook = createSyscallHook("NtSetInformationFile",
+                &fileextractor::setinformation_cb);
+        this->writefile_hook = createSyscallHook("NtWriteFile",
+                &fileextractor::writefile_cb);
+        this->close_hook = createSyscallHook("NtClose",
+                &fileextractor::close_cb);
+    }
+    else
+    {
+        this->queryvolumeinfo_va = get_function_va("ntoskrnl.exe",
+                "ZwQueryVolumeInformationFile");
+        this->queryinfo_va = get_function_va("ntoskrnl.exe",
+                "ZwQueryInformationFile");
+        this->createsection_va = get_function_va("ntoskrnl.exe",
+                "ZwCreateSection");
+        this->close_handle_va = get_function_va("ntoskrnl.exe",
+                "ZwClose");
+        this->mapview_va = get_function_va("ntoskrnl.exe",
+                "ZwMapViewOfSection");
+        this->unmapview_va = get_function_va("ntoskrnl.exe",
+                "ZwUnmapViewOfSection");
+        this->readfile_va = get_function_va("ntoskrnl.exe",
+                "ZwReadFile");
+        this->waitobject_va = get_function_va("ntoskrnl.exe",
+                "ZwWaitForSingleObject");
+        this->exallocatepool_va = get_function_va("ntoskrnl.exe",
+                "ExAllocatePoolWithTag");
+        this->exfreepool_va = get_function_va("ntoskrnl.exe",
+                "ExFreePoolWithTag");
+        this->memcpy_va = get_function_va("ntoskrnl.exe",
+                "RtlCopyMemoryNonTemporal");
+
+        this->setinformation_hook = createSyscallHook("NtSetInformationFile",
+                &fileextractor::setinformation_cb);
+        this->writefile_hook = createSyscallHook("NtWriteFile",
+                &fileextractor::writefile_cb);
+        this->close_hook = createSyscallHook("NtClose",
+                &fileextractor::close_cb);
+        this->createsection_hook = createSyscallHook("ZwCreateSection",
+                &fileextractor::createsection_cb);
+        this->createfile_hook = createSyscallHook("NtCreateFile",
+                &fileextractor::createfile_cb);
+        this->openfile_hook = createSyscallHook("NtOpenFile",
+                &fileextractor::openfile_cb);
+    }
+}
+
+/* NOTE One should run drakvuf loop to restore VM state.
+ *
+ * The plug-in injects syscalls thus changes the state. So to avoid BSOD
+ * one should restore state here. This requires to allow VM to live for a
+ * while.
+ *
+ * Hint: there is no need to wait all files read finish. Just waite every
+ * hook and restore state.
+ */
+fileextractor::~fileextractor()
+{
+    delete[] offsets;
+}
+
+bool fileextractor::stop_impl()
+{
+    for (auto& i: tasks)
+        if (i.second->stage != task_t::stage_t::pending)
+            return false;
+    return true;
 }
