@@ -105,6 +105,7 @@
 #include <glib.h>
 #include <config.h>
 #include <inttypes.h>
+#include <sys/stat.h>
 #include <libvmi/x86.h>
 #include <cassert>
 #include <sstream>
@@ -1148,6 +1149,7 @@ void fileextractor::save_file_metadata(drakvuf_trap_info_t* info,
             task.idx) < 0 )
         return;
 
+    umask(S_IWGRP|S_IWOTH);
     FILE* fp = fopen(file, "w");
     free(file);
     if (!fp)
@@ -1243,6 +1245,7 @@ void fileextractor::extract_ca_file(drakvuf_trap_info_t* info,
             task.idx) < 0 )
         return;
 
+    umask(S_IWGRP|S_IWOTH);
     FILE* fp = fopen(file, "w");
     free(file);
     if (!fp)
@@ -1394,6 +1397,7 @@ bool fileextractor::save_file_chunk(int file_sequence_number,
             file_sequence_number) < 0 )
         return false;
 
+    umask(S_IWGRP|S_IWOTH);
     FILE* fp = fopen(file, "a");
     free(file);
     if (!fp) return false;
