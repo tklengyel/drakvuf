@@ -164,7 +164,7 @@ void fileextractor::createfile_cb_impl(drakvuf_t,
     addr_t handle)
 {
     auto hook = createReturnHook<createfile_result_t>(info,
-        &fileextractor::createfile_ret_cb);
+            &fileextractor::createfile_ret_cb);
     auto params = libhook::GetTrapParams<createfile_result_t>(hook->trap_);
     params->handle = handle;
 }

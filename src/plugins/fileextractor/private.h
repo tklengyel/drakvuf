@@ -329,7 +329,7 @@ struct createfile_result_t : public PluginResult
 {
     createfile_result_t()
         : PluginResult(),
-        handle()
+          handle()
     {
     }
 
