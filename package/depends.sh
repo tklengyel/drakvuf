@@ -29,6 +29,9 @@ then
     apt-get --quiet --yes install python-is-python2
 fi
 
+# libgnutls28 is required for the password-protected VNC to work in Xen 4.16+.
+# See: https://bugs.gentoo.org/832494
+apt-get install -y libgnutls28-dev
 apt-get --quiet --yes build-dep xen
 apt-get autoremove -y
 apt-get clean
