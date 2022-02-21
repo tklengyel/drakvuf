@@ -325,6 +325,17 @@ struct task_t
     {}
 };
 
+struct createfile_result_t : public PluginResult
+{
+    createfile_result_t()
+        : PluginResult(),
+        handle()
+    {
+    }
+
+    addr_t handle;
+};
+
 struct IO_STATUS_BLOCK_32
 {
     uint32_t status;

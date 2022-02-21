@@ -163,20 +163,18 @@ void fileextractor::createfile_cb_impl(drakvuf_t,
     drakvuf_trap_info_t* info,
     addr_t handle)
 {
-    auto hook = createReturnHook(info, &fileextractor::createfile_ret_cb);
-    auto ret_params = libhook::GetTrapParams(hook->trap_);
-    ret_params->setResultCallParams(info, (void*)handle);
-    ret_hooks[make_hook_id(info)] = std::move(hook);
+    auto hook = createReturnHook<createfile_result_t>(info,
+        &fileextractor::createfile_ret_cb);
+    auto params = libhook::GetTrapParams<createfile_result_t>(hook->trap_);
+    params->handle = handle;
 }
 
 event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
     drakvuf_trap_info_t* info)
 {
-    auto params = libhook::GetTrapParams(info);
+    auto params = libhook::GetTrapParams<createfile_result_t>(info);
     if (!params->verifyResultCallParams(drakvuf, info))
         return VMI_EVENT_RESPONSE_NONE;
-
-    ret_hooks.erase(make_hook_id(info));
 
     // Return if NtCreateFile/NtOpenFile failed
     if (info->regs->rax)
@@ -186,14 +184,14 @@ event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = (addr_t) params->context
+        .addr = params->handle
     );
 
     vmi_lock_guard vmi(drakvuf);
     if (VMI_SUCCESS != vmi_read_32(vmi, &ctx, &handle))
         PRINT_DEBUG("[FILEDELETE] "
             "Failed to read pHandle at 0x%lx (PID %d, TID %d)\n",
-            (addr_t)params->context,
+            params->handle,
             params->target_pid,
             params->target_tid);
 

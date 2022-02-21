@@ -145,7 +145,6 @@ private:
 
     /* Internal data */
     drakvuf_t drakvuf{nullptr};
-    std::unordered_map<uint64_t, std::unique_ptr<libhook::ReturnHook>> ret_hooks;
     std::unordered_map<task_id, std::unique_ptr<task_t>> tasks;
     bool is32bit{false};
     // Maps virtual address of buffer to free flag:
