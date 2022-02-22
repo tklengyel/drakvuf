@@ -596,7 +596,7 @@ std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_inf
 template<typename Params, typename Callback>
 std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, Callback cb)
 {
-    return createReturnHook(info, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
+    return createReturnHook<Params, Callback>(info, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
 }
 
 template<typename Params, typename Callback>
