@@ -913,6 +913,10 @@ std::unique_ptr<ArgumentPrinter> make_arg_printer(
     {
         return std::make_unique<UlongPrinter>(name, config);
     }
+    else if (type == "pulonglong")
+    {
+        return std::make_unique<UlongLongPrinter>(name, config);
+    }
     else if (type == "lpvoid*")
     {
         return std::make_unique<PointerToPointerPrinter>(name, config);

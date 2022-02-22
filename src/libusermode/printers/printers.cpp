@@ -259,6 +259,20 @@ std::string UlongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint
     return ArgumentPrinter::print(drakvuf, info, value);
 }
 
+std::string UlongLongPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = argument
+    );
+    auto vmi = vmi_lock_guard(drakvuf);
+    uint64_t value;
+    if (vmi_read_64(vmi, &ctx, &value) != VMI_SUCCESS)
+        value = 0;
+    return ArgumentPrinter::print(drakvuf, info, value);
+}
+
 std::string PointerToPointerPrinter::print(drakvuf_t drakvuf, drakvuf_trap_info* info, uint64_t argument) const
 {
     ACCESS_CONTEXT(ctx,
