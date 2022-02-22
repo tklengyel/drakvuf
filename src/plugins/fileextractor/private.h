@@ -101,70 +101,282 @@
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
  ***************************************************************************/
-#pragma once
 
-#include <libdrakvuf/libdrakvuf.h>
-#include <libhook/hooks/base.hpp>
-#include <libhook/private.h>
+#ifndef FILEDELETE_PRIVATE_H
+#define FILEDELETE_PRIVATE_H
 
-namespace libhook
+#include "../plugin_utils.h"
+
+#define FILE_DISPOSITION_INFORMATION 13
+#define FILE_DELETE_ON_CLOSE 0x1000
+
+enum offset
 {
-
-struct CallResult
-{
-    CallResult()
-        : target_pid(), target_tid(), target_rsp(), hook_()
-    {}
-
-    virtual ~CallResult() = default;
-
-    void setResultCallParams(const drakvuf_trap_info_t* info)
-    {
-        target_pid = info->attached_proc_data.pid;
-        target_tid = info->attached_proc_data.tid;
-        target_rsp = info->regs->rsp;
-
-    }
-
-    bool verifyResultCallParams(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-    {
-        return drakvuf_check_return_context(drakvuf, info, target_pid, target_tid, target_rsp);
-    }
-
-    vmi_pid_t target_pid;
-    uint32_t target_tid;
-    addr_t target_rsp;
-    BaseHook* hook_;
+    FILE_OBJECT_TYPE,
+    FILE_OBJECT_FLAGS,
+    FILE_OBJECT_FILENAME,
+    FILE_OBJECT_SECTIONOBJECTPOINTER,
+    SECTIONOBJECTPOINTER_DATASECTIONOBJECT,
+    SECTIONOBJECTPOINTER_SHAREDCACHEMAP,
+    SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT,
+    CONTROL_AREA_SEGMENT,
+    SEGMENT_CONTROLAREA,
+    SEGMENT_SIZEOFSEGMENT,
+    SEGMENT_TOTALNUMBEROFPTES,
+    SUBSECTION_NEXTSUBSECTION,
+    SUBSECTION_SUBSECTIONBASE,
+    SUBSECTION_PTESINSUBSECTION,
+    SUBSECTION_CONTROLAREA,
+    SUBSECTION_STARTINGSECTOR,
+    OBJECT_HEADER_BODY,
+    OBJECT_HEADER_HANDLE_COUNT,
+    __OFFSET_MAX
 };
 
-template<typename Params = CallResult>
-Params* GetTrapParams(const drakvuf_trap_t* trap)
+struct createfile_ret_info
 {
-    static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
+    vmi_pid_t pid;
+    uint32_t tid;
+    uint64_t rsp;
 
-    if (!trap || !trap->data)
-        return nullptr;
+    addr_t handle;
 
-    auto params = static_cast<Params*>(trap->data);
-    if (!params)
+    fileextractor* f;
+};
+
+enum file_object_flags
+{
+    FO_FILE_OPEN                    = 0x00000001,
+    FO_SYNCHRONOUS_IO               = 0x00000002,
+    FO_ALERTABLE_IO                 = 0x00000004,
+    FO_NO_INTERMEDIATE_BUFFERING    = 0x00000008,
+    FO_WRITE_THROUGH                = 0x00000010,
+    FO_SEQUENTIAL_ONLY              = 0x00000020,
+    FO_CACHE_SUPPORTED              = 0x00000040,
+    FO_NAMED_PIPE                   = 0x00000080,
+    FO_STREAM_FILE                  = 0x00000100,
+    FO_MAILSLOT                     = 0x00000200,
+    FO_GENERATE_AUDIT_ON_CLOSE      = 0x00000400,
+    FO_DIRECT_DEVICE_OPEN           = 0x00000800,
+    FO_FILE_MODIFIED                = 0x00001000,
+    FO_FILE_SIZE_CHANGED            = 0x00002000,
+    FO_CLEANUP_COMPLETE             = 0x00004000,
+    FO_TEMPORARY_FILE               = 0x00008000,
+    FO_DELETE_ON_CLOSE              = 0x00010000,
+    FO_OPENED_CASE_SENSITIVE        = 0x00020000,
+    FO_HANDLE_CREATED               = 0x00040000,
+    FO_FILE_FAST_IO_READ            = 0x00080000,
+    FO_RANDOM_ACCESS                = 0x00100000,
+    FO_FILE_OPEN_CANCELLED          = 0x00200000,
+    FO_VOLUME_OPEN                  = 0x00400000,
+    FO_REMOTE_ORIGIN                = 0x01000000,
+    FO_DISALLOW_EXCLUSIVE           = 0x02000000,
+    FO_SKIP_SET_EVENT               = 0x04000000,
+    FO_SKIP_SET_FAST_IO             = 0x08000000,
+    FO_INDIRECT_WAIT_OBJECT         = 0x10000000,
+    FO_SECTION_MINSTORE_TREATMENT   = 0x20000000,
+};
+
+static const char* offset_names[__OFFSET_MAX][2] =
+{
+    [FILE_OBJECT_TYPE] = {"_FILE_OBJECT", "Type"},
+    [FILE_OBJECT_FLAGS] = {"_FILE_OBJECT", "Flags"},
+    [FILE_OBJECT_FILENAME] = {"_FILE_OBJECT", "FileName"},
+    [FILE_OBJECT_SECTIONOBJECTPOINTER] = {"_FILE_OBJECT", "SectionObjectPointer"},
+    [SECTIONOBJECTPOINTER_DATASECTIONOBJECT] = {"_SECTION_OBJECT_POINTERS", "DataSectionObject"},
+    [SECTIONOBJECTPOINTER_SHAREDCACHEMAP] = {"_SECTION_OBJECT_POINTERS", "SharedCacheMap"},
+    [SECTIONOBJECTPOINTER_IMAGESECTIONOBJECT] = {"_SECTION_OBJECT_POINTERS", "ImageSectionObject"},
+    [CONTROL_AREA_SEGMENT] = {"_CONTROL_AREA", "Segment"},
+    [SEGMENT_CONTROLAREA] = {"_SEGMENT", "ControlArea"},
+    [SEGMENT_SIZEOFSEGMENT] = {"_SEGMENT", "SizeOfSegment"},
+    [SEGMENT_TOTALNUMBEROFPTES] = {"_SEGMENT", "TotalNumberOfPtes"},
+    [SUBSECTION_NEXTSUBSECTION] = {"_SUBSECTION", "NextSubsection"},
+    [SUBSECTION_SUBSECTIONBASE] = {"_SUBSECTION", "SubsectionBase"},
+    [SUBSECTION_PTESINSUBSECTION] = {"_SUBSECTION", "PtesInSubsection"},
+    [SUBSECTION_CONTROLAREA] = {"_SUBSECTION", "ControlArea"},
+    [SUBSECTION_STARTINGSECTOR] = {"_SUBSECTION", "StartingSector"},
+    [OBJECT_HEADER_BODY] = { "_OBJECT_HEADER", "Body" },
+    [OBJECT_HEADER_HANDLE_COUNT] = { "_OBJECT_HEADER", "HandleCount" },
+};
+
+static const flags_str_t fo_flags_map =
+{
+    REGISTER_FLAG(FO_FILE_OPEN),
+    REGISTER_FLAG(FO_SYNCHRONOUS_IO),
+    REGISTER_FLAG(FO_ALERTABLE_IO),
+    REGISTER_FLAG(FO_NO_INTERMEDIATE_BUFFERING),
+    REGISTER_FLAG(FO_WRITE_THROUGH),
+    REGISTER_FLAG(FO_SEQUENTIAL_ONLY),
+    REGISTER_FLAG(FO_CACHE_SUPPORTED),
+    REGISTER_FLAG(FO_NAMED_PIPE),
+    REGISTER_FLAG(FO_STREAM_FILE),
+    REGISTER_FLAG(FO_MAILSLOT),
+    REGISTER_FLAG(FO_GENERATE_AUDIT_ON_CLOSE),
+    REGISTER_FLAG(FO_DIRECT_DEVICE_OPEN),
+    REGISTER_FLAG(FO_FILE_MODIFIED),
+    REGISTER_FLAG(FO_FILE_SIZE_CHANGED),
+    REGISTER_FLAG(FO_CLEANUP_COMPLETE),
+    REGISTER_FLAG(FO_TEMPORARY_FILE),
+    REGISTER_FLAG(FO_DELETE_ON_CLOSE),
+    REGISTER_FLAG(FO_OPENED_CASE_SENSITIVE),
+    REGISTER_FLAG(FO_HANDLE_CREATED),
+    REGISTER_FLAG(FO_FILE_FAST_IO_READ),
+    REGISTER_FLAG(FO_RANDOM_ACCESS),
+    REGISTER_FLAG(FO_FILE_OPEN_CANCELLED),
+    REGISTER_FLAG(FO_VOLUME_OPEN),
+    REGISTER_FLAG(FO_REMOTE_ORIGIN),
+    REGISTER_FLAG(FO_DISALLOW_EXCLUSIVE),
+    REGISTER_FLAG(FO_SKIP_SET_EVENT),
+    REGISTER_FLAG(FO_SKIP_SET_FAST_IO),
+    REGISTER_FLAG(FO_INDIRECT_WAIT_OBJECT),
+    REGISTER_FLAG(FO_SECTION_MINSTORE_TREATMENT),
+};
+
+struct task_t
+{
+    enum class stage_t
     {
-        PRINT_DEBUG("[PLUGINEX] nullptr at get_trap_params, this should never happen");
-        throw -1;
+        pending,
+        queryvolumeinfo,
+        queryinfo,
+        createsection,
+        mapview,
+        allocate_pool,
+        unmapview,
+        close_handle,
+        memcpy,
+        finished,
+    };
+
+    struct return_ctx
+    {
+        vmi_pid_t ret_pid{0};
+        addr_t    ret_rsp{0};
+        uint32_t  ret_tid{0};
+        x86_registers_t regs;
+    };
+
+    enum class task_reason
+    {
+        write,
+        del,
+        invalid,
+    };
+
+    handle_t handle;
+    std::string filename;
+    const task_reason reason{task_reason::invalid};
+    stage_t stage{stage_t::pending};
+
+    return_ctx target;
+    addr_t target_process_base{0};
+
+    const addr_t file_obj{0};
+    uint64_t fo_flags{0};
+    uint64_t file_size{0};
+    uint64_t file_offset{0};
+    uint64_t bytes_to_read{0};
+    handle_t section_handle{0};
+    addr_t view_base{0};
+
+    int idx{0};
+
+    union
+    {
+        struct
+        {
+            addr_t out{0};
+        } queryvolumeinfo;
+
+        struct
+        {
+            addr_t out;
+        } queryinfo{0};
+
+        struct
+        {
+            addr_t handle{0};
+        } createsection;
+
+        struct
+        {
+            addr_t base{0};
+            addr_t size{0};
+        } mapview;
+
+        struct
+        {
+            size_t bytes_read{0};
+            addr_t out{0};
+            addr_t io_status_block{0};
+        } readfile;
+    };
+
+    addr_t pool;
+
+    task_t(handle_t handle_,
+        std::string filename_,
+        task_reason reason_,
+        addr_t file_obj_)
+        : handle(handle_)
+        , filename(filename_)
+        , reason(reason_)
+        , file_obj(file_obj_)
+    {}
+};
+
+struct createfile_result_t : public PluginResult
+{
+    createfile_result_t()
+        : PluginResult(),
+          handle()
+    {
     }
-    return params;
-}
 
-template<typename Params = CallResult>
-Params* GetTrapParams(const drakvuf_trap_info_t* info)
+    addr_t handle;
+};
+
+struct IO_STATUS_BLOCK_32
 {
-    return GetTrapParams<Params>(info->trap);
-}
+    uint32_t status;
+    uint32_t info;
+} __attribute__((packed));
 
-template<typename Hook>
-Hook* GetTrapHook(const drakvuf_trap_info_t* info)
+struct IO_STATUS_BLOCK_64
 {
-    static_assert(std::is_base_of_v<BaseHook, Hook>, "Hook must derive from BaseHook");
-    return dynamic_cast<Hook*>(GetTrapParams(info)->hook_);
-}
+    uint64_t status;
+    uint64_t info;
+} __attribute__((packed));
 
-} // namespace libhook
+constexpr static uint32_t STATUS_SUCCESS = 0;
+constexpr static uint32_t STATUS_PENDING = 0x103;
+constexpr static uint32_t STATUS_END_OF_FILE = 0xC0000011;
+
+struct _LARGE_INTEGER
+{
+    uint64_t QuadPart;
+} __attribute__((packed));
+
+// NOTE The size of structure should be 0x18
+#define FileStandardInformation 5
+struct FILE_STANDARD_INFORMATION
+{
+    uint64_t allocation_size;
+    uint64_t end_of_file;
+    uint32_t number_of_links;
+    uint8_t  delete_pending;
+    uint8_t  directory;
+    uint16_t  dummy;
+} __attribute__((packed));
+
+#define FileFsDeviceInformation 4
+struct FILE_FS_DEVICE_INFORMATION
+{
+    uint32_t device_type;
+    uint32_t characteristics;
+} __attribute__((packed));
+
+// TODO Move into "task_t" as "MAX_READ_BYTES"
+static const uint64_t BYTES_TO_READ = 0x10000;
+
+#endif // FILEDELETE_PRIVATE_H

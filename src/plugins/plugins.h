@@ -117,9 +117,9 @@
 
 struct plugins_options
 {
-    const char* dump_folder;            // PLUGIN_FILEDELETE
-    bool dump_modified_files;           // PLUGIN_FILEDELETE
-    bool filedelete_use_injector;       // PLUGIN_FILEDELETE
+    const char* dump_folder;            // PLUGIN_FILEDELETE, PLUGIN_FILEEXTRACTOR
+    bool dump_modified_files;           // PLUGIN_FILEDELETE, PLUGIN_FILEEXTRACTOR
+    bool filedelete_use_injector;       // PLUGIN_FILEDELETE, PLUGIN_FILEEXTRACTOR
     bool cpuid_stealth;                 // PLUGIN_CPUIDMON
     const char* tcpip_profile;          // PLUGIN_SOCKETMON
     const char* win32k_profile;         // PLUGIN_CLIPBOARDMON, PLUGIN_WINDOWMON, PLUGIN_SYSCALLS
@@ -181,6 +181,7 @@ typedef enum drakvuf_plugin
     PLUGIN_POOLMON,
     PLUGIN_FILETRACER,
     PLUGIN_FILEDELETE,
+    PLUGIN_FILEEXTRACTOR,
     PLUGIN_OBJMON,
     PLUGIN_EXMON,
     PLUGIN_SSDTMON,
@@ -220,6 +221,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_POOLMON] = "poolmon",
     [PLUGIN_FILETRACER] = "filetracer",
     [PLUGIN_FILEDELETE] = "filedelete",
+    [PLUGIN_FILEEXTRACTOR] = "fileextractor",
     [PLUGIN_OBJMON] = "objmon",
     [PLUGIN_EXMON] = "exmon",
     [PLUGIN_SSDTMON] = "ssdtmon",
@@ -258,6 +260,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_POOLMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_FILETRACER]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
     [PLUGIN_FILEDELETE]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_FILEEXTRACTOR]= { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_OBJMON]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_EXMON]        = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_SSDTMON]      = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
