@@ -165,7 +165,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     g_free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool _verbose, bool libvmi_conf, addr_t kpgd, bool fast_singlestep, uint64_t limited_traps_ttl)
+bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool _verbose, bool libvmi_conf, addr_t kpgd, bool fast_singlestep, uint64_t limited_traps_ttl, bool get_userid)
 {
 
     if ( !domain )
@@ -177,6 +177,7 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
 
     *drakvuf = (drakvuf_t)g_try_malloc0(sizeof(struct drakvuf));
 
+    (*drakvuf)->get_userid = get_userid;
     (*drakvuf)->limited_traps_ttl = limited_traps_ttl;
     (*drakvuf)->context_switch_intercept_processes = NULL;
     (*drakvuf)->enable_cr3_based_interception = false;
