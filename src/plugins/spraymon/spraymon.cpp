@@ -109,13 +109,6 @@
 #include "spraymon.h"
 #include "plugins/output_format.h"
 
-// #define PRINT_SPRAYMON(...) \
-//     do { \
-//         eprint_current_time(); \
-//         fprintf (stderr, __VA_ARGS__); \
-//     } while (0)
-
-
 bool spraymon::read_counter(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid, uint16_t* value)
 {
     vmi_lock_guard vmi(drakvuf);
