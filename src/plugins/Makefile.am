@@ -344,6 +344,11 @@ sources += rootkitmon/rootkitmon.h
 sources += rootkitmon/private.h
 endif
 
+if PLUGIN_SPRAYMON
+sources += spraymon/spraymon.cpp
+sources += spraymon/spraymon.h
+endif
+
 if PLUGIN_CALLBACKMON
 sources += callbackmon/callbackmon.cpp
 sources += callbackmon/callbackmon.h
