@@ -518,7 +518,7 @@ AC_ARG_ENABLE([plugin_spraymon],
   [AS_HELP_STRING([--disable-plugin-spraymon],
     [Enable the spraymon plugin @<:@yes@:>@])],
   [plugin_spraymon="$enableval"],
-  [plugin_spraymon="yes"])   
+  [plugin_spraymon="yes"])
 AM_CONDITIONAL([PLUGIN_SPRAYMON], [test x$plugin_spraymon = xyes])
 if test x$plugin_spraymon = xyes; then
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_SPRAYMON, 1, "")
