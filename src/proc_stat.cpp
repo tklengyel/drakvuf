@@ -181,7 +181,7 @@ int main(int argc, char** argv)
 
 
     /* initialize the Drakvuf library */
-    if (!drakvuf_init(&drakvuf, domain, profile, NULL, false, false, 0, false, UNLIMITED_TTL))
+    if (!drakvuf_init(&drakvuf, domain, profile, NULL, false, false, 0, false, UNLIMITED_TTL, true))
     {
         printf("Failed to initialize Drakvuf\n");
         goto done;

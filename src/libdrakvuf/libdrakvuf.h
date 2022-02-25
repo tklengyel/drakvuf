@@ -385,7 +385,8 @@ bool drakvuf_init (drakvuf_t* drakvuf,
     const bool libvmi_conf,
     const addr_t kpgd,
     const bool fast_singlestep,
-    uint64_t limited_traps_ttl) NOEXCEPT;
+    uint64_t limited_traps_ttl,
+    bool get_userid) NOEXCEPT;
 bool drakvuf_init_os (drakvuf_t drakvuf) NOEXCEPT;
 void drakvuf_close (drakvuf_t drakvuf, const bool pause) NOEXCEPT;
 int drakvuf_send_qemu_monitor_command(drakvuf_t drakvuf, const char* in, char** out);
