@@ -363,7 +363,10 @@ bool linux_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv
             proc_data->name = linux_get_process_name(drakvuf, base_addr, true);
             if ( linux_get_process_ppid(drakvuf, base_addr, &proc_data->ppid))
             {
-                proc_data->userid = linux_get_process_userid(drakvuf, base_addr);
+                if (drakvuf->get_userid)
+                    proc_data->userid = linux_get_process_userid(drakvuf, base_addr);
+                else
+                    proc_data->userid = 0;
                 linux_get_process_tid(drakvuf, base_addr, &proc_data->tid);
                 if ( proc_data->tid )
                     return true;
