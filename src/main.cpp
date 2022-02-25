@@ -347,6 +347,8 @@ static void print_usage()
         "\t --json-netio <path to json>\n"
         "\t                           The JSON profile for netio.sys\n"
 #endif
+        "\t --libdrakvuf-not-get-userid\n"
+        "\t                           Don't collect user id in get process data\n"
         "\t -h, --help                Show this help\n"
     );
 }
@@ -389,6 +391,7 @@ int main(int argc, char** argv)
     bool context_based_interception = false;
     GSList* context_processes = NULL;
     bool procdump_on_finish = true;
+    bool libdrakvuf_get_userid = true;
 
     eprint_current_time();
 
@@ -458,7 +461,8 @@ int main(int argc, char** argv)
         opt_rootkitmon_json_fwpkclnt,
         opt_rootkitmon_json_fltmgr,
         opt_callbackmon_json_netio,
-        opt_json_hal
+        opt_json_hal,
+        opt_libdrakvuf_not_get_userid,
     };
     const option long_opts[] =
     {
@@ -526,6 +530,7 @@ int main(int argc, char** argv)
         {"json-fltmgr", required_argument, NULL, opt_rootkitmon_json_fltmgr},
         {"json-netio", required_argument, NULL, opt_callbackmon_json_netio},
         {"json-hal", required_argument, NULL, opt_json_hal},
+        {"libdrakvuf-not-get-userid", no_argument, NULL, opt_libdrakvuf_not_get_userid},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF:C";
@@ -846,6 +851,9 @@ int main(int argc, char** argv)
             case 'h':
                 print_usage();
                 return drakvuf_exit_code_t::SUCCESS;
+            case opt_libdrakvuf_not_get_userid:
+                libdrakvuf_get_userid = false;
+                break;
             default:
                 if (isalnum(c))
                     fprintf(stderr, "Unrecognized option: %c\n", c);
@@ -870,7 +878,7 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = std::make_unique<drakvuf_c>(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl);
+        drakvuf = std::make_unique<drakvuf_c>(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl, libdrakvuf_get_userid);
     }
     catch (const std::exception& e)
     {

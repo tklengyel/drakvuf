@@ -1277,7 +1277,10 @@ bool win_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv_t
         {
             if ( win_get_process_ppid( drakvuf, base_addr, &proc_data->ppid ) )
             {
-                proc_data->userid = win_get_process_userid( drakvuf, base_addr );
+                if (drakvuf->get_userid)
+                    proc_data->userid = win_get_process_userid( drakvuf, base_addr );
+                else
+                    proc_data->userid = 0;
                 proc_data->name   = win_get_process_name( drakvuf, base_addr, true );
 
                 if ( proc_data->name )
