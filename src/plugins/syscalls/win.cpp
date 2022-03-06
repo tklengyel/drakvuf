@@ -319,14 +319,23 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
             }
         }
 
+        const char* symbol_name = nullptr;
+
         if ( !symbol )
             PRINT_DEBUG("\t Syscall %lu @ 0x%lx has no debug information matching it with RVA 0x%lx. Table: 0x%lx Offset: 0x%lx\n", syscall_num, syscall_va, rva, sst[0], offset);
         else if ( !definition )
-            PRINT_DEBUG("\t Syscall %s has no internal definition. New syscall?\n", symbol->name);
-
-        if ( s->filter && ( !symbol || !g_hash_table_contains(s->filter, symbol->name) ) )
         {
-            PRINT_DEBUG("Syscall %s filtered out by syscalls filter file\n", symbol ? symbol->name : "<unknowm>");
+            gchar* tmp = g_strdup(symbol->name);
+            s->strings_to_free = g_slist_prepend(s->strings_to_free, tmp);
+            symbol_name = (const char*)tmp;
+            PRINT_DEBUG("\t Syscall %s has no internal definition. New syscall?\n", symbol_name);
+        }
+        else
+            symbol_name = definition->name;
+
+        if ( s->filter && ( !symbol_name || !g_hash_table_contains(s->filter, symbol_name) ) )
+        {
+            PRINT_DEBUG("Syscall %s filtered out by syscalls filter file\n", symbol_name ? symbol_name : "<unknown>");
             continue;
         }
 
@@ -335,7 +344,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
                 nullptr,
                 syscall_cb,
                 bp.for_virt_addr(syscall_va).for_dtb(cr3),
-                symbol ? symbol->name : nullptr);
+                symbol_name);
 
         if (!trap)
         {

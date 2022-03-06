@@ -121,6 +121,7 @@ class syscalls: public pluginex
 {
 public:
     GSList* traps; // NOTE Non "pluginex" support for linux
+    GSList* strings_to_free;
     GHashTable* filter;
     json_object* win32k_json;
 
