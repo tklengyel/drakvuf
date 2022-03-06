@@ -295,6 +295,7 @@ void free_trap(gpointer p)
 syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output)
     : pluginex(drakvuf, output)
     , traps(NULL)
+    , strings_to_free(NULL)
     , filter(NULL)
     , win32k_json(NULL)
     , format{output}
@@ -319,10 +320,18 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
 
 syscalls::~syscalls()
 {
+    GSList* loop = this->strings_to_free;
+    while (loop)
+    {
+        g_free(loop->data);
+        loop = loop->next;
+    }
+    g_slist_free(this->strings_to_free);
+
     // NOTE Non "pluginex" support for linux
     if ( this->os != VMI_OS_WINDOWS )
     {
-        GSList* loop = this->traps;
+        loop = this->traps;
         while (loop)
         {
             free_trap(loop->data);
@@ -330,6 +339,7 @@ syscalls::~syscalls()
         }
         g_slist_free(this->traps);
     }
+
 
     if ( this->filter )
         g_hash_table_destroy(this->filter);
