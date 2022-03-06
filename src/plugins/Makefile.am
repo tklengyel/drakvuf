@@ -354,12 +354,17 @@ sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp pl
 sources += output_format.h output_format/common.h output_format/csvfmt.h output_format/deffmt.h output_format/jsonfmt.h output_format/kvfmt.h
 sources += output_format/xfmt.h output_format/ostream.h output_format/ostream.cpp
 
-AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
-AM_CPPFLAGS += $(CPPFLAGS)
+AM_CPPFLAGS = $(CPPFLAGS) -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(VMI_CFLAGS)
 AM_CPPFLAGS += $(GLIB_CFLAGS)
 AM_CPPFLAGS += $(JSONC_CFLAGS)
 AM_CPPFLAGS += $(PTHREAD_CFLAGS)
+
+AM_CFLAGS = $(CFLAGS)
+AM_CFLAGS += $(VMI_CFLAGS)
+AM_CFLAGS += $(GLIB_CFLAGS)
+AM_CFLAGS += $(JSONC_CFLAGS)
+AM_CFLAGS += $(PTHREAD_CFLAGS)
 
 AM_LDFLAGS =  $(LDFLAGS)
 AM_LDFLAGS += $(GLIB_LIBS)
