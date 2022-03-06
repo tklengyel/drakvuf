@@ -339,15 +339,13 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
         for (uint32_t i = 0; i < ptes_to_dump; ++i)
             ctx->writer->append(zeros, VMI_PS_4KB);
 
-        vad->second.idx += ptes_to_dump;
-        skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
-                vad->second.idx, ptes_to_dump, ctx->POOL_SIZE_IN_PAGES);
-
         if (0 == ptes_to_dump)
         {
             ctx->vads.erase(vad_start);
             return RTLCOPY_GO_NEXT_VAD;
         }
+
+        vad->second.idx += ptes_to_dump;
     }
 
     if (ptes_to_dump > ctx->POOL_SIZE_IN_PAGES)
