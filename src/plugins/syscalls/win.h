@@ -4089,6 +4089,13 @@ SYSCALL(NtUserWindowFromPoint, NTSTATUS);
 SYSCALL(NtUserYieldTask, NTSTATUS);
 SYSCALL(NtValidateCompositionSurfaceHandle, NTSTATUS);
 SYSCALL(NtVisualCaptureBits, NTSTATUS);
+SYSCALL(NtAcquireCrossVmMutant, NTSTATUS);
+SYSCALL(NtAllocateUserPhysicalPagesEx, NTSTATUS);
+SYSCALL(NtContinueEx, NTSTATUS);
+SYSCALL(NtCreateCrossVmEvent, NTSTATUS);
+SYSCALL(NtCreateCrossVmMutant, NTSTATUS);
+SYSCALL(NtPssCaptureVaSpaceBulk, NTSTATUS);
+SYSCALL(NtLoadKey3, NTSTATUS);
 
 #pragma clang diagnostic pop
 
@@ -4567,6 +4574,13 @@ static const syscall_t* nt[] =
     &GetPnpProperty,
     &ArbPreprocessEntry,
     &ArbAddReserved,
+    &NtAcquireCrossVmMutant,
+    &NtAllocateUserPhysicalPagesEx,
+    &NtContinueEx,
+    &NtCreateCrossVmEvent,
+    &NtCreateCrossVmMutant,
+    &NtPssCaptureVaSpaceBulk,
+    &NtLoadKey3,
 };
 
 static const syscall_t* win32k[] =
