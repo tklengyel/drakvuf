@@ -328,7 +328,8 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
             gchar* tmp = g_strdup(symbol->name);
             s->strings_to_free = g_slist_prepend(s->strings_to_free, tmp);
             symbol_name = (const char*)tmp;
-            PRINT_DEBUG("\t Syscall %s has no internal definition. New syscall?\n", symbol_name);
+            PRINT_DEBUG("\t Syscall %s:%s has no internal definition. New syscall?\n",
+                        ntos ? "nt" : "wink32k", symbol_name);
         }
         else
             symbol_name = definition->name;
