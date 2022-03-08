@@ -325,7 +325,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
     auto skip = max_contigious_range(prototype_ptes, total_number_of_ptes,
             vad->second.idx, ptes_to_dump, ctx->POOL_SIZE_IN_PAGES);
 
-    if (!ptes_to_dump)
+    if (!skip && !ptes_to_dump)
     {
         PRINT_DEBUG("[PROCDUMP] [PID:%d] Error: Dump %u PTEs from %u / %lu\n",
             ctx->pid, ptes_to_dump, vad->second.idx, total_number_of_ptes);
@@ -344,6 +344,7 @@ static enum rtlcopy_status dump_with_rtlcopymemory(drakvuf_t drakvuf,
             ctx->vads.erase(vad_start);
             return RTLCOPY_GO_NEXT_VAD;
         }
+
 
         vad->second.idx += ptes_to_dump;
     }
