@@ -584,8 +584,10 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
             this->working_threads.erase(info->attached_proc_data.tid);
         }
         break;
-        default:
+        case procdump_stage::invalid:
             print_failure(info, ctx, "Active process get invalid stage");
+        case procdump_stage::target_fail:
+        default:
             // TODO Resume target process?
             restore(info, ctx->working.regs);
             finish_task(ctx);
@@ -810,15 +812,29 @@ bool procdump2::dispatch_wakeup(
                 finish_task(ctx);
             return true;
         default:
-            PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                "Suspended %s process wake up while not finished\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , ctx->target_process_pid, static_cast<int>(ctx->stage)
-                , is_target ? "target" : "host"
-            );
             if (is_target)
-                suspend(info, ctx->target_process_base, ctx->target);
+            {
+                if (ctx->on_target_resuspend())
+                {
+                    PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                        "Suspended %s process wake up while not finished "
+                        "(retries %d)\n"
+                        , info->event_uid
+                        , info->attached_proc_data.pid
+                        , info->attached_proc_data.tid
+                        , ctx->target_process_pid, static_cast<int>(ctx->stage)
+                        , is_target ? "target" : "host"
+                        , ctx->target_resuspend_count
+                    );
+                    suspend(info, ctx->target_process_base, ctx->target);
+                }
+                else
+                {
+                    print_failure(info, ctx, "Target process wake up");
+                    ctx->stage = procdump_stage::target_fail;
+                    restore(info, ctx->target.regs);
+                }
+            }
             else
                 suspend(info, ctx->target_process_base, ctx->host);
             return true;

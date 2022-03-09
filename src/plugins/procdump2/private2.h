@@ -172,7 +172,8 @@ enum class procdump_stage
     resume,        // 6
     awaken,        // 7
     finished,      // 8
-    invalid        // 9
+    target_fail,   // 9
+    invalid        // 10
 };
 
 struct return_ctx
@@ -223,6 +224,9 @@ struct procdump2_ctx
     string    target_process_name;
     vmi_pid_t target_process_pid{0};
 
+    const uint8_t TARGET_RESUSPEND_COUNT_MAX{5};
+    uint8_t target_resuspend_count{0};
+
     /* Data */
     size_t         current_dump_size{0};
     addr_t         pool{0}; // TODO Use "class pool" here
@@ -252,6 +256,14 @@ struct procdump2_ctx
         writer = ProcdumpWriterFactory::build(
                 procdump_dir + "/"s + data_file_name,
                 use_compression);
+    }
+
+    bool on_target_resuspend()
+    {
+        if (++target_resuspend_count < TARGET_RESUSPEND_COUNT_MAX)
+            return true;
+        else
+            return false;
     }
 };
 
