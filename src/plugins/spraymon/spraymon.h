@@ -128,11 +128,10 @@ private:
     //_W32PROCESS offsets
     size_t gdihandlecountpeak;
     size_t userhandlecountpeak;
-
+    bool do_final_analysis;
     // assigned from config
     uint16_t gdi_threshold;
     uint16_t usr_threshold;
-    bool do_final_analysis;
 
     bool get_counters(drakvuf_t drakvuf, addr_t process, vmi_pid_t pid, uint16_t* gdi_max_count, uint16_t* usr_max_count);
     void log(drakvuf_t drakvuf, uint16_t gdi_max_count, uint16_t usr_max_count, char* process_name, vmi_pid_t pid);
