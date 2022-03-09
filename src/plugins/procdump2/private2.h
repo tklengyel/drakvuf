@@ -163,17 +163,19 @@ using vads_t = std::map<addr_t, vad_info2>;
 
 enum class procdump_stage
 {
-    need_suspend,  // 0
-    suspend,       // 1
-    pending,       // 2
-    get_irql,      // 3
-    allocate_pool, // 4
-    copy_memory,   // 5
-    resume,        // 6
-    awaken,        // 7
-    finished,      // 8
-    target_fail,   // 9
-    invalid        // 10
+    need_suspend,     // 0
+    suspend,          // 1
+    pending,          // 2
+    get_irql,         // 3
+    allocate_pool,    // 4
+    prepare_minidump, // 5
+    copy_memory,      // 6
+    resume,           // 7
+    awaken,           // 8
+    finished,         // 9
+    target_fail,      // 10
+    timeout,          // 11
+    invalid           // 12
 };
 
 struct return_ctx
@@ -264,6 +266,25 @@ struct procdump2_ctx
             return true;
         else
             return false;
+    }
+
+    const char* status()
+    {
+        switch (stage)
+        {
+            case procdump_stage::finished:
+                return "Success";
+            case procdump_stage::timeout:
+                return "Timeout";
+            case procdump_stage::target_fail:
+                return "WakeUp";
+            case procdump_stage::prepare_minidump:
+                return "PrepareMinidump";
+            case procdump_stage::allocate_pool:
+                return "AllocatePool";
+            default:
+                return "Fail";
+        }
     }
 };
 

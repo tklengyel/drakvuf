@@ -148,6 +148,7 @@ struct plugins_options
     bool userhook_no_addr;              // PLUGIN_MEMDUMP, PLUGIN_APIMON
     const char* clr_profile;            // PLUGIN_MEMDUMP
     const char* mscorwks_profile;       // PLUGIN_MEMDUMP
+    uint32_t procdump_timeout;          // PLUGIN_PROCDUMP
     const char* procdump_dir;           // PLUGIN_PROCDUMP
     bool compress_procdumps = false;    // PLUGIN_PROCDUMP
     vmi_pid_t procdump_on_finish;       // PLUGIN_PROCDUMP2

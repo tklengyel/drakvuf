@@ -117,6 +117,7 @@
 
 struct procdump2_config
 {
+    uint32_t timeout;
     const char* procdump_dir;
     bool compress_procdumps;
     vmi_pid_t procdump_on_finish;
@@ -139,6 +140,7 @@ public:
 
 private:
     /* Config */
+    uint32_t                                             timeout{0};
     // TODO Use `std::filesystem::path`
     std::string const                                    procdump_dir;
     // TODO Rename
@@ -150,6 +152,7 @@ private:
     uint64_t                                             procdumps_count{0};
     std::unique_ptr<pool_manager>                        pools;
     std::map<vmi_pid_t, std::shared_ptr<procdump2_ctx>>  active;
+    uint32_t                                             begin_stop_at{0};
     /* Set of finished tasks.
      *
      * Prevents process dump on second call of NtTerminateProcess.
@@ -216,16 +219,13 @@ private:
 
     /* Routines */
     std::shared_ptr<procdump2_ctx> continues_task(drakvuf_trap_info_t*);
-    void finish_task(std::shared_ptr<procdump2_ctx>);
+    void finish_task(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     addr_t get_function_va(std::string_view, std::string_view);
     std::pair<addr_t, size_t> get_memory_region(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     bool is_active_process(vmi_pid_t pid);
     bool is_process_handled(vmi_pid_t pid);
     bool is_plugin_active();
     bool prepare_minidump(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
-    void print_failure(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>, const std::string& message);
-    void print_failure(drakvuf_trap_info_t*, vmi_pid_t, const std::string& message);
-    void print_failure(drakvuf_trap_info_t*, const std::string& message);
     void read_vm(addr_t, std::shared_ptr<procdump2_ctx> procdump_ctx, bool);
     void restore(drakvuf_trap_info_t*, x86_registers_t&);
     void save_file_metadata(std::shared_ptr<procdump2_ctx>, proc_data_t*);

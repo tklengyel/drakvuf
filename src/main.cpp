@@ -286,6 +286,8 @@ static void print_usage()
         "\t                           Stop printing addresses of string arguments in apimon and memdump\n"
 #endif
 #if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2)
+        "\t --procdump-timeout <timeout>\n"
+        "\t                           Timeout (in seconds) to finish process memory dumps\n"
         "\t --procdump-dir <directory>\n"
         "\t                           Where to store processes dumps\n"
         "\t --compress-procdumps\n"
@@ -427,6 +429,7 @@ int main(int argc, char** argv)
         opt_memdump_disable_set_thread,
         opt_memdump_disable_shellcode_detect,
         opt_dll_hooks_list,
+        opt_procdump_timeout,
         opt_procdump_dir,
         opt_compress_procdumps,
         opt_procdump_disable_dump_on_finish,
@@ -494,6 +497,7 @@ int main(int argc, char** argv)
         {"memdump-disable-set-thread", no_argument, NULL, opt_memdump_disable_set_thread},
         {"memdump-disable-shellcode-detect", no_argument, NULL, opt_memdump_disable_shellcode_detect},
         {"dll-hooks-list", required_argument, NULL, opt_dll_hooks_list},
+        {"procdump-timeout", required_argument, NULL, opt_procdump_timeout},
         {"procdump-dir", required_argument, NULL, opt_procdump_dir},
         {"compress-procdumps", no_argument, NULL, opt_compress_procdumps},
         {"procdump-disable-dump-on-finish", no_argument, NULL, opt_procdump_disable_dump_on_finish},
@@ -758,6 +762,8 @@ int main(int argc, char** argv)
                 break;
 #endif
 #if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2)
+            case opt_procdump_timeout:
+                options.procdump_timeout = strtoul(optarg, NULL, 0);
             case opt_procdump_dir:
                 options.procdump_dir = optarg;
                 break;
