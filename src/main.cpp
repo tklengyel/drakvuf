@@ -764,6 +764,7 @@ int main(int argc, char** argv)
 #if defined(ENABLE_PLUGIN_PROCDUMP) || defined(ENABLE_PLUGIN_PROCDUMP2)
             case opt_procdump_timeout:
                 options.procdump_timeout = strtoul(optarg, NULL, 0);
+                break;
             case opt_procdump_dir:
                 options.procdump_dir = optarg;
                 break;
