@@ -403,6 +403,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                 {
                     procdump2_config config =
                     {
+                        .timeout = options->procdump_timeout,
                         .procdump_dir = options->procdump_dir,
                         .compress_procdumps = options->compress_procdumps,
                         .procdump_on_finish = options->procdump_on_finish,
