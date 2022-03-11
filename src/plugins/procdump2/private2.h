@@ -163,16 +163,19 @@ using vads_t = std::map<addr_t, vad_info2>;
 
 enum class procdump_stage
 {
-    need_suspend,  // 0
-    suspend,       // 1
-    pending,       // 2
-    get_irql,      // 3
-    allocate_pool, // 4
-    copy_memory,   // 5
-    resume,        // 6
-    awaken,        // 7
-    finished,      // 8
-    invalid        // 9
+    need_suspend,     // 0
+    suspend,          // 1
+    pending,          // 2
+    get_irql,         // 3
+    allocate_pool,    // 4
+    prepare_minidump, // 5
+    copy_memory,      // 6
+    resume,           // 7
+    awaken,           // 8
+    finished,         // 9
+    target_fail,      // 10
+    timeout,          // 11
+    invalid           // 12
 };
 
 struct return_ctx
@@ -223,6 +226,9 @@ struct procdump2_ctx
     string    target_process_name;
     vmi_pid_t target_process_pid{0};
 
+    const uint8_t TARGET_RESUSPEND_COUNT_MAX{5};
+    uint8_t target_resuspend_count{0};
+
     /* Data */
     size_t         current_dump_size{0};
     addr_t         pool{0}; // TODO Use "class pool" here
@@ -252,6 +258,33 @@ struct procdump2_ctx
         writer = ProcdumpWriterFactory::build(
                 procdump_dir + "/"s + data_file_name,
                 use_compression);
+    }
+
+    bool on_target_resuspend()
+    {
+        if (++target_resuspend_count < TARGET_RESUSPEND_COUNT_MAX)
+            return true;
+        else
+            return false;
+    }
+
+    const char* status()
+    {
+        switch (stage)
+        {
+            case procdump_stage::finished:
+                return "Success";
+            case procdump_stage::timeout:
+                return "Timeout";
+            case procdump_stage::target_fail:
+                return "WakeUp";
+            case procdump_stage::prepare_minidump:
+                return "PrepareMinidump";
+            case procdump_stage::allocate_pool:
+                return "AllocatePool";
+            default:
+                return "Fail";
+        }
     }
 };
 
