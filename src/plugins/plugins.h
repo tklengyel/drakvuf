@@ -212,6 +212,7 @@ typedef enum drakvuf_plugin
     PLUGIN_IPT,
     PLUGIN_HIDSIM,
     PLUGIN_ROOTKITMON,
+    PLUGIN_SPRAYMON,
     PLUGIN_CALLBACKMON,
     __DRAKVUF_PLUGIN_LIST_MAX
 } drakvuf_plugin_t;
@@ -252,6 +253,7 @@ static const char* drakvuf_plugin_names[] =
     [PLUGIN_IPT] = "ipt",
     [PLUGIN_HIDSIM] = "hidsim",
     [PLUGIN_ROOTKITMON] = "rootkitmon",
+    [PLUGIN_SPRAYMON] = "spraymon",
     [PLUGIN_CALLBACKMON] = "callbackmon",
 };
 
@@ -291,6 +293,7 @@ static const bool drakvuf_plugin_os_support[__DRAKVUF_PLUGIN_LIST_MAX][VMI_OS_WI
     [PLUGIN_IPT]          = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
     [PLUGIN_HIDSIM]       = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 1 },
     [PLUGIN_ROOTKITMON]   = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
+    [PLUGIN_SPRAYMON]     = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
     [PLUGIN_CALLBACKMON]  = { [VMI_OS_WINDOWS] = 1, [VMI_OS_LINUX] = 0 },
 };
 
