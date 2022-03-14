@@ -158,6 +158,7 @@ struct vad_info2
     uint32_t type; // TODO Use backed file name instead of type?
     uint64_t total_number_of_ptes;
     uint32_t idx;                       // index in prototype_ptes
+    bool is_memory_mapped_file;
 };
 using vads_t = std::map<addr_t, vad_info2>;
 
@@ -230,11 +231,21 @@ struct procdump2_ctx
     uint8_t target_resuspend_count{0};
 
     /* Data */
-    size_t         current_dump_size{0};
-    addr_t         pool{0}; // TODO Use "class pool" here
-    const uint64_t POOL_SIZE_IN_PAGES{0x400}; // TODO Move into "class pool"
+    // Target process virtual address space size
     size_t         size{0};
+
+    addr_t         current_read_bytes_va{0};
+    addr_t         current_dump_base{0};
+    size_t         current_dump_size{0};
+    bool           is_current_memory_mapped_file{false};
     vads_t         vads;
+
+    // Intermediate buffer in guest OS used for coping address space.
+    // The "MmCopyVirtualMemory" creates it's own intermediate buffer.
+    // Thus the memory usage is twice of that size. Be carefull.
+    // TODO Use "class pool" here
+    addr_t         pool{0};
+    const uint64_t POOL_SIZE_IN_PAGES{32}; // 128 KB
 
     /* Backup file context */
     string                          data_file_name;
