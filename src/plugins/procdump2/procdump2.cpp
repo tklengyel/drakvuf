@@ -514,20 +514,46 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
 
         case procdump_stage::copy_memory:
         {
-            bool zero_fill = info->regs->rax != 0;
-            if (zero_fill)
-                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Failed to copy memory from target process. Status %#lx\n"
-                    , info->event_uid
-                    , info->attached_proc_data.pid, info->attached_proc_data.tid
-                    , ctx->target_process_pid, static_cast<int>(ctx->stage)
-                    , info->regs->rax
-                );
-
-            read_vm(info->regs->cr3, ctx, zero_fill);
-
-            if (ctx->vads.empty())
+            uint32_t read_bytes = 0;
             {
+                ACCESS_CONTEXT(vmi_ctx);
+                vmi_ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
+                vmi_ctx.dtb = info->regs->cr3;
+                vmi_ctx.addr = ctx->current_read_bytes_va;
+
+                vmi_lock_guard vmi(drakvuf);
+                vmi_read_32(vmi, &vmi_ctx, &read_bytes);
+            }
+
+            size_t size = 0;
+            if (read_bytes == ctx->current_dump_size)
+            {
+                read_vm(info->regs->cr3, ctx, read_bytes);
+                size = read_bytes;
+            }
+            else if (read_bytes == 0)
+            {
+                dump_zero_page(ctx);
+                size = VMI_PS_4KB;
+            }
+            else
+            {
+                read_vm(info->regs->cr3, ctx, read_bytes);
+                dump_zero_page(ctx);
+                size = read_bytes + VMI_PS_4KB;
+            }
+
+            // Dump data region (not memory-mapped file) with zeroes
+            if (size < ctx->current_dump_size &&
+                !ctx->is_current_memory_mapped_file)
+            {
+                for (; size < ctx->current_dump_size; size += VMI_PS_4KB)
+                    dump_zero_page(ctx);
+            }
+
+            if (size == ctx->current_dump_size && ctx->vads.empty())
+            {
+                // The last region have been fully dumped so finish task
                 PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
                     "Resume %s process\n"
                     , info->event_uid
@@ -537,15 +563,38 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
                 );
                 resume(info, ctx);
             }
-            else
+            else if (size == ctx->current_dump_size)
             {
+                // The region have been fully dumped so go to next one
                 auto [base, size] = get_memory_region(info, ctx);
                 PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
                     "Copy memory region [%#lx;%#lx]\n"
                     , info->event_uid
-                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , info->attached_proc_data.pid
+                    , info->attached_proc_data.tid
                     , ctx->target_process_pid, static_cast<int>(ctx->stage)
                     , base, size
+                );
+                copy_memory(info, ctx, base, size);
+            }
+            else
+            {
+                /* If we have read more any data (assume 4KB at least) then
+                 * after the last read byte the non-accessible page occur.
+                 * So skip this page.
+                 * If zero bytes have been read then the first page is
+                 * non-accessible. So skip this page.
+                 */
+                auto base = ctx->current_dump_base + size;
+                size = ctx->current_dump_size - size;
+                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                    "copy_memory: bytes copied %#x before "
+                    "NO_ACCESS page. Continue with [%#lx;%#lx]\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid
+                    , info->attached_proc_data.tid
+                    , ctx->target_process_pid, static_cast<int>(ctx->stage)
+                    , read_bytes, base, size
                 );
                 copy_memory(info, ctx, base, size);
             }
@@ -886,6 +935,9 @@ void procdump2::copy_memory(drakvuf_trap_info_t* info,
         throw -1;
     }
 
+    ctx->current_dump_base = addr;
+    ctx->current_dump_size = size;
+    ctx->current_read_bytes_va = args[6].data_on_stack;
     info->regs->rip = copy_virt_mem_va;
     ctx->working.ret_pid = info->attached_proc_data.pid;
     ctx->working.ret_rsp = info->regs->rsp;
@@ -1101,7 +1153,12 @@ std::pair<addr_t, size_t> procdump2::get_memory_region(drakvuf_trap_info_t* info
     );
 
     auto total_number_of_ptes = vad.total_number_of_ptes;
-    uint32_t ptes_to_dump = std::min(total_number_of_ptes - vad.idx, ctx->POOL_SIZE_IN_PAGES);
+    // Dump first page of memory-mapped files with signle page request.
+    auto max_size = (vad.is_memory_mapped_file && vad.idx == 0)
+        ? 1
+        : ctx->POOL_SIZE_IN_PAGES;
+
+    uint32_t ptes_to_dump = std::min(total_number_of_ptes - vad.idx, max_size);
 
     if (!ptes_to_dump)
     {
@@ -1124,14 +1181,15 @@ std::pair<addr_t, size_t> procdump2::get_memory_region(drakvuf_trap_info_t* info
     }
 
     addr_t start_addr = vad_start + vad.idx * VMI_PS_4KB;
-    ctx->current_dump_size = static_cast<size_t>(ptes_to_dump) * VMI_PS_4KB;
+    auto size = static_cast<size_t>(ptes_to_dump) * VMI_PS_4KB;
+    ctx->is_current_memory_mapped_file = vad.is_memory_mapped_file;
 
     if (vad.idx + ptes_to_dump == total_number_of_ptes)
         ctx->vads.erase(it);
     else
         vad.idx += ptes_to_dump;
 
-    return std::make_pair(start_addr, ctx->current_dump_size);
+    return std::make_pair(start_addr, size);
 }
 
 bool procdump2::is_plugin_active()
@@ -1179,7 +1237,7 @@ static bool dump_mmvad(drakvuf_t drakvuf, mmvad_info_t* mmvad,
         return false;
     }
 
-    ctx->vads[vad_start] = {vad_type, len_pages, 0};
+    ctx->vads[vad_start] = {vad_type, len_pages, 0, mmvad->file_name_ptr > 0};
     ctx->size += len_bytes;
 
     return false;
@@ -1248,52 +1306,43 @@ bool procdump2::prepare_minidump(drakvuf_trap_info_t* info, std::shared_ptr<proc
     return true;
 }
 
+void procdump2::dump_zero_page(std::shared_ptr<procdump2_ctx> ctx)
+{
+    uint8_t zeros[VMI_PS_4KB] = {};
+    ctx->writer->append(zeros, VMI_PS_4KB);
+}
+
 void procdump2::read_vm(addr_t dtb,
     std::shared_ptr<procdump2_ctx> ctx,
-    bool zero_fill)
+    size_t size)
 {
-    auto start = ctx->pool;
-    auto size = ctx->current_dump_size;
-    if (!size)
-    {
-        PRINT_DEBUG("[PROCDUMP] [%d:%d] "
-            "Zero size read\n"
-            , ctx->target_process_pid, static_cast<int>(ctx->stage)
-        );
-        return;
-    }
-
     vmi_lock_guard vmi(drakvuf);
 
     ACCESS_CONTEXT(vmi_ctx);
     vmi_ctx.translate_mechanism = VMI_TM_PROCESS_DTB;
     vmi_ctx.dtb = dtb;
-    vmi_ctx.addr = start;
+    vmi_ctx.addr = ctx->pool;
     auto num_pages = size / VMI_PS_4KB;
     auto access_ptrs = new void* [num_pages] { 0 };
 
-    bool res = true;
-    uint8_t zeros[VMI_PS_4KB] = {};
-    if (!zero_fill && VMI_SUCCESS == vmi_mmap_guest(vmi, &vmi_ctx, num_pages, access_ptrs))
+    if (VMI_SUCCESS == vmi_mmap_guest(vmi, &vmi_ctx, num_pages, access_ptrs))
     {
         for (size_t i = 0; i < num_pages; ++i)
         {
             if (access_ptrs[i])
             {
-                if (res)
-                    res = ctx->writer->append(static_cast<uint8_t*>(access_ptrs[i]), VMI_PS_4KB);
+                ctx->writer->append(static_cast<uint8_t*>(access_ptrs[i]), VMI_PS_4KB);
                 munmap(access_ptrs[i], VMI_PS_4KB);
             }
-            else if (res)
-                res = ctx->writer->append(zeros, VMI_PS_4KB);
+            else
+                dump_zero_page(ctx);
         }
     }
     else
     {
         // unaccessible page, pad with zeros to ensure proper alignment of the data
         for (size_t i = 0; i < num_pages; ++i)
-            if (res)
-                res = ctx->writer->append(zeros, VMI_PS_4KB);
+            dump_zero_page(ctx);
     }
 
     delete[] access_ptrs;
