@@ -226,7 +226,8 @@ private:
     bool is_process_handled(vmi_pid_t pid);
     bool is_plugin_active();
     bool prepare_minidump(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
-    void read_vm(addr_t, std::shared_ptr<procdump2_ctx> procdump_ctx, bool);
+    void dump_zero_page(std::shared_ptr<procdump2_ctx>);
+    void read_vm(addr_t, std::shared_ptr<procdump2_ctx>, size_t);
     void restore(drakvuf_trap_info_t*, x86_registers_t&);
     void save_file_metadata(std::shared_ptr<procdump2_ctx>, proc_data_t*);
     bool start_copy_memory(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
