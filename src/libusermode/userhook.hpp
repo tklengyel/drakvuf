@@ -266,7 +266,9 @@ public:
     {
         for (const auto& [pattern, wanted_hooks] : hooks)
         {
-            if (dll_name.find(pattern) != std::string::npos)
+            if ((pattern == "*.dll" && dll_name.find(".dll") != std::string::npos) ||
+                std::search(dll_name.begin(), dll_name.end(), pattern.begin(), pattern.end(),
+                    [](char x, char y){return std::toupper(x) == std::toupper(y);}) != dll_name.end())
             {
                 std::for_each(std::begin(wanted_hooks), std::end(wanted_hooks), visitor);
             }
