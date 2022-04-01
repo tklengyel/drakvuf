@@ -105,7 +105,9 @@
 #ifndef LIBINJECTOR_PRIVATE_H
 #define LIBINJECTOR_PRIVATE_H
 
+#ifdef HAVE_CONFIG_H
 #include <config.h>
+#endif
 
 #ifndef PRINT_DEBUG
 #ifdef DRAKVUF_DEBUG
