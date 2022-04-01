@@ -186,6 +186,7 @@ private:
     addr_t resume_process_va{0};
     addr_t copy_virt_mem_va{0};
     addr_t current_irql_va{0};
+    addr_t delay_execution_va{0};
 
     /* Minidump info */
     // TODO Move to function
@@ -216,6 +217,7 @@ private:
     void get_irql(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     void resume(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     void suspend(drakvuf_trap_info_t*, addr_t, return_ctx&);
+    void delay_execution(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
 
     /* Routines */
     std::shared_ptr<procdump2_ctx> continues_task(drakvuf_trap_info_t*);

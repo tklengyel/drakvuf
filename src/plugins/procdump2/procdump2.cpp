@@ -155,6 +155,8 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
         get_function_va("ntoskrnl.exe", "PsResumeProcess");
     this->copy_virt_mem_va =
         get_function_va("ntoskrnl.exe", "MmCopyVirtualMemory");
+    this->delay_execution_va =
+        get_function_va("ntoskrnl.exe", "KeDelayExecutionThread");
     if (is32bit && VMI_OS_WINDOWS_7 == winver)
     {
         json_object* hal_profile = json_object_from_file(config->hal_profile);
@@ -629,12 +631,11 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
         }
         break;
         case procdump_stage::invalid:
-        case procdump_stage::target_fail:
+        case procdump_stage::target_wakeup:
         case procdump_stage::timeout:
         default:
             // TODO Resume target process?
             restore(info, ctx->working.regs);
-            finish_task(info, ctx);
             this->working_threads.erase(info->attached_proc_data.tid);
     }
 }
@@ -849,6 +850,38 @@ bool procdump2::dispatch_wakeup(
             else
                 finish_task(info, ctx);
             return true;
+        case procdump_stage::target_wakeup:
+            if (this->working_threads.find(ctx->working.ret_tid) !=
+                this->working_threads.end())
+            {
+                // The working thread is active - keep alive
+                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                    "Suspended %s process wake up while not finished but "
+                    "working thread still active - keep alive\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid
+                    , info->attached_proc_data.tid
+                    , ctx->target_process_pid, static_cast<int>(ctx->stage)
+                    , is_target ? "target" : "host"
+                );
+                delay_execution(info, ctx);
+            }
+            else
+            {
+                // The working thread is active - keep alive
+                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                    "Suspended %s process wake up while not finished and "
+                    "working thread finished - finish the task\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid
+                    , info->attached_proc_data.tid
+                    , ctx->target_process_pid, static_cast<int>(ctx->stage)
+                    , is_target ? "target" : "host"
+                );
+                restore(info, ctx->target.regs);
+                finish_task(info, ctx);
+            }
+            return true;
         default:
             if (is_target)
             {
@@ -868,8 +901,8 @@ bool procdump2::dispatch_wakeup(
                 }
                 else
                 {
-                    ctx->stage = procdump_stage::target_fail;
-                    restore(info, ctx->target.regs);
+                    ctx->stage = procdump_stage::target_wakeup;
+                    dispatch_wakeup(info, ctx, is_target);
                 }
             }
             else
@@ -1021,6 +1054,33 @@ void procdump2::suspend(drakvuf_trap_info_t* info, addr_t target_process_base, r
     ctx.ret_pid = info->attached_proc_data.pid;
     ctx.ret_rsp = info->regs->rsp;
     ctx.ret_tid = info->attached_proc_data.tid;
+}
+
+void procdump2::delay_execution(drakvuf_trap_info_t* info, std::shared_ptr<procdump2_ctx> ctx)
+{
+    struct argument args[3] = {};
+    uint64_t interval = 1000000; // 100 ms
+
+    init_int_argument(&args[0], 0); // KernelMode
+    init_int_argument(&args[1], 1); // Alertable
+    init_struct_argument(&args[2], interval);
+
+    auto vmi = vmi_lock_guard(drakvuf);
+    if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 3))
+    {
+        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+            "Failed to inject KeDelayExecutionThread\n"
+            , info->event_uid
+            , info->attached_proc_data.pid, info->attached_proc_data.tid
+            , ctx->target_process_pid, static_cast<int>(ctx->stage)
+        );
+        throw -1;
+    }
+
+    info->regs->rip = delay_execution_va;
+    ctx->target.ret_pid = info->attached_proc_data.pid;
+    ctx->target.ret_rsp = info->regs->rsp;
+    ctx->target.ret_tid = info->attached_proc_data.tid;
 }
 
 /*****************************************************************************
