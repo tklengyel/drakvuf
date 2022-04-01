@@ -174,7 +174,7 @@ enum class procdump_stage
     resume,           // 7
     awaken,           // 8
     finished,         // 9
-    target_fail,      // 10
+    target_wakeup,    // 10
     timeout,          // 11
     invalid           // 12
 };
@@ -227,7 +227,7 @@ struct procdump2_ctx
     string    target_process_name;
     vmi_pid_t target_process_pid{0};
 
-    const uint8_t TARGET_RESUSPEND_COUNT_MAX{5};
+    const uint8_t TARGET_RESUSPEND_COUNT_MAX{3};
     uint8_t target_resuspend_count{0};
 
     /* Data */
@@ -287,7 +287,7 @@ struct procdump2_ctx
                 return "Success";
             case procdump_stage::timeout:
                 return "Timeout";
-            case procdump_stage::target_fail:
+            case procdump_stage::target_wakeup:
                 return "WakeUp";
             case procdump_stage::prepare_minidump:
                 return "PrepareMinidump";
