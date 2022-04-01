@@ -102,10 +102,7 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <glib.h>
 #include <inttypes.h>
-#include <libvmi/libvmi.h>
 #include <assert.h>
 
 #include "filetracer.h"

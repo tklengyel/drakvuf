@@ -102,15 +102,10 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
 #include <iostream>
 #include <stdexcept>
-#include <glib.h>
 #include <inttypes.h>
-#include <libvmi/libvmi.h>
-#include <libvmi/peparse.h>
 #include <assert.h>
-#include <libdrakvuf/json-util.h>
 
 #include "plugins/output_format.h"
 #include "apimon.h"

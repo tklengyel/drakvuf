@@ -3,7 +3,7 @@ libinjector_h = include_directories(
     'linux', 'linux/methods',
     'win', 'win/methods'
 )
-libinjector = static_library('libinjector',
+libinjector = static_library('injector',
     'injector.c',
     'debug_helpers.c',
     'injector_stack.c',
@@ -26,7 +26,7 @@ libinjector = static_library('libinjector',
     'linux/methods/linux_shellcode.c',
     'linux/methods/linux_write_file.c',
 
-    dependencies : [glib, libvmi],
+    dependencies : deps,
     include_directories : libinjector_h,
     link_with : libdrakvuf
 )

@@ -103,21 +103,19 @@
 ***************************************************************************/
 
 #include <glib.h>
-#include <config.h>
 #include <inttypes.h>
 #include <sys/stat.h>
-#include <libvmi/x86.h>
 #include <cassert>
 #include <sstream>
 #include <string>
 
-#include "../plugins.h"
-#include "fileextractor.h"
-#include "plugins/output_format.h"
-#include "private.h"
-
 #include <libinjector/libinjector.h>
-#include <libdrakvuf/json-util.h>
+
+#include "plugins/plugins.h"
+#include "plugins/output_format.h"
+
+#include "fileextractor.h"
+#include "private.h"
 
 using std::ostringstream;
 using std::string;

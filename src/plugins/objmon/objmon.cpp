@@ -102,7 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -114,12 +113,12 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <dirent.h>
-#include <glib.h>
 #include <err.h>
 
-#include <libvmi/libvmi.h>
-#include "objmon.h"
+#include "plugins/plugins.h"
 #include "plugins/output_format.h"
+
+#include "objmon.h"
 
 /*
 NTSYSAPI NTSTATUS ZwDuplicateObject(

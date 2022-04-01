@@ -111,7 +111,6 @@
  *    - YES: read string and remove trap
  */
 
-#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -124,7 +123,6 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <dirent.h>
-#include <glib.h>
 #include <err.h>
 
 #include <byteswap.h>
@@ -133,11 +131,11 @@
 #include <iostream>
 #include <cassert>
 
-#include <libvmi/libvmi.h>
 #include "plugins/plugins.h"
+#include "plugins/output_format.h"
+
 #include "private.h"
 #include "socketmon.h"
-#include "plugins/output_format.h"
 
 #define IPV4_ADDR_OFFSET 4
 #define IPV6_ADDR_OFFSET 8

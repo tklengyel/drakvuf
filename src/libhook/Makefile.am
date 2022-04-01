@@ -110,7 +110,6 @@ sources += hooks/cr3.hpp hooks/cr3.cpp
 sources += hooks/cpuid.hpp hooks/cpuid.cpp
 sources += call_result.hpp
 sources += libhook.hpp
-sources += private.h
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(CPPFLAGS)

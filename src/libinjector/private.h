@@ -109,31 +109,9 @@
 #include <config.h>
 #endif
 
-#ifndef PRINT_DEBUG
-#ifdef DRAKVUF_DEBUG
-// defined in libdrakvuf
-extern bool verbose;
-
-#define PRINT_DEBUG(args...) \
-    do { \
-        if(verbose) fprintf (stderr, args); \
-    } while (0)
-
-#else
-
-#define PRINT_DEBUG(args...) \
-    do {} while(0)
-
-#endif /* DRAKVUF_DEBUG */
-#endif /* PRINT_DEBUG */
-
-#define ARRAY_SIZE(arr) sizeof((arr)) / sizeof((arr)[0])
-
 #ifdef __clang_analyzer__
 #define vmi_free_unicode_str g_free
 #endif
-
-#define UNUSED(x) (void)(x)
 
 injector_status_t injector_start_app_on_linux(drakvuf_t drakvuf,
     vmi_pid_t pid,

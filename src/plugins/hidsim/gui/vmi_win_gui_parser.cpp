@@ -110,6 +110,8 @@
 #include <wchar.h>
 #include <string.h>
 
+#include "plugins.h"
+
 /* Offset retrieval */
 #include "vmi_win_gui_offsets.h"
 #include "vmi_win_gui_atoms.h"

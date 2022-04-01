@@ -102,16 +102,13 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <glib.h>
 #include <inttypes.h>
-#include <libvmi/libvmi.h>
-#include <libvmi/peparse.h>
 #include <assert.h>
-#include <libdrakvuf/json-util.h>
+
+#include "plugins/plugins.h"
+#include "plugins/output_format.h"
 
 #include "memdump.h"
-#include "plugins/output_format.h"
 #include "private.h"
 
 #define DUMP_NAME_PLACEHOLDER "(not configured)"
