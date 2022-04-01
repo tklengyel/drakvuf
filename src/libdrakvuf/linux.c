@@ -102,7 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
 #include <stdlib.h>
 #include <sys/prctl.h>
 #include <string.h>

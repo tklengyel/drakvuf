@@ -56,3 +56,7 @@ ylwrap
 
 # librepl
 src/librepl/libdrakvuf.py
+
+# meson
+build/*
+clang_output*
