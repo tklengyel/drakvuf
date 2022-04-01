@@ -1,0 +1,20 @@
+libdrakvuf = static_library('libdrakvuf',
+    'drakvuf.c',
+    'vmi.c',
+    'helper.c',
+    'json-profile.c',
+    'json-util.c',
+    'linux-exports.c',
+    'linux-processes.c',
+    'linux.c',
+    'os.c',
+    'win-exports.c',
+    'win-files.c',
+    'win-handles.c',
+    'win-processes.c',
+    'win-registry.c',
+    'win.c',
+
+    dependencies : [glib, libvmi, jsonc],
+    link_with : xen_helper
+)
