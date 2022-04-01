@@ -102,7 +102,7 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <libinjector/libinjector.h>
+#include "libinjector.h"
 #include "private.h"
 
 injector_status_t injector_start_app(

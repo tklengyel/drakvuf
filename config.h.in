@@ -1,0 +1,2 @@
+#define PACKAGE_NAME    "@name@"
+#define PACKAGE_VERSION "@version@"
