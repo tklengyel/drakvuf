@@ -184,7 +184,7 @@ struct DataPrinter
     template <class Tv = T>
     static bool print(std::ostream& os, const fmt::Qstr<Tv>& data, char)
     {
-        os << '"' << data.value << '"';
+        os << '"' << g_strescape(data.value.data(), nullptr) << '"';
         return true;
     }
 
