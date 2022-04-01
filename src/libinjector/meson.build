@@ -1,5 +1,5 @@
 libinjector_h = include_directories(
-    '..',
+    '..', '../..',
     'linux', 'linux/methods',
     'win', 'win/methods'
 )
