@@ -234,6 +234,9 @@ jobs:
 
       - name: Build with meson
         run: |
+          export CC=clang-10
+          export CXX=clang++-10
+
           meson build
           ninja -C build
 

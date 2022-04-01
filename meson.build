@@ -1,6 +1,8 @@
-project('drakvuf', 'c', 'cpp')
+project('drakvuf', 'c', 'cpp', version : '1.0')
 add_project_arguments('-DPACKAGE_NAME="drakvuf"', language : 'c')
 add_project_arguments('-DPACKAGE_VERSION="1.0"', language : 'c')
+
+subdir('mesontest')
 
 glib = dependency('glib-2.0')
 libvmi = dependency('libvmi')
