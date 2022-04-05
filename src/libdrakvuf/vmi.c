@@ -477,7 +477,7 @@ static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
         pass->gfn = event->mem_event.gfn;
         pass->pa = pa;
         pass->traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(pass->gfn));
-        pass->remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &pass->gfn);
+        pass->remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, GSIZE_TO_POINTER(pass->gfn));
 
         event->slat_id = 0;
 
@@ -594,7 +594,8 @@ static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
             {
                 pass->traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(pass->gfn));
                 if ( pass->traps )
-                    pass->remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &pass->gfn);
+                    pass->remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns,
+                        GSIZE_TO_POINTER(pass->gfn));
             }
         }
         else
@@ -1039,7 +1040,8 @@ void remove_trap(drakvuf_t drakvuf,
 
             if (!container->traps)
             {
-                struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &current_gfn);
+                struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns,
+                    GSIZE_TO_POINTER(current_gfn));
                 if ( !remapped_gfn )
                 {
                     fprintf(stderr, "Critical error in removing int3\n");
@@ -1106,7 +1108,8 @@ void remove_trap(drakvuf_t drakvuf,
                     PRINT_DEBUG("Removed memtrap for GFN 0x%lx in altp2m view %u\n",
                         container->memaccess.gfn, drakvuf->altp2m_idx);
 
-                    struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &container->memaccess.gfn);
+                    struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns,
+                        GSIZE_TO_POINTER(container->memaccess.gfn));
                     if ( remapped_gfn )
                         remapped_gfn->active = 0;
 
@@ -1295,7 +1298,8 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     container->breakpoint.pa = pa;
 
     /* Let's see if we have already created the shadow copy of this page */
-    struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns, &current_gfn);
+    struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns,
+        GSIZE_TO_POINTER(current_gfn));
 
     if ( !remapped_gfn )
     {
@@ -1316,7 +1320,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         }
 
         g_hash_table_insert(drakvuf->remapped_gfns,
-            &remapped_gfn->o,
+            GSIZE_TO_POINTER(remapped_gfn->o),
             remapped_gfn);
     }
 
@@ -1464,7 +1468,7 @@ err_exit:
     if ( container->traps )
         g_slist_free(container->traps);
     if ( remapped_gfn )
-        g_hash_table_remove(drakvuf->remapped_gfns, &remapped_gfn->o);
+        g_hash_table_remove(drakvuf->remapped_gfns, GSIZE_TO_POINTER(remapped_gfn->o));
     g_slice_free(struct wrapper, container);
     return 0;
 }
@@ -1742,7 +1746,7 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
     drakvuf->breakpoint_lookup_trap = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
     drakvuf->memaccess_lookup_gfn = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, free_wrapper);
     drakvuf->memaccess_lookup_trap = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
-    drakvuf->remapped_gfns = g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free_remapped_gfn);
+    drakvuf->remapped_gfns = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, free_remapped_gfn);
     drakvuf->remove_traps = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
 
     unsigned int i;
@@ -1955,7 +1959,7 @@ void close_vmi(drakvuf_t drakvuf)
     if (drakvuf->remapped_gfns)
     {
         GHashTableIter i;
-        xen_pfn_t* key;
+        gpointer key;
         struct remapped_gfn* remapped_gfn = NULL;
         ghashtable_foreach(drakvuf->remapped_gfns, i, key, remapped_gfn)
         {
