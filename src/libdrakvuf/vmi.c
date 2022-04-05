@@ -281,7 +281,7 @@ static event_response_t _post_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
      * The trap may have been removed since in another callback,
      * in which case we have nothing to do.
      */
-    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &pass->gfn);
+    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, GSIZE_TO_POINTER(pass->gfn));
     if (!s)
     {
         PRINT_DEBUG("Post mem cb @ 0x%lx has been cleared\n", pass->gfn);
@@ -488,7 +488,8 @@ static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
             VMI_EVENT_RESPONSE_SLAT_ID;
     }
 
-    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &event->mem_event.gfn);
+    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn,
+                            GSIZE_TO_POINTER(event->mem_event.gfn));
     if (!s)
     {
         PRINT_DEBUG("Event has been cleared for GFN 0x%lx but we are still in view %u\n",
@@ -557,7 +558,7 @@ static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
     process_free_requests(drakvuf);
 
     // Check if we have traps still active on this page
-    s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &event->mem_event.gfn);
+    s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, GSIZE_TO_POINTER(event->mem_event.gfn));
     if (s)
     {
         /*
@@ -1110,7 +1111,7 @@ void remove_trap(drakvuf_t drakvuf,
                         remapped_gfn->active = 0;
 
                     g_hash_table_remove(drakvuf->memaccess_lookup_trap, trap);
-                    g_hash_table_remove(drakvuf->memaccess_lookup_gfn, &container->memaccess.gfn);
+                    g_hash_table_remove(drakvuf->memaccess_lookup_gfn, GSIZE_TO_POINTER(container->memaccess.gfn));
 
                 }
                 return;
@@ -1185,7 +1186,8 @@ void remove_trap(drakvuf_t drakvuf,
 
 bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
 {
-    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn, &trap->memaccess.gfn);
+    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn,
+                            GSIZE_TO_POINTER(trap->memaccess.gfn));
 
     // We already have a trap registered on this page
     // check if type matches, if so, add trap to the list
@@ -1247,7 +1249,7 @@ bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
             return 0;
         }
 
-        g_hash_table_insert(drakvuf->memaccess_lookup_gfn, g_memdup_compat(&s->memaccess.gfn, sizeof(addr_t)), s);
+        g_hash_table_insert(drakvuf->memaccess_lookup_gfn, GSIZE_TO_POINTER(s->memaccess.gfn), s);
         g_hash_table_insert(drakvuf->memaccess_lookup_trap, trap, s);
     }
 
@@ -1738,7 +1740,7 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
     drakvuf->breakpoint_lookup_pa = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, free_wrapper);
     drakvuf->breakpoint_lookup_gfn = g_hash_table_new(g_direct_hash, g_direct_equal);
     drakvuf->breakpoint_lookup_trap = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
-    drakvuf->memaccess_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free_wrapper);
+    drakvuf->memaccess_lookup_gfn = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, free_wrapper);
     drakvuf->memaccess_lookup_trap = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
     drakvuf->remapped_gfns = g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free_remapped_gfn);
     drakvuf->remove_traps = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
@@ -1912,7 +1914,7 @@ void close_vmi(drakvuf_t drakvuf)
     if (drakvuf->memaccess_lookup_gfn)
     {
         GHashTableIter i;
-        addr_t* key = NULL;
+        gpointer key = NULL;
         struct wrapper* s = NULL;
         ghashtable_foreach(drakvuf->memaccess_lookup_gfn, i, key, s)
         {
