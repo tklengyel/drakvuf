@@ -219,12 +219,11 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
     GSList* loop = (GSList*)pass->traps;
     while (loop)
     {
-
-        addr_t* pa = (addr_t*)loop->data;
         uint8_t test = 0;
-        struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, pa);
+        addr_t pa = GPOINTER_TO_SIZE(loop->data);
+        struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, loop->data);
 
-        if ( VMI_FAILURE == vmi_read_8_pa(vmi, *pa, &test) )
+        if ( VMI_FAILURE == vmi_read_8_pa(vmi, pa, &test) )
         {
             fprintf(stderr, "Critical error in re-copying remapped gfn\n");
             drakvuf->interrupted = -1;
@@ -233,7 +232,7 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
 
         if ( test == bp )
         {
-            PRINT_DEBUG("Double-trap at 0x%lx\n", *pa);
+            PRINT_DEBUG("Double-trap at 0x%lx\n", pa);
             s->breakpoint.doubletrap = 1;
         }
         else
@@ -244,16 +243,16 @@ static bool refresh_shadow_copy(vmi_instance_t vmi, struct memcb_pass* pass)
              * If a write was observed near or at a breakpoint we automatically
              * fall back to memory access permission based monitoring.
              */
-            if ( pass->pa < *pa && pass->pa >= *pa-14 )
+            if ( pass->pa < pa && pass->pa >= pa-14 )
             {
-                PRINT_DEBUG("Write happened near a breakpoint at 0x%lx, switching to mem X-based monitoring\n", *pa);
+                PRINT_DEBUG("Write happened near a breakpoint at 0x%lx, switching to mem X-based monitoring\n", pa);
                 remove_trap(drakvuf, &s->breakpoint.guard);
                 s->breakpoint.guard.memaccess.access |= VMI_MEMACCESS_X;
                 if ( !inject_trap_mem(drakvuf, &s->breakpoint.guard, 0) )
                     drakvuf->interrupted = -1;
 
             }
-            else if ( VMI_FAILURE == vmi_write_8_pa(vmi, (pass->remapped_gfn->r << 12) + (*pa & VMI_BIT_MASK(0, 11)), &bp) )
+            else if ( VMI_FAILURE == vmi_write_8_pa(vmi, (pass->remapped_gfn->r << 12) + (pa & VMI_BIT_MASK(0, 11)), &bp) )
             {
                 fprintf(stderr, "Failed to set breakpoint in post_mem_cb!\n");
                 drakvuf->interrupted = -1;
@@ -532,7 +531,8 @@ static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
     /* We need to call breakpoint handlers registered for this physical address */
     if (event->mem_event.out_access & VMI_MEMACCESS_X)
     {
-        struct wrapper* sbp = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
+        struct wrapper* sbp = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa,
+                                GSIZE_TO_POINTER(pa));
         if (sbp)
         {
             PRINT_DEBUG("Simulated INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64"\n",
@@ -656,7 +656,8 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
         event->interrupt_event.gla, event->interrupt_event.insn_length);
 #endif
 
-    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
+    struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa,
+                            GSIZE_TO_POINTER(pa));
     if (!s)
     {
         /*
@@ -751,7 +752,7 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
     process_free_requests(drakvuf);
 
     // Check if we have traps still active on this breakpoint
-    if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa) )
+    if ( g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(pa)) )
     {
         PRINT_DEBUG("Switching altp2m and to singlestep on vcpu %u\n", event->vcpu_id);
         event->slat_id = 0;
@@ -1027,7 +1028,7 @@ void remove_trap(drakvuf_t drakvuf,
 
             /* Update list of traps on this gfn */
             GSList* traps_on_gfn = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &_current_gfn);
-            traps_on_gfn = g_slist_remove(traps_on_gfn, &container->breakpoint.pa);
+            traps_on_gfn = g_slist_remove(traps_on_gfn, GSIZE_TO_POINTER(container->breakpoint.pa));
             g_hash_table_remove(drakvuf->breakpoint_lookup_gfn, &_current_gfn);
 
             if ( traps_on_gfn )
@@ -1084,7 +1085,7 @@ void remove_trap(drakvuf_t drakvuf,
                     }
                 }
 
-                g_hash_table_remove(drakvuf->breakpoint_lookup_pa, &container->breakpoint.pa);
+                g_hash_table_remove(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(container->breakpoint.pa));
             }
 
             break;
@@ -1263,7 +1264,8 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     // check if already marked
     vmi_instance_t vmi = drakvuf->vmi;
     xen_pfn_t current_gfn = pa >> 12;
-    struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa, &pa);
+    struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa,
+                                    GSIZE_TO_POINTER(pa));
 
     if (container)
     {
@@ -1273,7 +1275,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
         container->traps = g_slist_prepend(container->traps, trap);
 
         GSList* traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &current_gfn);
-        traps = g_slist_append(traps, &container->breakpoint.pa);
+        traps = g_slist_append(traps, GSIZE_TO_POINTER(container->breakpoint.pa));
 
         /* this should never happen but at least it makes some static analyzers happy */
         if ( 1 == g_slist_length(traps) )
@@ -1447,12 +1449,12 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 
     // list of traps on this page
     GSList* traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, &current_gfn);
-    traps = g_slist_append(traps, &container->breakpoint.pa);
+    traps = g_slist_append(traps, GSIZE_TO_POINTER(container->breakpoint.pa));
 
     // save trap location into lookup tree
     uint64_t _current_gfn = current_gfn;
     g_hash_table_insert(drakvuf->breakpoint_lookup_gfn, g_memdup_compat(&_current_gfn, sizeof(uint64_t)), traps);
-    g_hash_table_insert(drakvuf->breakpoint_lookup_pa, g_memdup_compat(&container->breakpoint.pa, sizeof(addr_t)), container);
+    g_hash_table_insert(drakvuf->breakpoint_lookup_pa, GSIZE_TO_POINTER(container->breakpoint.pa), container);
     g_hash_table_insert(drakvuf->breakpoint_lookup_trap, trap, container);
 
     PRINT_DEBUG("\t\tTrap added @ PA 0x%" PRIx64 " RPA 0x%" PRIx64 " Page %" PRIu64 " for %s.\n",
@@ -1736,7 +1738,7 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
     PRINT_DEBUG("Max GPFN: 0x%lx\n", drakvuf->max_gpfn);
 
     // Crete tables to lookup breakpoints
-    drakvuf->breakpoint_lookup_pa = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free_wrapper);
+    drakvuf->breakpoint_lookup_pa = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, free_wrapper);
     drakvuf->breakpoint_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, NULL);
     drakvuf->breakpoint_lookup_trap = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
     drakvuf->memaccess_lookup_gfn = g_hash_table_new_full(g_int64_hash, g_int64_equal, free, free_wrapper);
@@ -1940,7 +1942,7 @@ void close_vmi(drakvuf_t drakvuf)
     if (drakvuf->breakpoint_lookup_pa)
     {
         GHashTableIter i;
-        addr_t* key = NULL;
+        gpointer key = NULL;
         struct wrapper* s = NULL;
         ghashtable_foreach(drakvuf->breakpoint_lookup_pa, i, key, s)
         {
