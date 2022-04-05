@@ -489,7 +489,7 @@ static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
     }
 
     struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn,
-                            GSIZE_TO_POINTER(event->mem_event.gfn));
+            GSIZE_TO_POINTER(event->mem_event.gfn));
     if (!s)
     {
         PRINT_DEBUG("Event has been cleared for GFN 0x%lx but we are still in view %u\n",
@@ -533,7 +533,7 @@ static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
     if (event->mem_event.out_access & VMI_MEMACCESS_X)
     {
         struct wrapper* sbp = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa,
-                                GSIZE_TO_POINTER(pa));
+                GSIZE_TO_POINTER(pa));
         if (sbp)
         {
             PRINT_DEBUG("Simulated INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64"\n",
@@ -595,7 +595,7 @@ static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
                 pass->traps = (GSList*)g_hash_table_lookup(drakvuf->breakpoint_lookup_gfn, GSIZE_TO_POINTER(pass->gfn));
                 if ( pass->traps )
                     pass->remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns,
-                        GSIZE_TO_POINTER(pass->gfn));
+                            GSIZE_TO_POINTER(pass->gfn));
             }
         }
         else
@@ -659,7 +659,7 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
 #endif
 
     struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa,
-                            GSIZE_TO_POINTER(pa));
+            GSIZE_TO_POINTER(pa));
     if (!s)
     {
         /*
@@ -1041,7 +1041,7 @@ void remove_trap(drakvuf_t drakvuf,
             if (!container->traps)
             {
                 struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns,
-                    GSIZE_TO_POINTER(current_gfn));
+                        GSIZE_TO_POINTER(current_gfn));
                 if ( !remapped_gfn )
                 {
                     fprintf(stderr, "Critical error in removing int3\n");
@@ -1109,7 +1109,7 @@ void remove_trap(drakvuf_t drakvuf,
                         container->memaccess.gfn, drakvuf->altp2m_idx);
 
                     struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns,
-                        GSIZE_TO_POINTER(container->memaccess.gfn));
+                            GSIZE_TO_POINTER(container->memaccess.gfn));
                     if ( remapped_gfn )
                         remapped_gfn->active = 0;
 
@@ -1190,7 +1190,7 @@ void remove_trap(drakvuf_t drakvuf,
 bool inject_trap_mem(drakvuf_t drakvuf, drakvuf_trap_t* trap, bool guard2)
 {
     struct wrapper* s = (struct wrapper*)g_hash_table_lookup(drakvuf->memaccess_lookup_gfn,
-                            GSIZE_TO_POINTER(trap->memaccess.gfn));
+            GSIZE_TO_POINTER(trap->memaccess.gfn));
 
     // We already have a trap registered on this page
     // check if type matches, if so, add trap to the list
@@ -1269,7 +1269,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
     vmi_instance_t vmi = drakvuf->vmi;
     xen_pfn_t current_gfn = pa >> 12;
     struct wrapper* container = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa,
-                                    GSIZE_TO_POINTER(pa));
+            GSIZE_TO_POINTER(pa));
 
     if (container)
     {
@@ -1299,7 +1299,7 @@ bool inject_trap_pa(drakvuf_t drakvuf,
 
     /* Let's see if we have already created the shadow copy of this page */
     struct remapped_gfn* remapped_gfn = (struct remapped_gfn*)g_hash_table_lookup(drakvuf->remapped_gfns,
-        GSIZE_TO_POINTER(current_gfn));
+            GSIZE_TO_POINTER(current_gfn));
 
     if ( !remapped_gfn )
     {
