@@ -110,7 +110,6 @@
 #include <inttypes.h>
 #include <string.h>
 #include <unistd.h>
-#include <glib.h>
 #include <exception>
 #include <memory>
 
@@ -133,11 +132,11 @@ void timeout_handler(int signal)
     drakvuf->interrupt(SIGDRAKVUFTIMEOUT);
 }
 
-static inline bool disable_plugin(char* optarg, bool* plugin_list)
+static inline bool disable_plugin(char* _optarg, bool* plugin_list)
 {
     for (int i=0; i<__DRAKVUF_PLUGIN_LIST_MAX; i++)
     {
-        if (!strcmp(optarg, drakvuf_plugin_names[i]))
+        if (!strcmp(_optarg, drakvuf_plugin_names[i]))
         {
             plugin_list[i] = false;
             return true;
@@ -153,7 +152,7 @@ static inline void disable_all_plugins(bool* plugin_list)
         plugin_list[i] = false;
 }
 
-static inline bool enable_plugin(char* optarg, bool* plugin_list, bool* disabled_all)
+static inline bool enable_plugin(char* _optarg, bool* plugin_list, bool* disabled_all)
 {
     if (!*disabled_all)
     {
@@ -162,7 +161,7 @@ static inline bool enable_plugin(char* optarg, bool* plugin_list, bool* disabled
     }
     for (int i = 0; i < __DRAKVUF_PLUGIN_LIST_MAX; i++)
     {
-        if (!strcmp(optarg, drakvuf_plugin_names[i]))
+        if (!strcmp(_optarg, drakvuf_plugin_names[i]))
         {
             plugin_list[i] = true;
             return true;
@@ -378,7 +377,6 @@ int main(int argc, char** argv)
     bool plugin_list[] = {[0 ... __DRAKVUF_PLUGIN_LIST_MAX-1] = 1};
     bool wait_stop_plugins = false;
     int wait_stop_plugins_timeout = 0;
-    bool verbose = false;
     bool leave_paused = false;
     bool libvmi_conf = false;
     bool fast_singlestep = false;
@@ -885,7 +883,7 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = std::make_unique<drakvuf_c>(domain, json_kernel_path, json_wow_path, output, verbose, leave_paused, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl, libdrakvuf_get_userid);
+        drakvuf = std::make_unique<drakvuf_c>(domain, json_kernel_path, json_wow_path, output, leave_paused, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl, libdrakvuf_get_userid);
     }
     catch (const std::exception& e)
     {

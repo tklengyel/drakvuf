@@ -120,15 +120,10 @@
 #include <string>
 #include <iostream>
 #include <stdexcept>
-
-#include <config.h>
-#include <glib.h>
 #include <inttypes.h>
-#include <libvmi/libvmi.h>
-#include <libvmi/peparse.h>
-#include <libdrakvuf/private.h>
-#include <libusermode/userhook.hpp>
 #include <assert.h>
+
+#include <libusermode/userhook.hpp>
 
 #include "memdump.h"
 #include "private.h"

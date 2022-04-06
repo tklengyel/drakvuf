@@ -143,6 +143,7 @@ void print_stack(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t addr)
 
 void print_registers(drakvuf_trap_info_t* info)
 {
+#ifdef DRAKVUF_DEBUG
     const char* fmt = "%s:\t%016lx\n";
     PRINT_DEBUG(fmt, "rax",    info->regs->rax);
     PRINT_DEBUG(fmt, "rcx",    info->regs->rcx);
@@ -168,4 +169,5 @@ void print_registers(drakvuf_trap_info_t* info)
     PRINT_DEBUG(fmt, "cr2",    info->regs->cr2);
     PRINT_DEBUG(fmt, "cr3",    info->regs->cr3);
     PRINT_DEBUG(fmt, "cr4",    info->regs->cr4);
+#endif
 }

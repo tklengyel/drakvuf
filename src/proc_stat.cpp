@@ -102,8 +102,11 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <map>
+#ifdef HAVE_CONFIG_H
 #include <config.h>
+#endif
+
+#include <map>
 #include <libdrakvuf/libdrakvuf.h>
 
 /*
@@ -130,9 +133,9 @@ static void close_handler(int sig)
     drakvuf_interrupt(drakvuf, sig);
 }
 
-static bool is_interrupted(drakvuf_t drakvuf, void*)
+static bool is_interrupted(drakvuf_t _drakvuf, void*)
 {
-    return drakvuf_is_interrupted(drakvuf);
+    return drakvuf_is_interrupted(_drakvuf);
 }
 
 int main(int argc, char** argv)
@@ -181,7 +184,7 @@ int main(int argc, char** argv)
 
 
     /* initialize the Drakvuf library */
-    if (!drakvuf_init(&drakvuf, domain, profile, NULL, false, false, 0, false, UNLIMITED_TTL, true))
+    if (!drakvuf_init(&drakvuf, domain, profile, NULL, false, 0, false, UNLIMITED_TTL, true))
     {
         printf("Failed to initialize Drakvuf\n");
         goto done;

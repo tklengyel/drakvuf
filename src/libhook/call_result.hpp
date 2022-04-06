@@ -105,7 +105,6 @@
 
 #include <libdrakvuf/libdrakvuf.h>
 #include <libhook/hooks/base.hpp>
-#include <libhook/private.h>
 
 namespace libhook
 {

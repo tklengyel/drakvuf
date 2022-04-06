@@ -102,16 +102,15 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
 #include <array>
 #include <sstream>
 #include <inttypes.h>
 #include <sys/stat.h>
-#include <libvmi/libvmi.h>
+
+#include "plugins/output_format.h"
 
 #include "ipt.h"
 #include "filesystem.hpp"
-#include "plugins/output_format.h"
 #include "private.h"
 
 namespace

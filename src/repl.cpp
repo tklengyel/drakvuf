@@ -109,9 +109,8 @@
 #include <signal.h>
 #include <unistd.h>
 
-#include <libvmi/libvmi.h>
-#include <librepl/librepl.h>
 #include <libdrakvuf/libdrakvuf.h>
+#include <librepl/librepl.h>
 
 static drakvuf_t drakvuf;
 
@@ -133,9 +132,9 @@ static inline void print_help(void)
     );
 }
 
-static bool is_interrupted(drakvuf_t drakvuf, void*)
+static bool is_interrupted(drakvuf_t _drakvuf, void*)
 {
-    return drakvuf_is_interrupted(drakvuf);
+    return drakvuf_is_interrupted(_drakvuf);
 }
 
 int main(int argc, char** argv)
@@ -145,7 +144,6 @@ int main(int argc, char** argv)
     char* json_kernel_path = NULL;
     char* domain = NULL;
     bool libvmi_conf = false;
-    bool verbose = 0;
     addr_t kpgd = 0;
 
     if (argc < 4)
@@ -195,7 +193,7 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, verbose, libvmi_conf, kpgd, false, UNLIMITED_TTL, true))
+    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, libvmi_conf, kpgd, false, UNLIMITED_TTL, true))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
         return 1;

@@ -108,16 +108,13 @@
 #include <fstream>
 #include <sstream>
 
-#include <config.h>
-#include <glib.h>
 #include <inttypes.h>
-#include <libvmi/libvmi.h>
-#include <libvmi/peparse.h>
-#include <libdrakvuf/private.h>
 #include <assert.h>
 #include <vector>
 #include <map>
 #include <string>
+
+#include "plugins.h"
 
 // Magic value found in rsaenh.dll
 // some internal pointers are xored with this mask

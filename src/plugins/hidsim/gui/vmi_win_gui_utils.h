@@ -111,8 +111,6 @@
 #include <libvmi/libvmi.h>
 #include "vmi_win_gui_offsets.h"
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
-
 extern struct Offsets symbol_offsets;
 
 /*

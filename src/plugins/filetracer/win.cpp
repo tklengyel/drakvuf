@@ -102,7 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -114,15 +113,14 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <dirent.h>
-#include <glib.h>
 #include <err.h>
 #include <algorithm>
 #include <assert.h>
 #include <sstream>
 
-#include <libvmi/libvmi.h>
 #include "plugins/plugins.h"
 #include "plugins/output_format.h"
+
 #include "private.h"
 #include "win.h"
 #include "win_acl.h"
