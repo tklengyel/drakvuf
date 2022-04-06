@@ -425,67 +425,67 @@ public:
     [[nodiscard]]
     std::unique_ptr<libhook::ManualHook> createManualHook(drakvuf_trap_t* info, drakvuf_trap_free_t free_routine);
 
-    template<typename Params>
+    template<typename Params = PluginResult>
     [[nodiscard]]
     std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, hook_cb_t cb);
 
-    template<typename Params>
+    template<typename Params = PluginResult>
     [[nodiscard]]
     std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, hook_cb_t cb, int ttl);
 
-    template<typename Params, typename Callback>
+    template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
     std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, Callback cb);
 
-    template<typename Params, typename Callback>
+    template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
     std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, Callback cb, int ttl);
 
-    template<typename Params>
+    template<typename Params = PluginResult>
     [[nodiscard]]
     std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, hook_cb_t cb);
 
-    template<typename Params>
+    template<typename Params = PluginResult>
     [[nodiscard]]
     std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, hook_cb_t cb, int ttl);
 
-    template<typename Params, typename Callback>
+    template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
     std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, Callback cb);
 
-    template<typename Params, typename Callback>
+    template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
     std::unique_ptr<libhook::SyscallHook> createSyscallHook(const std::string& syscall_name, Callback cb, int ttl);
 
-    template<typename Params>
+    template<typename Params = PluginResult>
     [[nodiscard]]
     std::unique_ptr<libhook::Cr3Hook> createCr3Hook(hook_cb_t cb);
 
-    template<typename Params>
+    template<typename Params = PluginResult>
     [[nodiscard]]
     std::unique_ptr<libhook::Cr3Hook> createCr3Hook(hook_cb_t cb, int ttl);
 
-    template<typename Params, typename Callback>
+    template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
     std::unique_ptr<libhook::Cr3Hook> createCr3Hook(Callback cb);
 
-    template<typename Params, typename Callback>
+    template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
     std::unique_ptr<libhook::Cr3Hook> createCr3Hook(Callback cb, int ttl);
 
-    template<typename Params>
+    template<typename Params = PluginResult>
     [[nodiscard]]
     std::unique_ptr<libhook::CpuidHook> createCpuidHook(hook_cb_t cb);
 
-    template<typename Params>
+    template<typename Params = PluginResult>
     [[nodiscard]]
     std::unique_ptr<libhook::CpuidHook> createCpuidHook(hook_cb_t cb, int ttl);
 
-    template<typename Params, typename Callback>
+    template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
     std::unique_ptr<libhook::CpuidHook> createCpuidHook(Callback cb);
 
-    template<typename Params, typename Callback>
+    template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
     std::unique_ptr<libhook::CpuidHook> createCpuidHook(Callback cb, int ttl);
 
