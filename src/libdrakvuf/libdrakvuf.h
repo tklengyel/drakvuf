@@ -122,9 +122,22 @@ extern "C" {
 #include <libvmi/libvmi.h>
 #include <libvmi/libvmi_extra.h>
 #include <libvmi/events.h>
+#include <libvmi/x86.h>
 #include <json-c/json.h>
 
-#define NUMBER_OF(x) ( sizeof(x) / sizeof(x[0]) )
+#ifdef DRAKVUF_DEBUG
+extern bool verbose;
+#define PRINT_DEBUG(...) \
+    do { \
+        if(verbose) { eprint_current_time(); fprintf (stderr, __VA_ARGS__); } \
+    } while (0)
+#else
+#define PRINT_DEBUG(...) do {} while(0)
+#endif
+
+#define UNUSED(x)       (void)(x)
+#define NUMBER_OF(x)    (sizeof(x) / sizeof(x[0]))
+#define ARRAY_SIZE(arr) NUMBER_OF(arr)
 
 /*---------------------------------------------------------
  * DRAKVUF functions
@@ -381,7 +394,6 @@ bool drakvuf_init (drakvuf_t* drakvuf,
     const char* domain,
     const char* json_profile,
     const char* json_wow_profile,
-    const bool verbose,
     const bool libvmi_conf,
     const addr_t kpgd,
     const bool fast_singlestep,

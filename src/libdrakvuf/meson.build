@@ -1,6 +1,6 @@
 incdir = include_directories('../..')
 
-libdrakvuf = static_library('libdrakvuf',
+libdrakvuf = static_library('drakvuf',
     'drakvuf.c',
     'vmi.c',
     'helper.c',
@@ -19,5 +19,6 @@ libdrakvuf = static_library('libdrakvuf',
 
     include_directories : incdir,
     dependencies : [glib, libvmi, jsonc],
-    link_with : xen_helper
+    link_with : xen_helper,
+    link_args : hardened_link_args
 )

@@ -115,29 +115,10 @@
 #include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
-#include <glib.h>
 
 #include <libdrakvuf/libdrakvuf.h>
 #include <plugins/plugins.h>
 #include <libinjector/libinjector.h>
-
-#ifndef PRINT_DEBUG
-#ifdef DRAKVUF_DEBUG
-// This is defined in libdrakvuf
-extern bool verbose;
-
-#define UNUSED(x) (void)(x)
-#define PRINT_DEBUG(...) \
-    do { \
-        if(verbose) { eprint_current_time(); fprintf (stderr, __VA_ARGS__); } \
-    } while (0)
-
-#else
-#define PRINT_DEBUG(...)
-#define UNUSED(...)
-
-#endif // DRAKVUF_DEBUG
-#endif // PRINT_DEBUG
 
 class drakvuf_c
 {
@@ -156,7 +137,6 @@ public:
         const char* json_kernel_path,
         const char* json_wow_path,
         output_format_t output,
-        bool verbose,
         bool leave_paused,
         bool libvmi_conf,
         addr_t kpgd,

@@ -176,7 +176,6 @@ int main(int argc, char** argv)
     char* binary_path = NULL;
     char* target_process = NULL;
     injection_method_t injection_method = INJECT_METHOD_CREATEPROC;
-    bool verbose = 0;
     bool libvmi_conf = false;
     bool wait_for_exit = false;
     const char* args[10] = {};
@@ -302,7 +301,7 @@ int main(int argc, char** argv)
     sigaction(SIGINT, &act, NULL);
     sigaction(SIGALRM, &act, NULL);
 
-    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, verbose, libvmi_conf, kpgd, false, UNLIMITED_TTL, true))
+    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, NULL, libvmi_conf, kpgd, false, UNLIMITED_TTL, true))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", domain);
         return 1;

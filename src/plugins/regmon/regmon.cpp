@@ -102,20 +102,17 @@
 *                                                                         *
 ***************************************************************************/
 
-#include <glib.h>
-#include <config.h>
 #include <inttypes.h>
-#include <libvmi/x86.h>
 #include <assert.h>
-
-#include "../plugins.h"
-#include "regmon.h"
-#include "plugins/output_format.h"
-
 #include <vector>
 #include <string>
 #include <sstream>
 #include <iomanip>
+
+#include "plugins/plugins.h"
+#include "plugins/output_format.h"
+
+#include "regmon.h"
 
 enum RegistryValueTypes
 {

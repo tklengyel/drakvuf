@@ -165,15 +165,11 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     g_free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool _verbose, bool libvmi_conf, addr_t kpgd, bool fast_singlestep, uint64_t limited_traps_ttl, bool get_userid)
+bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool libvmi_conf, addr_t kpgd, bool fast_singlestep, uint64_t limited_traps_ttl, bool get_userid)
 {
 
     if ( !domain )
         return 0;
-
-#ifdef DRAKVUF_DEBUG
-    verbose = _verbose;
-#endif
 
     *drakvuf = (drakvuf_t)g_try_malloc0(sizeof(struct drakvuf));
 

@@ -105,15 +105,19 @@
 #ifndef DRAKVUF_PLUGINS_H
 #define DRAKVUF_PLUGINS_H
 
+#ifdef HAVE_CONFIG_H
 #include <config.h>
+#endif
+
 #include <array>
 #include <memory>
+#include <unordered_map>
 #include <stdlib.h>
 #include <inttypes.h>
 #include <sys/time.h>
-#include <libdrakvuf/libdrakvuf.h>
 
-#include <unordered_map>
+#include <libdrakvuf/libdrakvuf.h>
+#include <libdrakvuf/json-util.h>
 
 struct plugins_options
 {

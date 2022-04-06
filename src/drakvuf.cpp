@@ -106,14 +106,14 @@
 #include <stdexcept>
 #include <errno.h>
 
-static bool startup_timer(drakvuf_c* drakvuf, int timeout)
+static bool startup_timer(drakvuf_c* drakvuf, int _timeout)
 {
     drakvuf->interrupted = 0;
-    drakvuf->timeout = timeout;
+    drakvuf->timeout = _timeout;
 
     struct itimerval it =
     {
-        .it_value.tv_sec = timeout
+        .it_value.tv_sec = _timeout
     };
 
     if ( setitimer(ITIMER_REAL, &it, NULL) )
@@ -193,9 +193,9 @@ static bool is_stopped(drakvuf_t drakvuf, void* data)
     }
 }
 
-void drakvuf_c::plugin_stop_loop(int timeout, const bool* plugin_list)
+void drakvuf_c::plugin_stop_loop(int _timeout, const bool* plugin_list)
 {
-    if ( !startup_timer(this, timeout) )
+    if ( !startup_timer(this, _timeout) )
         return;
 
     struct stop_plugins_data data;
@@ -209,7 +209,6 @@ drakvuf_c::drakvuf_c(const char* domain,
     const char* json_kernel_path,
     const char* json_wow_path,
     output_format_t output,
-    bool verbose,
     bool leave_paused,
     bool libvmi_conf,
     addr_t kpgd,
@@ -219,7 +218,7 @@ drakvuf_c::drakvuf_c(const char* domain,
     : leave_paused{ leave_paused }
     , format{ output }
 {
-    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, verbose, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl, libdrakvuf_get_userid))
+    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl, libdrakvuf_get_userid))
     {
         drakvuf_close(drakvuf, leave_paused);
         throw std::runtime_error("drakvuf_init() failed");
@@ -316,10 +315,10 @@ injector_status_t drakvuf_c::write_file(
     uint32_t injection_tid,
     const char* src,
     const char* dst,
-    int timeout,
+    int _timeout,
     bool global_search)
 {
-    if ( !startup_timer(this, timeout) )
+    if ( !startup_timer(this, _timeout) )
         return INJECTOR_FAILED;
 
     auto rc = injector_start_app(drakvuf,
@@ -354,13 +353,13 @@ injector_status_t drakvuf_c::inject_cmd(
     injection_method_t method,
     const char* binary_path,
     const char* target_process,
-    int timeout,
+    int _timeout,
     bool global_search,
     int args_count,
     const char* args[],
     vmi_pid_t* injected_pid)
 {
-    if ( !startup_timer(this, timeout) )
+    if ( !startup_timer(this, _timeout) )
         return INJECTOR_FAILED;
 
     auto rc = injector_start_app(drakvuf,

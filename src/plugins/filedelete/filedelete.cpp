@@ -103,21 +103,20 @@
 ***************************************************************************/
 
 #include <glib.h>
-#include <config.h>
 #include <inttypes.h>
-#include <libvmi/x86.h>
 #include <cassert>
 #include <sstream>
 #include <string>
 
-#include "../plugins.h"
-#include "../plugin_utils.h"
-#include "filedelete.h"
-#include "plugins/output_format.h"
-#include "private.h"
-
 #include <libinjector/libinjector.h>
 #include <libdrakvuf/json-util.h>
+
+#include "plugins/plugins.h"
+#include "plugins/plugin_utils.h"
+#include "plugins/output_format.h"
+
+#include "filedelete.h"
+#include "private.h"
 
 using std::ostringstream;
 using std::string;

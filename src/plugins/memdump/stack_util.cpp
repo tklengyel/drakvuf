@@ -102,9 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <config.h>
-#include <libvmi/libvmi.h>
-
 #include "memdump.h"
 #include "private.h"
 

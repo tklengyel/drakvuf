@@ -102,16 +102,14 @@
 *                                                                         *
 ***************************************************************************/
 
-#include <glib.h>
-#include <config.h>
 #include <inttypes.h>
-#include <libvmi/x86.h>
 #include <assert.h>
 
 #include <libdrakvuf/ntstatus.h>
 
-#include "../plugins.h"
+#include "plugins/plugins.h"
 #include "plugins/output_format.h"
+
 #include "procmon.h"
 #include "winnt.h"
 #include "privileges.h"
