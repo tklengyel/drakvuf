@@ -6,7 +6,8 @@ project('DRAKVUF (C) Tamas K Lengyel 2014-2022', 'c', 'cpp',
             'strip=true',
             'default_library=static',
             'warning_level=2',
-            'werror=true'
+            'werror=true',
+            'b_pie=true'
         ]
 )
 
@@ -59,7 +60,6 @@ if get_option('hardening')
     add_project_arguments('-fstack-protector-all', language : ['c', 'cpp'])
     add_project_arguments('--param', language : ['c', 'cpp'])
     add_project_arguments('ssp-buffer-size=1', language : ['c', 'cpp'])
-    add_project_arguments('-fPIE', language : ['c', 'cpp'])
 
     hardened_link_args += '-Wl,-z,noexecstack'
     hardened_link_args += '-Wl,-z,relro'
