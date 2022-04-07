@@ -578,7 +578,7 @@ Plugin* get_trap_plugin(const drakvuf_trap_info_t* info)
 template<typename Params>
 std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, hook_cb_t cb)
 {
-    return createReturnHook<Params, hook_cb_t>(info, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
+    return createReturnHook<Params>(info, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
 }
 
 template<typename Params>
@@ -617,7 +617,7 @@ std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_inf
 template<typename Params>
 std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::string& syscall_name, hook_cb_t cb)
 {
-    return createSyscallHook<Params, hook_cb_t>(syscall_name, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
+    return createSyscallHook<Params>(syscall_name, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
 }
 
 template<typename Params>
@@ -656,7 +656,7 @@ std::unique_ptr<libhook::SyscallHook> pluginex::createSyscallHook(const std::str
 template<typename Params>
 std::unique_ptr<libhook::Cr3Hook> pluginex::createCr3Hook(hook_cb_t cb)
 {
-    return createCr3Hook<Params, hook_cb_t>(cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
+    return createCr3Hook<Params>(cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
 }
 
 template<typename Params>
@@ -695,7 +695,7 @@ std::unique_ptr<libhook::Cr3Hook> pluginex::createCr3Hook(Callback cb, int ttl)
 template<typename Params>
 std::unique_ptr<libhook::CpuidHook> pluginex::createCpuidHook(hook_cb_t cb)
 {
-    return createCpuidHook<Params, hook_cb_t>(cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
+    return createCpuidHook<Params>(cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
 }
 
 template<typename Params>
