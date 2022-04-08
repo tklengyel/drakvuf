@@ -6,7 +6,8 @@ project('DRAKVUF (C) Tamas K Lengyel 2014-2022', 'c', 'cpp',
             'strip=true',
             'default_library=static',
             'warning_level=2',
-            'werror=true'
+            'werror=true',
+            'b_pie=true'
         ]
 )
 
@@ -22,10 +23,13 @@ libvmi = dependency('libvmi')
 jsonc = dependency('json-c')
 deps = [glib, libvmi, jsonc]
 
+version = meson.project_version()
+if not get_option('release')
+    version += '-' + run_command('git', 'describe', '--always', check: true).stdout().strip()
+endif
+
 # Setup for generating config.h
 add_project_arguments('-DHAVE_CONFIG_H', language : ['c', 'cpp'])
-version = meson.project_version()
-version += '-' + run_command('git', 'describe', '--always', check: true).stdout().strip()
 config_h = configuration_data()
 config_h.set_quoted('PACKAGE_NAME','DRAKVUF')
 config_h.set_quoted('PACKAGE_VERSION', version)
@@ -59,7 +63,6 @@ if get_option('hardening')
     add_project_arguments('-fstack-protector-all', language : ['c', 'cpp'])
     add_project_arguments('--param', language : ['c', 'cpp'])
     add_project_arguments('ssp-buffer-size=1', language : ['c', 'cpp'])
-    add_project_arguments('-fPIE', language : ['c', 'cpp'])
 
     hardened_link_args += '-Wl,-z,noexecstack'
     hardened_link_args += '-Wl,-z,relro'
@@ -113,9 +116,10 @@ executable('proc_stat',
     dependencies : deps,
     link_language : 'cpp',
     link_with : libdrakvuf,
+    link_args : hardened_link_args
 )
 
-if get_option('xtf').enabled()
+if get_option('xtf')
     executable('xtf',
                'src/xtf.c',
 
@@ -125,7 +129,7 @@ if get_option('xtf').enabled()
     )
 endif
 
-if get_option('repl').enabled()
+if get_option('repl')
     executable('repl',
                'src/repl.cpp',
 
@@ -138,8 +142,8 @@ endif
 summary({
     'buildtype': get_option('buildtype'),
     'Hardening': get_option('hardening'),
-    'XTF': get_option('xtf').enabled(),
-    'REPL': get_option('repl').enabled(),
+    'XTF': get_option('xtf'),
+    'REPL': get_option('repl'),
 }, section: 'Configuration')
 
 summary({
