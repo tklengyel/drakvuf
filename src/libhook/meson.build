@@ -9,7 +9,7 @@ libhook = static_library('hook',
     'hooks/cr3.cpp',
     'hooks/cpuid.cpp',
 
-    dependencies : [glib, libvmi],
+    dependencies : deps,
     include_directories : libhook_h,
     link_with : libdrakvuf
 )

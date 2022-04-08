@@ -6,7 +6,7 @@ libusermode = static_library('usermode',
     'running.cpp',
     'printers/printers.cpp',
 
-    dependencies : [glib, libvmi],
+    dependencies : deps,
     include_directories : libusermode_h,
     link_with : libdrakvuf
 )
