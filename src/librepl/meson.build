@@ -1,4 +1,4 @@
-if get_option('repl').enabled()
+if get_option('repl')
 
     python3 = dependency('python3')
     python3embed = dependency('python3-embed')

@@ -102,8 +102,6 @@
  *                                                                         *
  ***************************************************************************/
 #include <libdrakvuf/libdrakvuf.h>
-#include <libvmi/libvmi.h>
-#include <libdrakvuf/private.h>
 #include <plugins/plugins_ex.h>
 #include <plugins/output_format.h>
 #include <mutex>

@@ -23,10 +23,13 @@ libvmi = dependency('libvmi')
 jsonc = dependency('json-c')
 deps = [glib, libvmi, jsonc]
 
+version = meson.project_version()
+if not get_option('release')
+    version += '-' + run_command('git', 'describe', '--always', check: true).stdout().strip()
+endif
+
 # Setup for generating config.h
 add_project_arguments('-DHAVE_CONFIG_H', language : ['c', 'cpp'])
-version = meson.project_version()
-version += '-' + run_command('git', 'describe', '--always', check: true).stdout().strip()
 config_h = configuration_data()
 config_h.set_quoted('PACKAGE_NAME','DRAKVUF')
 config_h.set_quoted('PACKAGE_VERSION', version)
@@ -113,9 +116,10 @@ executable('proc_stat',
     dependencies : deps,
     link_language : 'cpp',
     link_with : libdrakvuf,
+    link_args : hardened_link_args
 )
 
-if get_option('xtf').enabled()
+if get_option('xtf')
     executable('xtf',
                'src/xtf.c',
 
@@ -125,7 +129,7 @@ if get_option('xtf').enabled()
     )
 endif
 
-if get_option('repl').enabled()
+if get_option('repl')
     executable('repl',
                'src/repl.cpp',
 
@@ -138,8 +142,8 @@ endif
 summary({
     'buildtype': get_option('buildtype'),
     'Hardening': get_option('hardening'),
-    'XTF': get_option('xtf').enabled(),
-    'REPL': get_option('repl').enabled(),
+    'XTF': get_option('xtf'),
+    'REPL': get_option('repl'),
 }, section: 'Configuration')
 
 summary({

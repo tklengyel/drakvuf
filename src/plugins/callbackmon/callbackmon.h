@@ -104,7 +104,6 @@
 #pragma once
 
 #include "plugins/plugins_ex.h"
-#include "private.h"
 
 struct callbackmon_config
 {
