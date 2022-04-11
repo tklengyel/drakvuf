@@ -205,7 +205,7 @@ static void print_usage()
         "\t                           Wait for plugins to stop before termination loop\n"
         "\t -a <plugin>               Activate the specified plugin\n"
         "\t -p                        Leave domain paused after DRAKVUF exits\n"
-        "\t -F                        Enable fast singlestepping (requires Xen 4.14+)\n"
+        "\t -F, --fast-singlestep     Enable fast singlestepping (requires Xen 4.14+)\n"
         "\t --traps-ttl <ttl value>   Maximum number of times trap can be triggered in 10sec period. Protects against api hammering.\n"
 #if defined(ENABLE_PLUGIN_FILEDELETE) || defined(ENABLE_PLUGIN_FILEEXTRACTOR)
         "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
@@ -535,7 +535,7 @@ int main(int argc, char** argv)
         {"libdrakvuf-not-get-userid", no_argument, NULL, opt_libdrakvuf_not_get_userid},
         {NULL, 0, NULL, 0}
     };
-    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hF:C";
+    const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hFC";
 
     while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
         switch (c)
