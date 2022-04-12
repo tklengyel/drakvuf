@@ -29,11 +29,12 @@ option('plugin-apimon', type : 'boolean', value : true)
 option('plugin-rpcmon', type : 'boolean', value : true)
 option('plugin-tlsmon', type : 'boolean', value : true)
 option('plugin-codemon', type : 'boolean', value : true)
-option('plugin-explitmon', type : 'boolean', value : true)
+option('plugin-exploitmon', type : 'boolean', value : true)
 option('plugin-rootkitmon', type : 'boolean', value : true)
 option('plugin-spraymon', type : 'boolean', value : true)
 option('plugin-hidsim', type : 'boolean', value : true)
 option('plugin-callbackmon', type : 'boolean', value : true)
+option('plugin-delaymon', type : 'boolean', value : true)
 
 # Disabled by default plugins
 option('plugin-libhooktest', type : 'boolean', value : 'false')
