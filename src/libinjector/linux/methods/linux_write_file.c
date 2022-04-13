@@ -178,8 +178,6 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = (injector_t)info->trap->data;
 
-    event_response_t event;
-
     switch (injector->step)
     {
         case STEP1: // Finds vdso and sets up mmap
@@ -195,9 +193,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
                 return cleanup(drakvuf, info, false);
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP2: // open file handle
         {
@@ -211,8 +207,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     S_IRWXU | S_IRWXG | S_IRWXO))
                 return cleanup(drakvuf, info, true);
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP3: // verify fd and write the first chunk
         {
@@ -229,8 +224,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                     injector->virtual_memory_addr, injector->buffer.len))
                 return cleanup(drakvuf, info, true);
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP4: // loop till all chunks are written and then close the fd
         {
@@ -245,6 +239,8 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 PRINT_DEBUG("Write file successful\n");
                 if (!setup_close_syscall(injector, info->regs, injector->fd))
                     return cleanup(drakvuf, info, true);
+
+                injector->rc = INJECTOR_SUCCEEDED;
             }
             else
             {
@@ -259,8 +255,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 injector->step = STEP4;
             }
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP5: // restore the registers
         {
@@ -274,8 +269,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             // restore regs
             memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP6: // cleanup
         {
@@ -283,10 +277,9 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             // remove the initial trap here
             free_bp_trap(drakvuf, injector, info->trap);
-            drakvuf_interrupt(drakvuf, SIGINT);
+            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
 
-            event = VMI_EVENT_RESPONSE_NONE;
-            break;
+            return VMI_EVENT_RESPONSE_NONE;
         }
         default:
         {
@@ -295,7 +288,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
-    return event;
+    return VMI_EVENT_RESPONSE_NONE;
 
 }
 

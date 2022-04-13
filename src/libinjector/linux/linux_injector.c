@@ -408,8 +408,16 @@ injector_status_t injector_start_app_on_linux(
     if (init_injector(injector))
     {
         inject(drakvuf, injector);
-        injector->result = INJECT_RESULT_SUCCESS;
-        injector->rc = INJECTOR_SUCCEEDED;
+        if (injector->rc == INJECTOR_TIMEOUTED)
+            injector->result = INJECT_RESULT_TIMEOUT;
+        else if (injector->rc == INJECTOR_SUCCEEDED)
+            injector->result = INJECT_RESULT_SUCCESS;
+        else
+        {
+            // TODO: Handle other cases
+            injector->rc = INJECTOR_SUCCEEDED;
+            injector->result = INJECT_RESULT_SUCCESS;
+        }
     }
     else
     {

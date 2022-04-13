@@ -154,7 +154,7 @@ injector_status_t injector_start_app(
                 app,
                 binary_path,
                 method,
-                OUTPUT_DEFAULT,
+                format,
                 args_count,
                 args);
     }
