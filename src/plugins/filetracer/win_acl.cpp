@@ -603,7 +603,10 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
                 break;
 
             case OUTPUT_KV:
-                fmt << ",Type=\"" << type << "\"," << hex << showbase << mask << ",SID=\"" << sid << '"';
+                fmt << ",Type=\"" << type << "\"";
+                if (!mask.empty())
+                    fmt << "," << hex << showbase << mask;
+                fmt << ",SID=\"" << sid << '"';
                 break;
 
             case OUTPUT_JSON:
