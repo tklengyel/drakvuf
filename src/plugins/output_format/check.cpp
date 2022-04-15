@@ -247,7 +247,11 @@ START_TEST(test_kvfmt_function_printer)
     std::stringstream ss;
     bool result = false;
 
-    auto printer = [](std::ostream& os) { os << "x"; return true; };
+    auto printer = [](std::ostream& os)
+    {
+        os << "x";
+        return true;
+    };
     result = kvfmt::print_data(ss, printer, ',');
     ck_assert_msg(ss.str() == std::string("x"), nullptr);
     ck_assert_msg(result == true, nullptr);
