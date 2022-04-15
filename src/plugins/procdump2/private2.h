@@ -179,6 +179,11 @@ enum class procdump_stage
     invalid           // 12
 };
 
+int to_int(procdump_stage stage)
+{
+    return static_cast<int>(stage);
+}
+
 struct return_ctx
 {
     vmi_pid_t ret_pid{0};
@@ -191,16 +196,21 @@ struct return_ctx
 // TODO Move stage transition logic here
 struct procdump2_ctx
 {
+private:
+    bool m_timeout{false};
+    procdump_stage m_stage{procdump_stage::pending};
+    procdump_stage m_old_stage{procdump_stage::pending};
+
+public:
     /* Basic context */
     /* For self-terminating process working thread injects PsSuspendProcess.
      * Thus it should remove task.
      */
-    bool is_hosted = false;
+    bool is_hosted{false};
     /* Processes targeted on analysys finish are not self-terminating neither
      * hosted. So after resuming such a target should be finished.
      */
-    bool wait_awaken = true;
-    procdump_stage stage{procdump_stage::pending};
+    bool wait_awaken{true};
     return_ctx host;
     return_ctx target;
     return_ctx working;
@@ -281,12 +291,13 @@ struct procdump2_ctx
 
     const char* status()
     {
-        switch (stage)
+        if (is_timed_out())
+            return "Timeout";
+
+        switch (m_stage)
         {
             case procdump_stage::finished:
                 return "Success";
-            case procdump_stage::timeout:
-                return "Timeout";
             case procdump_stage::target_wakeup:
                 return "WakeUp";
             case procdump_stage::prepare_minidump:
@@ -296,6 +307,32 @@ struct procdump2_ctx
             default:
                 return "Fail";
         }
+    }
+
+    bool is_timed_out()
+    {
+        return m_timeout || m_stage == procdump_stage::timeout;
+    }
+
+    procdump_stage stage()
+    {
+        return m_stage;
+    }
+
+    void stage(const procdump_stage new_stage)
+    {
+        if (new_stage != m_stage)
+        {
+            if (new_stage == procdump_stage::timeout)
+                m_timeout = true;
+            m_old_stage = m_stage;
+            m_stage = new_stage;
+        }
+    }
+
+    procdump_stage old_stage()
+    {
+        return m_old_stage;
     }
 };
 
