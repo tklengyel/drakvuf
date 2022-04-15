@@ -212,7 +212,7 @@ static void print_process_creation_result(
             curdir = g_strdup("");
     }
 
-    gchar* cmdline = g_strescape(cmdline_us ? reinterpret_cast<char const*>(cmdline_us->contents) : "", NULL);
+    char const* cmdline = cmdline_us ? reinterpret_cast<char const*>(cmdline_us->contents) : "";
     char const* imagepath = imagepath_us ? reinterpret_cast<char const*>(imagepath_us->contents) : "";
     char const* dllpath = dllpath_us ? reinterpret_cast<char const*>(dllpath_us->contents) : "";
 
@@ -228,7 +228,6 @@ static void print_process_creation_result(
         keyval("CWD", fmt::Qstr(curdir))
     );
 
-    g_free(cmdline);
     g_free(curdir);
     if (cmdline_us)
         vmi_free_unicode_str(cmdline_us);

@@ -102,275 +102,275 @@
 *                                                                         *
 ***************************************************************************/
 
-#ifndef PLUGINS_OUTPUT_FORMAT_KVFMT_H
-#define PLUGINS_OUTPUT_FORMAT_KVFMT_H
+#include "kvfmt.h"
 
-#include "common.h"
+#include <check.h>
+#include <string>
 
-#include "plugins/type_traits_helpers.h"
-
-namespace kvfmt
+START_TEST(test_kvfmt_qstr_basic)
 {
+    std::stringstream ss;
+    bool result = false;
 
-template <class T>
-constexpr bool print_data(std::ostream& os, const T& data, char sep);
+    result = kvfmt::print_data(ss, fmt::Qstr("simple"), ',');
+    ck_assert_msg(ss.str() == std::string("\"simple\""), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
 
-
-template<class T, std::size_t N>
-struct TuplePrinter
+START_TEST(test_kvfmt_qstr_quoted)
 {
-    static bool print(std::ostream& os, const T& data, char sep)
-    {
-        if constexpr (N > 0)
-        {
-            bool printed_prev = TuplePrinter<T, N-1>::print(os, data, sep);
-            if (printed_prev)
-                os << sep;
-            bool printed = print_data(os, std::get<N-1>(data), sep);
-            if (!printed && printed_prev)
-                fmt::unputc(os);
-            return printed;
-        }
-        return false;
-    }
-};
+    std::stringstream ss;
+    bool result = false;
 
-template <class T, class = void, class...>
-struct DataPrinter
+    result = kvfmt::print_data(ss, fmt::Qstr("\"quoted\""), ',');
+    ck_assert_msg(ss.str() == std::string("\"\\\"quoted\\\"\""), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_qstr_multiline)
 {
+    std::stringstream ss;
+    bool result = false;
 
-    static bool print(std::ostream& os, const TimeVal& t, char)
-    {
-        auto restore_flags = fmt::RestoreFlags(os);
-        os << t.tv_sec << '.' << std::setfill('0')
-            << std::setw(6) << t.tv_usec;
-        return true;
-    }
+    result = kvfmt::print_data(ss, fmt::Qstr("line 1\r\nline 2"), ',');
+    ck_assert_msg(ss.str() == std::string("\"line 1\\r\\nline 2\""), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
 
-    template <class Tv = T>
-    static bool print(std::ostream& os, const fmt::Nval<Tv>& data, char)
-    {
-        os << data.value;
-        return true;
-    }
-
-    template <class Tv = T>
-    static bool print(std::ostream& os, const fmt::Xval<Tv>& data, char)
-    {
-        auto restore_flags = fmt::RestoreFlags(os);
-        auto base = data.withbase ? "0x" : "";
-        os << base << std::uppercase << std::hex << data.value;
-        return true;
-    }
-
-    template <class Tv = T>
-    static bool print(std::ostream& os, const fmt::Fval<Tv>& data, char)
-    {
-        auto restore_flags = fmt::RestoreFlags(os);
-        os << std::fixed << data.value;
-        return true;
-    }
-
-    template <class Tv = T>
-    static bool print(std::ostream& os, const fmt::Rstr<Tv>& data, char)
-    {
-        if (data.value.empty())
-            return false;
-
-        os << data.value;
-        return true;
-    }
-
-    template <class Tv = T>
-    static bool print(std::ostream& os, const fmt::Qstr<Tv>& data, char)
-    {
-        char const* const hexdig = "0123456789ABCDEF";
-        os << '"';
-        for (unsigned char c: data.value)
-            switch (c)
-            {
-                case '\r':
-                    os << "\\r";
-                    break;
-                case '\n':
-                    os << "\\n";
-                    break;
-                case '"':
-                    os << "\\\"";
-                    break;
-                default:
-                    if (c < ' ')
-                        os << "\\x" << hexdig[c >> 4] << hexdig[c & 0xF];
-                    else
-                        os << c;
-                    break;
-            }
-        os << '"';
-        return true;
-    }
-
-    template <class Tv = T>
-    static bool print(std::ostream& os, const std::function<bool(std::ostream&)>& printer, char)
-    {
-        auto pos = os.tellp();
-        bool printed = printer(os);
-        if (!printed)
-            os.seekp(pos);
-        return printed;
-    }
-
-    template <class Tv = T>
-    static bool print(std::ostream& os, const std::optional<Tv>& data, char sep)
-    {
-        return data.has_value() && print_data(os, data.value(), sep);
-    }
-
-    template <class Tk, class Tv>
-    static bool print(std::ostream& os, const std::pair<Tk, Tv>& data, char)
-    {
-        static_assert(
-            std::is_same_v<Tk, const char*> ||
-            std::is_same_v<std::decay_t<Tk>, std::string> ||
-            std::is_same_v<std::decay_t<Tk>, std::string_view>,
-            "Unsupported KV printer key type");
-
-        auto pos = os.tellp();
-        auto is_print_data = true;
-        if (!is_iterable<Tv>::value)
-        {
-            if (print_data(os, fmt::Rstr(data.first), 0))
-                os << '=';
-            else
-                is_print_data = false;
-        }
-
-        if (is_print_data && print_data(os, data.second, ','))
-            return true;
-
-        os.seekp(pos);
-        return false;
-    }
-
-    template <class... Ts>
-    static bool print(std::ostream& os, const std::tuple<Ts...>& data, char sep)
-    {
-        return TuplePrinter<decltype(data), sizeof...(Ts)>::print(os, data, sep);
-    }
-
-    template <class... Ts>
-    static bool print(std::ostream& os, const std::variant<Ts...>& data, char sep)
-    {
-        return std::visit([&os, sep](auto&& arg) mutable
-        {
-            return print_data(os, arg, sep);
-        }, data);
-    }
-};
-
-template <class T>
-struct DataPrinter<T, std::enable_if_t<is_iterable<T>::value, void>>
+START_TEST(test_kvfmt_qstr_windows_path)
 {
-    static bool print(std::ostream& os, const T& data, char sep)
-    {
-        if (data.empty())
-            return false;
+    std::stringstream ss;
+    bool result = false;
 
-        bool printed = false;
-        for (const auto& v : data)
-        {
-            bool printed_prev = printed;
-            if (printed)
-                os << sep;
-            printed = print_data(os, v, sep);
-            if (!printed && printed_prev)
-                fmt::unputc(os);
-        }
-        return true;
-    }
-};
+    result = kvfmt::print_data(ss, fmt::Qstr("C:\\Windows"), ',');
+    ck_assert_msg(ss.str() == std::string("\"C:\\Windows\""), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
 
-template <class T>
-constexpr bool print_data(std::ostream& os, const T& data, char sep)
+START_TEST(test_kvfmt_qstr_utf_8)
 {
-    return DataPrinter<T>::print(os, data, sep);
+    std::stringstream ss;
+    bool result = false;
+
+    result = kvfmt::print_data(ss, fmt::Qstr("простая строка"), ',');
+    ck_assert_msg(ss.str() == std::string("\"простая строка\""), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_qstr_utf_8_multiline)
+{
+    std::stringstream ss;
+    bool result = false;
+
+    result = kvfmt::print_data(ss, fmt::Qstr("строка 1\r\nстрока 2"), ',');
+    ck_assert_msg(ss.str() == std::string("\"строка 1\\r\\nстрока 2\""), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_qstr_utf_8_binary)
+{
+    std::stringstream ss;
+    bool result = false;
+
+    result = kvfmt::print_data(ss, fmt::Qstr("простая строка \x1f"), ',');
+    ck_assert_msg(ss.str() == std::string("\"простая строка \\x1F\""), "Get: %s", ss.str().data());
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_rstr_basic)
+{
+    std::stringstream ss;
+    bool result = false;
+
+    result = kvfmt::print_data(ss, fmt::Rstr("simple"), ',');
+    ck_assert_msg(ss.str() == std::string("simple"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_xval)
+{
+    std::stringstream ss;
+    bool result = false;
+
+    result = kvfmt::print_data(ss, fmt::Xval(0xA1), ',');
+    ck_assert_msg(ss.str() == std::string("0xA1"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_nval)
+{
+    std::stringstream ss;
+    bool result = false;
+
+    result = kvfmt::print_data(ss, fmt::Nval(1), ',');
+    ck_assert_msg(ss.str() == std::string("1"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_fval)
+{
+    std::stringstream ss;
+    bool result = false;
+
+    result = kvfmt::print_data(ss, fmt::Fval(1.1), ',');
+    ck_assert_msg(ss.str() == std::string("1.100000"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_timeval)
+{
+    TimeVal tv;
+    tv.tv_sec = 1;
+    tv.tv_usec = 1;
+    std::stringstream ss;
+    bool result = false;
+
+    result = kvfmt::print_data(ss, tv, ',');
+    ck_assert_msg(ss.str() == std::string("1.000001"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_function_printer)
+{
+    std::stringstream ss;
+    bool result = false;
+
+    auto printer = [](std::ostream& os) { os << "x"; return true; };
+    result = kvfmt::print_data(ss, printer, ',');
+    ck_assert_msg(ss.str() == std::string("x"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_optional)
+{
+    std::optional<fmt::Nval<int>> opt1;
+    std::optional<fmt::Nval<int>> opt2{1};
+    std::stringstream ss;
+    bool result = false;
+
+    result = kvfmt::print_data(ss, opt1, ',');
+    ck_assert_msg(ss.str() == std::string(""), nullptr);
+    ck_assert_msg(result == false, nullptr);
+
+    result = kvfmt::print_data(ss, opt2, ',');
+    ck_assert_msg(ss.str() == std::string("1"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_pair_basic)
+{
+    std::pair<const char*, fmt::Nval<int>> data("x", 1);
+    std::stringstream ss;
+    bool result = false;
+
+    result = kvfmt::print_data(ss, data, ',');
+    ck_assert_msg(ss.str() == std::string("x=1"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_pair_iterable)
+{
+    std::vector<fmt::Nval<int>> value{1, 2, 3};
+    std::pair<const char*, std::vector<fmt::Nval<int>>> data("x", value);
+    std::stringstream ss;
+    bool result = false;
+
+    result = kvfmt::print_data(ss, data, ',');
+    ck_assert_msg(ss.str() != std::string("x=1,2,3"), nullptr);
+    ck_assert_msg(ss.str() == std::string("1,2,3"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_tuple)
+{
+    std::tuple<fmt::Nval<int>, fmt::Rstr<const char*>> t1{1, "x"};
+    std::stringstream ss;
+    bool result = false;
+
+    result = kvfmt::print_data(ss, t1, ',');
+    ck_assert_msg(ss.str() == std::string("1,x"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+START_TEST(test_kvfmt_variant)
+{
+    std::variant<fmt::Nval<int>, fmt::Rstr<const char*>> v{1};
+    std::stringstream ss1, ss2;
+    bool result = false;
+
+    result = kvfmt::print_data(ss1, v, ',');
+    ck_assert_msg(ss1.str() == std::string("1"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+
+    v = "x";
+    result = kvfmt::print_data(ss2, v, ',');
+    ck_assert_msg(ss2.str() == std::string("x"), nullptr);
+    ck_assert_msg(result == true, nullptr);
+}
+END_TEST
+
+Suite* kvfmt_suite(void)
+{
+    Suite* s;
+    TCase* tc_core;
+
+    s = suite_create("KVFMT");
+
+    /* Core test case */
+    tc_core = tcase_create("Core");
+
+    tcase_add_test(tc_core, test_kvfmt_qstr_basic);
+    tcase_add_test(tc_core, test_kvfmt_qstr_quoted);
+    tcase_add_test(tc_core, test_kvfmt_qstr_multiline);
+    tcase_add_test(tc_core, test_kvfmt_qstr_windows_path);
+    tcase_add_test(tc_core, test_kvfmt_qstr_utf_8);
+    tcase_add_test(tc_core, test_kvfmt_qstr_utf_8_multiline);
+    tcase_add_test(tc_core, test_kvfmt_qstr_utf_8_binary);
+    tcase_add_test(tc_core, test_kvfmt_rstr_basic);
+    tcase_add_test(tc_core, test_kvfmt_xval);
+    tcase_add_test(tc_core, test_kvfmt_nval);
+    tcase_add_test(tc_core, test_kvfmt_fval);
+    tcase_add_test(tc_core, test_kvfmt_timeval);
+    tcase_add_test(tc_core, test_kvfmt_function_printer);
+    tcase_add_test(tc_core, test_kvfmt_optional);
+    tcase_add_test(tc_core, test_kvfmt_pair_basic);
+    tcase_add_test(tc_core, test_kvfmt_pair_iterable);
+    tcase_add_test(tc_core, test_kvfmt_tuple);
+    tcase_add_test(tc_core, test_kvfmt_variant);
+
+    suite_add_tcase(s, tc_core);
+
+    return s;
 }
 
-/**/
-
-template <class T, class... Ts>
-constexpr bool print_data(std::ostream& os, const T& data, const Ts& ... rest)
+int main(void)
 {
-    constexpr char sep = ',';
-    bool printed = print_data(os, data, sep);
-    bool printed_rest = false;
+    int number_failed;
+    Suite* s;
+    SRunner* sr;
 
-    if constexpr (sizeof...(rest) > 0)
-    {
-        if (printed)
-            os << sep;
-        printed_rest = print_data(os, rest...);
-        if (!printed_rest && printed)
-            fmt::unputc(os);
-    }
-    return printed || printed_rest;
+    s = kvfmt_suite();
+    sr = srunner_create(s);
+
+    srunner_run_all(sr, CK_NORMAL);
+    number_failed = srunner_ntests_failed(sr);
+    srunner_free(sr);
+    return (number_failed == 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
-
-/**/
-
-inline void print_common_data(std::ostream& os, drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    if (info)
-    {
-        std::optional<fmt::Rstr<decltype(info->trap->name)>> method;
-        if (info->trap->name)
-            method = fmt::Rstr(info->trap->name);
-
-        proc_data_t* proc_data = drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS ? &info->attached_proc_data : &info->proc_data;
-        print_data(os,
-            keyval("Time", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-            keyval("PID", fmt::Nval(proc_data->pid)),
-            keyval("PPID", fmt::Nval(proc_data->ppid)),
-            keyval("TID", fmt::Nval(proc_data->tid)),
-            keyval("ProcessName", fmt::Qstr(proc_data->name)),
-            keyval("Method", method)
-        );
-    }
-}
-
-template<class... Args>
-void print(const char* plugin_name, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const Args& ... args)
-{
-    fmt::cout << plugin_name << ' ';
-
-    bool printed = false;
-    if (info)
-    {
-        print_common_data(fmt::cout, drakvuf, info);
-        printed = true;
-    }
-
-    if constexpr (sizeof...(args) > 0)
-    {
-        constexpr char sep = ',';
-        if (printed)
-            fmt::cout << sep;
-        if (!print_data(fmt::cout, args...))
-            fmt::unputc(fmt::cout);
-    }
-
-    fmt::cout << std::endl;
-}
-
-inline void print_running_process(const char* plugin_name, drakvuf_t drakvuf, gint64 timestamp, proc_data_t const& proc_data)
-{
-    print(plugin_name, drakvuf, nullptr,
-        keyval("Time", TimeVal{UNPACK_TIMEVAL(timestamp)}),
-        keyval("PID", fmt::Nval(proc_data.pid)),
-        keyval("PPID", fmt::Nval(proc_data.ppid)),
-        keyval("RunningProcess", fmt::Qstr(proc_data.name))
-    );
-}
-
-} // namespace kvfmt
-
-#endif // PLUGINS_OUTPUT_FORMAT_KVFMT_H
