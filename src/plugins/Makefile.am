@@ -427,6 +427,12 @@ procmon_check_CFLAGS = $(CHECK_CFLAGS)
 procmon_check_LDADD = $(CHECK_LIBS) procmon/winnt.lo
 endif
 
+# Unit tests for output format
+check_PROGRAMS += output_format/check
+output_format_check_SOURCES = output_format/check.cpp
+output_format_check_CFLAGS = $(CHECK_CFLAGS) $(ZLIB_CFLAGS)
+output_format_check_LDADD = $(CHECK_LIBS) $(ZLIB_LIBS)
+
 TESTS = $(check_PROGRAMS)
 
 endif

@@ -103,7 +103,8 @@
 #*************************************************************************#
 
 sources =  userhook.cpp running.cpp userhook.hpp uh-private.hpp
-sources += printers/printers.hpp printers/printers.cpp
+sources += printers/printers.hpp printers/printers.cpp printers/utils.hpp \
+           printers/utils.cpp
 
 AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(CPPFLAGS)
@@ -146,3 +147,19 @@ endif
 noinst_LTLIBRARIES= libusermode.la
 libusermode_la_SOURCES= $(sources)
 libusermode_la_LIBADD = ../libdrakvuf/libdrakvuf.la
+
+if MAKE_TESTS
+
+AM_DEFAULT_SOURCE_EXT = .cpp
+
+check_PROGRAMS =
+
+# Unit tests for printers
+check_PROGRAMS += printers/check
+printers_check_SOURCES = printers/check.cpp
+printers_check_CFLAGS = $(CHECK_CFLAGS) $(ZLIB_CFLAGS)
+printers_check_LDADD = $(CHECK_LIBS) $(ZLIB_LIBS) printers/utils.lo
+
+TESTS = $(check_PROGRAMS)
+
+endif
