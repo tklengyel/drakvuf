@@ -71,6 +71,58 @@ if get_option('plugin-debugmon')
     config_h.set('ENABLE_PLUGIN_DEBUGMON', 1)
 endif
 
+if get_option('plugin-delaymon')
+    plugin_sources += 'delaymon/delaymon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_DELAYMON', 1)
+endif
+
+if get_option('plugin-dkommon')
+    plugin_sources += 'dkommon/dkommon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_DKOMMON', 1)
+endif
+
+if get_option('plugin-envmon')
+    plugin_sources += 'envmon/envmon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_ENVMON', 1)
+endif
+
+if get_option('plugin-exmon')
+    plugin_sources += 'exmon/exmon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_EXMON', 1)
+endif
+
+if get_option('plugin-exploitmon')
+    plugin_sources += 'exploitmon/exploitmon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_EXPLOITMON', 1)
+endif
+
+if get_option('plugin-filedelete')
+    plugin_sources += 'filedelete/filedelete.cpp'
+    plugin_sources += 'filedelete/filedelete2_helpers.cpp'
+
+    config_h.set('ENABLE_PLUGIN_FILEDELETE', 1)
+endif
+
+if get_option('plugin-fileextractor')
+    plugin_sources += 'fileextractor/fileextractor.cpp'
+
+    config_h.set('ENABLE_PLUGIN_FILEEXTRACTOR', 1)
+endif
+
+if get_option('plugin-filetracer')
+    plugin_sources += 'filetracer/filetracer.cpp'
+    plugin_sources += 'filetracer/linux.cpp'
+    plugin_sources += 'filetracer/win.cpp'
+    plugin_sources += 'filetracer/win_acl.cpp'
+
+    config_h.set('ENABLE_PLUGIN_FILETRACER', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -82,13 +134,23 @@ summary({
     'cpuidmon': get_option('plugin-cpuidmon'),
     'crashmon': get_option('plugin-crashmon'),
     'debugmon': get_option('plugin-debugmon'),
+    'delaymon': get_option('plugin-delaymon'),
+    'dkommon': get_option('plugin-dkommon'),
+    'envmon': get_option('plugin-envmon'),
+    'exmon': get_option('plugin-exmon'),
+    'exploitmon': get_option('plugin-exploitmon'),
+    'fileextractor': get_option('plugin-fileextractor'),
+    'filetracer': get_option('plugin-filetracer'),
 }, section: 'Plugins (-Dplugin-<x>)')
+
+summary({
+    'filedelete': get_option('plugin-filedelete'),
+}, section: 'Deprecated plugins')
 
 #################
 
 drakvuf_plugins = static_library('drakvuf_plugins',
     sources : plugin_sources,
-
     include_directories : incdir,
     dependencies : deps,
     link_with : [libdrakvuf, libhook, libusermode],
