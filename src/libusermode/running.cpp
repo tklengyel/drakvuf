@@ -267,7 +267,7 @@ event_response_t hook_process_cb(
         }
     }
 
-    userhook_plugin->pf_in_progress.erase(std::make_pair(info->proc_data.pid, info->proc_data.tid));
+    userhook_plugin->remove_pf_in_progress(info->proc_data.pid, info->proc_data.tid);
 
     // Now let's try to resolve physical address of the target function.
     addr_t func_pa = 0;
@@ -284,10 +284,10 @@ event_response_t hook_process_cb(
             }
 
             // Otherwise request page fault, exit and wait for hook_process_cb to be hit again.
+            userhook_plugin->add_pf_in_progress(info->proc_data.pid, info->proc_data.tid);
             if (VMI_SUCCESS == vmi_request_page_fault(vmi, info->vcpu, rh_data->func_addr, 0))
             {
                 rh_data->state = HOOK_PAGEFAULT_RETRY;
-                userhook_plugin->pf_in_progress.insert(std::make_pair(info->proc_data.pid, info->proc_data.tid));
                 return VMI_EVENT_RESPONSE_NONE;
             }
             else

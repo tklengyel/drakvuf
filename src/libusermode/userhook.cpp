@@ -345,7 +345,7 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
     // are available for reading otherwise vmi_translate_sym2v will fail unconditionally
     // and we will be unable to add hooks
 
-    plugin->pf_in_progress.erase(std::make_pair(proc_data.pid, proc_data.tid));
+    plugin->remove_pf_in_progress(proc_data.pid, proc_data.tid);
 
     while (dll_meta->pf_current_addr <= dll_meta->pf_max_addr)
     {
@@ -357,10 +357,10 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
             continue;
         }
 
+        plugin->add_pf_in_progress(proc_data.pid, proc_data.tid);
         if (vmi_request_page_fault(vmi, info->vcpu, dll_meta->pf_current_addr, 0) == VMI_SUCCESS)
         {
             PRINT_DEBUG("[USERHOOK] Export info not accessible, page fault %llx\n", (unsigned long long)dll_meta->pf_current_addr);
-            plugin->pf_in_progress.insert(std::make_pair(proc_data.pid, proc_data.tid));
             dll_meta->pf_current_addr += VMI_PS_4KB;
         }
         else
@@ -407,10 +407,10 @@ static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap
                 page_info_t pinfo;
                 if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pinfo) != VMI_SUCCESS)
                 {
+                    plugin->add_pf_in_progress(proc_data.pid, proc_data.tid);
                     if (vmi_request_page_fault(vmi, info->vcpu, exec_func, 0) == VMI_SUCCESS)
                     {
                         target.state = HOOK_PAGEFAULT_RETRY;
-                        plugin->pf_in_progress.insert(std::make_pair(proc_data.pid, proc_data.tid));
                         return VMI_EVENT_RESPONSE_NONE;
                     }
                     else
@@ -588,7 +588,7 @@ static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvu
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    bool our_fault = plugin->pf_in_progress.find(std::make_pair(proc_data.pid, proc_data.tid)) != plugin->pf_in_progress.end();
+    bool our_fault = plugin->is_pf_in_progress(proc_data.pid, proc_data.tid);
     if (!our_fault)
     {
         PRINT_DEBUG("[USERHOOK] Not suppressing service exception - not our fault\n");

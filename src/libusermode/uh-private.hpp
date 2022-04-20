@@ -215,8 +215,6 @@ public:
     // map pid -> list of hooked dlls
     std::map<vmi_pid_t, std::vector<dll_t>> loaded_dlls;
 
-    std::set<std::pair<vmi_pid_t, uint32_t /*thread_id*/>> pf_in_progress;
-
     static userhook& get_instance(drakvuf_t drakvuf)
     {
         static userhook instance(drakvuf);
@@ -233,6 +231,19 @@ public:
     bool add_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
     void remove_running_rh_trap(drakvuf_t drakvuf, drakvuf_trap_t* trap);
 
+    void add_pf_in_progress(vmi_pid_t pid, uint32_t tid)
+    {
+        pf_in_progress.insert(std::make_pair(pid, tid));
+    }
+    void remove_pf_in_progress(vmi_pid_t pid, uint32_t tid)
+    {
+        pf_in_progress.erase(std::make_pair(pid, tid));
+    }
+    bool is_pf_in_progress(vmi_pid_t pid, uint32_t tid)
+    {
+        return pf_in_progress.find(std::make_pair(pid, tid)) != pf_in_progress.end();
+    }
+
 private:
     userhook(drakvuf_t drakvuf); // Force get_instance().
     ~userhook();
@@ -242,6 +253,7 @@ private:
     // internaly inside library.
     std::vector<drakvuf_trap_t*> running_traps;
     std::vector<drakvuf_trap_t*> running_rh_traps;
+    std::set<std::pair<vmi_pid_t, uint32_t /*thread_id*/>> pf_in_progress;
 };
 
 
