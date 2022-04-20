@@ -43,7 +43,7 @@
  *                                                                         *
  * This list is not exclusive, but is meant to clarify our interpretation  *
  * of derived works with some common examples.  Other people may interpret *
-* the plain GPL differently, so we consider this a special exception to   *
+ * the plain GPL differently, so we consider this a special exception to   *
  * the GPL that we apply to Covered Software.  Works which meet any of     *
  * these conditions must conform to all of the terms of this license,      *
  * particularly including the GPL Section 3 requirements of providing      *
@@ -102,106 +102,26 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <stdlib.h>
-#include <sys/prctl.h>
-#include <string.h>
-#include <strings.h>
-#include <errno.h>
-#include <sys/mman.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <limits.h>
+#ifndef WIN_PROCMON_H
+#define WIN_PROCMON_H
+
 #include <glib.h>
+#include "plugins/private.h"
+#include "plugins/plugins_ex.h"
 
-#include "private.h"
-#include "linux-exports.h"
-#include "linux.h"
-#include "linux-offsets.h"
-#include "linux-offsets-map.h"
-
-addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t narg)
+class win_procmon : public pluginex
 {
-    switch (narg)
-    {
-        case 1:
-            return info->regs->rdi;
-        case 2:
-            return info->regs->rsi;
-        case 3:
-            return info->regs->rdx;
-        case 4:
-            return info->regs->rcx;
-        case 5:
-            return info->regs->r8;
-        case 6:
-            return info->regs->r9;
-    }
+public:
+    addr_t command_line;
+    addr_t image_path_name;
+    addr_t dll_path;
+    addr_t current_directory_handle;
+    addr_t current_directory_dospath;
+    addr_t cid_tid;
 
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = info->regs->rsp + narg * 8
-    );
+    win_procmon(drakvuf_t drakvuf, output_format_t output);
+    win_procmon(const win_procmon&) = delete;
+    win_procmon& operator=(const win_procmon&) = delete;
+};
 
-    uint64_t ret;
-    if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &ret))
-        return 0;
-    return ret;
-}
-
-addr_t linux_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    addr_t ret_addr;
-    if (VMI_FAILURE == vmi_read_addr_va(drakvuf->vmi, info->regs->rsp, 0, &ret_addr))
-        return 0;
-    return ret_addr;
-}
-
-bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp)
-{
-    return (info->proc_data.pid == pid)
-        && (info->proc_data.tid == tid)
-        && (!rsp || info->regs->rip == rsp);
-}
-
-static bool find_kernbase(drakvuf_t drakvuf)
-{
-    if ( VMI_FAILURE == vmi_translate_ksym2v(drakvuf->vmi, "_text", &drakvuf->kernbase) )
-        return 0;
-
-    return !!drakvuf->kernbase;
-}
-
-bool set_os_linux(drakvuf_t drakvuf)
-{
-    if ( !find_kernbase(drakvuf) )
-        return 0;
-
-    if ( !drakvuf->kpgd && VMI_FAILURE == vmi_get_offset(drakvuf->vmi, "kpgd", &drakvuf->kpgd) )
-        return 0;
-
-    // Get the offsets from the Rekall profile
-    if ( !fill_kernel_offsets(drakvuf, __LINUX_OFFSETS_MAX, linux_offset_names) )
-        return 0;
-
-    drakvuf->osi.get_current_thread = linux_get_current_thread;
-    drakvuf->osi.get_current_process = linux_get_current_process;
-    drakvuf->osi.get_process_name = linux_get_process_name;
-    drakvuf->osi.get_current_process_name = linux_get_current_process_name;
-    drakvuf->osi.get_process_userid = linux_get_process_userid;
-    drakvuf->osi.get_current_process_userid = linux_get_current_process_userid;
-    drakvuf->osi.get_current_thread_id = linux_get_current_thread_id;
-    drakvuf->osi.get_process_pid = linux_get_process_pid;
-    drakvuf->osi.get_process_tid = linux_get_process_tid;
-    drakvuf->osi.get_process_ppid = linux_get_process_ppid;
-    drakvuf->osi.get_process_data = linux_get_process_data;
-    drakvuf->osi.get_process_dtb = linux_get_process_dtb;
-    drakvuf->osi.exportsym_to_va = linux_eprocess_sym2va;
-    drakvuf->osi.export_lib_address = get_lib_address;
-    drakvuf->osi.get_function_argument = linux_get_function_argument;
-    drakvuf->osi.get_function_return_address = linux_get_function_return_address;
-    drakvuf->osi.check_return_context = linux_check_return_context;
-    drakvuf->osi.enumerate_processes = linux_enumerate_processes;
-
-    return 1;
-}
+#endif
