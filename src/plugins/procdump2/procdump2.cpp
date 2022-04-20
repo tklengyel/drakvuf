@@ -624,9 +624,10 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
              * task should be removed here.
              */
             restore(info, ctx->working.regs);
-            ctx->stage(procdump_stage::finished);
             if (ctx->stage() == procdump_stage::awaken || !ctx->wait_awaken)
                 finish_task(info, ctx);
+            else
+                ctx->stage(procdump_stage::finished);
             this->working_threads.erase(info->attached_proc_data.tid);
         }
         break;
