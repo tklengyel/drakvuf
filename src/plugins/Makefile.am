@@ -197,6 +197,7 @@ sources += procmon/procmon.cpp
 sources += procmon/procmon.h
 sources += procmon/linux.cpp
 sources += procmon/linux.h
+sources += procmon/private.h
 sources += procmon/win.cpp
 sources += procmon/win.h
 sources += procmon/winnt.cpp

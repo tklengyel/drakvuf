@@ -192,35 +192,39 @@ addr_t linux_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 }
 
 
-static void prepend_path(drakvuf_t drakvuf, addr_t path, addr_t root, GString *b)
+static void prepend_path(drakvuf_t drakvuf, addr_t path, addr_t root, GString* b)
 {
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = drakvuf->kpgd,
-                   .addr = path + drakvuf->offsets[PATH_DENTRY]);
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = path + drakvuf->offsets[PATH_DENTRY]);
     addr_t dentry;
-    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &dentry)){
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &dentry))
+    {
         PRINT_DEBUG("Can't get path->dentry from struct path\n");
         return;
     }
 
     ctx.addr = path + drakvuf->offsets[PATH_MNT];
     addr_t vfsmnt;
-    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &vfsmnt)){
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &vfsmnt))
+    {
         PRINT_DEBUG("Can't get path->mnt from struct path\n");
         return;
     }
 
     addr_t root_dentry;
     ctx.addr = root + drakvuf->offsets[PATH_DENTRY];
-    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &root_dentry)){
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &root_dentry))
+    {
         PRINT_DEBUG("Can't get root->dentry from root\n");
         return;
     }
 
     addr_t root_mnt;
     ctx.addr = root + drakvuf->offsets[PATH_MNT];
-    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &root_mnt)){
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &root_mnt))
+    {
         PRINT_DEBUG("Can't get root->mnt from root\n");
         return;
     }
@@ -229,14 +233,16 @@ static void prepend_path(drakvuf_t drakvuf, addr_t path, addr_t root, GString *b
     {
         addr_t mnt_mnt_root;
         ctx.addr = vfsmnt + drakvuf->offsets[VFSMOUNT_MNT_ROOT];
-        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &mnt_mnt_root)){
+        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &mnt_mnt_root))
+        {
             PRINT_DEBUG("Can't read path->mnt->mnt_root from vfsmnt\n");
             return;
         }
 
         addr_t dentry_parent;
         ctx.addr = dentry + drakvuf->offsets[DENTRY_D_PARENT];
-        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &dentry_parent)){
+        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &dentry_parent))
+        {
             PRINT_DEBUG("Can't read path->dentry->d_parent\n");
             return;
         }
@@ -246,7 +252,7 @@ static void prepend_path(drakvuf_t drakvuf, addr_t path, addr_t root, GString *b
             break;
 
         ctx.addr = dentry + drakvuf->offsets[DENTRY_D_NAME] + drakvuf->offsets[QSTR_NAME] + 16;
-        gchar *res = vmi_read_str(drakvuf->vmi, &ctx);
+        gchar* res = vmi_read_str(drakvuf->vmi, &ctx);
 
         g_string_prepend(b, res);
         g_string_prepend(b, "/");
@@ -255,7 +261,8 @@ static void prepend_path(drakvuf_t drakvuf, addr_t path, addr_t root, GString *b
 
         addr_t parent;
         ctx.addr = dentry + drakvuf->offsets[DENTRY_D_PARENT];
-        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &parent)){
+        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &parent))
+        {
             PRINT_DEBUG("Can't read path->dentry->d_parent\n");
             return;
         }
@@ -264,12 +271,12 @@ static void prepend_path(drakvuf_t drakvuf, addr_t path, addr_t root, GString *b
     }
 }
 
-static bool get_fs_root_rcu(drakvuf_t drakvuf, addr_t process_base, addr_t *root)
+static bool get_fs_root_rcu(drakvuf_t drakvuf, addr_t process_base, addr_t* root)
 {
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = drakvuf->kpgd,
-                   .addr = process_base + drakvuf->offsets[TASK_STRUCT_FS]);
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_FS]);
 
     addr_t fs_struct;
     if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &fs_struct))
@@ -289,7 +296,7 @@ static bool get_fs_root_rcu(drakvuf_t drakvuf, addr_t process_base, addr_t *root
  */
 static GString* d_path(drakvuf_t drakvuf, addr_t process_base, addr_t path)
 {
-    GString *b = g_string_new("");
+    GString* b = g_string_new("");
 
     addr_t root;
     if (!get_fs_root_rcu(drakvuf, process_base, &root))
@@ -305,8 +312,8 @@ char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpa
     {
         // solution: https://stackoverflow.com/questions/18658295/full-process-name-from-task-struct
         ACCESS_CONTEXT(ctx,
-                       .translate_mechanism = VMI_TM_PROCESS_DTB,
-                       .dtb = drakvuf->kpgd);
+            .translate_mechanism = VMI_TM_PROCESS_DTB,
+            .dtb = drakvuf->kpgd);
 
         ctx.addr = process_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT];
         addr_t mm_struct;
@@ -330,9 +337,9 @@ char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpa
     else
     {
         ACCESS_CONTEXT(ctx,
-                       .translate_mechanism = VMI_TM_PROCESS_PID,
-                       .pid = 0,
-                       .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]);
+            .translate_mechanism = VMI_TM_PROCESS_PID,
+            .pid = 0,
+            .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]);
 
         return vmi_read_str(drakvuf->vmi, &ctx);
     }
@@ -525,21 +532,22 @@ bool linux_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb)
     );
 
     addr_t mm;
-    if(VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &mm))
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &mm))
         return false;
 
-    if(!mm){
+    if (!mm)
+    {
         ctx.addr = process_base + drakvuf->offsets[TASK_STRUCT_ACTIVE_MMSTRUCT];
-        if(VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &mm))
+        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &mm))
             return false;
     }
 
-    if(!mm)
+    if (!mm)
         return false;
 
     addr_t pgd;
     ctx.addr = mm + drakvuf->offsets[MM_STRUCT_PGD];
-    if(VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &pgd))
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &pgd))
         return false;
 
     *dtb = pgd - PAGE_OFFSET;
@@ -547,7 +555,7 @@ bool linux_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb)
 }
 
 
-bool linux_find_process_list(drakvuf_t drakvuf, addr_t *list_head)
+bool linux_find_process_list(drakvuf_t drakvuf, addr_t* list_head)
 {
     addr_t kernel_base = drakvuf_get_kernel_base(drakvuf);
     addr_t init_task = (kernel_base - drakvuf->offsets[_TEXT]) + drakvuf->offsets[INIT_TASK];
@@ -555,12 +563,12 @@ bool linux_find_process_list(drakvuf_t drakvuf, addr_t *list_head)
     return true;
 }
 
-bool linux_find_next_process_list_entry(drakvuf_t drakvuf, addr_t current_list_entry, addr_t *next_list_entry)
+bool linux_find_next_process_list_entry(drakvuf_t drakvuf, addr_t current_list_entry, addr_t* next_list_entry)
 {
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_PID,
-                   .pid = 0,
-                   .addr = current_list_entry);
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 0,
+        .addr = current_list_entry);
     return (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, next_list_entry));
 }
 
@@ -569,7 +577,7 @@ static addr_t linux_process_list_entry_to_process(drakvuf_t drakvuf, addr_t list
     return list_entry - drakvuf->offsets[TASK_STRUCT_TASKS];
 }
 
-bool linux_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void *visitor_ctx), void *visitor_ctx)
+bool linux_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx)
 {
     addr_t list_head;
     if (!linux_find_process_list(drakvuf, &list_head))

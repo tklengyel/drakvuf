@@ -115,15 +115,17 @@ public:
     addr_t kaslr;
     output_format_t output;
 
-    drakvuf_trap_t trap[2] = {
+    drakvuf_trap_t trap[2] =
+    {
         [0 ... 1] = {
             .breakpoint.lookup_type = LOOKUP_PID,
             .breakpoint.pid = 0,
             .breakpoint.addr_type = ADDR_VA,
             .breakpoint.module = "linux",
             .type = BREAKPOINT,
-            .data = (void *)this,
-        }};
+            .data = (void*)this,
+        }
+    };
 
     linux_procmon(drakvuf_t drakvuf, output_format_t output);
     linux_procmon(const linux_procmon&) = delete;

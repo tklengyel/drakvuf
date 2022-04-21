@@ -111,16 +111,16 @@
 #include "linux.h"
 #include "plugins/output_format.h"
 
-static char *get_image_path_name(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+static char* get_image_path_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t filename_struct = drakvuf_get_function_argument(drakvuf, info, 2);
 
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = filename_struct);
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = filename_struct);
 
     addr_t name_addr;
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &name_addr))
@@ -130,14 +130,14 @@ static char *get_image_path_name(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
     return vmi_read_str(vmi, &ctx);
 }
 
-static std::string get_command_line(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+static std::string get_command_line(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t argv = drakvuf_get_function_argument(drakvuf, info, 4);
 
     auto vmi = vmi_lock_guard(drakvuf);
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3);
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3);
 
     std::string command_line;
     for (uint32_t argc = 0; argc < ARG_MAX; argc++, argv += sizeof(addr_t))
@@ -148,7 +148,7 @@ static std::string get_command_line(drakvuf_t drakvuf, drakvuf_trap_info_t *info
             break;
 
         ctx.addr = current_argv_ptr;
-        char *argument = vmi_read_str(vmi, &ctx);
+        char* argument = vmi_read_str(vmi, &ctx);
         if (argument == nullptr)
             break;
 
@@ -165,7 +165,7 @@ static std::string get_command_line(drakvuf_t drakvuf, drakvuf_trap_info_t *info
     return command_line;
 }
 
-static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     // drakvuf_get_function_argument - return incorrect value. Real envp stored in r9. Gather with debug
     addr_t envp = info->regs->r9;
@@ -173,9 +173,9 @@ static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, d
     auto vmi = vmi_lock_guard(drakvuf);
 
     ACCESS_CONTEXT(ctx,
-                   .translate_mechanism = VMI_TM_PROCESS_DTB,
-                   .dtb = info->regs->cr3,
-                   .addr = envp);
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = envp);
 
     std::map<std::string, std::string> envp_map;
 
@@ -192,7 +192,7 @@ static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, d
             break;
 
         ctx.addr = env_str_ptr;
-        char *env_string = vmi_read_str(vmi, &ctx);
+        char* env_string = vmi_read_str(vmi, &ctx);
         if (env_string == nullptr)
             break;
 
@@ -215,32 +215,32 @@ static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, d
     return envp_map;
 }
 
-static void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+static void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    linux_wrapper *lw = (linux_wrapper *)info->trap->data;
+    linux_wrapper* lw = (linux_wrapper*)info->trap->data;
 
-    const char *image_path_name = lw->image_path_name.c_str();
-    gchar *cmdline = g_strescape(!lw->command_line.empty() ? lw->command_line.c_str() : "", NULL);
+    const char* image_path_name = lw->image_path_name.c_str();
+    gchar* cmdline = g_strescape(!lw->command_line.empty() ? lw->command_line.c_str() : "", NULL);
 
-    std::vector<std::pair<std::string, fmt::Rstr<const char *>>> extra_args;
+    std::vector<std::pair<std::string, fmt::Rstr<const char*>>> extra_args;
     if (lw->envp.find("PWD") != lw->envp.end())
         extra_args.emplace_back("CWD", fmt::Rstr(lw->envp["PWD"].c_str()));
     if (lw->envp.find("OLDPWD") != lw->envp.end())
         extra_args.emplace_back("OLDCWD", fmt::Rstr(lw->envp["OLDPWD"].c_str()));
 
     fmt::print(lw->procmon->output, "procmon", drakvuf, nullptr,
-               keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-               keyval("PID", fmt::Nval(lw->pid)),
-               keyval("TID", fmt::Nval(lw->tid)),
-               keyval("PPID", fmt::Nval(lw->ppid)),
-               keyval("ProcessName", fmt::Qstr(lw->process_name)),
-               keyval("ThreadName", fmt::Qstr(lw->thread_name)),
-               keyval("Method", fmt::Qstr(info->trap->name)),
-               keyval("NewPid", fmt::Nval(lw->new_pid)),
-               keyval("NewTid", fmt::Nval(lw->new_tid)),
-               keyval("CommandLine", fmt::Qstr(cmdline)),
-               keyval("ImagePathName", fmt::Qstr(image_path_name)),
-               extra_args);
+        keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
+        keyval("PID", fmt::Nval(lw->pid)),
+        keyval("TID", fmt::Nval(lw->tid)),
+        keyval("PPID", fmt::Nval(lw->ppid)),
+        keyval("ProcessName", fmt::Qstr(lw->process_name)),
+        keyval("ThreadName", fmt::Qstr(lw->thread_name)),
+        keyval("Method", fmt::Qstr(info->trap->name)),
+        keyval("NewPid", fmt::Nval(lw->new_pid)),
+        keyval("NewTid", fmt::Nval(lw->new_tid)),
+        keyval("CommandLine", fmt::Qstr(cmdline)),
+        keyval("ImagePathName", fmt::Qstr(image_path_name)),
+        extra_args);
 
     g_free(cmdline);
 }
@@ -248,9 +248,9 @@ static void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
 /*
     exec-family
 */
-static event_response_t do_execveat_common_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+static event_response_t do_execveat_common_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    linux_wrapper *lw = (linux_wrapper *)info->trap->data;
+    linux_wrapper* lw = (linux_wrapper*)info->trap->data;
 
     // lw->new_pid/lw->new_tid store actual pid/tid of running process
     if (!drakvuf_check_return_context(drakvuf, info, lw->new_pid, lw->new_tid, lw->rsp))
@@ -263,7 +263,7 @@ static event_response_t do_execveat_common_ret_cb(drakvuf_t drakvuf, drakvuf_tra
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_info_t *info)
+static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     /*
     static int do_execveat_common(
@@ -281,15 +281,15 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
     if (!ret_addr)
         return VMI_EVENT_RESPONSE_NONE;
 
-    linux_procmon *procmon = (linux_procmon *)info->trap->data;
+    linux_procmon* procmon = (linux_procmon*)info->trap->data;
 
-    linux_wrapper *lw = new (std::nothrow) linux_wrapper;
+    linux_wrapper* lw = new (std::nothrow) linux_wrapper;
     lw->procmon = procmon;
     lw->new_pid = info->proc_data.pid;
     lw->new_tid = info->proc_data.tid;
     lw->rsp = ret_addr;
 
-    char *image_path_name = get_image_path_name(drakvuf, info);
+    char* image_path_name = get_image_path_name(drakvuf, info);
     if (nullptr != image_path_name)
         lw->image_path_name.append(image_path_name);
     g_free(image_path_name);
@@ -325,7 +325,8 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
     }
 
     proc_data_t proc_data;
-    if(!drakvuf_get_process_data(drakvuf, parent_process, &proc_data)){
+    if (!drakvuf_get_process_data(drakvuf, parent_process, &proc_data))
+    {
         PRINT_DEBUG("[PROCMON] Failed to get process data of parent process\n");
         delete lw;
         return VMI_EVENT_RESPONSE_NONE;
@@ -334,11 +335,11 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
     lw->tid = proc_data.tid;
     lw->ppid = proc_data.ppid;
 
-    if(nullptr != proc_data.name)
+    if (nullptr != proc_data.name)
         lw->process_name.append(proc_data.name);
     g_free(const_cast<char*>(proc_data.name));
 
-    char *thread_name = drakvuf_get_process_name(drakvuf, parent_process, false);
+    char* thread_name = drakvuf_get_process_name(drakvuf, parent_process, false);
     if (nullptr != thread_name)
         lw->thread_name.append(thread_name);
     g_free(thread_name);
@@ -363,7 +364,7 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static void register_trap(drakvuf_t drakvuf, const char *function_name, drakvuf_trap_t *trap, event_response_t (*hook_cb)(drakvuf_t, drakvuf_trap_info_t *info))
+static void register_trap(drakvuf_t drakvuf, const char* function_name, drakvuf_trap_t* trap, event_response_t (*hook_cb)(drakvuf_t, drakvuf_trap_info_t* info))
 {
     addr_t function_addr;
     if (!drakvuf_get_kernel_symbol_rva(drakvuf, function_name, &function_addr))

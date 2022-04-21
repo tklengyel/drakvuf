@@ -118,7 +118,7 @@ struct linux_wrapper
 
     addr_t rsp = 0;
 
-    linux_procmon *procmon;
+    linux_procmon* procmon;
     std::string process_name;
     std::string thread_name;
     std::string image_path_name;

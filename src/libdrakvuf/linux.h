@@ -139,10 +139,10 @@ addr_t linux_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t*
 
 bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
 
-bool linux_find_process_list(drakvuf_t drakvuf, addr_t *list_head);
+bool linux_find_process_list(drakvuf_t drakvuf, addr_t* list_head);
 
-bool linux_find_next_process_list_entry(drakvuf_t drakvuf, addr_t current_list_entry, addr_t *next_list_entry);
+bool linux_find_next_process_list_entry(drakvuf_t drakvuf, addr_t current_list_entry, addr_t* next_list_entry);
 
-bool linux_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void *visitor_ctx), void *visitor_ctx);
+bool linux_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx);
 
 #endif
