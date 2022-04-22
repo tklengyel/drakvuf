@@ -974,22 +974,21 @@ int main(int argc, char** argv)
             break;
     }
 
+    if (terminate && injected_pid)
+        drakvuf->terminate(injection_pid, injection_thread, injected_pid, termination_timeout, terminated_processes);
+
     PRINT_DEBUG("Beginning stop plugins\n");
 
-    bool plugins_pending = false;
     int rc = drakvuf->stop_plugins(plugin_list);
     if (rc < 0)
         return drakvuf_exit_code_t::FAIL;
-    else if (rc > 0)
-        plugins_pending = true;
+    else if (rc == 0)
+        return drakvuf_exit_code_t::SUCCESS;
 
-    if (plugins_pending && wait_stop_plugins)
+    if (wait_stop_plugins)
         drakvuf->plugin_stop_loop(wait_stop_plugins_timeout, plugin_list);
 
     PRINT_DEBUG("Finished stop plugins\n");
-
-    if (terminate && injected_pid)
-        drakvuf->terminate(injection_pid, injection_thread, injected_pid, termination_timeout, terminated_processes);
 
     return drakvuf_exit_code_t::SUCCESS;
 }
