@@ -106,6 +106,7 @@
 #include <assert.h>
 #include <map>
 #include <string>
+#include <glib.h>
 
 #include "private.h"
 #include "linux.h"
@@ -364,11 +365,11 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static void register_trap(drakvuf_t drakvuf, const char* function_name, drakvuf_trap_t* trap, event_response_t (*hook_cb)(drakvuf_t, drakvuf_trap_info_t* info))
+static bool register_trap(drakvuf_t drakvuf, const char* function_name, drakvuf_trap_t* trap, event_response_t (*hook_cb)(drakvuf_t, drakvuf_trap_info_t* info))
 {
     addr_t function_addr;
     if (!drakvuf_get_kernel_symbol_rva(drakvuf, function_name, &function_addr))
-        throw -1;
+        return false;
 
     trap->breakpoint.addr += function_addr;
     trap->name = function_name;
@@ -377,7 +378,9 @@ static void register_trap(drakvuf_t drakvuf, const char* function_name, drakvuf_
     trap->ah_cb = nullptr;
 
     if (!drakvuf_add_trap(drakvuf, trap))
-        throw -1;
+        return false;
+
+    return true;
 }
 
 linux_procmon::linux_procmon(drakvuf_t drakvuf, output_format_t output)
@@ -397,5 +400,12 @@ linux_procmon::linux_procmon(drakvuf_t drakvuf, output_format_t output)
     for (int i = 0; i < 2; i++)
         this->trap[i].breakpoint.addr = this->kaslr;
 
-    register_trap(drakvuf, "do_execveat_common.isra.0", &trap[0], do_execveat_common_cb);
+    if (!register_trap(drakvuf, "do_execveat_common.isra.0", &trap[0], do_execveat_common_cb))
+    {
+        if (!register_trap(drakvuf, "do_execveat_common", &trap[0], do_execveat_common_cb))
+        {
+            PRINT_DEBUG("[PROCMON] Method do_execveat_common not found. You are probably using an older kernel version below 5.9\n");
+            return;
+        }
+    }
 }
