@@ -195,6 +195,11 @@ endif
 if PLUGIN_PROCMON
 sources += procmon/procmon.cpp
 sources += procmon/procmon.h
+sources += procmon/linux.cpp
+sources += procmon/linux.h
+sources += procmon/private.h
+sources += procmon/win.cpp
+sources += procmon/win.h
 sources += procmon/winnt.cpp
 sources += procmon/winnt.h
 sources += procmon/privileges.cpp

@@ -195,11 +195,13 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.get_process_tid = linux_get_process_tid;
     drakvuf->osi.get_process_ppid = linux_get_process_ppid;
     drakvuf->osi.get_process_data = linux_get_process_data;
+    drakvuf->osi.get_process_dtb = linux_get_process_dtb;
     drakvuf->osi.exportsym_to_va = linux_eprocess_sym2va;
     drakvuf->osi.export_lib_address = get_lib_address;
     drakvuf->osi.get_function_argument = linux_get_function_argument;
     drakvuf->osi.get_function_return_address = linux_get_function_return_address;
     drakvuf->osi.check_return_context = linux_check_return_context;
+    drakvuf->osi.enumerate_processes = linux_enumerate_processes;
 
     return 1;
 }

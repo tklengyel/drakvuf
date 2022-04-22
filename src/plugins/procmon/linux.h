@@ -102,47 +102,34 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef LINUX_H
-#define LINUX_H
+#ifndef PROCMON_LINUX_H
+#define PROCMON_LINUX_H
 
-#include <libvmi/libvmi.h>
-#include "libdrakvuf.h"
+#include "plugins/plugins_ex.h"
+#include "plugins/private.h"
 
-addr_t linux_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+class linux_procmon
+{
+public:
+    os_t os;
+    addr_t kaslr;
+    output_format_t output;
 
-addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    drakvuf_trap_t trap[2] =
+    {
+        [0 ... 1] = {
+            .breakpoint.lookup_type = LOOKUP_PID,
+            .breakpoint.pid = 0,
+            .breakpoint.addr_type = ADDR_VA,
+            .breakpoint.module = "linux",
+            .type = BREAKPOINT,
+            .data = (void*)this,
+        }
+    };
 
-char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpath);
-
-bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid);
-
-bool linux_get_process_tid(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid);
-
-char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
-
-int64_t linux_get_process_userid(drakvuf_t drakvuf, addr_t process_base);
-
-int64_t linux_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-bool linux_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
-
-bool linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid );
-
-bool linux_get_process_data( drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data );
-
-bool linux_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb);
-
-bool linux_find_eprocess_and_pid(drakvuf_t drakvuf, vmi_pid_t find_pid, char* const find_name, drakvuf_trap_info_t* info);
-
-addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t argument_number);
-addr_t linux_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
-
-bool linux_find_process_list(drakvuf_t drakvuf, addr_t* list_head);
-
-bool linux_find_next_process_list_entry(drakvuf_t drakvuf, addr_t current_list_entry, addr_t* next_list_entry);
-
-bool linux_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx);
+    linux_procmon(drakvuf_t drakvuf, output_format_t output);
+    linux_procmon(const linux_procmon&) = delete;
+    linux_procmon& operator=(const linux_procmon&) = delete;
+};
 
 #endif
