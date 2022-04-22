@@ -133,7 +133,7 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
     , drakvuf(drakvuf)
     , pools(std::make_unique<pool_manager>())
 {
-    if (!config->procdump_dir)
+    if (procdump_dir.empty())
         return;
 
     if (config->disable_kideliverapc_hook &&
@@ -199,7 +199,7 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
 
     num_cpus = vmi_get_num_vcpus(vmi);
     win_build_info_t build_info;
-    if (!vmi_get_windows_build_info(vmi.vmi, &build_info))
+    if (!vmi_get_windows_build_info(vmi, &build_info))
         throw -1;
 
     win_build_number = build_info.buildnumber;
@@ -227,9 +227,11 @@ procdump2::~procdump2()
 
 bool procdump2::stop_impl()
 {
+    bool is_plugin_enabled = this->delay_execution_hook || this->deliver_apc_hook;
+
     if (!begin_stop_at)
         begin_stop_at = g_get_real_time() / G_USEC_PER_SEC;
-    if (procdump_on_finish &&
+    if (is_plugin_enabled && procdump_on_finish &&
         !is_active_process(procdump_on_finish) &&
         !is_process_handled(procdump_on_finish))
     {
@@ -1256,10 +1258,7 @@ std::pair<addr_t, size_t> procdump2::get_memory_region(drakvuf_trap_info_t* info
 
 bool procdump2::is_plugin_active()
 {
-    if (!this->active.empty())
-        return true;
-
-    return false;
+    return !this->active.empty();
 }
 
 bool procdump2::is_active_process(vmi_pid_t pid)
