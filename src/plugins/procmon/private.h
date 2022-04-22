@@ -102,47 +102,30 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef LINUX_H
-#define LINUX_H
+#ifndef PROCMON_PRIVATE_H
+#define PROCMON_PRIVATE_H
 
-#include <libvmi/libvmi.h>
-#include "libdrakvuf.h"
+#include "linux.h"
 
-addr_t linux_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+struct linux_wrapper
+{
+    vmi_pid_t pid = 0;
+    uint32_t tid = 0;
+    vmi_pid_t ppid = 0;
 
-addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    vmi_pid_t new_pid = 0;
+    uint32_t new_tid = 0;
 
-char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpath);
+    addr_t rsp = 0;
 
-bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid);
+    linux_procmon* procmon;
+    std::string process_name;
+    std::string thread_name;
+    std::string image_path_name;
+    std::string command_line;
+    std::map<std::string, std::string> envp;
+};
 
-bool linux_get_process_tid(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid);
-
-char* linux_get_current_process_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bool fullpath);
-
-int64_t linux_get_process_userid(drakvuf_t drakvuf, addr_t process_base);
-
-int64_t linux_get_current_process_userid(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-bool linux_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id);
-
-bool linux_get_process_ppid( drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* ppid );
-
-bool linux_get_process_data( drakvuf_t drakvuf, addr_t process_base, proc_data_priv_t* proc_data );
-
-bool linux_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb);
-
-bool linux_find_eprocess_and_pid(drakvuf_t drakvuf, vmi_pid_t find_pid, char* const find_name, drakvuf_trap_info_t* info);
-
-addr_t linux_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t argument_number);
-addr_t linux_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
-bool linux_check_return_context(drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
-
-bool linux_find_process_list(drakvuf_t drakvuf, addr_t* list_head);
-
-bool linux_find_next_process_list_entry(drakvuf_t drakvuf, addr_t current_list_entry, addr_t* next_list_entry);
-
-bool linux_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx);
+#define ARG_MAX 131072
 
 #endif

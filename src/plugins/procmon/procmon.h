@@ -105,21 +105,20 @@
 #ifndef PROCMON_H
 #define PROCMON_H
 
-#include <glib.h>
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
+#include "win.h"
+#include "linux.h"
 
 class procmon: public pluginex
 {
 public:
-    addr_t command_line;
-    addr_t image_path_name;
-    addr_t dll_path;
-    addr_t current_directory_handle;
-    addr_t current_directory_dospath;
-    addr_t cid_tid;
-
+    os_t os;
+    win_procmon* wp;
+    linux_procmon* lp;
     procmon(drakvuf_t drakvuf, output_format_t output);
+    ~procmon();
+    virtual bool stop_impl() override;
 };
 
 #endif
