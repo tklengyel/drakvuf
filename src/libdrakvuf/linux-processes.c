@@ -287,23 +287,28 @@ static bool get_fs_root_rcu(drakvuf_t drakvuf, addr_t process_base, addr_t* root
 }
 
 /**
- * @brief Just implementation of https://elixir.bootlin.com/linux/v5.10.39/source/fs/d_path.c#L38
+ * @brief Just implementation of https://elixir.bootlin.com/linux/v5.10.39/source/fs/d_path.c#L262
  *
  * @param drakvuf - drakvuf instanse
  * @param process_base - task_struct of searching process
  * @param path - pointer to struct
- * @return GString* - full path of binary
+ * @return char* - full path of binary
  */
-static GString* d_path(drakvuf_t drakvuf, addr_t process_base, addr_t path)
+static char* d_path(drakvuf_t drakvuf, addr_t process_base, addr_t path)
 {
-    GString* b = g_string_new("");
+    GString* b = g_string_new(NULL);
 
     addr_t root;
     if (!get_fs_root_rcu(drakvuf, process_base, &root))
         return NULL;
 
     prepend_path(drakvuf, path, root, b);
-    return b;
+
+    char* ret = (char*)calloc(b->len, sizeof(char));
+    memcpy(ret, b->str, b->len);
+
+    g_string_free(b, TRUE);
+    return ret;
 }
 
 char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpath)
@@ -332,7 +337,7 @@ char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpa
         }
 
         addr_t f_path = exe_file + drakvuf->offsets[FILE_PATH];
-        return d_path(drakvuf, process_base, f_path)->str;
+        return d_path(drakvuf, process_base, f_path);
     }
     else
     {

@@ -274,7 +274,7 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
         struct user_arg_ptr envp,
         int flags
     )
-     */
+    */
 
     PRINT_DEBUG("[PROCMON] Callback: %s\n", info->trap->name);
 
