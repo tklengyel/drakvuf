@@ -292,9 +292,9 @@ static bool get_fs_root_rcu(drakvuf_t drakvuf, addr_t process_base, addr_t* root
  * @param drakvuf - drakvuf instanse
  * @param process_base - task_struct of searching process
  * @param path - pointer to struct
- * @return GString* - full path of binary
+ * @return char* - full path of binary
  */
-static GString* d_path(drakvuf_t drakvuf, addr_t process_base, addr_t path)
+static char* d_path(drakvuf_t drakvuf, addr_t process_base, addr_t path)
 {
     GString* b = g_string_new("");
 
@@ -303,7 +303,7 @@ static GString* d_path(drakvuf_t drakvuf, addr_t process_base, addr_t path)
         return NULL;
 
     prepend_path(drakvuf, path, root, b);
-    return b;
+    return g_string_free(b, 0);
 }
 
 char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpath)
@@ -332,7 +332,7 @@ char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpa
         }
 
         addr_t f_path = exe_file + drakvuf->offsets[FILE_PATH];
-        return d_path(drakvuf, process_base, f_path)->str;
+        return d_path(drakvuf, process_base, f_path);
     }
     else
     {
