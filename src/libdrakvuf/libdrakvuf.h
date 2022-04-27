@@ -125,6 +125,16 @@ extern "C" {
 #include <libvmi/x86.h>
 #include <json-c/json.h>
 
+// Printf helpers for timestamp.
+#define FORMAT_TIMEVAL "%" PRId64 ".%06" PRId64
+#define UNPACK_TIMEVAL(t) (t/G_USEC_PER_SEC), (t - (t/G_USEC_PER_SEC)*G_USEC_PER_SEC)
+
+#define eprint_current_time(...) \
+    do { \
+        gint64 current_time = g_get_real_time(); \
+        fprintf(stderr, FORMAT_TIMEVAL " ", UNPACK_TIMEVAL(current_time)); \
+    } while (0)
+
 #ifdef DRAKVUF_DEBUG
 extern bool verbose;
 #define PRINT_DEBUG(...) \
@@ -745,16 +755,6 @@ typedef enum
     OUTPUT_KV,
     OUTPUT_JSON,
 } output_format_t;
-
-// Printf helpers for timestamp.
-#define FORMAT_TIMEVAL "%" PRId64 ".%06" PRId64
-#define UNPACK_TIMEVAL(t) (t/G_USEC_PER_SEC), (t - (t/G_USEC_PER_SEC)*G_USEC_PER_SEC)
-
-#define eprint_current_time(...) \
-    do { \
-        gint64 current_time = g_get_real_time(); \
-        fprintf(stderr, FORMAT_TIMEVAL " ", UNPACK_TIMEVAL(current_time)); \
-    } while (0)
 
 #pragma GCC visibility pop
 
