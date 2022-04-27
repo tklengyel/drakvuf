@@ -24,6 +24,9 @@ jobs:
         apt-get install -y autoconf-archive flex bison libjson-c-dev clang build-essential git libtool autotools-dev libglib2.0-dev libyajl-dev liblzo2-dev
         apt-get clean
 
+    - name: Configure safe dirs
+      run: git config --global --add safe.directory $PWD
+
     - uses: actions/checkout@v2
       with:
         fetch-depth: 2
