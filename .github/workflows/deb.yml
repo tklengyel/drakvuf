@@ -107,21 +107,17 @@ jobs:
           fi
       - name: Upload DRAKVUF asset
         if: github.event_name == 'push' && steps.build_drakvuf_deb.outputs.drakvuf_deb_path != ''
-        uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
-          upload_url: ${{ steps.gen_vars.outputs.release_url }}
-          asset_path: ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_path }}
-          asset_name: ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }}
-          asset_content_type: application/vnd.debian.binary-package
+          run: |
+            cp ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_path }} ${{ steps.build_drakvuf_deb.outputs.drakvuf_deb_name }}
+            gh release upload ${{ steps.gen_vars.outputs.release_url }} ${{  steps.build_drakvuf_deb.outputs.drakvuf_deb_name }}
       - name: Upload Xen asset
         if: github.event_name == 'push' && steps.build_drakvuf_deb.outputs.xen_deb_path != ''
-        uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
         with:
-          upload_url: ${{ steps.gen_vars.outputs.release_url }}
-          asset_path: ${{ steps.build_drakvuf_deb.outputs.xen_deb_path }}
-          asset_name: ${{ steps.build_drakvuf_deb.outputs.xen_deb_name }}
-          asset_content_type: application/vnd.debian.binary-package
+          run: |
+            cp ${{ steps.build_drakvuf_deb.outputs.xen_deb_path }} ${{ steps.build_drakvuf_deb.outputs.xen_deb_name }}
+            gh release upload ${{ steps.gen_vars.outputs.release_url }} ${{ steps.build_drakvuf_deb.outputs.xen_deb_name }}
