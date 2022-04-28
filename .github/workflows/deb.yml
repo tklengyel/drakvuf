@@ -6,7 +6,7 @@ on:
     branches: [ master ]
 jobs:
   release:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
     - name: Generate variables
       id: gen_vars
@@ -48,7 +48,7 @@ jobs:
         delete_tags: true
   deb:
     needs: [release]
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -56,6 +56,7 @@ jobs:
           - "debian:10-slim"
           - "debian:11-slim"
           - "ubuntu:focal"
+          - "ubuntu:jammy"
     steps:
       - uses: actions/checkout@v2
         with:

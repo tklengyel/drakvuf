@@ -12,11 +12,13 @@ RUN mkdir -p /log && \
 
 COPY xen /build-xen
 COPY package/patch-xen.sh /build-xen
+COPY package/configure-xen.sh /build-xen
 RUN cd /build-xen && \
     chmod +x patch-xen.sh && \
+    chmod +x configure-xen.sh && \
     ./patch-xen.sh && \
+    ./configure-xen.sh && \
     echo "Building Xen, this may take a few minutes..." && \
-    ./configure --prefix=/usr --enable-githttp --disable-pvshim --enable-systemd --enable-ovmf && \
     echo CONFIG_EXPERT=y > xen/.config && \
     echo CONFIG_MEM_SHARING=y >> xen/.config && \
     make -C xen olddefconfig && \
