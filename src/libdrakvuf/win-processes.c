@@ -294,12 +294,8 @@ bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* 
         if (VMI_SUCCESS != vmi_pid_to_dtb(vmi, pid, &cr3))
             return false;
 
-    addr_t kthread = win_get_current_thread(drakvuf, info);
-    if (!kthread)
-        return false;
-
-    addr_t teb = 0;
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, kthread + drakvuf->offsets[KTHREAD_TEB], 0, &teb))
+    addr_t teb = win_get_current_thread_teb(drakvuf, info);
+    if (!teb)
         return false;
 
     ACCESS_CONTEXT(ctx,
@@ -483,27 +479,6 @@ bool win_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb)
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-
-bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id)
-{
-    addr_t p_tid ;
-    addr_t ethread = win_get_current_thread(drakvuf, info);
-
-    if ( ethread )
-    {
-        if ( vmi_read_addr_va( drakvuf->vmi, ethread + drakvuf->offsets[ ETHREAD_CID ] + drakvuf->offsets[ CLIENT_ID_UNIQUETHREAD ],
-                0,
-                &p_tid ) == VMI_SUCCESS )
-        {
-            *thread_id = p_tid;
-
-            return true;
-        }
-    }
-
-    return false ;
-}
-
 static bool win_get_thread_id(drakvuf_t drakvuf, addr_t ethread, uint32_t* thread_id)
 {
     addr_t p_tid ;
@@ -519,6 +494,16 @@ static bool win_get_thread_id(drakvuf_t drakvuf, addr_t ethread, uint32_t* threa
     return false ;
 }
 
+
+bool win_get_current_thread_id(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id)
+{
+    addr_t ethread = win_get_current_thread(drakvuf, info);
+
+    if ( ethread )
+        return win_get_thread_id(drakvuf, ethread, thread_id);
+
+    return false ;
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 
