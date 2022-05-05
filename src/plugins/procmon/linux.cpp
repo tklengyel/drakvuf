@@ -112,6 +112,13 @@
 #include "linux.h"
 #include "plugins/output_format.h"
 
+static void free_trap(drakvuf_trap_t* trap)
+{
+    linux_wrapper* lw = (linux_wrapper*)trap->data;
+    delete trap;
+    delete lw;
+}
+
 static char* get_image_path_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t filename_struct = drakvuf_get_function_argument(drakvuf, info, 2);
@@ -259,8 +266,8 @@ static event_response_t do_execveat_common_ret_cb(drakvuf_t drakvuf, drakvuf_tra
 
     print_info(drakvuf, info);
 
-    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)g_free);
-    delete lw;
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
+
     return VMI_EVENT_RESPONSE_NONE;
 }
 
