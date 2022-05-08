@@ -24,12 +24,12 @@ jobs:
         echo $release_tag > release-tag.txt
     - name: Upload release tag artifact
       if: github.event_name == 'push'
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v3
       with:
         name: release-tag
         path: release-tag.txt
     - name: Delete old release
-      uses: dev-drprasad/delete-older-releases@v0.2.0
+      uses: dev-drprasad/delete-older-releases@e3510b26d17114d63269aa02d3ebb592936d0981 # pin 0.2.0
       if: github.ref == 'refs/heads/master'
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
@@ -49,12 +49,12 @@ jobs:
           - "ubuntu:focal"
           - "ubuntu:jammy"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Fetch release tag
         if: github.event_name == 'push'
-        uses: actions/download-artifact@v1
+        uses: actions/download-artifact@v3
         with:
           name: release-tag
       - name: Generate variables
@@ -68,13 +68,13 @@ jobs:
           XEN_COMMIT=$(git ls-tree HEAD xen | cut -f3 '-d ' | cut -f1 -d$'\t')
           echo "Xen commit: $XEN_COMMIT"
           echo "::set-output name=xen_commit::${XEN_COMMIT}"
-          if [ -f release-tag/release-tag.txt ]; then
-            RELEASE_TAG=$(cat release-tag/release-tag.txt)
+          if [ -f release-tag.txt ]; then
+            RELEASE_TAG=$(cat release-tag.txt)
             echo "Release tag: $RELEASE_TAG"
             echo "::set-output name=release_tag::${RELEASE_TAG}"
           fi
       - name: Cache Xen intermediate
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
             package/cache

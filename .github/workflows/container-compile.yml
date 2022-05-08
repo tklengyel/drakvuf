@@ -28,7 +28,7 @@ jobs:
     - name: Configure safe dirs
       run: git config --global --add safe.directory $PWD
 
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
       with:
         fetch-depth: 2
 
@@ -39,7 +39,7 @@ jobs:
 
     - name: Cache Xen debball
       id: cache-xen
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: xen/dist
         key: ${{ steps.get-xen-hash.outputs.XEN_HASH }}

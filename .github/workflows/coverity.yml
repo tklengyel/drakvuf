@@ -14,7 +14,7 @@ jobs:
       TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -27,7 +27,7 @@ jobs:
           echo ::set-output name=XEN_HASH::$(git submodule | grep xen | awk '{ print $1 }')
       - name: Cache Xen debball
         id: cache-xen
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: xen/dist
           key: ${{ steps.get-xen-hash.outputs.XEN_HASH }}
@@ -70,7 +70,7 @@ jobs:
           hash=$(cat coverity_tool.md5)
           echo ::set-output name=hash::$hash
 
-      - uses: actions/cache@v2
+      - uses: actions/cache@v3
         id: cache-coverity
         with:
           path: coverity
