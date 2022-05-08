@@ -29,7 +29,7 @@ jobs:
         name: release-tag
         path: release-tag.txt
     - name: Delete old release
-      uses: dev-drprasad/delete-older-releases@v0.2.0
+      uses: dev-drprasad/delete-older-releases@e3510b26d17114d63269aa02d3ebb592936d0981 # pin 0.2.0
       if: github.ref == 'refs/heads/master'
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
