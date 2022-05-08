@@ -15,7 +15,7 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -29,7 +29,7 @@ jobs:
 
       - name: Cache Xen debball
         id: cache-xen
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: xen/dist
           key: xen-${{ steps.get-hash.outputs.XEN_HASH }}
@@ -51,7 +51,7 @@ jobs:
 
       - name: Cache Libvmi files
         id: cache-libvmi
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: libvmi/dist
           key: libvmi-${{ steps.get-hash.outputs.LIBVMI_HASH }}
@@ -99,7 +99,7 @@ jobs:
       CC: clang
       CXX: clang++
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -108,13 +108,13 @@ jobs:
           sudo pip3 install ctypesgen ipython
 
       - name: Cache Xen debball
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: xen/dist
           key: xen-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: libvmi/dist
           key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -148,7 +148,7 @@ jobs:
           os:
             - 'ubuntu-20.04'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -156,13 +156,13 @@ jobs:
           sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
 
       - name: Cache Xen debball
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: xen/dist
           key: xen-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: libvmi/dist
           key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -202,7 +202,7 @@ jobs:
           os:
             - 'ubuntu-20.04'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -210,13 +210,13 @@ jobs:
           sudo apt-get install -y clang-10 build-essential libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build
 
       - name: Cache Xen debball
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: xen/dist
           key: xen-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: libvmi/dist
           key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -254,7 +254,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         # We must fetch at least the immediate parents so that if this is
         # a pull request then we can checkout the head.
@@ -262,7 +262,7 @@ jobs:
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@v1
+      uses: github/codeql-action/init@v2
       with:
         languages: ${{ matrix.language }}
         queries: security-and-quality
@@ -274,13 +274,13 @@ jobs:
         sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
 
     - name: Cache Xen debball
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: xen/dist
         key: xen-${{ needs.init.outputs.XEN_HASH }}
 
     - name: Cache Libvmi files
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: libvmi/dist
         key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
@@ -303,7 +303,7 @@ jobs:
         make -j2
 
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v1
+      uses: github/codeql-action/analyze@v2
 
   scan-build:
     runs-on: ${{ matrix.os }}
@@ -315,7 +315,7 @@ jobs:
       - init
     if: ${{ github.event_name == 'pull_request' }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         run: |
           # Install packages
@@ -323,13 +323,13 @@ jobs:
           sudo apt-get install -y clang-10 clang-tools-10 autoconf-archive flex bison libjson-c-dev
 
       - name: Cache Xen debball
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: xen/dist
           key: xen-${{ needs.init.outputs.XEN_HASH }}
 
       - name: Cache Libvmi files
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: libvmi/dist
           key: libvmi-${{ needs.init.outputs.LIBVMI_HASH }}
