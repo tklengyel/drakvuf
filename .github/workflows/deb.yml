@@ -68,8 +68,8 @@ jobs:
           XEN_COMMIT=$(git ls-tree HEAD xen | cut -f3 '-d ' | cut -f1 -d$'\t')
           echo "Xen commit: $XEN_COMMIT"
           echo "::set-output name=xen_commit::${XEN_COMMIT}"
-          if [ -f release-tag/release-tag.txt ]; then
-            RELEASE_TAG=$(cat release-tag/release-tag.txt)
+          if [ -f release-tag.txt ]; then
+            RELEASE_TAG=$(cat release-tag.txt)
             echo "Release tag: $RELEASE_TAG"
             echo "::set-output name=release_tag::${RELEASE_TAG}"
           fi
