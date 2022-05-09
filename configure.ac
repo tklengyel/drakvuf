@@ -103,11 +103,8 @@
 #*************************************************************************#
 
 AC_PREREQ([2.60])
-AC_INIT([DRAKVUF],
-        m4_join([], [1.0-git],
-            m4_esyscmd_s([git log -1 --date=format:%Y%m%d%H%M%S --pretty=format:%cd]), [+], m4_esyscmd_s([git describe --always]), [-1]),
-        [tamas@tklengyel.com], [],
-        [https://drakvuf.com])
+AC_INIT([DRAKVUF],[m4_join(, 1.0-git,
+            m4_esyscmd_s(git log -1 --date=format:%Y%m%d%H%M%S --pretty=format:%cd), +, m4_esyscmd_s(git describe --always), -1)],[tamas@tklengyel.com],[],[https://drakvuf.com])
 AM_INIT_AUTOMAKE([1.10 no-define foreign subdir-objects])
 
 LT_INIT([disable-shared])
@@ -115,7 +112,7 @@ LT_INIT([disable-shared])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
-AC_PROG_CC_STDC
+AC_PROG_CC(clang)
 AC_PROG_CXX(clang++)
 
 # Pthread support!
@@ -129,7 +126,7 @@ CXXFLAGS="-std=gnu++17"
 
 AC_LANG_PUSH([C++])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [[bool test[2] = { [1] = 1, [0] = 0 };]])], [],
-    [AC_ERROR(Your C++ compiler ($CXX) is not supported. Please use clang++ (clang-9 or newer)!)])
+    [AC_MSG_ERROR(Your C++ compiler ($CXX) is not supported. Please use clang++ (clang-9 or newer)!)])
 
 #Check requirement of lstdc++fs
 STDCPPFSLIB=""
@@ -669,7 +666,7 @@ SANITIZE_CFLAGS=""
 SANITIZE_CXXFLAGS=""
 SANITIZE_LDFLAGS=""
 
-AS_IF([test x"$fsanitize" != x"no"], [
+AS_IF([test x"$sanitize" != x"no"], [
   check_cc_cxx_flag([-fno-omit-frame-pointer],
    [check_link_flag([-fno-omit-frame-pointer],
      [SANITIZE_CFLAGS="$SANITIZE_CFLAGS -fno-omit-frame-pointer"
@@ -706,14 +703,8 @@ LD="$saved_LD"
 # AUTOSANITIZE END
 #####################################################
 
-AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h malloc.h stdio.h stdlib.h string.h sys/time.h sys/mman.h sys/inotify.h unistd.h errno.h])
-
-# Checks for typedefs, structures, and compiler characteristics.
-AC_C_CONST
-AC_HEADER_STDBOOL
-AC_TYPE_SIZE_T
-AC_HEADER_TIME
+HAVE_SYS_TIME_H
 AC_STRUCT_TM
 
 # Make sure we get standard PRI... definitions.
@@ -726,18 +717,18 @@ AH_VERBATIM([__STDC_FORMAT_MACROS],
 PKG_CHECK_MODULES([CHECK], [check >= 0.9.4], [have_check="yes"], [have_check="no"])
 AM_CONDITIONAL([MAKE_TESTS], [test x$have_check = xyes])
 
-PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.28], [], [AC_ERROR([glib-2.0 (version 2.28+) has to be installed!])])
-PKG_CHECK_MODULES([VMI], [libvmi >= 0.11], [], [AC_ERROR([LibVMI not found])])
+PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.28], [], [AC_MSG_ERROR(glib-2.0 (version 2.28+) has to be installed!)])
+PKG_CHECK_MODULES([VMI], [libvmi >= 0.11], [], [AC_MSG_ERROR(LibVMI not found)])
 PKG_CHECK_MODULES([JSONC], [json-c >= 0.15], [AC_DEFINE([JSONC5], [1], [json-c5 installed])],
-    [PKG_CHECK_MODULES([JSONC], [json-c], [], [AC_ERROR([libjson-c not found])])])
+    [PKG_CHECK_MODULES([JSONC], [json-c], [], [AC_MSG_ERROR(libjson-c not found)])])
 AS_IF([test x$plugin_procdump == xyes],
-    [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
+    [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_MSG_ERROR(zlib not found)])])
 AS_IF([test x$plugin_procdump2 == xyes],
-    [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_ERROR([zlib not found])])])
-PKG_CHECK_MODULES([LIBXC], [xencontrol], [], [AC_ERROR([libxc not found])])
-PKG_CHECK_MODULES([LIBXL], [xenlight], [], [AC_ERROR([libxl not found])])
-PKG_CHECK_MODULES([XENFMEM], [xenforeignmemory], [], [AC_ERROR([xenforeignmemory not found])])
-PKG_CHECK_MODULES([XENTOOLLOG], [xentoollog], [], [AC_ERROR([xentoollog not found])])
+    [PKG_CHECK_MODULES([ZLIB],[zlib], [], [AC_MSG_ERROR(zlib not found)])])
+PKG_CHECK_MODULES([LIBXC], [xencontrol], [], [AC_MSG_ERROR(libxc not found)])
+PKG_CHECK_MODULES([LIBXL], [xenlight], [], [AC_MSG_ERROR(libxl not found)])
+PKG_CHECK_MODULES([XENFMEM], [xenforeignmemory], [], [AC_MSG_ERROR(xenforeignmemory not found)])
+PKG_CHECK_MODULES([XENTOOLLOG], [xentoollog], [], [AC_MSG_ERROR(xentoollog not found)])
 
 if test x$repl = xyes; then
   PKG_CHECK_MODULES([PYTHON3], [python3])
