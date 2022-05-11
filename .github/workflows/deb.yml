@@ -13,6 +13,15 @@ jobs:
       run: |
         echo "::set-output name=short_sha::$(echo ${GITHUB_SHA} | cut -c1-8)"
         echo "::set-output name=cur_datetime::$(date '+%Y-%m-%d %H:%M:%S')"
+    - name: Delete old release
+      uses: dev-drprasad/delete-older-releases@e3510b26d17114d63269aa02d3ebb592936d0981 # pin 0.2.0
+      if: github.ref == 'refs/heads/master'
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+      with:
+        repo: tklengyel/drakvuf-builds
+        keep_latest: 0
+        delete_tags: true
     - name: Create a Release
       if: github.event_name == 'push'
       env:
@@ -28,15 +37,6 @@ jobs:
       with:
         name: release-tag
         path: release-tag.txt
-    - name: Delete old release
-      uses: dev-drprasad/delete-older-releases@e3510b26d17114d63269aa02d3ebb592936d0981 # pin 0.2.0
-      if: github.ref == 'refs/heads/master'
-      env:
-        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-      with:
-        repo: tklengyel/drakvuf-builds
-        keep_latest: 5
-        delete_tags: true
   deb:
     needs: [release]
     runs-on: ubuntu-latest
