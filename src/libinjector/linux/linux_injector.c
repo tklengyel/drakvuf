@@ -230,8 +230,8 @@ static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvu
     PRINT_DEBUG("CR3 changed to 0x%" PRIx64 ". PID: %u PPID: %u TID: %u\n",
         info->regs->cr3, info->proc_data.pid, info->proc_data.ppid, info->proc_data.tid);
 
-    if (info->proc_data.pid != injector->target_pid && info->proc_data.tid != injector->target_tid)
-        return 0;
+    if (info->proc_data.pid != injector->target_pid || info->proc_data.tid != injector->target_tid)
+        return VMI_EVENT_RESPONSE_NONE;
 
     // rcx register should have the address for userspace rip
     // for x64 systems
@@ -269,7 +269,7 @@ static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvu
         injector->bp = NULL;
     }
 
-    return 0;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 static bool is_interrupted(drakvuf_t drakvuf, void* data __attribute__((unused)))
