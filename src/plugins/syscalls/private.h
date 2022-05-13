@@ -105,6 +105,9 @@
 #ifndef SYSCALLS_PRIVATE_H
 #define SYSCALLS_PRIVATE_H
 
+namespace syscalls_ns
+{
+
 typedef enum
 {
     DIR_IN,
@@ -496,5 +499,7 @@ struct wrapper
     addr_t stack_fingerprint;
 };
 void free_trap(gpointer p);
+
+}
 
 #endif // commoncsproto_h

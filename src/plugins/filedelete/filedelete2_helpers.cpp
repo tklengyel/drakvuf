@@ -108,6 +108,8 @@
 
 #include <libinjector/libinjector.h>
 
+using namespace filedelete;
+
 void free_pool(std::map<addr_t, bool>& pools, addr_t va)
 {
     for (auto pool: pools)
