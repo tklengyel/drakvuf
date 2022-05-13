@@ -118,6 +118,7 @@
 #include "filedelete.h"
 #include "private.h"
 
+using namespace filedelete;
 using std::ostringstream;
 using std::string;
 

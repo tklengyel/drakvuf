@@ -116,6 +116,11 @@
 #include "win.h"
 #include "linux.h"
 
+using namespace syscalls_ns;
+
+namespace syscalls_ns
+{
+
 static std::string extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
     char* cstr = nullptr;
@@ -289,6 +294,8 @@ void free_trap(gpointer p)
         g_slice_free(struct wrapper, t->data);
 
     g_slice_free(drakvuf_trap_t, t);
+}
+
 }
 
 syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output)

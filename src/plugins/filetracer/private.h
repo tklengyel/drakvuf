@@ -110,6 +110,9 @@
 #include "win.h"
 #include "linux.h"
 
+namespace filetracer_ns
+{
+
 struct win_objattrs_t
 {
     std::string file_path;
@@ -685,5 +688,7 @@ static const flags_str_t linux_lseek_whence =
     REGISTER_FLAG(LSEEK_DATA),
     REGISTER_FLAG(LSEEK_HOLE),
 };
+
+}
 
 #endif

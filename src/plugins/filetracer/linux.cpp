@@ -125,6 +125,8 @@
 #include "filetracer.h"
 #include "private.h"
 
+using namespace filetracer_ns;
+
 static void free_gstrings(struct linux_wrapper& lw)
 {
 

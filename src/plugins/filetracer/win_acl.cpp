@@ -117,6 +117,7 @@ using std::setfill;
 using std::setw;
 using std::string;
 using std::stringstream;
+using namespace filetracer_ns;
 
 namespace
 {
@@ -543,7 +544,7 @@ string read_acl(vmi_instance_t vmi, access_context_t* ctx, size_t* offsets, stri
             break;
 
         case OUTPUT_KV:
-            fmt << base_name << ':' << ace_count;
+            fmt << base_name << '=' << ace_count;
             break;
 
         case OUTPUT_JSON:
