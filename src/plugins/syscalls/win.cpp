@@ -115,6 +115,9 @@
 #include "private.h"
 #include "win.h"
 
+namespace syscalls_ns
+{
+
 static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     //Loads a pointer to the plugin, which is responsible for the trap
@@ -489,4 +492,6 @@ char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* in
     }
 
     return nullptr;
+}
+
 }

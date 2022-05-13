@@ -105,6 +105,9 @@
 #ifndef SYSCALLS_WIN_H
 #define SYSCALLS_WIN_H
 
+namespace syscalls_ns
+{
+
 void setup_windows(drakvuf_t drakvuf, syscalls* s);
 char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val);
 
@@ -6026,5 +6029,7 @@ static const syscall_t* win32k[] =
 
 #define NUM_SYSCALLS_NT sizeof(nt)/sizeof(syscall_t*)
 #define NUM_SYSCALLS_WIN32K sizeof(win32k)/sizeof(syscall_t*)
+
+}
 
 #endif

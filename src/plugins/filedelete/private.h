@@ -108,6 +108,9 @@
 #define FILE_DISPOSITION_INFORMATION 13
 #define FILE_DELETE_ON_CLOSE 0x1000
 
+namespace filedelete
+{
+
 enum offset
 {
     FILE_OBJECT_TYPE,
@@ -318,5 +321,7 @@ bool inject_memcpy(drakvuf_t drakvuf, drakvuf_trap_info_t* info, vmi_instance_t 
 void free_resources(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 void free_pool(std::map<addr_t, bool>& pools, addr_t va);
 addr_t find_pool(std::map<addr_t, bool>& pools);
+
+}
 
 #endif // FILEDELETE_PRIVATE_H

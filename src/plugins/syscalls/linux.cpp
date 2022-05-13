@@ -111,6 +111,9 @@
 #include "private.h"
 #include "linux.h"
 
+namespace syscalls_ns
+{
+
 // Builds the argument buffer from the current context, returns status
 static std::vector<uint64_t> linux_build_argbuf(vmi_instance_t vmi,
     drakvuf_trap_info_t* info, syscalls* s,
@@ -333,4 +336,6 @@ void setup_linux(drakvuf_t drakvuf, syscalls* s)
         free_trap(trap);
         throw -1;
     }
+}
+
 }

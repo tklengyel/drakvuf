@@ -107,6 +107,9 @@
 
 #include "linux.h"
 
+namespace procmon
+{
+
 struct linux_wrapper
 {
     vmi_pid_t pid = 0;
@@ -125,6 +128,8 @@ struct linux_wrapper
     std::string command_line;
     std::map<std::string, std::string> envp;
 };
+
+}
 
 #define ARG_MAX 131072
 

@@ -112,6 +112,8 @@
 #include "linux.h"
 #include "plugins/output_format.h"
 
+using namespace procmon;
+
 static void free_trap(drakvuf_trap_t* trap)
 {
     linux_wrapper* lw = (linux_wrapper*)trap->data;
@@ -282,6 +284,7 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
         int flags
     )
      */
+    linux_procmon* procmon = (linux_procmon*)info->trap->data;
 
     PRINT_DEBUG("[PROCMON] Callback: %s\n", info->trap->name);
 
@@ -289,46 +292,25 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
     if (!ret_addr)
         return VMI_EVENT_RESPONSE_NONE;
 
-    linux_procmon* procmon = (linux_procmon*)info->trap->data;
-
-    linux_wrapper* lw = new (std::nothrow) linux_wrapper;
-    lw->procmon = procmon;
-    lw->new_pid = info->proc_data.pid;
-    lw->new_tid = info->proc_data.tid;
-    lw->rsp = ret_addr;
-
-    char* image_path_name = get_image_path_name(drakvuf, info);
-    if (nullptr != image_path_name)
-        lw->image_path_name.append(image_path_name);
-    g_free(image_path_name);
-
-    std::string cmd = get_command_line(drakvuf, info);
-    if (!cmd.empty())
-        lw->command_line.append(cmd);
-
-    lw->envp = parse_environment(drakvuf, info);
-
     // Gather information about parent process
     addr_t process_base = drakvuf_get_current_process(drakvuf, info);
     if (!process_base)
     {
         PRINT_DEBUG("[PROCMON] Failed to get process_base\n");
-        delete lw;
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    if (!drakvuf_get_process_ppid(drakvuf, process_base, &lw->pid))
+    vmi_pid_t pid;
+    if (!drakvuf_get_process_ppid(drakvuf, process_base, &pid))
     {
         PRINT_DEBUG("[PROCMON] Failed to get process pid\n");
-        delete lw;
         return VMI_EVENT_RESPONSE_NONE;
     }
 
     addr_t parent_process, dtb;
-    if (!drakvuf_get_process_by_pid(drakvuf, lw->pid, &parent_process, &dtb))
+    if (!drakvuf_get_process_by_pid(drakvuf, pid, &parent_process, &dtb))
     {
         PRINT_DEBUG("[PROCMON] Failed to get process by pid\n");
-        delete lw;
         return VMI_EVENT_RESPONSE_NONE;
     }
 
@@ -336,20 +318,39 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
     if (!drakvuf_get_process_data(drakvuf, parent_process, &proc_data))
     {
         PRINT_DEBUG("[PROCMON] Failed to get process data of parent process\n");
-        delete lw;
         return VMI_EVENT_RESPONSE_NONE;
     }
 
+    linux_wrapper* lw = new (std::nothrow) linux_wrapper;
+    if (!lw)
+    {
+        PRINT_DEBUG("[PROCMON] Failed to allocate momory for linux wrapper structure\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    lw->procmon = procmon;
+    lw->pid = pid;
     lw->tid = proc_data.tid;
     lw->ppid = proc_data.ppid;
+    lw->new_pid = info->proc_data.pid;
+    lw->new_tid = info->proc_data.tid;
+    lw->rsp = ret_addr;
 
-    if (nullptr != proc_data.name)
-        lw->process_name.append(proc_data.name);
+    char* image_path_name = get_image_path_name(drakvuf, info);
+    if (image_path_name)
+        lw->image_path_name = image_path_name;
+    g_free(image_path_name);
+
+    lw->command_line = get_command_line(drakvuf, info);
+    lw->envp = parse_environment(drakvuf, info);
+
+    if (proc_data.name)
+        lw->process_name = proc_data.name;
     g_free(const_cast<char*>(proc_data.name));
 
     char* thread_name = drakvuf_get_process_name(drakvuf, parent_process, false);
-    if (nullptr != thread_name)
-        lw->thread_name.append(thread_name);
+    if (thread_name)
+        lw->thread_name = thread_name;
     g_free(thread_name);
 
     // Create new trap for return callback
@@ -367,7 +368,7 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
     if (!drakvuf_add_trap(drakvuf, trap))
     {
         fprintf(stderr, "Failed to trap return at 0x%lx\n", ret_addr);
-        delete lw;
+        free_trap(trap);
     }
     return VMI_EVENT_RESPONSE_NONE;
 }

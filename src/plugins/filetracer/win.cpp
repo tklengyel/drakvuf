@@ -125,6 +125,8 @@
 #include "win.h"
 #include "win_acl.h"
 
+using namespace filetracer_ns;
+
 extern const flags_str_t generic_ar;
 
 static auto build_security_descriptor(const win_objattrs_t& attrs)

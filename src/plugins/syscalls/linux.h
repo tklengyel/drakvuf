@@ -105,9 +105,12 @@
 #ifndef SYSCALLS_LINUX_H
 #define SYSCALLS_LINUX_H
 
-void setup_linux(drakvuf_t drakvuf, syscalls* s);
-
 #include "private.h"
+
+namespace syscalls_ns
+{
+
+void setup_linux(drakvuf_t drakvuf, syscalls* s);
 
 /**
  * Older Linux kernels pass the arguments to the syscall functions via
@@ -841,6 +844,8 @@ static const syscall_t* linux_syscalls[] =
 
 // The actual max depends on the arch and actual kernel version
 #define NUM_SYSCALLS_LINUX sizeof(linuxsc::linux_syscalls)/sizeof(syscall_t*)
+
+}
 
 }
 #endif // SYSCALLS_LINUX_H
