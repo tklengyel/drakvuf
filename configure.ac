@@ -110,7 +110,7 @@ AC_INIT([DRAKVUF],
         [https://drakvuf.com])
 AM_INIT_AUTOMAKE([1.10 no-define foreign subdir-objects])
 
-LT_INIT([disable-shared])
+LT_INIT
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_MACRO_DIR([m4])
@@ -715,6 +715,8 @@ AC_HEADER_STDBOOL
 AC_TYPE_SIZE_T
 AC_HEADER_TIME
 AC_STRUCT_TM
+
+AC_CHECK_LIB(dl, dlopen)
 
 # Make sure we get standard PRI... definitions.
 AH_VERBATIM([__STDC_FORMAT_MACROS],

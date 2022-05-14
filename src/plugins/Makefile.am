@@ -103,17 +103,24 @@
 #*************************************************************************#
 
 sources =
+noinst_LTLIBRARIES =
+lib_LTLIBRARIES =
 
 ###############################################################################
 
 if PLUGIN_SYSCALLS
-sources += syscalls/syscalls.cpp
-sources += syscalls/syscalls.h
-sources += syscalls/linux.cpp
-sources += syscalls/linux.h
-sources += syscalls/win.cpp
-sources += syscalls/win.h
-sources += syscalls/private.h
+syscalls  = syscalls/syscalls.cpp
+syscalls += syscalls/syscalls.h
+syscalls += syscalls/linux.cpp
+syscalls += syscalls/linux.h
+syscalls += syscalls/win.cpp
+syscalls += syscalls/win.h
+syscalls += syscalls/private.h
+
+lib_LTLIBRARIES += libdrakvufplugin_syscalls.la
+libdrakvufplugin_syscalls_la_SOURCES= $(syscalls)
+libdrakvufplugin_syscalls_la_LIBADD  = ../libdrakvuf/libdrakvuf.la
+libdrakvufplugin_syscalls_la_LIBADD += libdrakvufplugins.la
 endif
 
 if PLUGIN_POOLMON
@@ -360,9 +367,12 @@ sources += callbackmon/callbackmon.h
 endif
 
 ###############################################################################
-sources += plugins.cpp plugins.h plugins_ex.cpp plugins_ex.h plugin_utils.cpp plugin_utils.h private.h type_traits_helpers.h hook_helpers.h
-sources += output_format.h output_format/common.h output_format/csvfmt.h output_format/deffmt.h output_format/jsonfmt.h output_format/kvfmt.h
-sources += output_format/xfmt.h output_format/ostream.h output_format/ostream.cpp
+sources += plugins.cpp plugins.h
+sources += plugins_ex.cpp plugins_ex.h
+
+utils  = plugin_utils.cpp plugin_utils.h private.h type_traits_helpers.h hook_helpers.h
+utils += output_format.h output_format/common.h output_format/csvfmt.h output_format/deffmt.h output_format/jsonfmt.h output_format/kvfmt.h
+utils += output_format/xfmt.h output_format/ostream.h output_format/ostream.cpp
 
 AM_CPPFLAGS = $(CPPFLAGS) -I$(top_srcdir) -I$(top_srcdir)/src -I$(srcdir)
 AM_CPPFLAGS += $(VMI_CFLAGS)
@@ -414,11 +424,15 @@ AM_CXXFLAGS += -pg
 endif
 endif
 
-noinst_LTLIBRARIES= libdrakvufplugins.la
+lib_LTLIBRARIES += libdrakvufplugin_utils
+
+noinst_LTLIBRARIES += libdrakvufplugins.la
 libdrakvufplugins_la_SOURCES= $(sources)
 libdrakvufplugins_la_LIBADD = ../xen_helper/libxenhelper.la
 libdrakvufplugins_la_LIBADD += ../libdrakvuf/libdrakvuf.la
+libdrakvufplugins_la_LIBADD += libdrakvufplugin_utils.la
 
+=
 if MAKE_TESTS
 
 AM_DEFAULT_SOURCE_EXT = .cpp

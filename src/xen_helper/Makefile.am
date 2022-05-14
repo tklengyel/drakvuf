@@ -136,5 +136,5 @@ if ENABLE_IPT
 AM_CFLAGS += -DENABLE_IPT
 endif
 
-noinst_LTLIBRARIES= libxenhelper.la
+lib_LTLIBRARIES= libxenhelper.la
 libxenhelper_la_SOURCES= $(h_sources) $(c_sources)

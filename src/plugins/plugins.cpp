@@ -103,6 +103,7 @@
  ***************************************************************************/
 
 #include <stdarg.h>
+#include <dlfcn.h>
 #include "plugins.h"
 #include "syscalls/syscalls.h"
 #include "poolmon/poolmon.h"
@@ -170,7 +171,12 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .win32k_profile = options->win32k_profile,
                         .disable_sysret = options->disable_sysret,
                     };
-                    this->plugins[plugin_id] = std::make_unique<syscalls>(this->drakvuf, &config, this->output);
+                    void *handle = dlopen ("libdrakvufplugin_syscalls.so", RTLD_NOW | RTLD_GLOBAL);
+                    void *gptr = dlsym(handle, "drakvufplugin_init");
+                    typedef std::unique_ptr<plugin> (*drakvufplugin_init)(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output);
+                    drakvufplugin_init ptr = reinterpret_cast<drakvufplugin_init>(reinterpret_cast<long long>(gptr));
+                    this->plugins[plugin_id] = ptr(this->drakvuf, &config, this->output);
+                    dlclose(handle);
                     break;
                 }
 #endif
