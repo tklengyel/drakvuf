@@ -120,7 +120,7 @@ syscalls += syscalls/private.h
 lib_LTLIBRARIES += libdrakvufplugin_syscalls.la
 libdrakvufplugin_syscalls_la_SOURCES= $(syscalls)
 libdrakvufplugin_syscalls_la_LIBADD  = ../libdrakvuf/libdrakvuf.la
-libdrakvufplugin_syscalls_la_LIBADD += libdrakvufplugins.la
+libdrakvufplugin_syscalls_la_LIBADD += libdrakvufplugin_utils.la
 endif
 
 if PLUGIN_POOLMON
