@@ -4,6 +4,9 @@ on:
     branches: [ master ]
   pull_request:
     branches: [ master ]
+concurrency:
+  group: environment-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   release:
     runs-on: ubuntu-latest
