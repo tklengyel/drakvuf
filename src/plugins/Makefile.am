@@ -109,8 +109,13 @@ lib_LTLIBRARIES =
 ###############################################################################
 
 if PLUGIN_SYSCALLS
-SUBDIR(syscalls)
-endif
+syscalls  = syscalls/syscalls.cpp
+syscalls += syscalls/syscalls.h
+syscalls += syscalls/linux.cpp
+syscalls += syscalls/linux.h
+syscalls += syscalls/win.cpp
+syscalls += syscalls/win.h
+syscalls += syscalls/private.h
 
 lib_LTLIBRARIES += libdrakvufplugin_syscalls.la
 libdrakvufplugin_syscalls_la_SOURCES= $(syscalls)
@@ -362,6 +367,8 @@ sources += callbackmon/callbackmon.h
 endif
 
 ###############################################################################
+SUBDIRS(subdir)
+
 sources += plugins.cpp plugins.h
 sources += plugins_ex.cpp plugins_ex.h
 
@@ -390,6 +397,7 @@ AM_LDFLAGS += $(STDCPPFSLIB)
 AM_LDFLAGS += $(PTHREAD_CFLAGS)
 
 AM_CXXFLAGS = $(CXXFLAGS)
+AM_CXXFLAGS += -Wno-return-type-c-linkage
 
 if HARDENING
 AM_CXXFLAGS += $(HARDEN_CFLAGS) -DHARDENING
@@ -419,7 +427,8 @@ AM_CXXFLAGS += -pg
 endif
 endif
 
-lib_LTLIBRARIES += libdrakvufplugin_utils
+lib_LTLIBRARIES += libdrakvufplugin_utils.la
+libdrakvufplugin_utils_la_SOURCES= $(utils)
 
 noinst_LTLIBRARIES += libdrakvufplugins.la
 libdrakvufplugins_la_SOURCES= $(sources)
@@ -427,7 +436,6 @@ libdrakvufplugins_la_LIBADD = ../xen_helper/libxenhelper.la
 libdrakvufplugins_la_LIBADD += ../libdrakvuf/libdrakvuf.la
 libdrakvufplugins_la_LIBADD += libdrakvufplugin_utils.la
 
-=
 if MAKE_TESTS
 
 AM_DEFAULT_SOURCE_EXT = .cpp
