@@ -121,6 +121,11 @@ using namespace syscalls_ns;
 namespace syscalls_ns
 {
 
+extern "C" std::unique_ptr<plugin> drakvufplugin_init(drakvuf_t drakvuf, const syscalls_config* c, output_format_t format)
+{
+    return std::make_unique<syscalls>(drakvuf, c, format);
+}
+
 static std::string extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
     char* cstr = nullptr;

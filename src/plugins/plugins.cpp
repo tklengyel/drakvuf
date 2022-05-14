@@ -172,14 +172,13 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .disable_sysret = options->disable_sysret,
                     };
                     void *handle = dlopen ("libdrakvufplugin_syscalls.so", RTLD_NOW | RTLD_GLOBAL);
-                    void *gptr = dlsym(handle, "drakvufplugin_init");
-                    typedef std::unique_ptr<plugin> (*drakvufplugin_init)(drakvuf_t drakvuf, const syscalls_config* c, output_format_t output);
-                    drakvufplugin_init ptr = reinterpret_cast<drakvufplugin_init>(reinterpret_cast<long long>(gptr));
-                    this->plugins[plugin_id] = ptr(this->drakvuf, &config, this->output);
+                    drakvufplugin_init_t *init = (drakvufplugin_init_t*)dlsym(handle, "drakvufplugin_init");
+                    this->plugins[plugin_id] = init(this->drakvuf, (const void*)&config, this->output);
                     dlclose(handle);
                     break;
                 }
 #endif
+/*
 #ifdef ENABLE_PLUGIN_POOLMON
                 case PLUGIN_POOLMON:
                     this->plugins[plugin_id] = std::make_unique<poolmon>(this->drakvuf, this->output);
@@ -532,7 +531,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     this->plugins[plugin_id] = std::make_unique<callbackmon>(this->drakvuf, &config, this->output);
                     break;
                 }
-#endif
+#endif*/
                 case __DRAKVUF_PLUGIN_LIST_MAX:
                     /* Should never reach here */
                     fprintf(stderr, "Plugin start falls-through to default switch case!\n");

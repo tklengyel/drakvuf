@@ -109,13 +109,8 @@ lib_LTLIBRARIES =
 ###############################################################################
 
 if PLUGIN_SYSCALLS
-syscalls  = syscalls/syscalls.cpp
-syscalls += syscalls/syscalls.h
-syscalls += syscalls/linux.cpp
-syscalls += syscalls/linux.h
-syscalls += syscalls/win.cpp
-syscalls += syscalls/win.h
-syscalls += syscalls/private.h
+SUBDIR(syscalls)
+endif
 
 lib_LTLIBRARIES += libdrakvufplugin_syscalls.la
 libdrakvufplugin_syscalls_la_SOURCES= $(syscalls)

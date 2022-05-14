@@ -333,6 +333,9 @@ private:
     bool m_is_stopped = false;
 };
 
+typedef std::unique_ptr<plugin> drakvufplugin_init_t(drakvuf_t drakvuf, const void* config, output_format_t output);
+typedef void drakvufplugin_destroy_t(std::unique_ptr<plugin>);
+
 class drakvuf_plugins
 {
 private:
