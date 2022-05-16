@@ -111,22 +111,36 @@
 #include <string>
 #include <set>
 
+struct dkommon_config
+{
+    const char* services_profile;
+};
+
 class dkommon: public pluginex
 {
 public:
     const output_format_t format;
     size_t* offsets;
+    uint16_t winver;
 
     std::set<vmi_pid_t> live_processes;
     std::set<vmi_pid_t> dead_processes;
 
     std::set<std::string> loaded_drivers;
 
-    dkommon(drakvuf_t drakvuf, const void* config, output_format_t output);
+    vmi_pid_t srv_pid;
+    addr_t srv_module_base;
+    addr_t srv_db_va;
+    drakvuf_trap_t srv_trap[2];
+    std::set<addr_t> loaded_services;
+
+    dkommon(drakvuf_t drakvuf, const dkommon_config* config, output_format_t output);
     dkommon(const dkommon&) = delete;
     dkommon& operator=(const dkommon&) = delete;
     ~dkommon();
     bool stop_impl() override;
+    bool find_services_db(vmi_instance_t vmi);
+    std::set<addr_t> enumerate_services(vmi_instance_t vmi);
 };
 
 #endif

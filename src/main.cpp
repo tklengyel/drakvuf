@@ -348,6 +348,10 @@ static void print_usage()
         "\t --json-netio <path to json>\n"
         "\t                           The JSON profile for netio.sys\n"
 #endif
+#ifdef ENABLE_PLUGIN_DKOMMON
+        "\t --json-services <path to json>\n"
+        "\t                           The JSON profile for services.exe\n"
+#endif
         "\t --libdrakvuf-not-get-userid\n"
         "\t                           Don't collect user id in get process data\n"
         "\t -h, --help                Show this help\n"
@@ -461,6 +465,7 @@ int main(int argc, char** argv)
         opt_hidsim_random_clicks,
         opt_rootkitmon_json_fwpkclnt,
         opt_rootkitmon_json_fltmgr,
+        opt_dkommon_json_services,
         opt_callbackmon_json_netio,
         opt_json_hal,
         opt_libdrakvuf_not_get_userid,
@@ -531,6 +536,7 @@ int main(int argc, char** argv)
         {"json-fwpkclnt", required_argument, NULL, opt_rootkitmon_json_fwpkclnt},
         {"json-fltmgr", required_argument, NULL, opt_rootkitmon_json_fltmgr},
         {"json-netio", required_argument, NULL, opt_callbackmon_json_netio},
+        {"json-services", required_argument, NULL, opt_dkommon_json_services},
         {"json-hal", required_argument, NULL, opt_json_hal},
         {"libdrakvuf-not-get-userid", no_argument, NULL, opt_libdrakvuf_not_get_userid},
         {NULL, 0, NULL, 0}
@@ -850,6 +856,11 @@ int main(int argc, char** argv)
 #ifdef ENABLE_PLUGIN_CALLBACKMON
             case opt_callbackmon_json_netio:
                 options.netio_profile = optarg;
+                break;
+#endif
+#ifdef ENABLE_PLUGIN_DKOMMON
+            case opt_dkommon_json_services:
+                options.services_profile = optarg;
                 break;
 #endif
 
