@@ -118,6 +118,10 @@ public:
     const callbackmon_config config;
     const output_format_t format;
 
+    addr_t ldr_data_name_rva;
+    addr_t ldr_data_base_rva;
+    addr_t ldr_data_size_rva;
+
     std::vector<addr_t> process_cb;
     std::vector<addr_t> thread_cb;
     std::vector<addr_t> image_cb;
