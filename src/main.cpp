@@ -343,6 +343,8 @@ static void print_usage()
         "\t                           The JSON profile for fwpkclnt.sys\n"
         "\t --json-fltmgr <path to json>\n"
         "\t                           The JSON profile for fltmgr.sys\n"
+        "\t --json-ci <path to json>\n"
+        "\t                           The JSON profile for ci.dll\n"
 #endif
 #ifdef ENABLE_PLUGIN_CALLBACKMON
         "\t --json-netio <path to json>\n"
@@ -461,6 +463,7 @@ int main(int argc, char** argv)
         opt_hidsim_random_clicks,
         opt_rootkitmon_json_fwpkclnt,
         opt_rootkitmon_json_fltmgr,
+        opt_rootkitmon_json_ci,
         opt_callbackmon_json_netio,
         opt_json_hal,
         opt_libdrakvuf_not_get_userid,
@@ -530,6 +533,7 @@ int main(int argc, char** argv)
         {"hid-random-clicks", no_argument, NULL, opt_hidsim_random_clicks},
         {"json-fwpkclnt", required_argument, NULL, opt_rootkitmon_json_fwpkclnt},
         {"json-fltmgr", required_argument, NULL, opt_rootkitmon_json_fltmgr},
+        {"json-ci", required_argument, NULL, opt_rootkitmon_json_ci},
         {"json-netio", required_argument, NULL, opt_callbackmon_json_netio},
         {"json-hal", required_argument, NULL, opt_json_hal},
         {"libdrakvuf-not-get-userid", no_argument, NULL, opt_libdrakvuf_not_get_userid},
@@ -845,6 +849,9 @@ int main(int argc, char** argv)
                 break;
             case opt_rootkitmon_json_fltmgr:
                 options.fltmgr_profile = optarg;
+                break;
+            case opt_rootkitmon_json_ci:
+                options.ci_profile = optarg;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_CALLBACKMON
