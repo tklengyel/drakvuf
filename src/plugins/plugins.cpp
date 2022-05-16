@@ -335,8 +335,14 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
 #endif
 #ifdef ENABLE_PLUGIN_DKOMMON
                 case PLUGIN_DKOMMON:
-                    this->plugins[plugin_id] = std::make_unique<dkommon>(this->drakvuf, nullptr, this->output);
+                {
+                    dkommon_config config =
+                    {
+                        .services_profile = options->services_profile
+                    };
+                    this->plugins[plugin_id] = std::make_unique<dkommon>(this->drakvuf, &config, this->output);
                     break;
+                }
 #endif
 #ifdef ENABLE_PLUGIN_WMIMON
                 case PLUGIN_WMIMON:
