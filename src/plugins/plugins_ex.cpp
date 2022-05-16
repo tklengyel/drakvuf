@@ -143,11 +143,12 @@ void pluginex::destroy_all_traps()
         destroy_trap(traps.front());
 }
 
+#if 0
 std::unique_ptr<libhook::ManualHook> pluginex::createManualHook(drakvuf_trap_t* info, drakvuf_trap_free_t free_routine)
 {
     return libhook::ManualHook::create(this->drakvuf, info, free_routine);
 }
-
+#endif
 
 void pluginex::destroy_trap(drakvuf_trap_t* target)
 {

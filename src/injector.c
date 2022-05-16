@@ -248,7 +248,7 @@ int main(int argc, char** argv)
                 break;
 #ifdef DRAKVUF_DEBUG
             case 'v':
-                verbose = 1;
+//                verbose = 1;
                 break;
 #endif
             case 'l':

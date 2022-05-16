@@ -282,6 +282,8 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     ret_trap->data = wr;
     ret_trap->ttl = UNLIMITED_TTL;
 
+    PRINT_DEBUG("Adding trap with cb @ %p\n", linux_ret_cb);
+
     if ( drakvuf_add_trap(drakvuf, ret_trap) )
         s->traps = g_slist_prepend(s->traps, ret_trap);
     else
@@ -328,6 +330,8 @@ void setup_linux(drakvuf_t drakvuf, syscalls* s)
     trap->data = w;
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     trap->ah_cb = nullptr;
+
+    PRINT_DEBUG("Adding trap with cb @ %p\n", linux_cb);
 
     if ( drakvuf_add_trap(drakvuf, trap) )
         s->traps = g_slist_prepend(s->traps, trap);

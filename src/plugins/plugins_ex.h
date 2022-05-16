@@ -418,6 +418,7 @@ public:
     virtual bool stop_impl() override;
     void destroy_all_traps();
 
+#if 0
     /**********************************
      *        Libhook RAII API        *
      **********************************/
@@ -488,6 +489,7 @@ public:
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
     std::unique_ptr<libhook::CpuidHook> createCpuidHook(Callback cb, int ttl);
+#endif
 
     /************************************
      *        Legacy hooking API        *
@@ -575,6 +577,7 @@ Plugin* get_trap_plugin(const drakvuf_trap_info_t* info)
     return plugin;
 }
 
+#if 0
 template<typename Params>
 std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, hook_cb_t cb)
 {
@@ -730,6 +733,7 @@ std::unique_ptr<libhook::CpuidHook> pluginex::createCpuidHook(Callback cb, int t
         PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
     return hook;
 }
+#endif
 
 template<typename Params, typename IB>
 drakvuf_trap_t* pluginex::register_trap(drakvuf_trap_info_t* info,

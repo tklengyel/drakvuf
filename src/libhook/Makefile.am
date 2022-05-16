@@ -149,6 +149,6 @@ AM_CXXFLAGS += -pg
 endif
 endif
 
-noinst_LTLIBRARIES= libhook.la
+lib_LTLIBRARIES= libhook.la
 libhook_la_SOURCES= $(sources)
 libhook_la_LIBADD = ../libdrakvuf/libdrakvuf.la

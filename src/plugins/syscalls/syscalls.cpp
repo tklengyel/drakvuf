@@ -118,13 +118,14 @@
 
 using namespace syscalls_ns;
 
-namespace syscalls_ns
-{
-
 extern "C" std::unique_ptr<plugin> drakvufplugin_init(drakvuf_t drakvuf, const syscalls_config* c, output_format_t format)
 {
+    PRINT_DEBUG("Syscalls plugin init called\n");
     return std::make_unique<syscalls>(drakvuf, c, format);
 }
+
+namespace syscalls_ns
+{
 
 static std::string extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
@@ -327,6 +328,8 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
         setup_windows(drakvuf, this);
     else
         setup_linux(drakvuf, this);
+
+    PRINT_DEBUG("Syscalls plugin constructed\n");
 }
 
 syscalls::~syscalls()
@@ -358,4 +361,5 @@ syscalls::~syscalls()
     g_free(this->offsets);
 
     json_object_put(this->win32k_json);
+    PRINT_DEBUG("Syscalls plugin destructed\n");
 }

@@ -116,12 +116,15 @@ syscalls += syscalls/linux.h
 syscalls += syscalls/win.cpp
 syscalls += syscalls/win.h
 syscalls += syscalls/private.h
+syscalls += plugins_ex.cpp plugins_ex.h
 
 lib_LTLIBRARIES += libdrakvufplugin_syscalls.la
 libdrakvufplugin_syscalls_la_SOURCES= $(syscalls)
 libdrakvufplugin_syscalls_la_LIBADD  = ../libdrakvuf/libdrakvuf.la
 libdrakvufplugin_syscalls_la_LIBADD += libdrakvufplugin_utils.la
 endif
+
+if PLUGIN_POOLMON
 
 if PLUGIN_POOLMON
 sources += poolmon/poolmon.cpp
@@ -365,12 +368,11 @@ if PLUGIN_CALLBACKMON
 sources += callbackmon/callbackmon.cpp
 sources += callbackmon/callbackmon.h
 endif
+endif
 
 ###############################################################################
-SUBDIRS(subdir)
-
 sources += plugins.cpp plugins.h
-sources += plugins_ex.cpp plugins_ex.h
+#sources += plugins_ex.cpp plugins_ex.h
 
 utils  = plugin_utils.cpp plugin_utils.h private.h type_traits_helpers.h hook_helpers.h
 utils += output_format.h output_format/common.h output_format/csvfmt.h output_format/deffmt.h output_format/jsonfmt.h output_format/kvfmt.h
@@ -397,7 +399,6 @@ AM_LDFLAGS += $(STDCPPFSLIB)
 AM_LDFLAGS += $(PTHREAD_CFLAGS)
 
 AM_CXXFLAGS = $(CXXFLAGS)
-AM_CXXFLAGS += -Wno-return-type-c-linkage
 
 if HARDENING
 AM_CXXFLAGS += $(HARDEN_CFLAGS) -DHARDENING
@@ -412,6 +413,7 @@ endif
 if !DEBUG
 AM_CXXFLAGS += -Wno-c99-designator -Wno-reorder-init-list
 AM_CXXFLAGS += -Wno-unknown-warning-option
+AM_CXXFLAGS += -Wno-return-type-c-linkage
 else
 AM_CXXFLAGS += -DDRAKVUF_DEBUG -Werror -Wall -Wextra -g -ggdb3
 AM_CXXFLAGS += -ferror-limit=0
@@ -421,6 +423,7 @@ AM_CXXFLAGS += -Wcast-qual -Wcast-align -Wstrict-aliasing \
                -Wpointer-arith -Winit-self -Wshadow \
                -Wredundant-decls -Wfloat-equal -Wundef \
                -Wvla -Wformat -Wformat-security
+AM_CXXFLAGS += -Wno-return-type-c-linkage
 # Note that -pg is incompatible with HARDENING
 if !HARDENING
 AM_CXXFLAGS += -pg
@@ -428,10 +431,10 @@ endif
 endif
 
 lib_LTLIBRARIES += libdrakvufplugin_utils.la
-libdrakvufplugin_utils_la_SOURCES= $(utils)
+libdrakvufplugin_utils_la_SOURCES = $(utils)
 
 noinst_LTLIBRARIES += libdrakvufplugins.la
-libdrakvufplugins_la_SOURCES= $(sources)
+libdrakvufplugins_la_SOURCES = $(sources)
 libdrakvufplugins_la_LIBADD = ../xen_helper/libxenhelper.la
 libdrakvufplugins_la_LIBADD += ../libdrakvuf/libdrakvuf.la
 libdrakvufplugins_la_LIBADD += libdrakvufplugin_utils.la

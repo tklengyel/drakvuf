@@ -654,7 +654,7 @@ int main(int argc, char** argv)
                 break;
 #ifdef DRAKVUF_DEBUG
             case 'v':
-                verbose = true;
+//                verbose = true;
                 break;
 #endif
 #ifdef ENABLE_PLUGIN_SYSCALLS

@@ -172,9 +172,25 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                         .disable_sysret = options->disable_sysret,
                     };
                     void *handle = dlopen ("libdrakvufplugin_syscalls.so", RTLD_NOW | RTLD_GLOBAL);
+                    if ( !handle )
+                    {
+                        handle = dlopen ("src/plugins/.libs/libdrakvufplugin_syscalls.so", RTLD_NOW | RTLD_GLOBAL);
+                        if ( ! handle )
+                        {
+                            PRINT_DEBUG("Can't find syscalls plugin\n");
+                            return -1;
+                        }
+                    }
                     drakvufplugin_init_t *init = (drakvufplugin_init_t*)dlsym(handle, "drakvufplugin_init");
+
+                    if ( !init )
+                    {
+                        PRINT_DEBUG("Can't find drakvufplugin_init\n");
+                        return -1;
+                    }
+
                     this->plugins[plugin_id] = init(this->drakvuf, (const void*)&config, this->output);
-                    dlclose(handle);
+                    //dlclose(handle);
                     break;
                 }
 #endif

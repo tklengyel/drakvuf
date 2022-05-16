@@ -159,7 +159,6 @@ drakvuf_LDADD += xen_helper/libxenhelper.la
 drakvuf_LDADD += plugins/libdrakvufplugins.la
 drakvuf_LDADD += libinjector/libinjector.la
 drakvuf_LDADD += libusermode/libusermode.la
-drakvuf_LDADD += libhook/libhook.la
 
 injector_LDADD = libdrakvuf/libdrakvuf.la
 injector_LDADD += libinjector/libinjector.la

@@ -716,6 +716,7 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
         while (loop)
         {
             trap_info.trap = (drakvuf_trap_t*)loop->data;
+            PRINT_DEBUG("Calling cb at %p\n", trap_info.trap->cb);
             rsp |= trap_info.trap->cb(drakvuf, &trap_info);
             loop = loop->next;
         }
