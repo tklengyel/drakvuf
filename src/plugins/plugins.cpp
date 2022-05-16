@@ -500,6 +500,7 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     {
                         .fwpkclnt_profile = options->fwpkclnt_profile,
                         .fltmgr_profile = options->fltmgr_profile,
+                        .ci_profile = options->ci_profile
                     };
                     this->plugins[plugin_id] = std::make_unique<rootkitmon>(this->drakvuf, &config, this->output);
                     break;
