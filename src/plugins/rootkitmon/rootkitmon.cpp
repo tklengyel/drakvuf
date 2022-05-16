@@ -452,7 +452,7 @@ static void initialize_ob_checks(vmi_instance_t vmi, rootkitmon* plugin)
         if (VMI_SUCCESS != vmi_read_addr_va(vmi, head, 4, &entry))
             return out;
         while (entry != head && entry)
-        {   
+        {
             addr_t pre_cb{ 0 }, post_cb{ 0 };
             uint32_t active{ 0 };
             if (VMI_SUCCESS != vmi_read_32_va(vmi, entry + 0x14, 4, &active) ||
