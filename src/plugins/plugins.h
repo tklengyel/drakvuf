@@ -177,6 +177,7 @@ struct plugins_options
     bool hidsim_random_clicks;          // PLUGIN_HIDSIM
     const char* fwpkclnt_profile;       // PLUGIN_ROOTKITMON
     const char* fltmgr_profile;         // PLUGIN_ROOTKITMON
+    const char* ci_profile;             // PLUGIN_ROOTKITMON
     const char* netio_profile;          // PLUGIN_CALLBACKMON
 };
 
