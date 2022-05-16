@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2021 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -117,6 +117,10 @@ public:
 
     const callbackmon_config config;
     const output_format_t format;
+
+    addr_t ldr_data_name_rva;
+    addr_t ldr_data_base_rva;
+    addr_t ldr_data_size_rva;
 
     std::vector<addr_t> process_cb;
     std::vector<addr_t> thread_cb;

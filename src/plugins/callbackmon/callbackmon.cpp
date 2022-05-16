@@ -1,6 +1,6 @@
 /*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
  *                                                                         *
- * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
+ * DRAKVUF (C) 2014-2021 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
  * This program is free software; you may redistribute and/or modify it    *
  * under the terms of the GNU General Public License as published by the   *
@@ -115,11 +115,6 @@ static constexpr uint16_t win_8_1_ver       = 9600;
 static constexpr uint16_t win_10_rs1_ver    = 14393;
 static constexpr uint16_t win_10_1803_ver   = 17134;
 
-static std::once_flag once;
-static addr_t name_rva;
-static addr_t base_rva;
-static addr_t size_rva;
-
 static const std::vector<const char*> callout_syms =
 {
     "PspW32ProcessCallout",
@@ -156,19 +151,11 @@ struct pass_ctx
     addr_t cb_va;
     std::string name = "<Unknown>";
     addr_t base_va = 0;
+    callbackmon const* plugin;
 
-    explicit pass_ctx(drakvuf_t drakvuf, addr_t cb_va) : cb_va(cb_va)
+    pass_ctx(callbackmon const* plugin, addr_t cb_va) : cb_va(cb_va), plugin{plugin}
     {
-        std::call_once(once, [&]()
-        {
-            if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "FullDllName",  &name_rva) ||
-                !drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "DllBase",      &base_rva) ||
-                !drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "SizeOfImage",  &size_rva))
-            {
-                throw -1;
-            }
-        });
-    };
+    }
 };
 }
 
@@ -220,15 +207,16 @@ static void driver_visitor(drakvuf_t drakvuf, addr_t ldr_table, void* ctx)
     vmi_lock_guard vmi(drakvuf);
     addr_t base;
     uint32_t size;
-    if (VMI_SUCCESS != vmi_read_addr_va(vmi, ldr_table + base_rva, 4, &base) ||
-        VMI_SUCCESS != vmi_read_32_va(vmi, ldr_table + size_rva, 4, &size))
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, ldr_table + data->plugin->ldr_data_base_rva, 4, &base) ||
+        VMI_SUCCESS != vmi_read_32_va(vmi, ldr_table + data->plugin->ldr_data_size_rva, 4, &size))
     {
-        throw -1;
+        PRINT_DEBUG("[CALLBACKMON] Can't read driver base and size for ldr_table %" PRIx64 "\n", ldr_table);
+        return;
     }
 
     if (data->cb_va >= base && data->cb_va < base + size)
     {
-        unicode_string_t* module_name = drakvuf_read_unicode_va(drakvuf, ldr_table + name_rva, 4);
+        unicode_string_t* module_name = drakvuf_read_unicode_va(drakvuf, ldr_table + data->plugin->ldr_data_name_rva, 4);
         if (module_name && module_name->contents)
         {
             data->name.assign(reinterpret_cast<char*>(module_name->contents));
@@ -239,9 +227,9 @@ static void driver_visitor(drakvuf_t drakvuf, addr_t ldr_table, void* ctx)
     }
 }
 
-static inline std::pair<std::string, addr_t> get_module_by_addr(drakvuf_t drakvuf, addr_t addr)
+static inline std::pair<std::string, addr_t> get_module_by_addr(drakvuf_t drakvuf, callbackmon* plugin, addr_t addr)
 {
-    pass_ctx ctx{ drakvuf, addr };
+    pass_ctx ctx{ plugin, addr };
     drakvuf_enumerate_drivers(drakvuf, driver_visitor, &ctx);
     return { ctx.name, ctx.base_va };
 }
@@ -254,7 +242,10 @@ callbackmon::callbackmon(drakvuf_t drakvuf, const callbackmon_config* config, ou
     const size_t fast_ref  = (ptrsize == 8 ? 15 : 7);
     addr_t drv_obj_rva, mj_array_rva;
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_DEVICE_OBJECT", "DriverObject", &drv_obj_rva) ||
-        !drakvuf_get_kernel_struct_member_rva(drakvuf, "_DRIVER_OBJECT", "MajorFunction", &mj_array_rva))
+        !drakvuf_get_kernel_struct_member_rva(drakvuf, "_DRIVER_OBJECT", "MajorFunction", &mj_array_rva) ||
+        !drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "FullDllName",  &ldr_data_name_rva) ||
+        !drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "DllBase",      &ldr_data_base_rva) ||
+        !drakvuf_get_kernel_struct_member_rva(drakvuf, "_LDR_DATA_TABLE_ENTRY", "SizeOfImage",  &ldr_data_size_rva))
     {
         throw -1;
     }
@@ -423,9 +414,15 @@ bool callbackmon::stop_impl()
 {
     auto snapshot = std::make_unique<callbackmon>(drakvuf, &config, format);
 
+    uint16_t winver;
+    {
+        vmi_lock_guard vmi(drakvuf);
+        winver = vmi_get_win_buildnumber(vmi);
+    }
+
     auto report = [&](const auto& list_name, const auto& addr, const auto& action)
     {
-        const auto& [name, base] = get_module_by_addr(drakvuf, addr);
+        const auto& [name, base] = get_module_by_addr(drakvuf, this, addr);
         fmt::print(format, "callbackmon", drakvuf, nullptr,
             keyval("Type", fmt::Qstr("Callback")),
             keyval("ListName", fmt::Qstr(list_name)),
@@ -449,12 +446,6 @@ bool callbackmon::stop_impl()
 
     auto check_callouts = [&](const auto& previous, const auto& current)
     {
-
-        uint16_t winver;
-        {
-            vmi_lock_guard vmi(drakvuf);
-            winver = vmi_get_win_buildnumber(vmi);
-        }
         if (winver < win_8_1_ver)
         {
             for (size_t i = 0; i < callout_syms.size(); i++)
