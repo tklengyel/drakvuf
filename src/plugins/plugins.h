@@ -178,6 +178,7 @@ struct plugins_options
     const char* fwpkclnt_profile;       // PLUGIN_ROOTKITMON
     const char* fltmgr_profile;         // PLUGIN_ROOTKITMON
     const char* ci_profile;             // PLUGIN_ROOTKITMON
+    const char* services_profile;       // PLUGIN_DKOMMON
     const char* netio_profile;          // PLUGIN_CALLBACKMON
 };
 

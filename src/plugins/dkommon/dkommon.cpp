@@ -110,6 +110,38 @@
 #include "dkommon.h"
 #include "private.h"
 
+static constexpr uint16_t win_7_sp1_ver   = 7601;
+static constexpr uint16_t win_10_1803_ver = 17134;
+
+static const std::vector<uint8_t> win_7_srv_signature
+{
+    0x48, 0x8B, 0x1D, 0x00, 0x00, 0x00, 0x00,   // mov     rbx, cs:g_serviceDB
+    0xEB, 0x00,                                 // jmp     short loc_1000017C0
+    0x90, 0x90, 0x90, 0x90, 0x90, 0x90,         // nop
+    0x90, 0x90, 0x90,                           // nop
+    0x48, 0x85, 0xDB,                           // test    rbx, rbx
+    0x74, 0x00,                                 // jz      short loc_1000017E3
+    0x48, 0x8B, 0x4B, 0x08,                     // mov     rcx, [rbx+8]    ; String1
+    0x48, 0x8B, 0xD6,                           // mov     rdx, rsi        ; String2
+    0xFF, 0x15, 0x00, 0x00, 0x00, 0x00          // call    cs:__imp__wcsicmp
+};
+
+static const std::vector<uint8_t> win_10_srv_signature
+{
+    0x48, 0x8B, 0x1D, 0x00, 0x00, 0x00, 0x00,   // mov     rbx, qword ptr cs:g_ServicesDB
+    0x48, 0x85, 0xDB,                           // test    rbx, rbx
+    0x74, 0x00,                                 // jz      short loc_7FF78BAE1E61
+    0x8B, 0x43, 0x34,                           // mov     eax, [rbx+34h]
+    0x0F, 0xBA, 0xE0, 0x15                      // bt      eax, 15h
+};
+
+// Map of Windows version -> [name offset, next pointer offset in `SERVICE_RECORD` structure]
+static const std::map<uint64_t, std::pair<uint64_t, uint64_t>> srv_offsets =
+{
+    { win_7_sp1_ver, { 0x08, 0x80 } },
+    { win_10_1803_ver, { 0x40, 0x18 } }
+};
+
 static void print_hidden_process_information(drakvuf_t drakvuf, drakvuf_trap_info_t* info, dkommon* plugin, vmi_pid_t pid)
 {
     fmt::print(plugin->format, "dkommon", drakvuf, info,
@@ -176,6 +208,25 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* pass_ctx)
     {
         PRINT_DEBUG("[DKOMMON] Failed to read process pid\n");
         return;
+    }
+    // Locate services.exe process.
+    auto name = drakvuf_get_process_name(drakvuf, process, true);
+    if (name)
+    {
+        if (strstr(name, "\\Windows\\System32\\services.exe"))
+        {
+            plugin->srv_pid = pid;
+            // Get services.exe module base address.
+            addr_t module_list{ 0 };
+            drakvuf_get_module_list(drakvuf, process, &module_list);
+            ACCESS_CONTEXT(ctx,
+                .translate_mechanism = VMI_TM_PROCESS_PID,
+                .pid = pid
+            );
+            drakvuf_get_module_base_addr_ctx(drakvuf, module_list, &ctx, "services.exe", &plugin->srv_module_base);
+            PRINT_DEBUG("[DKOMMON] Found services.exe: 0x%lx\n", plugin->srv_module_base);
+        }
+        g_free(name);
     }
     plugin->live_processes.insert(pid);
 }
@@ -260,6 +311,78 @@ done:
     return VMI_EVENT_RESPONSE_NONE;
 }
 
+static event_response_t delete_service_return_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto params = get_trap_params<srv_result_t>(info);
+    if (!params->verify_result_call_params(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    auto plugin = get_trap_plugin<dkommon>(info);
+    if (info->regs->rax == 0)
+        plugin->loaded_services.erase(params->srv_record);
+    plugin->destroy_trap(info->trap);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t delete_service_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin = static_cast<dkommon*>(info->trap->data);
+    auto srv_record = drakvuf_get_function_argument(drakvuf, info, 2);
+    // In case of Windows 10 we have to make sure "remove" function returned 0.
+    if (plugin->winver == win_10_1803_ver)
+    {
+        auto trap = plugin->register_trap<srv_result_t>(info, delete_service_return_cb, breakpoint_by_pid_searcher());
+        auto params = get_trap_params<srv_result_t>(trap);
+        params->set_result_call_params(info);
+        params->srv_record = srv_record;
+    }
+    else
+    {
+        plugin->loaded_services.erase(srv_record);
+    }
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t add_service_return_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto params = get_trap_params<srv_result_t>(info);
+    if (!params->verify_result_call_params(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    auto plugin = get_trap_plugin<dkommon>(info);
+    vmi_lock_guard vmi(drakvuf);
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, params->srv_record, info->proc_data.pid, &params->srv_record))
+        return VMI_EVENT_RESPONSE_NONE;
+
+
+    if (info->regs->rax == 0)
+        plugin->loaded_services.insert(params->srv_record);
+    plugin->destroy_trap(info->trap);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t add_service_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto plugin = static_cast<dkommon*>(info->trap->data);
+    addr_t srv_record;
+    if (plugin->winver == win_7_sp1_ver)
+    {
+        auto srv_record_ptr = drakvuf_get_function_argument(drakvuf, info, 3);
+        auto trap = plugin->register_trap<srv_result_t>(info, add_service_return_cb, breakpoint_by_pid_searcher());
+        auto params = get_trap_params<srv_result_t>(trap);
+        params->set_result_call_params(info);
+        params->srv_record = srv_record_ptr;
+    }
+    else
+    {
+        srv_record = drakvuf_get_function_argument(drakvuf, info, 2);
+        plugin->loaded_services.insert(srv_record);
+    }
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 static event_response_t insert_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     auto plugin = get_trap_plugin<dkommon>(info);
@@ -280,8 +403,86 @@ static event_response_t insert_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
-    : pluginex(drakvuf, output), format(output), offsets(new size_t[__OFFSET_MAX])
+static inline bool is_matched(const uint8_t* memory, const std::vector<uint8_t>& signature)
+{
+    for (size_t i = 0; i < signature.size(); i++)
+        if (signature[i] != 0x00 && memory[i] != signature[i])
+            return false;
+    return true;
+}
+
+bool dkommon::find_services_db(vmi_instance_t vmi)
+{
+    if (!srv_module_base)
+        return false;
+
+    // Locate pattern within first 3 pages.
+    std::vector<void*> access_ptrs(3, nullptr);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = srv_pid,
+        .addr = srv_module_base
+    );
+
+    if (VMI_SUCCESS != vmi_mmap_guest(vmi, &ctx, access_ptrs.size(), access_ptrs.data()))
+        return false;
+
+    const auto& signature = this->winver == win_7_sp1_ver ? win_7_srv_signature : win_10_srv_signature;
+    std::vector<addr_t> hits;
+    for (size_t n_page = 0; n_page < access_ptrs.size(); n_page++)
+    {
+        if (access_ptrs[n_page])
+        {
+            auto page = static_cast<const uint8_t*>(access_ptrs[n_page]);
+            for (size_t i = 0; i < VMI_PS_4KB - signature.size(); i++)
+            {
+                // Save guest memory location
+                if (is_matched(&page[i], signature))
+                    hits.push_back(srv_module_base + VMI_PS_4KB * n_page + i);
+            }
+            munmap(access_ptrs[n_page], VMI_PS_4KB);
+        }
+    }
+    // Make sure only 1 pattern is found.
+    if (hits.size() != 1)
+    {
+        PRINT_DEBUG("[DKOMMON] Failed to match pattern: %zu\n", hits.size());
+        return false;
+    }
+
+    uint32_t srv_db_offset = 0;
+    if (VMI_SUCCESS != vmi_read_32_va(vmi, hits[0] + 3, srv_pid, &srv_db_offset))
+        return false;
+    PRINT_DEBUG("[DKOMMON] DB Offset: 0x%x\n", srv_db_offset);
+
+    this->srv_db_va = srv_db_offset + hits[0] + 7;
+    PRINT_DEBUG("[DKOMMON] DB VA: 0x%lx\n", srv_db_va);
+    return true;
+}
+
+std::set<addr_t> dkommon::enumerate_services(vmi_instance_t vmi)
+{
+    std::set<addr_t> out;
+    // Walk linked list of service records.
+    if (srv_offsets.find(this->winver) == srv_offsets.end())
+        return {};
+
+    const auto [name_off, next_off] = srv_offsets.at(this->winver);
+    addr_t srv_record;
+    if (VMI_SUCCESS != vmi_read_addr_va(vmi, srv_db_va, srv_pid, &srv_record))
+        return {};
+    while (true)
+    {
+        out.insert(srv_record);
+        vmi_read_addr_va(vmi, srv_record + next_off, srv_pid, &srv_record);
+        if (!srv_record)
+            break;
+    }
+    return out;
+}
+
+dkommon::dkommon(drakvuf_t drakvuf, const dkommon_config* config, output_format_t output)
+    : pluginex(drakvuf, output), format(output), offsets(new size_t[__OFFSET_MAX]), srv_pid(0), srv_module_base(0)
 {
     if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets))
         throw -1;
@@ -297,6 +498,66 @@ dkommon::dkommon(drakvuf_t drakvuf, const void* config, output_format_t output)
     {
         PRINT_DEBUG("[DKOMMON] Failed to setup critical traps\n");
         throw -1;
+    }
+
+    auto hook_usermode = [&](vmi_instance_t vmi, addr_t hook_addr, drakvuf_trap_t* trap, hook_cb_t cb) -> bool
+    {
+        trap->cb = cb;
+        trap->type = BREAKPOINT;
+        trap->data = (void*)this;
+        trap->breakpoint.lookup_type = LOOKUP_PID;
+        trap->breakpoint.addr_type = ADDR_VA;
+        trap->breakpoint.module = "services.exe";
+        trap->breakpoint.pid = srv_pid;
+        trap->breakpoint.addr = hook_addr;
+        return drakvuf_add_trap(drakvuf, trap);
+    };
+
+    vmi_lock_guard vmi(drakvuf);
+    this->winver = vmi_get_win_buildnumber(vmi);
+    // Before we procced with hooks from json-profile, make sure we can locate services database.
+    if (srv_pid && config->services_profile && drakvuf_get_address_width(drakvuf) == 8 && find_services_db(vmi))
+    {
+        // Only win7 sp1 x64 and win10 1803 x64 are supported
+        if (this->winver == win_7_sp1_ver || this->winver == win_10_1803_ver)
+        {
+            auto profile_json = json_object_from_file(config->services_profile);
+            if (profile_json)
+            {
+                addr_t fn_srv_add, fn_srv_del;
+                if (this->winver == win_7_sp1_ver)
+                {
+                    if (!json_get_symbol_rva(drakvuf, profile_json, "?ScCreateServiceRecord@@YAKPEAGHPEAPEAU_SERVICE_RECORD@@@Z", &fn_srv_add) ||
+                        !json_get_symbol_rva(drakvuf, profile_json, "?Add@DEFER_LIST@@QEAAXPEAU_SERVICE_RECORD@@@Z", &fn_srv_del))
+                    {
+                        PRINT_DEBUG("[DKOMMON] Failed to resolve symbols\n");
+                        throw -1;
+                    }
+                }
+                else
+                {
+                    if (!json_get_symbol_rva(drakvuf, profile_json, "?Add@CServiceDatabase@@QEAAKPEAVCServiceRecord@@@Z", &fn_srv_add) ||
+                        !json_get_symbol_rva(drakvuf, profile_json, "?Remove@CServiceDatabase@@QEAAKPEAVCServiceRecord@@@Z", &fn_srv_del))
+                    {
+                        PRINT_DEBUG("[DKOMMON] Failed to resolve symbols\n");
+                        throw -1;
+                    }
+                }
+                json_object_put(profile_json);
+                if (!hook_usermode(vmi, fn_srv_add + srv_module_base, &srv_trap[0], add_service_cb))
+                {
+                    PRINT_DEBUG("[DKOMMON] Failed to hook add_service fn\n");
+                    return;
+                }
+                if (!hook_usermode(vmi, fn_srv_del + srv_module_base, &srv_trap[1], delete_service_cb))
+                {
+                    PRINT_DEBUG("[DKOMMON] Failed to hook delete_service fn\n");
+                    drakvuf_remove_trap(drakvuf, &srv_trap[0], nullptr);
+                    return;
+                }
+            }
+        }
+        loaded_services = enumerate_services(vmi);
     }
 }
 
@@ -328,6 +589,36 @@ bool dkommon::stop_impl()
         {
             if (std::find(temp_drivers.begin(), temp_drivers.end(), drvname) == temp_drivers.end())
                 print_driver_information(drakvuf, nullptr, this->format, "Hidden Driver", drvname.c_str());
+        }
+        // Check hidden services
+        //
+        vmi_lock_guard vmi(drakvuf);
+        if (!loaded_services.empty() && srv_offsets.find(this->winver) != srv_offsets.end())
+        {
+            auto temp_services = enumerate_services(vmi);
+            auto [name_off, next_off] = srv_offsets.at(this->winver);
+            for (auto srv : loaded_services)
+            {
+                if (temp_services.find(srv) == temp_services.end())
+                {
+                    // Get service name.
+                    addr_t name_va;
+                    if (VMI_SUCCESS != vmi_read_addr_va(vmi, srv + name_off, srv_pid, &name_va))
+                        continue;
+                    ACCESS_CONTEXT(ctx,
+                        .translate_mechanism = VMI_TM_PROCESS_PID,
+                        .pid = srv_pid,
+                        .addr = name_va);
+                    auto name = drakvuf_read_wchar_string(drakvuf, &ctx);
+                    if (name)
+                    {
+                        print_driver_information(drakvuf, nullptr, this->format, "Hidden Service", (const char*)name->contents);
+                        vmi_free_unicode_str(name);
+                    }
+                    else
+                        print_driver_information(drakvuf, nullptr, this->format, "Hidden Service", "<Anonymous>");
+                }
+            }
         }
     }
     return pluginex::stop_impl();
