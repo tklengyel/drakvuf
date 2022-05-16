@@ -120,3 +120,10 @@ static const char* offset_names[__OFFSET_MAX][2] =
     [LDR_DATA_TABLE_ENTRY_INLOADORDERLINKS] = {"_LDR_DATA_TABLE_ENTRY", "InLoadOrderLinks"},
     [LDR_DATA_TABLE_ENTRY_BASEDLLNAME] = {"_LDR_DATA_TABLE_ENTRY", "BaseDllName"},
 };
+
+struct srv_result_t : public call_result_t
+{
+    srv_result_t() : call_result_t(), srv_record()
+    {}
+    addr_t srv_record;
+};
