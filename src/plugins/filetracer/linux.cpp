@@ -145,13 +145,8 @@ static void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info, linux_wrapp
 {
     linux_filetracer* f = (linux_filetracer*)info->trap->data;
 
-    std::vector<std::pair<std::string, fmt::Rstr<const char*>>> extra_args;
-    {
-        gchar* escaped_fname = drakvuf_escape_str(lw.filename->str);
-        extra_args.emplace_back(keyval("FileName", fmt::Rstr(const_cast<const char*>(escaped_fname))));
-        g_free(escaped_fname);
-    }
-
+    std::vector<std::pair<std::string, fmt::Aarg>> extra_args;
+    extra_args.emplace_back(keyval("FileName", fmt::Estr(const_cast<const char*>(lw.filename->str))));
     if (lw.modes->len)
         extra_args.emplace_back(keyval("Mode", fmt::Rstr(const_cast<const char*>(lw.modes->str))));
     if (lw.flags->len)

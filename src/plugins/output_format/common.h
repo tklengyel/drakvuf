@@ -250,8 +250,49 @@ struct Qstr<T,
     Qstr(T v): Rstr<std::string>(nullptr == v ? std::string("(null)") : std::string(v)) {}
 };
 
+/* format specific encoded string value */
+template<class T, class = void>
+struct Estr
+{
+    Estr(T v)
+    {
+        static_assert(always_false<T>::value, "should be the one of: const char*, std::string, std::string_view");
+    }
+};
+
+template<class T>
+struct Estr<T,
+           std::enable_if_t<
+           std::is_same_v<std::decay_t<T>, std::string>
+           || std::is_same_v<std::decay_t<T>, std::string_view>,
+           void>
+           >: Rstr<std::string>
+{
+    Estr(T v): Rstr<std::string>(std::string_view(v).empty() ? std::string("(null)") : std::move(v)) {}
+};
+
+template<class T>
+struct Estr<T,
+           std::enable_if_t<
+           std::is_same_v<T, const char*>
+           || std::is_same_v<T, char*>,
+           void>
+           >: Rstr<std::string>
+{
+    Estr(T v): Rstr<std::string>(nullptr == v ? std::string("(null)") : std::string(v)) {}
+};
+
 /* Any argument type */
-using Aarg = std::variant<fmt::Nval<unsigned long>, fmt::Xval<unsigned long>, fmt::Fval<long double>, fmt::Rstr<std::string>, fmt::Qstr<std::string>>;
+using Aarg = std::variant<
+    fmt::Nval<unsigned long>,
+    fmt::Xval<unsigned long>,
+    fmt::Fval<long double>,
+    fmt::Rstr<const char*>,
+    fmt::Rstr<std::string>,
+    fmt::Qstr<const char*>,
+    fmt::Qstr<std::string>,
+    fmt::Estr<const char*>,
+    fmt::Estr<std::string>>;
 
 } // namespace fmt
 
