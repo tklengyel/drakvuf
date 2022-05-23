@@ -948,7 +948,11 @@ gchar* drakvuf_escape_str(const char* input)
         goto exit;
     }
 
+#ifdef JSON_C_TO_STRING_NOSLASHESCAPE
+    const char* escaped = json_object_to_json_string_ext(obj, JSON_C_TO_STRING_NOSLASHESCAPE);
+#else
     const char* escaped = json_object_to_json_string(obj);
+#endif
     if (NULL == escaped)
     {
         fprintf(stderr, "json_object_to_json_string() failed!\n");
