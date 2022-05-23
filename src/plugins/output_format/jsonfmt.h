@@ -170,6 +170,15 @@ public:
     }
 
     template <class Tv = T>
+    static bool print(std::ostream& os, const fmt::Estr<Tv>& data, char)
+    {
+        gchar* escaped = drakvuf_escape_str(data.value.c_str());
+        os << escaped;
+        g_free(escaped);
+        return true;
+    }
+
+    template <class Tv = T>
     static bool print(std::ostream& os, const std::function<bool(std::ostream&)>& printer, char)
     {
         auto pos = os.tellp();
