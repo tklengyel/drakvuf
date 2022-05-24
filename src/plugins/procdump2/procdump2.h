@@ -209,7 +209,8 @@ private:
     void dispatch_active(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     bool dispatch_new(drakvuf_trap_info_t*);
     bool dispatch_pending(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
-    bool dispatch_wakeup(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>, bool);
+    bool dispatch_host_wakeup(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    bool dispatch_target_wakeup(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
 
     /* Injection helpers */
     void allocate_pool(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
@@ -217,7 +218,7 @@ private:
     void get_irql(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     void resume(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     void suspend(drakvuf_trap_info_t*, addr_t, return_ctx&);
-    void delay_execution(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
+    void delay_execution(drakvuf_trap_info_t*, return_ctx&, uint16_t msec = 100);
 
     /* Routines */
     std::shared_ptr<procdump2_ctx> continues_task(drakvuf_trap_info_t*);
@@ -230,7 +231,7 @@ private:
     bool prepare_minidump(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     void dump_zero_page(std::shared_ptr<procdump2_ctx>);
     void read_vm(addr_t, std::shared_ptr<procdump2_ctx>, size_t);
-    void restore(drakvuf_trap_info_t*, x86_registers_t&);
+    void restore(drakvuf_trap_info_t*, return_ctx&);
     void save_file_metadata(std::shared_ptr<procdump2_ctx>, proc_data_t*);
     bool start_copy_memory(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
 };

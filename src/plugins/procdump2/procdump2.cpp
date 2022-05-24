@@ -133,7 +133,7 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
     , drakvuf(drakvuf)
     , pools(std::make_unique<pool_manager>())
 {
-    if (procdump_dir.empty())
+    if (!config->procdump_dir)
         return;
 
     if (config->disable_kideliverapc_hook &&
@@ -199,7 +199,7 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
 
     num_cpus = vmi_get_num_vcpus(vmi);
     win_build_info_t build_info;
-    if (!vmi_get_windows_build_info(vmi, &build_info))
+    if (!vmi_get_windows_build_info(vmi.vmi, &build_info))
         throw -1;
 
     win_build_number = build_info.buildnumber;
@@ -227,11 +227,9 @@ procdump2::~procdump2()
 
 bool procdump2::stop_impl()
 {
-    bool is_plugin_enabled = this->delay_execution_hook || this->deliver_apc_hook;
-
     if (!begin_stop_at)
         begin_stop_at = g_get_real_time() / G_USEC_PER_SEC;
-    if (is_plugin_enabled && procdump_on_finish &&
+    if (procdump_on_finish &&
         !is_active_process(procdump_on_finish) &&
         !is_process_handled(procdump_on_finish))
     {
@@ -254,6 +252,7 @@ bool procdump2::stop_impl()
                     use_compression);
             ctx->stage(procdump_stage::need_suspend);
             ctx->wait_awaken = false;
+            ctx->target.restored = true;
             PRINT_DEBUG("[PROCDUMP] [%d:%d] "
                 "Dispatch new process\n"
                 , ctx->target_process_pid, to_int(ctx->stage())
@@ -349,13 +348,10 @@ event_response_t procdump2::terminate_process_cb(drakvuf_t,
                 ctx->host.ret_pid,
                 ctx->host.ret_tid,
                 ctx->host.ret_rsp);
-        if (is_target || is_host)
-        {
-            if (dispatch_wakeup(info, ctx, is_target))
-                return VMI_EVENT_RESPONSE_SET_REGISTERS;
-            else
-                return VMI_EVENT_RESPONSE_NONE;
-        }
+        if (is_target && dispatch_target_wakeup(info, ctx))
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
+        else if (is_host && dispatch_host_wakeup(info, ctx))
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
     /* The host process could become a target one. So dispatch wake up first. */
@@ -384,11 +380,8 @@ event_response_t procdump2::dispatcher(drakvuf_trap_info_t* info)
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
-    if (is_stopping())
-        return VMI_EVENT_RESPONSE_NONE;
-
     /* Check if there is something to processes. */
-    if (this->active.empty())
+    if (!is_plugin_active())
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] "
             "Nothing to dispatch\n"
@@ -458,10 +451,12 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
              * target process would be really suspended. So move the
              * context into pending state.
              */
-            restore(info, ctx->working.regs);
+            restore(info, ctx->working);
             ctx->stage(procdump_stage::pending);
             /* This trick prevents to fetching the task from active list
-             * while handline KiDeliverApc hook. */
+             * while handline KiDeliverApc hook.
+             * TODO Move to function
+             */
             ctx->working.ret_pid = 0;
             this->working_threads.erase(info->attached_proc_data.tid);
         }
@@ -473,8 +468,13 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
             if (irql >= IRQL_DISPATCH_LEVEL)
             {
                 /* The current thread's IRQL is high. Search other one. */
-                restore(info, ctx->working.regs);
+                restore(info, ctx->working);
                 ctx->stage(procdump_stage::pending);
+                /* This trick prevents to fetching the task from active list
+                * while handline KiDeliverApc hook.
+                * TODO Move to function
+                */
+                ctx->working.ret_pid = 0;
                 this->working_threads.erase(info->attached_proc_data.tid);
             }
             else
@@ -483,10 +483,14 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
                 {
                     if (!start_copy_memory(info, ctx))
                     {
-                        // TODO Resume target process?
-                        restore(info, ctx->working.regs);
-                        finish_task(info, ctx);
-                        this->working_threads.erase(info->attached_proc_data.tid);
+                        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                            "Resume target process on dump start fail\n"
+                            , info->event_uid
+                            , info->attached_proc_data.pid
+                            , info->attached_proc_data.tid
+                            , ctx->target_process_pid, to_int(ctx->stage())
+                        );
+                        resume(info, ctx);
                     }
                 }
                 else
@@ -504,18 +508,25 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
                 ctx->pool = pools->get();
                 if (!start_copy_memory(info, ctx))
                 {
-                    // TODO Resume target process?
-                    restore(info, ctx->working.regs);
-                    finish_task(info, ctx);
-                    this->working_threads.erase(info->attached_proc_data.tid);
+                    PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                        "Resume target process on dump start fail\n"
+                        , info->event_uid
+                        , info->attached_proc_data.pid
+                        , info->attached_proc_data.tid
+                        , ctx->target_process_pid, to_int(ctx->stage())
+                    );
+                    resume(info, ctx);
                 }
             }
             else
             {
-                // TODO Resume target process?
-                restore(info, ctx->working.regs);
-                finish_task(info, ctx);
-                this->working_threads.erase(info->attached_proc_data.tid);
+                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                    "Resume target process on pool allocation fail\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid, info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                );
+                resume(info, ctx);
             }
         }
         break;
@@ -563,11 +574,10 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
             {
                 // The last region have been fully dumped so finish task
                 PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Resume %s process\n"
+                    "Resume target process on dump finish\n"
                     , info->event_uid
                     , info->attached_proc_data.pid, info->attached_proc_data.tid
                     , ctx->target_process_pid, to_int(ctx->stage())
-                    , ctx->is_hosted ? "host" : "target"
                 );
                 resume(info, ctx);
             }
@@ -613,11 +623,10 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
         case procdump_stage::resume:
         {
             PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                "After resuming %s process\n"
+                "After resuming target process\n"
                 , info->event_uid
                 , info->attached_proc_data.pid, info->attached_proc_data.tid
                 , ctx->target_process_pid, to_int(ctx->stage())
-                , ctx->is_hosted ? "host" : "target"
             );
             /* Assume self-terminating target here. Such a target would
              * remove task after return from PsSuspendProcess.
@@ -625,11 +634,17 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
              * For not self-terminating target this is not the case. The
              * task should be removed here.
              */
-            restore(info, ctx->working.regs);
-            if (ctx->stage() == procdump_stage::awaken || !ctx->wait_awaken)
-                finish_task(info, ctx);
-            else
+            restore(info, ctx->working);
+            if (ctx->is_restored())
+            {
                 ctx->stage(procdump_stage::finished);
+                finish_task(info, ctx);
+            }
+            /* This trick prevents to fetching the task from active list
+             * while handline KiDeliverApc hook.
+             * TODO Move to function
+             */
+            ctx->working.ret_pid = 0;
             this->working_threads.erase(info->attached_proc_data.tid);
         }
         break;
@@ -639,7 +654,12 @@ void procdump2::dispatch_active(drakvuf_trap_info_t* info, std::shared_ptr<procd
         case procdump_stage::invalid:
         case procdump_stage::target_wakeup:
         default:
-            restore(info, ctx->working.regs);
+            restore(info, ctx->working);
+            /* This trick prevents to fetching the task from active list
+             * while handline KiDeliverApc hook.
+             * TODO Move to function
+             */
+            ctx->working.ret_pid = 0;
             this->working_threads.erase(info->attached_proc_data.tid);
     }
 }
@@ -662,7 +682,10 @@ bool procdump2::dispatch_pending(drakvuf_trap_info_t* info, std::shared_ptr<proc
             , ctx->target_process_pid, to_int(ctx->stage())
         );
         ctx->stage(procdump_stage::suspend);
+        // TODO Move to function ... START
         memcpy(&ctx->working.regs, info->regs, sizeof(x86_registers_t));
+        ctx->working.restored = false;
+        // ... END
         this->working_threads.insert(info->attached_proc_data.tid);
         suspend(info, ctx->target_process_base, ctx->working);
         return true;
@@ -684,7 +707,10 @@ bool procdump2::dispatch_pending(drakvuf_trap_info_t* info, std::shared_ptr<proc
                 , info->attached_proc_data.pid, info->attached_proc_data.tid
                 , ctx->target_process_pid, to_int(ctx->stage())
             );
-            return false;
+            memcpy(&ctx->working.regs, info->regs, sizeof(x86_registers_t));
+            this->working_threads.insert(info->attached_proc_data.tid);
+            resume(info, ctx);
+            return true;
         }
         if (!is_suspended)
             return false;
@@ -764,9 +790,10 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
         is_process_handled(target_process_pid))
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] "
-            "Skip active or finished process\n"
+            "Skip active or finished process %d (%s)\n"
             , info->event_uid
             , info->attached_proc_data.pid, info->attached_proc_data.tid
+            , target_process_pid, target_process_name.data()
         );
         return false;
     }
@@ -783,10 +810,11 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
     this->active[target_process_pid] = ctx;
 
     PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-        "Dispatch new process\n"
+        "Dispatch new process: %s\n"
         , info->event_uid
         , info->attached_proc_data.pid, info->attached_proc_data.tid
         , ctx->target_process_pid, to_int(ctx->stage())
+        , target_process_name.data()
     );
 
     /* Suspend target and/or host processes.
@@ -797,11 +825,10 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
      * If later suspended process would be resumed beforehand than it would be
      * suspended once more.
      */
-    // TODO Check re-suspend works.
     if (is_hosted)
     {
         PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-            "Delay suspend\n"
+            "Delay target suspend\n"
             , info->event_uid
             , info->attached_proc_data.pid, info->attached_proc_data.tid
             , ctx->target_process_pid, to_int(ctx->stage())
@@ -809,7 +836,7 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
         ctx->stage(procdump_stage::need_suspend);
         ctx->host_process_base = info->attached_proc_data.base_addr;
         memcpy(&ctx->host.regs, info->regs, sizeof(x86_registers_t));
-        suspend(info, ctx->host_process_base, ctx->host);
+        delay_execution(info, ctx->host, 500);
     }
     else
     {
@@ -826,91 +853,115 @@ bool procdump2::dispatch_new(drakvuf_trap_info_t* info)
     return true;
 }
 
-bool procdump2::dispatch_wakeup(
+bool procdump2::dispatch_host_wakeup(
     drakvuf_trap_info_t* info,
-    std::shared_ptr<procdump2_ctx> ctx,
-    bool is_target)
+    std::shared_ptr<procdump2_ctx> ctx)
 {
+    PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+        "Delayed host process wake up\n"
+        , info->event_uid
+        , info->attached_proc_data.pid, info->attached_proc_data.tid
+        , ctx->target_process_pid, to_int(ctx->stage())
+    );
+    switch (ctx->stage())
+    {
+        case procdump_stage::resume:
+        case procdump_stage::awaken:
+        case procdump_stage::finished:
+            restore(info, ctx->host);
+            if (ctx->is_restored())
+            {
+                ctx->stage(procdump_stage::finished);
+                finish_task(info, ctx);
+            }
+            return true;
+        default:
+            delay_execution(info, ctx->host, 500);
+            return true;
+    }
+}
+
+bool procdump2::dispatch_target_wakeup(
+    drakvuf_trap_info_t* info,
+    std::shared_ptr<procdump2_ctx> ctx)
+{
+    PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+        "Suspended target process wake up\n"
+        , info->event_uid
+        , info->attached_proc_data.pid, info->attached_proc_data.tid
+        , ctx->target_process_pid, to_int(ctx->stage())
+    );
     switch (ctx->stage())
     {
         case procdump_stage::awaken:
-            /* Nothing to do. Wait until task would be removed from active. */
+            if (ctx->is_restored())
+            {
+                ctx->stage(procdump_stage::finished);
+                finish_task(info, ctx);
+            }
             return false;
         case procdump_stage::finished:
         case procdump_stage::resume:
-            PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                "Suspended %s process wake up\n"
-                , info->event_uid
-                , info->attached_proc_data.pid, info->attached_proc_data.tid
-                , ctx->target_process_pid, to_int(ctx->stage())
-                , is_target ? "target" : "host"
-            );
-            if (is_target)
-                restore(info, ctx->target.regs);
-            else
-                restore(info, ctx->host.regs);
+            restore(info, ctx->target);
             if (ctx->stage() == procdump_stage::resume)
                 ctx->stage(procdump_stage::awaken);
-            else
+
+            if (ctx->is_restored())
+            {
+                ctx->stage(procdump_stage::finished);
                 finish_task(info, ctx);
+            }
             return true;
         case procdump_stage::target_wakeup:
+            // TODO Move working thread check into function
             if (this->working_threads.find(ctx->working.ret_tid) !=
                 this->working_threads.end())
             {
                 // The working thread is active - keep alive
                 PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Suspended %s process wake up while not finished but "
+                    "Suspended target process wake up while not finished but "
                     "working thread still active - keep alive\n"
                     , info->event_uid
                     , info->attached_proc_data.pid
                     , info->attached_proc_data.tid
                     , ctx->target_process_pid, to_int(ctx->stage())
-                    , is_target ? "target" : "host"
                 );
-                delay_execution(info, ctx);
+                delay_execution(info, ctx->target, 100);
             }
             else
             {
-                // The working thread is active - keep alive
+                // The working thread is not active - finish task
                 PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                    "Suspended %s process wake up while not finished and "
+                    "Suspended target process wake up while not finished and "
                     "working thread finished - finish the task\n"
                     , info->event_uid
                     , info->attached_proc_data.pid
                     , info->attached_proc_data.tid
                     , ctx->target_process_pid, to_int(ctx->stage())
-                    , is_target ? "target" : "host"
                 );
-                restore(info, ctx->target.regs);
+                restore(info, ctx->target);
                 finish_task(info, ctx);
             }
             return true;
         default:
-            if (is_target)
+            if (ctx->on_target_resuspend())
             {
-                if (ctx->on_target_resuspend())
-                {
-                    PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
-                        "Suspended %s process wake up while not finished "
-                        "(retries %d)\n"
-                        , info->event_uid
-                        , info->attached_proc_data.pid
-                        , info->attached_proc_data.tid
-                        , ctx->target_process_pid, to_int(ctx->stage())
-                        , is_target ? "target" : "host"
-                        , ctx->target_resuspend_count
-                    );
-                    suspend(info, ctx->target_process_base, ctx->target);
-                }
-                else
-                {
-                    ctx->stage(procdump_stage::target_wakeup);
-                    dispatch_wakeup(info, ctx, is_target);
-                }
+                PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+                    "Suspended target process wake up while not finished "
+                    "(retries %d)\n"
+                    , info->event_uid
+                    , info->attached_proc_data.pid
+                    , info->attached_proc_data.tid
+                    , ctx->target_process_pid, to_int(ctx->stage())
+                    , ctx->target_resuspend_count
+                );
+                suspend(info, ctx->target_process_base, ctx->target);
             }
             else
-                suspend(info, ctx->target_process_base, ctx->host);
+            {
+                ctx->stage(procdump_stage::target_wakeup);
+                dispatch_target_wakeup(info, ctx);
+            }
             return true;
     }
 }
@@ -1007,10 +1058,7 @@ void procdump2::get_irql(drakvuf_trap_info_t* info, std::shared_ptr<procdump2_ct
 void procdump2::resume(drakvuf_trap_info_t* info, std::shared_ptr<procdump2_ctx> ctx)
 {
     struct argument args[1] = {};
-    if (ctx->is_hosted)
-        init_int_argument(&args[0], ctx->host_process_base);
-    else
-        init_int_argument(&args[0], ctx->target_process_base);
+    init_int_argument(&args[0], ctx->target_process_base);
 
     auto vmi = vmi_lock_guard(drakvuf);
     if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 1))
@@ -1060,10 +1108,12 @@ void procdump2::suspend(drakvuf_trap_info_t* info, addr_t target_process_base, r
     ctx.ret_tid = info->attached_proc_data.tid;
 }
 
-void procdump2::delay_execution(drakvuf_trap_info_t* info, std::shared_ptr<procdump2_ctx> ctx)
+void procdump2::delay_execution(drakvuf_trap_info_t* info,
+    return_ctx& ctx,
+    uint16_t msec)
 {
     struct argument args[3] = {};
-    uint64_t interval = 1000000; // 100 ms
+    int64_t interval = -10000 * static_cast<int64_t>(msec);
 
     init_int_argument(&args[0], 0); // KernelMode
     init_int_argument(&args[1], 1); // Alertable
@@ -1072,19 +1122,18 @@ void procdump2::delay_execution(drakvuf_trap_info_t* info, std::shared_ptr<procd
     auto vmi = vmi_lock_guard(drakvuf);
     if (!setup_stack_locked(drakvuf, vmi, info->regs, args, 3))
     {
-        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] [%d:%d] "
+        PRINT_DEBUG("[PROCDUMP] [%8zu] [%d:%d] "
             "Failed to inject KeDelayExecutionThread\n"
             , info->event_uid
             , info->attached_proc_data.pid, info->attached_proc_data.tid
-            , ctx->target_process_pid, to_int(ctx->stage())
         );
         throw -1;
     }
 
     info->regs->rip = delay_execution_va;
-    ctx->target.ret_pid = info->attached_proc_data.pid;
-    ctx->target.ret_rsp = info->regs->rsp;
-    ctx->target.ret_tid = info->attached_proc_data.tid;
+    ctx.ret_pid = info->attached_proc_data.pid;
+    ctx.ret_rsp = info->regs->rsp;
+    ctx.ret_tid = info->attached_proc_data.tid;
 }
 
 /*****************************************************************************
@@ -1258,7 +1307,10 @@ std::pair<addr_t, size_t> procdump2::get_memory_region(drakvuf_trap_info_t* info
 
 bool procdump2::is_plugin_active()
 {
-    return !this->active.empty();
+    if (!this->active.empty())
+        return true;
+
+    return false;
 }
 
 bool procdump2::is_active_process(vmi_pid_t pid)
@@ -1409,8 +1461,7 @@ void procdump2::read_vm(addr_t dtb,
     delete[] access_ptrs;
 }
 
-void procdump2::restore(drakvuf_trap_info_t* info,
-    x86_registers_t& regs)
+void procdump2::restore(drakvuf_trap_info_t* info, return_ctx& ctx)
 {
     // One could not restore all registers at once like this:
     //     memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t)),
@@ -1419,22 +1470,23 @@ void procdump2::restore(drakvuf_trap_info_t* info,
     // GS BASE on vCPU0 and start injections Windows scheduler could switch
     // thread to other vCPU1. After restoring all registers vCPU1's GS BASE
     // would point to KPCR of vCPU0.
-    info->regs->rax = regs.rax;
-    info->regs->rcx = regs.rcx;
-    info->regs->rdx = regs.rdx;
-    info->regs->rbx = regs.rbx;
-    info->regs->rbp = regs.rbp;
-    info->regs->rsp = regs.rsp;
-    info->regs->rdi = regs.rdi;
-    info->regs->rsi = regs.rsi;
-    info->regs->r8  = regs.r8;
-    info->regs->r9  = regs.r9;
-    info->regs->r10 = regs.r10;
-    info->regs->r11 = regs.r11;
-    info->regs->r12 = regs.r12;
-    info->regs->r13 = regs.r13;
-    info->regs->r14 = regs.r14;
-    info->regs->r15 = regs.r15;
+    info->regs->rax = ctx.regs.rax;
+    info->regs->rcx = ctx.regs.rcx;
+    info->regs->rdx = ctx.regs.rdx;
+    info->regs->rbx = ctx.regs.rbx;
+    info->regs->rbp = ctx.regs.rbp;
+    info->regs->rsp = ctx.regs.rsp;
+    info->regs->rdi = ctx.regs.rdi;
+    info->regs->rsi = ctx.regs.rsi;
+    info->regs->r8  = ctx.regs.r8;
+    info->regs->r9  = ctx.regs.r9;
+    info->regs->r10 = ctx.regs.r10;
+    info->regs->r11 = ctx.regs.r11;
+    info->regs->r12 = ctx.regs.r12;
+    info->regs->r13 = ctx.regs.r13;
+    info->regs->r14 = ctx.regs.r14;
+    info->regs->r15 = ctx.regs.r15;
+    ctx.restored = true;
 }
 
 void procdump2::save_file_metadata(std::shared_ptr<procdump2_ctx> ctx, proc_data_t* proc_data)
