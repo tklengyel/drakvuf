@@ -236,6 +236,16 @@ bool setup_stack_locked(drakvuf_t drakvuf,
     struct argument args[],
     int nb_args) NOEXCEPT;
 
+bool inject_function_call(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
+    x86_registers_t* regs,
+    struct argument args[],
+    int nb_args,
+    addr_t function_addr,
+    addr_t* stack_pointer);
+
 injector_status_t injector_start_app(drakvuf_t drakvuf,
     vmi_pid_t pid,
     uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used

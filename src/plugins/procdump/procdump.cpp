@@ -968,26 +968,6 @@ static event_response_t terminate_process_cb(drakvuf_t drakvuf,
     return detach(drakvuf, info, ctx);
 }
 
-static addr_t get_function_va(drakvuf_t drakvuf, const char* lib,
-    const char* func_name)
-{
-    addr_t rva;
-    if (!drakvuf_get_kernel_symbol_rva(drakvuf, func_name, &rva))
-    {
-        PRINT_DEBUG("[PROCDUMP] [Init] Failed to get RVA of %s\n", func_name);
-        throw -1;
-    }
-
-    addr_t va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, lib, rva);
-    if (!va)
-    {
-        PRINT_DEBUG("[PROCDUMP] [Init] Failed to get VA of %s\n", func_name);
-        throw -1;
-    }
-
-    return va;
-}
-
 procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
     output_format_t output)
     : pluginex(drakvuf, output)
@@ -1014,11 +994,19 @@ procdump::procdump(drakvuf_t drakvuf, const procdump_config* config,
         return;
 
     this->malloc_va =
-        get_function_va(drakvuf, "ntoskrnl.exe", "ExAllocatePoolWithTag");
+        drakvuf_kernel_symbol_to_va(drakvuf, "ExAllocatePoolWithTag");
     this->memcpy_va =
-        get_function_va(drakvuf, "ntoskrnl.exe", "RtlCopyMemoryNonTemporal");
+        drakvuf_kernel_symbol_to_va(drakvuf, "RtlCopyMemoryNonTemporal");
     this->clean_process_va =
-        get_function_va(drakvuf, "ntoskrnl.exe", "MmCleanProcessAddressSpace");
+        drakvuf_kernel_symbol_to_va(drakvuf, "MmCleanProcessAddressSpace");
+
+    if (!this->malloc_va ||
+        !this->memcpy_va ||
+        !this->clean_process_va)
+    {
+        PRINT_DEBUG("[PROCDUMP] Failed to get function address\n");
+        throw -1;
+    }
 
     vmi_lock_guard vmi(drakvuf);
     num_cpus = vmi_get_num_vcpus(vmi);

@@ -107,6 +107,8 @@
 #include <string>
 #include <vector>
 
+#include <libinjector/libinjector.h>
+
 #include "syscalls.h"
 #include "private.h"
 #include "linux.h"

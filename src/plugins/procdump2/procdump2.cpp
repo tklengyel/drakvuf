@@ -148,15 +148,26 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
     win_ver_t winver = vmi_get_winver(vmi);
 
     this->malloc_va =
-        get_function_va("ntoskrnl.exe", "ExAllocatePoolWithTag");
+        drakvuf_kernel_symbol_to_va(drakvuf, "ExAllocatePoolWithTag");
     this->suspend_process_va =
-        get_function_va("ntoskrnl.exe", "PsSuspendProcess");
+        drakvuf_kernel_symbol_to_va(drakvuf, "PsSuspendProcess");
     this->resume_process_va =
-        get_function_va("ntoskrnl.exe", "PsResumeProcess");
+        drakvuf_kernel_symbol_to_va(drakvuf, "PsResumeProcess");
     this->copy_virt_mem_va =
-        get_function_va("ntoskrnl.exe", "MmCopyVirtualMemory");
+        drakvuf_kernel_symbol_to_va(drakvuf, "MmCopyVirtualMemory");
     this->delay_execution_va =
-        get_function_va("ntoskrnl.exe", "KeDelayExecutionThread");
+        drakvuf_kernel_symbol_to_va(drakvuf, "KeDelayExecutionThread");
+
+    if (!this->malloc_va ||
+        !this->suspend_process_va ||
+        !this->resume_process_va ||
+        !this->copy_virt_mem_va ||
+        !this->delay_execution_va)
+    {
+        PRINT_DEBUG("[PROCDUMP] Failed to get function address\n");
+        throw -1;
+    }
+
     if (is32bit && VMI_OS_WINDOWS_7 == winver)
     {
         json_object* hal_profile = json_object_from_file(config->hal_profile);
@@ -194,7 +205,7 @@ procdump2::procdump2(drakvuf_t drakvuf, const procdump2_config* config,
     else
     {
         this->current_irql_va =
-            get_function_va("ntoskrnl.exe", "KeGetCurrentIrql");
+            drakvuf_kernel_symbol_to_va(drakvuf, "KeGetCurrentIrql");
     }
 
     num_cpus = vmi_get_num_vcpus(vmi);
@@ -1008,7 +1019,7 @@ void procdump2::copy_memory(drakvuf_trap_info_t* info,
     init_int_argument(&args[2], info->attached_proc_data.base_addr);
     init_int_argument(&args[3], ctx->pool);
     init_int_argument(&args[4], size);
-    init_int_argument(&args[5], 0); // UserMode (TODO Is this correct?)
+    init_int_argument(&args[5], 0);
     init_struct_argument(&args[6], read_bytes);
 
     auto vmi = vmi_lock_guard(drakvuf);
@@ -1219,27 +1230,6 @@ void procdump2::finish_task(drakvuf_trap_info_t* info,
     if (ctx->pool)
         pools->free(ctx->pool);
     this->active.erase(ctx->target_process_pid);
-}
-
-addr_t procdump2::get_function_va(
-    std::string_view lib,
-    std::string_view func_name)
-{
-    addr_t rva;
-    if (!drakvuf_get_kernel_symbol_rva(drakvuf, func_name.data(), &rva))
-    {
-        PRINT_DEBUG("[PROCDUMP] [Init] Failed to get RVA of %s\n", func_name.data());
-        return 0;
-    }
-
-    addr_t va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, lib.data(), rva);
-    if (!va)
-    {
-        PRINT_DEBUG("[PROCDUMP] [Init] Failed to get VA of %s\n", func_name.data());
-        return 0;
-    }
-
-    return va;
 }
 
 std::pair<addr_t, size_t> procdump2::get_memory_region(drakvuf_trap_info_t* info,

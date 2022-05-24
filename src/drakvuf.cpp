@@ -214,11 +214,25 @@ drakvuf_c::drakvuf_c(const char* domain,
     addr_t kpgd,
     bool fast_singlestep,
     uint64_t limited_traps_ttl,
-    bool libdrakvuf_get_userid)
+    bool libdrakvuf_get_userid,
+    bool enable_active_callback_check)
     : leave_paused{ leave_paused }
     , format{ output }
 {
-    if (!drakvuf_init(&drakvuf, domain, json_kernel_path, json_wow_path, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl, libdrakvuf_get_userid))
+    bool success = drakvuf_init(
+            &drakvuf,
+            domain,
+            json_kernel_path,
+            json_wow_path,
+            libvmi_conf,
+            kpgd,
+            fast_singlestep,
+            limited_traps_ttl,
+            libdrakvuf_get_userid,
+            enable_active_callback_check
+        );
+
+    if (!success)
     {
         drakvuf_close(drakvuf, leave_paused);
         throw std::runtime_error("drakvuf_init() failed");

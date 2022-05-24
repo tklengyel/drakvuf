@@ -652,6 +652,20 @@ addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf, const vmi_pid_t pid, const ch
     return ret;
 }
 
+addr_t drakvuf_kernel_symbol_to_va(drakvuf_t drakvuf, const char* func)
+{
+    addr_t ret = 0;
+
+    if ( drakvuf->osi.kernel_symbol_to_va )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.kernel_symbol_to_va(drakvuf, func);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
     const char* module, const char* sym)
 {

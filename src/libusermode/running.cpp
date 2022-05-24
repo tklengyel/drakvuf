@@ -235,8 +235,19 @@ event_response_t hook_process_cb(
     rh_data_t* rh_data = static_cast<rh_data_t*>(info->trap->data);
     userhook* userhook_plugin = rh_data->userhook_plugin;
 
-    if (info->proc_data.pid != rh_data->target_process_pid)
-        return VMI_EVENT_RESPONSE_NONE;
+    if (!rh_data->inject_in_progress)
+    {
+        if (info->proc_data.pid != rh_data->target_process_pid)
+            return VMI_EVENT_RESPONSE_NONE;
+    }
+    else
+    {
+        if (!drakvuf_check_return_context(drakvuf, info, rh_data->target_process_pid, rh_data->target_process_tid, rh_data->target_process_rsp))
+            return VMI_EVENT_RESPONSE_NONE;
+
+        memcpy(info->regs, &rh_data->regs, sizeof(x86_registers_t));
+        rh_data->inject_in_progress = false;
+    }
 
     if (rh_data->state == HOOK_FIRST_TRY)
     {
@@ -267,8 +278,6 @@ event_response_t hook_process_cb(
         }
     }
 
-    userhook_plugin->pf_in_progress.erase(std::make_pair(info->proc_data.pid, info->proc_data.tid));
-
     // Now let's try to resolve physical address of the target function.
     addr_t func_pa = 0;
     {
@@ -284,7 +293,12 @@ event_response_t hook_process_cb(
             }
 
             // Otherwise request page fault, exit and wait for hook_process_cb to be hit again.
-            if (VMI_SUCCESS == vmi_request_page_fault(vmi, info->vcpu, rh_data->func_addr, 0))
+            memcpy(&rh_data->regs, info->regs, sizeof(x86_registers_t));
+            rh_data->target_process_tid = info->proc_data.tid;
+            rh_data->target_process_rsp = info->regs->rsp;
+            rh_data->inject_in_progress = true;
+            addr_t stack_pointer;
+            if (inject_copy_memory(userhook_plugin, drakvuf, info, info->trap->cb, rh_data->func_addr, &stack_pointer))
             {
                 rh_data->state = HOOK_PAGEFAULT_RETRY;
                 userhook_plugin->pf_in_progress.insert(std::make_pair(info->proc_data.pid, info->proc_data.tid));

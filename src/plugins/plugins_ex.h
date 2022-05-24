@@ -382,6 +382,13 @@ struct call_result_t
         target_rsp = info->regs->rsp;
     }
 
+    void set_result_call_params(const drakvuf_trap_info_t* info, addr_t stack_pointer)
+    {
+        target_pid = info->attached_proc_data.pid;
+        target_tid = info->attached_proc_data.tid;
+        target_rsp = stack_pointer;
+    }
+
     bool verify_result_call_params(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         return drakvuf_check_return_context(drakvuf, info, target_pid, target_tid, target_rsp);

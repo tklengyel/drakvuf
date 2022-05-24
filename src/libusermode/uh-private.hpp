@@ -145,8 +145,12 @@ struct rh_data_t
     // Additional data. Stored here for optimalization.
     target_hook_state state;
     vmi_pid_t target_process_pid;
+    uint32_t target_process_tid;
+    uint64_t target_process_rsp;
     addr_t target_process_dtb;
     addr_t func_addr;
+    x86_registers_t regs;
+    bool inject_in_progress{false};
 
     // We need to pass this around as we need offsets.
     userhook* userhook_plugin;
@@ -180,6 +184,9 @@ struct dll_t
     // internal, for page faults
     addr_t pf_current_addr;
     addr_t pf_max_addr;
+
+    bool in_progress{false};
+    x86_registers_t regs;
 };
 
 struct map_view_of_section_result_t : public call_result_t
@@ -205,6 +212,7 @@ class userhook : public pluginex
 {
 public:
     drakvuf_t m_drakvuf = nullptr;
+    addr_t copy_virt_mem_va{0};
 
     userhook(userhook const&) = delete;
     userhook& operator=(userhook const&) = delete;
@@ -244,5 +252,10 @@ private:
     std::vector<drakvuf_trap_t*> running_rh_traps;
 };
 
+bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
+    addr_t addr,
+    addr_t* stack_pointer);
 
 #endif

@@ -408,7 +408,8 @@ bool drakvuf_init (drakvuf_t* drakvuf,
     const addr_t kpgd,
     const bool fast_singlestep,
     uint64_t limited_traps_ttl,
-    bool get_userid) NOEXCEPT;
+    bool get_userid,
+    bool enable_active_callback_check) NOEXCEPT;
 bool drakvuf_init_os (drakvuf_t drakvuf) NOEXCEPT;
 void drakvuf_close (drakvuf_t drakvuf, const bool pause) NOEXCEPT;
 int drakvuf_send_qemu_monitor_command(drakvuf_t drakvuf, const char* in, char** out);
@@ -570,6 +571,8 @@ addr_t drakvuf_exportksym_to_va(drakvuf_t drakvuf,
     const vmi_pid_t pid, const char* proc_name,
     const char* mod_name, addr_t rva) NOEXCEPT;
 
+addr_t drakvuf_kernel_symbol_to_va(drakvuf_t drakvuf, const char* func) NOEXCEPT;
+
 addr_t drakvuf_exportsym_to_va(drakvuf_t drakvuf, addr_t process_addr,
     const char* module, const char* sym) NOEXCEPT;
 
@@ -719,6 +722,22 @@ bool drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
 bool drakvuf_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid) NOEXCEPT;
 
 bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, unsigned int vcpu, registers_t* regs) NOEXCEPT;
+/* This function is used to delay registers modification on injections.
+ * This fixes two issues:
+ * 1. Two plug-ins injects function call or modify registers.
+ * 2. One plug-in injects function call and other one reads modified registers.
+ */
+bool drakvuf_vmi_response_set_registers(drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    x86_registers_t* regs,
+    bool immediate);
+/* The plug-in is called "active" if it injects function call. */
+bool drakvuf_is_active_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+void* drakvuf_lookup_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+void drakvuf_insert_injection(drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*));
+void drakvuf_remove_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 #define DRAKVUF_IPT_BRANCH_EN (1 << 0)
 #define DRAKVUF_IPT_TRACE_OS  (1 << 1)
