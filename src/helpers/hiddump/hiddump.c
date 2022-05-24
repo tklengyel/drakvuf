@@ -115,12 +115,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include<sys/stat.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <signal.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <glib/gprintf.h>
 
 /* Input event codes */
 #include <linux/input.h>
@@ -197,15 +198,9 @@ int find_event_file(char** file)
     if (pos)
     {
         /* Removes ' \n' from end of line */
-        pos[strlen(pos) - 2] = '\0';
-
-        size_t len = strlen(DEVICE_PATH_STUB) + strlen(pos) + 1;
-        *file = (char*) malloc(sizeof(char) * len);
-        memset(*file, 0, len);
-
-        /* Constructs device path */
-        strcpy(*file, "/dev/input/");
-        snprintf(*file + strlen(*file), len, "%s", pos);
+        if ( strlen(pos) >= 2 )
+            pos[strlen(pos) - 2] = '\0';
+        *file = g_strdup_printf("/dev/input/%s", pos);
         return 0;
     }
     return 1;
