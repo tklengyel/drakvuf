@@ -173,6 +173,7 @@ enum class procdump_stage
     copy_memory,      // 6
     resume,           // 7
     awaken,           // 8
+    // TODO Check if the stage is steel needed
     finished,         // 9
     target_wakeup,    // 10
     timeout,          // 11
@@ -184,12 +185,47 @@ int to_int(procdump_stage stage)
     return static_cast<int>(stage);
 }
 
+std::string to_str(procdump_stage stage)
+{
+    switch (stage)
+    {
+        case procdump_stage::need_suspend:
+            return "need_suspend";
+        case procdump_stage::suspend:
+            return "suspend";
+        case procdump_stage::pending:
+            return "pending";
+        case procdump_stage::get_irql:
+            return "get_irql";
+        case procdump_stage::allocate_pool:
+            return "allocate_pool";
+        case procdump_stage::prepare_minidump:
+            return "prepare_minidump";
+        case procdump_stage::copy_memory:
+            return "copy_memory";
+        case procdump_stage::resume:
+            return "resume";
+        case procdump_stage::awaken:
+            return "awaken";
+        case procdump_stage::finished:
+            return "finished";
+        case procdump_stage::target_wakeup:
+            return "target_wakeup";
+        case procdump_stage::timeout:
+            return "timeout";
+        case procdump_stage::invalid:
+        default:
+            return "invalid";
+    }
+}
+
 struct return_ctx
 {
     vmi_pid_t ret_pid{0};
     addr_t    ret_rsp{0};
     uint32_t  ret_tid{0};
     x86_registers_t regs;
+    bool restored{false};
 };
 
 // TODO Rename into "task"
@@ -209,6 +245,8 @@ public:
     bool is_hosted{false};
     /* Processes targeted on analysys finish are not self-terminating neither
      * hosted. So after resuming such a target should be finished.
+     *
+     * TODO Check if to remove because of "return_ctx.restored"
      */
     bool wait_awaken{true};
     return_ctx host;
@@ -279,6 +317,13 @@ public:
         writer = ProcdumpWriterFactory::build(
                 procdump_dir + "/"s + data_file_name,
                 use_compression);
+
+        if (is_hosted)
+            /* The hosted target is suspended from it's host... */
+            target.restored = true;
+        else
+            /* The self-terminating target is suspended from it's own context */
+            host.restored = true;
     }
 
     bool on_target_resuspend()
@@ -327,12 +372,23 @@ public:
                 m_timeout = true;
             m_old_stage = m_stage;
             m_stage = new_stage;
+            PRINT_DEBUG("[PROCDUMP] [%d] Stage switch: %s -> %s%s\n"
+                , target_process_pid
+                , to_str(m_old_stage).data()
+                , to_str(m_stage).data()
+                , m_timeout ? "(timeout)" : ""
+            );
         }
     }
 
     procdump_stage old_stage()
     {
         return m_old_stage;
+    }
+
+    bool is_restored()
+    {
+        return host.restored && target.restored && working.restored;
     }
 };
 
