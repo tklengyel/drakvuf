@@ -189,33 +189,33 @@ std::string to_str(procdump_stage stage)
 {
     switch (stage)
     {
-    case procdump_stage::need_suspend:
-        return "need_suspend";
-    case procdump_stage::suspend:
-        return "suspend";
-    case procdump_stage::pending:
-        return "pending";
-    case procdump_stage::get_irql:
-        return "get_irql";
-    case procdump_stage::allocate_pool:
-        return "allocate_pool";
-    case procdump_stage::prepare_minidump:
-        return "prepare_minidump";
-    case procdump_stage::copy_memory:
-        return "copy_memory";
-    case procdump_stage::resume:
-        return "resume";
-    case procdump_stage::awaken:
-        return "awaken";
-    case procdump_stage::finished:
-        return "finished";
-    case procdump_stage::target_wakeup:
-        return "target_wakeup";
-    case procdump_stage::timeout:
-        return "timeout";
-    case procdump_stage::invalid:
-    default:
-        return "invalid";
+        case procdump_stage::need_suspend:
+            return "need_suspend";
+        case procdump_stage::suspend:
+            return "suspend";
+        case procdump_stage::pending:
+            return "pending";
+        case procdump_stage::get_irql:
+            return "get_irql";
+        case procdump_stage::allocate_pool:
+            return "allocate_pool";
+        case procdump_stage::prepare_minidump:
+            return "prepare_minidump";
+        case procdump_stage::copy_memory:
+            return "copy_memory";
+        case procdump_stage::resume:
+            return "resume";
+        case procdump_stage::awaken:
+            return "awaken";
+        case procdump_stage::finished:
+            return "finished";
+        case procdump_stage::target_wakeup:
+            return "target_wakeup";
+        case procdump_stage::timeout:
+            return "timeout";
+        case procdump_stage::invalid:
+        default:
+            return "invalid";
     }
 }
 
