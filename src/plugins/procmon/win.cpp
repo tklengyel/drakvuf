@@ -255,7 +255,7 @@ static event_response_t process_creation_return_hook(drakvuf_t drakvuf, drakvuf_
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = new_process_handle_addr,
+        .addr = new_process_handle_addr
     );
 
     addr_t new_process_handle;
@@ -297,7 +297,7 @@ static event_response_t process_create_ex_return_hook(drakvuf_t drakvuf, drakvuf
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = process_handle_addr,
+        .addr = process_handle_addr
     );
 
     addr_t process_handle;
@@ -468,7 +468,7 @@ static event_response_t open_process_return_hook_cb(drakvuf_t drakvuf, drakvuf_t
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = params->process_handle_addr,
+        .addr = params->process_handle_addr
     );
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);
@@ -551,7 +551,7 @@ static event_response_t open_thread_return_hook_cb(drakvuf_t drakvuf, drakvuf_tr
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = params->thread_handle_addr,
+        .addr = params->thread_handle_addr
     );
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(drakvuf);

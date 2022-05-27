@@ -165,7 +165,7 @@ static std::set<std::string> enumerate_drivers(dkommon* plugin, drakvuf_t drakvu
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4,
+        .pid = 4
     );
 
     addr_t list_head = 0;
@@ -287,7 +287,7 @@ static event_response_t delete_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t
     vmi_lock_guard vmi(drakvuf);
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4,
+        .pid = 4
     );
 
     ctx.addr = list_entry_va + plugin->offsets[LIST_ENTRY_FLINK];

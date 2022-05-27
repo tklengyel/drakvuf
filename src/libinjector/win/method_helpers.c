@@ -114,7 +114,7 @@ bool setup_create_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = injector->payload_addr,
+        .addr = injector->payload_addr
     );
 
     PRINT_DEBUG("Reading expanded variable\n");

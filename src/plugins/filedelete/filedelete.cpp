@@ -556,7 +556,7 @@ static void grab_file_by_handle(filedelete* f, drakvuf_t drakvuf,
         ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .addr = filetype,
-            .dtb = info->regs->cr3,
+            .dtb = info->regs->cr3
         );
         extract_file(f, drakvuf, info, vmi, file, &ctx, filename.c_str(), fo_flags, reason);
         return;
@@ -777,7 +777,7 @@ event_response_t injected_createsection_cb(drakvuf_t drakvuf, drakvuf_trap_info_
         ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
-            .addr = injector->createsection.handle,
+            .addr = injector->createsection.handle
         );
 
         if ((VMI_FAILURE == vmi_read(vmi, &ctx, sizeof(injector->section_handle), &injector->section_handle, NULL)))
@@ -864,7 +864,7 @@ event_response_t queryvolumeinfo_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info
         ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
-            .addr = injector->queryvolumeinfo.out,
+            .addr = injector->queryvolumeinfo.out
         );
 
         struct FILE_FS_DEVICE_INFORMATION dev_info = {};

@@ -276,7 +276,7 @@ static unicode_string_t* get_data_as_string( drakvuf_t drakvuf, drakvuf_trap_inf
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = data_addr,
+        .addr = data_addr
     );
 
     vmi_lock_guard vmi_lg(drakvuf);

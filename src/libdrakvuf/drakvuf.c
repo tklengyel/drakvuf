@@ -717,7 +717,7 @@ char* drakvuf_read_ascii_str(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = addr,
+        .addr = addr
     );
 
     char* ret = vmi_read_str(drakvuf->vmi, &ctx);
@@ -769,7 +769,7 @@ unicode_string_t* drakvuf_read_unicode(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     ACCESS_CONTEXT(ctx,
         .addr = addr,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = info->regs->cr3
     );
 
     return drakvuf_read_unicode_common(drakvuf, &ctx);
@@ -828,7 +828,7 @@ unicode_string_t* drakvuf_read_unicode32(drakvuf_t drakvuf, drakvuf_trap_info_t*
     ACCESS_CONTEXT(ctx,
         .addr = addr,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = info->regs->cr3
     );
 
     return drakvuf_read_unicode32_common(drakvuf, &ctx);

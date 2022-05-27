@@ -108,8 +108,8 @@
 #include <vector>
 #include <memory>
 #include <set>
+#include <filesystem>
 #include <glib.h>
-#include "filesystem.hpp"
 #include "plugins/private.h"
 #include "plugins/plugins_ex.h"
 
