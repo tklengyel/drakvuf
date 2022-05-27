@@ -118,9 +118,6 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_PROG_CC_STDC
 AC_PROG_CXX(clang++)
 
-# Pthread support!
-AX_PTHREAD(, [AC_MSG_ERROR([libpthread is required])])
-
 AX_REQUIRE_DEFINED([AX_CXX_COMPILE_STDCXX])
 AX_CXX_COMPILE_STDCXX([17], [ext], [mandatory])
 CXXFLAGS="-std=gnu++17"
@@ -481,6 +478,7 @@ AC_ARG_ENABLE([plugin_hidsim],
   [plugin_hidsim="yes"])
 AM_CONDITIONAL([PLUGIN_HIDSIM], [test x$plugin_hidsim = xyes])
 if test x$plugin_hidsim = xyes; then
+  AX_PTHREAD(, [AC_MSG_ERROR([libpthread is required])])
   AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_HIDSIM, 1, "")
 fi
 

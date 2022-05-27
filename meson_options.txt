@@ -35,6 +35,7 @@ option('plugin-spraymon', type : 'boolean', value : true)
 option('plugin-hidsim', type : 'boolean', value : true)
 option('plugin-callbackmon', type : 'boolean', value : true)
 option('plugin-delaymon', type : 'boolean', value : true)
+option('plugin-memdump', type : 'boolean', value : true)
 
 # Disabled by default plugins
 option('plugin-libhooktest', type : 'boolean', value : 'false')

@@ -123,6 +123,54 @@ if get_option('plugin-filetracer')
     config_h.set('ENABLE_PLUGIN_FILETRACER', 1)
 endif
 
+if get_option('plugin-hidsim')
+    plugin_sources += 'hidsim/hidsim.cpp'
+    plugin_sources += 'hidsim/qmp/qmp_connection.cpp'
+    plugin_sources += 'hidsim/hid_injection.cpp'
+    plugin_sources += 'hidsim/gui/vmi_win_gui_parser.cpp'
+    plugin_sources += 'hidsim/gui/vmi_win_gui_utils.cpp'
+    plugin_sources += 'hidsim/gui/vmi_win_gui_offsets.cpp'
+    plugin_sources += 'hidsim/gui/vmi_win_gui_atoms.cpp'
+    plugin_sources += 'hidsim/gui_monitor.cpp'
+
+    pthread = dependency('threads')
+    deps += pthread
+
+    config_h.set('ENABLE_PLUGIN_HIDSIM', 1)
+endif
+
+if get_option('plugin-librarymon')
+    plugin_sources += 'librarymon/librarymon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_LIBRARYMON', 1)
+endif
+
+if get_option('plugin-memdump')
+    plugin_sources += 'memdump/memdump.cpp'
+    plugin_sources += 'memdump/stack_util.cpp'
+    plugin_sources += 'memdump/userhook.cpp'
+
+    config_h.set('ENABLE_PLUGIN_MEMDUMP', 1)
+endif
+
+if get_option('plugin-objmon')
+    plugin_sources += 'objmon/objmon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_OBJMON', 1)
+endif
+
+if get_option('plugin-rootkitmon')
+    plugin_sources += 'rootkitmon/rootkitmon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_ROOTKITMON', 1)
+endif
+
+if get_option('plugin-spraymon')
+    plugin_sources += 'spraymon/spraymon.cpp'
+
+    config_h.set('ENABLE_PLUGIN_SPRAYMON', 1)
+endif
+
 summary({
     'syscalls': get_option('plugin-syscalls'),
     'poolmon': get_option('plugin-poolmon'),
@@ -141,6 +189,12 @@ summary({
     'exploitmon': get_option('plugin-exploitmon'),
     'fileextractor': get_option('plugin-fileextractor'),
     'filetracer': get_option('plugin-filetracer'),
+    'hidsim': get_option('plugin-hidsim'),
+    'librarymon': get_option('plugin-librarymon'),
+    'memdump': get_option('plugin-memdump'),
+    'objmon': get_option('plugin-objmon'),
+    'rootkitmon': get_option('plugin-rootkitmon'),
+    'spraymon': get_option('plugin-spraymon'),
 }, section: 'Plugins (-Dplugin-<x>)')
 
 summary({
