@@ -406,7 +406,7 @@ int poll_events(struct pollfd* fds, size_t n, FILE* fout, int seconds, double x_
 
         /* Checks, if capture time is up */
         gettimeofday(&t2, NULL);
-        if (end_t.tv_sec > 0 && timercmp(&t2, &end_t, >))
+        if (end_t.tv_sec > 0 && t2.tv_sec == end_t.tv_sec ? t2.tv_usec > end_t.tv_usec : t2.tv_sec > end_t.tv_sec)
             is_stopping = 1;
     }
     return 0;

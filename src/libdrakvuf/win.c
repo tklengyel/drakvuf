@@ -337,7 +337,7 @@ bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const 
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4,
+        .pid = 4
     );
 
     return win_get_module_base_addr_ctx(drakvuf, module_list_head, &ctx, module_name, base_addr_out);
@@ -427,7 +427,7 @@ addr_t win_get_function_argument(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = info->regs->rsp + narg * (is32 ? 4 : 8),
+        .addr = info->regs->rsp + narg * (is32 ? 4 : 8)
     );
 
     addr_t ret;
@@ -441,7 +441,7 @@ addr_t win_get_function_return_address(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = info->regs->rsp,
+        .addr = info->regs->rsp
     );
 
     addr_t ret_addr;

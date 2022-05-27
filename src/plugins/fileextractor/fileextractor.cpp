@@ -499,7 +499,7 @@ fileextractor::error fileextractor::dispatch_queryvolumeinfo(
         ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
-            .addr = task.queryvolumeinfo.out,
+            .addr = task.queryvolumeinfo.out
         );
 
         struct FILE_FS_DEVICE_INFORMATION dev_info = {};
@@ -599,7 +599,7 @@ fileextractor::error fileextractor::dispatch_createsection(
         ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
             .dtb = info->regs->cr3,
-            .addr = task.createsection.handle,
+            .addr = task.createsection.handle
         );
 
         if ((VMI_FAILURE == vmi_read(vmi,
@@ -1211,7 +1211,7 @@ void fileextractor::extract_ca_file(drakvuf_trap_info_t* info,
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = info->regs->cr3
     );
 
     /* Check whether subsection points back to the control area */
@@ -1330,7 +1330,7 @@ void fileextractor::extract_file(drakvuf_trap_info_t* info,
 
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
+        .dtb = info->regs->cr3
     );
 
     ctx.addr = task.file_obj + this->offsets[FILE_OBJECT_SECTIONOBJECTPOINTER];

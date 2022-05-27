@@ -242,7 +242,7 @@ bool drakvuf_obj_ref_by_handle( drakvuf_t drakvuf, drakvuf_trap_info_t* info, ad
         uint8_t object_type ;
         ACCESS_CONTEXT(ctx,
             .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = info->regs->cr3,
+            .dtb = info->regs->cr3
         );
 
         // Get TypeIndex from _OBJ_HEADER...
