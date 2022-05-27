@@ -182,7 +182,7 @@ addr_t eprocess_sym2va (drakvuf_t drakvuf, addr_t eprocess_base, const char* mod
     addr_t inloadorder;
     addr_t ret = 0;
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .translate_mechanism = VMI_TM_PROCESS_DTB
     );
 
     if (VMI_FAILURE==vmi_read_addr_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PDBASE], 0, &ctx.dtb))

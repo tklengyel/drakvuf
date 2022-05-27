@@ -251,7 +251,7 @@ static addr_t place_struct_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = regs->cr3,
-        .addr = addr,
+        .addr = addr
     );
 
     if (VMI_FAILURE == vmi_write(vmi, &ctx, size, data, NULL))

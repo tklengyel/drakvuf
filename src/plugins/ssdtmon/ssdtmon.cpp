@@ -203,7 +203,7 @@ static bool get_driver_base(drakvuf_t drakvuf, ssdtmon* plugin, const char* driv
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 4,
+        .pid = 4
     );
 
     vmi_lock_guard vmi(drakvuf);

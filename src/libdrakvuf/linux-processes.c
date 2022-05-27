@@ -168,7 +168,7 @@ addr_t linux_get_current_process(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = dtb,
-        .addr = addr + drakvuf->offsets[CURRENT_TASK],
+        .addr = addr + drakvuf->offsets[CURRENT_TASK]
     );
     addr_t process = read_process_base(drakvuf, info->regs->rsp, &ctx);
 
