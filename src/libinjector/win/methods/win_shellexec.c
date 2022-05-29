@@ -141,16 +141,12 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             PRINT_DEBUG("ShellExecute successful\n");
 
             injector->rc = INJECTOR_SUCCEEDED;
-            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-        }
-        case STEP3:
-        {
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
             drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
-            event = VMI_EVENT_RESPONSE_NONE;
+
+            memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
+            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
         }
         default:
@@ -163,7 +159,7 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return event;
 }
 
-static event_response_t cleanup(drakvuf_t drakvuf __attribute__((unused)), drakvuf_trap_info_t* info)
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
 
@@ -172,6 +168,9 @@ static event_response_t cleanup(drakvuf_t drakvuf __attribute__((unused)), drakv
     if (injector->rc == INJECTOR_SUCCEEDED)
         injector->rc = INJECTOR_FAILED;
 
+    drakvuf_remove_trap(drakvuf, info->trap, NULL);
+    drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+
     memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-    return override_step(injector, STEP3, VMI_EVENT_RESPONSE_SET_REGISTERS);
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
