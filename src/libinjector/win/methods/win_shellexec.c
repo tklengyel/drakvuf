@@ -106,7 +106,7 @@
 #include <win/win_functions.h>
 #include <win/method_helpers.h>
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -124,7 +124,7 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!setup_shell_execute_stack(injector, info->regs))
             {
                 fprintf(stderr, "Failed to setup shellexec stack\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             info->regs->rip = injector->exec_func;
@@ -136,7 +136,7 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             // For some reason ShellExecute could return ERROR_FILE_NOT_FOUND(6) while
             // successfully opening file.
             if (info->regs->rax != 6 && is_fun_error(drakvuf, info, "ShellExecute failed"))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             PRINT_DEBUG("ShellExecute successful\n");
 
@@ -163,8 +163,10 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return event;
 }
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
+static event_response_t cleanup(drakvuf_t drakvuf __attribute__((unused)), drakvuf_trap_info_t* info)
 {
+    injector_t injector = info->trap->data;
+
     fprintf(stderr, "Exiting prematurely\n");
 
     if (injector->rc == INJECTOR_SUCCEEDED)

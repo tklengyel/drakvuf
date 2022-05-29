@@ -106,7 +106,7 @@
 #include <win/win_functions.h>
 #include <win/method_helpers.h>
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 static bool inject_payload(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -125,7 +125,7 @@ event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* in
             if (!setup_virtual_alloc_stack(injector, info->regs))
             {
                 PRINT_DEBUG("Failed to setup virtual alloc for passing inputs!\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             info->regs->rip = injector->exec_func;
@@ -142,7 +142,7 @@ event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* in
             if (!setup_memset_stack(injector, info->regs))
             {
                 PRINT_DEBUG("Failed to setup memset stack for passing inputs!\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             info->regs->rip = injector->memset;
@@ -152,7 +152,7 @@ event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* in
         case STEP3: // inject payload
         {
             if (!inject_payload(drakvuf, info))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
@@ -183,8 +183,10 @@ event_response_t handle_win_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* in
     return event;
 }
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
+static event_response_t cleanup(drakvuf_t drakvuf __attribute__((unused)), drakvuf_trap_info_t* info)
 {
+    injector_t injector = info->trap->data;
+
     fprintf(stderr, "Exiting prematurely\n");
 
     if (injector->rc == INJECTOR_SUCCEEDED)

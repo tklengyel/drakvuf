@@ -3,7 +3,7 @@
 #include <win/method_helpers.h>
 #include <win/win_functions.h>
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 static bool setup_open_process_stack(injector_t injector, x86_registers_t* regs)
 {
@@ -74,7 +74,7 @@ event_response_t handle_win_terminate(drakvuf_t drakvuf, drakvuf_trap_info_t* in
             PRINT_DEBUG("Open process %d to terminate it.\n", injector->terminate_pid);
 
             if (!setup_open_process_stack(injector, info->regs))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             info->regs->rip = injector->open_process;
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -83,12 +83,12 @@ event_response_t handle_win_terminate(drakvuf_t drakvuf, drakvuf_trap_info_t* in
         case STEP2:
         {
             if (is_fun_error(drakvuf, info, "Could not open process handle"))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             PRINT_DEBUG("Process %d opened with handle %#lx. Terminate it!\n", injector->terminate_pid, info->regs->rax);
 
             if (!setup_create_remote_thread_stack(injector, info->regs))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             info->regs->rip = injector->exec_func;
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -97,7 +97,7 @@ event_response_t handle_win_terminate(drakvuf_t drakvuf, drakvuf_trap_info_t* in
         case STEP3:
         {
             if (is_fun_error(drakvuf, info, "Could not terminate process"))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             PRINT_DEBUG("Process %d terminated successfully!\n", injector->terminate_pid);
 
@@ -121,8 +121,10 @@ event_response_t handle_win_terminate(drakvuf_t drakvuf, drakvuf_trap_info_t* in
     return event;
 }
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
+static event_response_t cleanup(drakvuf_t drakvuf __attribute__((unused)), drakvuf_trap_info_t* info)
 {
+    injector_t injector = info->trap->data;
+
     PRINT_DEBUG("Exiting prematurely\n");
 
     if (injector->rc == INJECTOR_SUCCEEDED)

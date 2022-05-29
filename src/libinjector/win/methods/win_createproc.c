@@ -110,7 +110,7 @@ static bool fill_created_process_info(injector_t injector, drakvuf_trap_info_t* 
 static event_response_t wait_for_termination_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 static event_response_t wait_for_injected_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 static bool setup_wait_for_injected_process_trap(injector_t injector);
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info);
+static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 
 event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
@@ -128,7 +128,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!setup_create_process_stack(injector, info->regs))
             {
                 fprintf(stderr, "Failed to setup create process stack\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             injector->target_rsp = info->regs->rsp;
@@ -140,15 +140,15 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         {
             // We are now in the return path from CreateProcessW
             if (is_fun_error(drakvuf, info, "CreateProcessW Failed"))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             if (!fill_created_process_info(injector, info))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             if (!injector->pid || !injector->tid)
             {
                 fprintf(stderr, "Failed to inject\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             PRINT_DEBUG("Injected PID: %i. TID: %i\n", injector->pid, injector->tid);
@@ -156,13 +156,13 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!setup_resume_thread_stack(injector, info->regs))
             {
                 fprintf(stderr, "Failed to setup stack for passing inputs!\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
 
             injector->target_rsp = info->regs->rsp;
 
             if (!setup_wait_for_injected_process_trap(injector))
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
 
             info->regs->rip = injector->resume_thread;
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
@@ -177,7 +177,7 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (injector->rc == INJECTOR_FAILED)
             {
                 fprintf(stderr, "Failed to resume\n");
-                return cleanup(injector, info);
+                return cleanup(drakvuf, info);
             }
             PRINT_DEBUG("Resume successful\n");
             memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
@@ -218,8 +218,10 @@ event_response_t handle_createproc(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return event;
 }
 
-static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
+static event_response_t cleanup(drakvuf_t drakvuf __attribute__((unused)), drakvuf_trap_info_t* info)
 {
+    injector_t injector = info->trap->data;
+
     fprintf(stderr, "Exiting prematurely\n");
 
     if (injector->rc == INJECTOR_SUCCEEDED)
