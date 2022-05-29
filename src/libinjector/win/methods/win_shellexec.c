@@ -143,7 +143,7 @@ event_response_t handle_shellexec(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             injector->rc = INJECTOR_SUCCEEDED;
 
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+            drakvuf_interrupt(drakvuf, SIGINT);
 
             memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
