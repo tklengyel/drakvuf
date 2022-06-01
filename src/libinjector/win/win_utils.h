@@ -135,16 +135,6 @@
 #define PAGE_EXECUTE_READWRITE  0x40
 #define CREATE_SUSPENDED 0x00000004
 
-typedef enum
-{
-    INJECT_RESULT_SUCCESS,
-    INJECT_RESULT_TIMEOUT,
-    INJECT_RESULT_CRASH,
-    INJECT_RESULT_PREMATURE,
-    INJECT_RESULT_ERROR_CODE,
-    INJECT_RESULT_INIT_FAIL
-} inject_result_t;
-
 struct injector
 {
     // common in win and linux
@@ -205,12 +195,7 @@ struct injector
     // Results:
     injector_status_t rc;
     inject_result_t result;
-    struct
-    {
-        bool valid;
-        uint32_t code;
-        const char* string;
-    } error_code;
+    injection_error_t error_code;
 
     uint32_t pid, tid;
     uint64_t hProc, hThr;
@@ -283,7 +268,7 @@ addr_t get_function_va(drakvuf_t drakvuf, addr_t eprocess_base, char const* lib,
 void free_memtraps(injector_t injector);
 void free_injector(injector_t injector);
 void injector_free_win(injector_t injector);
-void print_injection_info(output_format_t format, const char* file, injector_t injector);
+void print_win_injection_info(output_format_t format, const char* file, injector_t injector);
 
 struct module_context
 {

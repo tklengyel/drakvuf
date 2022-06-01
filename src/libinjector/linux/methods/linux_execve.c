@@ -154,8 +154,6 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = (injector_t)info->trap->data;
 
-    event_response_t event;
-
     switch (injector->step)
     {
         case STEP1: // Finds vdso and sets up mmap
@@ -163,56 +161,69 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
             if (!init_syscalls(drakvuf, info))
+            {
+                injector->injection_failed = true;
                 return override_step(injector, STEP5, VMI_EVENT_RESPONSE_NONE);
+            }
 
             // don't remove the initial trap
             // it is used for cleanup after restoring registers
 
             if (!setup_mmap_syscall(injector, info->regs, FILE_BUF_SIZE))
             {
+                injector->injection_failed = true;
                 // clear post_syscall_trap
                 free_bp_trap(drakvuf, injector, injector->bp);
                 return override_step(injector, STEP5, VMI_EVENT_RESPONSE_NONE);
             }
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP2: // forks the process
         {
             if (!call_mmap_syscall_cb(injector, info->regs))
+            {
+                injector->injection_failed = true;
                 return cleanup(injector, info->regs);
+            }
 
             char* proc_name = strdup(info->proc_data.name);
 
             PRINT_DEBUG("vForking the process\n");
             setup_vfork_syscall(injector, info->regs, proc_name, info->proc_data.pid);
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP3: // get child pid and runs execve
         {
             if (!call_vfork_syscall_cb(injector, info->regs, info->proc_data.pid, info->proc_data.tid))
+            {
+                injector->injection_failed = true;
                 return cleanup(injector, info->regs);
+            }
 
             addr_t argv_addr, envp_addr;
 
             if (!create_argv_and_envp_arrays(injector, info->regs, FILE_BUF_SIZE, &argv_addr, &envp_addr))
+            {
+                injector->injection_failed = true;
                 return cleanup(injector, info->regs);
+            }
 
             if (!setup_execve_syscall(injector, info->regs, injector->host_file, argv_addr, envp_addr))
+            {
+                injector->injection_failed = true;
                 return cleanup(injector, info->regs);
+            }
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP4: // handles execve and restores parent
         {
             if (is_child_process(injector, info))
             {
-                is_syscall_error(info->regs->rax, "execve syscall failed");
+                if (is_syscall_error(info->regs->rax, "execve syscall failed"))
+                    injector->injection_failed = true;
 
                 PRINT_DEBUG("Exiting child process\n");
                 if (!setup_exit_syscall(injector, info->regs, 0))
@@ -234,9 +245,7 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 free_bp_trap(drakvuf, injector, info->trap);
             }
 
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-            break;
-
+            return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
         case STEP5: // exit drakvuf loop
         {
@@ -253,8 +262,18 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             free_bp_trap(drakvuf, injector, info->trap);
             drakvuf_interrupt(drakvuf, SIGINT);
 
-            event = VMI_EVENT_RESPONSE_NONE;
-            break;
+            if (injector->injection_failed)
+            {
+                injector->rc = INJECTOR_FAILED;
+            }
+            else
+            {
+                injector->rc = INJECTOR_SUCCEEDED;
+                injector->pid = injector->child_data.pid;
+                injector->tid = injector->child_data.tid;
+            }
+
+            return VMI_EVENT_RESPONSE_NONE;
         }
         default:
         {
@@ -263,7 +282,7 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
     }
 
-    return event;
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
 addr_t create_argv_array(injector_t injector, x86_registers_t* regs, addr_t* data_addr, addr_t* array_addr)

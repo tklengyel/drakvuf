@@ -239,8 +239,6 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
                 PRINT_DEBUG("Write file successful\n");
                 if (!setup_close_syscall(injector, info->regs, injector->fd))
                     return cleanup(drakvuf, info, true);
-
-                injector->rc = INJECTOR_SUCCEEDED;
             }
             else
             {
@@ -268,6 +266,8 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             // restore regs
             memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+
+            injector->rc = INJECTOR_SUCCEEDED;
 
             return VMI_EVENT_RESPONSE_SET_REGISTERS;
         }
