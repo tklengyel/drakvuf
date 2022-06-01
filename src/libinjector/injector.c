@@ -142,9 +142,6 @@ injector_status_t injector_start_app(
     }
     else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
     {
-        if (injected_pid)
-            *injected_pid = 0;
-
         if (!tid)
             tid = pid;
 
@@ -152,11 +149,12 @@ injector_status_t injector_start_app(
                 pid,
                 tid,
                 app,
-                binary_path,
                 method,
                 format,
+                binary_path,
                 args_count,
-                args);
+                args,
+                injected_pid);
     }
     else
     {
@@ -182,4 +180,28 @@ void injector_free(drakvuf_t drakvuf, injector_t injector)
         injector_free_win(injector);
     else
         injector_free_linux(injector);
+}
+
+const char* injection_method_name(injection_method_t method)
+{
+    switch (method)
+    {
+        case INJECT_METHOD_CREATEPROC:
+            return "CreateProc";
+        case INJECT_METHOD_TERMINATEPROC:
+            return "TerminateProc";
+        case INJECT_METHOD_SHELLEXEC:
+            return "ShellExec";
+        case INJECT_METHOD_SHELLCODE:
+            return "Shellcode";
+        case INJECT_METHOD_READ_FILE:
+            return "ReadFile";
+        case INJECT_METHOD_WRITE_FILE:
+            return "WriteFile";
+        case INJECT_METHOD_EXECPROC:
+            return "ExecProc";
+        case __INJECT_METHOD_MAX:
+            break;
+    }
+    return "Unknown";
 }

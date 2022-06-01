@@ -260,6 +260,8 @@ void injector_terminate(drakvuf_t drakvuf,
 
 void injector_free(drakvuf_t drakvuf, injector_t injector);
 
+const char* injection_method_name(injection_method_t method);
+
 #pragma GCC visibility pop
 
 #ifdef __cplusplus

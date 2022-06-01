@@ -113,15 +113,34 @@
 #define vmi_free_unicode_str g_free
 #endif
 
+typedef enum
+{
+    INJECT_RESULT_SUCCESS,
+    INJECT_RESULT_TIMEOUT,
+    INJECT_RESULT_CRASH,
+    INJECT_RESULT_PREMATURE,
+    INJECT_RESULT_ERROR_CODE,
+    INJECT_RESULT_INIT_FAIL,
+    INJECT_RESULT_METHOD_UNSUPPORTED,
+} inject_result_t;
+
+typedef struct
+{
+    bool valid;
+    uint32_t code;
+    const char* string;
+} injection_error_t;
+
 injector_status_t injector_start_app_on_linux(drakvuf_t drakvuf,
     vmi_pid_t pid,
     uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used i.e, tid = pid
-    const char* file,
-    const char* binary_path,
+    const char* app,
     injection_method_t method,
     output_format_t format,
+    const char* binary_path,
     int args_count,
-    const char* args[]);
+    const char* args[],
+    vmi_pid_t* injected_pid);
 
 injector_status_t injector_start_app_on_win(drakvuf_t drakvuf,
     vmi_pid_t pid,
@@ -145,6 +164,18 @@ void injector_terminate_on_win(drakvuf_t drakvuf,
 
 void injector_free_win(injector_t injector);
 void injector_free_linux(injector_t injector);
+
+void print_injection_info(
+    output_format_t format,
+    injection_method_t method,
+    inject_result_t injector_result,
+    uint32_t target_pid,
+    uint32_t pid,
+    uint32_t tid,
+    const char* process_name,
+    const char* arguments,
+    const injection_error_t* error
+);
 
 static inline void copy_gprs(x86_registers_t* dst, x86_registers_t* src)
 {

@@ -306,3 +306,16 @@ bool is_syscall_error(addr_t rax, const char* err)
     }
     return false;
 }
+
+void print_linux_injection_info(output_format_t format, injector_t injector)
+{
+    const char* process_name = injector->host_file;
+    gchar* arguments = g_strjoinv(" ", (gchar**)injector->args);
+
+    print_injection_info(format, injector->method,
+        injector->result, injector->target_pid,
+        injector->pid, injector->tid, process_name,
+        arguments, &injector->error_code);
+
+    g_free(arguments);
+}

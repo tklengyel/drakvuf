@@ -131,15 +131,6 @@
 
 typedef enum
 {
-    INJECT_RESULT_SUCCESS,
-    INJECT_RESULT_TIMEOUT,
-    INJECT_RESULT_CRASH,
-    INJECT_RESULT_ERROR_CODE,
-    INJECT_RESULT_METHOD_UNSUPPORTED,
-} inject_result_t;
-
-typedef enum
-{
     sys_read = 0,
     sys_write = 1,
     sys_open = 2,
@@ -168,13 +159,14 @@ struct injector
     const char* target_file;
     const char* host_file;
     int args_count;
+    // A NULL-terminated array of arguments
     const char** args;
-    output_format_t format;
 
     // Internal:
     drakvuf_t drakvuf;
     injection_method_t method;
     addr_t syscall_addr;
+    bool injection_failed;
 
     // Buffer
     struct
@@ -208,12 +200,9 @@ struct injector
     // Results:
     injector_status_t rc;
     inject_result_t result;
-    struct
-    {
-        bool valid;
-        uint32_t code;
-        const char* string;
-    } error_code;
+    injection_error_t error_code;
+
+    uint32_t pid, tid;
 };
 
 void free_bp_trap(drakvuf_t drakvuf, injector_t injector, drakvuf_trap_t* trap);
@@ -224,5 +213,6 @@ addr_t find_syscall(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t vdso);
 bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t syscall_addr);
 event_response_t override_step(injector_t injector, const injector_step_t step, event_response_t event);
 bool is_syscall_error(addr_t rax, const char* err);
+void print_linux_injection_info(output_format_t format, injector_t injector);
 
 #endif

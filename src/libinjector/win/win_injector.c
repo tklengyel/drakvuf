@@ -658,7 +658,7 @@ injector_status_t injector_start_app_on_win(
     {
         PRINT_DEBUG("Unable to initialize injector functions\n");
         injector->result = INJECT_RESULT_INIT_FAIL;
-        print_injection_info(format, file, injector);
+        print_win_injection_info(format, file, injector);
         free_injector(injector);
         return 0;
     }
@@ -666,7 +666,7 @@ injector_status_t injector_start_app_on_win(
     if (inject(drakvuf, injector) && injector->rc == INJECTOR_SUCCEEDED)
     {
         injector->result = INJECT_RESULT_SUCCESS;
-        print_injection_info(format, file, injector);
+        print_win_injection_info(format, file, injector);
     }
     else
     {
@@ -674,13 +674,13 @@ injector_status_t injector_start_app_on_win(
         {
             PRINT_DEBUG("Injection timeout\n");
             injector->result = INJECT_RESULT_TIMEOUT;
-            print_injection_info(format, file, injector);
+            print_win_injection_info(format, file, injector);
         }
         else if (SIGDRAKVUFCRASH == drakvuf_is_interrupted(drakvuf))
         {
             PRINT_DEBUG("Target process crash detected\n");
             injector->result = INJECT_RESULT_CRASH;
-            print_injection_info(format, file, injector);
+            print_win_injection_info(format, file, injector);
         }
         else if (injector->error_code.valid)
         {
@@ -688,13 +688,13 @@ injector_status_t injector_start_app_on_win(
                 injector->error_code.string,
                 injector->error_code.code);
             injector->result = INJECT_RESULT_ERROR_CODE;
-            print_injection_info(format, file, injector);
+            print_win_injection_info(format, file, injector);
         }
         else
         {
             PRINT_DEBUG("Injection premature break\n");
             injector->result = INJECT_RESULT_PREMATURE;
-            print_injection_info(format, file, injector);
+            print_win_injection_info(format, file, injector);
         }
     }
 
