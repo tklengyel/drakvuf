@@ -322,6 +322,22 @@ char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpa
             return NULL;
         }
 
+        if (!mm_struct)
+        {
+            // This is a kernel thread (with null pointer to mm_struct)
+            vmi_pid_t pid;
+            if (linux_get_process_pid(drakvuf, process_base, &pid))
+            {
+                gchar tmp[32] = {0};
+                if (g_snprintf(tmp, 32, "kthread-%d", pid) >= 0)
+                    return g_strdup(tmp);
+                else
+                    return NULL;
+            }
+            else
+                return NULL;
+        }
+
         ctx.addr = mm_struct + drakvuf->offsets[MM_STRUCT_EXE_FILE];
         addr_t exe_file;
         if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &exe_file))
