@@ -112,7 +112,7 @@
 #include "methods/linux_read_file.h"
 #include "methods/linux_execve.h"
 
-bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
+static bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
 {
     // check CPL
     short CPL = info->regs->cs_sel & 3;
@@ -146,10 +146,15 @@ bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
         return true;
     }
 
-    if ( info->proc_data.pid != injector->target_pid && info->proc_data.pid != injector->child_data.pid )
+    bool is_target = (info->proc_data.pid == injector->target_pid && info->proc_data.tid == injector->target_tid);
+    bool is_child = (info->proc_data.pid == injector->child_data.pid && info->proc_data.tid == injector->child_data.tid);
+
+    if ( !is_target && !is_child )
     {
-        PRINT_DEBUG("INT3 received but '%s' PID (%u) doesn't match target process (%u) or child process (%u)\n",
-            info->proc_data.name, info->proc_data.pid, injector->target_pid, injector->child_data.pid);
+        PRINT_DEBUG("INT3 received but '%s' PID:TID (%u:%u) doesn't match target process (%u:%u) or child process (%u:%u)\n",
+            info->proc_data.name, info->proc_data.pid, info->proc_data.tid,
+            injector->target_pid, injector->target_tid,
+            injector->child_data.pid, injector->child_data.tid);
         return false;
     }
 
@@ -158,15 +163,6 @@ bool check_userspace_int3_trap(injector_t injector, drakvuf_trap_info_t* info)
         PRINT_DEBUG("INT3 received but BP_ADDR (%lx) doesn't match RIP (%lx)",
             info->trap->breakpoint.addr, info->regs->rip);
         assert(false);
-    }
-
-    if (injector->target_tid &&
-        (uint32_t)info->proc_data.tid != injector->target_tid &&
-        info->proc_data.tid != injector->child_data.tid )
-    {
-        PRINT_DEBUG("INT3 received but '%s' TID (%u) doesn't match target process (%u) or child process (%u)\n",
-            info->proc_data.name, info->proc_data.tid, injector->target_tid, injector->child_data.tid);
-        return false;
     }
 
     return true;
@@ -238,23 +234,24 @@ static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvu
     // if rcx doesn't have it, TODO: try to extract it from stack
     addr_t bp_addr = info->regs->rcx;
 
-    injector->bp = g_malloc0(sizeof(drakvuf_trap_t));
+    drakvuf_trap_t* bp = g_malloc0(sizeof(drakvuf_trap_t));
 
     // setup int3 trap
-    injector->bp->type = BREAKPOINT;
-    injector->bp->name = "injector_int3_userspace_cb";
-    injector->bp->cb = injector_int3_userspace_cb;
-    injector->bp->data = injector;
-    injector->bp->breakpoint.lookup_type = LOOKUP_DTB;
-    injector->bp->breakpoint.dtb = info->regs->cr3;
-    injector->bp->breakpoint.addr_type = ADDR_VA;
-    injector->bp->breakpoint.addr = bp_addr;
-    injector->bp->ttl = UNLIMITED_TTL;
-    injector->bp->ah_cb = NULL;
+    bp->type = BREAKPOINT;
+    bp->name = "injector_int3_userspace_cb";
+    bp->cb = injector_int3_userspace_cb;
+    bp->data = injector;
+    bp->breakpoint.lookup_type = LOOKUP_DTB;
+    bp->breakpoint.dtb = info->regs->cr3;
+    bp->breakpoint.addr_type = ADDR_VA;
+    bp->breakpoint.addr = bp_addr;
+    bp->ttl = UNLIMITED_TTL;
+    bp->ah_cb = NULL;
 
-    if ( drakvuf_add_trap(injector->drakvuf, injector->bp) )
+    if ( drakvuf_add_trap(injector->drakvuf, bp) )
     {
         PRINT_DEBUG("Usermode Trap Addr: %lx\n", info->regs->rcx);
+        injector->bp = bp;
 
         // Unsubscribe from the CR3 trap
         drakvuf_remove_trap(drakvuf, info->trap, NULL);
@@ -265,8 +262,7 @@ static event_response_t wait_for_target_process_cr3_cb(drakvuf_t drakvuf, drakvu
         PRINT_DEBUG("Will keep trying in next callback\n");
         print_registers(info);
         print_stack(drakvuf, info, info->regs->rsp);
-        g_free(injector->bp);
-        injector->bp = NULL;
+        g_free(bp);
     }
 
     return VMI_EVENT_RESPONSE_NONE;
@@ -306,7 +302,7 @@ static bool inject(drakvuf_t drakvuf, injector_t injector)
     return true;
 }
 
-bool init_injector(injector_t injector)
+static bool init_injector(injector_t injector)
 {
     switch (injector->method)
     {
@@ -369,11 +365,12 @@ injector_status_t injector_start_app_on_linux(
     vmi_pid_t pid,
     uint32_t tid,
     const char* file,
-    const char* binary_path,
     injection_method_t method,
     output_format_t format,
+    const char* binary_path,
     int args_count,
-    const char** args
+    const char** args,
+    vmi_pid_t* injected_pid
 )
 {
     injector_t injector = (injector_t)g_malloc0(sizeof(struct injector));
@@ -396,36 +393,48 @@ injector_status_t injector_start_app_on_linux(
         injector->target_tid = pid;
     injector->args_count = args_count;
 
-    injector->args = (const char**)g_new0(const char*, args_count);
+    injector->args = (const char**)g_new0(const char*, args_count + 1);
 
     for ( int i = 0; i<args_count; i++ )
         injector->args[i] = args[i];
     injector->method = method;
-    injector->format = format;
     injector->step = STEP1;
     injector->set_gprs_only = true;
 
-    if (init_injector(injector))
+    if (!init_injector(injector))
     {
-        inject(drakvuf, injector);
-        if (injector->rc == INJECTOR_TIMEOUTED)
-            injector->result = INJECT_RESULT_TIMEOUT;
-        else if (injector->rc == INJECTOR_SUCCEEDED)
-            injector->result = INJECT_RESULT_SUCCESS;
-        else
-        {
-            // TODO: Handle other cases
-            injector->rc = INJECTOR_SUCCEEDED;
-            injector->result = INJECT_RESULT_SUCCESS;
-        }
+        injector->result = INJECT_RESULT_INIT_FAIL;
+        print_linux_injection_info(format, injector);
+        injector_free_linux(injector);
+        return 0;
+    }
+
+    if (inject(drakvuf, injector) && injector->rc == INJECTOR_SUCCEEDED)
+    {
+        injector->result = INJECT_RESULT_SUCCESS;
+        print_linux_injection_info(format, injector);
     }
     else
     {
-        injector->result = INJECT_RESULT_METHOD_UNSUPPORTED;
-        injector->rc = INJECTOR_FAILED_WITH_ERROR_CODE;
+        if (SIGDRAKVUFTIMEOUT == drakvuf_is_interrupted(drakvuf))
+        {
+            PRINT_DEBUG("Injection timeout\n");
+            injector->result = INJECT_RESULT_TIMEOUT;
+            print_linux_injection_info(format, injector);
+        }
+        else
+        {
+            PRINT_DEBUG("Injection premature break\n");
+            injector->result = INJECT_RESULT_PREMATURE;
+            print_linux_injection_info(format, injector);
+        }
     }
 
     injector_status_t rc = injector->rc;
+    if (injected_pid)
+        *injected_pid = injector->pid;
+    PRINT_DEBUG("Finished with injection. Ret: %i.\n", rc);
+
     injector_free_linux(injector);
     return rc;
 }
