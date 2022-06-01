@@ -114,6 +114,34 @@
 
 using namespace procmon;
 
+namespace
+{
+
+struct process_visitor_ctx
+{
+    output_format_t format;
+};
+
+void process_visitor(drakvuf_t drakvuf, addr_t process, void* visitor_ctx)
+{
+    struct process_visitor_ctx* ctx = reinterpret_cast<struct process_visitor_ctx*>(visitor_ctx);
+
+    proc_data_t data = {};
+    if (!drakvuf_get_process_data(drakvuf, process, &data))
+    {
+        PRINT_DEBUG("Failed to get PID of process 0x%" PRIx64 "\n", process);
+        return;
+    }
+
+    gint64 t = g_get_real_time();
+
+    fmt::print_running_process(ctx->format, "procmon", drakvuf, t, data);
+
+    g_free(const_cast<char*>(data.name));
+}
+
+} // namespace
+
 static void free_trap(drakvuf_trap_t* trap)
 {
     linux_wrapper* lw = (linux_wrapper*)trap->data;
@@ -393,6 +421,9 @@ static bool register_trap(drakvuf_t drakvuf, const char* function_name, drakvuf_
 
 linux_procmon::linux_procmon(drakvuf_t drakvuf, output_format_t output)
 {
+    struct process_visitor_ctx ctx = { .format = output };
+    drakvuf_enumerate_processes(drakvuf, process_visitor, &ctx);
+
     this->output = output;
 
     addr_t _text;
