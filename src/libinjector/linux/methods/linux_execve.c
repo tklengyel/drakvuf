@@ -239,7 +239,8 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             else
             {
                 PRINT_DEBUG("Restoring parent registers\n");
-                memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+                copy_gprs(info->regs, &injector->saved_regs);
+                // memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
 
                 // free the post_syscall_trap
                 free_bp_trap(drakvuf, injector, info->trap);
@@ -367,7 +368,8 @@ static event_response_t cleanup(injector_t injector, x86_registers_t* regs)
 {
     fprintf(stderr, "Doing premature cleanup\n");
 
-    memcpy(regs, &injector->saved_regs, sizeof(x86_registers_t));
+    copy_gprs(regs, &injector->saved_regs);
+    // memcpy(regs, &injector->saved_regs, sizeof(x86_registers_t));
 
     return override_step(injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
 }

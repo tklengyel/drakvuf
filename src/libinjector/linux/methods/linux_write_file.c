@@ -265,7 +265,8 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             free_bp_trap(drakvuf, injector, info->trap);
 
             // restore regs
-            memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+            copy_gprs(info->regs, &injector->saved_regs);
+            // memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
 
             injector->rc = INJECTOR_SUCCEEDED;
 
@@ -314,7 +315,8 @@ static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bo
     injector_t injector = (injector_t)info->trap->data;
 
     // restore regs
-    memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
+    copy_gprs(info->regs, &injector->saved_regs);
+    // memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
 
     if (clear_trap)
         free_bp_trap(drakvuf, injector, info->trap);
