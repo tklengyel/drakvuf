@@ -675,7 +675,7 @@ static bool linux_get_process_environ_buffer(drakvuf_t drakvuf, drakvuf_trap_inf
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = info->regs->cr3,
-        .addr = env_start,
+        .addr = env_start
     );
     if (VMI_SUCCESS != vmi_read(drakvuf->vmi, &ctx, buffer_size, _buffer, NULL))
     {

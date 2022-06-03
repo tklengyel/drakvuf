@@ -111,7 +111,7 @@
 #include "linux_syscalls.h"
 
 static event_response_t cleanup(injector_t injector, x86_registers_t* regs);
-bool create_argv_and_envp_arrays(injector_t injector, x86_registers_t* regs, size_t mmap_size, addr_t* argv_addr, addr_t* envp_addr);
+bool create_argv_and_envp_arrays(injector_t injector, drakvuf_trap_info_t* info, size_t mmap_size, addr_t* argv_addr, addr_t* envp_addr);
 bool is_child_process(injector_t injector,  drakvuf_trap_info_t* info)
 {
     if (info->proc_data.ppid == injector->target_pid)
@@ -158,6 +158,7 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         case STEP1: // Finds vdso and sets up mmap
         {
+            injector->target_process = info->proc_data.base_addr;
             memcpy(&injector->saved_regs, info->regs, sizeof(x86_registers_t));
 
             if (!init_syscalls(drakvuf, info))
@@ -204,7 +205,7 @@ event_response_t handle_execve(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             addr_t argv_addr, envp_addr;
 
-            if (!create_argv_and_envp_arrays(injector, info->regs, FILE_BUF_SIZE, &argv_addr, &envp_addr))
+            if (!create_argv_and_envp_arrays(injector, info, FILE_BUF_SIZE, &argv_addr, &envp_addr))
             {
                 injector->injection_failed = true;
                 return cleanup(injector, info->regs);
@@ -295,10 +296,11 @@ addr_t create_argv_array(injector_t injector, x86_registers_t* regs, addr_t* dat
     init_string_argument(&argv[0], injector->host_file);
 
     PRINT_DEBUG("Total arguments: %d\n", injector->args_count);
+    PRINT_DEBUG("Args 0: %s\n", injector->host_file);
     for (int i=0; i<injector->args_count; i++)
     {
         init_string_argument(&argv[i+1], injector->args[i]);
-        PRINT_DEBUG("Args %d: %s\n", i, injector->args[i]);
+        PRINT_DEBUG("Args %d: %s\n", i+1, injector->args[i]);
     }
 
     init_int_argument(&argv[injector->args_count+1], 0); // null in the end
@@ -320,40 +322,83 @@ err:
     return 0;
 }
 
-addr_t create_envp_array(injector_t injector, x86_registers_t* regs, addr_t* data_addr, addr_t* array_addr)
+addr_t create_envp_array(injector_t injector, drakvuf_trap_info_t* info, addr_t* data_addr, addr_t* array_addr)
 {
     struct argument arg; // this will be passed in place_array_on_addr_64
+    size_t envs_count = 0;
+    struct argument* envp = NULL;
+    bool set_minimal = true;
+    GHashTable* env_htable = NULL; // process "__environ" contents
+    char** env_tmp_array = NULL;
 
-    // TODO: allow passing envp arguments through cli
-    struct argument envp[1];
+    // Get current list of environment variables
+    if ( drakvuf_get_process_environ(injector->drakvuf, info, &env_htable) &&
+        env_htable )
+    {
+        PRINT_DEBUG("After vFork successfully read environ with %d variables\n", g_hash_table_size(env_htable));
+        envs_count = g_hash_table_size(env_htable) + 1; // add null argument
+        envp = g_new0(struct argument, envs_count);
+        env_tmp_array = g_new0(char*, envs_count);
+        set_minimal = false;
+
+        GHashTableIter iter;
+        gpointer key, value;
+
+        int idx = 0;
+        g_hash_table_iter_init(&iter, env_htable);
+        while (g_hash_table_iter_next(&iter, &key, &value))
+        {
+            env_tmp_array[idx] = g_strconcat((const char*)key, "=", (const char*)value, NULL);
+            PRINT_DEBUG("Envs %d: %s\n", idx + 1, env_tmp_array[idx]);
+            init_string_argument(&envp[idx], env_tmp_array[idx]);
+            idx++;
+        }
+    }
+    else
+    {
+        PRINT_DEBUG("After vFork failed to get environ\n");
+    }
+
+    if (set_minimal)
+    {
+        // TODO: allow passing envp arguments through cli
+        envs_count = 2;
+        envp = g_new0(struct argument, envs_count);
+
+        init_string_argument(&envp[0], "DISPLAY=:0");
+    }
+
+    init_int_argument(&envp[envs_count - 1], 0); // null
+    init_array_argument(&arg, envp, envs_count);
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
+    *array_addr = place_array_on_addr_64(vmi, info->regs, &arg, data_addr, array_addr);
+    drakvuf_release_vmi(injector->drakvuf);
 
-    // envp = [NULL];
-    init_int_argument(&envp[0], 0); // null
-    init_array_argument(&arg, envp, 1);
+    g_free(envp);
+    if (env_tmp_array)
+        g_strfreev(env_tmp_array);
+    if (env_htable)
+        g_hash_table_destroy(env_htable);
 
-    *array_addr = place_array_on_addr_64(vmi, regs, &arg, data_addr, array_addr);
     if (*array_addr == 0)
-        goto err;
+    {
+        fprintf(stderr, "Could not create envp arrays\n");
+        return 0;
+    }
 
-    drakvuf_release_vmi(injector->drakvuf);
     return arg.data_on_stack;
-err:
-    fprintf(stderr, "Could not create envp arrays\n");
-    drakvuf_release_vmi(injector->drakvuf);
-    return 0;
 }
 
-bool create_argv_and_envp_arrays(injector_t injector, x86_registers_t* regs, size_t mmap_size, addr_t* argv_addr, addr_t* envp_addr)
+bool create_argv_and_envp_arrays(injector_t injector, drakvuf_trap_info_t* info, size_t mmap_size, addr_t* argv_addr, addr_t* envp_addr)
 {
     addr_t data_addr = injector->virtual_memory_addr + mmap_size;
     addr_t array_addr = injector->virtual_memory_addr + mmap_size/2;
 
-    if ((*argv_addr = create_argv_array(injector, regs, &data_addr, &array_addr)) == 0)
+    if ((*argv_addr = create_argv_array(injector, info->regs, &data_addr, &array_addr)) == 0)
         return false;
 
-    if ((*envp_addr = create_envp_array(injector, regs, &data_addr, &array_addr)) == 0)
+    if ((*envp_addr = create_envp_array(injector, info, &data_addr, &array_addr)) == 0)
         return false;
 
     return true;
