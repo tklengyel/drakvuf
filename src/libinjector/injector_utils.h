@@ -109,5 +109,6 @@
 #include <libinjector/private.h>
 
 event_response_t override_step(injector_t injector, const injector_step_t step, event_response_t event);
+void fall_through_step(injector_t injector, const injector_step_t step);
 event_response_t handle_gprs_registers(drakvuf_t drakvuf, drakvuf_trap_info_t* info, event_response_t event);
 #endif
