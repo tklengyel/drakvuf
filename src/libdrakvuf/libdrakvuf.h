@@ -500,6 +500,14 @@ bool drakvuf_get_process_dtb(drakvuf_t drakvuf,
     addr_t process_base,
     addr_t* dtb) NOEXCEPT;
 
+bool drakvuf_get_process_environ(drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    GHashTable** environ);
+
+bool drakvuf_get_process_arguments(drakvuf_t drakvuf,
+    addr_t process_base,
+    addr_t* argv);
+
 /* Process userid or -1 on error */
 int64_t drakvuf_get_process_userid(drakvuf_t drakvuf,
     addr_t process_base) NOEXCEPT;
