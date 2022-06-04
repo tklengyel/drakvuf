@@ -119,6 +119,7 @@
 #define STACK_SIZE_16K 0x3fff
 #define MIN_KERNEL_BOUNDARY 0x80000000
 #define PAGE_OFFSET 0xffff800000000000
+#define PF_KTHREAD		0x00200000	/* I am a kernel thread */
 
 static addr_t read_process_base(drakvuf_t drakvuf, addr_t rsp, access_context_t* ctx)
 {
@@ -190,6 +191,15 @@ addr_t linux_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return linux_get_current_process(drakvuf, info);
 }
 
+static bool get_mm_struct(drakvuf_t drakvuf, addr_t process_base, addr_t* mm_struct)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT]);
+
+    return (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, mm_struct));
+}
 
 static void prepend_path(drakvuf_t drakvuf, addr_t path, addr_t root, GString* b)
 {
@@ -305,59 +315,76 @@ static char* d_path(drakvuf_t drakvuf, addr_t process_base, addr_t path)
     return g_string_free(b, 0);
 }
 
+static char* linux_get_short_process_name(drakvuf_t drakvuf, addr_t process_base)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]);
+
+    return vmi_read_str(drakvuf->vmi, &ctx);
+}
+
+static bool linux_get_process_flags(drakvuf_t drakvuf, addr_t process_base, uint64_t* pflags)
+{
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_FLAGS]);
+
+    uint64_t flags;
+    if (VMI_FAILURE == vmi_read_64(drakvuf->vmi, &ctx, &flags))
+    {
+        PRINT_DEBUG("Can't read flags from task_struct.\n");
+        return false;
+    }
+
+    if (pflags)
+        *pflags = flags;
+    return true;
+}
+
+// solution: https://stackoverflow.com/questions/18658295/full-process-name-from-task-struct
+static char* linux_get_full_process_name(drakvuf_t drakvuf, addr_t process_base)
+{
+    uint64_t flags;
+    if (!linux_get_process_flags(drakvuf, process_base, &flags))
+        return NULL;
+
+    // This is a kernel thread (with null pointer to mm_struct)
+    bool is_kernel_thread = (flags & PF_KTHREAD);
+
+    if (is_kernel_thread)
+        return linux_get_short_process_name(drakvuf, process_base);
+
+    addr_t mm_struct;
+    if (!get_mm_struct(drakvuf, process_base, &mm_struct))
+    {
+        PRINT_DEBUG("Can't get mm_struct from task_struct\n");
+        return NULL;
+    }
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = mm_struct + drakvuf->offsets[MM_STRUCT_EXE_FILE]);
+
+    addr_t exe_file;
+    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &exe_file))
+    {
+        PRINT_DEBUG("Can't get exe_file from mm_struct\n");
+        return NULL;
+    }
+
+    addr_t f_path = exe_file + drakvuf->offsets[FILE_PATH];
+    return d_path(drakvuf, process_base, f_path);
+}
+
 char* linux_get_process_name(drakvuf_t drakvuf, addr_t process_base, bool fullpath)
 {
     if (fullpath)
-    {
-        // solution: https://stackoverflow.com/questions/18658295/full-process-name-from-task-struct
-        ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_DTB,
-            .dtb = drakvuf->kpgd);
-
-        ctx.addr = process_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT];
-        addr_t mm_struct;
-        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &mm_struct))
-        {
-            PRINT_DEBUG("Can't get mm_struct from task_struct\n");
-            return NULL;
-        }
-
-        if (!mm_struct)
-        {
-            // This is a kernel thread (with null pointer to mm_struct)
-            vmi_pid_t pid;
-            if (linux_get_process_pid(drakvuf, process_base, &pid))
-            {
-                gchar tmp[32] = {0};
-                if (g_snprintf(tmp, 32, "kthread-%d", pid) >= 0)
-                    return g_strdup(tmp);
-                else
-                    return NULL;
-            }
-            else
-                return NULL;
-        }
-
-        ctx.addr = mm_struct + drakvuf->offsets[MM_STRUCT_EXE_FILE];
-        addr_t exe_file;
-        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &exe_file))
-        {
-            PRINT_DEBUG("Can't get exe_file from mm_struct\n");
-            return NULL;
-        }
-
-        addr_t f_path = exe_file + drakvuf->offsets[FILE_PATH];
-        return d_path(drakvuf, process_base, f_path);
-    }
-    else
-    {
-        ACCESS_CONTEXT(ctx,
-            .translate_mechanism = VMI_TM_PROCESS_PID,
-            .pid = 0,
-            .addr = process_base + drakvuf->offsets[TASK_STRUCT_COMM]);
-
-        return vmi_read_str(drakvuf->vmi, &ctx);
-    }
+        return linux_get_full_process_name(drakvuf, process_base);
+    return linux_get_short_process_name(drakvuf, process_base);
 }
 
 bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pid )

@@ -113,6 +113,7 @@ static const char* linux_offset_names[__LINUX_OFFSETS_MAX][2] =
     [_TEXT] = {"_text", NULL},
     [INIT_TASK] = {"init_task", NULL},
     [CURRENT_TASK] = {"current_task", NULL},
+    [TASK_STRUCT_FLAGS] = {"task_struct", "flags"},
     [TASK_STRUCT_COMM] = {"task_struct", "comm"},
     [TASK_STRUCT_CRED] = {"task_struct", "cred"},
     [TASK_STRUCT_PID] = {"task_struct", "pid"},
