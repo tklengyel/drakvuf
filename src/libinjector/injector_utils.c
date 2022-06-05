@@ -123,6 +123,11 @@ event_response_t override_step(injector_t injector, const injector_step_t step, 
     return event;
 }
 
+void fall_through_step(injector_t injector, const injector_step_t step)
+{
+    injector->step = step;
+}
+
 // One could not set all registers at once because the kernel structures could be affected.
 // For example on Windows 7 x64 GS BASE stores pointer to KPCR. If save
 // GS BASE on vCPU0 and start injections Windows scheduler could switch

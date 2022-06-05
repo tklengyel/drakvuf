@@ -193,6 +193,7 @@ event_response_t handle_writefile(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
             if (!open_host_file(injector, "rb"))
                 return cleanup(drakvuf, info);
 
+            fall_through_step(injector, STEP6);
         }
         // fall through
         case STEP6: // read chunk from host and write to guest
