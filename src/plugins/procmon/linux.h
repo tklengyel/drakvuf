@@ -115,9 +115,9 @@ public:
     addr_t kaslr;
     output_format_t output;
 
-    drakvuf_trap_t trap[2] =
+    drakvuf_trap_t trap[3] =
     {
-        [0 ... 1] = {
+        [0 ... 2] = {
             .breakpoint.lookup_type = LOOKUP_PID,
             .breakpoint.pid = 0,
             .breakpoint.addr_type = ADDR_VA,
