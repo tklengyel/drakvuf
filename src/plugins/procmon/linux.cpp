@@ -401,14 +401,201 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-static bool register_trap(drakvuf_t drakvuf, const char* function_name, drakvuf_trap_t* trap, event_response_t (*hook_cb)(drakvuf_t, drakvuf_trap_info_t* info))
+static event_response_t do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
+{
+    /*
+    void __noreturn do_exit(long code)
+    */
+    PRINT_DEBUG("[PROCMON] Callback: %s\n", info->trap->name);
+
+    linux_procmon* procmon = (linux_procmon*)info->trap->data;
+
+    proc_data_t proc_data = info->proc_data;
+
+    addr_t code = drakvuf_get_function_argument(drakvuf, info, 1);
+    uint32_t exit_status = (uint32_t)(code >> 8);
+
+    addr_t process_base = drakvuf_get_current_process(drakvuf, info);
+    if (!process_base)
+    {
+        PRINT_DEBUG("[PROCMON] Failed to get current process base.\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    char* thread_name = drakvuf_get_process_name(drakvuf, process_base, false);
+
+    fmt::print(procmon->output, "procmon", drakvuf, nullptr,
+        keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
+        keyval("PID", fmt::Nval(proc_data.pid)),
+        keyval("TID", fmt::Nval(proc_data.tid)),
+        keyval("PPID", fmt::Nval(proc_data.ppid)),
+        keyval("ProcessName", fmt::Qstr(proc_data.name)),
+        keyval("ThreadName", fmt::Qstr(thread_name)),
+        keyval("Method", fmt::Qstr(info->trap->name)),
+        keyval("ExitStatus", fmt::Nval(exit_status)),
+        keyval("ExitStatusStr", fmt::Qstr(exit_status_to_string((exit_status_t)exit_status)))
+    );
+
+    g_free(thread_name);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t send_signal_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    linux_wrapper* lw = (linux_wrapper*)info->trap->data;
+
+    if (!drakvuf_check_return_context(drakvuf, info, lw->pid, lw->tid, lw->rsp))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    fmt::print(lw->procmon->output, "procmon", drakvuf, nullptr,
+        keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
+        keyval("PID", fmt::Nval(lw->pid)),
+        keyval("TID", fmt::Nval(lw->tid)),
+        keyval("PPID", fmt::Nval(lw->ppid)),
+        keyval("ProcessName", fmt::Qstr(lw->process_name)),
+        keyval("ThreadName", fmt::Qstr(lw->thread_name)),
+        keyval("Method", fmt::Qstr(info->trap->name)),
+        keyval("TargetPID", fmt::Nval(lw->target_pid)),
+        keyval("TargetTID", fmt::Nval(lw->target_tid)),
+        keyval("TargetPPID", fmt::Nval(lw->target_ppid)),
+        keyval("TargetProcessName", fmt::Qstr(lw->target_process_name)),
+        keyval("TargetThreadName", fmt::Qstr(lw->target_thread_name)),
+        keyval("Signal", fmt::Nval(lw->signal)),
+        keyval("SignalStr", fmt::Qstr(signal_to_string((signal_t)lw->signal)))
+    );
+
+    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static event_response_t send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    /*
+    static int __send_signal(
+        int sig,
+        struct kernel_siginfo *info,
+        struct task_struct *t,
+        enum pid_type type,
+        bool force
+    )
+    */
+
+    linux_procmon* procmon = (linux_procmon*)info->trap->data;
+
+    PRINT_DEBUG("[PROCMON] Callback: %s\n", info->trap->name);
+
+    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+    if (!ret_addr)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    uint64_t signal = (uint64_t)drakvuf_get_function_argument(drakvuf, info, 1);
+
+    /* Gather information about target process */
+    addr_t process_base_of_target_process = drakvuf_get_function_argument(drakvuf, info, 3);
+    if (!process_base_of_target_process)
+    {
+        PRINT_DEBUG("[PROCMON] Failed to get process_base of affected process\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    proc_data_t target_proc_data;
+    if (!drakvuf_get_process_data(drakvuf, process_base_of_target_process, &target_proc_data))
+    {
+        PRINT_DEBUG("[PROCMON] Failed to get data of affected process\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+    char* target_thread_name = drakvuf_get_process_name(drakvuf, process_base_of_target_process, false);
+
+    /* Gather information about current process */
+    proc_data_t current_proc_data = info->proc_data;
+
+    addr_t process_base_of_current_process = drakvuf_get_current_process(drakvuf, info);
+    if (!process_base_of_current_process)
+    {
+        PRINT_DEBUG("[PROCMON] Failed to get process_base of affected process\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+    char* current_thread_name = drakvuf_get_process_name(drakvuf, process_base_of_current_process, false);
+
+    linux_wrapper* lw = new (std::nothrow) linux_wrapper;
+    if (!lw)
+    {
+        PRINT_DEBUG("[PROCMON] Failed to allocate memory for linux wrapper structure\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    // Save data about current process
+    lw->procmon = procmon;
+    lw->process_name = current_proc_data.name;
+    lw->thread_name = current_thread_name;
+    lw->pid = current_proc_data.pid;
+    lw->tid = current_proc_data.tid;
+    lw->ppid = current_proc_data.ppid;
+    lw->rsp = ret_addr;
+
+    // Save data about target process
+    lw->target_process_name = target_proc_data.name;
+    lw->target_thread_name = target_thread_name;
+    lw->target_pid = target_proc_data.pid;
+    lw->target_tid = target_proc_data.tid;
+    lw->target_ppid = target_proc_data.ppid;
+    lw->signal = signal;
+
+    auto trap = new drakvuf_trap_t();
+    trap->breakpoint.lookup_type = LOOKUP_PID;
+    trap->breakpoint.pid = 0;
+    trap->breakpoint.addr_type = ADDR_VA;
+    trap->breakpoint.addr = ret_addr;
+    trap->breakpoint.module = "linux";
+    trap->type = BREAKPOINT;
+    trap->name = info->trap->name;
+    trap->data = lw;
+    trap->cb = send_signal_ret_cb;
+
+    if (!drakvuf_add_trap(drakvuf, trap))
+    {
+        fprintf(stderr, "Failed to trap return at 0x%lx\n", ret_addr);
+        free_trap(trap);
+    }
+
+    g_free(const_cast<char*>(target_proc_data.name));
+    g_free(target_thread_name);
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+static bool find_symbol(drakvuf_t drakvuf, const char* function_name, addr_t* function_addr)
+{
+    if (drakvuf_get_kernel_symbol_rva(drakvuf, function_name, function_addr))
+        return true;
+
+    for (uint8_t i = 0; i < 0xff; i++)
+    {
+        char tmp[64] = {0};
+
+        sprintf(tmp, "%s.isra.%d", function_name, i);
+        if (drakvuf_get_kernel_symbol_rva(drakvuf, tmp, function_addr))
+            return true;
+    }
+
+    return false;
+}
+
+static bool register_trap(drakvuf_t drakvuf, const char* function_name, const char* output_function_name, drakvuf_trap_t* trap, event_response_t (*hook_cb)(drakvuf_t, drakvuf_trap_info_t* info))
 {
     addr_t function_addr;
-    if (!drakvuf_get_kernel_symbol_rva(drakvuf, function_name, &function_addr))
+    if (!find_symbol(drakvuf, function_name, &function_addr))
         return false;
 
     trap->breakpoint.addr += function_addr;
-    trap->name = function_name;
+
+    if (nullptr != output_function_name)
+        trap->name = output_function_name;
+    else
+        trap->name = function_name;
+
     trap->cb = hook_cb;
     trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
     trap->ah_cb = nullptr;
@@ -436,15 +623,25 @@ linux_procmon::linux_procmon(drakvuf_t drakvuf, output_format_t output)
 
     this->kaslr = kernel_base - _text;
 
-    for (int i = 0; i < 2; i++)
+    uint32_t trap_size = sizeof(this->trap) / sizeof(this->trap[0]);
+    for (uint32_t i = 0; i < trap_size; i++)
         this->trap[i].breakpoint.addr = this->kaslr;
 
-    if (!register_trap(drakvuf, "do_execveat_common.isra.0", &trap[0], do_execveat_common_cb))
+    if (!register_trap(drakvuf, "do_execveat_common", nullptr, &trap[0], do_execveat_common_cb))
     {
-        if (!register_trap(drakvuf, "do_execveat_common", &trap[0], do_execveat_common_cb))
-        {
-            PRINT_DEBUG("[PROCMON] Method do_execveat_common not found. You are probably using an older kernel version below 5.9\n");
-            return;
-        }
+        PRINT_DEBUG("[PROCMON] Method do_execveat_common not found. You are probably using an older kernel version below 5.9\n");
+        return;
+    }
+
+    if (!register_trap(drakvuf, "do_exit", nullptr, &trap[1], do_exit_cb))
+    {
+        PRINT_DEBUG("[PROCMON] Method do_exit not found.\n");
+        return;
+    }
+
+    if (!register_trap(drakvuf, "__send_signal", "send_signal", &trap[2], send_signal_cb))
+    {
+        PRINT_DEBUG("[PROCMON] Method __send_signal not found.\n");
+        return;
     }
 }

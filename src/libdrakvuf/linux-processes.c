@@ -119,6 +119,7 @@
 #define STACK_SIZE_16K 0x3fff
 #define MIN_KERNEL_BOUNDARY 0x80000000
 #define PAGE_OFFSET 0xffff800000000000
+#define PF_EXITING		0x00000004	/* Getting shut down */
 #define PF_KTHREAD		0x00200000	/* I am a kernel thread */
 
 static addr_t read_process_base(drakvuf_t drakvuf, addr_t rsp, access_context_t* ctx)
@@ -356,6 +357,24 @@ static char* linux_get_full_process_name(drakvuf_t drakvuf, addr_t process_base)
 
     if (is_kernel_thread)
         return linux_get_short_process_name(drakvuf, process_base);
+
+    // The terminating process has no name due to the fact that its structures have already been cleared in memory
+    bool is_exiting = (flags & PF_EXITING);
+    if (is_exiting)
+    {
+        vmi_pid_t pid;
+        if (linux_get_process_pid(drakvuf, process_base, &pid))
+        {
+            gchar tmp[32] = {0};
+
+            if (g_snprintf(tmp, 32, "process-%d", pid))
+                return g_strdup(tmp);
+            else
+                return NULL;
+        }
+        else
+            return NULL;
+    }
 
     addr_t mm_struct;
     if (!get_mm_struct(drakvuf, process_base, &mm_struct))
