@@ -113,21 +113,246 @@ namespace procmon
 struct linux_wrapper
 {
     vmi_pid_t pid = 0;
+    vmi_pid_t target_pid = 0;
+
     uint32_t tid = 0;
+    uint32_t target_tid = 0;
+
     vmi_pid_t ppid = 0;
+    vmi_pid_t target_ppid = 0;
 
     vmi_pid_t new_pid = 0;
     uint32_t new_tid = 0;
 
     addr_t rsp = 0;
+    addr_t target_rsp = 0;
 
     linux_procmon* procmon;
+
     std::string process_name;
+    std::string target_process_name;
+
     std::string thread_name;
+    std::string target_thread_name;
+
     std::string image_path_name;
     std::string command_line;
     std::map<std::string, std::string> envp;
+
+    uint8_t exit_status;
+    uint64_t signal;
 };
+
+typedef enum exit_status
+{
+    EXIT_STATUS_SUCCESS                     = 0x00,
+    EXIT_STATUS_FAILURE                     = 0x01,
+    EXIT_USAGE                              = 0x40,
+    EXIT_DATAERR                            = 0x41,
+    EXIT_NOINPUT                            = 0x42,
+    EXIT_NOUSER                             = 0x43,
+    EXIT_NOHOST                             = 0x44,
+    EXIT_UNAVAILABLE                        = 0x45,
+    EXIT_SOFTWARE                           = 0x46,
+    EXIT_OSERROR                            = 0x47,
+    EXIT_OSFILE                             = 0x48,
+    EXIT_CANTCREATE                         = 0x49,
+    EXIT_IOERROR                            = 0x4A,
+    EXIT_TEMPFAIL                           = 0x4B,
+    EXIT_PROTOCOL                           = 0x4C,
+    EXIT_NOPERMISSION                       = 0x4D,
+    EXIT_CONFIG                             = 0x4E,
+    EXIT_CANNOT_EXECUTE                     = 0x7E,
+    EXIT_COMMAND_NOT_FOUND                  = 0x7F,
+    EXIT_INVALID_ARGUMENT                   = 0x80,
+    EXIT_SIGHUP                             = 0x81,
+    EXIT_SIGINT                             = 0x82,
+    EXIT_SIGQUIT                            = 0x83,
+    EXIT_SIGILL                             = 0x84,
+    EXIT_SIGABRT                            = 0x86,
+    EXIT_SIGFPE                             = 0x88,
+    EXIT_SIGKILL                            = 0x89,
+    EXIT_SIGSEGV                            = 0x8B,
+    EXIT_SIGPIPE                            = 0x8D,
+    EXIT_SIGALRM                            = 0x8E,
+    EXIT_SIGTERM                            = 0x8F
+} exit_status_t;
+
+static inline const char* exit_status_to_string(exit_status_t status)
+{
+    switch (status)
+    {
+        case EXIT_STATUS_SUCCESS:
+            return "EXIT_SUCCESS";
+        case EXIT_STATUS_FAILURE:
+            return "EXIT_FAILURE";
+        case EXIT_USAGE:
+            return "EXIT_USAGE";
+        case EXIT_DATAERR:
+            return "EXIT_DATAERR";
+        case EXIT_NOINPUT:
+            return "EXIT_NOINPUT";
+        case EXIT_NOUSER:
+            return "EXIT_NOUSER";
+        case EXIT_NOHOST:
+            return "EXIT_NOHOST";
+        case EXIT_UNAVAILABLE:
+            return "EXIT_UNAVAILABLE";
+        case EXIT_SOFTWARE:
+            return "EXIT_SOFTWARE";
+        case EXIT_OSERROR:
+            return "EXIT_OSERROR";
+        case EXIT_OSFILE:
+            return "EXIT_OSFILE";
+        case EXIT_CANTCREATE:
+            return "EXIT_CANTCREATE";
+        case EXIT_IOERROR:
+            return "EXIT_IOERROR";
+        case EXIT_TEMPFAIL:
+            return "EXIT_TEMPFAIL";
+        case EXIT_PROTOCOL:
+            return "EXIT_PROTOCOL";
+        case EXIT_NOPERMISSION:
+            return "EXIT_NOPERMISSION";
+        case EXIT_CONFIG:
+            return "EXIT_CONFIG";
+        case EXIT_CANNOT_EXECUTE:
+            return "EXIT_CANNOT_EXECUTE";
+        case EXIT_COMMAND_NOT_FOUND:
+            return "EXIT_COMMAND_NOT_FOUND";
+        case EXIT_INVALID_ARGUMENT:
+            return "EXIT_INVALID_ARGUMENT";
+        case EXIT_SIGHUP:
+            return "EXIT_SIGHUP";
+        case EXIT_SIGINT:
+            return "EXIT_SIGINT";
+        case EXIT_SIGQUIT:
+            return "EXIT_SIGQUIT";
+        case EXIT_SIGILL:
+            return "EXIT_SIGILL";
+        case EXIT_SIGABRT:
+            return "EXIT_SIGABRT";
+        case EXIT_SIGFPE:
+            return "EXIT_SIGFPE";
+        case EXIT_SIGKILL:
+            return "EXIT_SIGKILL";
+        case EXIT_SIGSEGV:
+            return "EXIT_SIGSEGV";
+        case EXIT_SIGPIPE:
+            return "EXIT_SIGPIPE";
+        case EXIT_SIGALRM:
+            return "EXIT_SIGALRM";
+        case EXIT_SIGTERM:
+            return "EXIT_SIGTERM";
+    }
+    return "UNDEFINED";
+}
+
+typedef enum signal
+{
+    SIGNAL_HUP                =	0x01,
+    SIGNAL_INT                = 0x02,
+    SIGNAL_QUIT               = 0x03,
+    SIGNAL_ILL                = 0x04,
+    SIGNAL_TRAP               = 0x05,
+    SIGNAL_ABRT               = 0x06,
+    SIGNAL_BUS                = 0x07,
+    SIGNAL_FPE                = 0x08,
+    SIGNAL_KILL               = 0x09,
+    SIGNAL_USR1               = 0x0A,
+    SIGNAL_SEGV               =	0x0B,
+    SIGNAL_USR2               =	0x0C,
+    SIGNAL_PIPE               =	0x0D,
+    SIGNAL_ALRM               =	0x0E,
+    SIGNAL_TERM               =	0x0F,
+    SIGNAL_STKFLT             =	0x10,
+    SIGNAL_CHLD               =	0x11,
+    SIGNAL_CONT               =	0x12,
+    SIGNAL_STOP               =	0x13,
+    SIGNAL_TSTP               =	0x14,
+    SIGNAL_TTIN               =	0x15,
+    SIGNAL_TTOU               =	0x16,
+    SIGNAL_URG                =	0x17,
+    SIGNAL_XCPU               =	0x18,
+    SIGNAL_XFSZ               =	0x19,
+    SIGNAL_VTALRM             =	0x1A,
+    SIGNAL_PROF               =	0x1B,
+    SIGNAL_WINCH              =	0x1C,
+    SIGNAL_IO                 = 0x1D,
+    SIGNAL_PWR                =	0x1E,
+    SIGNAL_SYS                =	0x1F
+} signal_t;
+
+static inline const char* signal_to_string(signal_t signal)
+{
+    switch (signal)
+    {
+        case SIGNAL_HUP:
+            return "SIGHUP";
+        case SIGNAL_INT:
+            return "SIGINT";
+        case SIGNAL_QUIT:
+            return "SIGQUIT";
+        case SIGNAL_ILL:
+            return "SIGILL";
+        case SIGNAL_TRAP:
+            return "SIGTRAP";
+        case SIGNAL_ABRT:
+            return "SIGABRT";
+        case SIGNAL_BUS:
+            return "SIGBUS";
+        case SIGNAL_FPE:
+            return "SIGFPE";
+        case SIGNAL_KILL:
+            return "SIGKILL";
+        case SIGNAL_USR1:
+            return "SIGUSR1";
+        case SIGNAL_SEGV:
+            return "SIGSEGV";
+        case SIGNAL_USR2:
+            return "SIGUSR2";
+        case SIGNAL_PIPE:
+            return "SIGPIPE";
+        case SIGNAL_ALRM:
+            return "SIGALRM";
+        case SIGNAL_TERM:
+            return "SIGTERM";
+        case SIGNAL_STKFLT:
+            return "SIGSTKFLT";
+        case SIGNAL_CHLD:
+            return "SIGCHLD";
+        case SIGNAL_CONT:
+            return "SIGCONT";
+        case SIGNAL_STOP:
+            return "SIGSTOP";
+        case SIGNAL_TSTP:
+            return "SIGTSTP";
+        case SIGNAL_TTIN:
+            return "SIGTTIN";
+        case SIGNAL_TTOU:
+            return "SIGTTOU";
+        case SIGNAL_URG:
+            return "SIGURG";
+        case SIGNAL_XCPU:
+            return "SIGXCPU";
+        case SIGNAL_XFSZ:
+            return "SIGXFSZ";
+        case SIGNAL_VTALRM:
+            return "SIGVTALRM";
+        case SIGNAL_PROF:
+            return "SIGPROF";
+        case SIGNAL_WINCH:
+            return "SIGWINCH";
+        case SIGNAL_IO:
+            return "SIGIO";
+        case SIGNAL_PWR:
+            return "SIGPWR";
+        case SIGNAL_SYS:
+            return "SIGSYS";
+    }
+
+    return "UNDEFINED";
+}
 
 }
 
