@@ -205,7 +205,6 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
             // restore regs
             copy_gprs(info->regs, &injector->saved_regs);
-            // memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
 
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
             break;
@@ -238,7 +237,6 @@ static event_response_t cleanup(drakvuf_t drakvuf, drakvuf_trap_info_t* info, bo
 
     // restore regs
     copy_gprs(info->regs, &injector->saved_regs);
-    // memcpy(info->regs, &injector->saved_regs, sizeof(x86_registers_t));
 
     if (clear_trap)
         free_bp_trap(drakvuf, injector, info->trap);
