@@ -262,18 +262,7 @@ public:
         return hooks.empty();
     }
 
-    void visit_hooks_for(const std::string& dll_name, std::function<void(const plugin_target_config_entry_t&)>&& visitor) const
-    {
-        for (const auto& [pattern, wanted_hooks] : hooks)
-        {
-            if ((pattern == "*.dll" && dll_name.find(".dll") != std::string::npos) ||
-                std::search(dll_name.begin(), dll_name.end(), pattern.begin(), pattern.end(),
-                    [](char x, char y){return std::toupper(x) == std::toupper(y);}) != dll_name.end())
-            {
-                std::for_each(std::begin(wanted_hooks), std::end(wanted_hooks), visitor);
-            }
-        }
-    }
+    void visit_hooks_for(const std::string& dll_name, std::function<void(const plugin_target_config_entry_t&)>&& visitor) const;
 
 private:
     std::map<std::string, std::vector<plugin_target_config_entry_t>> hooks;
