@@ -297,9 +297,9 @@ bool drakvuf_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* 
 
 typedef struct pass_context
 {
-    addr_t* dtb;
-    addr_t* process;
-    vmi_pid_t* pid;
+    addr_t dtb;
+    addr_t process;
+    vmi_pid_t pid;
 } pass_context_t;
 
 static void process_visitor(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx)
@@ -312,15 +312,15 @@ static void process_visitor(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ct
         PRINT_DEBUG("[LIBDRAKVUF] Failed to get process pid\n");
         return;
     }
-    if (temp_pid == *ctx->pid)
+    if (temp_pid == ctx->pid)
     {
         PRINT_DEBUG("[LIBDRAKVUF] Found remote process base! Getting dtb..\n");
-        if (!drakvuf_get_process_dtb(drakvuf, eprocess, ctx->dtb))
+        if (!drakvuf_get_process_dtb(drakvuf, eprocess, &ctx->dtb))
         {
             PRINT_DEBUG("[LIBDRAKVUF] Failed to get process dtb\n");
             return;
         }
-        *ctx->process = eprocess;
+        ctx->process = eprocess;
     }
 }
 
@@ -333,27 +333,17 @@ bool drakvuf_get_process_by_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info,
         if (!drakvuf_get_pid_from_handle(drakvuf, info, handle, &pid))
         {
             PRINT_DEBUG("[LIBDRAKVUF] Failed to get remote process pid\n");
-            return VMI_EVENT_RESPONSE_NONE;
+            return false;
         }
 
-        pass_context_t pctx =
-        {
-            .pid = &pid,
-            .process = process,
-            .dtb = dtb
-        };
-        // Get process by pid
-        drakvuf_enumerate_processes(drakvuf, process_visitor, (void*)(&pctx));
-    }
-    // Self process
-    else
-    {
-        *process = info->attached_proc_data.base_addr;
-        *dtb     = info->regs->cr3;
+        return drakvuf_get_process_by_pid(drakvuf, pid, process, dtb);
     }
 
-    if (!*process || !*dtb)
-        return false;
+    // Self process
+    if (process)
+        *process = info->attached_proc_data.base_addr;
+    if (dtb)
+        *dtb = info->regs->cr3;
     return true;
 }
 
@@ -361,16 +351,20 @@ bool drakvuf_get_process_by_pid(drakvuf_t drakvuf, vmi_pid_t pid, addr_t* proces
 {
     pass_context_t pctx =
     {
-        .pid = &pid,
-        .process = process,
-        .dtb = dtb
+        .pid = pid,
     };
     // Get process by pid
     drakvuf_enumerate_processes(drakvuf, process_visitor, (void*)(&pctx));
 
-    if (!*process || !*dtb)
-        return false;
-    return true;
+    if (pctx.process && pctx.dtb)
+    {
+        if (process)
+            *process = pctx.process;
+        if (dtb)
+            *dtb = pctx.dtb;
+        return true;
+    }
+    return false;
 }
 
 bool drakvuf_get_process_thread_id(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid)
