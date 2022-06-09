@@ -149,7 +149,7 @@ static void free_trap(drakvuf_trap_t* trap)
     delete lw;
 }
 
-static char* get_image_path_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+static std::string get_image_path_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     addr_t filename_struct = drakvuf_get_function_argument(drakvuf, info, 2);
 
@@ -162,10 +162,13 @@ static char* get_image_path_name(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     addr_t name_addr;
     if (VMI_FAILURE == vmi_read_addr(vmi, &ctx, &name_addr))
-        return nullptr;
+        return {};
 
     ctx.addr = name_addr;
-    return vmi_read_str(vmi, &ctx);
+    char* str = vmi_read_str(vmi, &ctx);
+    std::string ret = str ?: "";
+    g_free(str);
+    return ret;
 }
 
 static std::string get_command_line(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -256,31 +259,32 @@ static std::map<std::string, std::string> parse_environment(drakvuf_t drakvuf, d
 static void print_info(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     linux_wrapper* lw = (linux_wrapper*)info->trap->data;
+    linux_procmon* procmon = lw->procmon;
 
-    const char* image_path_name = lw->image_path_name.c_str();
-    gchar* cmdline = g_strescape(!lw->command_line.empty() ? lw->command_line.c_str() : "", NULL);
-
-    std::vector<std::pair<std::string, fmt::Rstr<const char*>>> extra_args;
+    std::vector<std::pair<std::string, fmt::Estr<std::string>>> extra_args;
     if (lw->envp.find("PWD") != lw->envp.end())
-        extra_args.emplace_back("CWD", fmt::Rstr(lw->envp["PWD"].c_str()));
+        extra_args.emplace_back("CWD", fmt::Estr(lw->envp["PWD"]));
     if (lw->envp.find("OLDPWD") != lw->envp.end())
-        extra_args.emplace_back("OLDCWD", fmt::Rstr(lw->envp["OLDPWD"].c_str()));
+        extra_args.emplace_back("OLDCWD", fmt::Estr(lw->envp["OLDPWD"]));
 
-    fmt::print(lw->procmon->output, "procmon", drakvuf, nullptr,
-        keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-        keyval("PID", fmt::Nval(lw->pid)),
-        keyval("TID", fmt::Nval(lw->tid)),
-        keyval("PPID", fmt::Nval(lw->ppid)),
-        keyval("ProcessName", fmt::Qstr(lw->process_name)),
-        keyval("ThreadName", fmt::Qstr(lw->thread_name)),
-        keyval("Method", fmt::Qstr(info->trap->name)),
+    auto proc_data_backup = info->proc_data;
+
+    // Fake caller process data to print correct data
+    info->proc_data.pid = lw->pid;
+    info->proc_data.tid = lw->tid;
+    info->proc_data.ppid = lw->ppid;
+    info->proc_data.name = lw->process_name.c_str();
+
+    fmt::print(procmon->output, "procmon", drakvuf, info,
+        keyval("ThreadName", fmt::Estr(lw->thread_name)),
         keyval("NewPid", fmt::Nval(lw->new_pid)),
         keyval("NewTid", fmt::Nval(lw->new_tid)),
-        keyval("CommandLine", fmt::Qstr(cmdline)),
-        keyval("ImagePathName", fmt::Qstr(image_path_name)),
+        keyval("CommandLine", fmt::Estr(lw->command_line)),
+        keyval("ImagePathName", fmt::Estr(lw->image_path_name)),
         extra_args);
 
-    g_free(cmdline);
+    // restore original proc_data
+    info->proc_data = proc_data_backup;
 }
 
 /*
@@ -321,29 +325,16 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
         return VMI_EVENT_RESPONSE_NONE;
 
     // Gather information about parent process
-    addr_t process_base = drakvuf_get_current_process(drakvuf, info);
-    if (!process_base)
-    {
-        PRINT_DEBUG("[PROCMON] Failed to get process_base\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    vmi_pid_t pid;
-    if (!drakvuf_get_process_ppid(drakvuf, process_base, &pid))
-    {
-        PRINT_DEBUG("[PROCMON] Failed to get process pid\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    addr_t parent_process, dtb;
-    if (!drakvuf_get_process_by_pid(drakvuf, pid, &parent_process, &dtb))
+    vmi_pid_t parent_pid = info->proc_data.ppid;
+    addr_t parent_process;
+    if (!drakvuf_get_process_by_pid(drakvuf, parent_pid, &parent_process, nullptr))
     {
         PRINT_DEBUG("[PROCMON] Failed to get process by pid\n");
         return VMI_EVENT_RESPONSE_NONE;
     }
 
-    proc_data_t proc_data;
-    if (!drakvuf_get_process_data(drakvuf, parent_process, &proc_data))
+    proc_data_t parent_proc_data;
+    if (!drakvuf_get_process_data(drakvuf, parent_process, &parent_proc_data))
     {
         PRINT_DEBUG("[PROCMON] Failed to get process data of parent process\n");
         return VMI_EVENT_RESPONSE_NONE;
@@ -357,24 +348,20 @@ static event_response_t do_execveat_common_cb(drakvuf_t drakvuf, drakvuf_trap_in
     }
 
     lw->procmon = procmon;
-    lw->pid = pid;
-    lw->tid = proc_data.tid;
-    lw->ppid = proc_data.ppid;
+    lw->pid = parent_proc_data.pid;
+    lw->tid = parent_proc_data.tid;
+    lw->ppid = parent_proc_data.ppid;
     lw->new_pid = info->proc_data.pid;
     lw->new_tid = info->proc_data.tid;
     lw->rsp = ret_addr;
 
-    char* image_path_name = get_image_path_name(drakvuf, info);
-    if (image_path_name)
-        lw->image_path_name = image_path_name;
-    g_free(image_path_name);
-
+    lw->image_path_name = get_image_path_name(drakvuf, info);
     lw->command_line = get_command_line(drakvuf, info);
     lw->envp = parse_environment(drakvuf, info);
 
-    if (proc_data.name)
-        lw->process_name = proc_data.name;
-    g_free(const_cast<char*>(proc_data.name));
+    if (parent_proc_data.name)
+        lw->process_name = parent_proc_data.name;
+    g_free(const_cast<char*>(parent_proc_data.name));
 
     char* thread_name = drakvuf_get_process_name(drakvuf, parent_process, false);
     if (thread_name)
@@ -410,30 +397,16 @@ static event_response_t do_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info* info)
 
     linux_procmon* procmon = (linux_procmon*)info->trap->data;
 
-    proc_data_t proc_data = info->proc_data;
-
     addr_t code = drakvuf_get_function_argument(drakvuf, info, 1);
     uint32_t exit_status = (uint32_t)(code >> 8);
+    auto exit_status_str = exit_status_to_string((exit_status_t)exit_status);
 
-    addr_t process_base = drakvuf_get_current_process(drakvuf, info);
-    if (!process_base)
-    {
-        PRINT_DEBUG("[PROCMON] Failed to get current process base.\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
+    char* thread_name = drakvuf_get_process_name(drakvuf, info->proc_data.base_addr, false);
 
-    char* thread_name = drakvuf_get_process_name(drakvuf, process_base, false);
-
-    fmt::print(procmon->output, "procmon", drakvuf, nullptr,
-        keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-        keyval("PID", fmt::Nval(proc_data.pid)),
-        keyval("TID", fmt::Nval(proc_data.tid)),
-        keyval("PPID", fmt::Nval(proc_data.ppid)),
-        keyval("ProcessName", fmt::Qstr(proc_data.name)),
-        keyval("ThreadName", fmt::Qstr(thread_name)),
-        keyval("Method", fmt::Qstr(info->trap->name)),
+    fmt::print(procmon->output, "procmon", drakvuf, info,
+        keyval("ThreadName", fmt::Estr(thread_name)),
         keyval("ExitStatus", fmt::Nval(exit_status)),
-        keyval("ExitStatusStr", fmt::Qstr(exit_status_to_string((exit_status_t)exit_status)))
+        keyval("ExitStatusStr", fmt::Rstr(exit_status_str))
     );
 
     g_free(thread_name);
@@ -448,21 +421,17 @@ static event_response_t send_signal_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_
     if (!drakvuf_check_return_context(drakvuf, info, lw->pid, lw->tid, lw->rsp))
         return VMI_EVENT_RESPONSE_NONE;
 
-    fmt::print(lw->procmon->output, "procmon", drakvuf, nullptr,
-        keyval("TimeStamp", TimeVal{UNPACK_TIMEVAL(info->timestamp)}),
-        keyval("PID", fmt::Nval(lw->pid)),
-        keyval("TID", fmt::Nval(lw->tid)),
-        keyval("PPID", fmt::Nval(lw->ppid)),
-        keyval("ProcessName", fmt::Qstr(lw->process_name)),
-        keyval("ThreadName", fmt::Qstr(lw->thread_name)),
-        keyval("Method", fmt::Qstr(info->trap->name)),
+    auto signal_str = signal_to_string((signal_t)lw->signal);
+
+    fmt::print(lw->procmon->output, "procmon", drakvuf, info,
+        keyval("ThreadName", fmt::Estr(lw->thread_name)),
         keyval("TargetPID", fmt::Nval(lw->target_pid)),
         keyval("TargetTID", fmt::Nval(lw->target_tid)),
         keyval("TargetPPID", fmt::Nval(lw->target_ppid)),
-        keyval("TargetProcessName", fmt::Qstr(lw->target_process_name)),
-        keyval("TargetThreadName", fmt::Qstr(lw->target_thread_name)),
+        keyval("TargetProcessName", fmt::Estr(lw->target_process_name)),
+        keyval("TargetThreadName", fmt::Estr(lw->target_thread_name)),
         keyval("Signal", fmt::Nval(lw->signal)),
-        keyval("SignalStr", fmt::Qstr(signal_to_string((signal_t)lw->signal)))
+        keyval("SignalStr", fmt::Rstr(signal_str))
     );
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
@@ -511,7 +480,7 @@ static event_response_t send_signal_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     /* Gather information about current process */
     proc_data_t current_proc_data = info->proc_data;
 
-    addr_t process_base_of_current_process = drakvuf_get_current_process(drakvuf, info);
+    addr_t process_base_of_current_process = info->proc_data.base_addr;
     if (!process_base_of_current_process)
     {
         PRINT_DEBUG("[PROCMON] Failed to get process_base of affected process\n");
@@ -571,11 +540,11 @@ static bool find_symbol(drakvuf_t drakvuf, const char* function_name, addr_t* fu
     if (drakvuf_get_kernel_symbol_rva(drakvuf, function_name, function_addr))
         return true;
 
-    for (uint8_t i = 0; i < 0xff; i++)
+    for (uint8_t i = 0; i < 255; i++)
     {
-        char tmp[64] = {0};
+        char tmp[64];
 
-        sprintf(tmp, "%s.isra.%d", function_name, i);
+        snprintf(tmp, sizeof(tmp), "%s.isra.%d", function_name, i);
         if (drakvuf_get_kernel_symbol_rva(drakvuf, tmp, function_addr))
             return true;
     }
