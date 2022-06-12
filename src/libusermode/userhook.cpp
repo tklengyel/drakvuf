@@ -1073,3 +1073,20 @@ bool drakvuf_are_userhooks_supported(drakvuf_t drakvuf)
 {
     return userhook::is_supported(drakvuf);
 }
+
+static bool dll_name_comparator(char x, char y)
+{
+    return std::toupper(x) == std::toupper(y);
+}
+
+void wanted_hooks_t::visit_hooks_for(const std::string& dll_name, std::function<void(const plugin_target_config_entry_t&)>&& visitor) const
+{
+    for (const auto& [pattern, wanted_hooks] : hooks)
+    {
+        if (std::search(dll_name.begin(), dll_name.end(), pattern.begin(), pattern.end(),
+                dll_name_comparator) != dll_name.end())
+        {
+            std::for_each(std::begin(wanted_hooks), std::end(wanted_hooks), visitor);
+        }
+    }
+}
