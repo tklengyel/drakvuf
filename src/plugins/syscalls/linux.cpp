@@ -204,16 +204,14 @@ static std::vector<uint64_t> linux_build_argbuf(vmi_instance_t vmi,
 static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     struct wrapper* w = (struct wrapper*)info->trap->data;
+    syscalls* s = w->s;
 
     if (!drakvuf_check_return_context(drakvuf, info, w->pid, w->tid, 0))
         return VMI_EVENT_RESPONSE_NONE;
 
-    syscalls* s = w->s;
-
     const syscall_t* sc = w->num < NUM_SYSCALLS_LINUX ? linuxsc::linux_syscalls[w->num] : NULL;
 
-    std::vector<uint64_t> args;
-    print_syscall(s, drakvuf, VMI_OS_LINUX, false, info, w->num, std::string(info->trap->breakpoint.module), sc, args, info->regs->rax, nullptr);
+    print_sysret(s, drakvuf, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax);
 
     drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
     s->traps = g_slist_remove(s->traps, info->trap);
@@ -258,7 +256,7 @@ static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     auto args = linux_build_argbuf(vmi, info, s, sc, pt_regs);
 
-    print_syscall(s, drakvuf, VMI_OS_LINUX, true, info, nr, std::string(info->trap->breakpoint.module), sc, args, 0, NULL);
+    print_syscall(s, drakvuf, info, nr, info->trap->breakpoint.module, sc, args);
 
     if ( s->disable_sysret )
         return 0;

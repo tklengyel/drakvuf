@@ -205,52 +205,58 @@ static uint64_t transform_value(drakvuf_t drakvuf, drakvuf_trap_info_t* info, co
     return mask_value(arg, val);
 }
 
-void print_syscall(syscalls* s, drakvuf_t drakvuf, os_t os,
-    bool syscall, drakvuf_trap_info_t* info,
-    int nr, std::string module, const syscall_t* sc,
-    const std::vector<uint64_t>& args,
+void print_syscall(
+    syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    int nr, std::string&& module, const syscall_t* sc,
+    const std::vector<uint64_t>& args
+)
+{
+    if (sc)
+        info->trap->name = sc->name;
+
+    s->fmt_args.clear();
+
+    if (sc)
+    {
+        for (size_t i = 0; i < args.size(); ++i)
+        {
+            auto str = extract_string(s, drakvuf, info, sc->args[i], args[i]);
+            if ( !str.empty() )
+                s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Qstr(str)));
+            else
+            {
+                uint64_t val = transform_value(drakvuf, info, sc->args[i], args[i]);
+                s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(val)));
+            }
+        }
+    }
+
+    fmt::print(s->format, "syscall", drakvuf, info,
+        keyval("Module", fmt::Qstr(std::move(module))),
+        keyval("vCPU", fmt::Nval(info->vcpu)),
+        keyval("CR3", fmt::Xval(info->regs->cr3)),
+        keyval("Syscall", fmt::Nval(nr)),
+        keyval("NArgs", fmt::Nval(args.size())),
+        s->fmt_args
+    );
+}
+
+void print_sysret(
+    syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info,
+    int nr, std::string&& module, const syscall_t* sc,
     uint64_t ret, const char* extra_info)
 {
     if (sc)
         info->trap->name = sc->name;
 
-    if (syscall)
-    {
-        s->fmt_args.clear();
-
-        if (sc)
-            for (size_t i = 0; i < args.size(); ++i)
-            {
-                auto str = extract_string(s, drakvuf, info, sc->args[i], args[i]);
-                if ( !str.empty() )
-                    s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Qstr(str)));
-                else
-                {
-                    uint64_t val = transform_value(drakvuf, info, sc->args[i], args[i]);
-                    s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Xval(val)));
-                }
-            }
-
-        fmt::print(s->format, "syscall", drakvuf, info,
-            keyval("Module", fmt::Qstr(module)),
-            keyval("vCPU", fmt::Nval(info->vcpu)),
-            keyval("CR3", fmt::Xval(info->regs->cr3)),
-            keyval("Syscall", fmt::Nval(nr)),
-            keyval("NArgs", fmt::Nval(args.size())),
-            s->fmt_args
-        );
-    }
-    else
-    {
-        fmt::print(s->format, "sysret", drakvuf, info,
-            keyval("Module", fmt::Qstr(module)),
-            keyval("vCPU", fmt::Nval(info->vcpu)),
-            keyval("CR3", fmt::Xval(info->regs->cr3)),
-            keyval("Syscall", fmt::Nval(nr)),
-            keyval("Ret", fmt::Nval(ret)),
-            keyval("Info", fmt::Rstr(extra_info ?: ""))
-        );
-    }
+    fmt::print(s->format, "sysret", drakvuf, info,
+        keyval("Module", fmt::Qstr(std::move(module))),
+        keyval("vCPU", fmt::Nval(info->vcpu)),
+        keyval("CR3", fmt::Xval(info->regs->cr3)),
+        keyval("Syscall", fmt::Nval(nr)),
+        keyval("Ret", fmt::Nval(ret)),
+        keyval("Info", fmt::Rstr(extra_info ?: ""))
+    );
 }
 
 static GHashTable* read_syscalls_filter(const char* filter_file)

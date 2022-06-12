@@ -135,8 +135,7 @@ static event_response_t ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     if (!exit_status_str)
         exit_status_str = ntstatus_format_string(ntstatus_t(info->regs->rax), exit_status_buf, sizeof(exit_status_buf));
 
-    std::vector<uint64_t> args;
-    print_syscall(s, drakvuf, VMI_OS_WINDOWS, false, info, wr->num, std::string(info->trap->breakpoint.module), wr->sc, args, info->regs->rax, exit_status_str);
+    print_sysret(s, drakvuf, info, wr->num, info->trap->breakpoint.module, wr->sc, info->regs->rax, exit_status_str);
 
     //Destroys this return trap, because it is specific for the RIP and not usable anymore. This was the trap being called when the physical address got computed.
     //Deletes this trap from the list of existing traps traps
@@ -210,7 +209,7 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 
     std::vector<uint64_t> args = extract_args(drakvuf, info, s->reg_size, sc ? sc->num_args : 0);
 
-    print_syscall(s, drakvuf, VMI_OS_WINDOWS, true, info, w->num, std::string(w->type), sc, args, 0, NULL);
+    print_syscall(s, drakvuf, info, w->num, w->type, sc, args);
 
     if ( s->disable_sysret || s->is_stopping() )
         return 0;
