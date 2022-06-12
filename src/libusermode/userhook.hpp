@@ -262,16 +262,7 @@ public:
         return hooks.empty();
     }
 
-    void visit_hooks_for(const std::string& dll_name, std::function<void(const plugin_target_config_entry_t&)>&& visitor) const
-    {
-        for (const auto& [pattern, wanted_hooks] : hooks)
-        {
-            if (dll_name.find(pattern) != std::string::npos)
-            {
-                std::for_each(std::begin(wanted_hooks), std::end(wanted_hooks), visitor);
-            }
-        }
-    }
+    void visit_hooks_for(const std::string& dll_name, std::function<void(const plugin_target_config_entry_t&)>&& visitor) const;
 
 private:
     std::map<std::string, std::vector<plugin_target_config_entry_t>> hooks;
