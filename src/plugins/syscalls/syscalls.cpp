@@ -222,7 +222,7 @@ void print_syscall(
         {
             auto str = extract_string(s, drakvuf, info, sc->args[i], args[i]);
             if ( !str.empty() )
-                s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Qstr(str)));
+                s->fmt_args.push_back(keyval(sc->args[i].name, fmt::Estr(str)));
             else
             {
                 uint64_t val = transform_value(drakvuf, info, sc->args[i], args[i]);
