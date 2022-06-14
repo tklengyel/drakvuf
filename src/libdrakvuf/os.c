@@ -300,13 +300,14 @@ typedef struct pass_context
     addr_t dtb;
     addr_t process;
     vmi_pid_t pid;
+    bool found;
 } pass_context_t;
 
 static void process_visitor(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx)
 {
-    vmi_pid_t temp_pid;
     pass_context_t* ctx = (pass_context_t*)(visitor_ctx);
 
+    vmi_pid_t temp_pid;
     if (!drakvuf_get_process_pid(drakvuf, eprocess, &temp_pid))
     {
         PRINT_DEBUG("[LIBDRAKVUF] Failed to get process pid\n");
@@ -321,6 +322,7 @@ static void process_visitor(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ct
             return;
         }
         ctx->process = eprocess;
+        ctx->found = true;
     }
 }
 
@@ -356,7 +358,7 @@ bool drakvuf_get_process_by_pid(drakvuf_t drakvuf, vmi_pid_t pid, addr_t* proces
     // Get process by pid
     drakvuf_enumerate_processes(drakvuf, process_visitor, (void*)(&pctx));
 
-    if (pctx.process && pctx.dtb)
+    if (pctx.found)
     {
         if (process)
             *process = pctx.process;
