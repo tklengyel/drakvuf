@@ -106,6 +106,8 @@
 #include "plugins/plugins_ex.h"
 #include "private.h"
 
+#include <array>
+
 struct rootkitmon_config
 {
     const char* fwpkclnt_profile;
@@ -119,7 +121,7 @@ public:
     rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, output_format_t output);
     rootkitmon(const rootkitmon&) = delete;
     rootkitmon& operator=(const rootkitmon&) = delete;
-    ~rootkitmon();
+    ~rootkitmon() = default;
 
     std::unique_ptr<libhook::ManualHook> register_profile_hook(drakvuf_t drakvuf, const char* profile, const char* dll_name,
         const char* func_name, hook_cb_t callback);
@@ -142,7 +144,7 @@ public:
     const output_format_t format;
     win_ver_t winver;
 
-    size_t* offsets;
+    std::array<size_t, __OFFSET_MAX> offsets;
     size_t guest_ptr_size;
     bool is32bit;
 
