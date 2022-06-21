@@ -120,6 +120,7 @@ static void save_file_metadata(const drakvuf_trap_info_t* info,
     addr_t dump_address,
     const char* method,
     const char* dump_reason,
+    int sequence_number,
     extras_t* extras)
 {
     char* file = NULL;
@@ -148,6 +149,7 @@ static void save_file_metadata(const drakvuf_trap_info_t* info,
     }
 
     json_object_object_add(jobj, "DataFileName", json_object_new_string(data_file_name));
+    json_object_object_add(jobj, "SequenceNumber", json_object_new_int(sequence_number));
 
     fprintf(fp, "%s\n", json_object_get_string(jobj));
     fclose(fp);
@@ -197,6 +199,8 @@ bool dump_memory_region(
 
     std::optional<fmt::Nval<decltype(extras->write_virtual_memory_extras.target_pid)>> target_pid;
     std::optional<fmt::Xval<decltype(extras->write_virtual_memory_extras.base_address)>> write_addr;
+
+    int sequence_number = ++plugin->dumps_count;
 
     if (!plugin->memdump_dir)
     {
@@ -291,10 +295,10 @@ bool dump_memory_region(
     if (rename(tmp_file_path, file_path) != 0)
         goto done;
 
-    if (asprintf(&metafile, "%s/memdump.%06d", plugin->memdump_dir, ++plugin->dumps_count) < 0)
+    if (asprintf(&metafile, "%s/memdump.%06d", plugin->memdump_dir, sequence_number) < 0)
         goto done;
 
-    save_file_metadata(info, metafile, file, len_bytes, ctx->addr, info->trap->name, reason, extras);
+    save_file_metadata(info, metafile, file, len_bytes, ctx->addr, info->trap->name, reason, sequence_number, extras);
 
     ret = true;
 
@@ -302,25 +306,23 @@ printout:
     // scoping the block as goto jumps
     // bypasses variable initialization
     {
-        auto default_print=std::make_tuple(
+        auto default_print = std::make_tuple(
                 keyval("DumpReason", fmt::Qstr(reason)),
                 keyval("DumpPID", fmt::Nval(info->attached_proc_data.pid)),
                 keyval("DumpAddr", fmt::Xval(ctx->addr, false)),
                 keyval("DumpSize", fmt::Xval(len_bytes)),
                 keyval("DumpFilename", fmt::Qstr(display_file)),
-                keyval("DumpsCount", fmt::Nval(plugin->dumps_count))
+                keyval("DumpsCount", fmt::Nval(sequence_number))
             );
         if (print_extras)
         {
             target_pid = fmt::Nval(extras->write_virtual_memory_extras.target_pid);
             write_addr = fmt::Xval(extras->write_virtual_memory_extras.base_address, false);
-            auto extra_arguments=std::make_tuple(
+            auto extra_arguments = std::make_tuple(
                     keyval("TargetPID", target_pid),
                     keyval("WriteAddr", write_addr)
                 );
-            fmt::print(plugin->m_output_format, "memdump", drakvuf, info,
-                std::tuple_cat(default_print, extra_arguments)
-            );
+            fmt::print(plugin->m_output_format, "memdump", drakvuf, info, default_print, extra_arguments);
         }
         else
         {

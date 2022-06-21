@@ -1512,6 +1512,7 @@ void procdump2::save_file_metadata(std::shared_ptr<procdump2_ctx> ctx, proc_data
     json_object_object_add(jobj, "Compression", json_object_new_string(use_compression ? "gzip" : "none"));
     json_object_object_add(jobj, "Status", json_object_new_string(ctx->status()));
     json_object_object_add(jobj, "DataFileName", json_object_new_string(ctx->data_file_name.data()));
+    json_object_object_add(jobj, "SequenceNumber", json_object_new_int(ctx->idx));
 
     fprintf(fp, "%s\n", json_object_get_string(jobj));
     fclose(fp);
