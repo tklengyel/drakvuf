@@ -1079,8 +1079,7 @@ device_stack_t rootkitmon::enumerate_driver_stacks(vmi_instance_t vmi, addr_t dr
 }
 
 rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, output_format_t output)
-    : pluginex(drakvuf, output), format(output), offsets(new size_t[__OFFSET_MAX]),
-      done_final_analysis(false)
+    : pluginex(drakvuf, output), format(output), done_final_analysis(false)
 {
     if (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E)
     {
@@ -1096,7 +1095,7 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
     {
         vmi_lock_guard vmi(drakvuf);
         win_build_info_t build_info;
-        if (!vmi_get_windows_build_info(vmi.vmi, &build_info))
+        if (!vmi_get_windows_build_info(vmi, &build_info))
             throw -1;
 
         this->winver = build_info.version;
@@ -1114,7 +1113,7 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
     else
         manual_hooks.push_back(register_profile_hook(drakvuf, config->fltmgr_profile, "fltmgr.sys", "FltRegisterFilter", flt_cb));
 
-    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, this->offsets))
+    if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, this->offsets.size(), this->offsets.data()))
     {
         PRINT_DEBUG("[ROOTKITMON] Failed to get kernel struct member offsets\n");
         throw -1;
@@ -1180,11 +1179,6 @@ rootkitmon::rootkitmon(drakvuf_t drakvuf, const rootkitmon_config* config, outpu
         PRINT_DEBUG("[ROOTKITMON] Failed to enumerate descriptors\n");
         throw -1;
     }
-}
-
-rootkitmon::~rootkitmon()
-{
-    delete[] offsets;
 }
 
 bool rootkitmon::stop_impl()
