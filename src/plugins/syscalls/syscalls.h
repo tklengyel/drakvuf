@@ -123,7 +123,6 @@ public:
     GSList* traps; // NOTE Non "pluginex" support for linux
     GSList* strings_to_free;
     GHashTable* filter;
-    json_object* win32k_json;
 
     uint8_t reg_size;
     bool is32bit;
@@ -136,7 +135,6 @@ public:
     addr_t sst[2][2]; // [0=nt][base, limit],[1=win32k][base,limit]
 
     addr_t kernel_base;
-    addr_t win32k_base;
 
     std::vector<std::pair<char const*, fmt::Aarg>> fmt_args; // cache
 
