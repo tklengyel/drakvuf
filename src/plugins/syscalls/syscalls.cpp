@@ -309,7 +309,6 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
     , traps(NULL)
     , strings_to_free(NULL)
     , filter(NULL)
-    , win32k_json(NULL)
     , format{output}
     , offsets(NULL)
 {
@@ -321,11 +320,9 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
 
     if ( c->syscalls_filter_file )
         this->filter = read_syscalls_filter(c->syscalls_filter_file);
-    if ( c->win32k_profile )
-        this->win32k_json = json_object_from_file(c->win32k_profile);
 
     if ( this->os == VMI_OS_WINDOWS )
-        setup_windows(drakvuf, this);
+        setup_windows(drakvuf, this, c);
     else
         setup_linux(drakvuf, this);
 }
@@ -357,6 +354,4 @@ syscalls::~syscalls()
         g_hash_table_destroy(this->filter);
 
     g_free(this->offsets);
-
-    json_object_put(this->win32k_json);
 }

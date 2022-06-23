@@ -249,12 +249,11 @@ static event_response_t syscall_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 }
 
 static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, syscalls* s,
-    addr_t cr3, bool ntos, addr_t base, addr_t* sst)
+    addr_t cr3, bool ntos, addr_t base, addr_t sst[2], json_object* json)
 {
     unsigned int syscall_count = ntos ? NUM_SYSCALLS_NT : NUM_SYSCALLS_WIN32K;
     const syscall_t** definitions = ntos ? nt : win32k;
 
-    json_object* json = ntos ? vmi_get_kernel_json(vmi) : s->win32k_json;
     symbols_t* symbols = json ? json_get_symbols(json) : NULL;
 
     int32_t* table = (int32_t*)g_try_malloc0(sst[1] * sizeof(int32_t));
@@ -374,7 +373,7 @@ static bool trap_syscall_table_entries(drakvuf_t drakvuf, vmi_instance_t vmi, sy
     return true;
 }
 
-void setup_windows(drakvuf_t drakvuf, syscalls* s)
+void setup_windows(drakvuf_t drakvuf, syscalls* s, const syscalls_config* c)
 {
     auto vmi = vmi_lock_guard(drakvuf);
 
@@ -428,13 +427,13 @@ void setup_windows(drakvuf_t drakvuf, syscalls* s)
     PRINT_DEBUG("Windows syscall entry: 0x%lx\n", start);
 #endif
 
-    if ( !trap_syscall_table_entries(drakvuf, vmi, s, dtb, true, s->kernel_base, (addr_t*)&s->sst[0]) )
+    if ( !trap_syscall_table_entries(drakvuf, vmi, s, dtb, true, s->kernel_base, (addr_t*)&s->sst[0], vmi_get_kernel_json(vmi)) )
     {
         PRINT_DEBUG("Failed to trap NT syscall table entries\n");
         throw -1;
     }
 
-    if ( !s->win32k_json )
+    if ( !c->win32k_profile )
     {
         PRINT_DEBUG("Skipping second syscall table since no json profile for win32k is provided\n");
         return;
@@ -447,7 +446,8 @@ void setup_windows(drakvuf_t drakvuf, syscalls* s)
         throw -1;
     }
 
-    if ( !drakvuf_get_module_base_addr(drakvuf, modlist, "win32k.sys", &s->win32k_base) )
+    addr_t win32k_base;
+    if ( !drakvuf_get_module_base_addr(drakvuf, modlist, "win32k.sys", &win32k_base) )
     {
         PRINT_DEBUG("Couldn't find win32k.sys\n");
         throw -1;
@@ -468,11 +468,21 @@ void setup_windows(drakvuf_t drakvuf, syscalls* s)
 
     PRINT_DEBUG("Found explorer.exe @ 0x%lx. DTB: 0x%lx\n", explorer, dtb);
 
-    if ( !trap_syscall_table_entries(drakvuf, vmi, s, dtb, false, s->win32k_base, (addr_t*)&s->sst[1]) )
+    json_object* win32k_json = json_object_from_file(c->win32k_profile);
+    if (!win32k_json)
     {
+        PRINT_DEBUG("Failed to load win32k profile\n");
+        throw -1;
+    }
+
+    if ( !trap_syscall_table_entries(drakvuf, vmi, s, dtb, false, win32k_base, (addr_t*)&s->sst[1], win32k_json) )
+    {
+        json_object_put(win32k_json);
         PRINT_DEBUG("Failed to trap win32k syscall entries\n");
         throw -1;
     }
+
+    json_object_put(win32k_json);
 }
 
 char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
