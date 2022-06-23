@@ -106,23 +106,11 @@
 #include "win.h"
 #include "linux.h"
 
-procmon::procmon(drakvuf_t drakvuf, output_format_t output) : pluginex(drakvuf, output), os(drakvuf_get_os_type(drakvuf))
+procmon::procmon(drakvuf_t drakvuf, output_format_t output) : pluginex(drakvuf, output)
 {
-    if (this->os == VMI_OS_WINDOWS)
-        this->wp = new win_procmon(drakvuf, output);
+    auto os = drakvuf_get_os_type(drakvuf);
+    if (os == VMI_OS_WINDOWS)
+        this->wp = std::make_unique<win_procmon>(drakvuf, output);
     else
-        this->lp = new linux_procmon(drakvuf, output);
-}
-
-procmon::~procmon()
-{
-    if (this->os == VMI_OS_WINDOWS)
-        delete this->wp;
-    else
-        delete this->lp;
-}
-
-bool procmon::stop_impl()
-{
-    return true;
+        this->lp = std::make_unique<linux_procmon>(drakvuf, output);
 }
