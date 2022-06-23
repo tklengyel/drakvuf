@@ -108,7 +108,7 @@
 namespace syscalls_ns
 {
 
-void setup_windows(drakvuf_t drakvuf, syscalls* s);
+void setup_windows(drakvuf_t drakvuf, syscalls* s, const syscalls_config* c);
 char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val);
 
 #define NUMBER_SERVICE_TABLES   2
