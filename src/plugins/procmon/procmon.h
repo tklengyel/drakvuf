@@ -110,15 +110,16 @@
 #include "win.h"
 #include "linux.h"
 
+#include <memory>
+
 class procmon: public pluginex
 {
 public:
-    os_t os;
-    win_procmon* wp;
-    linux_procmon* lp;
+    std::unique_ptr<win_procmon> wp;
+    std::unique_ptr<linux_procmon> lp;
+
     procmon(drakvuf_t drakvuf, output_format_t output);
-    ~procmon();
-    virtual bool stop_impl() override;
+    ~procmon() = default;
 };
 
 #endif
