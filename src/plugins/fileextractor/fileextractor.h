@@ -169,6 +169,7 @@ private:
     std::unique_ptr<libhook::SyscallHook> createsection_hook;
     std::unique_ptr<libhook::SyscallHook> createfile_hook;
     std::unique_ptr<libhook::SyscallHook> openfile_hook;
+    std::map<uint64_t, std::unique_ptr<libhook::ReturnHook>> createfile_ret_hooks;
 
     /* VA of functions to be injected */
     addr_t queryvolumeinfo_va = 0;
