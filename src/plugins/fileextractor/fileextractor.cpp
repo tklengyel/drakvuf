@@ -161,10 +161,14 @@ void fileextractor::createfile_cb_impl(drakvuf_t,
     drakvuf_trap_info_t* info,
     addr_t handle)
 {
+    auto hook_id = make_hook_id(info);
     auto hook = createReturnHook<createfile_result_t>(info,
-            &fileextractor::createfile_ret_cb);
+            &fileextractor::createfile_ret_cb, UNLIMITED_TTL);
     auto params = libhook::GetTrapParams<createfile_result_t>(hook->trap_);
+    params->setResultCallParams(info);
     params->handle = handle;
+
+    createfile_ret_hooks[hook_id] = std::move(hook);
 }
 
 event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
@@ -208,6 +212,9 @@ event_response_t fileextractor::createfile_ret_cb(drakvuf_t,
                     file);
         }
     }
+
+    auto hook_id = make_hook_id(info);
+    createfile_ret_hooks.erase(hook_id);
 
     return VMI_EVENT_RESPONSE_NONE;
 }
