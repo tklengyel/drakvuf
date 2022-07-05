@@ -127,7 +127,7 @@ using std::string;
 //
 // The group of hooks that detects new tasks - files to dump.
 //
-event_response_t fileextractor::openfile_cb(drakvuf_t,
+event_response_t fileextractor::openfile_cb(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info)
 {
     if (this->is_stopping())
@@ -142,7 +142,7 @@ event_response_t fileextractor::openfile_cb(drakvuf_t,
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-event_response_t fileextractor::createfile_cb(drakvuf_t,
+event_response_t fileextractor::createfile_cb(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info)
 {
     if (this->is_stopping())
@@ -336,7 +336,7 @@ event_response_t fileextractor::createsection_cb(drakvuf_t,
 //
 // Dumps file on last handle close.
 //
-event_response_t fileextractor::close_cb_injector(drakvuf_trap_info_t* info)
+event_response_t fileextractor::close_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     vmi_lock_guard vmi(drakvuf);
 
@@ -422,42 +422,6 @@ event_response_t fileextractor::close_cb_injector(drakvuf_trap_info_t* info)
         return VMI_EVENT_RESPONSE_SET_REGISTERS;
 
     return VMI_EVENT_RESPONSE_NONE;
-}
-
-event_response_t fileextractor::close_cb_no_injector(drakvuf_trap_info_t* info)
-{
-    vmi_lock_guard vmi(drakvuf);
-
-    addr_t handle = drakvuf_get_function_argument(drakvuf, info, 1);
-
-    /* If there are more then one open handle to the file. So do nothing. */
-    uint64_t handle_count = 1;
-    if (get_file_object_handle_count(info, handle, &handle_count) &&
-        handle_count > 1)
-        return VMI_EVENT_RESPONSE_NONE;
-
-    auto id = make_task_id(info->attached_proc_data.pid, handle);
-    auto task_it = tasks.find(id);
-
-    /* The system closes handle to untracked resource. So do nothing. */
-    if ( tasks.end() == task_it )
-        return VMI_EVENT_RESPONSE_NONE;
-
-    auto& task = *task_it->second;
-
-    grab_file_by_handle(vmi, info, task);
-    tasks.erase(id);
-
-    return VMI_EVENT_RESPONSE_NONE;
-}
-
-event_response_t fileextractor::close_cb(drakvuf_t,
-    drakvuf_trap_info_t* info)
-{
-    if (this->use_injector)
-        return close_cb_injector(info);
-    else
-        return close_cb_no_injector(info);
 }
 
 /*****************************************************************************
@@ -1089,7 +1053,7 @@ std::string fileextractor::get_file_name(vmi_instance_t vmi,
     return ret;
 }
 
-void fileextractor::print_filedelete_information(drakvuf_trap_info_t* info,
+void fileextractor::print_file_information(drakvuf_trap_info_t* info,
     task_t& task)
 {
     std::string flags = parse_flags(task.fo_flags, fo_flags_map, this->format);
@@ -1203,7 +1167,7 @@ void fileextractor::save_file_metadata(drakvuf_trap_info_t* info,
     fclose(fp);
 
     json_object_put(jobj);
-    print_filedelete_information(info, task);
+    print_file_information(info, task);
 }
 
 void fileextractor::extract_ca_file(drakvuf_trap_info_t* info,
@@ -1386,7 +1350,7 @@ void fileextractor::grab_file_by_handle(vmi_instance_t vmi,
     if (this->dump_folder)
         extract_file(info, vmi, task);
     else
-        print_filedelete_information(info, task);
+        print_file_information(info, task);
 }
 
 bool fileextractor::save_file_chunk(int file_sequence_number,
@@ -1548,12 +1512,10 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
     const fileextractor_config* c,
     output_format_t output)
     : pluginex(drakvuf, output)
-    , drakvuf(drakvuf)
     , is32bit(drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E)
     , offsets(new size_t[__OFFSET_MAX])
     , dump_folder(c->dump_folder)
     , format(output)
-    , use_injector(c->filedelete_use_injector)
     , sequence_number()
 {
     if ( !drakvuf_get_kernel_struct_members_array_rva(drakvuf,
@@ -1564,58 +1526,46 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
             "_CONTROL_AREA", &this->control_area_size) )
         throw -1;
 
-    if ( VMI_PM_LEGACY == drakvuf_get_page_mode(drakvuf) )
+    if ( this->is32bit )
         this->mmpte_size = 4;
     else
         this->mmpte_size = 8;
 
-    if (!this->use_injector)
-    {
-        this->setinformation_hook = createSyscallHook("NtSetInformationFile",
-                &fileextractor::setinformation_cb);
-        this->writefile_hook = createSyscallHook("NtWriteFile",
-                &fileextractor::writefile_cb);
-        this->close_hook = createSyscallHook("NtClose",
-                &fileextractor::close_cb);
-    }
-    else
-    {
-        this->queryvolumeinfo_va = get_function_va("ntoskrnl.exe",
-                "ZwQueryVolumeInformationFile");
-        this->queryinfo_va = get_function_va("ntoskrnl.exe",
-                "ZwQueryInformationFile");
-        this->createsection_va = get_function_va("ntoskrnl.exe",
-                "ZwCreateSection");
-        this->close_handle_va = get_function_va("ntoskrnl.exe",
-                "ZwClose");
-        this->mapview_va = get_function_va("ntoskrnl.exe",
-                "ZwMapViewOfSection");
-        this->unmapview_va = get_function_va("ntoskrnl.exe",
-                "ZwUnmapViewOfSection");
-        this->readfile_va = get_function_va("ntoskrnl.exe",
-                "ZwReadFile");
-        this->waitobject_va = get_function_va("ntoskrnl.exe",
-                "ZwWaitForSingleObject");
-        this->exallocatepool_va = get_function_va("ntoskrnl.exe",
-                "ExAllocatePoolWithTag");
-        this->exfreepool_va = get_function_va("ntoskrnl.exe",
-                "ExFreePoolWithTag");
-        this->memcpy_va = get_function_va("ntoskrnl.exe",
-                "RtlCopyMemoryNonTemporal");
+    this->queryvolumeinfo_va = get_function_va("ntoskrnl.exe",
+            "ZwQueryVolumeInformationFile");
+    this->queryinfo_va = get_function_va("ntoskrnl.exe",
+            "ZwQueryInformationFile");
+    this->createsection_va = get_function_va("ntoskrnl.exe",
+            "ZwCreateSection");
+    this->close_handle_va = get_function_va("ntoskrnl.exe",
+            "ZwClose");
+    this->mapview_va = get_function_va("ntoskrnl.exe",
+            "ZwMapViewOfSection");
+    this->unmapview_va = get_function_va("ntoskrnl.exe",
+            "ZwUnmapViewOfSection");
+    this->readfile_va = get_function_va("ntoskrnl.exe",
+            "ZwReadFile");
+    this->waitobject_va = get_function_va("ntoskrnl.exe",
+            "ZwWaitForSingleObject");
+    this->exallocatepool_va = get_function_va("ntoskrnl.exe",
+            "ExAllocatePoolWithTag");
+    this->exfreepool_va = get_function_va("ntoskrnl.exe",
+            "ExFreePoolWithTag");
+    this->memcpy_va = get_function_va("ntoskrnl.exe",
+            "RtlCopyMemoryNonTemporal");
 
-        this->setinformation_hook = createSyscallHook("NtSetInformationFile",
-                &fileextractor::setinformation_cb);
-        this->writefile_hook = createSyscallHook("NtWriteFile",
-                &fileextractor::writefile_cb);
-        this->close_hook = createSyscallHook("NtClose",
-                &fileextractor::close_cb);
-        this->createsection_hook = createSyscallHook("ZwCreateSection",
-                &fileextractor::createsection_cb);
-        this->createfile_hook = createSyscallHook("NtCreateFile",
-                &fileextractor::createfile_cb);
-        this->openfile_hook = createSyscallHook("NtOpenFile",
-                &fileextractor::openfile_cb);
-    }
+    this->setinformation_hook = createSyscallHook("NtSetInformationFile",
+            &fileextractor::setinformation_cb);
+    this->writefile_hook = createSyscallHook("NtWriteFile",
+            &fileextractor::writefile_cb);
+    this->close_hook = createSyscallHook("NtClose",
+            &fileextractor::close_cb);
+    this->createsection_hook = createSyscallHook("ZwCreateSection",
+            &fileextractor::createsection_cb);
+    this->createfile_hook = createSyscallHook("NtCreateFile",
+            &fileextractor::createfile_cb);
+    this->openfile_hook = createSyscallHook("NtOpenFile",
+            &fileextractor::openfile_cb);
 }
 
 /* NOTE One should run drakvuf loop to restore VM state.

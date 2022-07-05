@@ -208,6 +208,8 @@ static void print_usage()
         "\t --traps-ttl <ttl value>   Maximum number of times trap can be triggered in 10sec period. Protects against api hammering.\n"
 #if defined(ENABLE_PLUGIN_FILEDELETE) || defined(ENABLE_PLUGIN_FILEEXTRACTOR)
         "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
+#endif
+#ifdef ENABLE_PLUGIN_FILEDELETE
         "\t -M                        Dump new or modified files also (requires -D)\n"
         "\t -n                        Use extraction method based on function injection (requires -D)\n"
 #endif
@@ -674,12 +676,14 @@ int main(int argc, char** argv)
                 options.disable_sysret = true;
                 break;
 #endif
+#ifdef ENABLE_PLUGIN_FILEDELETE
             case 'M':
                 options.dump_modified_files = true;
                 break;
             case 'n':
                 options.filedelete_use_injector = true;
                 break;
+#endif
             case 'b':
                 options.abort_on_bsod = true;
                 break;

@@ -122,8 +122,10 @@
 struct plugins_options
 {
     const char* dump_folder;            // PLUGIN_FILEDELETE, PLUGIN_FILEEXTRACTOR
-    bool dump_modified_files;           // PLUGIN_FILEDELETE, PLUGIN_FILEEXTRACTOR
-    bool filedelete_use_injector;       // PLUGIN_FILEDELETE, PLUGIN_FILEEXTRACTOR
+#ifdef PLUGIN_ENABLE_FILEDELETE
+    bool dump_modified_files;           // PLUGIN_FILEDELETE
+    bool filedelete_use_injector;       // PLUGIN_FILEDELETE
+#endif
     bool cpuid_stealth;                 // PLUGIN_CPUIDMON
     const char* tcpip_profile;          // PLUGIN_SOCKETMON
     const char* win32k_profile;         // PLUGIN_CLIPBOARDMON, PLUGIN_WINDOWMON, PLUGIN_SYSCALLS
