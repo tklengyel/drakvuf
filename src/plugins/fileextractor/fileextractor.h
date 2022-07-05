@@ -119,8 +119,6 @@ using task_id = uint64_t;
 struct fileextractor_config
 {
     const char* dump_folder;
-    bool dump_modified_files;
-    bool filedelete_use_injector;
 };
 
 struct task_t;
@@ -144,7 +142,6 @@ private:
     };
 
     /* Internal data */
-    drakvuf_t drakvuf{nullptr};
     std::unordered_map<task_id, std::unique_ptr<task_t>> tasks;
     bool is32bit{false};
     // Maps virtual address of buffer to free flag:
@@ -158,7 +155,6 @@ private:
 
     const char* dump_folder;
     output_format_t format;
-    bool use_injector = false;
 
     int sequence_number = 0;
 
@@ -230,7 +226,7 @@ private:
         addr_t handle,
         addr_t* out_file,
         addr_t* out_filetype);
-    void print_filedelete_information(drakvuf_trap_info_t*, task_t&);
+    void print_file_information(drakvuf_trap_info_t*, task_t&);
     void print_extraction_failure(drakvuf_trap_info_t*,
         const std::string& filename,
         const std::string& message);
@@ -253,8 +249,6 @@ private:
         vmi_instance_t,
         addr_t control_area,
         task_t&);
-    event_response_t close_cb_injector(drakvuf_trap_info_t*);
-    event_response_t close_cb_no_injector(drakvuf_trap_info_t*);
     bool is_handle_valid(handle_t);
 };
 

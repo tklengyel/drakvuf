@@ -203,8 +203,6 @@ int drakvuf_plugins::start(const drakvuf_plugin_t plugin_id,
                     fileextractor_config config =
                     {
                         .dump_folder = options->dump_folder,
-                        .dump_modified_files = options->dump_modified_files,
-                        .filedelete_use_injector = options->filedelete_use_injector,
                     };
                     this->plugins[plugin_id] = std::make_unique<fileextractor>(this->drakvuf, &config, this->output);
                     break;
