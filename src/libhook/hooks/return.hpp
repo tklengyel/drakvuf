@@ -165,34 +165,33 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
 {
     PRINT_DEBUG("[LIBHOOK] creating return hook\n");
 
-    // not using std::make_unique because ctor is private
-    auto hook = std::unique_ptr<ReturnHook>(new ReturnHook(drakvuf, cb));
-    hook->trap_ = new drakvuf_trap_t();
-
     auto ret_addr = drakvuf_get_function_return_address(drakvuf, info);
     if (!ret_addr)
     {
         PRINT_DEBUG("[LIBHOOK] Failed to receive return addr of function\n");
-        delete hook->trap_;
-        hook->trap_ = nullptr;
-        return std::unique_ptr<ReturnHook>();
+        return {};
     }
 
-    hook->trap_->breakpoint.lookup_type = LOOKUP_DTB;
+    auto trap = new drakvuf_trap_t();
+    trap->breakpoint.lookup_type = LOOKUP_DTB;
     // TODO: decide whether to use CR3 or PID
-    hook->trap_->breakpoint.dtb = info->regs->cr3;
-    hook->trap_->breakpoint.addr_type = ADDR_VA;
-    hook->trap_->breakpoint.addr = ret_addr;
-    hook->trap_->breakpoint.module = info->trap->breakpoint.module;
+    trap->breakpoint.dtb = info->regs->cr3;
+    trap->breakpoint.addr_type = ADDR_VA;
+    trap->breakpoint.addr = ret_addr;
+    trap->breakpoint.module = info->trap->breakpoint.module;
 
-    hook->trap_->type = BREAKPOINT;
-    hook->trap_->name = "ReturnHook";
-    hook->trap_->ah_cb = nullptr;
-    hook->trap_->ttl = ttl;
-    hook->trap_->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+    trap->type = BREAKPOINT;
+    trap->name = "ReturnHook";
+    trap->ah_cb = nullptr;
+    trap->ttl = ttl;
+    trap->cb = [](drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     {
         return GetTrapHook<ReturnHook>(info)->callback_(drakvuf, info);
     };
+
+    // not using std::make_unique because ctor is private
+    auto hook = std::unique_ptr<ReturnHook>(new ReturnHook(drakvuf, cb));
+    hook->trap_ = trap;
 
     static_assert(std::is_base_of_v<CallResult, Params>, "Params must derive from CallResult");
     static_assert(std::is_default_constructible_v<Params>, "Params must be default constructible");
@@ -206,17 +205,17 @@ auto ReturnHook::create(drakvuf_t drakvuf, drakvuf_trap_info* info, cb_wrapper_t
     {
         PRINT_DEBUG("[LIBHOOK] failed to create trap for return hook\n");
 
-        delete static_cast<CallResult*>(hook->trap_->data);
+        delete params;
         hook->trap_->data = nullptr;
 
         delete hook->trap_;
         hook->trap_ = nullptr;
 
-        return std::unique_ptr<ReturnHook>();
+        return {};
     }
 
     PRINT_DEBUG("[LIBHOOK] return hook OK\n");
     return hook;
 }
 
-};  // namespace libhook
+}  // namespace libhook

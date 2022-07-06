@@ -427,19 +427,11 @@ public:
 
     template<typename Params = PluginResult>
     [[nodiscard]]
-    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, hook_cb_t cb);
-
-    template<typename Params = PluginResult>
-    [[nodiscard]]
-    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, hook_cb_t cb, int ttl);
+    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, hook_cb_t cb, int ttl = UNLIMITED_TTL);
 
     template<typename Params = PluginResult, typename Callback>
     [[nodiscard]]
-    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, Callback cb);
-
-    template<typename Params = PluginResult, typename Callback>
-    [[nodiscard]]
-    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, Callback cb, int ttl);
+    std::unique_ptr<libhook::ReturnHook> createReturnHook(drakvuf_trap_info* info, Callback cb, int ttl = UNLIMITED_TTL);
 
     template<typename Params = PluginResult>
     [[nodiscard]]
@@ -576,27 +568,19 @@ Plugin* get_trap_plugin(const drakvuf_trap_info_t* info)
 }
 
 template<typename Params>
-std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, hook_cb_t cb)
-{
-    return createReturnHook<Params>(info, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
-}
-
-template<typename Params>
 std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, hook_cb_t cb, int ttl)
 {
     static_assert(std::is_base_of_v<PluginResult, Params>, "Params must derive from PluginResult");
     auto hook = libhook::ReturnHook::create<Params>(this->drakvuf, info, cb, ttl);
     if (hook)
+    {
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+        auto params = libhook::GetTrapParams(hook->trap_);
+        params->setResultCallParams(info);
+    }
     else
         PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
     return hook;
-}
-
-template<typename Params, typename Callback>
-std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_info* info, Callback cb)
-{
-    return createReturnHook<Params, Callback>(info, cb, drakvuf_get_limited_traps_ttl(this->drakvuf));
 }
 
 template<typename Params, typename Callback>
@@ -608,7 +592,11 @@ std::unique_ptr<libhook::ReturnHook> pluginex::createReturnHook(drakvuf_trap_inf
         return std::invoke(cb, static_cast<typename class_type<Callback>::type*>(this), args...);
     }, ttl);
     if (hook)
+    {
         static_cast<Params*>(hook->trap_->data)->plugin_ = this;
+        auto params = libhook::GetTrapParams(hook->trap_);
+        params->setResultCallParams(info);
+    }
     else
         PRINT_DEBUG("[WARNING] libhook failed to setup a trap, returning nullptr!\n");
     return hook;
