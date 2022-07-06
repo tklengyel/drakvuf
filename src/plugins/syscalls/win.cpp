@@ -427,6 +427,9 @@ void setup_windows(drakvuf_t drakvuf, syscalls* s, const syscalls_config* c)
     PRINT_DEBUG("Windows syscall entry: 0x%lx\n", start);
 #endif
 
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_RTL_USER_PROCESS_PARAMETERS", "ImagePathName", &s->image_path_name))
+        throw -1;
+
     if ( !trap_syscall_table_entries(drakvuf, vmi, s, dtb, true, s->kernel_base, (addr_t*)&s->sst[0], vmi_get_kernel_json(vmi)) )
     {
         PRINT_DEBUG("Failed to trap NT syscall table entries\n");
@@ -439,51 +442,72 @@ void setup_windows(drakvuf_t drakvuf, syscalls* s, const syscalls_config* c)
         return;
     }
 
+    if (!s->setup_win32k_syscalls(drakvuf))
+    {
+        PRINT_DEBUG("[SYSCALLS] Delay second syscall table hooks initialization\n");
+
+        s->load_driver_hook = s->createSyscallHook("NtLoadDriver", &syscalls::load_driver_cb);
+        s->create_process_hook = s->createSyscallHook("NtCreateUserProcess", &syscalls::create_process_cb);
+    }
+}
+
+}
+
+bool syscalls::setup_win32k_syscalls(drakvuf_t drakvuf)
+{
+    auto vmi = vmi_lock_guard(drakvuf);
+
     addr_t modlist;
-    if ( VMI_FAILURE == vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &modlist) )
+    if (VMI_SUCCESS != vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &modlist))
     {
         PRINT_DEBUG("Couldn't read PsLoadedModuleList\n");
-        throw -1;
+        return false;
     }
 
     addr_t win32k_base;
-    if ( !drakvuf_get_module_base_addr(drakvuf, modlist, "win32k.sys", &win32k_base) )
+    if (!drakvuf_get_module_base_addr(drakvuf, modlist, "win32k.sys", &win32k_base))
     {
         PRINT_DEBUG("Couldn't find win32k.sys\n");
-        throw -1;
+        return false;
     }
 
     addr_t explorer;
-    if ( !drakvuf_find_process(drakvuf, ~0, "explorer.exe", &explorer) )
+    if (!drakvuf_find_process(drakvuf, ~0, "explorer.exe", &explorer))
     {
         PRINT_DEBUG("Couldn't find explorer.exe\n");
-        throw -1;
+        return false;
     }
 
-    if ( !drakvuf_get_process_dtb(drakvuf, explorer, &dtb) )
+    addr_t dtb;
+    if (!drakvuf_get_process_dtb(drakvuf, explorer, &dtb))
     {
         PRINT_DEBUG("Couldn't find explorer.exe's dtb\n");
-        throw -1;
+        return false;
     }
 
     PRINT_DEBUG("Found explorer.exe @ 0x%lx. DTB: 0x%lx\n", explorer, dtb);
 
-    json_object* win32k_json = json_object_from_file(c->win32k_profile);
+    json_object* win32k_json = json_object_from_file(this->win32k_profile.data());
     if (!win32k_json)
     {
         PRINT_DEBUG("Failed to load win32k profile\n");
-        throw -1;
+        return false;
     }
 
-    if ( !trap_syscall_table_entries(drakvuf, vmi, s, dtb, false, win32k_base, (addr_t*)&s->sst[1], win32k_json) )
+    if (!syscalls_ns::trap_syscall_table_entries(drakvuf, vmi, this, dtb, false, win32k_base, (addr_t*)&sst[1], win32k_json))
     {
         json_object_put(win32k_json);
         PRINT_DEBUG("Failed to trap win32k syscall entries\n");
-        throw -1;
+        return false;
     }
 
     json_object_put(win32k_json);
+    PRINT_DEBUG("Successfully trap win32k syscall entries\n");
+    return true;
 }
+
+namespace syscalls_ns
+{
 
 char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* info, const arg_t& arg, addr_t val)
 {
@@ -503,4 +527,73 @@ char* win_extract_string(syscalls* s, drakvuf_t drakvuf, drakvuf_trap_info_t* in
     return nullptr;
 }
 
+}
+
+event_response_t syscalls::load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t service_name_addr = drakvuf_get_function_argument(drakvuf, info, 1);
+    unicode_string_t* service_name = drakvuf_read_unicode(drakvuf, info, service_name_addr);
+    if (!service_name)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    PRINT_DEBUG("[SYSCALLS] Load driver: %s\n", service_name->contents);
+
+    gchar* service_name_casefold = g_utf8_casefold(reinterpret_cast<const gchar*>(service_name->contents), -1);
+    vmi_free_unicode_str(service_name);
+
+    if (service_name_casefold)
+    {
+        if (strstr(service_name_casefold, "win32k.sys"))
+        {
+            this->load_driver_hook = {};
+
+            if (setup_win32k_syscalls(drakvuf))
+                this->create_process_hook = {};
+        }
+        g_free(service_name_casefold);
+    }
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+event_response_t syscalls::create_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    addr_t user_process_parameters_addr = drakvuf_get_function_argument(drakvuf, info, 9);
+    addr_t imagepath_addr = user_process_parameters_addr + this->image_path_name;
+    unicode_string_t* image_path = drakvuf_read_unicode(drakvuf, info, imagepath_addr);
+    if (!image_path)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    PRINT_DEBUG("[SYSCALLS] Create process: %s\n", image_path->contents);
+
+    gchar* image_path_casefold = g_utf8_casefold(reinterpret_cast<const gchar*>(image_path->contents), -1);
+    vmi_free_unicode_str(image_path);
+
+    if (image_path_casefold)
+    {
+        if (strstr(image_path_casefold, "explorer.exe"))
+        {
+            this->create_process_hook = {};
+
+            auto hook = createReturnHook<PluginResult>(info, &syscalls::create_process_ret_cb);
+            this->wait_process_creation_hook = std::move(hook);
+        }
+        g_free(image_path_casefold);
+    }
+
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
+event_response_t syscalls::create_process_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto params = libhook::GetTrapParams<PluginResult>(info);
+    if (!params->verifyResultCallParams(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    this->wait_process_creation_hook = {};
+
+    if (setup_win32k_syscalls(drakvuf))
+        this->load_driver_hook = {};
+
+    return VMI_EVENT_RESPONSE_NONE;
 }

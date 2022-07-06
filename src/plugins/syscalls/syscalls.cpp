@@ -311,6 +311,7 @@ syscalls::syscalls(drakvuf_t drakvuf, const syscalls_config* c, output_format_t 
     , filter(NULL)
     , format{output}
     , offsets(NULL)
+    , win32k_profile{c->win32k_profile ?: ""}
 {
     this->os = drakvuf_get_os_type(drakvuf);
     this->kernel_base = drakvuf_get_kernel_base(drakvuf);

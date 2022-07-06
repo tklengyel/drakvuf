@@ -135,6 +135,12 @@ public:
     addr_t sst[2][2]; // [0=nt][base, limit],[1=win32k][base,limit]
 
     addr_t kernel_base;
+    addr_t image_path_name;
+    std::string win32k_profile;
+
+    std::unique_ptr<libhook::SyscallHook> load_driver_hook;
+    std::unique_ptr<libhook::SyscallHook> create_process_hook;
+    std::unique_ptr<libhook::ReturnHook> wait_process_creation_hook;
 
     std::vector<std::pair<char const*, fmt::Aarg>> fmt_args; // cache
 
@@ -142,6 +148,12 @@ public:
     syscalls(const syscalls&) = delete;
     syscalls& operator=(const syscalls&) = delete;
     ~syscalls();
+
+    bool setup_win32k_syscalls(drakvuf_t drakvuf);
+
+    event_response_t load_driver_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t create_process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+    event_response_t create_process_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
 };
 
 #endif
