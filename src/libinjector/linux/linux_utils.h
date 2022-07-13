@@ -151,11 +151,12 @@ struct injector
     // KEEP THESE IN TOP and in sync with the order in injector_utils.c
     injector_step_t step;
     bool step_override; // set this as true for jumping to some arbitrary step
-    bool set_gprs_only;
+    bool dummy; // set_gprs_only
 
     // Inputs:
     vmi_pid_t target_pid;
     uint32_t target_tid;
+    addr_t target_process;
     const char* target_file;
     const char* host_file;
     int args_count;

@@ -453,6 +453,20 @@ bool drakvuf_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb
     return ret;
 }
 
+bool drakvuf_get_process_environ(drakvuf_t drakvuf, drakvuf_trap_info_t* info, GHashTable** environ)
+{
+    bool ret = false;
+
+    if ( drakvuf->osi.get_process_environ )
+    {
+        drakvuf_lock_and_get_vmi(drakvuf);
+        ret = drakvuf->osi.get_process_environ(drakvuf, info, environ);
+        drakvuf_release_vmi(drakvuf);
+    }
+
+    return ret;
+}
+
 bool drakvuf_get_current_thread_id( drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* thread_id )
 {
     bool ret = false;
