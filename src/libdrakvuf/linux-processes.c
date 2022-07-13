@@ -625,3 +625,87 @@ bool linux_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t
 
     return true;
 }
+
+static bool linux_get_process_env_start_end(drakvuf_t drakvuf, addr_t process_base, addr_t* env_start, addr_t* env_end)
+{
+    addr_t mm_struct;
+    if (!get_mm_struct(drakvuf, process_base, &mm_struct))
+        return false;
+
+    addr_t env_start_addr = mm_struct + drakvuf->offsets[MM_STRUCT_ENV_START];
+    addr_t env_end_addr = mm_struct + drakvuf->offsets[MM_STRUCT_ENV_END];
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd);
+
+    ctx.addr = env_start_addr;
+    if (VMI_SUCCESS != vmi_read_addr(drakvuf->vmi, &ctx, env_start))
+        return false;
+
+    ctx.addr = env_end_addr;
+    if (VMI_SUCCESS != vmi_read_addr(drakvuf->vmi, &ctx, env_end))
+        return false;
+
+    return true;
+}
+
+static bool linux_get_process_environ_buffer(drakvuf_t drakvuf, drakvuf_trap_info_t* info, void** buffer, size_t* size)
+{
+    addr_t env_start, env_end;
+    if (!linux_get_process_env_start_end(drakvuf, info->proc_data.base_addr, &env_start, &env_end) ||
+        !env_start || env_start >= env_end)
+    {
+        PRINT_DEBUG("Failed to get env_start and env_end\n");
+        return false;
+    }
+
+    size_t buffer_size = env_end - env_start;
+    void* _buffer = g_new0(char, buffer_size);
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = info->regs->cr3,
+        .addr = env_start
+    );
+    if (VMI_SUCCESS != vmi_read(drakvuf->vmi, &ctx, buffer_size, _buffer, NULL))
+    {
+        PRINT_DEBUG("Failed to read environ buffer\n");
+        g_free(_buffer);
+        return false;
+    }
+
+    *buffer = _buffer;
+    *size = buffer_size;
+    return true;
+}
+
+bool linux_get_process_environ(drakvuf_t drakvuf, drakvuf_trap_info_t* info, GHashTable** environ)
+{
+    void* buffer = NULL;
+    size_t buffer_size = 0;
+    if (!linux_get_process_environ_buffer(drakvuf, info, &buffer, &buffer_size))
+        return false;
+
+    *environ = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
+    for (size_t offset = 0;
+        offset < buffer_size;
+        offset += strlen((char*)((uint64_t)buffer + offset)) + 1)
+    {
+        gchar* var_str = (char*)((uint64_t)buffer + offset);
+        gchar** var_kv = g_strsplit(var_str, "=", 2);
+        g_hash_table_insert(*environ, g_strdup(var_kv[0]), g_strdup(var_kv[1]));
+        g_strfreev(var_kv);
+    }
+
+    return true;
+}
+
+bool linux_get_process_arguments(drakvuf_t drakvuf, addr_t process_base, addr_t* argv)
+{
+    addr_t mm_struct;
+    if (!get_mm_struct(drakvuf, process_base, &mm_struct))
+        return false;
+
+    *argv = mm_struct + drakvuf->offsets[MM_STRUCT_ARG_START];
+    return true;
+}

@@ -277,6 +277,12 @@ typedef struct os_interface
     bool (*check_return_context)
     (drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
 
+    bool (*get_process_environ)
+    (drakvuf_t drakvuf, drakvuf_trap_info_t* info, GHashTable** environ);
+
+    bool (*get_process_arguments)
+    (drakvuf_t drakvuf, addr_t process_base, addr_t* argv);
+
 } os_interface_t;
 
 bool set_os_windows(drakvuf_t drakvuf);
