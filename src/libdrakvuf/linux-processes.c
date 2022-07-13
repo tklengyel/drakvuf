@@ -626,16 +626,6 @@ bool linux_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t
     return true;
 }
 
-static bool get_mm_struct(drakvuf_t drakvuf, addr_t process_base, addr_t* mm_struct)
-{
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->kpgd,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT]);
-
-    return (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, mm_struct));
-}
-
 static bool linux_get_process_env_start_end(drakvuf_t drakvuf, addr_t process_base, addr_t* env_start, addr_t* env_end)
 {
     addr_t mm_struct;
