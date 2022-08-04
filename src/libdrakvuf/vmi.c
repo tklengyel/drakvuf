@@ -148,6 +148,16 @@ static void free_proc_data_priv_2(proc_data_priv_t* proc_data, proc_data_priv_t*
         g_free((gpointer)attached_proc_data->name);
 }
 
+static void copy_proc_data_from_priv(proc_data_t* proc_data, proc_data_priv_t* proc_data_priv)
+{
+    proc_data->base_addr = proc_data_priv->base_addr;
+    proc_data->name      = proc_data_priv->name;
+    proc_data->pid       = proc_data_priv->pid;
+    proc_data->ppid      = proc_data_priv->ppid;
+    proc_data->userid    = proc_data_priv->userid;
+    proc_data->tid       = proc_data_priv->tid;
+}
+
 /*
  * This function gets called from the singlestep event
  * after an int3 or a read event happens.
@@ -290,43 +300,35 @@ static event_response_t _post_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
 
     PRINT_DEBUG("Post mem cb @ 0x%lx vCPU %u altp2m %u\n", pass->pa, event->vcpu_id, event->slat_id);
 
-    drakvuf->in_callback = 1;
-    GSList* loop = s->traps;
-    while (loop)
+    if (!drakvuf_is_ignored_process(drakvuf, pass->attached_proc_data.pid))
     {
-        drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
-
-        if (trap->cb && trap->memaccess.type == POST &&
-            (trap->memaccess.access & pass->access))
+        drakvuf->in_callback = 1;
+        GSList* loop = s->traps;
+        while (loop)
         {
-            drakvuf_trap_info_t trap_info =
+            drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
+
+            if (trap->cb && trap->memaccess.type == POST &&
+                (trap->memaccess.access & pass->access))
             {
-                .trap = trap,
-                .proc_data.base_addr = pass->proc_data.base_addr,
-                .proc_data.name      = pass->proc_data.name,
-                .proc_data.pid       = pass->proc_data.pid,
-                .proc_data.ppid      = pass->proc_data.ppid,
-                .proc_data.userid    = pass->proc_data.userid,
-                .proc_data.tid       = pass->proc_data.tid,
-                .attached_proc_data.base_addr = pass->attached_proc_data.base_addr,
-                .attached_proc_data.name      = pass->attached_proc_data.name,
-                .attached_proc_data.pid       = pass->attached_proc_data.pid,
-                .attached_proc_data.ppid      = pass->attached_proc_data.ppid,
-                .attached_proc_data.userid    = pass->attached_proc_data.userid,
-                .attached_proc_data.tid       = pass->attached_proc_data.tid,
-                .trap_pa = pass->pa,
-                .regs = event->x86_regs,
-                .vcpu = event->vcpu_id,
-            };
+                drakvuf_trap_info_t trap_info =
+                {
+                    .trap = trap,
+                    .trap_pa = pass->pa,
+                    .regs = event->x86_regs,
+                    .vcpu = event->vcpu_id,
+                    .timestamp = g_get_real_time(),
+                };
+                copy_proc_data_from_priv(&trap_info.proc_data, &pass->proc_data);
+                copy_proc_data_from_priv(&trap_info.attached_proc_data, &pass->attached_proc_data);
 
-            trap_info.timestamp = g_get_real_time();
+                rsp |= trap->cb(drakvuf, &trap_info);
+            }
 
-            rsp |= trap->cb(drakvuf, &trap_info);
+            loop = loop->next;
         }
-
-        loop = loop->next;
+        drakvuf->in_callback = 0;
     }
-    drakvuf->in_callback = 0;
 
     /*
      * We don't need to pause the VM here because mem events
@@ -399,16 +401,6 @@ static event_response_t post_mem_idrx_cb(vmi_instance_t vmi, vmi_event_t* event)
 
     return VMI_EVENT_RESPONSE_TOGGLE_SINGLESTEP | // Turn off singlestep
         VMI_EVENT_RESPONSE_SLAT_ID;
-}
-
-static void copy_proc_data_from_priv(proc_data_t* proc_data, proc_data_priv_t* proc_data_priv)
-{
-    proc_data->base_addr = proc_data_priv->base_addr;
-    proc_data->name      = proc_data_priv->name;
-    proc_data->pid       = proc_data_priv->pid;
-    proc_data->ppid      = proc_data_priv->ppid;
-    proc_data->userid    = proc_data_priv->userid;
-    proc_data->tid       = proc_data_priv->tid;
 }
 
 static void fill_common_event_trap_info(drakvuf_t drakvuf, drakvuf_trap_info_t* trap_info,
@@ -513,43 +505,46 @@ static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
     if (s->traps)
         trap_info.event_uid = ++drakvuf->event_counter;
 
-    GSList* loop = s->traps;
-    drakvuf->in_callback = 1;
-    while (loop)
+    if (!drakvuf_is_ignored_process(drakvuf, attached_proc_data.pid))
     {
-        drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
-
-        if (trap->cb && trap->memaccess.type == PRE &&
-            (trap->memaccess.access & event->mem_event.out_access))
+        GSList* loop = s->traps;
+        drakvuf->in_callback = 1;
+        while (loop)
         {
-            trap_info.trap = trap;
-            rsp |= trap->cb(drakvuf, &trap_info);
+            drakvuf_trap_t* trap = (drakvuf_trap_t*)loop->data;
+
+            if (trap->cb && trap->memaccess.type == PRE &&
+                (trap->memaccess.access & event->mem_event.out_access))
+            {
+                trap_info.trap = trap;
+                rsp |= trap->cb(drakvuf, &trap_info);
+            }
+
+            loop = loop->next;
         }
 
-        loop = loop->next;
-    }
-
-    /* We need to call breakpoint handlers registered for this physical address */
-    if (event->mem_event.out_access & VMI_MEMACCESS_X)
-    {
-        struct wrapper* sbp = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa,
-                GSIZE_TO_POINTER(pa));
-        if (sbp)
+        /* We need to call breakpoint handlers registered for this physical address */
+        if (event->mem_event.out_access & VMI_MEMACCESS_X)
         {
-            PRINT_DEBUG("Simulated INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64"\n",
-                event->vcpu_id, event->slat_id, event->x86_regs->cr3, pa, event->x86_regs->rip);
-
-            loop = sbp->traps;
-            while (loop)
+            struct wrapper* sbp = (struct wrapper*)g_hash_table_lookup(drakvuf->breakpoint_lookup_pa,
+                    GSIZE_TO_POINTER(pa));
+            if (sbp)
             {
-                trap_info.trap = (drakvuf_trap_t*)loop->data;
+                PRINT_DEBUG("Simulated INT3 event vCPU %u altp2m:%u CR3: 0x%"PRIx64" PA=0x%"PRIx64" RIP=0x%"PRIx64"\n",
+                    event->vcpu_id, event->slat_id, event->x86_regs->cr3, pa, event->x86_regs->rip);
 
-                loop = loop->next;
-                rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+                loop = sbp->traps;
+                while (loop)
+                {
+                    trap_info.trap = (drakvuf_trap_t*)loop->data;
+
+                    loop = loop->next;
+                    rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+                }
             }
         }
+        drakvuf->in_callback = 0;
     }
-    drakvuf->in_callback = 0;
 
     /*
      * We don't need to pause the VM here because mem events
@@ -570,18 +565,8 @@ static event_response_t _pre_mem_cb(drakvuf_t drakvuf, vmi_event_t* event)
         pass->gfn = event->mem_event.gfn;
         pass->pa = pa;
         pass->access = event->mem_event.out_access;
-        pass->proc_data.base_addr = proc_data.base_addr;
-        pass->proc_data.name      = proc_data.name;
-        pass->proc_data.pid       = proc_data.pid;
-        pass->proc_data.ppid      = proc_data.ppid;
-        pass->proc_data.userid    = proc_data.userid;
-        pass->proc_data.tid       = proc_data.tid;
-        pass->attached_proc_data.base_addr = attached_proc_data.base_addr;
-        pass->attached_proc_data.name      = attached_proc_data.name;
-        pass->attached_proc_data.pid       = attached_proc_data.pid;
-        pass->attached_proc_data.ppid      = attached_proc_data.ppid;
-        pass->attached_proc_data.userid    = attached_proc_data.userid;
-        pass->attached_proc_data.tid       = attached_proc_data.tid;
+        pass->proc_data = proc_data;
+        pass->attached_proc_data = attached_proc_data;
 
         if (!s->memaccess.guard2)
         {
@@ -706,59 +691,62 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
     if (s->traps)
         trap_info.event_uid = ++drakvuf->event_counter;
 
-    drakvuf->in_callback = 1;
-    GSList* lists[2] = {drakvuf->catchall_breakpoint, s->traps};
-    // catchall breakpoint will not be fired
-    // if there are no "normal" subscribers for this trap
-    for (int i = 0; s->traps && i < 2; i++)
+    if (!drakvuf_is_ignored_process(drakvuf, attached_proc_data.pid))
     {
-        GSList* loop = lists[i];
-        while (loop)
+        drakvuf->in_callback = 1;
+        GSList* lists[2] = {drakvuf->catchall_breakpoint, s->traps};
+        // catchall breakpoint will not be fired
+        // if there are no "normal" subscribers for this trap
+        for (int i = 0; s->traps && i < 2; i++)
         {
-            trap_info.trap = (drakvuf_trap_t*)loop->data;
-            if ( drakvuf_is_active_callback(drakvuf, &trap_info) )
-                rsp |= trap_info.trap->cb(drakvuf, &trap_info);
-            loop = loop->next;
+            GSList* loop = lists[i];
+            while (loop)
+            {
+                trap_info.trap = (drakvuf_trap_t*)loop->data;
+                if ( drakvuf_is_active_callback(drakvuf, &trap_info) )
+                    rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+                loop = loop->next;
+            }
         }
-    }
 
-    if (drakvuf->vmi_response_set_registers[trap_info.vcpu])
-    {
-        if (VMI_EVENT_RESPONSE_SET_REGISTERS & rsp)
-            PRINT_DEBUG("[LIBDRAKVUF] FATAL ERROR! Undefined behavior on invalid VM state!\n");
-
-        drakvuf->vmi_response_set_registers[trap_info.vcpu] = false;
-        memcpy(trap_info.regs, &drakvuf->regs_modified[trap_info.vcpu], sizeof(x86_registers_t));
-        rsp |= VMI_EVENT_RESPONSE_SET_REGISTERS;
-    }
-
-    // Iterate over traps updating ttl.
-    GSList* update_ttl_loop = s->traps;
-    time_t cur_time = time(NULL);
-    while (update_ttl_loop)
-    {
-        drakvuf_trap_t* trap = (drakvuf_trap_t*) update_ttl_loop->data;
-        if (trap->ttl == UNLIMITED_TTL)
+        if (drakvuf->vmi_response_set_registers[trap_info.vcpu])
         {
+            if (VMI_EVENT_RESPONSE_SET_REGISTERS & rsp)
+                PRINT_DEBUG("[LIBDRAKVUF] FATAL ERROR! Undefined behavior on invalid VM state!\n");
+
+            drakvuf->vmi_response_set_registers[trap_info.vcpu] = false;
+            memcpy(trap_info.regs, &drakvuf->regs_modified[trap_info.vcpu], sizeof(x86_registers_t));
+            rsp |= VMI_EVENT_RESPONSE_SET_REGISTERS;
+        }
+
+        // Iterate over traps updating ttl.
+        GSList* update_ttl_loop = s->traps;
+        time_t cur_time = time(NULL);
+        while (update_ttl_loop)
+        {
+            drakvuf_trap_t* trap = (drakvuf_trap_t*) update_ttl_loop->data;
+            if (trap->ttl == UNLIMITED_TTL)
+            {
+                update_ttl_loop = update_ttl_loop->next;
+                continue;
+            }
+
+            if (cur_time - trap->last_ttl_rst >= TRAP_TTL_RESET_INTERVAL_SEC)
+            {
+                trap->last_ttl_rst = cur_time;
+                trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+            }
+
+            if (--trap->ttl == 0)
+            {
+                trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
+                trap->ah_cb(drakvuf, trap);
+            }
+
             update_ttl_loop = update_ttl_loop->next;
-            continue;
         }
-
-        if (cur_time - trap->last_ttl_rst >= TRAP_TTL_RESET_INTERVAL_SEC)
-        {
-            trap->last_ttl_rst = cur_time;
-            trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
-        }
-
-        if (--trap->ttl == 0)
-        {
-            trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
-            trap->ah_cb(drakvuf, trap);
-        }
-
-        update_ttl_loop = update_ttl_loop->next;
+        drakvuf->in_callback = 0;
     }
-    drakvuf->in_callback = 0;
 
     free_proc_data_priv_2(&proc_data, &attached_proc_data);
 
@@ -811,16 +799,19 @@ static event_response_t _cr3_cb(drakvuf_t drakvuf, vmi_event_t* event)
     proc_data_priv_t attached_proc_data;
     fill_common_event_trap_info(drakvuf, &trap_info, &proc_data, &attached_proc_data, event);
 
-    drakvuf->in_callback = 1;
-    GSList* loop = drakvuf->cr3;
-    while (loop)
+    if (!drakvuf_is_ignored_process(drakvuf, attached_proc_data.pid))
     {
-        trap_info.trap = (drakvuf_trap_t*)loop->data;
+        drakvuf->in_callback = 1;
+        GSList* loop = drakvuf->cr3;
+        while (loop)
+        {
+            trap_info.trap = (drakvuf_trap_t*)loop->data;
 
-        rsp |= trap_info.trap->cb(drakvuf, &trap_info);
-        loop = loop->next;
+            rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+            loop = loop->next;
+        }
+        drakvuf->in_callback = 0;
     }
-    drakvuf->in_callback = 0;
 
     if (drakvuf->enable_cr3_based_interception)
     {
@@ -897,15 +888,18 @@ static event_response_t _debug_cb(drakvuf_t drakvuf, vmi_event_t* event)
     fill_common_event_trap_info(drakvuf, &trap_info, &proc_data, &attached_proc_data, event);
     trap_info.debug = &event->debug_event;
 
-    drakvuf->in_callback = 1;
-    GSList* loop = drakvuf->debug;
-    while (loop)
+    if (!drakvuf_is_ignored_process(drakvuf, attached_proc_data.pid))
     {
-        trap_info.trap = (drakvuf_trap_t*)loop->data;
-        rsp |= trap_info.trap->cb(drakvuf, &trap_info);
-        loop = loop->next;
+        drakvuf->in_callback = 1;
+        GSList* loop = drakvuf->debug;
+        while (loop)
+        {
+            trap_info.trap = (drakvuf_trap_t*)loop->data;
+            rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+            loop = loop->next;
+        }
+        drakvuf->in_callback = 0;
     }
-    drakvuf->in_callback = 0;
 
     free_proc_data_priv_2(&proc_data, &attached_proc_data);
 
@@ -941,15 +935,18 @@ static event_response_t _msr_cb(drakvuf_t drakvuf, vmi_event_t* event)
     fill_common_event_trap_info(drakvuf, &trap_info, &proc_data, &attached_proc_data, event);
     trap_info.reg = &event->reg_event;
 
-    drakvuf->in_callback = 1;
-    GSList* loop = drakvuf->msr;
-    while (loop)
+    if (!drakvuf_is_ignored_process(drakvuf, attached_proc_data.pid))
     {
-        trap_info.trap = (drakvuf_trap_t*)loop->data;
-        rsp |= trap_info.trap->cb(drakvuf, &trap_info);
-        loop = loop->next;
+        drakvuf->in_callback = 1;
+        GSList* loop = drakvuf->msr;
+        while (loop)
+        {
+            trap_info.trap = (drakvuf_trap_t*)loop->data;
+            rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+            loop = loop->next;
+        }
+        drakvuf->in_callback = 0;
     }
-    drakvuf->in_callback = 0;
 
     free_proc_data_priv_2(&proc_data, &attached_proc_data);
 
@@ -986,15 +983,18 @@ static event_response_t _cpuid_cb(drakvuf_t drakvuf, vmi_event_t* event)
     fill_common_event_trap_info(drakvuf, &trap_info, &proc_data, &attached_proc_data, event);
     trap_info.cpuid = &event->cpuid_event;
 
-    drakvuf->in_callback = 1;
-    GSList* loop = drakvuf->cpuid;
-    while (loop)
+    if (!drakvuf_is_ignored_process(drakvuf, attached_proc_data.pid))
     {
-        trap_info.trap = (drakvuf_trap_t*)loop->data;
-        rsp |= trap_info.trap->cb(drakvuf, &trap_info);
-        loop = loop->next;
+        drakvuf->in_callback = 1;
+        GSList* loop = drakvuf->cpuid;
+        while (loop)
+        {
+            trap_info.trap = (drakvuf_trap_t*)loop->data;
+            rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+            loop = loop->next;
+        }
+        drakvuf->in_callback = 0;
     }
-    drakvuf->in_callback = 0;
 
     free_proc_data_priv_2(&proc_data, &attached_proc_data);
 

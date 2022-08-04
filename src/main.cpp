@@ -114,6 +114,7 @@
 #include <memory>
 #include <filesystem>
 #include <map>
+#include <set>
 
 #include "drakvuf.h"
 #include "exitcodes.h"
@@ -206,6 +207,7 @@ static void print_usage()
         "\t -p                        Leave domain paused after DRAKVUF exits\n"
         "\t -F, --fast-singlestep     Enable fast singlestepping (requires Xen 4.14+)\n"
         "\t --traps-ttl <ttl value>   Maximum number of times trap can be triggered in 10sec period. Protects against api hammering.\n"
+        "\t --ignore-pid <PID>        Ignore events from process with PID (can be repeated multiple times).\n"
         "\t --enable-active-callback-check\n"
         "\t                           The check prevents events processing until function call injection finish.\n"
 #if defined(ENABLE_PLUGIN_FILEDELETE) || defined(ENABLE_PLUGIN_FILEEXTRACTOR)
@@ -401,6 +403,7 @@ int main(int argc, char** argv)
     GSList* context_processes = NULL;
     bool procdump_on_finish = true;
     bool libdrakvuf_get_userid = true;
+    std::set<uint64_t> ignored_processes;
     bool enable_active_callback_check = false;
 
     eprint_current_time();
@@ -476,6 +479,7 @@ int main(int argc, char** argv)
         opt_callbackmon_json_netio,
         opt_json_hal,
         opt_libdrakvuf_not_get_userid,
+        opt_ignore_pid,
         opt_enable_active_callback_check,
     };
     const option long_opts[] =
@@ -548,6 +552,7 @@ int main(int argc, char** argv)
         {"json-services", required_argument, NULL, opt_dkommon_json_services},
         {"json-hal", required_argument, NULL, opt_json_hal},
         {"libdrakvuf-not-get-userid", no_argument, NULL, opt_libdrakvuf_not_get_userid},
+        {"ignore-pid", required_argument, NULL, opt_ignore_pid},
         {"enable-active-callback-check", no_argument, NULL, opt_enable_active_callback_check},
         {NULL, 0, NULL, 0}
     };
@@ -731,6 +736,12 @@ int main(int argc, char** argv)
             case opt_userhook_no_addr:
                 options.userhook_no_addr = true;
                 break;
+            case opt_ignore_pid:
+            {
+                auto pid = strtoull(optarg, NULL, 0);
+                ignored_processes.insert(pid);
+                break;
+            }
 #ifdef ENABLE_PLUGIN_WMIMON
             case opt_json_ole32:
                 options.ole32_profile = optarg;
@@ -922,6 +933,7 @@ int main(int argc, char** argv)
                 kpgd,
                 fast_singlestep,
                 limited_traps_ttl,
+                ignored_processes,
                 libdrakvuf_get_userid,
                 enable_active_callback_check
             );

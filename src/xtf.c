@@ -196,7 +196,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
-    if (!drakvuf_init(&drakvuf, argv[1], NULL, NULL, true, 0, false, UNLIMITED_TTL, true, false))
+    if (!drakvuf_init(&drakvuf, argv[1], NULL, NULL, true, 0, false, UNLIMITED_TTL, NULL, true, false))
     {
         fprintf(stderr, "Failed to initialize on domain %s\n", argv[1]);
         return 1;
