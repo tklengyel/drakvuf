@@ -173,7 +173,7 @@ event_response_t handle_shellcode(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
         case STEP2: // setup shellcode
         {
-            if (!call_mmap_syscall_cb(injector, info->regs))
+            if (!call_mmap_syscall_cb(injector, info->regs, FILE_BUF_SIZE))
                 return cleanup(drakvuf, info, true);
 
             if (!write_shellcode_to_mmap_location(drakvuf, info))

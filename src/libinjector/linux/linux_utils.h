@@ -184,6 +184,7 @@ struct injector
 
     // mmap
     addr_t virtual_memory_addr;
+    size_t virtual_memory_size;
 
     // for restoring stack
     x86_registers_t saved_regs;
@@ -215,5 +216,7 @@ bool setup_post_syscall_trap(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_
 event_response_t override_step(injector_t injector, const injector_step_t step, event_response_t event);
 bool is_syscall_error(addr_t rax, const char* err);
 void print_linux_injection_info(output_format_t format, injector_t injector);
+
+GHashTable* get_injection_environ(injector_t injector, drakvuf_trap_info_t* info);
 
 #endif

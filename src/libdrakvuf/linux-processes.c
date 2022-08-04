@@ -192,14 +192,24 @@ addr_t linux_get_current_thread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
     return linux_get_current_process(drakvuf, info);
 }
 
-static bool get_mm_struct(drakvuf_t drakvuf, addr_t process_base, addr_t* mm_struct)
+static bool get_kernel_struct_field_pointer(drakvuf_t drakvuf, addr_t struct_addr, int offset_field, addr_t* addr)
 {
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
         .dtb = drakvuf->kpgd,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT]);
+        .addr = struct_addr + drakvuf->offsets[offset_field]);
 
-    return (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, mm_struct));
+    return (VMI_SUCCESS == vmi_read_addr(drakvuf->vmi, &ctx, addr));
+}
+
+static bool get_mm_struct(drakvuf_t drakvuf, addr_t process_base, addr_t* mm_struct)
+{
+    return get_kernel_struct_field_pointer(drakvuf, process_base, TASK_STRUCT_MMSTRUCT, mm_struct);
+}
+
+static bool get_active_mm_struct(drakvuf_t drakvuf, addr_t process_base, addr_t* mm_struct)
+{
+    return get_kernel_struct_field_pointer(drakvuf, process_base, TASK_STRUCT_ACTIVE_MMSTRUCT, mm_struct);
 }
 
 static void prepend_path(drakvuf_t drakvuf, addr_t path, addr_t root, GString* b)
@@ -413,10 +423,9 @@ bool linux_get_process_pid(drakvuf_t drakvuf, addr_t process_base, vmi_pid_t* pi
      * what getpid() would return. Because THAT makes sense.
      */
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 0,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_TGID]
-    );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_TGID]);
 
     return ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, (uint32_t*)pid) );
 }
@@ -427,10 +436,9 @@ bool linux_get_process_tid(drakvuf_t drakvuf, addr_t process_base, uint32_t* tid
      * On Linux TASK_STRUCT_PID is actually the thread ID.
      */
     ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_PID,
-        .pid = 0,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]
-    );
+        .translate_mechanism = VMI_TM_PROCESS_DTB,
+        .dtb = drakvuf->kpgd,
+        .addr = process_base + drakvuf->offsets[TASK_STRUCT_PID]);
 
     return ( VMI_SUCCESS == vmi_read_32(drakvuf->vmi, &ctx, tid) );
 }
@@ -548,29 +556,16 @@ bool linux_get_process_data( drakvuf_t drakvuf, addr_t base_addr, proc_data_priv
 bool linux_get_process_dtb(drakvuf_t drakvuf, addr_t process_base, addr_t* dtb)
 {
     // based on: https://carteryagemann.com/pid-to-cr3.html
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->kpgd,
-        .addr = process_base + drakvuf->offsets[TASK_STRUCT_MMSTRUCT]
-    );
-
     addr_t mm;
-    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &mm))
+    if (!get_mm_struct(drakvuf, process_base, &mm))
         return false;
-
-    if (!mm)
-    {
-        ctx.addr = process_base + drakvuf->offsets[TASK_STRUCT_ACTIVE_MMSTRUCT];
-        if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &mm))
-            return false;
-    }
-
+    if (!mm && !get_active_mm_struct(drakvuf, process_base, &mm))
+        return false;
     if (!mm)
         return false;
 
     addr_t pgd;
-    ctx.addr = mm + drakvuf->offsets[MM_STRUCT_PGD];
-    if (VMI_FAILURE == vmi_read_addr(drakvuf->vmi, &ctx, &pgd))
+    if (!get_kernel_struct_field_pointer(drakvuf, mm, MM_STRUCT_PGD, &pgd))
         return false;
 
     *dtb = pgd - PAGE_OFFSET;
@@ -632,28 +627,14 @@ static bool linux_get_process_env_start_end(drakvuf_t drakvuf, addr_t process_ba
     if (!get_mm_struct(drakvuf, process_base, &mm_struct))
         return false;
 
-    addr_t env_start_addr = mm_struct + drakvuf->offsets[MM_STRUCT_ENV_START];
-    addr_t env_end_addr = mm_struct + drakvuf->offsets[MM_STRUCT_ENV_END];
-
-    ACCESS_CONTEXT(ctx,
-        .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = drakvuf->kpgd);
-
-    ctx.addr = env_start_addr;
-    if (VMI_SUCCESS != vmi_read_addr(drakvuf->vmi, &ctx, env_start))
-        return false;
-
-    ctx.addr = env_end_addr;
-    if (VMI_SUCCESS != vmi_read_addr(drakvuf->vmi, &ctx, env_end))
-        return false;
-
-    return true;
+    return (get_kernel_struct_field_pointer(drakvuf, mm_struct, MM_STRUCT_ENV_START, env_start)
+            && get_kernel_struct_field_pointer(drakvuf, mm_struct, MM_STRUCT_ENV_END, env_end));
 }
 
-static bool linux_get_process_environ_buffer(drakvuf_t drakvuf, drakvuf_trap_info_t* info, void** buffer, size_t* size)
+static bool linux_get_process_environ_buffer(drakvuf_t drakvuf, addr_t process_base, addr_t process_dtb, void** buffer, size_t* size)
 {
     addr_t env_start, env_end;
-    if (!linux_get_process_env_start_end(drakvuf, info->proc_data.base_addr, &env_start, &env_end) ||
+    if (!linux_get_process_env_start_end(drakvuf, process_base, &env_start, &env_end) ||
         !env_start || env_start >= env_end)
     {
         PRINT_DEBUG("Failed to get env_start and env_end\n");
@@ -662,11 +643,12 @@ static bool linux_get_process_environ_buffer(drakvuf_t drakvuf, drakvuf_trap_inf
 
     size_t buffer_size = env_end - env_start;
     void* _buffer = g_new0(char, buffer_size);
+
     ACCESS_CONTEXT(ctx,
         .translate_mechanism = VMI_TM_PROCESS_DTB,
-        .dtb = info->regs->cr3,
-        .addr = env_start
-    );
+        .dtb = process_dtb,
+        .addr = env_start);
+
     if (VMI_SUCCESS != vmi_read(drakvuf->vmi, &ctx, buffer_size, _buffer, NULL))
     {
         PRINT_DEBUG("Failed to read environ buffer\n");
@@ -679,11 +661,14 @@ static bool linux_get_process_environ_buffer(drakvuf_t drakvuf, drakvuf_trap_inf
     return true;
 }
 
-bool linux_get_process_environ(drakvuf_t drakvuf, drakvuf_trap_info_t* info, GHashTable** environ)
+bool linux_get_current_process_environ(drakvuf_t drakvuf, drakvuf_trap_info_t* info, GHashTable** environ)
 {
+    addr_t process_base = info->proc_data.base_addr;
+    addr_t process_dtb = info->regs->cr3;
+
     void* buffer = NULL;
     size_t buffer_size = 0;
-    if (!linux_get_process_environ_buffer(drakvuf, info, &buffer, &buffer_size))
+    if (!linux_get_process_environ_buffer(drakvuf, process_base, process_dtb, &buffer, &buffer_size))
         return false;
 
     *environ = g_hash_table_new_full(g_str_hash, g_str_equal, g_free, g_free);
@@ -697,6 +682,7 @@ bool linux_get_process_environ(drakvuf_t drakvuf, drakvuf_trap_info_t* info, GHa
         g_strfreev(var_kv);
     }
 
+    g_free(buffer);
     return true;
 }
 

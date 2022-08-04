@@ -319,3 +319,21 @@ void print_linux_injection_info(output_format_t format, injector_t injector)
 
     g_free(arguments);
 }
+
+GHashTable* get_injection_environ(injector_t injector, drakvuf_trap_info_t* info)
+{
+    GHashTable* env = NULL; // process "__environ" contents
+
+    // Get current list of environment variables
+    if (drakvuf_get_current_process_environ(injector->drakvuf, info, &env) && env)
+    {
+        PRINT_DEBUG("Successfully read environ with %d variables\n", g_hash_table_size(env));
+    }
+    else
+    {
+        PRINT_DEBUG("Failed to get environ\n");
+        env = g_hash_table_new(g_str_hash, g_str_equal);
+        g_hash_table_insert(env, "DISPLAY", ":0");
+    }
+    return env;
+}
