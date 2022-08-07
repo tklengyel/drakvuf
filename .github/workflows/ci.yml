@@ -16,6 +16,8 @@ jobs:
       CXX: clang++
     steps:
       - uses: actions/checkout@v3
+      - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
+
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -26,7 +28,6 @@ jobs:
         run: |
           echo ::set-output name=XEN_HASH::$(git submodule | grep xen | awk '{ print $1 }')
           echo ::set-output name=LIBVMI_HASH::$(git submodule | grep libvmi | awk '{ print $1 }')
-
       - name: Cache Xen debball
         id: cache-xen
         uses: actions/cache@v3
@@ -100,6 +101,8 @@ jobs:
       CXX: clang++
     steps:
       - uses: actions/checkout@v3
+      - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
+
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -147,8 +150,13 @@ jobs:
         matrix:
           os:
             - 'ubuntu-20.04'
+    env:
+      CC: clang
+      CXX: clang++
     steps:
       - uses: actions/checkout@v3
+      - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
+
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -203,6 +211,8 @@ jobs:
             - 'ubuntu-20.04'
     steps:
       - uses: actions/checkout@v3
+      - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
+
       - name: Install dependencies
         run: |
           sudo apt-get update -q
@@ -234,8 +244,6 @@ jobs:
 
       - name: Build with meson
         run: |
-          export CC=clang-10
-          export CXX=clang++-10
 
           meson build
           ninja -C build
@@ -251,14 +259,12 @@ jobs:
         language: ['cpp']
         os:
           - 'ubuntu-20.04'
-
+    env:
+      CC: clang
+      CXX: clang++
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-      with:
-        # We must fetch at least the immediate parents so that if this is
-        # a pull request then we can checkout the head.
-        fetch-depth: 2
+    - uses: actions/checkout@v3
+    - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
@@ -316,6 +322,8 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
     steps:
       - uses: actions/checkout@v3
+      - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
+
       - name: Install dependencies
         run: |
           # Install packages
@@ -349,8 +357,6 @@ jobs:
         run: |
           # Set Exports
           export PATH=/usr/lib/llvm-10/bin:$PATH
-          export CC=clang-10
-          export CXX=clang++-10
 
           # scan-build
           autoreconf -vif
