@@ -22,7 +22,7 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         apt-get update -q
-        apt-get install -y autoconf-archive flex bison libjson-c-dev clang build-essential git libtool autotools-dev libglib2.0-dev libyajl-dev liblzo2-dev wget jq
+        apt-get install -y autoconf-archive flex bison libjson-c-dev clang build-essential git libtool autotools-dev libglib2.0-dev libyajl-dev liblzo2-dev wget jq sudo
         apt-get clean
 
     - name: Configure safe dirs
