@@ -17,6 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
+        with:
+          make-default: false
 
       - name: Install dependencies
         run: |
@@ -96,18 +98,17 @@ jobs:
             - '--enable-debug --enable-sanitize'
             - '--enable-debug --enable-repl'
             - '--enable-debug --enable-threadsafety'
-    env:
-      CC: clang
-      CXX: clang++
     steps:
       - uses: actions/checkout@v3
       - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
+        with:
+          make-default: false
 
       - name: Install dependencies
         run: |
           sudo apt-get update -q
           sudo apt-get remove -y clang
-          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool jq wget
           sudo pip3 install ctypesgen ipython
 
       - name: Cache Xen debball
@@ -127,6 +128,10 @@ jobs:
           sudo apt-get install -f ./xen/dist/xen-*.deb
 
       - name: Install LibVMI
+        env:
+          CC: clang
+          CXX: clang++
+          LDFLAGS: '-fuse-ld=mold'
         run: |
           cd libvmi/dist
           sudo apt install -f ./*.deb
@@ -137,6 +142,10 @@ jobs:
         run: autoreconf -vif
 
       - name: Compile ${{ matrix.flags }}
+        env:
+          CC: clang
+          CXX: clang++
+          LDFLAGS: '-fuse-ld=mold'
         run: |
           ./configure ${{ matrix.flags }}
           make -j2
@@ -153,6 +162,7 @@ jobs:
     env:
       CC: clang
       CXX: clang++
+      LDFLAGS: '-fuse-ld=mold'
     steps:
       - uses: actions/checkout@v3
       - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
@@ -161,7 +171,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get remove -y clang
-          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool jq wget
 
       - name: Cache Xen debball
         uses: actions/cache@v3
@@ -209,15 +219,22 @@ jobs:
         matrix:
           os:
             - 'ubuntu-20.04'
+    env:
+      CC: clang
+      CXX: clang++
+      LDFLAGS: '-fuse-ld=mold'
     steps:
       - uses: actions/checkout@v3
-      - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
 
       - name: Install dependencies
         run: |
           sudo apt-get update -q
           sudo apt-get remove -y clang
-          sudo apt-get install -y clang-10 build-essential libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build
+          sudo apt-get install -y clang-10 build-essential libjson-c-dev liblzo2-dev libglib2.0-dev meson ninja-build jq wget
+
+      - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
+        with:
+          make-default: false
 
       - name: Cache Xen debball
         uses: actions/cache@v3
@@ -262,9 +279,9 @@ jobs:
     env:
       CC: clang
       CXX: clang++
+      LDFLAGS: '-fuse-ld=mold'
     steps:
     - uses: actions/checkout@v3
-    - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL
@@ -277,7 +294,11 @@ jobs:
       run: |
         sudo apt-get update -q
         sudo apt-get remove -y clang
-        sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+        sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool jq wget
+
+    - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
+      with:
+        make-default: false
 
     - name: Cache Xen debball
       uses: actions/cache@v3
@@ -320,15 +341,23 @@ jobs:
     needs:
       - init
     if: ${{ github.event_name == 'pull_request' }}
+    env:
+      CC: clang
+      CXX: clang++
+      LDFLAGS: '-fuse-ld=mold'
     steps:
       - uses: actions/checkout@v3
-      - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
 
       - name: Install dependencies
         run: |
           # Install packages
           sudo apt-get update -q
-          sudo apt-get install -y clang-10 clang-tools-10 autoconf-archive flex bison libjson-c-dev
+          sudo apt-get remove -y clang
+          sudo apt-get install -y clang-10 clang-tools-10 autoconf-archive flex bison libjson-c-dev jq wget
+
+      - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
+        with:
+          make-default: false
 
       - name: Cache Xen debball
         uses: actions/cache@v3
@@ -360,5 +389,5 @@ jobs:
 
           # scan-build
           autoreconf -vif
-          scan-build --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
-          scan-build --status-bugs --use-cc=clang-10 --use-c++=clang++-10 -analyze-headers -disable-checker deadcode.DeadStores make -j2
+          scan-build --status-bugs -analyze-headers -disable-checker deadcode.DeadStores ./configure --enable-debug
+          scan-build --status-bugs -analyze-headers -disable-checker deadcode.DeadStores make -j2

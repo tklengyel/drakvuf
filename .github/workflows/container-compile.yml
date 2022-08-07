@@ -31,7 +31,10 @@ jobs:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 2
+
     - uses: rui314/setup-mold@6dde38252affb567c951f891790da82dc6f23e6b
+      with:
+        make-default: false
 
     - name: Get Xen version
       id: get-xen-hash
@@ -60,6 +63,10 @@ jobs:
         dpkg -i xen/dist/xen-*.deb
 
     - name: Install LibVMI
+      env:
+        CC: clang
+        CXX: clang++
+        LDFLAGS: '-fuse-ld=mold'
       run: |
         git submodule update --init libvmi
         cd libvmi
@@ -73,6 +80,7 @@ jobs:
       env:
         CC: clang
         CXX: clang++
+        LDFLAGS: '-fuse-ld=mold'
       run: |
         autoreconf -vif
         ./configure --enable-debug
