@@ -22,7 +22,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get remove -y clang
-          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool
+          sudo apt-get install -y clang-10 build-essential autotools-dev autoconf-archive flex bison libjson-c-dev liblzo2-dev libglib2.0-dev libtool jq wget
       - name: Get submodule hashes version
         id: get-hash
         run: |
