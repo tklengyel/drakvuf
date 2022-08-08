@@ -202,7 +202,7 @@ bool set_os_linux(drakvuf_t drakvuf)
     drakvuf->osi.get_function_return_address = linux_get_function_return_address;
     drakvuf->osi.check_return_context = linux_check_return_context;
     drakvuf->osi.enumerate_processes = linux_enumerate_processes;
-    drakvuf->osi.get_process_environ = linux_get_process_environ;
+    drakvuf->osi.get_current_process_environ = linux_get_current_process_environ;
     drakvuf->osi.get_process_arguments = linux_get_process_arguments;
 
     return 1;

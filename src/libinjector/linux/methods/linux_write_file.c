@@ -197,7 +197,7 @@ event_response_t handle_write_file(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
         }
         case STEP2: // open file handle
         {
-            if (!call_mmap_syscall_cb(injector, info->regs))
+            if (!call_mmap_syscall_cb(injector, info->regs, FILE_BUF_SIZE))
                 return cleanup(drakvuf, info, true);
 
             PRINT_DEBUG("Opening file descriptor\n");

@@ -145,7 +145,7 @@ bool linux_find_next_process_list_entry(drakvuf_t drakvuf, addr_t current_list_e
 
 bool linux_enumerate_processes(drakvuf_t drakvuf, void (*visitor_func)(drakvuf_t drakvuf, addr_t eprocess, void* visitor_ctx), void* visitor_ctx);
 
-bool linux_get_process_environ(drakvuf_t drakvuf, drakvuf_trap_info_t* info, GHashTable** environ);
+bool linux_get_current_process_environ(drakvuf_t drakvuf, drakvuf_trap_info_t* info, GHashTable** environ);
 
 bool linux_get_process_arguments(drakvuf_t drakvuf, addr_t process_base, addr_t* argv);
 
