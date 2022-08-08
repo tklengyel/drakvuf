@@ -149,6 +149,7 @@ bool win_get_current_thread_previous_mode(drakvuf_t drakvuf,
     privilege_mode_t* previous_mode);
 
 bool win_is_ethread(drakvuf_t drakvuf, addr_t dtb, addr_t ethread_addr);
+GHashTable* win_enum_threads(drakvuf_t drakvuf, addr_t process);
 
 bool win_is_eprocess(drakvuf_t drakvuf, addr_t dtb, addr_t eprocess_addr);
 bool win_is_process_suspended(drakvuf_t drakvuf, addr_t process, bool* status);

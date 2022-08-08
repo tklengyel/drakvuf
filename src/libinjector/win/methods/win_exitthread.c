@@ -125,6 +125,20 @@ static bool setup_exitthread_stack(injector_t injector, x86_registers_t* regs)
 
 }
 
+static event_response_t wait_for_thread_exit_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    injector_t injector = info->trap->data;
+    if (drakvuf_get_thread(drakvuf,
+            info->attached_proc_data.base_addr, injector->target_tid))
+    {
+        PRINT_DEBUG("Target thread with PID %u and TID %u terminated\n",
+            injector->target_pid, injector->target_tid);
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
+    }
+    return VMI_EVENT_RESPONSE_NONE;
+}
+
 event_response_t handle_win_exitthread(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
     injector_t injector = info->trap->data;
@@ -143,8 +157,20 @@ event_response_t handle_win_exitthread(drakvuf_t drakvuf, drakvuf_trap_info_t* i
 
             info->regs->rip = injector->exit_thread;
             drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            drakvuf_interrupt(drakvuf, SIGDRAKVUFERROR);
             event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+
+            drakvuf_trap_t* trap = g_malloc0(sizeof(drakvuf_trap_t));
+            trap->type = REGISTER;
+            trap->reg = CR3;
+            trap->cb = wait_for_thread_exit_cb;
+            trap->data = injector;
+            if (!drakvuf_add_trap(injector->drakvuf, trap))
+            {
+                fprintf(stderr, "Failed to setup wait_for_thread_exit_cb trap!\n");
+                g_free(trap);
+                return false;
+            }
+            PRINT_DEBUG("Waiting for thread exit\n");
             break;
         }
         default:
@@ -164,5 +190,5 @@ static event_response_t cleanup(injector_t injector, drakvuf_trap_info_t* info)
         injector->rc = INJECTOR_FAILED;
 
     memcpy(info->regs, &injector->x86_saved_regs, sizeof(x86_registers_t));
-    return override_step(injector, STEP4, VMI_EVENT_RESPONSE_SET_REGISTERS);
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
