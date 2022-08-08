@@ -113,7 +113,7 @@
 #include <libinjector/libinjector.h>
 #include "private.h"
 
-void init_argument(struct argument* arg, argument_type_t type, size_t size, void* data)
+void init_argument(struct argument* arg, argument_type_t type, size_t size, const void* data)
 {
     arg->type = type;
     arg->size = size;
@@ -123,26 +123,17 @@ void init_argument(struct argument* arg, argument_type_t type, size_t size, void
 
 void init_int_argument(struct argument* arg, uint64_t value)
 {
-    arg->type = ARGUMENT_INT;
-    arg->size = 0; // unused
-    arg->data = (void*)value;
-    arg->data_on_stack = 0;
+    init_argument(arg, ARGUMENT_INT, 0 /* unused */, (void*)value);
 }
 
 void init_string_argument(struct argument* arg, const char* string)
 {
-    arg->type = ARGUMENT_STRING;
-    arg->size = strlen(string);
-    arg->data = (char*)string;
-    arg->data_on_stack = 0;
+    init_argument(arg, ARGUMENT_STRING, strlen(string), string);
 }
 
 void init_array_argument(struct argument* arg, struct argument array[], int size)
 {
-    arg->type = ARGUMENT_ARRAY;
-    arg->size = size;
-    arg->data = array;
-    arg->data_on_stack = 0;
+    init_argument(arg, ARGUMENT_ARRAY, size, array);
 }
 
 void init_unicode_argument(struct argument* arg, unicode_string_t* us)
@@ -217,7 +208,7 @@ static addr_t place_string_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
     return addr;
 }
 
-static addr_t place_struct_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, void* data, size_t size)
+static addr_t place_struct_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, const void* data, size_t size)
 {
     const uint32_t stack_align = 64;
 
@@ -230,7 +221,7 @@ static addr_t place_struct_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs
         .addr = addr
     );
 
-    if (VMI_FAILURE == vmi_write(vmi, &ctx, size, data, NULL))
+    if (VMI_FAILURE == vmi_write(vmi, &ctx, size, (void*)data, NULL))
     {
         PRINT_DEBUG("Could not place struct on stack\n");
         return 0;
@@ -239,7 +230,7 @@ static addr_t place_struct_on_stack_32(vmi_instance_t vmi, x86_registers_t* regs
     return addr;
 }
 
-static addr_t place_struct_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, void* data, size_t size)
+static addr_t place_struct_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs, addr_t addr, const void* data, size_t size)
 {
     /* According to Microsoft Doc "Building C/C++ Programs":
      * > The alignment of the beginning of a structure or a union is the maximum
@@ -254,7 +245,7 @@ static addr_t place_struct_on_stack_64(vmi_instance_t vmi, x86_registers_t* regs
         .addr = addr
     );
 
-    if (VMI_FAILURE == vmi_write(vmi, &ctx, size, data, NULL))
+    if (VMI_FAILURE == vmi_write(vmi, &ctx, size, (void*)data, NULL))
     {
         PRINT_DEBUG("Could not place struct on stack\n");
         return 0;
@@ -355,29 +346,73 @@ err:
     return 0;
 }
 
-addr_t place_array_on_addr_64(vmi_instance_t vmi, x86_registers_t* regs, struct argument* arg, addr_t* data_addr, addr_t* array_addr)
+static addr_t place_array_data_on_addr_64(vmi_instance_t vmi, x86_registers_t* regs, struct argument* args, size_t nb_args, addr_t addr)
 {
-    // fill bottom up as stack grows towards top
-    int i;
-    for (i=arg->size - 1; i>=0; i--)
+    for (size_t i = 0; i < nb_args; i++)
     {
-        // put the argument on data_addr
-        struct argument data;
-        *data_addr = place_argument_on_addr_64(vmi, regs, &((struct argument*)arg->data)[i], *data_addr);
-        if (*data_addr == 0)
-            goto err;
+        switch (args[i].type)
+        {
+            case ARGUMENT_STRING:
+                addr = place_string_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
+                if (!addr) return 0;
+                args[i].data_on_stack = addr;
+                break;
+            case ARGUMENT_STRUCT:
+                addr = place_struct_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
+                if (!addr) return 0;
+                args[i].data_on_stack = addr;
+                break;
+            case ARGUMENT_INT:
+                args[i].data_on_stack = (uint64_t)args[i].data;
+                break;
+            case ARGUMENT_ARRAY:
+                // should be placed manually using place_array_on_addr_64
+                // which will set data_on_stack
+                break;
+            default:
+                PRINT_DEBUG("Undefined argument type\n");
+                return 0;
+        }
+    }
+    return addr;
+}
 
-        // put the pointer to data on array_addr
-        init_int_argument(&data, *data_addr);
+addr_t place_array_on_addr_64(vmi_instance_t vmi, x86_registers_t* regs, struct argument* arg, bool null_terminate, addr_t* data_addr, addr_t* array_addr)
+{
+    struct argument* array = (struct argument*)arg->data;
+
+    // place array elements data onto data_addr
+
+    *data_addr = place_array_data_on_addr_64(vmi, regs, array, arg->size, *data_addr);
+    if (*data_addr == 0)
+        goto err;
+
+    // fill bottom up as stack grows towards top
+
+    if (null_terminate)
+    {
+        struct argument data;
+        init_int_argument(&data, 0);
         *array_addr = place_argument_on_addr_64(vmi, regs, &data, *array_addr);
         if (*array_addr == 0)
             goto err;
     }
+
+    for (int i=arg->size - 1; i>=0; i--)
+    {
+        const struct argument* element = &array[i];
+        // put the pointer to data on array_addr
+        struct argument data;
+        init_int_argument(&data, element->data_on_stack);
+        *array_addr = place_argument_on_addr_64(vmi, regs, &data, *array_addr);
+        if (*array_addr == 0)
+            goto err;
+    }
+
     arg->data_on_stack = *array_addr;
     return *array_addr;
 err:
     PRINT_DEBUG("Array could not be placed on address specified\n");
-    PRINT_DEBUG("Failure index: %d\n", i);
     PRINT_DEBUG("Data addr: %lx\n", *data_addr);
     PRINT_DEBUG("Array addr: %lx\n", *array_addr);
     return 0;
@@ -489,36 +524,11 @@ static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct arg
 
     addr_t addr = regs->rsp;
 
-    int i = 0;
     if ( args )
     {
         // make room for strings and structs into guest's stack
-        for (i = 0; i < nb_args; i++)
-        {
-            switch (args[i].type)
-            {
-                case ARGUMENT_STRING:
-                    addr = place_string_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
-                    if ( !addr ) goto err;
-                    args[i].data_on_stack = addr;
-                    break;
-                case ARGUMENT_STRUCT:
-                    addr = place_struct_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
-                    if ( !addr ) goto err;
-                    args[i].data_on_stack = addr;
-                    break;
-                case ARGUMENT_INT:
-                    args[i].data_on_stack = (uint64_t)args[i].data;
-                    break;
-                case ARGUMENT_ARRAY:
-                    // should be placed manually using place_array_on_addr_64
-                    // which will set data_on_stack
-                    break;
-                default:
-                    PRINT_DEBUG("Undefined argument type\n");
-                    goto err;
-            }
-        }
+        addr = place_array_data_on_addr_64(vmi, regs, args, nb_args, addr);
+        if (!addr) goto err;
 
         /* According to Microsoft Doc "Building C/C++ Programs":
          * > The stack will always be maintained 16-byte aligned, except within the prolog
@@ -543,7 +553,7 @@ static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct arg
         // 5th parameter onwards (if any) passed via the stack
 
         // write parameters (5th onwards) into guest's stack
-        for (i = nb_args-1; i > 3; i--)
+        for (int i = nb_args-1; i > 3; i--)
         {
             addr -= 0x8;
             ctx.addr = addr;
@@ -605,7 +615,6 @@ static bool setup_stack_64(vmi_instance_t vmi, x86_registers_t* regs, struct arg
 
 err:
     PRINT_DEBUG("Could not setup stack for 64 bit\n");
-    PRINT_DEBUG("Failure index: %d\n", i);
     return 0;
 }
 
@@ -616,32 +625,8 @@ static bool setup_linux_syscall(vmi_instance_t vmi, x86_registers_t* regs, struc
     if ( args )
     {
         // make room for strings and structs into guest's stack
-        for (int i = 0; i < nb_args; i++)
-        {
-            switch (args[i].type)
-            {
-                case ARGUMENT_STRING:
-                    addr = place_string_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
-                    if ( !addr ) goto err;
-                    args[i].data_on_stack = addr;
-                    break;
-                case ARGUMENT_STRUCT:
-                    addr = place_struct_on_stack_64(vmi, regs, addr, args[i].data, args[i].size);
-                    if ( !addr ) goto err;
-                    args[i].data_on_stack = addr;
-                    break;
-                case ARGUMENT_INT:
-                    args[i].data_on_stack = (uint64_t)args[i].data;
-                    break;
-                case ARGUMENT_ARRAY:
-                    // should be placed manually using place_array_on_addr_64
-                    // which will set data_on_stack
-                    break;
-                default:
-                    PRINT_DEBUG("Undefined argument type\n");
-                    goto err;
-            }
-        }
+        addr = place_array_data_on_addr_64(vmi, regs, args, nb_args, addr);
+        if (!addr) goto err;
 
         // First 6 arguments are sent by registers
         // It follows system-call ABI instead of function-call ABI

@@ -189,13 +189,13 @@ struct argument
     uint32_t type;
     uint32_t size;
     uint64_t data_on_stack;
-    void* data;
+    const void* data;
 };
 
 void init_argument(struct argument* arg,
     argument_type_t type,
     size_t size,
-    void* data) NOEXCEPT;
+    const void* data) NOEXCEPT;
 
 void init_int_argument(struct argument* arg,
     uint64_t value) NOEXCEPT;
@@ -216,6 +216,7 @@ void init_array_argument(struct argument* arg,
 addr_t place_array_on_addr_64(vmi_instance_t vmi,
     x86_registers_t* regs,
     struct argument* arg,
+    bool null_terminate,
     addr_t* data_addr,
     addr_t* array_addr) NOEXCEPT;
 
