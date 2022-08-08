@@ -1,4 +1,4 @@
-/*********************IMPORTANT DRAKVUF LICENSE TERMS***********************
+/*********************IMPORTANT DRAKVUF LICENSE TERMS**********************
  *                                                                         *
  * DRAKVUF (C) 2014-2022 Tamas K Lengyel.                                  *
  * Tamas K Lengyel is hereinafter referred to as the author.               *
@@ -100,120 +100,12 @@
  * DRAKVUF, and also available from                                        *
  * https://github.com/tklengyel/drakvuf/COPYING)                           *
  *                                                                         *
- ***************************************************************************/
+***************************************************************************/
 
-#include "libinjector.h"
-#include "private.h"
+#ifndef WIN_METHOD_EXITTHREAD
+#define WIN_METHOD_EXITTHREAD
 
-injector_status_t injector_start_app(
-    drakvuf_t drakvuf,
-    vmi_pid_t pid,
-    uint32_t tid,
-    const char* app,
-    const char* cwd,
-    injection_method_t method,
-    output_format_t format,
-    const char* binary_path,
-    const char* target_process,
-    bool break_loop_on_detection,
-    injector_t* injector_to_be_freed,
-    bool global_search,
-    bool wait_for_exit,
-    int args_count,
-    const char* args[],
-    vmi_pid_t* injected_pid)
-{
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-    {
-        return injector_start_app_on_win(drakvuf,
-                pid,
-                tid,
-                app,
-                cwd,
-                method,
-                format,
-                binary_path,
-                target_process,
-                break_loop_on_detection,
-                injector_to_be_freed,
-                global_search,
-                wait_for_exit,
-                injected_pid);
-    }
-    else if (drakvuf_get_os_type(drakvuf) == VMI_OS_LINUX)
-    {
-        if (!tid)
-            tid = pid;
+#include "win_utils.h"
 
-        return injector_start_app_on_linux(drakvuf,
-                pid,
-                tid,
-                app,
-                method,
-                format,
-                binary_path,
-                args_count,
-                args,
-                injected_pid);
-    }
-    else
-    {
-        PRINT_DEBUG("WARNING Unsupported OS!\n");
-        return 0;
-    }
-}
-
-void injector_terminate(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid,
-    vmi_pid_t pid)
-{
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_terminate_on_win(drakvuf, injection_pid, injection_tid, pid);
-    else
-        PRINT_DEBUG("WARNING Unsupported OS!\n");
-}
-
-void injector_exitthread(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid)
-{
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_exitthread_on_win(drakvuf, injection_pid, injection_tid);
-    else
-        PRINT_DEBUG("WARNING Unsupported OS!\n");
-}
-
-void injector_free(drakvuf_t drakvuf, injector_t injector)
-{
-    if (drakvuf_get_os_type(drakvuf) == VMI_OS_WINDOWS)
-        injector_free_win(injector);
-    else
-        injector_free_linux(injector);
-}
-
-const char* injection_method_name(injection_method_t method)
-{
-    switch (method)
-    {
-        case INJECT_METHOD_CREATEPROC:
-            return "CreateProc";
-        case INJECT_METHOD_TERMINATEPROC:
-            return "TerminateProc";
-        case INJECT_METHOD_EXITTHREAD:
-            return "ExitThread";
-        case INJECT_METHOD_SHELLEXEC:
-            return "ShellExec";
-        case INJECT_METHOD_SHELLCODE:
-            return "Shellcode";
-        case INJECT_METHOD_READ_FILE:
-            return "ReadFile";
-        case INJECT_METHOD_WRITE_FILE:
-            return "WriteFile";
-        case INJECT_METHOD_EXECPROC:
-            return "ExecProc";
-        case __INJECT_METHOD_MAX:
-            break;
-    }
-    return "Unknown";
-}
+event_response_t handle_win_exitthread(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+#endif

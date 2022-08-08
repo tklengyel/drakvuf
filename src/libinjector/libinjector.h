@@ -143,6 +143,7 @@ typedef enum
     // win
     INJECT_METHOD_CREATEPROC,
     INJECT_METHOD_TERMINATEPROC,
+    INJECT_METHOD_EXITTHREAD,
     INJECT_METHOD_SHELLEXEC,
     INJECT_METHOD_SHELLCODE,
     INJECT_METHOD_READ_FILE,
@@ -267,6 +268,11 @@ void injector_terminate(drakvuf_t drakvuf,
     vmi_pid_t injection_pid,
     uint32_t injection_tid,
     vmi_pid_t pid);
+
+void injector_exitthread(drakvuf_t drakvuf,
+    vmi_pid_t injection_pid,
+    uint32_t injection_tid);
+
 
 void injector_free(drakvuf_t drakvuf, injector_t injector);
 

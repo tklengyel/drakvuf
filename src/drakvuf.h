@@ -174,6 +174,7 @@ public:
         int args_count,
         const char* args[],
         vmi_pid_t* injected_pid);
+    void exit_thread(vmi_pid_t injection_pid, uint32_t injection_tid);
     void terminate(vmi_pid_t injection_pid, uint32_t injection_tid, vmi_pid_t pid, int termination_timeout, std::shared_ptr<const std::unordered_map<vmi_pid_t, bool>> terminated_processes);
     int start_plugins(const bool* plugin_list, const plugins_options* options);
     int stop_plugins(const bool* plugin_list);
