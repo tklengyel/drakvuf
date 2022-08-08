@@ -716,9 +716,20 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
         while (loop)
         {
             trap_info.trap = (drakvuf_trap_t*)loop->data;
-            rsp |= trap_info.trap->cb(drakvuf, &trap_info);
+            if ( drakvuf_is_active_callback(drakvuf, &trap_info) )
+                rsp |= trap_info.trap->cb(drakvuf, &trap_info);
             loop = loop->next;
         }
+    }
+
+    if (drakvuf->vmi_response_set_registers[trap_info.vcpu])
+    {
+        if (VMI_EVENT_RESPONSE_SET_REGISTERS & rsp)
+            PRINT_DEBUG("[LIBDRAKVUF] FATAL ERROR! Undefined behavior on invalid VM state!\n");
+
+        drakvuf->vmi_response_set_registers[trap_info.vcpu] = false;
+        memcpy(trap_info.regs, &drakvuf->regs_modified[trap_info.vcpu], sizeof(x86_registers_t));
+        rsp |= VMI_EVENT_RESPONSE_SET_REGISTERS;
     }
 
     // Iterate over traps updating ttl.
@@ -1743,11 +1754,12 @@ bool init_vmi(drakvuf_t drakvuf, bool fast_singlestep)
     // Crete tables to lookup breakpoints
     drakvuf->breakpoint_lookup_pa = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, free_wrapper);
     drakvuf->breakpoint_lookup_gfn = g_hash_table_new(g_direct_hash, g_direct_equal);
-    drakvuf->breakpoint_lookup_trap = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
+    drakvuf->breakpoint_lookup_trap = g_hash_table_new(g_direct_hash, g_direct_equal);
     drakvuf->memaccess_lookup_gfn = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, free_wrapper);
-    drakvuf->memaccess_lookup_trap = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
+    drakvuf->memaccess_lookup_trap = g_hash_table_new(g_direct_hash, g_direct_equal);
     drakvuf->remapped_gfns = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, free_remapped_gfn);
-    drakvuf->remove_traps = g_hash_table_new_full(g_direct_hash, g_direct_equal, NULL, NULL);
+    drakvuf->remove_traps = g_hash_table_new(g_direct_hash, g_direct_equal);
+    drakvuf->injections_in_progress = g_hash_table_new(g_direct_hash, g_direct_equal);
 
     unsigned int i;
     /*
@@ -1986,6 +1998,8 @@ void close_vmi(drakvuf_t drakvuf)
         g_hash_table_destroy(drakvuf->breakpoint_lookup_trap);
     if (drakvuf->remove_traps)
         g_hash_table_destroy(drakvuf->remove_traps);
+    if (drakvuf->injections_in_progress)
+        g_hash_table_destroy(drakvuf->injections_in_progress);
 
     drakvuf->debug = NULL;
     drakvuf->cpuid = NULL;

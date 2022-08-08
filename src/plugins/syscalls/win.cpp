@@ -110,6 +110,7 @@
 #include <vector>
 
 #include <libdrakvuf/ntstatus.h>
+#include <libinjector/libinjector.h>
 
 #include "syscalls.h"
 #include "private.h"

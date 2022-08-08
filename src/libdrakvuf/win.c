@@ -315,6 +315,25 @@ bool win_inject_traps_modules(drakvuf_t drakvuf, drakvuf_trap_t* trap, addr_t li
     return false;
 }
 
+addr_t win_kernel_symbol_to_va(drakvuf_t drakvuf, const char* func)
+{
+    addr_t rva;
+    if (!drakvuf_get_kernel_symbol_rva(drakvuf, func, &rva))
+    {
+        PRINT_DEBUG("Failed to get RVA of nt!%s\n", func);
+        return 0;
+    }
+
+    addr_t va = drakvuf_exportksym_to_va(drakvuf, 4, NULL, "ntoskrnl.exe", rva);
+    if (!va)
+    {
+        PRINT_DEBUG("Failed to get VA of nt!%s\n", func);
+        return 0;
+    }
+
+    return va;
+}
+
 bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out)
 {
     struct find_module_visitor_ctx visitor_ctx = { .module_name = module_name, .ret = NULL };
@@ -531,6 +550,7 @@ bool set_os_windows(drakvuf_t drakvuf)
     drakvuf->osi.get_module_list_wow = win_get_module_list_wow;
     drakvuf->osi.find_process = win_find_eprocess;
     drakvuf->osi.inject_traps_modules = win_inject_traps_modules;
+    drakvuf->osi.kernel_symbol_to_va = win_kernel_symbol_to_va;
     drakvuf->osi.exportksym_to_va = ksym2va;
     drakvuf->osi.exportsym_to_va = eprocess_sym2va;
     drakvuf->osi.get_process_pid = win_get_process_pid;

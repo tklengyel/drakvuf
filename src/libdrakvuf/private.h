@@ -253,6 +253,16 @@ struct drakvuf
     ipt_state_t ipt_state[MAX_DRAKVUF_VCPU];
 
     int64_t limited_traps_ttl;
+
+    /* This field is used to delay registers modification on injections.
+     * This fixes two issues:
+     * 1. Two plug-ins injects function call or modify registers.
+     * 2. One plug-in injects function call and other one reads modified registers.
+     */
+    bool vmi_response_set_registers[MAX_DRAKVUF_VCPU];
+    x86_registers_t regs_modified[MAX_DRAKVUF_VCPU];
+    GHashTable* injections_in_progress; // key: <pid:tid>
+    bool enable_active_callback_check;
 };
 
 struct breakpoint

@@ -156,6 +156,8 @@ bool win_is_process_suspended(drakvuf_t drakvuf, addr_t process, bool* status);
 bool win_get_module_list(drakvuf_t drakvuf, addr_t eprocess_base, addr_t* module_list);
 bool win_get_module_list_wow( drakvuf_t drakvuf, access_context_t* ctx, addr_t wow_peb, addr_t* module_list );
 
+addr_t win_kernel_symbol_to_va(drakvuf_t drakvuf, const char* func);
+
 bool win_get_module_base_addr(drakvuf_t drakvuf, addr_t module_list_head, const char* module_name, addr_t* base_addr_out);
 bool win_get_module_base_addr_ctx(drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name, addr_t* base_addr_out);
 module_info_t* win_get_module_info_ctx( drakvuf_t drakvuf, addr_t module_list_head, access_context_t* ctx, const char* module_name );

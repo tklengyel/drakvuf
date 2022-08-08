@@ -108,7 +108,8 @@
  * (1) Observes when a process is loading a new DLL through the side effects
  * of NtMapViewOfSection or NtProtectVirtualMemory being called.
  * (2) Finds the DLL export information and checks if it's fully readable,
- * if not, triggers a page fault to force system to load it into memory.
+ * if not, triggers a page fault or MmCopyVirutalMemory to force system to load
+ * it into memory.
  * (3) Translates given export symbols to virtual addresses, checks if
  * the underlying memory is available (if not, again triggers page fault)
  * and finally adds a standard DRAKVUF trap.
@@ -127,6 +128,7 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
 #include <libdrakvuf/libdrakvuf.h>
+#include <libinjector/libinjector.h>
 #include <assert.h>
 
 #include "userhook.hpp"
@@ -150,7 +152,7 @@ static std::string drakvuf_read_unicode(drakvuf_t drakvuf, addr_t addr)
     return str;
 }
 
-static auto get_proc_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
+proc_data_t get_proc_data(drakvuf_t drakvuf, const drakvuf_trap_info_t* info)
 {
     proc_data_t proc_data = info->proc_data;
     {
@@ -240,11 +242,9 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
     }
 
     if (dll_meta.targets.empty())
-    {
         return nullptr;
-    }
 
-    PRINT_DEBUG("[USERHOOK] Found DLL which is worth processing %llx\n", (unsigned long long)mmvad.starting_vpn << 12);
+    PRINT_DEBUG("[USERHOOK] Found DLL which is worth processing %llx: %s\n", (unsigned long long)mmvad.starting_vpn << 12, dll_name.data());
     addr_t vad_start = mmvad.starting_vpn << 12;
     size_t vad_length = (mmvad.ending_vpn - mmvad.starting_vpn + 1) << 12;
 
@@ -298,7 +298,7 @@ static dll_t* create_dll_meta(drakvuf_t drakvuf, drakvuf_trap_info* info, userho
     return &it->second.back();
 }
 
-static bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func)
+bool make_trap(vmi_instance_t vmi, drakvuf_t drakvuf, drakvuf_trap_info* info, hook_target_entry_t* target, addr_t exec_func)
 {
     if (VMI_OS_WINDOWS == vmi_get_ostype((vmi)))
         target->pid = info->attached_proc_data.pid;
@@ -335,124 +335,10 @@ fail:
     return false;
 }
 
-static event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta)
+bool is_pagetable_loaded(vmi_instance_t vmi, const drakvuf_trap_info* info, addr_t vaddr)
 {
-    proc_data_t proc_data = get_proc_data(drakvuf, info);
-
-    auto vmi = vmi_lock_guard(drakvuf);
-
-    // we have to make sure that addresses between [pf_current_addr, pf_max_addr]
-    // are available for reading otherwise vmi_translate_sym2v will fail unconditionally
-    // and we will be unable to add hooks
-
-    plugin->pf_in_progress.erase(std::make_pair(proc_data.pid, proc_data.tid));
-
-    while (dll_meta->pf_current_addr <= dll_meta->pf_max_addr)
-    {
-        page_info_t pinfo;
-        if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, dll_meta->pf_current_addr, &pinfo) == VMI_SUCCESS)
-        {
-            PRINT_DEBUG("[USERHOOK] Export info accessible OK %llx\n", (unsigned long long)dll_meta->pf_current_addr);
-            dll_meta->pf_current_addr += VMI_PS_4KB;
-            continue;
-        }
-
-        if (vmi_request_page_fault(vmi, info->vcpu, dll_meta->pf_current_addr, 0) == VMI_SUCCESS)
-        {
-            PRINT_DEBUG("[USERHOOK] Export info not accessible, page fault %llx\n", (unsigned long long)dll_meta->pf_current_addr);
-            plugin->pf_in_progress.insert(std::make_pair(proc_data.pid, proc_data.tid));
-            dll_meta->pf_current_addr += VMI_PS_4KB;
-        }
-        else
-        {
-            PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n", (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
-        }
-
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    // export info should be available, try hooking DLLs
-    for (auto& target : dll_meta->targets)
-    {
-        if (target.state == HOOK_FIRST_TRY || target.state == HOOK_PAGEFAULT_RETRY)
-        {
-            addr_t exec_func = 0;
-
-            if (target.type == HOOK_BY_NAME)
-            {
-                ACCESS_CONTEXT(ctx,
-                    .translate_mechanism = VMI_TM_PROCESS_DTB,
-                    .dtb = info->regs->cr3,
-                    .addr = dll_meta->v.real_dll_base
-                );
-
-                if (vmi_translate_sym2v(vmi, &ctx, target.target_name.c_str(), &exec_func) != VMI_SUCCESS)
-                {
-                    target.state = HOOK_FAILED;
-                    PRINT_DEBUG("[USERHOOK] Failed to hook %s: failed to translate symbol to address\n", target.target_name.c_str());
-                    continue;
-                }
-
-                target.offset = exec_func - dll_meta->v.real_dll_base;
-            }
-            else // HOOK_BY_OFFSET
-            {
-                exec_func = dll_meta->v.real_dll_base + target.offset;
-            }
-
-            if (target.state == HOOK_FIRST_TRY)
-            {
-                target.state = HOOK_FAILED;
-
-                page_info_t pinfo;
-                if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pinfo) != VMI_SUCCESS)
-                {
-                    if (vmi_request_page_fault(vmi, info->vcpu, exec_func, 0) == VMI_SUCCESS)
-                    {
-                        target.state = HOOK_PAGEFAULT_RETRY;
-                        plugin->pf_in_progress.insert(std::make_pair(proc_data.pid, proc_data.tid));
-                        return VMI_EVENT_RESPONSE_NONE;
-                    }
-                    else
-                    {
-                        PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n",
-                            (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
-                        return VMI_EVENT_RESPONSE_NONE;
-                    }
-                }
-                else
-                {
-                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
-                        target.state = HOOK_OK;
-                }
-            }
-            else if (target.state == HOOK_PAGEFAULT_RETRY)
-            {
-                target.state = HOOK_FAILED;
-                page_info_t pinfo;
-
-                if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pinfo) == VMI_SUCCESS)
-                {
-                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
-                        target.state = HOOK_OK;
-                }
-            }
-            else
-            {
-                target.state = HOOK_FAILED;
-            }
-
-            PRINT_DEBUG("[USERHOOK] Hook %s (vaddr = 0x%llx, dll_base = 0x%llx, result = %s)\n",
-                target.target_name.c_str(),
-                (unsigned long long)exec_func,
-                (unsigned long long)dll_meta->v.real_dll_base,
-                target.state == HOOK_OK ? "OK" : "FAIL");
-        }
-    }
-
-    PRINT_DEBUG("[USERHOOK] Done, flag DLL as hooked\n");
-    dll_meta->v.is_hooked = true;
-    return VMI_EVENT_RESPONSE_NONE;
+    page_info_t pinfo;
+    return vmi_pagetable_lookup_extended(vmi, info->regs->cr3, vaddr, &pinfo) == VMI_SUCCESS;
 }
 
 static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta)
@@ -478,7 +364,7 @@ static event_response_t perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* in
     return ret;
 }
 
-static event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t base_address_ptr)
+event_response_t hook_dll(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t base_address_ptr)
 {
     auto plugin = get_trap_plugin<userhook>(info);
 
@@ -551,8 +437,12 @@ static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_t
             map_view_of_section_ret_cb,
             breakpoint_by_pid_searcher(),
             "NtMapViewOfSection ret");
+    if (!trap)
+        return VMI_EVENT_RESPONSE_NONE;
 
     auto params = get_trap_params<map_view_of_section_result_t>(trap);
+    if (!params)
+        return VMI_EVENT_RESPONSE_NONE;
 
     params->set_result_call_params(info);
 
@@ -564,54 +454,6 @@ static event_response_t map_view_of_section_hook_cb(drakvuf_t drakvuf, drakvuf_t
     params->base_address_ptr = drakvuf_get_function_argument(drakvuf, info, 3);
 
     return VMI_EVENT_RESPONSE_NONE;
-}
-
-/**
- * As we may accidentally trigger an exception in the kernel by using vmi_request_page_fault,
- * we hook KiSystemServiceHandler to account for that situation. Inside this hook,
- * we check if it was "our fault" and if so, we forcefully return EXCEPTION_CONTINUE_EXECUTION.
- * In any other case, we just pass the control to the original exception handler.
- */
-static event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    PRINT_DEBUG("[USERHOOK] Entered system service handler\n");
-
-    auto plugin = get_trap_plugin<userhook>(info);
-
-    proc_data_t proc_data = get_proc_data(drakvuf, info);
-
-    uint32_t thread_id = proc_data.tid;
-
-    if (!thread_id)
-    {
-        PRINT_DEBUG("[USERHOOK] Failed to get thread id in system service handler!\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    bool our_fault = plugin->pf_in_progress.find(std::make_pair(proc_data.pid, proc_data.tid)) != plugin->pf_in_progress.end();
-    if (!our_fault)
-    {
-        PRINT_DEBUG("[USERHOOK] Not suppressing service exception - not our fault\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    // emulate `ret` instruction
-    addr_t saved_rip = drakvuf_get_function_return_address(drakvuf, info);
-
-    if (!saved_rip)
-    {
-        PRINT_DEBUG("[USERHOOK] Error while reading the saved RIP in system service handler\n");
-        return VMI_EVENT_RESPONSE_NONE;
-    }
-
-    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
-    bool is32 = (pm != VMI_PM_IA32E);
-
-    constexpr int EXCEPTION_CONTINUE_EXECUTION = 0;
-    info->regs->rip = saved_rip;
-    info->regs->rsp += (is32 ? 4 : 8);
-    info->regs->rax = EXCEPTION_CONTINUE_EXECUTION;
-    return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
 
 /**
@@ -789,12 +631,14 @@ bool userhook::is_supported(drakvuf_t drakvuf)
         }
     } // Unlock vmi.
 
+#ifndef LIBUSERMODE_USE_INJECTION
     page_mode_t pm = drakvuf_get_page_mode(drakvuf);
     if (pm != VMI_PM_IA32E)
     {
         PRINT_DEBUG("[USERHOOK] Usermode hooking is not yet supported on this architecture/bitness.\n");
         return false;
     }
+#endif
 
     return true;
 }
@@ -807,13 +651,20 @@ userhook::userhook(drakvuf_t drakvuf): pluginex(drakvuf, OUTPUT_DEFAULT), m_drak
     if (!drakvuf_get_kernel_struct_members_array_rva(drakvuf, offset_names, __OFFSET_MAX, offsets.data()))
     {
         PRINT_DEBUG("[USERHOOK] Failed to get kernel struct member offsets\n");
+#ifndef LIBUSERMODE_USE_INJECTION
         throw -1;
+#endif
     }
+
+    this->copy_virt_mem_va =
+        drakvuf_kernel_symbol_to_va(drakvuf, "MmCopyVirtualMemory");
 
     breakpoint_in_system_process_searcher bp;
     if (!register_trap(nullptr, protect_virtual_memory_hook_cb, bp.for_syscall_name("NtProtectVirtualMemory"), nullptr, UNLIMITED_TTL) ||
         !register_trap(nullptr, map_view_of_section_hook_cb, bp.for_syscall_name("NtMapViewOfSection"), nullptr, UNLIMITED_TTL) ||
+#ifndef LIBUSERMODE_USE_INJECTION
         !register_trap(nullptr, system_service_handler_hook_cb, bp.for_syscall_name("KiSystemServiceHandler"), nullptr, UNLIMITED_TTL) ||
+#endif
         !register_trap(nullptr, clean_process_address_space_hook_cb, bp.for_syscall_name("MmCleanProcessAddressSpace"), nullptr, UNLIMITED_TTL) ||
         !register_trap(nullptr, copy_on_write_handler, bp.for_syscall_name("MiCopyOnWrite"), nullptr, UNLIMITED_TTL))
         throw -1;
