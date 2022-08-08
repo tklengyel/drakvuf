@@ -144,41 +144,38 @@ event_response_t handle_win_exitthread(drakvuf_t drakvuf, drakvuf_trap_info_t* i
     injector_t injector = info->trap->data;
     event_response_t event;
 
-    switch (injector->step)
+    if (injector->step == STEP1)
     {
-        case STEP1:
+        // save registers
+        PRINT_DEBUG("Saving registers\n");
+        memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
+
+        if (!setup_exitthread_stack(injector, info->regs))
+            return cleanup(injector, info);
+
+        info->regs->rip = injector->exit_thread;
+        drakvuf_remove_trap(drakvuf, info->trap, NULL);
+        event = VMI_EVENT_RESPONSE_SET_REGISTERS;
+
+        drakvuf_trap_t* trap = g_malloc0(sizeof(drakvuf_trap_t));
+        trap->type = REGISTER;
+        trap->reg = CR3;
+        trap->cb = wait_for_thread_exit_cb;
+        trap->data = injector;
+        if (!drakvuf_add_trap(injector->drakvuf, trap))
         {
-            // save registers
-            PRINT_DEBUG("Saving registers\n");
-            memcpy(&injector->x86_saved_regs, info->regs, sizeof(x86_registers_t));
-
-            if (!setup_exitthread_stack(injector, info->regs))
-                return cleanup(injector, info);
-
-            info->regs->rip = injector->exit_thread;
-            drakvuf_remove_trap(drakvuf, info->trap, NULL);
-            event = VMI_EVENT_RESPONSE_SET_REGISTERS;
-
-            drakvuf_trap_t* trap = g_malloc0(sizeof(drakvuf_trap_t));
-            trap->type = REGISTER;
-            trap->reg = CR3;
-            trap->cb = wait_for_thread_exit_cb;
-            trap->data = injector;
-            if (!drakvuf_add_trap(injector->drakvuf, trap))
-            {
-                fprintf(stderr, "Failed to setup wait_for_thread_exit_cb trap!\n");
-                g_free(trap);
-                return false;
-            }
-            PRINT_DEBUG("Waiting for thread exit\n");
-            break;
+            fprintf(stderr, "Failed to setup wait_for_thread_exit_cb trap!\n");
+            g_free(trap);
+            return false;
         }
-        default:
-        {
-            PRINT_DEBUG("Should not be here\n");
-            assert(false);
-        }
+        PRINT_DEBUG("Waiting for thread exit\n");
     }
+    else
+    {
+        PRINT_DEBUG("Should not be here\n");
+        assert(false);
+    }
+
     return event;
 }
 

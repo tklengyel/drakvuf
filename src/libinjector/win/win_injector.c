@@ -541,6 +541,7 @@ static bool initialize_injector_functions(drakvuf_t drakvuf, injector_t injector
         {
             injector->exit_thread = get_function_va(drakvuf, eprocess_base, "ntdll.dll", "RtlExitUserThread", injector->global_search);
             if (!injector->exit_thread) return false;
+            break;
         }
         case INJECT_METHOD_SHELLEXEC:
         {
