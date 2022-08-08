@@ -102,7 +102,8 @@
 #                                                                         #
 #*************************************************************************#
 
-sources =  userhook.cpp running.cpp userhook.hpp uh-private.hpp
+sources =  userhook.cpp running.cpp userhook.hpp uh-private.hpp userhook_pf.cpp \
+           userhook_inject.cpp
 sources += printers/printers.hpp printers/printers.cpp printers/utils.hpp \
            printers/utils.cpp
 
