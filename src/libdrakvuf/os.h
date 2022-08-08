@@ -277,7 +277,7 @@ typedef struct os_interface
     bool (*check_return_context)
     (drakvuf_trap_info_t* info, vmi_pid_t pid, uint32_t tid, addr_t rsp);
 
-    bool (*get_process_environ)
+    bool (*get_current_process_environ)
     (drakvuf_t drakvuf, drakvuf_trap_info_t* info, GHashTable** environ);
 
     bool (*get_process_arguments)

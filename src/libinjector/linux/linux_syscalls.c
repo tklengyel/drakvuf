@@ -250,15 +250,107 @@ void setup_vfork_syscall(injector_t injector, x86_registers_t* regs, char* proc_
     injector->fork = true;
 }
 
-bool setup_execve_syscall(injector_t injector, x86_registers_t* regs, const char* binary_file, addr_t argv, addr_t envp)
+static addr_t place_argv(injector_t injector, x86_registers_t* regs, addr_t* data_addr, addr_t* array_addr)
+{
+    struct argument arg; // this will be passed in place_array_on_addr_64
+    struct argument* argv = g_new0(struct argument, injector->args_count + 2);
+
+    PRINT_DEBUG("Total arguments: %d\n", injector->args_count);
+
+    init_string_argument(&argv[0], injector->host_file);
+    PRINT_DEBUG("Args 0: %s\n", injector->host_file);
+
+    for (int i=0; i<injector->args_count; i++)
+    {
+        init_string_argument(&argv[i+1], injector->args[i]);
+        PRINT_DEBUG("Args %d: %s\n", i+1, injector->args[i]);
+    }
+
+    init_int_argument(&argv[injector->args_count+1], 0); // null in the end
+    init_array_argument(&arg, argv, injector->args_count + 2);
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
+
+    *array_addr = place_array_on_addr_64(vmi, regs, &arg, data_addr, array_addr);
+    if (*array_addr == 0)
+        goto err;
+
+    g_free(argv);
+    drakvuf_release_vmi(injector->drakvuf);
+    return arg.data_on_stack;
+
+err:
+    fprintf(stderr, "Could not create argv arrays\n");
+    g_free(argv);
+    drakvuf_release_vmi(injector->drakvuf);
+    return 0;
+}
+
+static addr_t place_environ(injector_t injector, x86_registers_t* regs, GHashTable* environ, addr_t* data_addr, addr_t* array_addr)
+{
+    struct argument arg; // this will be passed in place_array_on_addr_64
+
+    size_t envs_count = g_hash_table_size(environ) + 1; // add null argument
+    struct argument* envp = g_new0(struct argument, envs_count);
+    char** str_holder = g_new0(char*, envs_count);
+
+    GHashTableIter iter;
+    gpointer key, value;
+
+    int idx = 0;
+    g_hash_table_iter_init(&iter, environ);
+    while (g_hash_table_iter_next(&iter, &key, &value))
+    {
+        gchar* str = str_holder[idx] = g_strdup_printf("%s=%s", (char*)key, (char*)value);
+        PRINT_DEBUG("Envs %d: %s\n", idx + 1, str);
+        init_string_argument(&envp[idx++], str);
+    }
+
+    init_int_argument(&envp[envs_count - 1], 0); // null
+    init_array_argument(&arg, envp, envs_count);
+
+    vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
+    *array_addr = place_array_on_addr_64(vmi, regs, &arg, data_addr, array_addr);
+    drakvuf_release_vmi(injector->drakvuf);
+
+    g_strfreev(str_holder);
+    g_free(envp);
+
+    if (*array_addr == 0)
+    {
+        fprintf(stderr, "Could not create envp arrays\n");
+        return 0;
+    }
+
+    return arg.data_on_stack;
+}
+
+static bool create_argv_and_envp_arrays(injector_t injector, x86_registers_t* regs, GHashTable* environ, addr_t* argv_addr, addr_t* envp_addr)
+{
+    addr_t data_addr = injector->virtual_memory_addr + injector->virtual_memory_size;
+    addr_t array_addr = injector->virtual_memory_addr + injector->virtual_memory_size/2;
+
+    *argv_addr = place_argv(injector, regs, &data_addr, &array_addr);
+    *envp_addr = place_environ(injector, regs, environ, &data_addr, &array_addr);
+
+    return *argv_addr && *envp_addr;
+}
+
+bool setup_execve_syscall(injector_t injector, x86_registers_t* regs, const char* binary_file, const GHashTable* environ)
 {
     // execve(const char *filename, const char *const argv[], const char *const envp[])
     struct argument args[3] = { {0} };
 
+    addr_t argv_addr, envp_addr;
+    if (!create_argv_and_envp_arrays(injector, regs, (GHashTable*)environ, &argv_addr, &envp_addr))
+    {
+        PRINT_DEBUG("Failed to place execve syscall params\n");
+        return false;
+    }
+
     init_string_argument(&args[0], binary_file);
-    // create these arrays manually using place_array_on_addr_64
-    init_int_argument(&args[1], argv);
-    init_int_argument(&args[2], envp);
+    init_int_argument(&args[1], argv_addr);
+    init_int_argument(&args[2], envp_addr);
 
     regs->rax = sys_execve;
     regs->rip = injector->syscall_addr;
@@ -314,13 +406,14 @@ bool call_open_syscall_cb(injector_t injector, x86_registers_t* regs)
     return true;
 }
 
-bool call_mmap_syscall_cb(injector_t injector, x86_registers_t* regs)
+bool call_mmap_syscall_cb(injector_t injector, x86_registers_t* regs, size_t size)
 {
     if (is_syscall_error(regs->rax, "mmap syscall failed"))
         return false;
 
     // save it for future use
     injector->virtual_memory_addr = regs->rax;
+    injector->virtual_memory_size = size;
     PRINT_DEBUG("memory address allocated using mmap: %lx\n", injector->virtual_memory_addr);
 
     return true;
