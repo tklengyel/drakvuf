@@ -223,7 +223,6 @@ private:
     /* Routines */
     std::shared_ptr<procdump2_ctx> continues_task(drakvuf_trap_info_t*);
     void finish_task(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
-    addr_t get_function_va(std::string_view, std::string_view);
     std::pair<addr_t, size_t> get_memory_region(drakvuf_trap_info_t*, std::shared_ptr<procdump2_ctx>);
     bool is_active_process(vmi_pid_t pid);
     bool is_process_handled(vmi_pid_t pid);

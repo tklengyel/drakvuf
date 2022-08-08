@@ -206,6 +206,8 @@ static void print_usage()
         "\t -p                        Leave domain paused after DRAKVUF exits\n"
         "\t -F, --fast-singlestep     Enable fast singlestepping (requires Xen 4.14+)\n"
         "\t --traps-ttl <ttl value>   Maximum number of times trap can be triggered in 10sec period. Protects against api hammering.\n"
+        "\t --enable-active-callback-check\n"
+        "\t                           The check prevents events processing until function call injection finish.\n"
 #if defined(ENABLE_PLUGIN_FILEDELETE) || defined(ENABLE_PLUGIN_FILEEXTRACTOR)
         "\t -D <file dump folder>     Folder where extracted files should be stored at\n"
 #endif
@@ -399,6 +401,7 @@ int main(int argc, char** argv)
     GSList* context_processes = NULL;
     bool procdump_on_finish = true;
     bool libdrakvuf_get_userid = true;
+    bool enable_active_callback_check = false;
 
     eprint_current_time();
 
@@ -473,6 +476,7 @@ int main(int argc, char** argv)
         opt_callbackmon_json_netio,
         opt_json_hal,
         opt_libdrakvuf_not_get_userid,
+        opt_enable_active_callback_check,
     };
     const option long_opts[] =
     {
@@ -544,6 +548,7 @@ int main(int argc, char** argv)
         {"json-services", required_argument, NULL, opt_dkommon_json_services},
         {"json-hal", required_argument, NULL, opt_json_hal},
         {"libdrakvuf-not-get-userid", no_argument, NULL, opt_libdrakvuf_not_get_userid},
+        {"enable-active-callback-check", no_argument, NULL, opt_enable_active_callback_check},
         {NULL, 0, NULL, 0}
     };
     const char* opts = "r:d:i:I:e:m:t:D:o:vx:a:f:spT:S:Mc:nblgj:k:w:W:hFC";
@@ -880,6 +885,9 @@ int main(int argc, char** argv)
             case opt_libdrakvuf_not_get_userid:
                 libdrakvuf_get_userid = false;
                 break;
+            case opt_enable_active_callback_check:
+                enable_active_callback_check = true;
+                break;
             default:
                 if (isalnum(c))
                     fprintf(stderr, "Unrecognized option: %c\n", c);
@@ -904,7 +912,19 @@ int main(int argc, char** argv)
 
     try
     {
-        drakvuf = std::make_unique<drakvuf_c>(domain, json_kernel_path, json_wow_path, output, leave_paused, libvmi_conf, kpgd, fast_singlestep, limited_traps_ttl, libdrakvuf_get_userid);
+        drakvuf = std::make_unique<drakvuf_c>(
+                domain,
+                json_kernel_path,
+                json_wow_path,
+                output,
+                leave_paused,
+                libvmi_conf,
+                kpgd,
+                fast_singlestep,
+                limited_traps_ttl,
+                libdrakvuf_get_userid,
+                enable_active_callback_check
+            );
     }
     catch (const std::exception& e)
     {

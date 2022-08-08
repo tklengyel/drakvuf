@@ -102,240 +102,224 @@
  *                                                                         *
  ***************************************************************************/
 
-#include <inttypes.h>
-#include <assert.h>
-#include <string>
-#include <vector>
+#ifdef LIBUSERMODE_USE_INJECTION
 
-#include <libinjector/libinjector.h>
+#include "userhook.hpp"
+#include "uh-private.hpp"
 
-#include "syscalls.h"
-#include "private.h"
-#include "linux.h"
 
-namespace syscalls_ns
+bool inject_copy_memory(userhook* plugin, drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
+    addr_t addr, addr_t* stack_pointer)
 {
+    x86_registers_t regs;
+    memcpy(&regs, info->regs, sizeof(x86_registers_t));
 
-// Builds the argument buffer from the current context, returns status
-static std::vector<uint64_t> linux_build_argbuf(vmi_instance_t vmi,
-    drakvuf_trap_info_t* info, syscalls* s,
-    const syscall_t* sc,
-    addr_t pt_regs_addr)
-{
-    std::vector<uint64_t> args;
+    uint64_t buffer = 0;
+    uint64_t read_bytes = 0;
+    struct argument args[7] = {};
+    init_int_argument(&args[0], info->attached_proc_data.base_addr);
+    init_int_argument(&args[1], addr);
+    init_int_argument(&args[2], info->attached_proc_data.base_addr);
+    init_struct_argument(&args[3], buffer);
+    init_int_argument(&args[4], sizeof(buffer));
+    init_int_argument(&args[5], 0);
+    init_struct_argument(&args[6], read_bytes);
 
-    if (NULL == sc)
-        return args;
-
-    int nargs = sc->num_args;
-
-    // get arguments only if we know how many to get
-    if (0 == nargs)
-        return args;
-
-    // Now now, only support legacy syscall arg passing on 32 bit
-    if ( 4 == s->reg_size )
+    if (!inject_function_call(drakvuf, info, cb, &regs, args, 7, plugin->copy_virt_mem_va, stack_pointer))
     {
-        if ( nargs > 0 )
-            args.push_back(info->regs->rbx);
-        if ( nargs > 1 )
-            args.push_back(info->regs->rcx);
-        if ( nargs > 2 )
-            args.push_back(info->regs->rdx);
-        if ( nargs > 3 )
-            args.push_back(info->regs->rsi);
-        if ( nargs > 4 )
-            args.push_back(info->regs->rdi);
+        PRINT_DEBUG("[USERHOOK] [%8zu] [%d:%d:%#lx]  "
+            "Failed to inject MmCopyVirtualMemory\n"
+            , info->event_uid
+            , info->attached_proc_data.pid, info->attached_proc_data.tid, info->regs->rsp
+        );
+        return false;
     }
-    else if ( 8 == s->reg_size )
+
+    return true;
+}
+
+/**
+ * This is used in order to observe when 64 bit process is loading a new DLL.
+ * If the DLL is interesting, we perform further investigation and try to equip user mode hooks.
+ */
+static event_response_t map_view_of_section_ret_cb_2(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    auto params = get_trap_params<map_view_of_section_result_t>(info);
+
+    if (!params->verify_result_call_params(drakvuf, info))
+        return VMI_EVENT_RESPONSE_NONE;
+
+    return hook_dll(drakvuf, info, params->base_address_ptr);
+}
+
+event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta)
+{
+    auto vmi = vmi_lock_guard(drakvuf);
+
+    // we have to make sure that addresses between [pf_current_addr, pf_max_addr]
+    // are available for reading otherwise vmi_translate_sym2v will fail unconditionally
+    // and we will be unable to add hooks
+
+    if (drakvuf_lookup_injection(drakvuf, info))
+        drakvuf_remove_injection(drakvuf, info);
+
+    drakvuf_trap_t* trap = nullptr;
+    map_view_of_section_result_t* params = nullptr;
+    if (!dll_meta->in_progress)
     {
-        // Support both calling conventions for 64 bit Linux syscalls
-        if (pt_regs_addr)
+        if (plugin->is_stopping())
         {
-            // The syscall args are passed via a struct pt_regs *, which is in %rdi upon entry
-            size_t pt_regs[__PT_REGS_MAX] = {0};
-            ACCESS_CONTEXT(ctx,
-                .translate_mechanism = VMI_TM_PROCESS_DTB,
-                .dtb = info->regs->cr3
-            );
+            PRINT_DEBUG("[USERHOOK] Premature stop\n");
+            return VMI_EVENT_RESPONSE_NONE;
+        }
 
-            for ( int i=0; i<__PT_REGS_MAX; i++)
-            {
-                ctx.addr = pt_regs_addr + s->offsets[i];
-                if ( VMI_FAILURE == vmi_read_64(vmi, &ctx, &pt_regs[i]) )
-                {
-                    fprintf(stderr, "vmi_read_va(%p) failed\n", (void*)ctx.addr);
-                    return args;
-                }
-            }
+        PRINT_DEBUG("[USERHOOK] Start processing this dll_meta\n");
+        memcpy(&dll_meta->regs, info->regs, sizeof(x86_registers_t));
+        dll_meta->in_progress = true;
 
-            if ( nargs > 0 )
-                args.push_back(pt_regs[PT_REGS_RDI]);
-            if ( nargs > 1 )
-                args.push_back(pt_regs[PT_REGS_RSI]);
-            if ( nargs > 2 )
-                args.push_back(pt_regs[PT_REGS_RDX]);
-            if ( nargs > 3 )
-                args.push_back(pt_regs[PT_REGS_RCX]);
-            if ( nargs > 4 )
-                args.push_back(pt_regs[PT_REGS_R8]);
-            if ( nargs > 5 )
-                args.push_back(pt_regs[PT_REGS_R9]);
+        breakpoint_by_dtb_searcher bp;
+        trap = plugin->register_trap<map_view_of_section_result_t>(
+                info,
+                map_view_of_section_ret_cb_2,
+                bp.for_virt_addr(info->regs->rip).for_dtb(info->regs->cr3),
+                "NtMapViewOfSection ret v2");
+        if (!trap)
+            return VMI_EVENT_RESPONSE_NONE;
+    }
+    else
+    {
+        trap = info->trap;
+        if (plugin->is_stopping())
+        {
+            PRINT_DEBUG("[USERHOOK] Premature stop\n");
+            drakvuf_vmi_response_set_registers(drakvuf, info, &dll_meta->regs, true);
+            dll_meta->in_progress = false;
+            plugin->destroy_trap(trap);
+            return VMI_EVENT_RESPONSE_NONE;
+        }
+
+        PRINT_DEBUG("[USERHOOK] Continue processing this dll_meta\n");
+    }
+
+
+    params = get_trap_params<map_view_of_section_result_t>(trap);
+    if (!params)
+        return VMI_EVENT_RESPONSE_NONE;
+
+    while (dll_meta->pf_current_addr <= dll_meta->pf_max_addr)
+    {
+        page_info_t pinfo;
+        if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, dll_meta->pf_current_addr, &pinfo) == VMI_SUCCESS)
+        {
+            PRINT_DEBUG("[USERHOOK] Export info accessible OK %llx\n", (unsigned long long)dll_meta->pf_current_addr);
+            dll_meta->pf_current_addr += VMI_PS_4KB;
+            continue;
+        }
+
+        addr_t stack_pointer;
+        if (inject_copy_memory(plugin, drakvuf, info, trap->cb, dll_meta->pf_current_addr, &stack_pointer))
+        {
+            PRINT_DEBUG("[USERHOOK] Export info not accessible, page fault %llx\n", (unsigned long long)dll_meta->pf_current_addr);
+            dll_meta->pf_current_addr += VMI_PS_4KB;
+            params->set_result_call_params(info, stack_pointer);
+            return VMI_EVENT_RESPONSE_NONE;
         }
         else
         {
-            // The args are passed directly via registers in sycall context
-            if ( nargs > 0 )
-                args.push_back(info->regs->rdi);
-            if ( nargs > 1 )
-                args.push_back(info->regs->rsi);
-            if ( nargs > 2 )
-                args.push_back(info->regs->rdx);
-            if ( nargs > 3 )
-                args.push_back(info->regs->rcx);
-            if ( nargs > 4 )
-                args.push_back(info->regs->r8);
-            if ( nargs > 5 )
-                args.push_back(info->regs->r9);
+            PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n", (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
+            return VMI_EVENT_RESPONSE_NONE;
         }
     }
 
-    return args;
-}
-
-static event_response_t linux_ret_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    struct wrapper* w = (struct wrapper*)info->trap->data;
-    syscalls* s = w->s;
-
-    if (!drakvuf_check_return_context(drakvuf, info, w->pid, w->tid, 0))
-        return VMI_EVENT_RESPONSE_NONE;
-
-    const syscall_t* sc = w->num < NUM_SYSCALLS_LINUX ? linuxsc::linux_syscalls[w->num] : NULL;
-
-    print_sysret(s, drakvuf, info, w->num, info->trap->breakpoint.module, sc, info->regs->rax);
-
-    drakvuf_remove_trap(drakvuf, info->trap, (drakvuf_trap_free_t)free_trap);
-    s->traps = g_slist_remove(s->traps, info->trap);
-
-    return 0;
-}
-
-static event_response_t linux_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto vmi = vmi_lock_guard(drakvuf);
-    struct wrapper* w = (struct wrapper*)info->trap->data;
-    syscalls* s = w->s;
-
-    const syscall_t* sc = NULL;
-    addr_t pt_regs = 0;
-
-    addr_t nr = ~0;
-    if ( VMI_GET_BIT(info->regs->rdi, 47) )
+    // export info should be available, try hooking DLLs
+    for (auto& target : dll_meta->targets)
     {
-        /*
-         * On older kernels: __visible void do_syscall_64(struct pt_regs *regs)
-         */
-        pt_regs = info->regs->rdi;
-        (void)vmi_read_addr_va(vmi, pt_regs + s->offsets[PT_REGS_ORIG_RAX], 0, &nr);
-    }
-    else
-    {
-        /*
-         * On newer kernels: __visible void do_syscall_64(unsigned long nr, struct pt_regs *regs)
-         */
-        nr = info->regs->rdi;
-        pt_regs = info->regs->rsi;
-    }
+        if (target.state == HOOK_FIRST_TRY || target.state == HOOK_PAGEFAULT_RETRY)
+        {
+            addr_t exec_func = 0;
 
-    if ( nr<NUM_SYSCALLS_LINUX )
-    {
-        sc = linuxsc::linux_syscalls[nr];
+            if (target.type == HOOK_BY_NAME)
+            {
+                ACCESS_CONTEXT(ctx,
+                    .translate_mechanism = VMI_TM_PROCESS_DTB,
+                    .dtb = info->regs->cr3,
+                    .addr = dll_meta->v.real_dll_base
+                );
 
-        if ( s->filter && !g_hash_table_contains(s->filter, sc->name) )
-            return 0;
-    }
+                if (vmi_translate_sym2v(vmi, &ctx, target.target_name.c_str(), &exec_func) != VMI_SUCCESS)
+                {
+                    target.state = HOOK_FAILED;
+                    PRINT_DEBUG("[USERHOOK] Failed to hook %s: failed to translate symbol to address\n", target.target_name.c_str());
+                    continue;
+                }
 
-    auto args = linux_build_argbuf(vmi, info, s, sc, pt_regs);
+                target.offset = exec_func - dll_meta->v.real_dll_base;
+            }
+            else // HOOK_BY_OFFSET
+            {
+                exec_func = dll_meta->v.real_dll_base + target.offset;
+            }
 
-    print_syscall(s, drakvuf, info, nr, info->trap->breakpoint.module, sc, args);
+            if (target.state == HOOK_FIRST_TRY)
+            {
+                target.state = HOOK_FAILED;
 
-    if ( s->disable_sysret )
-        return 0;
+                if (is_pagetable_loaded(vmi, info, exec_func))
+                {
+                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
+                        target.state = HOOK_OK;
+                }
+                else
+                {
+                    addr_t stack_pointer;
+                    if (inject_copy_memory(plugin, drakvuf, info, trap->cb, exec_func, &stack_pointer))
+                    {
+                        target.state = HOOK_PAGEFAULT_RETRY;
+                        params->set_result_call_params(info, stack_pointer);
+                        return VMI_EVENT_RESPONSE_NONE;
+                    }
+                    else
+                    {
+                        PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n",
+                            (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
+                        drakvuf_vmi_response_set_registers(drakvuf, info, &dll_meta->regs, true);
+                        dll_meta->in_progress = false;
+                        plugin->destroy_trap(trap);
+                        return VMI_EVENT_RESPONSE_NONE;
+                    }
+                }
+            }
+            else if (target.state == HOOK_PAGEFAULT_RETRY)
+            {
+                target.state = HOOK_FAILED;
 
-    addr_t ret_addr = drakvuf_get_function_return_address(drakvuf, info);
+                if (is_pagetable_loaded(vmi, info, exec_func))
+                {
+                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
+                        target.state = HOOK_OK;
+                }
+            }
+            else
+            {
+                target.state = HOOK_FAILED;
+            }
 
-    struct wrapper* wr = g_slice_new0(struct wrapper);
-    wr->s = s;
-    wr->num = nr;
-    wr->pid = info->proc_data.pid;
-    wr->tid = info->proc_data.tid;
-
-    drakvuf_trap_t* ret_trap = g_slice_new0(drakvuf_trap_t);
-    ret_trap->breakpoint.lookup_type = LOOKUP_DTB;
-    ret_trap->breakpoint.dtb = info->regs->cr3;
-    ret_trap->breakpoint.addr_type = ADDR_VA;
-    ret_trap->breakpoint.addr = ret_addr;
-    ret_trap->breakpoint.module = "linux";
-    ret_trap->type = BREAKPOINT;
-    ret_trap->cb = linux_ret_cb;
-    ret_trap->data = wr;
-    ret_trap->ttl = UNLIMITED_TTL;
-
-    if ( drakvuf_add_trap(drakvuf, ret_trap) )
-        s->traps = g_slist_prepend(s->traps, ret_trap);
-    else
-    {
-        g_slice_free(drakvuf_trap_t, ret_trap);
-        g_slice_free(struct wrapper, w);
+            PRINT_DEBUG("[USERHOOK] Hook %s (vaddr = 0x%llx, dll_base = 0x%llx, result = %s)\n",
+                target.target_name.c_str(),
+                (unsigned long long)exec_func,
+                (unsigned long long)dll_meta->v.real_dll_base,
+                target.state == HOOK_OK ? "OK" : "FAIL");
+        }
     }
 
-    return 0;
+    PRINT_DEBUG("[USERHOOK] Done, flag DLL as hooked\n");
+    drakvuf_vmi_response_set_registers(drakvuf, info, &dll_meta->regs, true);
+    dll_meta->in_progress = false;
+    dll_meta->v.is_hooked = true;
+    plugin->destroy_trap(trap);
+    return VMI_EVENT_RESPONSE_NONE;
 }
 
-void setup_linux(drakvuf_t drakvuf, syscalls* s)
-{
-    s->offsets = (size_t*)g_try_malloc0(__PT_REGS_MAX*sizeof(size_t));
-    if ( !s->offsets )
-        throw -1;
-
-    for ( int i=0; i<__PT_REGS_MAX; i++ )
-        if ( !drakvuf_get_kernel_struct_member_rva(drakvuf, "pt_regs", linux_pt_regs_names[i], &s->offsets[i]) )
-            throw -1;
-
-    addr_t _text;
-    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "_text", &_text) )
-        throw -1;
-
-    addr_t syscall64;
-    if ( !drakvuf_get_kernel_symbol_rva(drakvuf, "do_syscall_64", &syscall64) )
-        throw -1;
-
-    addr_t kaslr = s->kernel_base - _text;
-
-    drakvuf_trap_t* trap = g_slice_new0(drakvuf_trap_t);
-    struct wrapper* w = g_slice_new0(struct wrapper);
-
-    w->s = s;
-
-    trap->breakpoint.lookup_type = LOOKUP_PID;
-    trap->breakpoint.pid = 0;
-    trap->breakpoint.addr_type = ADDR_VA;
-    trap->breakpoint.addr = syscall64 + kaslr;
-    trap->breakpoint.module = "linux";
-    trap->type = BREAKPOINT;
-    trap->cb = linux_cb;
-    trap->data = w;
-    trap->ttl = drakvuf_get_limited_traps_ttl(drakvuf);
-    trap->ah_cb = nullptr;
-
-    if ( drakvuf_add_trap(drakvuf, trap) )
-        s->traps = g_slist_prepend(s->traps, trap);
-    else
-    {
-        free_trap(trap);
-        throw -1;
-    }
-}
-
-}
+#endif

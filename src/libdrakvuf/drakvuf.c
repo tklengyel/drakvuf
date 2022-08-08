@@ -165,7 +165,18 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     g_free(drakvuf);
 }
 
-bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kernel_path, const char* json_wow_path, bool libvmi_conf, addr_t kpgd, bool fast_singlestep, uint64_t limited_traps_ttl, bool get_userid)
+bool drakvuf_init(
+    drakvuf_t* drakvuf,
+    const char* domain,
+    const char* json_kernel_path,
+    const char* json_wow_path,
+    bool libvmi_conf,
+    addr_t kpgd,
+    bool fast_singlestep,
+    uint64_t limited_traps_ttl,
+    bool get_userid,
+    bool enable_active_callback_check
+)
 {
 
     if ( !domain )
@@ -179,6 +190,7 @@ bool drakvuf_init(drakvuf_t* drakvuf, const char* domain, const char* json_kerne
     (*drakvuf)->enable_cr3_based_interception = false;
     (*drakvuf)->libvmi_conf = libvmi_conf;
     (*drakvuf)->kpgd = kpgd;
+    (*drakvuf)->enable_active_callback_check = enable_active_callback_check;
 
     if ( json_kernel_path )
         (*drakvuf)->json_kernel_path = g_strdup(json_kernel_path);
@@ -1083,6 +1095,79 @@ bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, unsigned int vcpu, registers_t* re
     ctx.x64.user_regs.r15 = regs->x86.r15;
 
     return xen_set_vcpu_ctx(drakvuf->xen, drakvuf->domID, vcpu, &ctx);
+}
+
+bool drakvuf_vmi_response_set_registers(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    x86_registers_t* regs,
+    bool immediate)
+{
+    bool res;
+
+    drakvuf_lock_and_get_vmi(drakvuf);
+    if (drakvuf->vmi_response_set_registers[info->vcpu])
+    {
+        PRINT_DEBUG(
+            "[LIBDRAKVUF] [%ld] Failed to set registers."
+            " Registers modification been requested beforehand.\n",
+            info->event_uid);
+        res = false;
+    }
+    else
+    {
+        drakvuf->vmi_response_set_registers[info->vcpu] = true;
+        memcpy(&drakvuf->regs_modified[info->vcpu], regs, sizeof(x86_registers_t));
+        if (immediate)
+            memcpy(info->regs, regs, sizeof(x86_registers_t));
+        res = true;
+    }
+    drakvuf_release_vmi(drakvuf);
+
+    return res;
+}
+
+bool drakvuf_is_active_callback(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+    void* injection_cb = drakvuf_lookup_injection(drakvuf, info);
+    bool res = !drakvuf->enable_active_callback_check
+        || !injection_cb || injection_cb == info->trap->cb;
+    drakvuf_release_vmi(drakvuf);
+    return res;
+}
+
+void* drakvuf_lookup_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+    uint64_t pid = info->attached_proc_data.pid;
+    uint64_t tid = info->attached_proc_data.tid;
+    gpointer key = GSIZE_TO_POINTER(pid << 32 | tid);
+    gpointer value = g_hash_table_lookup(drakvuf->injections_in_progress, key);
+    drakvuf_release_vmi(drakvuf);
+    return value;
+}
+
+void drakvuf_insert_injection(drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*))
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+    uint64_t pid = info->attached_proc_data.pid;
+    uint64_t tid = info->attached_proc_data.tid;
+    gpointer key = GSIZE_TO_POINTER(pid << 32 | tid);
+    g_assert(g_hash_table_insert(drakvuf->injections_in_progress, key, cb));
+    drakvuf_release_vmi(drakvuf);
+}
+
+void drakvuf_remove_injection(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+    uint64_t pid = info->attached_proc_data.pid;
+    uint64_t tid = info->attached_proc_data.tid;
+    gpointer key = GSIZE_TO_POINTER(pid << 32 | tid);
+    g_assert (g_hash_table_remove(drakvuf->injections_in_progress, key));
+    drakvuf_release_vmi(drakvuf);
 }
 
 static bool is_valid_vcpu(drakvuf_t drakvuf, unsigned int vcpu)

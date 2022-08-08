@@ -234,7 +234,6 @@ private:
     bool save_file_chunk(int file_sequence_number,
         void* buffer,
         size_t size);
-    addr_t get_function_va(const char* lib, const char* func_name);
     uint64_t make_hook_id(drakvuf_trap_info_t*);
     uint64_t make_task_id(vmi_pid_t pid, handle_t handle);
     uint64_t make_task_id(task_t&);

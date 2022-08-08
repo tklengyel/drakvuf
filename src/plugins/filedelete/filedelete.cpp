@@ -1370,25 +1370,6 @@ static void register_trap( drakvuf_t drakvuf, const char* syscall_name,
     if ( ! drakvuf_add_trap( drakvuf, trap ) ) throw -1;
 }
 
-static addr_t get_function_va(drakvuf_t drakvuf, const char* lib, const char* func_name)
-{
-    addr_t rva;
-    if ( !drakvuf_get_kernel_symbol_rva( drakvuf, func_name, &rva) )
-    {
-        PRINT_DEBUG("[FILEDELETE2] [Init] Failed to get RVA of %s\n", func_name);
-        throw -1;
-    }
-
-    addr_t va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, lib, rva);
-    if (!va)
-    {
-        PRINT_DEBUG("[FILEDELETE2] [Init] Failed to get VA of %s\n", func_name);
-        throw -1;
-    }
-
-    return va;
-}
-
 filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_format_t output)
     : drakvuf(drakvuf)
     , offsets(new size_t[__OFFSET_MAX])
@@ -1413,17 +1394,17 @@ filedelete::filedelete(drakvuf_t drakvuf, const filedelete_config* c, output_for
     }
     else
     {
-        this->queryvolumeinfo_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryVolumeInformationFile");
-        this->queryinfo_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwQueryInformationFile");
-        this->createsection_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwCreateSection");
-        this->close_handle_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwClose");
-        this->mapview_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwMapViewOfSection");
-        this->unmapview_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwUnmapViewOfSection");
-        this->readfile_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwReadFile");
-        this->waitobject_va = get_function_va(drakvuf, "ntoskrnl.exe", "ZwWaitForSingleObject");
-        this->exallocatepool_va = get_function_va(drakvuf, "ntoskrnl.exe", "ExAllocatePoolWithTag");
-        this->exfreepool_va = get_function_va(drakvuf, "ntoskrnl.exe", "ExFreePoolWithTag");
-        this->memcpy_va = get_function_va(drakvuf, "ntoskrnl.exe", "RtlCopyMemoryNonTemporal");
+        this->queryvolumeinfo_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwQueryVolumeInformationFile");
+        this->queryinfo_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwQueryInformationFile");
+        this->createsection_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwCreateSection");
+        this->close_handle_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwClose");
+        this->mapview_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwMapViewOfSection");
+        this->unmapview_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwUnmapViewOfSection");
+        this->readfile_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwReadFile");
+        this->waitobject_va = drakvuf_kernel_symbol_to_va(drakvuf, "ZwWaitForSingleObject");
+        this->exallocatepool_va = drakvuf_kernel_symbol_to_va(drakvuf, "ExAllocatePoolWithTag");
+        this->exfreepool_va = drakvuf_kernel_symbol_to_va(drakvuf, "ExFreePoolWithTag");
+        this->memcpy_va = drakvuf_kernel_symbol_to_va(drakvuf, "RtlCopyMemoryNonTemporal");
 
         assert(sizeof(traps)/sizeof(traps[0]) > 3);
         register_trap(drakvuf, "NtSetInformationFile", &traps[0], setinformation_cb);

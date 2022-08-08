@@ -102,180 +102,178 @@
  *                                                                         *
  ***************************************************************************/
 
-#ifndef LIBINJECTOR_H
-#define LIBINJECTOR_H
+#ifndef LIBUSERMODE_USE_INJECTION
 
-#ifdef __cplusplus
-extern "C" {
-#define NOEXCEPT noexcept
-#else
-#define NOEXCEPT
-#endif
+#include "userhook.hpp"
+#include "uh-private.hpp"
 
-#pragma GCC visibility push(default)
 
-#include <libdrakvuf/libdrakvuf.h>
-
-typedef struct injector* injector_t;
-
-typedef enum
+/**
+ * As we may accidentally trigger an exception in the kernel by using vmi_request_page_fault,
+ * we hook KiSystemServiceHandler to account for that situation. Inside this hook,
+ * we check if it was "our fault" and if so, we forcefully return EXCEPTION_CONTINUE_EXECUTION.
+ * In any other case, we just pass the control to the original exception handler.
+ */
+event_response_t system_service_handler_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-    STEP1,
-    STEP2,
-    STEP3,
-    STEP4,
-    STEP5,
-    STEP6,
-    STEP7,
-    STEP8,
-} injector_step_t;
+    PRINT_DEBUG("[USERHOOK] Entered system service handler\n");
 
-typedef enum
-{
-    INJECTOR_FAILED,
-    INJECTOR_FAILED_WITH_ERROR_CODE,
-    INJECTOR_SUCCEEDED,
-    INJECTOR_TIMEOUTED,
-} injector_status_t;
+    auto plugin = get_trap_plugin<userhook>(info);
 
-typedef enum
-{
-    // win
-    INJECT_METHOD_CREATEPROC,
-    INJECT_METHOD_TERMINATEPROC,
-    INJECT_METHOD_SHELLEXEC,
-    INJECT_METHOD_SHELLCODE,
-    INJECT_METHOD_READ_FILE,
-    INJECT_METHOD_WRITE_FILE,
-    // linux
-    INJECT_METHOD_EXECPROC,
+    proc_data_t proc_data = get_proc_data(drakvuf, info);
 
-    __INJECT_METHOD_MAX
+    uint32_t thread_id = proc_data.tid;
+
+    if (!thread_id)
+    {
+        PRINT_DEBUG("[USERHOOK] Failed to get thread id in system service handler!\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    bool our_fault = plugin->pf_in_progress.find(std::make_pair(proc_data.pid, proc_data.tid)) != plugin->pf_in_progress.end();
+    if (!our_fault)
+    {
+        PRINT_DEBUG("[USERHOOK] Not suppressing service exception - not our fault\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    // emulate `ret` instruction
+    addr_t saved_rip = drakvuf_get_function_return_address(drakvuf, info);
+
+    if (!saved_rip)
+    {
+        PRINT_DEBUG("[USERHOOK] Error while reading the saved RIP in system service handler\n");
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    page_mode_t pm = drakvuf_get_page_mode(drakvuf);
+    bool is32 = (pm != VMI_PM_IA32E);
+
+    constexpr int EXCEPTION_CONTINUE_EXECUTION = 0;
+    info->regs->rip = saved_rip;
+    info->regs->rsp += (is32 ? 4 : 8);
+    info->regs->rax = EXCEPTION_CONTINUE_EXECUTION;
+    return VMI_EVENT_RESPONSE_SET_REGISTERS;
 }
-injection_method_t;
 
-typedef enum
+event_response_t internal_perform_hooking(drakvuf_t drakvuf, drakvuf_trap_info* info, userhook* plugin, dll_t* dll_meta)
 {
-    ARGUMENT_STRING,
-    ARGUMENT_STRUCT,
-    ARGUMENT_INT,
-    ARGUMENT_ARRAY,
-    __ARGUMENT_MAX
-} argument_type_t;
+    proc_data_t proc_data = get_proc_data(drakvuf, info);
 
-typedef enum
-{
-    STATUS_NULL,
-    STATUS_ALLOC_OK,
-    STATUS_PHYS_ALLOC_OK,
-    STATUS_EXPAND_ENV_OK,
-    STATUS_WRITE_OK,
-    STATUS_EXEC_OK,
-    STATUS_BP_HIT,
-    STATUS_OPEN,
-    STATUS_TERMINATE,
-    STATUS_CREATE_OK,
-    STATUS_RESUME_OK,
-    STATUS_CREATE_FILE_OK,
-    STATUS_READ_FILE_OK,
-    STATUS_WRITE_FILE_OK,
-    STATUS_CLOSE_FILE_OK,
-    STATUS_GET_LAST_ERROR,
-    __STATUS_MAX
-} status_type_t;
+    auto vmi = vmi_lock_guard(drakvuf);
 
-struct argument
-{
-    uint32_t type;
-    uint32_t size;
-    uint64_t data_on_stack;
-    void* data;
-};
+    // we have to make sure that addresses between [pf_current_addr, pf_max_addr]
+    // are available for reading otherwise vmi_translate_sym2v will fail unconditionally
+    // and we will be unable to add hooks
 
-void init_argument(struct argument* arg,
-    argument_type_t type,
-    size_t size,
-    void* data) NOEXCEPT;
+    plugin->pf_in_progress.erase(std::make_pair(proc_data.pid, proc_data.tid));
 
-void init_int_argument(struct argument* arg,
-    uint64_t value) NOEXCEPT;
+    while (dll_meta->pf_current_addr <= dll_meta->pf_max_addr)
+    {
+        page_info_t pinfo;
+        if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, dll_meta->pf_current_addr, &pinfo) == VMI_SUCCESS)
+        {
+            PRINT_DEBUG("[USERHOOK] Export info accessible OK %llx\n", (unsigned long long)dll_meta->pf_current_addr);
+            dll_meta->pf_current_addr += VMI_PS_4KB;
+            continue;
+        }
 
-void init_unicode_argument(struct argument* arg,
-    unicode_string_t* us) NOEXCEPT;
+        if (vmi_request_page_fault(vmi, info->vcpu, dll_meta->pf_current_addr, 0) == VMI_SUCCESS)
+        {
+            PRINT_DEBUG("[USERHOOK] Export info not accessible, page fault %llx\n", (unsigned long long)dll_meta->pf_current_addr);
+            plugin->pf_in_progress.insert(std::make_pair(proc_data.pid, proc_data.tid));
+            dll_meta->pf_current_addr += VMI_PS_4KB;
+        }
+        else
+        {
+            PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n", (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
+        }
 
-void init_string_argument(struct argument* arg,
-    const char* string) NOEXCEPT;
+        return VMI_EVENT_RESPONSE_NONE;
+    }
 
-void init_array_argument(struct argument* arg,
-    struct argument array[],
-    int size) NOEXCEPT;
+    // export info should be available, try hooking DLLs
+    for (auto& target : dll_meta->targets)
+    {
+        if (target.state == HOOK_FIRST_TRY || target.state == HOOK_PAGEFAULT_RETRY)
+        {
+            addr_t exec_func = 0;
 
-#define init_struct_argument(arg, sv) \
-    init_argument((arg), ARGUMENT_STRUCT, sizeof((sv)), (void*)&(sv))
+            if (target.type == HOOK_BY_NAME)
+            {
+                ACCESS_CONTEXT(ctx,
+                    .translate_mechanism = VMI_TM_PROCESS_DTB,
+                    .dtb = info->regs->cr3,
+                    .addr = dll_meta->v.real_dll_base
+                );
 
-addr_t place_array_on_addr_64(vmi_instance_t vmi,
-    x86_registers_t* regs,
-    struct argument* arg,
-    addr_t* data_addr,
-    addr_t* array_addr) NOEXCEPT;
+                if (vmi_translate_sym2v(vmi, &ctx, target.target_name.c_str(), &exec_func) != VMI_SUCCESS)
+                {
+                    target.state = HOOK_FAILED;
+                    PRINT_DEBUG("[USERHOOK] Failed to hook %s: failed to translate symbol to address\n", target.target_name.c_str());
+                    continue;
+                }
 
-addr_t place_array_on_addr_32(vmi_instance_t vmi,
-    x86_registers_t* regs,
-    struct argument* arg,
-    addr_t* data_addr,
-    addr_t* array_addr) NOEXCEPT;
+                target.offset = exec_func - dll_meta->v.real_dll_base;
+            }
+            else // HOOK_BY_OFFSET
+            {
+                exec_func = dll_meta->v.real_dll_base + target.offset;
+            }
 
-bool setup_stack(drakvuf_t drakvuf,
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args) NOEXCEPT;
+            if (target.state == HOOK_FIRST_TRY)
+            {
+                target.state = HOOK_FAILED;
 
-bool setup_stack_locked(drakvuf_t drakvuf,
-    vmi_instance_t vmi,
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args) NOEXCEPT;
+                page_info_t pinfo;
+                if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pinfo) != VMI_SUCCESS)
+                {
+                    if (vmi_request_page_fault(vmi, info->vcpu, exec_func, 0) == VMI_SUCCESS)
+                    {
+                        target.state = HOOK_PAGEFAULT_RETRY;
+                        plugin->pf_in_progress.insert(std::make_pair(proc_data.pid, proc_data.tid));
+                        return VMI_EVENT_RESPONSE_NONE;
+                    }
+                    else
+                    {
+                        PRINT_DEBUG("[USERHOOK] Failed to request page fault for DTB %llx, address %llx\n",
+                            (unsigned long long)info->regs->cr3, (unsigned long long)dll_meta->pf_current_addr);
+                        return VMI_EVENT_RESPONSE_NONE;
+                    }
+                }
+                else
+                {
+                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
+                        target.state = HOOK_OK;
+                }
+            }
+            else if (target.state == HOOK_PAGEFAULT_RETRY)
+            {
+                target.state = HOOK_FAILED;
+                page_info_t pinfo;
 
-bool inject_function_call(
-    drakvuf_t drakvuf,
-    drakvuf_trap_info_t* info,
-    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
-    x86_registers_t* regs,
-    struct argument args[],
-    int nb_args,
-    addr_t function_addr,
-    addr_t* stack_pointer);
+                if (vmi_pagetable_lookup_extended(vmi, info->regs->cr3, exec_func, &pinfo) == VMI_SUCCESS)
+                {
+                    if (make_trap(vmi, drakvuf, info, &target, exec_func))
+                        target.state = HOOK_OK;
+                }
+            }
+            else
+            {
+                target.state = HOOK_FAILED;
+            }
 
-injector_status_t injector_start_app(drakvuf_t drakvuf,
-    vmi_pid_t pid,
-    uint32_t tid, // optional, if tid=0 the first thread that gets scheduled is used
-    const char* app,
-    const char* cwd,
-    injection_method_t method,
-    output_format_t format,
-    const char* binary_path,     // if -m = doppelganging
-    const char* target_process,  // if -m = doppelganging
-    bool break_loop_on_detection,
-    injector_t* injector_to_be_freed,
-    bool global_search, // out: iff break_loop_on_detection is set
-    bool wait_for_exit,
-    int args_count,
-    const char* args[],
-    vmi_pid_t* injected_pid) NOEXCEPT;
+            PRINT_DEBUG("[USERHOOK] Hook %s (vaddr = 0x%llx, dll_base = 0x%llx, result = %s)\n",
+                target.target_name.c_str(),
+                (unsigned long long)exec_func,
+                (unsigned long long)dll_meta->v.real_dll_base,
+                target.state == HOOK_OK ? "OK" : "FAIL");
+        }
+    }
 
-void injector_terminate(drakvuf_t drakvuf,
-    vmi_pid_t injection_pid,
-    uint32_t injection_tid,
-    vmi_pid_t pid);
-
-void injector_free(drakvuf_t drakvuf, injector_t injector);
-
-const char* injection_method_name(injection_method_t method);
-
-#pragma GCC visibility pop
-
-#ifdef __cplusplus
+    PRINT_DEBUG("[USERHOOK] Done, flag DLL as hooked\n");
+    dll_meta->v.is_hooked = true;
+    return VMI_EVENT_RESPONSE_NONE;
 }
-#endif
 
-#endif // LIBINJECTOR_H
+#endif

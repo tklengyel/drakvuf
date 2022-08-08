@@ -719,3 +719,40 @@ bool setup_stack(
     drakvuf_release_vmi(drakvuf);
     return success;
 }
+
+bool inject_function_call(
+    drakvuf_t drakvuf,
+    drakvuf_trap_info_t* info,
+    event_response_t (*cb)(drakvuf_t, drakvuf_trap_info_t*),
+    x86_registers_t* regs,
+    struct argument args[],
+    int nb_args,
+    addr_t function_addr,
+    addr_t* stack_pointer)
+{
+    drakvuf_lock_and_get_vmi(drakvuf);
+
+    if (drakvuf_lookup_injection(drakvuf, info))
+    {
+        drakvuf_release_vmi(drakvuf);
+        return false;
+    }
+
+    if (!setup_stack(drakvuf, regs, args, nb_args))
+    {
+        drakvuf_release_vmi(drakvuf);
+        return false;
+    }
+
+    regs->rip = function_addr;
+    if (!drakvuf_vmi_response_set_registers(drakvuf, info, regs, false))
+    {
+        drakvuf_release_vmi(drakvuf);
+        return false;
+    }
+    *stack_pointer = regs->rsp;
+
+    drakvuf_insert_injection(drakvuf, info, cb);
+    drakvuf_release_vmi(drakvuf);
+    return true;
+}

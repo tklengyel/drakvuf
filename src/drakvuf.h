@@ -142,7 +142,8 @@ public:
         addr_t kpgd,
         bool fast_singlestep,
         uint64_t limited_traps_ttl,
-        bool libdrakvuf_get_userid);
+        bool libdrakvuf_get_userid,
+        bool enable_active_callback_check);
     ~drakvuf_c();
 
     int is_initialized();

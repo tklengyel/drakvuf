@@ -1374,25 +1374,6 @@ bool fileextractor::save_file_chunk(int file_sequence_number,
     return success;
 }
 
-addr_t fileextractor::get_function_va(const char* lib, const char* func_name)
-{
-    addr_t rva;
-    if ( !drakvuf_get_kernel_symbol_rva( drakvuf, func_name, &rva) )
-    {
-        PRINT_DEBUG("[FILEDELETE] [Init] Failed to get RVA of %s\n", func_name);
-        throw -1;
-    }
-
-    addr_t va = drakvuf_exportksym_to_va(drakvuf, 4, nullptr, lib, rva);
-    if (!va)
-    {
-        PRINT_DEBUG("[FILEDELETE] [Init] Failed to get VA of %s\n", func_name);
-        throw -1;
-    }
-
-    return va;
-}
-
 uint64_t fileextractor::make_hook_id(drakvuf_trap_info_t* info)
 {
     uint64_t u64_pid = info->attached_proc_data.pid;
@@ -1530,28 +1511,44 @@ fileextractor::fileextractor(drakvuf_t drakvuf,
     else
         this->mmpte_size = 8;
 
-    this->queryvolumeinfo_va = get_function_va("ntoskrnl.exe",
+    this->queryvolumeinfo_va = drakvuf_kernel_symbol_to_va(drakvuf,
             "ZwQueryVolumeInformationFile");
-    this->queryinfo_va = get_function_va("ntoskrnl.exe",
+    this->queryinfo_va = drakvuf_kernel_symbol_to_va(drakvuf,
             "ZwQueryInformationFile");
-    this->createsection_va = get_function_va("ntoskrnl.exe",
+    this->createsection_va = drakvuf_kernel_symbol_to_va(drakvuf,
             "ZwCreateSection");
-    this->close_handle_va = get_function_va("ntoskrnl.exe",
+    this->close_handle_va = drakvuf_kernel_symbol_to_va(drakvuf,
             "ZwClose");
-    this->mapview_va = get_function_va("ntoskrnl.exe",
+    this->mapview_va = drakvuf_kernel_symbol_to_va(drakvuf,
             "ZwMapViewOfSection");
-    this->unmapview_va = get_function_va("ntoskrnl.exe",
+    this->unmapview_va = drakvuf_kernel_symbol_to_va(drakvuf,
             "ZwUnmapViewOfSection");
-    this->readfile_va = get_function_va("ntoskrnl.exe",
+    this->readfile_va = drakvuf_kernel_symbol_to_va(drakvuf,
             "ZwReadFile");
-    this->waitobject_va = get_function_va("ntoskrnl.exe",
+    this->waitobject_va = drakvuf_kernel_symbol_to_va(drakvuf,
             "ZwWaitForSingleObject");
-    this->exallocatepool_va = get_function_va("ntoskrnl.exe",
+    this->exallocatepool_va = drakvuf_kernel_symbol_to_va(drakvuf,
             "ExAllocatePoolWithTag");
-    this->exfreepool_va = get_function_va("ntoskrnl.exe",
+    this->exfreepool_va = drakvuf_kernel_symbol_to_va(drakvuf,
             "ExFreePoolWithTag");
-    this->memcpy_va = get_function_va("ntoskrnl.exe",
+    this->memcpy_va = drakvuf_kernel_symbol_to_va(drakvuf,
             "RtlCopyMemoryNonTemporal");
+
+    if (!this->queryvolumeinfo_va ||
+        !this->queryinfo_va ||
+        !this->createsection_va ||
+        !this->close_handle_va ||
+        !this->mapview_va ||
+        !this->unmapview_va ||
+        !this->readfile_va ||
+        !this->waitobject_va ||
+        !this->exallocatepool_va ||
+        !this->exfreepool_va ||
+        !this->memcpy_va)
+    {
+        PRINT_DEBUG("[FILEEXTRACTOR] Failed to get function address\n");
+        throw -1;
+    }
 
     this->setinformation_hook = createSyscallHook("NtSetInformationFile",
             &fileextractor::setinformation_cb);
