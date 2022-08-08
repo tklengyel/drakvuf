@@ -253,7 +253,7 @@ void setup_vfork_syscall(injector_t injector, x86_registers_t* regs, char* proc_
 static addr_t place_argv(injector_t injector, x86_registers_t* regs, addr_t* data_addr, addr_t* array_addr)
 {
     struct argument arg; // this will be passed in place_array_on_addr_64
-    struct argument* argv = g_new0(struct argument, injector->args_count + 2);
+    struct argument* argv = g_new0(struct argument, injector->args_count + 1);
 
     PRINT_DEBUG("Total arguments: %d\n", injector->args_count);
 
@@ -266,12 +266,11 @@ static addr_t place_argv(injector_t injector, x86_registers_t* regs, addr_t* dat
         PRINT_DEBUG("Args %d: %s\n", i+1, injector->args[i]);
     }
 
-    init_int_argument(&argv[injector->args_count+1], 0); // null in the end
-    init_array_argument(&arg, argv, injector->args_count + 2);
+    init_array_argument(&arg, argv, injector->args_count + 1);
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
 
-    *array_addr = place_array_on_addr_64(vmi, regs, &arg, data_addr, array_addr);
+    *array_addr = place_array_on_addr_64(vmi, regs, &arg, true, data_addr, array_addr);
     if (*array_addr == 0)
         goto err;
 
@@ -290,7 +289,7 @@ static addr_t place_environ(injector_t injector, x86_registers_t* regs, GHashTab
 {
     struct argument arg; // this will be passed in place_array_on_addr_64
 
-    size_t envs_count = g_hash_table_size(environ) + 1; // add null argument
+    size_t envs_count = g_hash_table_size(environ);
     struct argument* envp = g_new0(struct argument, envs_count);
     char** str_holder = g_new0(char*, envs_count);
 
@@ -306,11 +305,10 @@ static addr_t place_environ(injector_t injector, x86_registers_t* regs, GHashTab
         init_string_argument(&envp[idx++], str);
     }
 
-    init_int_argument(&envp[envs_count - 1], 0); // null
     init_array_argument(&arg, envp, envs_count);
 
     vmi_instance_t vmi = drakvuf_lock_and_get_vmi(injector->drakvuf);
-    *array_addr = place_array_on_addr_64(vmi, regs, &arg, data_addr, array_addr);
+    *array_addr = place_array_on_addr_64(vmi, regs, &arg, true, data_addr, array_addr);
     drakvuf_release_vmi(injector->drakvuf);
 
     g_strfreev(str_holder);
