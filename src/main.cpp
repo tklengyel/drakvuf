@@ -1011,5 +1011,8 @@ int main(int argc, char** argv)
 
     PRINT_DEBUG("Finished stop plugins\n");
 
-    return drakvuf_exit_code_t::SUCCESS;
+    if (SIGDRAKVUFTIMEOUT == drakvuf->is_interrupted())
+        return drakvuf_exit_code_t::PLUGINS_STOP_TIMEOUT;
+    else
+        return drakvuf_exit_code_t::SUCCESS;
 }
