@@ -573,7 +573,8 @@ addr_t drakvuf_get_thread(drakvuf_t drakvuf, addr_t process, uint32_t tid)
     if (!threads)
         return 0;
 
-    addr_t thread = (addr_t)g_hash_table_lookup(threads, (gconstpointer)(uint64_t)tid);
+    gpointer key = GUINT_TO_POINTER((uint64_t)tid);
+    addr_t thread = (addr_t)g_hash_table_lookup(threads, key);
     g_hash_table_destroy(threads);
     return thread;
 }
