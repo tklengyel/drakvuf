@@ -408,6 +408,7 @@ bool drakvuf_init (drakvuf_t* drakvuf,
     const addr_t kpgd,
     const bool fast_singlestep,
     uint64_t limited_traps_ttl,
+    GSList* ignored_processes,
     bool get_userid,
     bool enable_active_callback_check) NOEXCEPT;
 bool drakvuf_init_os (drakvuf_t drakvuf) NOEXCEPT;

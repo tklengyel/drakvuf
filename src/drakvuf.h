@@ -116,6 +116,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <set>
+
 #include <libdrakvuf/libdrakvuf.h>
 #include <plugins/plugins.h>
 #include <libinjector/libinjector.h>
@@ -142,6 +144,7 @@ public:
         addr_t kpgd,
         bool fast_singlestep,
         uint64_t limited_traps_ttl,
+        const std::set<uint64_t>& ignored_processes,
         bool libdrakvuf_get_userid,
         bool enable_active_callback_check);
     ~drakvuf_c();

@@ -214,11 +214,16 @@ drakvuf_c::drakvuf_c(const char* domain,
     addr_t kpgd,
     bool fast_singlestep,
     uint64_t limited_traps_ttl,
+    const std::set<uint64_t>& ignored_processes_,
     bool libdrakvuf_get_userid,
     bool enable_active_callback_check)
     : leave_paused{ leave_paused }
     , format{ output }
 {
+    GSList* ignored_processes = NULL;
+    for (auto pid : ignored_processes_)
+        ignored_processes = g_slist_prepend(ignored_processes, GUINT_TO_POINTER(pid));
+
     bool success = drakvuf_init(
             &drakvuf,
             domain,
@@ -228,6 +233,7 @@ drakvuf_c::drakvuf_c(const char* domain,
             kpgd,
             fast_singlestep,
             limited_traps_ttl,
+            ignored_processes,
             libdrakvuf_get_userid,
             enable_active_callback_check
         );
@@ -235,6 +241,7 @@ drakvuf_c::drakvuf_c(const char* domain,
     if (!success)
     {
         drakvuf_close(drakvuf, leave_paused);
+        g_slist_free(ignored_processes);
         throw std::runtime_error("drakvuf_init() failed");
     }
 
