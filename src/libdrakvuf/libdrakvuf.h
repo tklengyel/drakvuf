@@ -723,12 +723,13 @@ bool drakvuf_get_pid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, a
 bool drakvuf_get_tid_from_handle(drakvuf_t drakvuf, drakvuf_trap_info_t* info, addr_t handle, uint32_t* tid) NOEXCEPT;
 
 bool drakvuf_set_vcpu_gprs(drakvuf_t drakvuf, unsigned int vcpu, registers_t* regs) NOEXCEPT;
+void drakvuf_copy_gpr_registers(x86_registers_t* dst, x86_registers_t* src);
 /* This function is used to delay registers modification on injections.
  * This fixes two issues:
  * 1. Two plug-ins injects function call or modify registers.
  * 2. One plug-in injects function call and other one reads modified registers.
  */
-bool drakvuf_vmi_response_set_registers(drakvuf_t drakvuf,
+bool drakvuf_vmi_response_set_gpr_registers(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info,
     x86_registers_t* regs,
     bool immediate);

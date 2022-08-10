@@ -712,8 +712,7 @@ bool inject_function_call(
     x86_registers_t* regs,
     struct argument args[],
     int nb_args,
-    addr_t function_addr,
-    addr_t* stack_pointer)
+    addr_t function_addr)
 {
     drakvuf_lock_and_get_vmi(drakvuf);
 
@@ -730,12 +729,11 @@ bool inject_function_call(
     }
 
     regs->rip = function_addr;
-    if (!drakvuf_vmi_response_set_registers(drakvuf, info, regs, false))
+    if (!drakvuf_vmi_response_set_gpr_registers(drakvuf, info, regs, false))
     {
         drakvuf_release_vmi(drakvuf);
         return false;
     }
-    *stack_pointer = regs->rsp;
 
     drakvuf_insert_injection(drakvuf, info, cb);
     drakvuf_release_vmi(drakvuf);

@@ -709,15 +709,15 @@ static event_response_t _int3_cb(drakvuf_t drakvuf, vmi_event_t* event)
             }
         }
 
-        if (drakvuf->vmi_response_set_registers[trap_info.vcpu])
-        {
-            if (VMI_EVENT_RESPONSE_SET_REGISTERS & rsp)
-                PRINT_DEBUG("[LIBDRAKVUF] FATAL ERROR! Undefined behavior on invalid VM state!\n");
+    if (drakvuf->vmi_response_set_registers[trap_info.vcpu])
+    {
+        if (VMI_EVENT_RESPONSE_SET_REGISTERS & rsp)
+            PRINT_DEBUG("[LIBDRAKVUF] FATAL ERROR! Undefined behavior on invalid VM state!\n");
 
-            drakvuf->vmi_response_set_registers[trap_info.vcpu] = false;
-            memcpy(trap_info.regs, &drakvuf->regs_modified[trap_info.vcpu], sizeof(x86_registers_t));
-            rsp |= VMI_EVENT_RESPONSE_SET_REGISTERS;
-        }
+        drakvuf->vmi_response_set_registers[trap_info.vcpu] = false;
+        drakvuf_copy_gpr_registers(trap_info.regs, &drakvuf->regs_modified[trap_info.vcpu]);
+        rsp |= VMI_EVENT_RESPONSE_SET_REGISTERS;
+    }
 
         // Iterate over traps updating ttl.
         GSList* update_ttl_loop = s->traps;
