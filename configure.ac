@@ -545,12 +545,12 @@ AC_ARG_ENABLE([debug],
   [debug="no"])
 AM_CONDITIONAL([DEBUG], [test x$debug = xyes])
 
-AC_ARG_ENABLE([libusermode-injections],
-  [AS_HELP_STRING([--enable-libusermode-injections],
+AC_ARG_ENABLE([libusermodeinjections],
+  [AS_HELP_STRING([--enable-libusermodeinjections],
     [Use injections instead of page faults in libusermode @<:@no@:>@])],
-  [libusermode-injections="$enableval"],
-  [libusermode-injections="no"])
-AM_CONDITIONAL([LIBUSERMODE_USE_INJECTION], [test x$libusermode-injections = xyes])
+  [libusermodeinjections="$enableval"],
+  [libusermodeinjections="no"])
+AM_CONDITIONAL([LIBUSERMODE_USE_INJECTION], [test x$libusermodeinjections = xyes])
 
 AC_ARG_ENABLE([sanitize],
   [AS_HELP_STRING([--enable-sanitize],

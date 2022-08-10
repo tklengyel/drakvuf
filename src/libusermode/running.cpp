@@ -314,7 +314,9 @@ event_response_t hook_process_cb(
 #endif
             {
                 rh_data->state = HOOK_PAGEFAULT_RETRY;
+#ifndef LIBUSERMODE_USE_INJECTION
                 userhook_plugin->pf_in_progress.insert(std::make_pair(info->proc_data.pid, info->proc_data.tid));
+#endif
                 return VMI_EVENT_RESPONSE_NONE;
             }
             else
