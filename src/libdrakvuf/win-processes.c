@@ -331,38 +331,42 @@ static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t epr
             image_file_name_addr + drakvuf->offsets[OBJECTNAMEINFORMATION_NAME], 0);
 }
 
-char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath)
+static char* win_get_process_name_impl(unicode_string_t* fullname, bool fullpath)
 {
-    unicode_string_t* fullname = win_get_process_full_name( drakvuf, eprocess_base );
-    char* name = vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
+    if ( !(fullname && fullname->contents && strlen((const char*)fullname->contents) > 0) )
+        return NULL;
 
-    if (fullname && fullname->contents && strlen((const char*)fullname->contents) > 0)
+    // Moving ownership of fullname->contents to name for later cleanup
+    char* name = g_strdup((char*)fullname->contents);
+    // ImageFileName size differs between kernel builds & versions,
+    // relying on it would sometimes yield incomplete process name.
+    if ( !fullpath )
     {
-        g_free(name);
-        // Replace 'proc_data->name' with 'fullname->contents'
-        // Moving ownership of fullname->contents to name for later cleanup
-        name = g_strdup((char*)fullname->contents);
-        // ImageFileName size differs between kernel builds & versions,
-        // relying on it would sometimes yield incomplete process name.
-        if ( !fullpath )
+        char** tokens = g_strsplit(name, "\\", -1);
+        int index = 0;
+
+        if (tokens && tokens[index])
         {
-            char** tokens = g_strsplit(name, "\\", -1);
-            int index = 0;
-
-            if (tokens && tokens[index])
-            {
-                g_free(name);
-                while (tokens[index])
-                    name = tokens[index++];
-                name = g_strdup(name);
-            }
-
-            g_strfreev(tokens);
+            g_free(name);
+            while (tokens[index])
+                name = tokens[index++];
+            name = g_strdup(name);
         }
+
+        g_strfreev(tokens);
     }
 
-    if (fullname)
-        vmi_free_unicode_str(fullname);
+    return name;
+}
+
+char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath)
+{
+    unicode_string_t* fullname = win_get_process_full_name(drakvuf, eprocess_base);
+    char* name = win_get_process_name_impl(fullname, fullpath);
+    vmi_free_unicode_str(fullname);
+
+    if (!name)
+        name = vmi_read_str_va(drakvuf->vmi, eprocess_base + drakvuf->offsets[EPROCESS_PNAME], 0);
 
     return name;
 }
