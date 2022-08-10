@@ -242,6 +242,9 @@ struct drakvuf
     bool enable_cr3_based_interception;
     GSList* context_switch_intercept_processes;
 
+    // list of processes to be ignored
+    GSList* ignored_processes;
+
     GSList* event_fd_info;     // the list of registered event FDs
     struct pollfd* event_fds;  // auto-generated pollfd for poll()
     int event_fd_cnt;          // auto-generated for poll()
@@ -353,5 +356,7 @@ char* drakvuf_get_current_process_name(drakvuf_t drakvuf,
 
 int64_t drakvuf_get_current_process_userid(drakvuf_t drakvuf,
     drakvuf_trap_info_t* info);
+
+bool drakvuf_is_ignored_process(drakvuf_t drakvuf, vmi_pid_t pid);
 
 #endif

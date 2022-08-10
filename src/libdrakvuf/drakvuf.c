@@ -156,6 +156,7 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
     }
 
     g_rec_mutex_clear(&drakvuf->vmi_lock);
+    g_slist_free(drakvuf->ignored_processes);
     g_free(drakvuf->offsets);
     drakvuf->offsets = NULL;
     g_free(drakvuf->bitfields);
@@ -181,6 +182,7 @@ bool drakvuf_init(
     addr_t kpgd,
     bool fast_singlestep,
     uint64_t limited_traps_ttl,
+    GSList* ignored_processes,
     bool get_userid,
     bool enable_active_callback_check
 )
@@ -198,6 +200,9 @@ bool drakvuf_init(
     (*drakvuf)->libvmi_conf = libvmi_conf;
     (*drakvuf)->kpgd = kpgd;
     (*drakvuf)->enable_active_callback_check = enable_active_callback_check;
+
+    (*drakvuf)->ignored_processes = ignored_processes;
+    ignored_processes = NULL;
 
     if ( json_kernel_path )
         (*drakvuf)->json_kernel_path = g_strdup(json_kernel_path);
@@ -242,6 +247,7 @@ bool drakvuf_init(
     return 1;
 
 err:
+    g_slist_free(ignored_processes);
     drakvuf_close(*drakvuf, 1);
     *drakvuf = NULL;
 
@@ -1237,4 +1243,9 @@ void drakvuf_intercept_process_add(drakvuf_t drakvuf, char* process_name, vmi_pi
     process->pid = pid;
     process->strict = strict;
     drakvuf->context_switch_intercept_processes = g_slist_prepend(drakvuf->context_switch_intercept_processes, process);
+}
+
+bool drakvuf_is_ignored_process(drakvuf_t drakvuf, vmi_pid_t pid)
+{
+    return g_slist_find(drakvuf->ignored_processes, GUINT_TO_POINTER(pid)) != NULL;
 }
