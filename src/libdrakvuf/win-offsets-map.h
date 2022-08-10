@@ -125,6 +125,11 @@ static const char* win_offset_names[__WIN_OFFSETS_MAX][2] =
     [EPROCESS_WOW64PROCESS_WIN10] = { "_EPROCESS", "WoW64Process" },
     [EPROCESS_VADROOT] = { "_EPROCESS", "VadRoot" },
     [EPROCESS_LISTTHREADHEAD] = { "_EPROCESS", "ThreadListHead" },
+    [EPROCESS_SECTIONOBJECT] = { "_EPROCESS", "SectionObject" },
+
+    [SECTIONOBJECT_SEGMENT] = { "_SECTION_OBJECT", "Segment" },
+    [SECTION_CONTROLAREA] = { "_SECTION", "ControlArea" },
+    [SEGMENT_CONTROLAREA] = { "_SEGMENT", "ControlArea" },
 
     // Windows >=8 specific
     [RTL_AVL_TREE_ROOT] = { "_RTL_AVL_TREE", "Root"},

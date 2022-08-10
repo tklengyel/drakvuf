@@ -316,9 +316,35 @@ bool win_get_last_error(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint32_t* 
     return true;
 }
 
+static addr_t win_get_file_name_ptr_from_controlarea(drakvuf_t drakvuf, addr_t control_area)
+{
+    bool is32bit = (drakvuf_get_page_mode(drakvuf) != VMI_PM_IA32E);
+    addr_t ex_fast_ref_mask = is32bit ? ~7ULL : ~0xfULL;
+
+    ACCESS_CONTEXT(ctx,
+        .translate_mechanism = VMI_TM_PROCESS_PID,
+        .pid = 4
+    );
+
+    ctx.addr = control_area + drakvuf->offsets[CONTROL_AREA_FILEPOINTER];
+
+    addr_t file_object = 0;
+    if (vmi_read_addr(drakvuf->vmi, &ctx, &file_object) == VMI_SUCCESS)
+    {
+        // file_object is a special _EX_FAST_REF pointer,
+        // we need to explicitly clear low bits
+        file_object &= ex_fast_ref_mask;
+
+        if (file_object)
+            return file_object + drakvuf->offsets[FILEOBJECT_NAME];
+    }
+
+    return 0;
+}
+
 static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t eprocess_base)
 {
-    addr_t image_file_name_addr;
+    addr_t image_file_name_addr = 0;
     if ( vmi_read_addr_va(drakvuf->vmi,
             eprocess_base + drakvuf->offsets[EPROCESS_PROCCREATIONINFO] + drakvuf->offsets[PROCCREATIONINFO_IMAGEFILENAME],
             0, &image_file_name_addr) != VMI_SUCCESS )
@@ -327,8 +353,42 @@ static unicode_string_t* win_get_process_full_name(drakvuf_t drakvuf, addr_t epr
         return NULL;
     }
 
-    return drakvuf_read_unicode_va(drakvuf,
-            image_file_name_addr + drakvuf->offsets[OBJECTNAMEINFORMATION_NAME], 0);
+    if (image_file_name_addr)
+        return drakvuf_read_unicode_va(drakvuf,
+                image_file_name_addr + drakvuf->offsets[OBJECTNAMEINFORMATION_NAME], 0);
+    else
+    {
+        addr_t section_object = 0;
+        if ( vmi_read_addr_va(drakvuf->vmi,
+                eprocess_base + drakvuf->offsets[EPROCESS_SECTIONOBJECT],
+                0, &image_file_name_addr) == VMI_SUCCESS)
+        {
+            addr_t control_area = 0;
+            bool is_win7_win8 = vmi_get_winver( drakvuf->vmi ) <= VMI_OS_WINDOWS_8;
+            if (is_win7_win8)
+            {
+                addr_t segment = 0;
+                if ( vmi_read_addr_va(drakvuf->vmi,
+                        section_object + drakvuf->offsets[SECTIONOBJECT_SEGMENT],
+                        0, &segment) == VMI_SUCCESS)
+                {
+                    vmi_read_addr_va(drakvuf->vmi,
+                        segment + drakvuf->offsets[SEGMENT_CONTROLAREA],
+                        0, &control_area);
+                }
+            }
+            else
+            {
+                vmi_read_addr_va(drakvuf->vmi,
+                    section_object + drakvuf->offsets[SECTION_CONTROLAREA], 0, &control_area);
+            }
+
+            if (control_area)
+                return drakvuf_read_unicode_va(drakvuf, win_get_file_name_ptr_from_controlarea(drakvuf, control_area), 0);
+        }
+    }
+
+    return NULL;
 }
 
 char* win_get_process_name(drakvuf_t drakvuf, addr_t eprocess_base, bool fullpath)
@@ -1433,7 +1493,6 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
             uint32_t pool_tag;
             addr_t subsection;
             addr_t control_area;
-            addr_t file_object;
             addr_t segment;
             uint32_t ptes;
             addr_t prototype_pte;
@@ -1485,18 +1544,7 @@ bool win_find_mmvad(drakvuf_t drakvuf, addr_t eprocess, addr_t vaddr, mmvad_info
 
                     if (vmi_read_addr(drakvuf->vmi, &ctx, &control_area) == VMI_SUCCESS)
                     {
-                        ctx.addr = control_area + drakvuf->offsets[CONTROL_AREA_FILEPOINTER];
-
-                        if (vmi_read_addr(drakvuf->vmi, &ctx, &file_object) == VMI_SUCCESS)
-                        {
-                            // file_object is a special _EX_FAST_REF pointer, we need to explicitly clear low bits
-                            file_object &= (~0xFULL);
-
-                            if ((void*)file_object != NULL)
-                            {
-                                out_mmvad->file_name_ptr = (file_object + drakvuf->offsets[FILEOBJECT_NAME]);
-                            }
-                        }
+                        out_mmvad->file_name_ptr = win_get_file_name_ptr_from_controlarea(drakvuf, control_area);
 
                         ctx.addr = control_area + drakvuf->offsets[CONTROL_AREA_SEGMENT];
 
@@ -1572,7 +1620,6 @@ static bool win_traverse_mmvad_node(drakvuf_t drakvuf, addr_t node_addr, mmvad_c
     uint32_t pool_tag;
     addr_t subsection;
     addr_t control_area;
-    addr_t file_object;
     addr_t segment;
     uint32_t ptes;
     addr_t prototype_pte;
@@ -1627,18 +1674,7 @@ static bool win_traverse_mmvad_node(drakvuf_t drakvuf, addr_t node_addr, mmvad_c
 
             if (vmi_read_addr(drakvuf->vmi, &ctx, &control_area) == VMI_SUCCESS)
             {
-                ctx.addr = control_area + drakvuf->offsets[CONTROL_AREA_FILEPOINTER];
-
-                if (vmi_read_addr(drakvuf->vmi, &ctx, &file_object) == VMI_SUCCESS)
-                {
-                    // file_object is a special _EX_FAST_REF pointer, we need to explicitly clear low bits
-                    file_object &= (~0xFULL);
-
-                    if ((void*)file_object != NULL)
-                    {
-                        mmvad.file_name_ptr = (file_object + drakvuf->offsets[FILEOBJECT_NAME]);
-                    }
-                }
+                mmvad.file_name_ptr = win_get_file_name_ptr_from_controlarea(drakvuf, control_area);
 
                 // FIXME We could get this fields form MMVAD.FirstPrototypePte and MMVAD.LastPrototypePte
                 ctx.addr = control_area + drakvuf->offsets[CONTROL_AREA_SEGMENT];
