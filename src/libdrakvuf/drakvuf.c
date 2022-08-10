@@ -157,11 +157,18 @@ void drakvuf_close(drakvuf_t drakvuf, const bool pause)
 
     g_rec_mutex_clear(&drakvuf->vmi_lock);
     g_free(drakvuf->offsets);
+    drakvuf->offsets = NULL;
     g_free(drakvuf->bitfields);
+    drakvuf->bitfields = NULL;
     g_free(drakvuf->sizes);
+    drakvuf->sizes = NULL;
+    g_rec_mutex_clear(&drakvuf->vmi_lock);
     g_free(drakvuf->dom_name);
+    drakvuf->dom_name = NULL;
     g_free(drakvuf->json_kernel_path);
+    drakvuf->json_kernel_path = NULL;
     g_free(drakvuf->json_wow_path);
+    drakvuf->json_wow_path = NULL;
     g_free(drakvuf);
 }
 
